@@ -18,7 +18,9 @@ final class VehicleServiceJobCardLineModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-
+            'metadata' => 'array',
+            'is_combo_component' => 'boolean',
+            'requires_stock_movement' => 'boolean',
         ]);
     }
 }

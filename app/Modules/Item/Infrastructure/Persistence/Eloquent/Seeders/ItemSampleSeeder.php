@@ -44,8 +44,8 @@ final class ItemSampleSeeder extends Seeder
             $now = now();
             $hourUomId = $this->uomId($tenantId, 'Hour') ?? $eachUomId;
             $dayUomId = $this->uomId($tenantId, 'Day') ?? $eachUomId;
-            $boxUomId = $this->uomId($tenantId, 'Box');
-            $packUomId = $this->uomId($tenantId, 'Pack');
+            $boxUomId = $this->uomId($tenantId, 'Box') ?? $eachUomId;
+            $packUomId = $this->uomId($tenantId, 'Pack') ?? $eachUomId;
             $monthUomId = $this->uomId($tenantId, 'Month');
 
             $generalCategoryId = $this->ensureCategory($tenantId, $organizationUnitId, 'GENERAL', 'General');
@@ -64,13 +64,22 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => $brandId,
                     'item_type_id' => $this->itemTypeId('INVENTORY_PRODUCT'),
                     'base_uom_id' => $eachUomId,
-                    'default_receipt_uom_id' => $eachUomId,
+                    'default_receipt_uom_id' => $boxUomId,
                     'default_issue_uom_id' => $eachUomId,
                     'default_consumption_uom_id' => $eachUomId,
+                    'default_charge_uom_id' => $eachUomId,
                     'description' => 'Sample stock-tracked inventory product.',
                     'is_stockable' => true,
                     'is_purchasable' => true,
                     'is_sellable' => true,
+                    'valuation_method' => 'standard',
+                    'standard_cost' => '650.00',
+                    'minimum_stock' => '10.0000',
+                    'maximum_stock' => '250.0000',
+                    'reorder_point' => '25.0000',
+                    'reorder_quantity' => '50.0000',
+                    'safety_stock' => '5.0000',
+                    'lead_time_days' => 7,
                 ],
                 [
                     'sku' => 'ITM-SERVICE-001',
@@ -80,6 +89,8 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('SERVICE'),
                     'base_uom_id' => $hourUomId,
+                    'default_receipt_uom_id' => $hourUomId,
+                    'default_issue_uom_id' => $hourUomId,
                     'default_charge_uom_id' => $hourUomId,
                     'default_consumption_uom_id' => $hourUomId,
                     'description' => 'Sample service item with reusable service setup.',
@@ -96,6 +107,8 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('LABOUR'),
                     'base_uom_id' => $hourUomId,
+                    'default_receipt_uom_id' => $hourUomId,
+                    'default_issue_uom_id' => $hourUomId,
                     'default_charge_uom_id' => $hourUomId,
                     'default_consumption_uom_id' => $hourUomId,
                     'description' => 'Sample labour item.',
@@ -114,6 +127,8 @@ final class ItemSampleSeeder extends Seeder
                     'base_uom_id' => $eachUomId,
                     'default_receipt_uom_id' => $eachUomId,
                     'default_issue_uom_id' => $eachUomId,
+                    'default_consumption_uom_id' => $eachUomId,
+                    'default_charge_uom_id' => $eachUomId,
                     'description' => 'Sample non-inventory item.',
                     'is_stockable' => false,
                     'is_chargeable' => true,
@@ -126,8 +141,13 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('COMBO'),
                     'base_uom_id' => $eachUomId,
+                    'default_receipt_uom_id' => $eachUomId,
+                    'default_issue_uom_id' => $eachUomId,
+                    'default_consumption_uom_id' => $eachUomId,
                     'default_charge_uom_id' => $eachUomId,
                     'description' => 'Sample combo item with persisted component setup.',
+                    'is_purchasable' => false,
+                    'is_sellable' => true,
                     'is_chargeable' => true,
                 ],
                 [
@@ -138,6 +158,9 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('RENTAL_CHARGE'),
                     'base_uom_id' => $dayUomId,
+                    'default_receipt_uom_id' => $dayUomId,
+                    'default_issue_uom_id' => $dayUomId,
+                    'default_consumption_uom_id' => $dayUomId,
                     'default_charge_uom_id' => $dayUomId,
                     'description' => 'Sample rental charge item with reusable charge setup.',
                     'is_rentable' => true,
@@ -203,20 +226,34 @@ final class ItemSampleSeeder extends Seeder
 
             $comboItemId = $this->itemId($tenantId, 'ITM-BUNDLE-001');
             $filterItemId = $this->itemId($tenantId, 'ITM-FILTER-001');
+            $serviceItemId = $this->itemId($tenantId, 'ITM-SERVICE-001');
+            $labourItemId = $this->itemId($tenantId, 'ITM-LABOUR-001');
+            $shopSupplyItemId = $this->itemId($tenantId, 'ITM-SHOPSUPPLY-001');
             $rentalChargeItemId = $this->itemId($tenantId, 'ITM-RENTAL-DAY-001');
 
             if ($filterItemId !== null) {
-                if ($boxUomId !== null) {
-                    $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $boxUomId, $eachUomId, '12', 'UNIT');
-                }
+                $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $boxUomId, $eachUomId, '12', 'UNIT');
+                $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $packUomId, $eachUomId, '6', 'UNIT');
+            }
 
-                if ($packUomId !== null) {
-                    $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $packUomId, $eachUomId, '6', 'UNIT');
+            foreach ([$serviceItemId, $labourItemId] as $timeItemId) {
+                if ($timeItemId !== null && $dayUomId !== $hourUomId) {
+                    $this->ensureItemConversion($tenantId, $organizationUnitId, $timeItemId, $dayUomId, $hourUomId, '8', 'TIME');
                 }
             }
 
-            if ($rentalChargeItemId !== null && $monthUomId !== null) {
-                $this->ensureItemConversion($tenantId, $organizationUnitId, $rentalChargeItemId, $monthUomId, $dayUomId, '30', 'TIME');
+            if ($shopSupplyItemId !== null && $packUomId !== $eachUomId) {
+                $this->ensureItemConversion($tenantId, $organizationUnitId, $shopSupplyItemId, $packUomId, $eachUomId, '10', 'UNIT');
+            }
+
+            if ($rentalChargeItemId !== null) {
+                if ($dayUomId !== $hourUomId) {
+                    $this->ensureItemConversion($tenantId, $organizationUnitId, $rentalChargeItemId, $dayUomId, $hourUomId, '24', 'TIME');
+                }
+
+                if ($monthUomId !== null) {
+                    $this->ensureItemConversion($tenantId, $organizationUnitId, $rentalChargeItemId, $monthUomId, $dayUomId, '30', 'TIME');
+                }
             }
 
             if ($comboItemId !== null && $filterItemId !== null && Schema::hasTable('combo_items')) {
@@ -262,6 +299,39 @@ final class ItemSampleSeeder extends Seeder
                         'updated_at' => $now,
                     ],
                 );
+
+                foreach ([
+                    [$serviceItemId, 'AUTOERP-SERVICE-GENERAL'],
+                    [$labourItemId, 'AUTOERP-LABOUR-HOUR'],
+                    [$shopSupplyItemId, 'AUTOERP-SHOP-SUPPLY'],
+                    [$comboItemId, 'AUTOERP-BUNDLE-BASIC'],
+                    [$rentalChargeItemId, 'AUTOERP-RENTAL-DAY'],
+                ] as [$itemId, $identifierValue]) {
+                    if ($itemId === null) {
+                        continue;
+                    }
+
+                    DB::table('item_identifiers')->updateOrInsert(
+                        ['tenant_id' => $tenantId, 'value' => $identifierValue],
+                        [
+                            'row_version' => 1,
+                            'organization_unit_id' => $organizationUnitId,
+                            'metadata' => json_encode(['seed_source' => 'item_sample']),
+                            'item_id' => $itemId,
+                            'variant_id' => null,
+                            'batch_id' => null,
+                            'serial_id' => null,
+                            'technology' => 'internal_code',
+                            'format' => 'text',
+                            'gs1_company_prefix' => null,
+                            'gs1_application_identifiers' => null,
+                            'is_primary' => true,
+                            'is_active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ],
+                    );
+                }
             }
 
             if ($filterItemId !== null && Schema::hasTable('item_attributes') && Schema::hasTable('item_variants')) {
@@ -383,7 +453,7 @@ final class ItemSampleSeeder extends Seeder
         string $factor,
         string $category,
     ): void {
-        if (! Schema::hasTable('uom_conversions')) {
+        if (! Schema::hasTable('uom_conversions') || $fromUomId === $toUomId) {
             return;
         }
 

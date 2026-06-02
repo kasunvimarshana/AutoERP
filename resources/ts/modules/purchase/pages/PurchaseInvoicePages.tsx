@@ -19,7 +19,7 @@ import {
     PurchaseWorkflowActions,
 } from '../components/PurchaseComponents';
 import { purchaseApi } from '../services/purchaseApi';
-import type { PurchaseAuditEntry, PurchaseInvoice, PurchasePayment, PurchaseReturn } from '../types/purchase.types';
+import type { PurchaseAuditEntry, PurchaseFinancePostingPreview, PurchaseInvoice, PurchasePayment, PurchaseReturn } from '../types/purchase.types';
 
 export function PurchaseInvoiceListPage() {
     const [rows, setRows] = useState<PurchaseInvoice[]>([]);
@@ -72,6 +72,8 @@ export function PurchaseInvoiceDetailPage() {
     const [payments, setPayments] = useState<PurchasePayment[]>([]);
     const [returns, setReturns] = useState<PurchaseReturn[]>([]);
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
+    const [financePreview, setFinancePreview] = useState<PurchaseFinancePostingPreview>();
+    const [tabError, setTabError] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
@@ -85,19 +87,24 @@ export function PurchaseInvoiceDetailPage() {
 
     useEffect(() => {
         let active = true;
+        setTabError('');
 
         if (activeTab === 'payments' && payments.length === 0) {
-            purchaseApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data));
+            purchaseApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data)).catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load payments.'));
         } else if (activeTab === 'returns' && returns.length === 0) {
-            purchaseApi.returns.list({ perPage: 25 }).then((response) => active && setReturns(response.data));
+            purchaseApi.returns.list({ perPage: 25 }).then((response) => active && setReturns(response.data)).catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load returns.'));
         } else if (activeTab === 'history' && history.length === 0) {
-            setHistory([]);
+            purchaseApi.invoices.history(id).then((response) => active && setHistory(response.data)).catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load invoice history.'));
+        } else if (activeTab === 'finance' && !financePreview && invoice?.sourceType && invoice.sourceId && ['grn_header', 'purchase_order', 'purchase_return'].includes(invoice.sourceType)) {
+            purchaseApi.previews.financePosting(invoice.sourceType as 'grn_header' | 'purchase_order' | 'purchase_return', invoice.sourceId)
+                .then((response) => active && setFinancePreview(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load finance preview.'));
         }
 
         return () => {
             active = false;
         };
-    }, [activeTab, history.length, payments.length, returns.length]);
+    }, [activeTab, financePreview, history.length, id, invoice?.sourceId, invoice?.sourceType, payments.length, returns.length]);
 
     if (!invoice) {
         return <EmptyState description="Loading supplier invoice details..." title="Loading" />;
@@ -106,11 +113,12 @@ export function PurchaseInvoiceDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                actions={<Link to={`/purchase/invoices/${invoice.id}/edit`}><Button variant="secondary">Edit</Button></Link>}
+                actions={<Button disabled title="Supplier invoice editing is source-scoped in the current backend. Use matching/correction flows from the source document." variant="secondary">Edit</Button>}
                 eyebrow="Supplier Invoice"
                 subtitle="Invoice detail with calculation preview, source matching, document, payment allocation, AP posting, returns, and audit."
                 title={invoice.invoiceNumber}
             />
+            {tabError ? <EmptyState description={tabError} title="Purchase invoice tab unavailable" /> : null}
             <Tabs
                 active={activeTab}
                 items={[
@@ -126,13 +134,13 @@ export function PurchaseInvoiceDetailPage() {
                 ]}
                 onChange={setActiveTab}
             />
-            {activeTab === 'overview' ? <PurchaseWorkflowActions entityId={invoice.id} entityType="purchase_invoice" status={invoice.status} /> : null}
+            {activeTab === 'overview' ? <PurchaseWorkflowActions entityId={invoice.id} entityType="purchase_invoice" sourceId={invoice.sourceId} sourceType={invoice.sourceType} status={invoice.status} /> : null}
             {activeTab === 'lines' ? <PurchaseInvoiceLineTable rows={invoice.lines} /> : null}
             {activeTab === 'calculation' ? <PurchaseInvoiceCalculationPanel /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={invoice.sourceReference} /> : null}
-            {activeTab === 'document' ? <PurchaseInvoiceDocumentPanel /> : null}
+            {activeTab === 'document' ? <PurchaseInvoiceDocumentPanel invoice={invoice} /> : null}
             {activeTab === 'payments' ? <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === invoice.supplierId)} /> : null}
-            {activeTab === 'finance' ? <EmptyState description="Posting preview requires a persisted purchase source context. Backend invoice detail is source-scoped." title="Finance preview unavailable" /> : null}
+            {activeTab === 'finance' ? financePreview ? <PurchaseFinancePostingPanel preview={financePreview} /> : <EmptyState description="Direct Document invoices do not expose the Purchase workflow finance preview endpoint. Source-backed invoices preview through their PO/GRN/return source." title="Finance preview unavailable" /> : null}
             {activeTab === 'returns' ? <PurchaseReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}
             {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
         </div>

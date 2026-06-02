@@ -16,7 +16,7 @@ import {
     PurchaseWorkflowActions,
 } from '../components/PurchaseComponents';
 import { purchaseApi } from '../services/purchaseApi';
-import type { GoodsReceivedNote, PurchaseAuditEntry, PurchaseInvoice } from '../types/purchase.types';
+import type { GoodsReceivedNote, PurchaseAuditEntry, PurchaseInventoryEffect, PurchaseInvoice } from '../types/purchase.types';
 
 export function GrnListPage() {
     const [rows, setRows] = useState<GoodsReceivedNote[]>([]);
@@ -92,13 +92,36 @@ export function GrnDetailPage() {
     const [grn, setGrn] = useState<GoodsReceivedNote>();
     const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
+    const [inventoryEffects, setInventoryEffects] = useState<PurchaseInventoryEffect[]>([]);
+    const [tabError, setTabError] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        purchaseApi.grns.get(id).then((response) => setGrn(response.data));
-        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
-        purchaseApi.grns.history(id).then((response) => setHistory(response.data)).catch(() => setHistory([]));
+        let active = true;
+        purchaseApi.grns.get(id).then((response) => active && setGrn(response.data));
+        return () => { active = false; };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+        setTabError('');
+
+        if (activeTab === 'inventory' && inventoryEffects.length === 0) {
+            purchaseApi.previews.inventoryEffect('grn_header', id)
+                .then((response) => active && setInventoryEffects(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load GRN inventory preview.'));
+        } else if (activeTab === 'invoices' && invoices.length === 0) {
+            purchaseApi.invoices.list({ perPage: 25 })
+                .then((response) => active && setInvoices(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load linked invoices.'));
+        } else if (activeTab === 'history' && history.length === 0) {
+            purchaseApi.grns.history(id)
+                .then((response) => active && setHistory(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load GRN history.'));
+        }
+
+        return () => { active = false; };
+    }, [activeTab, history.length, id, inventoryEffects.length, invoices.length]);
 
     if (!grn) {
         return <EmptyState description="Loading GRN details..." title="Loading" />;
@@ -107,6 +130,7 @@ export function GrnDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to={`/purchase/grns/${grn.id}/edit`}><Button variant="secondary">Edit</Button></Link>} eyebrow="Goods Receipt Note" subtitle="GRN detail with received lines, source PO, inventory effect, invoices, and audit." title={grn.grnNumber} />
+            {tabError ? <EmptyState description={tabError} title="GRN tab unavailable" /> : null}
             <Tabs
                 active={activeTab}
                 items={[
@@ -123,7 +147,7 @@ export function GrnDetailPage() {
             {activeTab === 'overview' ? <PurchaseWorkflowActions entityId={grn.id} entityType="grn_header" status={grn.status} /> : null}
             {activeTab === 'lines' ? <GrnLineTable rows={grn.lines} /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={grn.sourcePo} /> : null}
-            {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={[]} /> : null}
+            {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={inventoryEffects} /> : null}
             {activeTab === 'invoices' ? <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === grn.grnNumber || invoice.sourceReference === grn.id)} /> : null}
             {activeTab === 'documents' ? <PurchaseSourceReferencePanel reference={grn.grnNumber} /> : null}
             {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}

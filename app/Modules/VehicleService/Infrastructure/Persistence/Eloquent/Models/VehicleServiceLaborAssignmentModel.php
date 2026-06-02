@@ -18,7 +18,7 @@ final class VehicleServiceLaborAssignmentModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-
+            'metadata' => 'array',
         ]);
     }
 }

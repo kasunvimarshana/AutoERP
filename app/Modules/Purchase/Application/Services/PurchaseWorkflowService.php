@@ -792,6 +792,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            if (($payload['preview_only'] ?? false) === true) {
+                return Result::success($this->buildInventoryPreviewRows($entityType, $record, $lineRecords, $tenantId));
+            }
 
             return $this->withinEntityTransaction($entityType, function () use (
                 $lineRecords,
@@ -944,6 +947,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     PurchaseErrorCode::INVALID_VALUE,
                     'Cannot post finance for cancelled/reversed entities.',
                 ));
+            }
+
+            if (($payload['preview_only'] ?? false) === true) {
+                return Result::success($this->buildFinancePreview($entityType, $record));
             }
 
             $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
@@ -1151,6 +1158,84 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    /**
+     * @param list<DataRecord> $lineRecords
+     * @return list<array<string, mixed>>
+     */
+    private function buildInventoryPreviewRows(string $entityType, DataRecord $record, array $lineRecords, int $tenantId): array
+    {
+        $rows = [];
+        $sourceReference = $this->sourceReference($entityType, $record);
+
+        foreach ($lineRecords as $line) {
+            $quantity = $entityType === 'purchase_return'
+                ? (float) $line->get('return_qty', 0)
+                : (float) $line->get('received_qty', $line->get('ordered_qty', 0));
+
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            $itemId = (int) $line->get('item_id', 0);
+            $item = $itemId > 0 ? $this->itemRepository->findByIdInTenant($itemId, $tenantId) : null;
+            $direction = $entityType === 'purchase_return' ? 'OUT' : 'IN';
+            $decision = $direction === 'IN' ? 'increase_stock' : 'decrease_stock';
+
+            $rows[] = [
+                'decision' => $decision,
+                'item' => $item instanceof DataRecord
+                    ? trim((string) ($item->get('sku') ?? $item->get('code') ?? '') . ' ' . (string) $item->get('name', ''))
+                    : 'Item #' . $itemId,
+                'quantity_effect' => $direction . ' ' . number_format($quantity, 4, '.', ''),
+                'source_reference' => $sourceReference,
+                'warehouse' => 'Warehouse #' . (int) ($line->get('warehouse_id') ?? $record->get('warehouse_id', 0)),
+                'decision_code' => $decision,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return array<string, mixed> */
+    private function buildFinancePreview(string $entityType, DataRecord $record): array
+    {
+        $amount = match ($entityType) {
+            'purchase_order' => (float) $record->get('grand_total', $record->get('total_amount', 0)),
+            'grn_header' => (float) $record->get('total_amount', $record->get('grand_total', 0)),
+            'purchase_return' => (float) $record->get('return_total', $record->get('total_amount', 0)),
+            default => 0.0,
+        };
+
+        $formattedAmount = number_format($amount, 4, '.', '');
+
+        return [
+            'calculated' => [
+                'apImpact' => $entityType === 'purchase_return' ? '-' . $formattedAmount : $formattedAmount,
+                'eligibility' => 'Preview only. Posting still requires Finance module entry_payload and lines_payload.',
+                'journalImpact' => 'Backend Finance mapping required for authoritative journal lines.',
+                'taxImpact' => number_format((float) $record->get('tax_amount', 0), 4, '.', ''),
+            ],
+            'lines' => [
+                [
+                    'account' => 'Backend account mapping',
+                    'credit' => $entityType === 'purchase_return' ? '0.0000' : $formattedAmount,
+                    'debit' => $entityType === 'purchase_return' ? $formattedAmount : '0.0000',
+                    'description' => $this->sourceReference($entityType, $record),
+                ],
+            ],
+        ];
+    }
+
+    private function sourceReference(string $entityType, DataRecord $record): string
+    {
+        return match ($entityType) {
+            'purchase_order' => (string) $record->get('po_number', 'Purchase order #' . $record->id()),
+            'grn_header' => (string) $record->get('grn_number', 'GRN #' . $record->id()),
+            'purchase_return' => (string) $record->get('return_number', 'Purchase return #' . $record->id()),
+            default => (string) $record->id(),
+        };
     }
 
     private function findEntity(string $entityType, int|string $id): ?DataRecord

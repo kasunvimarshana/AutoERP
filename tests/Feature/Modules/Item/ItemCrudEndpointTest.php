@@ -274,6 +274,60 @@ final class ItemCrudEndpointTest extends TestCase
             ->assertJsonValidationErrors(['name', 'base_uom_id']);
     }
 
+    public function test_item_uom_setup_keeps_configured_defaults_when_context_flags_are_missing(): void
+    {
+        [$tenantId, , $headers] = $this->authenticatedHeaders();
+
+        $categoryId = (int) DB::table('item_categories')
+            ->where('tenant_id', $tenantId)
+            ->where('code', 'GENERAL')
+            ->value('id');
+        $uomId = (int) DB::table('unit_of_measures')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'Each')
+            ->value('id');
+        $itemTypeId = (int) DB::table('item_types')
+            ->whereNull('tenant_id')
+            ->where('code', 'INVENTORY_PRODUCT')
+            ->value('id');
+
+        $createResponse = $this->withHeaders($headers)->postJson('/api/item/items', [
+            'base_uom_id' => $uomId,
+            'category_id' => $categoryId,
+            'default_receipt_uom_id' => $uomId,
+            'item_type_id' => $itemTypeId,
+            'name' => 'Purchase UOM Fallback Item',
+            'sku' => 'ITM-UOM-FALLBACK',
+            'status' => 'ACTIVE',
+            'type' => 'inventory_product',
+            'is_stockable' => true,
+            'is_purchasable' => true,
+            'is_sellable' => true,
+        ]);
+
+        $createResponse->assertCreated();
+
+        $itemId = (int) $createResponse->json('data.id');
+
+        DB::table('unit_of_measures')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $uomId)
+            ->update(['usable_for_purchase' => false]);
+
+        $response = $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/uom-setup?context=purchase')
+            ->assertOk()
+            ->assertJsonPath('data.default_uom.id', $uomId)
+            ->assertJsonPath('data.default_uom.is_default_for_context', true);
+
+        $allowedUomIds = collect($response->json('data.allowed_uoms'))
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $this->assertContains($uomId, $allowedUomIds);
+    }
+
     /**
      * @return array{0:int,1:int,2:array<string,string>}
      */

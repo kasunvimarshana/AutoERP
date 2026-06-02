@@ -16,7 +16,7 @@ import {
     SupplierRefundPanel,
 } from '../components/PurchaseComponents';
 import { purchaseApi } from '../services/purchaseApi';
-import type { PurchaseAuditEntry, PurchaseReturn, SupplierRefund } from '../types/purchase.types';
+import type { PurchaseAuditEntry, PurchaseFinancePostingPreview, PurchaseInventoryEffect, PurchaseReturn, SupplierRefund } from '../types/purchase.types';
 
 export function PurchaseReturnListPage() {
     const [rows, setRows] = useState<PurchaseReturn[]>([]);
@@ -91,13 +91,41 @@ export function PurchaseReturnDetailPage() {
     const [record, setRecord] = useState<PurchaseReturn>();
     const [refunds, setRefunds] = useState<SupplierRefund[]>([]);
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
+    const [financePreview, setFinancePreview] = useState<PurchaseFinancePostingPreview>();
+    const [inventoryEffects, setInventoryEffects] = useState<PurchaseInventoryEffect[]>([]);
+    const [tabError, setTabError] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        purchaseApi.returns.get(id).then((response) => setRecord(response.data));
-        purchaseApi.refunds.list().then((response) => setRefunds(response.data));
-        setHistory([]);
+        let active = true;
+        purchaseApi.returns.get(id).then((response) => active && setRecord(response.data));
+        return () => { active = false; };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+        setTabError('');
+
+        if (activeTab === 'inventory' && inventoryEffects.length === 0) {
+            purchaseApi.previews.inventoryEffect('purchase_return', id)
+                .then((response) => active && setInventoryEffects(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load return inventory preview.'));
+        } else if (activeTab === 'finance' && !financePreview) {
+            purchaseApi.previews.financePosting('purchase_return', id)
+                .then((response) => active && setFinancePreview(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load return finance preview.'));
+        } else if (activeTab === 'refunds' && refunds.length === 0) {
+            purchaseApi.refunds.list()
+                .then((response) => active && setRefunds(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load supplier refunds.'));
+        } else if (activeTab === 'history' && history.length === 0) {
+            purchaseApi.returns.history(id)
+                .then((response) => active && setHistory(response.data))
+                .catch((caught: unknown) => active && setTabError(caught instanceof Error ? caught.message : 'Unable to load return history.'));
+        }
+
+        return () => { active = false; };
+    }, [activeTab, financePreview, history.length, id, inventoryEffects.length, refunds.length]);
 
     if (!record) {
         return <EmptyState description="Loading purchase return details..." title="Loading" />;
@@ -106,6 +134,7 @@ export function PurchaseReturnDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Purchase Return" subtitle="Return detail with source, inventory effect, AP effect, refunds, and audit." title={record.returnNumber} />
+            {tabError ? <EmptyState description={tabError} title="Purchase return tab unavailable" /> : null}
             <Tabs
                 active={activeTab}
                 items={[
@@ -122,8 +151,8 @@ export function PurchaseReturnDetailPage() {
             {activeTab === 'overview' ? <PurchaseReturnTable rows={[record]} /> : null}
             {activeTab === 'lines' ? <PurchaseReturnLineTable rows={record.lines} /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={record.sourceReference} /> : null}
-            {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={[]} /> : null}
-            {activeTab === 'finance' ? <EmptyState description="Return finance preview requires a backend preview endpoint before AP effects can be displayed." title="Finance preview unavailable" /> : null}
+            {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={inventoryEffects} /> : null}
+            {activeTab === 'finance' ? financePreview ? <PurchaseFinancePostingPanel preview={financePreview} /> : <EmptyState description="Return finance preview is loaded from the Purchase workflow backend when this tab is opened." title="Finance preview unavailable" /> : null}
             {activeTab === 'refunds' ? <SupplierRefundPanel refunds={refunds.filter((refund) => refund.sourceReference === record.returnNumber || refund.sourceReference === record.id)} /> : null}
             {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
         </div>

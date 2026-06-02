@@ -8,7 +8,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import {
     PurchaseActivityTimeline,
     PurchaseAdvancePanel,
-    PurchaseFinancePostingPanel,
     PurchasePaymentAllocationPanel,
     PurchasePaymentForm,
     PurchasePaymentTable,
@@ -74,12 +73,37 @@ export function PurchasePaymentDetailPage() {
     const { id = 'pay-001' } = useParams();
     const [payment, setPayment] = useState<PurchasePayment>();
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
+    const [actionMessage, setActionMessage] = useState('');
+    const [isActing, setIsActing] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        purchaseApi.payments.get(id).then((response) => setPayment(response.data));
+        let active = true;
+        purchaseApi.payments.get(id).then((response) => active && setPayment(response.data));
         setHistory([]);
+        return () => { active = false; };
     }, [id]);
+
+    async function runAction(action: 'post' | 'reverse' | 'void'): Promise<void> {
+        setIsActing(true);
+        setActionMessage('');
+        try {
+            if (action === 'post') {
+                await purchaseApi.payments.post(id);
+            } else if (action === 'void') {
+                await purchaseApi.payments.void(id);
+            } else {
+                await purchaseApi.payments.reverse(id);
+            }
+            const response = await purchaseApi.payments.get(id);
+            setPayment(response.data);
+            setActionMessage(`${action} requested from backend.`);
+        } catch (caught) {
+            setActionMessage(caught instanceof Error ? caught.message : 'Payment action failed.');
+        } finally {
+            setIsActing(false);
+        }
+    }
 
     if (!payment) {
         return <EmptyState description="Loading supplier payment details..." title="Loading" />;
@@ -87,7 +111,19 @@ export function PurchasePaymentDetailPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<Button variant="blue">Backend Actions</Button>} eyebrow="Supplier Payment" subtitle="Payment detail with allocation, source invoice, finance posting, and history." title={payment.paymentNumber} />
+            <PageHeader
+                actions={(
+                    <div className="flex flex-wrap gap-2">
+                        <Button disabled={isActing} onClick={() => void runAction('post')} variant="blue">Post</Button>
+                        <Button disabled={isActing} onClick={() => void runAction('void')} variant="secondary">Void</Button>
+                        <Button disabled={isActing} onClick={() => void runAction('reverse')} variant="secondary">Reverse</Button>
+                    </div>
+                )}
+                eyebrow="Supplier Payment"
+                subtitle="Payment detail with allocation, source invoice, finance posting, and history."
+                title={payment.paymentNumber}
+            />
+            {actionMessage ? <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">{actionMessage}</div> : null}
             <Tabs
                 active={activeTab}
                 items={[
@@ -103,7 +139,7 @@ export function PurchasePaymentDetailPage() {
             {activeTab === 'allocations' ? <PurchasePaymentAllocationPanel allocations={payment.allocations} /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={payment.reference} /> : null}
             {activeTab === 'finance' ? <EmptyState description="Payment posting preview is exposed through the generic Payment/Finance modules and is not duplicated in Purchase." title="Finance preview unavailable" /> : null}
-            {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
+            {activeTab === 'history' ? history.length ? <PurchaseActivityTimeline rows={history} /> : <EmptyState description="Purchase payment history is owned by the Payment module and is not exposed by the current Purchase API route." title="No payment history endpoint" /> : null}
         </div>
     );
 }

@@ -8,6 +8,7 @@ use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseDocumen
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseDocumentSequenceSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseDocumentTypesSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseDocumentWorkflowSeeder;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseSampleSeeder;
 
 class PurchaseModuleSeeder extends Seeder
 {
@@ -19,6 +20,7 @@ class PurchaseModuleSeeder extends Seeder
             PurchaseDocumentDefinitionsSeeder::class,
             PurchaseDocumentWorkflowSeeder::class,
             PurchaseDocumentSequenceSeeder::class,
+            PurchaseSampleSeeder::class,
         ]);
     }
 }

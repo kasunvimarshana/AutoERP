@@ -16,7 +16,11 @@ export type DocumentRecord = {
     dueDate: string;
     grandTotal: string;
     id: string;
+    items: DocumentLine[];
     notes: string;
+    ownerId?: string;
+    partyId?: string;
+    sourceId?: string;
     sourceModule: DocumentSourceModule;
     sourceReference: string;
     sourceType: string;
@@ -89,6 +93,7 @@ export type DocumentTemplate = {
 
 export type DocumentLine = {
     description: string;
+    discountAmount: string;
     displayOrder: number;
     documentId: string;
     id: string;
@@ -99,6 +104,7 @@ export type DocumentLine = {
     quantity: string;
     sourceLineId?: string;
     sourceLineType?: string;
+    taxAmount: string;
     unitPrice: string;
     uomLabel: string;
 };
@@ -253,4 +259,28 @@ export type DocumentTemplateFormInput = {
     isActive: boolean;
     layoutType: DocumentTemplate['layoutType'];
     name: string;
+};
+
+export type DocumentCreateItemInput = {
+    data?: Record<string, unknown>;
+    description?: string;
+    itemType: string;
+    lineTotal: string | number;
+};
+
+export type DocumentCreateInput = {
+    data?: Record<string, unknown>;
+    documentDate: string;
+    documentDefinitionId?: string;
+    documentTypeId: string;
+    dueDate?: string;
+    items: DocumentCreateItemInput[];
+    notes?: string;
+    ownerId?: string;
+    partyId?: string;
+    sourceId?: string;
+    sourceModule?: string;
+    sourceReference?: string;
+    sourceType?: string;
+    title?: string;
 };

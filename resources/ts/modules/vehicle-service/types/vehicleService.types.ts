@@ -259,6 +259,7 @@ export type VehicleServiceLookupOption = {
 
 export type VehicleServiceJobCardLineFormInput = {
     accountId?: string;
+    clientKey: string;
     description: string;
     discountType?: string;
     discountValue?: string;
@@ -274,6 +275,18 @@ export type VehicleServiceJobCardLineFormInput = {
     warehouseId?: string;
 };
 
+export type VehicleServiceLabourAssignmentFormInput = {
+    clientKey: string;
+    employeeId: string;
+    hoursWorked: string;
+    laborItemClientKey?: string;
+    laborItemId?: string;
+    notes: string;
+    quantity: string;
+    role: string;
+    status: string;
+};
+
 export type VehicleServiceJobCardFormInput = {
     billingCustomerId: string;
     billingCustomerName?: string;
@@ -285,6 +298,7 @@ export type VehicleServiceJobCardFormInput = {
     headerTaxGroupId?: string;
     initialDiagnosis: string;
     jobCardNumber: string;
+    labourAssignments: VehicleServiceLabourAssignmentFormInput[];
     laborItems: VehicleServiceJobCardLineFormInput[];
     lines: VehicleServiceJobCardLineFormInput[];
     nextServiceDate: string;

@@ -116,7 +116,7 @@ export type Item = {
 export type ItemUnit = {
     id: string;
     isBase: boolean;
-    purpose: 'base' | 'charge' | 'consumption' | 'issue' | 'receipt';
+    purpose: 'allowed' | 'base' | 'charge' | 'consumption' | 'issue' | 'receipt';
     unit: string;
 };
 

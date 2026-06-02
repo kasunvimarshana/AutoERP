@@ -455,9 +455,9 @@ export const salesApi = {
             return { data: response.data.map((item) => normalizeLookup(item.id, item.code, item.name, 'Item')) };
         },
         itemUoms: async (itemId: string) => {
-            const response = await itemApi.getItemUnits(itemId);
+            const response = await itemApi.getItemUnits(itemId, 'sales');
             return {
-                data: response.data.map((unit) => ({ id: unit.id, label: unit.unit, secondary: unit.purpose })).filter((unit) => unit.id && !unit.id.startsWith('base-uom')),
+                data: response.data.map((unit) => ({ id: unit.id, label: unit.unit, secondary: unit.purpose })).filter((unit) => unit.id && unit.label !== 'Not configured' && !unit.id.endsWith('-uom')),
             };
         },
         uoms: async () => {

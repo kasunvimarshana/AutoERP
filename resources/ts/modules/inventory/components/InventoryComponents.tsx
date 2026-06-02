@@ -507,7 +507,7 @@ function useItemUomOptions(context: 'inventory') {
 
                 setUoms(mapped);
                 setUomId(defaultOption?.id ?? '');
-                setError(mapped.length === 0 ? 'No UOM configured for this item.' : '');
+                setError(mapped.length === 0 ? 'This item has no inventory UOM returned by Item setup.' : '');
             })
             .catch((caught: unknown) => {
                 if (!mounted) return;

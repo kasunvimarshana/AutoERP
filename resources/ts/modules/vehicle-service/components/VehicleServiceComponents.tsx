@@ -23,6 +23,7 @@ import type {
     VehicleServiceJobCardFormInput,
     VehicleServiceJobCardLine,
     VehicleServiceJobCardLineFormInput,
+    VehicleServiceLabourAssignmentFormInput,
     VehicleServiceLineType,
     VehicleServiceLookupOption,
     VehicleServicePayment,
@@ -39,8 +40,13 @@ function optionList(options: VehicleServiceLookupOption[]) {
     return options.map((option) => ({ label: option.secondary ? `${option.label} (${option.secondary})` : option.label, value: option.id }));
 }
 
+function clientKey(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function emptyLine(lineType: VehicleServiceLineType): VehicleServiceJobCardLineFormInput {
     return {
+        clientKey: clientKey(lineType),
         description: '',
         itemId: '',
         lineType,
@@ -59,8 +65,9 @@ function emptyForm(): VehicleServiceJobCardFormInput {
         expectedCompletion: '',
         initialDiagnosis: '',
         jobCardNumber: '',
+        labourAssignments: [],
         laborItems: [],
-        lines: [emptyLine('spare_part')],
+        lines: [],
         nextServiceDate: '',
         nonInventoryItems: [],
         notes: '',
@@ -94,7 +101,18 @@ function formFromJobCard(jobCard: VehicleServiceJobCard): VehicleServiceJobCardF
             .filter((line) => line.lineType !== 'labour' && line.lineType !== 'non_inventory')
             .map(lineToInput),
         laborItems: jobCard.lines.filter((line) => line.lineType === 'labour').map(lineToInput),
+        labourAssignments: jobCard.labourAssignments.map((assignment) => ({
+            clientKey: assignment.id,
+            employeeId: '',
+            hoursWorked: '',
+            laborItemId: '',
+            notes: '',
+            quantity: '1',
+            role: assignment.assignmentType,
+            status: assignment.status,
+        })),
         nextServiceDate: jobCard.nextServiceDate,
+        nonInventoryItems: jobCard.lines.filter((line) => line.lineType === 'non_inventory').map(lineToInput),
         odometer: jobCard.odometer,
         openedAt: jobCard.openedAt,
         payerId: jobCard.partyContext.payer.id ?? '',
@@ -109,6 +127,7 @@ function formFromJobCard(jobCard: VehicleServiceJobCard): VehicleServiceJobCardF
 
 function lineToInput(line: VehicleServiceJobCardLine): VehicleServiceJobCardLineFormInput {
     return {
+        clientKey: line.id || clientKey(line.lineType),
         description: line.description,
         id: line.id,
         itemId: line.itemId ?? '',
@@ -262,6 +281,8 @@ export function JobCardTable({ rows }: { rows: VehicleServiceJobCard[] }) {
 }
 
 function LineEditor({
+    allowedLineTypes,
+    itemContext,
     items,
     line,
     loadItems,
@@ -269,14 +290,18 @@ function LineEditor({
     onChange,
     warehouses,
 }: {
+    allowedLineTypes: VehicleServiceLineType[];
+    itemContext: 'service-lines' | 'non-inventory' | 'labour';
     items: VehicleServiceLookupOption[];
     line: VehicleServiceJobCardLineFormInput;
-    loadItems: () => void;
+    loadItems: (context: 'service-lines' | 'non-inventory' | 'labour', search?: string) => void;
     loadWarehouses: () => void;
     onChange: (line: VehicleServiceJobCardLineFormInput) => void;
     warehouses: VehicleServiceLookupOption[];
 }) {
     const [uoms, setUoms] = useState<VehicleServiceLookupOption[]>([]);
+    const [comboComponents, setComboComponents] = useState<VehicleServiceLookupOption[]>([]);
+    const [itemSearch, setItemSearch] = useState('');
 
     useEffect(() => {
         if (!line.itemId) {
@@ -304,15 +329,54 @@ function LineEditor({
         };
     }, [line.itemId]);
 
+    useEffect(() => {
+        if (!line.itemId || line.lineType !== 'combo') {
+            setComboComponents([]);
+            return;
+        }
+
+        let active = true;
+        vehicleServiceApi.lookups.comboComponents(line.itemId)
+            .then((response) => {
+                if (active) setComboComponents(response.data);
+            })
+            .catch(() => {
+                if (active) setComboComponents([]);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [line.itemId, line.lineType]);
+
     return (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[150px_1fr_100px_130px_120px_1fr]">
-            <Select onChange={(event) => onChange({ ...line, lineType: event.target.value as VehicleServiceLineType, requiresStockMovement: event.target.value === 'spare_part' })} options={Object.entries(lineTypeLabels).map(([value, label]) => ({ label, value }))} value={line.lineType} />
-            <Select onFocus={loadItems} onMouseDown={loadItems} onChange={(event) => onChange({ ...line, itemId: event.target.value, uomId: '' })} options={optionList(items)} placeholder="Select item/service" value={line.itemId} />
+            <Select onChange={(event) => onChange({ ...line, lineType: event.target.value as VehicleServiceLineType, requiresStockMovement: event.target.value === 'spare_part' })} options={allowedLineTypes.map((value) => ({ label: lineTypeLabels[value], value }))} value={line.lineType} />
+            <div className="space-y-2">
+                <Input onChange={(event) => {
+                    setItemSearch(event.target.value);
+                    loadItems(itemContext, event.target.value);
+                }} onFocus={() => loadItems(itemContext, itemSearch)} placeholder="Search item" value={itemSearch} />
+                <Select onFocus={() => loadItems(itemContext, itemSearch)} onMouseDown={() => loadItems(itemContext, itemSearch)} onChange={(event) => onChange({ ...line, itemId: event.target.value, uomId: '' })} options={optionList(items)} placeholder="Select item/service" value={line.itemId} />
+            </div>
             <Input min="0.0001" onChange={(event) => onChange({ ...line, quantity: event.target.value })} type="number" value={line.quantity} />
             <Select disabled={!line.itemId} onChange={(event) => onChange({ ...line, uomId: event.target.value })} options={optionList(uoms)} placeholder={line.itemId ? 'Item UOM' : 'Select item first'} value={line.uomId} />
             <Input min="0" onChange={(event) => onChange({ ...line, unitPrice: event.target.value })} type="number" value={line.unitPrice} />
             <Select onFocus={loadWarehouses} onMouseDown={loadWarehouses} onChange={(event) => onChange({ ...line, warehouseId: event.target.value })} options={optionList(warehouses)} placeholder="Warehouse" value={line.warehouseId ?? ''} />
             <div className="md:col-span-6"><Textarea onChange={(event) => onChange({ ...line, description: event.target.value })} placeholder="Line notes" value={line.description} /></div>
+            {line.lineType === 'combo' && comboComponents.length ? (
+                <div className="md:col-span-6 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                    <p className="font-semibold">Backend combo components</p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        {comboComponents.map((component) => (
+                            <div className="rounded border border-blue-100 bg-white px-3 py-2" key={`combo-component-${line.clientKey}-${component.id}`}>
+                                <span className="font-semibold">{component.label}</span>
+                                {component.secondary ? <span className="ml-2 text-blue-700">{component.secondary}</span> : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -320,7 +384,11 @@ function LineEditor({
 function useLookups() {
     const [customers, setCustomers] = useState<VehicleServiceLookupOption[]>([]);
     const [employees, setEmployees] = useState<VehicleServiceLookupOption[]>([]);
-    const [items, setItems] = useState<VehicleServiceLookupOption[]>([]);
+    const [items, setItems] = useState<Record<'service-lines' | 'non-inventory' | 'labour', VehicleServiceLookupOption[]>>({
+        labour: [],
+        'non-inventory': [],
+        'service-lines': [],
+    });
     const [serviceTypes, setServiceTypes] = useState<VehicleServiceLookupOption[]>([]);
     const [vehicles, setVehicles] = useState<VehicleServiceLookupOption[]>([]);
     const [warehouses, setWarehouses] = useState<VehicleServiceLookupOption[]>([]);
@@ -331,25 +399,37 @@ function useLookups() {
         mountedRef.current = false;
     }, []);
 
-    const load = useCallback(async (name: 'customers' | 'employees' | 'items' | 'serviceTypes' | 'vehicles' | 'warehouses') => {
-        if (loadingRef.current.has(name)) return;
+    const load = useCallback(async (name: 'customers' | 'employees' | 'items' | 'serviceTypes' | 'vehicles' | 'warehouses', context: 'service-lines' | 'non-inventory' | 'labour' = 'service-lines', search = '') => {
+        const key = name === 'items' || name === 'employees' ? `${name}:${context}:${search.trim()}` : name;
+        if (loadingRef.current.has(key)) return;
 
         let shouldLoad = false;
-        const stateLengths = { customers, employees, items, serviceTypes, vehicles, warehouses };
-        shouldLoad = stateLengths[name].length === 0;
+        if (name === 'items') {
+            shouldLoad = search.trim() !== '' || items[context].length === 0;
+        } else if (name === 'customers') {
+            shouldLoad = customers.length === 0;
+        } else if (name === 'employees') {
+            shouldLoad = employees.length === 0;
+        } else if (name === 'serviceTypes') {
+            shouldLoad = serviceTypes.length === 0;
+        } else if (name === 'vehicles') {
+            shouldLoad = vehicles.length === 0;
+        } else {
+            shouldLoad = warehouses.length === 0;
+        }
         if (!shouldLoad) return;
 
-        loadingRef.current.add(name);
+        loadingRef.current.add(key);
         try {
             if (name === 'customers') {
                 const response = await vehicleServiceApi.lookups.customers();
                 if (mountedRef.current) setCustomers((current) => current.length ? current : response.data);
             } else if (name === 'employees') {
-                const response = await vehicleServiceApi.lookups.employees();
-                if (mountedRef.current) setEmployees((current) => current.length ? current : response.data);
+                const response = await vehicleServiceApi.lookups.employees(search);
+                if (mountedRef.current) setEmployees((current) => search.trim() === '' && current.length ? current : response.data);
             } else if (name === 'items') {
-                const response = await vehicleServiceApi.lookups.items();
-                if (mountedRef.current) setItems((current) => current.length ? current : response.data);
+                const response = await vehicleServiceApi.lookups.items(context, search);
+                if (mountedRef.current) setItems((current) => search.trim() === '' && current[context].length ? current : { ...current, [context]: response.data });
             } else if (name === 'serviceTypes') {
                 const response = await vehicleServiceApi.serviceTypes.list({ per_page: 25 });
                 if (mountedRef.current) setServiceTypes((current) => current.length ? current : response.data.map((serviceType) => ({ id: serviceType.id, label: `${serviceType.code} - ${serviceType.name}` })));
@@ -361,7 +441,7 @@ function useLookups() {
                 if (mountedRef.current) setWarehouses((current) => current.length ? current : response.data);
             }
         } finally {
-            loadingRef.current.delete(name);
+            loadingRef.current.delete(key);
         }
     }, [customers, employees, items, serviceTypes, vehicles, warehouses]);
 
@@ -375,6 +455,7 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
     const [activeTab, setActiveTab] = useState('intake');
     const [error, setError] = useState<string>();
     const [errors, setErrors] = useState<Record<string, string[]>>({});
+    const [employeeSearch, setEmployeeSearch] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -382,24 +463,6 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             setForm(formFromJobCard(jobCard));
         }
     }, [jobCard?.id]);
-
-    useEffect(() => {
-        if (activeTab === 'intake') {
-            void lookups.load('serviceTypes');
-            void lookups.load('customers');
-            void lookups.load('vehicles');
-            void lookups.load('employees');
-            void lookups.load('warehouses');
-        }
-        if (activeTab === 'lines' || activeTab === 'labour') {
-            void lookups.load('items');
-            void lookups.load('warehouses');
-        }
-        if (activeTab === 'review') {
-            void lookups.load('customers');
-            void lookups.load('vehicles');
-        }
-    }, [activeTab, lookups]);
 
     async function submit(event: FormEvent): Promise<void> {
         event.preventDefault();
@@ -431,11 +494,51 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
         setForm((current) => ({ ...current, [group]: [...current[group], emptyLine(lineType)] }));
     }
 
+    function removeLine(group: 'lines' | 'laborItems' | 'nonInventoryItems', index: number): void {
+        setForm((current) => ({
+            ...current,
+            [group]: current[group].filter((_, currentIndex) => currentIndex !== index),
+        }));
+    }
+
+    function setAssignmentForLine(line: VehicleServiceJobCardLineFormInput, patch: Partial<VehicleServiceLabourAssignmentFormInput>): void {
+        setForm((current) => {
+            const existingIndex = current.labourAssignments.findIndex((assignment) => (
+                assignment.laborItemId === line.id || assignment.laborItemClientKey === line.clientKey
+            ));
+            const base: VehicleServiceLabourAssignmentFormInput = existingIndex >= 0
+                ? current.labourAssignments[existingIndex]
+                : {
+                    clientKey: clientKey('assignment'),
+                    employeeId: '',
+                    hoursWorked: '',
+                    laborItemClientKey: line.clientKey,
+                    laborItemId: line.id,
+                    notes: '',
+                    quantity: line.quantity || '1',
+                    role: 'technician',
+                    status: 'assigned',
+                };
+            const next = { ...base, ...patch };
+
+            return {
+                ...current,
+                labourAssignments: existingIndex >= 0
+                    ? current.labourAssignments.map((assignment, index) => index === existingIndex ? next : assignment)
+                    : [...current.labourAssignments, next],
+            };
+        });
+    }
+
+    const assignmentForLine = useCallback((line: VehicleServiceJobCardLineFormInput): VehicleServiceLabourAssignmentFormInput | undefined => (
+        form.labourAssignments.find((assignment) => assignment.laborItemId === line.id || assignment.laborItemClientKey === line.clientKey)
+    ), [form.labourAssignments]);
+
     const tabs = [
-        { label: 'Header / Vehicle & Customer', value: 'intake' },
-        { label: 'Service & Parts', value: 'lines' },
-        { label: 'Labour / Technicians', value: 'labour' },
-        { label: 'Review', value: 'review' },
+        { label: 'Header Details', value: 'intake' },
+        { label: 'Items / Service Lines', value: 'lines' },
+        { label: 'Non-Inventory Items', value: 'non_inventory' },
+        { label: 'Labour Assignments', value: 'labour' },
     ];
 
     return (
@@ -446,9 +549,9 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             </Card>
 
             {activeTab === 'intake' ? (
-                <FormSection description="Customer, vehicle, party roles, sequence and tenant rules are validated by backend." title="Intake & Header">
+                <FormSection description="Customer, vehicle, billing party and workflow defaults are validated by backend. Leave job card number blank for backend sequence generation." title="Header Details">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field error={errors.job_card_number} label="Job card number"><Input onChange={(event) => setForm((current) => ({ ...current, jobCardNumber: event.target.value }))} placeholder="Leave blank to generate temporary draft number" value={form.jobCardNumber} /></Field>
+                        <Field error={errors.job_card_number} label="Job card number"><Input onChange={(event) => setForm((current) => ({ ...current, jobCardNumber: event.target.value }))} placeholder="Backend generated if blank" value={form.jobCardNumber} /></Field>
                         <Field error={errors.service_type_id} label="Service type"><Select onFocus={() => void lookups.load('serviceTypes')} onMouseDown={() => void lookups.load('serviceTypes')} onChange={(event) => setForm((current) => ({ ...current, serviceTypeId: event.target.value }))} options={optionList(lookups.serviceTypes)} placeholder="Select type" value={form.serviceTypeId} /></Field>
                         <Field error={errors.service_customer_id ?? errors.linked_customer_id} label="Service customer"><Select onFocus={() => void lookups.load('customers')} onMouseDown={() => void lookups.load('customers')} onChange={(event) => setForm((current) => ({ ...current, serviceCustomerId: event.target.value, billingCustomerId: current.billingCustomerId || event.target.value, payerId: current.payerId || event.target.value }))} options={optionList(lookups.customers)} placeholder="Select service customer" value={form.serviceCustomerId} /></Field>
                         <Field error={errors.billing_customer_id} label="Billing customer"><Select onFocus={() => void lookups.load('customers')} onMouseDown={() => void lookups.load('customers')} onChange={(event) => setForm((current) => ({ ...current, billingCustomerId: event.target.value }))} options={optionList(lookups.customers)} placeholder="May differ from service customer" value={form.billingCustomerId} /></Field>
@@ -467,41 +570,94 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             ) : null}
 
             {activeTab === 'lines' ? (
-                <FormSection description="Frontend collects item, quantity, UOM and rate. Backend owns price/tax/discount/UOM/stock effects." title="Service, Parts and Non-Inventory Lines">
+                <FormSection description="Add stock products, spare parts, service work, labour-capable items and backend-defined combo packages. Backend owns price, tax, UOM, stock effects and combo expansion." title="Items / Service Lines">
                     <div className="space-y-3">
-                        {form.lines.map((line, index) => <LineEditor items={lookups.items} key={`service-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('lines', index, next)} warehouses={lookups.warehouses} />)}
-                        {form.nonInventoryItems.map((line, index) => <LineEditor items={lookups.items} key={`non-inventory-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('nonInventoryItems', index, next)} warehouses={lookups.warehouses} />)}
+                        {form.lines.map((line, index) => (
+                            <div className="space-y-2" key={`service-line-${line.clientKey}`}>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-bold text-slate-800">Line {index + 1}</p>
+                                    <Button onClick={() => removeLine('lines', index)} type="button" variant="secondary">Remove</Button>
+                                </div>
+                                <LineEditor allowedLineTypes={['spare_part', 'service', 'labour', 'combo']} itemContext={line.lineType === 'labour' ? 'labour' : 'service-lines'} items={line.lineType === 'labour' ? lookups.items.labour : lookups.items['service-lines']} line={line} loadItems={(context) => void lookups.load('items', context)} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => {
+                                    const normalized = { ...next, requiresStockMovement: next.lineType === 'spare_part' };
+                                    if (normalized.lineType === 'labour') {
+                                        setForm((current) => ({
+                                            ...current,
+                                            laborItems: [...current.laborItems, { ...normalized, lineType: 'labour', requiresStockMovement: false }],
+                                            lines: current.lines.filter((_, currentIndex) => currentIndex !== index),
+                                        }));
+                                        return;
+                                    }
+                                    updateLine('lines', index, normalized);
+                                }} warehouses={lookups.warehouses} />
+                            </div>
+                        ))}
+                        {form.laborItems.map((line, index) => (
+                            <div className="space-y-2" key={`labour-line-${line.clientKey}`}>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-bold text-slate-800">Labour-capable line {index + 1}</p>
+                                    <Button onClick={() => removeLine('laborItems', index)} type="button" variant="secondary">Remove</Button>
+                                </div>
+                                <LineEditor allowedLineTypes={['labour']} itemContext="labour" items={lookups.items.labour} line={line} loadItems={(context) => void lookups.load('items', context)} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('laborItems', index, { ...next, lineType: 'labour', requiresStockMovement: false })} warehouses={lookups.warehouses} />
+                            </div>
+                        ))}
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={() => addLine('lines', 'service')} type="button" variant="secondary">Add Service</Button>
-                            <Button onClick={() => addLine('lines', 'spare_part')} type="button" variant="secondary">Add Part</Button>
-                            <Button onClick={() => addLine('nonInventoryItems', 'non_inventory')} type="button" variant="secondary">Add Non-Inventory</Button>
+                            <Button onClick={() => addLine('lines', 'spare_part')} type="button" variant="secondary">Add Product / Part</Button>
+                            <Button onClick={() => addLine('lines', 'service')} type="button" variant="secondary">Add Service Item</Button>
+                            <Button onClick={() => addLine('laborItems', 'labour')} type="button" variant="secondary">Add Labour Item</Button>
+                            <Button onClick={() => addLine('lines', 'combo')} type="button" variant="secondary">Add Combo Package</Button>
                         </div>
                     </div>
                 </FormSection>
             ) : null}
 
-            {activeTab === 'labour' ? (
-                <FormSection description="Labour items are persisted as backend labour rows. Technician assignment is managed from the job detail page." title="Labour Items">
+            {activeTab === 'non_inventory' ? (
+                <FormSection description="Add billable charges that do not affect stock. Inventory products are excluded from this selector and backend validation still owns eligibility." title="Non-Inventory Items">
                     <div className="space-y-3">
-                        {form.laborItems.map((line, index) => <LineEditor items={lookups.items} key={`labour-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('laborItems', index, { ...next, lineType: 'labour', requiresStockMovement: false })} warehouses={lookups.warehouses} />)}
-                        <Button onClick={() => addLine('laborItems', 'labour')} type="button" variant="secondary">Add Labour</Button>
+                        {form.nonInventoryItems.map((line, index) => (
+                            <div className="space-y-2" key={`non-inventory-line-${line.clientKey}`}>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-bold text-slate-800">Charge {index + 1}</p>
+                                    <Button onClick={() => removeLine('nonInventoryItems', index)} type="button" variant="secondary">Remove</Button>
+                                </div>
+                                <LineEditor allowedLineTypes={['non_inventory']} itemContext="non-inventory" items={lookups.items['non-inventory']} line={line} loadItems={(context) => void lookups.load('items', context)} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('nonInventoryItems', index, { ...next, lineType: 'non_inventory', requiresStockMovement: false })} warehouses={lookups.warehouses} />
+                            </div>
+                        ))}
+                        <Button onClick={() => addLine('nonInventoryItems', 'non_inventory')} type="button" variant="secondary">Add Non-Inventory Charge</Button>
                     </div>
                 </FormSection>
             ) : null}
 
-            {activeTab === 'review' ? (
-                <div className="grid gap-5 xl:grid-cols-3">
-                    <PreviewPanel rows={[
-                        { label: 'Service customer', value: labelFor(lookups.customers, form.serviceCustomerId) ?? 'Not selected' },
-                        { label: 'Billing customer', value: labelFor(lookups.customers, form.billingCustomerId) ?? 'Not selected' },
-                        { label: 'Vehicle', value: labelFor(lookups.vehicles, form.vehicleId) ?? 'Not selected' },
-                        { label: 'Lines', value: String(form.lines.length + form.laborItems.length + form.nonInventoryItems.length) },
-                    ]} status="Backend save" title="Draft Summary" />
-                    <PreviewPanel rows={[
-                        { label: 'Stock preview', value: 'Use detail workflow after saving; backend posts stock effects.' },
-                        { label: 'Invoice preview', value: 'Backend preview available after job card is saved.' },
-                    ]} status="Backend-owned" title="Preview Contracts" />
-                </div>
+            {activeTab === 'labour' ? (
+                <FormSection description="Only labour-capable rows appear here. Product, stock and ordinary non-inventory rows are intentionally hidden from technician assignment." title="Labour Assignments">
+                    <div className="space-y-3">
+                        {form.laborItems.length === 0 ? (
+                            <Card className="p-4 text-sm font-semibold text-slate-600">Add a labour item or save a combo package with labour components before assigning technicians.</Card>
+                        ) : null}
+                        {form.laborItems.map((line, index) => {
+                            const assignment = assignmentForLine(line);
+                            return (
+                                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_1fr_120px_120px_1fr]" key={`assignment-${line.clientKey}`}>
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Labour row</p>
+                                        <p className="mt-1 font-semibold text-slate-900">{labelFor(lookups.items.labour, line.itemId) ?? (line.description || `Labour line ${index + 1}`)}</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Input onChange={(event) => {
+                                            setEmployeeSearch(event.target.value);
+                                            void lookups.load('employees', 'service-lines', event.target.value);
+                                        }} onFocus={() => void lookups.load('employees', 'service-lines', employeeSearch)} placeholder="Search technician" value={employeeSearch} />
+                                        <Select onFocus={() => void lookups.load('employees', 'service-lines', employeeSearch)} onMouseDown={() => void lookups.load('employees', 'service-lines', employeeSearch)} onChange={(event) => setAssignmentForLine(line, { employeeId: event.target.value })} options={optionList(lookups.employees)} placeholder="Technician / Employee" value={assignment?.employeeId ?? ''} />
+                                    </div>
+                                    <Input min="0" onChange={(event) => setAssignmentForLine(line, { hoursWorked: event.target.value })} placeholder="Hours" type="number" value={assignment?.hoursWorked ?? ''} />
+                                    <Input min="0.0001" onChange={(event) => setAssignmentForLine(line, { quantity: event.target.value })} placeholder="Qty" type="number" value={assignment?.quantity ?? line.quantity} />
+                                    <Select onChange={(event) => setAssignmentForLine(line, { role: event.target.value })} options={[{ label: 'Technician', value: 'technician' }, { label: 'Lead technician', value: 'lead' }, { label: 'Assistant', value: 'assistant' }, { label: 'Supervisor', value: 'supervisor' }]} value={assignment?.role ?? 'technician'} />
+                                    <div className="md:col-span-5"><Textarea onChange={(event) => setAssignmentForLine(line, { notes: event.target.value })} placeholder="Assignment notes" value={assignment?.notes ?? ''} /></div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </FormSection>
             ) : null}
 
             <div className="flex justify-end gap-2">
@@ -728,7 +884,6 @@ export function PaymentCreateForm() {
     const navigate = useNavigate();
     const [form, setForm] = useState<VehicleServicePaymentFormInput>({ amount: '', documentId: '', documentType: 'document', jobCardId: '', paymentId: '' });
     const [jobs, setJobs] = useState<VehicleServiceJobCard[]>([]);
-    const [preview, setPreview] = useState<VehicleServicePayment>();
     const [error, setError] = useState<string>();
     const [saving, setSaving] = useState(false);
 
@@ -773,11 +928,9 @@ export function PaymentCreateForm() {
                     <Field label="Amount"><Input onChange={(event) => update('amount', event.target.value)} type="number" value={form.amount} /></Field>
                 </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
-                    <Button onClick={() => setPreview(vehicleServiceApi.payments.previewAllocation(form).data)} type="button" variant="secondary">Preview Allocation Contract</Button>
                     <Button disabled={saving} type="submit" variant="blue">{saving ? 'Allocating...' : 'Allocate Payment'}</Button>
                 </div>
             </FormSection>
-            {preview ? <ServicePaymentPanel payments={[preview]} /> : null}
         </form>
     );
 }

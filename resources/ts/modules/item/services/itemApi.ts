@@ -593,21 +593,74 @@ export const itemApi = {
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
-    getItemUnits: async (itemId: string): Promise<ApiCollectionResponse<ItemUnit>> => {
-        const setup = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`);
-        const allowedUoms = Array.isArray(setup.data.allowed_uoms) ? setup.data.allowed_uoms.map((row) => normalizeUom(row as BackendRecord)) : [];
+    getItemUnits: async (itemId: string, context?: string): Promise<ApiCollectionResponse<ItemUnit>> => {
+        const setup = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`, {
+            query: context ? { context } : undefined,
+        });
+        const rawAllowedUoms = Array.isArray(setup.data.allowed_uoms) ? setup.data.allowed_uoms.map((row) => row as BackendRecord) : [];
+        const allowedUoms = rawAllowedUoms.map(normalizeUom);
         const uomMap = new Map(allowedUoms.map((uom) => [uom.id, uom]));
         const baseUomId = asOptionalString(setup.data.base_uom_id);
-        const units: ItemUnit[] = [
-            { id: baseUomId ?? 'base-uom', isBase: true, purpose: 'base', unit: baseUomId ? uomMap.get(baseUomId)?.label ?? 'Configured base UOM' : 'Not configured' },
-            { id: asString(setup.data.default_receipt_uom_id), isBase: false, purpose: 'receipt', unit: setup.data.default_receipt_uom_id ? uomMap.get(asString(setup.data.default_receipt_uom_id))?.label ?? 'Configured receipt UOM' : 'Not configured' },
-            { id: asString(setup.data.default_issue_uom_id), isBase: false, purpose: 'issue', unit: setup.data.default_issue_uom_id ? uomMap.get(asString(setup.data.default_issue_uom_id))?.label ?? 'Configured issue UOM' : 'Not configured' },
-            { id: asString(setup.data.default_consumption_uom_id), isBase: false, purpose: 'consumption', unit: setup.data.default_consumption_uom_id ? uomMap.get(asString(setup.data.default_consumption_uom_id))?.label ?? 'Configured consumption UOM' : 'Not configured' },
-            { id: asString(setup.data.default_charge_uom_id), isBase: false, purpose: 'charge', unit: setup.data.default_charge_uom_id ? uomMap.get(asString(setup.data.default_charge_uom_id))?.label ?? 'Configured charge UOM' : 'Not configured' },
-        ];
+        const unitsById = new Map<string, ItemUnit>();
+        const contextPurpose = (raw: BackendRecord): ItemUnit['purpose'] => {
+            if (asBool(raw.is_base)) {
+                return 'base';
+            }
+
+            if (asBool(raw.is_default_for_context)) {
+                switch (asString(setup.data.context ?? context).toLowerCase()) {
+                    case 'purchase':
+                        return 'receipt';
+                    case 'sales':
+                        return 'issue';
+                    case 'inventory':
+                    case 'service':
+                    case 'vehicle_service':
+                        return 'consumption';
+                    case 'pricing':
+                    case 'rental':
+                    case 'vehicle_rental':
+                        return 'charge';
+                    default:
+                        return 'allowed';
+                }
+            }
+
+            return 'allowed';
+        };
+        const addUnit = (unit: ItemUnit): void => {
+            const existing = unitsById.get(unit.id);
+            if (!existing || existing.unit.startsWith('Configured') || existing.unit === 'Not configured') {
+                unitsById.set(unit.id, unit);
+            }
+        };
+        const addConfiguredUnit = (id: string | undefined, purpose: ItemUnit['purpose'], fallback: string, isBase = false): void => {
+            addUnit({
+                id: id || `${purpose}-uom`,
+                isBase,
+                purpose,
+                unit: id ? uomMap.get(id)?.label ?? fallback : 'Not configured',
+            });
+        };
+
+        addConfiguredUnit(baseUomId, 'base', 'Configured base UOM', true);
+        addConfiguredUnit(asOptionalString(setup.data.default_receipt_uom_id), 'receipt', 'Configured receipt UOM');
+        addConfiguredUnit(asOptionalString(setup.data.default_issue_uom_id), 'issue', 'Configured issue UOM');
+        addConfiguredUnit(asOptionalString(setup.data.default_consumption_uom_id), 'consumption', 'Configured consumption UOM');
+        addConfiguredUnit(asOptionalString(setup.data.default_charge_uom_id), 'charge', 'Configured charge UOM');
+
+        rawAllowedUoms.forEach((raw) => {
+            const uom = normalizeUom(raw);
+            addUnit({
+                id: uom.id,
+                isBase: uom.isBase || asBool(raw.is_base),
+                purpose: contextPurpose(raw),
+                unit: uom.label,
+            });
+        });
 
         return {
-            data: units.map((unit, index) => ({ ...unit, id: unit.id || `${itemId}-uom-${index}` })),
+            data: Array.from(unitsById.values()).map((unit, index) => ({ ...unit, id: unit.id || `${itemId}-uom-${index}` })),
         };
     },
     getItemUsage: async (itemId: string): Promise<ApiResponse<ItemUsageSummary>> => {

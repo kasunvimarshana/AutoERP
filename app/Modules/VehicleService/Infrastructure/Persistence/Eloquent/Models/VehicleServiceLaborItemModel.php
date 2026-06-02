@@ -18,7 +18,10 @@ final class VehicleServiceLaborItemModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-
+            'metadata' => 'array',
+            'is_combo_component' => 'boolean',
+            'requires_assignment' => 'boolean',
+            'is_billable' => 'boolean',
         ]);
     }
 }

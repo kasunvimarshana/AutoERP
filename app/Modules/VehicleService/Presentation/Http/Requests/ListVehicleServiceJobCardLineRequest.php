@@ -21,6 +21,8 @@ final class ListVehicleServiceJobCardLineRequest extends FormRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'job_card_id' => ['nullable', 'integer', 'min:1', 'exists:vehicle_service_job_cards,id'],
+            'line_type' => ['nullable', 'string', 'max:80'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('vehicle_service.pagination.max_per_page', 200)],
         ];

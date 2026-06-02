@@ -7,8 +7,10 @@ namespace Modules\VehicleService\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Result;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceManagementServiceInterface;
+use Modules\VehicleService\Presentation\Http\Resources\VehicleServiceJobCardResource;
 
 final class VehicleServiceManagementController extends Controller
 {
@@ -131,6 +133,20 @@ final class VehicleServiceManagementController extends Controller
             return response()->json(['message' => $error->message], $statusCode);
         }
 
-        return response()->json(['data' => $result->valueOrFail()]);
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    private function normalizeResponseValue(mixed $value): mixed
+    {
+        if (! $value instanceof DataRecord) {
+            return $value;
+        }
+
+        $payload = $value->toArray();
+        if (array_key_exists('job_card_number', $payload)) {
+            return (new VehicleServiceJobCardResource($value))->resolve(request());
+        }
+
+        return $payload;
     }
 }

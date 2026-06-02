@@ -130,7 +130,7 @@ function useItemUomLookup(context: string, initialItemId = '', initialUomId = ''
 
                 setUoms(rows);
                 setUomId(existingStillValid ? initialUomId : (defaultOption?.id ?? ''));
-                setMessage(rows.length === 0 ? 'No UOM configured for this item.' : '');
+                setMessage(rows.length === 0 ? 'This item has no pricing UOM returned by Item setup.' : '');
             })
             .catch((error: unknown) => {
                 if (!mounted) return;

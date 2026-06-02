@@ -24,7 +24,7 @@ import {
     VehicleServiceWorkflowActions,
 } from '../components/VehicleServiceComponents';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
-import type { VehicleServiceJobCard } from '../types/vehicleService.types';
+import type { VehicleServiceAuditEntry, VehicleServiceCalculationPreview, VehicleServiceDiagnostic, VehicleServiceInspection, VehicleServiceJobCard } from '../types/vehicleService.types';
 
 const detailTabs = [
     { label: 'Overview', value: 'overview' },
@@ -42,6 +42,10 @@ const detailTabs = [
 export function JobCardDetailPage() {
     const { id = '' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
+    const [audit, setAudit] = useState<VehicleServiceAuditEntry[]>([]);
+    const [diagnostics, setDiagnostics] = useState<VehicleServiceDiagnostic[]>([]);
+    const [inspections, setInspections] = useState<VehicleServiceInspection[]>([]);
+    const [invoicePreview, setInvoicePreview] = useState<VehicleServiceCalculationPreview>();
     const [jobCard, setJobCard] = useState<VehicleServiceJobCard>();
     const [error, setError] = useState<string>();
 
@@ -58,6 +62,43 @@ export function JobCardDetailPage() {
     useEffect(() => {
         reload();
     }, [id]);
+
+    useEffect(() => {
+        if (!id) {
+            return;
+        }
+
+        let active = true;
+        if (activeTab === 'diagnostics' && diagnostics.length === 0) {
+            vehicleServiceApi.diagnostics.list(id).then((response) => {
+                if (active) setDiagnostics(response.data);
+            }).catch(() => undefined);
+        } else if (activeTab === 'inspections' && inspections.length === 0) {
+            vehicleServiceApi.inspections.list(id).then((response) => {
+                if (active) setInspections(response.data);
+            }).catch(() => undefined);
+        } else if ((activeTab === 'history' || activeTab === 'audit') && audit.length === 0) {
+            vehicleServiceApi.jobCards.history(id).then((response) => {
+                if (active) setAudit(response.data);
+            }).catch(() => undefined);
+        } else if (activeTab === 'invoice' && !invoicePreview) {
+            vehicleServiceApi.invoices.preview(id).then((preview) => {
+                if (active) {
+                    setInvoicePreview({
+                        breakdown: preview.breakdown.map((row) => ({ label: String(row.label), value: String(row.value) })),
+                        calculated: preview.calculated,
+                        errors: preview.errors,
+                        input: preview.input as Record<string, unknown>,
+                        warnings: preview.warnings,
+                    });
+                }
+            }).catch(() => undefined);
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [activeTab, audit.length, diagnostics.length, id, inspections.length, invoicePreview]);
 
     if (error) {
         return <EmptyState description={error} title="Job card unavailable" />;
@@ -120,13 +161,13 @@ export function JobCardDetailPage() {
 
             {activeTab === 'lines' ? <div className="space-y-5"><JobCardLineTable rows={jobCard.lines} /><SparePartsSection lines={jobCard.lines} /><NonInventoryItemsSection lines={jobCard.lines} /><CustomerSuppliedItemsSection lines={jobCard.lines} /><ExternalServicesSection lines={jobCard.lines} /></div> : null}
             {activeTab === 'labour' ? <LabourAssignmentPanel jobCard={jobCard} /> : null}
-            {activeTab === 'diagnostics' ? <DiagnosticsPanel rows={jobCard.diagnostics} /> : null}
-            {activeTab === 'inspections' ? <InspectionPanel rows={jobCard.inspections} /> : null}
+            {activeTab === 'diagnostics' ? <DiagnosticsPanel rows={diagnostics} /> : null}
+            {activeTab === 'inspections' ? <InspectionPanel rows={inspections} /> : null}
             {activeTab === 'inventory' ? <StockAvailabilityPanel jobCard={jobCard} /> : null}
-            {activeTab === 'invoice' ? <div className="space-y-5"><ServiceInvoicePreviewPanel jobCard={jobCard} /><ServicePaymentPanel payments={jobCard.payments} /><VehicleServiceFinancePostingPanel jobCard={jobCard} /></div> : null}
+            {activeTab === 'invoice' ? <div className="space-y-5"><ServiceInvoicePreviewPanel jobCard={invoicePreview ? { ...jobCard, invoicePreview } : jobCard} /><ServicePaymentPanel payments={jobCard.payments} /><VehicleServiceFinancePostingPanel jobCard={jobCard} /></div> : null}
             {activeTab === 'documents' ? <ServiceInvoiceDocumentPanel jobCard={jobCard} /> : null}
-            {activeTab === 'history' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
-            {activeTab === 'audit' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
+            {activeTab === 'history' ? <VehicleServiceActivityTimeline rows={audit} /> : null}
+            {activeTab === 'audit' ? <VehicleServiceActivityTimeline rows={audit} /> : null}
         </div>
     );
 }

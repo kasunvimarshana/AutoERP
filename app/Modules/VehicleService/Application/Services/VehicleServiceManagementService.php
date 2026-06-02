@@ -18,6 +18,7 @@ use Modules\VehicleService\Application\Repositories\VehicleServiceJobCustomerSup
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobExternalServiceRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface;
+use Modules\VehicleService\Application\Repositories\VehicleServiceLaborAssignmentRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceLaborItemRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceNonInventoryItemRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceSettingRepositoryInterface;
@@ -30,6 +31,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         private readonly VehicleServiceJobCardRepositoryInterface $jobCardRepository,
         private readonly VehicleServiceJobCardLineRepositoryInterface $jobCardLineRepository,
         private readonly VehicleServiceLaborItemRepositoryInterface $laborItemRepository,
+        private readonly VehicleServiceLaborAssignmentRepositoryInterface $laborAssignmentRepository,
         private readonly VehicleServiceNonInventoryItemRepositoryInterface $nonInventoryItemRepository,
         private readonly VehicleServiceJobExternalServiceRepositoryInterface $externalServiceRepository,
         private readonly VehicleServiceJobCustomerSuppliedItemRepositoryInterface $customerSuppliedItemRepository,
@@ -45,6 +47,12 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         try {
             return $this->jobCardRepository->transaction(function () use ($id, $payload): Result {
                 $headerPayload = $this->applyPartyContextDefaults($this->extractHeaderPayload($payload));
+                if ($id === null && trim((string) ($headerPayload['job_card_number'] ?? '')) === '') {
+                    $headerPayload['job_card_number'] = $this->nextJobCardNumber(
+                        (int) ($headerPayload['tenant_id'] ?? 0),
+                        isset($headerPayload['organization_unit_id']) ? (int) $headerPayload['organization_unit_id'] : null,
+                    );
+                }
                 $partyValidation = $this->validatePartyContext($headerPayload);
                 if ($partyValidation->isFailure()) {
                     return $partyValidation;
@@ -69,6 +77,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     }
                 }
 
+                $laborItemClientKeys = [];
                 if (is_array($payload['labor_items'] ?? null)) {
                     $syncLabor = $this->syncLaborItems($jobCardId, [
                         'tenant_id' => $tenantId,
@@ -77,6 +86,10 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     ]);
                     if ($syncLabor->isFailure()) {
                         return $syncLabor;
+                    }
+                    $syncValue = $syncLabor->valueOrFail();
+                    if (is_array($syncValue['labor_item_client_keys'] ?? null)) {
+                        $laborItemClientKeys = $syncValue['labor_item_client_keys'];
                     }
                 }
 
@@ -113,6 +126,18 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     }
                 }
 
+                if (is_array($payload['labor_assignments'] ?? null)) {
+                    $syncAssignments = $this->syncLaborAssignments($jobCardId, [
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $organizationUnitId,
+                        'labor_assignments' => $payload['labor_assignments'],
+                        'labor_item_client_keys' => $laborItemClientKeys,
+                    ]);
+                    if ($syncAssignments->isFailure()) {
+                        return $syncAssignments;
+                    }
+                }
+
                 $this->recalculateJobCardTotals($jobCardId, $tenantId);
 
                 $reloaded = $this->jobCardRepository->findById($jobCardId);
@@ -146,9 +171,14 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
 
                 $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
                 if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
+                    $this->deleteComboExpansion($tenantId, $jobCardId, $lineId);
                     $this->jobCardLineRepository->delete($lineId);
 
                     continue;
+                }
+
+                if ((int) ($linePayload['item_id'] ?? 0) < 1 || (int) ($linePayload['uom_id'] ?? 0) < 1) {
+                    return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'Each service line requires a valid item and UOM.'));
                 }
 
                 $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
@@ -159,12 +189,15 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 ]));
 
                 if ($lineId === null) {
-                    $this->jobCardLineRepository->create($upsert);
+                    $created = $this->jobCardLineRepository->create($upsert);
+                    $this->expandComboComponents($created, $upsert);
 
                     continue;
                 }
 
-                $this->jobCardLineRepository->update($lineId, $upsert);
+                $this->deleteComboExpansion($tenantId, $jobCardId, $lineId);
+                $updated = $this->jobCardLineRepository->update($lineId, $upsert);
+                $this->expandComboComponents($updated, $upsert);
             }
 
             $this->recalculateJobCardTotals($jobCardId, $tenantId);
@@ -189,6 +222,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             $tenantId = (int) ($payload['tenant_id'] ?? $jobCard->get('tenant_id', 0));
             $organizationUnitId = $payload['organization_unit_id'] ?? $jobCard->get('organization_unit_id');
             $laborItems = is_array($payload['labor_items'] ?? null) ? $payload['labor_items'] : [];
+            $clientKeys = [];
 
             foreach ($laborItems as $linePayload) {
                 if (! is_array($linePayload)) {
@@ -202,26 +236,41 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     continue;
                 }
 
-                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
+                if ((int) ($linePayload['item_id'] ?? 0) < 1 || (int) ($linePayload['uom_id'] ?? 0) < 1) {
+                    return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'Each labour line requires a valid item and UOM.'));
+                }
+
+                $clientKey = $this->extractClientKey($linePayload);
+                $lineData = [
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'job_card_id' => $jobCardId,
                     ...$linePayload,
-                ], true));
+                ];
+                unset($lineData['line_type'], $lineData['requires_stock_movement'], $lineData['warehouse_id']);
+
+                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals($lineData, true));
 
                 if ($lineId === null) {
-                    $this->laborItemRepository->create($upsert);
+                    $created = $this->laborItemRepository->create($upsert);
+                    if ($clientKey !== null) {
+                        $clientKeys[$clientKey] = (int) $created->id();
+                    }
 
                     continue;
                 }
 
-                $this->laborItemRepository->update($lineId, $upsert);
+                $updated = $this->laborItemRepository->update($lineId, $upsert);
+                if ($clientKey !== null) {
+                    $clientKeys[$clientKey] = (int) $updated->id();
+                }
             }
 
             $this->recalculateJobCardTotals($jobCardId, $tenantId);
 
             return Result::success([
                 'job_card_id' => $jobCardId,
+                'labor_item_client_keys' => $clientKeys,
                 'synced' => true,
             ]);
         } catch (Throwable $exception) {
@@ -253,12 +302,21 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     continue;
                 }
 
-                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
+                if ((int) ($linePayload['item_id'] ?? 0) < 1 || (int) ($linePayload['uom_id'] ?? 0) < 1) {
+                    return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'Each non-inventory line requires a valid item and UOM.'));
+                }
+
+                $lineData = [
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'job_card_id' => $jobCardId,
+                    'name' => $this->resolveItemName($tenantId, isset($linePayload['item_id']) ? (int) $linePayload['item_id'] : null)
+                        ?? (string) ($linePayload['name'] ?? $linePayload['description'] ?? 'Non-inventory charge'),
                     ...$linePayload,
-                ]));
+                ];
+                unset($lineData['item_id'], $lineData['line_type'], $lineData['requires_stock_movement'], $lineData['warehouse_id']);
+
+                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals($lineData));
 
                 if ($lineId === null) {
                     $this->nonInventoryItemRepository->create($upsert);
@@ -270,6 +328,90 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             }
 
             $this->recalculateJobCardTotals($jobCardId, $tenantId);
+
+            return Result::success([
+                'job_card_id' => $jobCardId,
+                'synced' => true,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function syncLaborAssignments(int $jobCardId, array $payload): Result
+    {
+        try {
+            $jobCard = $this->jobCardRepository->findById($jobCardId);
+            if (! $jobCard instanceof DataRecord) {
+                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? $jobCard->get('tenant_id', 0));
+            $organizationUnitId = $payload['organization_unit_id'] ?? $jobCard->get('organization_unit_id');
+            $assignments = is_array($payload['labor_assignments'] ?? null) ? $payload['labor_assignments'] : [];
+            $clientKeyMap = is_array($payload['labor_item_client_keys'] ?? null) ? $payload['labor_item_client_keys'] : [];
+
+            foreach ($assignments as $assignmentPayload) {
+                if (! is_array($assignmentPayload)) {
+                    continue;
+                }
+
+                $assignmentId = isset($assignmentPayload['id']) ? (int) $assignmentPayload['id'] : null;
+                if ((bool) ($assignmentPayload['_delete'] ?? false) && $assignmentId !== null) {
+                    $this->laborAssignmentRepository->delete($assignmentId);
+
+                    continue;
+                }
+
+                $laborItemId = isset($assignmentPayload['labor_item_id']) ? (int) $assignmentPayload['labor_item_id'] : 0;
+                $clientKey = isset($assignmentPayload['labor_item_client_key']) ? (string) $assignmentPayload['labor_item_client_key'] : '';
+                if ($laborItemId < 1 && $clientKey !== '' && isset($clientKeyMap[$clientKey])) {
+                    $laborItemId = (int) $clientKeyMap[$clientKey];
+                }
+
+                $employeeId = isset($assignmentPayload['employee_id']) ? (int) $assignmentPayload['employee_id'] : 0;
+                if ($laborItemId < 1 || $employeeId < 1) {
+                    continue;
+                }
+
+                if (! $this->laborItemBelongsToJob($tenantId, $jobCardId, $laborItemId)) {
+                    return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'Technician assignment must reference a labour item from this job card.'));
+                }
+
+                if (! $this->activeEmployeeExists($tenantId, $employeeId)) {
+                    return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'Technician assignment must reference an active employee in this tenant.'));
+                }
+
+                $upsert = $this->withDefaultRowVersion([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'job_card_id' => $jobCardId,
+                    ...$assignmentPayload,
+                    'labor_item_id' => $laborItemId,
+                    'employee_id' => $employeeId,
+                ]);
+                unset($upsert['labor_item_client_key'], $upsert['quantity']);
+
+                if ($assignmentId === null) {
+                    $existing = $this->laborAssignmentRepository->list([
+                        'tenant_id' => $tenantId,
+                        'labor_item_id' => $laborItemId,
+                        'employee_id' => $employeeId,
+                    ]);
+
+                    if ($existing !== []) {
+                        $this->laborAssignmentRepository->update((int) $existing[0]->id(), $upsert);
+
+                        continue;
+                    }
+
+                    $this->laborAssignmentRepository->create($upsert);
+
+                    continue;
+                }
+
+                $this->laborAssignmentRepository->update($assignmentId, $upsert);
+            }
 
             return Result::success([
                 'job_card_id' => $jobCardId,
@@ -775,6 +917,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             $payload['id'],
             $payload['lines'],
             $payload['labor_items'],
+            $payload['labor_assignments'],
             $payload['non_inventory_items'],
             $payload['external_services'],
             $payload['customer_supplied_items'],
@@ -1058,6 +1201,213 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         $tax = $result->valueOrFail();
 
         return round((float) ($tax['tax_amount'] ?? 0), 4);
+    }
+
+    private function nextJobCardNumber(int $tenantId, ?int $organizationUnitId): string
+    {
+        if ($tenantId < 1) {
+            return 'VSJC-' . now()->format('YmdHis');
+        }
+
+        $periodValue = now()->format('Y');
+        $documentType = 'vehicle_service_job_card';
+        $query = DB::table('sequences')
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', $documentType)
+            ->where('period_value', $periodValue)
+            ->whereNull('deleted_at');
+
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
+
+        $sequence = $query->lockForUpdate()->first();
+        if ($sequence === null) {
+            $id = DB::table('sequences')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'document_type' => $documentType,
+                'prefix' => 'VSJC-',
+                'suffix' => '',
+                'padding' => 5,
+                'next_number' => 1,
+                'period_type' => 'yearly',
+                'period_value' => $periodValue,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $sequence = DB::table('sequences')->where('id', $id)->lockForUpdate()->first();
+        }
+
+        $nextNumber = (int) ($sequence->next_number ?? 1);
+        DB::table('sequences')
+            ->where('id', $sequence->id)
+            ->update([
+                'next_number' => $nextNumber + 1,
+                'row_version' => ((int) ($sequence->row_version ?? 1)) + 1,
+                'updated_at' => now(),
+            ]);
+
+        return (string) ($sequence->prefix ?? '')
+            . str_pad((string) $nextNumber, (int) ($sequence->padding ?? 5), '0', STR_PAD_LEFT)
+            . (string) ($sequence->suffix ?? '');
+    }
+
+    private function extractClientKey(array $payload): ?string
+    {
+        $metadata = $payload['metadata'] ?? null;
+        if (! is_array($metadata)) {
+            return null;
+        }
+
+        $clientKey = $metadata['client_key'] ?? null;
+
+        return is_string($clientKey) && trim($clientKey) !== '' ? $clientKey : null;
+    }
+
+    private function resolveItemName(int $tenantId, ?int $itemId): ?string
+    {
+        if ($tenantId < 1 || $itemId === null || $itemId < 1) {
+            return null;
+        }
+
+        $item = DB::table('items')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $itemId)
+            ->first();
+
+        if ($item === null) {
+            return null;
+        }
+
+        $sku = trim((string) ($item->sku ?? ''));
+        $name = trim((string) ($item->name ?? ''));
+
+        return trim($sku . ' - ' . $name, ' -');
+    }
+
+    private function laborItemBelongsToJob(int $tenantId, int $jobCardId, int $laborItemId): bool
+    {
+        return DB::table('vehicle_service_labor_items')
+            ->where('tenant_id', $tenantId)
+            ->where('job_card_id', $jobCardId)
+            ->where('id', $laborItemId)
+            ->exists();
+    }
+
+    private function activeEmployeeExists(int $tenantId, int $employeeId): bool
+    {
+        $query = DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId);
+
+        if (Schema::hasColumn('employees', 'status')) {
+            $query->where(function ($query): void {
+                $query->where('status', 'active')->orWhere('status', 'ACTIVE')->orWhereNull('status');
+            });
+        }
+
+        if (Schema::hasColumn('employees', 'is_active')) {
+            $query->where(function ($query): void {
+                $query->where('is_active', true)->orWhereNull('is_active');
+            });
+        }
+
+        if (Schema::hasColumn('employees', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->exists();
+    }
+
+    private function expandComboComponents(DataRecord $parentLine, array $parentPayload): void
+    {
+        if ((string) ($parentPayload['line_type'] ?? '') !== 'combo') {
+            return;
+        }
+
+        $tenantId = (int) $parentLine->get('tenant_id', 0);
+        $jobCardId = (int) $parentLine->get('job_card_id', 0);
+        $parentLineId = (int) $parentLine->id();
+        $comboItemId = (int) $parentLine->get('item_id', 0);
+        if ($tenantId < 1 || $jobCardId < 1 || $parentLineId < 1 || $comboItemId < 1) {
+            return;
+        }
+
+        $parentQuantity = max(1.0, (float) $parentLine->get('quantity', 1));
+        $components = DB::table('combo_items')
+            ->join('items', 'items.id', '=', 'combo_items.component_item_id')
+            ->where('combo_items.tenant_id', $tenantId)
+            ->where('combo_items.combo_item_id', $comboItemId)
+            ->whereNull('combo_items.deleted_at')
+            ->orderBy('combo_items.sort_order')
+            ->select([
+                'combo_items.id',
+                'combo_items.component_item_id',
+                'combo_items.quantity',
+                'combo_items.uom_id',
+                'items.type',
+                'items.is_stockable',
+                'items.name',
+                'items.sku',
+            ])
+            ->get();
+
+        foreach ($components as $component) {
+            $quantity = round($parentQuantity * (float) $component->quantity, 4);
+            $type = (string) $component->type;
+            $base = [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $parentLine->get('organization_unit_id'),
+                'job_card_id' => $jobCardId,
+                'combo_item_id' => (int) $component->id,
+                'combo_group_key' => $parentLineId,
+                'description' => trim((string) ($component->sku ?? '') . ' - ' . (string) ($component->name ?? ''), ' -'),
+                'is_combo_component' => true,
+                'item_id' => (int) $component->component_item_id,
+                'quantity' => $quantity,
+                'unit_price' => 0,
+                'uom_id' => (int) $component->uom_id,
+            ];
+
+            if (in_array($type, ['labour', 'service'], true)) {
+                $this->laborItemRepository->create($this->withDefaultRowVersion($this->hydrateLineTotals([
+                    ...$base,
+                    'requires_assignment' => true,
+                    'status' => 'planned',
+                ], true)));
+
+                continue;
+            }
+
+            $this->jobCardLineRepository->create($this->withDefaultRowVersion($this->hydrateLineTotals([
+                ...$base,
+                'combo_parent_line_id' => $parentLineId,
+                'line_type' => (bool) $component->is_stockable ? 'inventory' : $type,
+                'requires_stock_movement' => (bool) $component->is_stockable,
+            ])));
+        }
+    }
+
+    private function deleteComboExpansion(int $tenantId, int $jobCardId, int $parentLineId): void
+    {
+        foreach ($this->jobCardLineRepository->list([
+            'tenant_id' => $tenantId,
+            'job_card_id' => $jobCardId,
+            'combo_parent_line_id' => $parentLineId,
+        ]) as $componentLine) {
+            $this->jobCardLineRepository->delete((int) $componentLine->id());
+        }
+
+        foreach ($this->laborItemRepository->list([
+            'tenant_id' => $tenantId,
+            'job_card_id' => $jobCardId,
+            'combo_group_key' => $parentLineId,
+            'is_combo_component' => true,
+        ]) as $componentLine) {
+            $this->laborItemRepository->delete((int) $componentLine->id());
+        }
     }
 
     private function withDefaultRowVersion(array $payload): array

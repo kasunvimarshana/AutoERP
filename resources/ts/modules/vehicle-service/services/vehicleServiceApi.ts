@@ -17,6 +17,7 @@ import type {
     VehicleServiceJobCardFormInput,
     VehicleServiceJobCardLine,
     VehicleServiceJobCardLineFormInput,
+    VehicleServiceLabourAssignmentFormInput,
     VehicleServiceLookupOption,
     VehicleServicePayment,
     VehicleServicePaymentFormInput,
@@ -167,7 +168,7 @@ function normalizeLine(raw: BackendRecord, index = 0): VehicleServiceJobCardLine
         discountPreview: decimal(raw.discount_amount),
         id: asString(raw.id, `line-${index}`),
         invoiceable: raw.invoiceable !== false,
-        item: labelFrom(raw, 'item', asString(raw.item_id, 'Item')),
+        item: labelFrom(raw, 'item', asString(raw.name ?? raw.item_id, 'Item')),
         itemId: optionalString(raw.item_id),
         lineType: lineType === 'inventory' ? 'spare_part' : lineType as VehicleServiceJobCardLine['lineType'],
         quantity: decimal(raw.quantity),
@@ -176,6 +177,20 @@ function normalizeLine(raw: BackendRecord, index = 0): VehicleServiceJobCardLine
         unitPrice: decimal(raw.unit_price),
         uom: labelFrom(raw, 'uom', asString(raw.uom_id, 'UOM')),
         uomId: optionalString(raw.uom_id),
+    };
+}
+
+function normalizeAssignment(raw: BackendRecord): VehicleServiceJobCard['labourAssignments'][number] {
+    const employee = record(raw.employee);
+    const laborItem = record(raw.labor_item);
+
+    return {
+        assignmentType: asString(raw.role ?? raw.split_type, 'Technician'),
+        employee: labelFrom(raw, 'employee', asString(employee.full_name ?? employee.name ?? raw.employee_id, 'Employee')),
+        id: asString(raw.id),
+        incentivePreview: decimal(raw.incentive_amount ?? raw.split_amount),
+        labourItem: labelFrom(raw, 'labor_item', asString(laborItem.item_name ?? raw.labor_item_id, 'Labour item')),
+        status: asString(raw.status, 'assigned'),
     };
 }
 
@@ -372,6 +387,8 @@ function normalizePaymentLink(raw: BackendRecord, jobCard?: VehicleServiceJobCar
 }
 
 function jobCardPayload(input: VehicleServiceJobCardFormInput): BackendRecord {
+    const validLine = (line: VehicleServiceJobCardLineFormInput) => Boolean(numberOrUndefined(line.itemId));
+
     return contextPayload({
         assigned_to: numberOrUndefined(input.supervisorId),
         billing_customer_id: numberOrUndefined(input.billingCustomerId),
@@ -380,7 +397,7 @@ function jobCardPayload(input: VehicleServiceJobCardFormInput): BackendRecord {
         header_discount_type: input.headerDiscountType || null,
         header_discount_value: input.headerDiscountValue ? Number(input.headerDiscountValue) : 0,
         header_tax_group_id: numberOrUndefined(input.headerTaxGroupId),
-        job_card_number: input.jobCardNumber || `JC-${Date.now()}`,
+        job_card_number: input.jobCardNumber || null,
         linked_customer_id: numberOrUndefined(input.serviceCustomerId),
         next_service_date: input.nextServiceDate || null,
         notes: input.notes || null,
@@ -402,9 +419,10 @@ function jobCardPayload(input: VehicleServiceJobCardFormInput): BackendRecord {
         technician_notes: input.initialDiagnosis || null,
         vehicle_id: numberOrUndefined(input.vehicleId),
         warehouse_id: numberOrUndefined(input.warehouseId),
-        lines: input.lines.map(linePayload),
-        labor_items: input.laborItems.map(linePayload),
-        non_inventory_items: input.nonInventoryItems.map(linePayload),
+        labor_assignments: input.labourAssignments.filter((assignment) => Boolean(numberOrUndefined(assignment.employeeId))).map(assignmentPayload),
+        labor_items: input.laborItems.filter(validLine).map(linePayload),
+        lines: input.lines.filter(validLine).map(linePayload),
+        non_inventory_items: input.nonInventoryItems.filter(validLine).map(linePayload),
     });
 }
 
@@ -415,15 +433,30 @@ function linePayload(input: VehicleServiceJobCardLineFormInput): BackendRecord {
         discount_type: input.discountType || null,
         discount_value: input.discountValue ? Number(input.discountValue) : 0,
         id: numberOrUndefined(input.id),
-        item_id: Number(input.itemId),
+        item_id: numberOrUndefined(input.itemId),
         line_type: input.lineType === 'spare_part' ? 'inventory' : input.lineType,
+        metadata: { client_key: input.clientKey },
         quantity: Number(input.quantity || 0),
         requires_stock_movement: input.requiresStockMovement,
         tax_group_id: numberOrUndefined(input.taxGroupId),
         unit_cost: input.unitCost ? Number(input.unitCost) : null,
         unit_price: Number(input.unitPrice || 0),
-        uom_id: Number(input.uomId),
+        uom_id: numberOrUndefined(input.uomId),
         warehouse_id: numberOrUndefined(input.warehouseId),
+    };
+}
+
+function assignmentPayload(input: VehicleServiceLabourAssignmentFormInput): BackendRecord {
+    return {
+        employee_id: numberOrUndefined(input.employeeId),
+        hours_worked: input.hoursWorked ? Number(input.hoursWorked) : null,
+        labor_item_client_key: input.laborItemClientKey,
+        labor_item_id: numberOrUndefined(input.laborItemId),
+        metadata: { client_key: input.clientKey },
+        notes: input.notes || null,
+        quantity: input.quantity ? Number(input.quantity) : null,
+        role: input.role || null,
+        status: input.status || 'assigned',
     };
 }
 
@@ -516,27 +549,17 @@ export const vehicleServiceApi = {
         get: async (id: string): Promise<ApiResponse<VehicleServiceJobCard>> => {
             const response = await httpClient<ApiResponse<BackendRecord> | BackendRecord>(`/api/vehicle-service/vehicle-service-job-cards/${id}`);
             const raw = 'data' in response && response.data ? response.data as BackendRecord : response as BackendRecord;
-            const [lines, labourItems, assignments, diagnostics, inspections, audit, invoicePreview] = await Promise.all([
+            const [lines, labourItems, nonInventoryItems, assignments] = await Promise.all([
                 vehicleServiceApi.lines.list(id),
                 vehicleServiceApi.lines.listLaborItems(id),
+                vehicleServiceApi.lines.listNonInventoryItems(id),
                 vehicleServiceApi.labour.listAssignments(id),
-                safeCollection(() => vehicleServiceApi.diagnostics.list(id)),
-                safeCollection(() => vehicleServiceApi.inspections.list(id)),
-                safeCollection(() => vehicleServiceApi.jobCards.history(id)),
-                safeResponse(async () => {
-                    const preview = await vehicleServiceApi.invoices.preview(id);
-                    return { data: { breakdown: preview.breakdown.map((row) => ({ label: asString(row.label), value: asString(row.value) })), calculated: preview.calculated, errors: preview.errors, input: preview.input as BackendRecord, warnings: preview.warnings } };
-                }, emptyInvoicePreview(raw)),
             ]);
 
             return {
                 data: normalizeJobCard(raw, {
-                    audit,
-                    diagnostics,
-                    inspections,
-                    invoicePreview,
                     labourAssignments: assignments.data,
-                    lines: [...lines.data, ...labourItems.data],
+                    lines: [...lines.data, ...labourItems.data, ...nonInventoryItems.data],
                 }),
             };
         },
@@ -554,18 +577,7 @@ export const vehicleServiceApi = {
         assign: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/vehicle-service/vehicle-service-labor-assignments', { body: contextPayload(record(input)), method: 'POST' }),
         listAssignments: async (jobCardId: string) => {
             const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-labor-assignments', { query: contextQuery({ job_card_id: jobCardId }) });
-            const laborItems = await vehicleServiceApi.lines.listLaborItems(jobCardId);
-            const laborMap = new Map(laborItems.data.map((line) => [line.id, line.item]));
-            const employees = await safeCollection(() => vehicleServiceApi.lookups.employees());
-            const employeeMap = new Map(employees.map((employee) => [employee.id, employee.label]));
-            return collection(response, (raw) => ({
-                assignmentType: asString(raw.role ?? raw.split_type, 'Technician'),
-                employee: employeeMap.get(asString(raw.employee_id)) ?? asString(raw.employee_id, 'Employee'),
-                id: asString(raw.id),
-                incentivePreview: decimal(raw.incentive_amount ?? raw.split_amount),
-                labourItem: laborMap.get(asString(raw.labor_item_id)) ?? asString(raw.labor_item_id, 'Labour item'),
-                status: asString(raw.status, 'assigned'),
-            }));
+            return collection(response, normalizeAssignment);
         },
         remove: (id: string) => httpClient<void>(`/api/vehicle-service/vehicle-service-labor-assignments/${id}`, { method: 'DELETE' }),
         update: (id: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-labor-assignments/${id}`, { body: contextPayload(record(input)), method: 'PUT' }),
@@ -573,6 +585,7 @@ export const vehicleServiceApi = {
     lines: {
         list: async (jobCardId: string): Promise<ApiCollectionResponse<VehicleServiceJobCardLine>> => collection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-job-card-lines', { query: contextQuery({ job_card_id: jobCardId }) }), normalizeLine),
         listLaborItems: async (jobCardId: string): Promise<ApiCollectionResponse<VehicleServiceJobCardLine>> => collection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-labor-items', { query: contextQuery({ job_card_id: jobCardId }) }), (raw) => ({ ...normalizeLine(raw), lineType: 'labour' as const, stockBehavior: 'No stock impact' })),
+        listNonInventoryItems: async (jobCardId: string): Promise<ApiCollectionResponse<VehicleServiceJobCardLine>> => collection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-non-inventory-items', { query: contextQuery({ job_card_id: jobCardId }) }), (raw) => ({ ...normalizeLine({ ...raw, line_type: 'non_inventory' }), lineType: 'non_inventory' as const, stockBehavior: 'No stock impact' })),
         previewComboExpansion: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/item/items/preview-type-setup', { body: input, method: 'POST' }),
         syncLabour: (jobCardId: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/job-cards/${jobCardId}/labor-items/sync`, { body: contextPayload(record(input)), method: 'POST' }),
         syncNonInventory: (jobCardId: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/job-cards/${jobCardId}/non-inventory-items/sync`, { body: contextPayload(record(input)), method: 'POST' }),
@@ -584,17 +597,34 @@ export const vehicleServiceApi = {
             const response = await customerApi.listCustomers({ perPage: 25 });
             return { data: response.data.map((customer) => simpleOption(customer.id, `${customer.code} - ${customer.name}`, customer.status)) };
         },
-        employees: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await hrApi.employees.list({ perPage: 25, status: 'active' });
+        employees: async (search = ''): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
+            const response = await hrApi.employees.list({ perPage: 25, search: search || undefined, status: 'active' });
             return { data: response.data.map((employee) => simpleOption(employee.id, `${employee.code} - ${employee.displayName}`, employee.status)) };
         },
         itemUnits: async (itemId: string): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await itemApi.getItemUnits(itemId);
-            return { data: response.data.filter((unit) => unit.id && unit.unit !== 'Not configured').map((unit) => simpleOption(unit.id, unit.unit, unit.purpose)) };
+            const response = await itemApi.getItemUnits(itemId, 'service');
+            return { data: response.data.filter((unit) => unit.id && unit.unit !== 'Not configured' && !unit.id.endsWith('-uom')).map((unit) => simpleOption(unit.id, unit.unit, unit.purpose)) };
         },
-        items: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await itemApi.lookupItems({ perPage: 25, status: 'active' });
-            return { data: response.data.map((item) => simpleOption(item.id, `${item.code} - ${item.name}`, item.itemType)) };
+        items: async (context: 'service-lines' | 'non-inventory' | 'labour' = 'service-lines', search = ''): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
+            const type = context === 'non-inventory' ? 'non_inventory' : context === 'labour' ? 'labour' : undefined;
+            const response = await itemApi.lookupItems({ perPage: 25, search: search || undefined, status: 'active', type });
+            const allowedServiceTypes = new Set(['combo', 'inventory_product', 'labour', 'service']);
+            const data = response.data
+                .filter((item) => context !== 'service-lines' || allowedServiceTypes.has(item.itemType))
+                .map((item) => simpleOption(item.id, `${item.code} - ${item.name}`, item.itemType));
+
+            return { data };
+        },
+        comboComponents: async (itemId: string): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
+            const response = await itemApi.listComboComponents(itemId);
+            return {
+                data: response.data.map((component) => simpleOption(
+                    component.id,
+                    component.componentItemName,
+                    `${component.componentType} · ${component.quantity} ${component.uom}`,
+                )),
+                meta: response.meta,
+            };
         },
         uoms: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
             const response = await inventoryApi.listUoms();
@@ -616,18 +646,6 @@ export const vehicleServiceApi = {
             const data = (response.data.payment_links ?? []).map((payment) => normalizePaymentLink(payment, jobMap.get(asString(payment.job_card_id))));
             return { data };
         },
-        previewAllocation: (input: VehicleServicePaymentFormInput): ApiResponse<VehicleServicePayment> => ({
-            data: {
-                allocationPreview: 'Allocation will be validated by backend when submitted',
-                amount: input.amount,
-                id: 'preview',
-                method: 'Existing payment allocation',
-                payer: 'Backend payer',
-                paymentNumber: input.paymentId ? `Payment #${input.paymentId}` : 'Select payment',
-                sourceInvoice: input.documentId ? `Document #${input.documentId}` : `Job #${input.jobCardId}`,
-                status: 'preview',
-            },
-        }),
     },
     serviceTypes: {
         activate: (id: string) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-types/${id}`, { body: { status: 'active' }, method: 'PUT' }),

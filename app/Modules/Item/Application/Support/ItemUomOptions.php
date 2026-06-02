@@ -77,17 +77,28 @@ final class ItemUomOptions
             return [];
         }
 
-        $query = DB::table('unit_of_measures')
+        $baseQuery = DB::table('unit_of_measures')
             ->where('tenant_id', $tenantId)
             ->whereIn('id', $uomIds)
             ->where('is_active', true);
 
         $contextColumn = self::contextColumn($context);
+        $requiredUomIds = array_values(array_unique(array_filter(
+            [$baseUomId, $defaultUomId],
+            static fn (int $id): bool => $id > 0
+        )));
+        $query = clone $baseQuery;
         if ($contextColumn !== null && Schema::hasColumn('unit_of_measures', $contextColumn)) {
-            $query->where($contextColumn, true);
+            $query->where(static function ($nested) use ($contextColumn, $requiredUomIds): void {
+                $nested->where($contextColumn, true);
+
+                if ($requiredUomIds !== []) {
+                    $nested->orWhereIn('id', $requiredUomIds);
+                }
+            });
         }
 
-        return $query
+        $rows = $query
             ->orderByRaw('CASE WHEN id = ? THEN 0 WHEN id = ? THEN 1 ELSE 2 END', [$defaultUomId ?: $baseUomId, $baseUomId])
             ->orderBy('code')
             ->get([
@@ -103,7 +114,29 @@ final class ItemUomOptions
                 'usable_for_sales',
                 'usable_for_service',
                 'usable_for_rental',
-            ])
+            ]);
+
+        if ($rows->isEmpty() && $contextColumn !== null) {
+            $rows = (clone $baseQuery)
+                ->orderByRaw('CASE WHEN id = ? THEN 0 WHEN id = ? THEN 1 ELSE 2 END', [$defaultUomId ?: $baseUomId, $baseUomId])
+                ->orderBy('code')
+                ->get([
+                    'id',
+                    'code',
+                    'symbol',
+                    'name',
+                    'category',
+                    'type',
+                    'is_base',
+                    'usable_for_inventory',
+                    'usable_for_purchase',
+                    'usable_for_sales',
+                    'usable_for_service',
+                    'usable_for_rental',
+                ]);
+        }
+
+        return $rows
             ->map(static function (object $uom) use ($baseUomId, $defaultUomId, $conversionFactors, $context): array {
                 $id = (int) $uom->id;
 

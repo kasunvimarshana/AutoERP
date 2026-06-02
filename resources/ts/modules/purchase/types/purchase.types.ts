@@ -1,6 +1,6 @@
 export type PurchaseOrderStatus = 'draft' | 'submitted' | 'approved' | 'partially_received' | 'received' | 'closed' | 'cancelled' | 'reversed';
 export type GrnStatus = 'draft' | 'submitted' | 'inspected' | 'confirmed' | 'posted' | 'cancelled' | 'reversed';
-export type PurchaseInvoiceStatus = 'draft' | 'posted' | 'partially_paid' | 'paid' | 'cancelled' | 'reversed';
+export type PurchaseInvoiceStatus = 'archived' | 'draft' | 'posted' | 'partially_paid' | 'paid' | 'cancelled' | 'reversed';
 export type PurchaseReturnStatus = 'draft' | 'approved' | 'posted' | 'refunded' | 'cancelled' | 'reversed';
 export type PurchasePaymentStatus = 'draft' | 'posted' | 'allocated' | 'voided' | 'reversed';
 
@@ -93,6 +93,7 @@ export type PurchaseInvoiceLine = {
 
 export type PurchaseInvoice = {
     balance: string;
+    currencyId?: string;
     documentStatus: string;
     dueDate: string;
     grandTotal: string;
@@ -101,7 +102,10 @@ export type PurchaseInvoice = {
     invoiceNumber: string;
     lines: PurchaseInvoiceLine[];
     paidAmount: string;
+    sourceId?: string;
+    sourceModule?: string;
     sourceReference?: string;
+    sourceType?: string;
     supplierId?: string;
     status: PurchaseInvoiceStatus;
     supplier: string;
@@ -206,8 +210,19 @@ export type PurchaseSettings = {
     stockReceiveTiming: string;
 };
 
+export type PurchaseCalculationLinePreview = {
+    discountAmount: string;
+    grossAmount: string;
+    id: string;
+    lineTotal: string;
+    lineTotalWithTax: string;
+    quantity: string;
+    taxAmount: string;
+    unitPrice: string;
+};
+
 export type PurchaseCalculationPreview = {
-    breakdown: Array<{ label: string; value: string }>;
+    breakdown: PurchaseCalculationLinePreview[];
     calculated: {
         discountTotal: string;
         grandTotal: string;
@@ -266,6 +281,7 @@ export type PurchaseListQuery = {
 };
 
 export type PurchaseLineFormInput = {
+    clientKey: string;
     discountType?: string;
     discountValue?: string;
     itemId: string;
@@ -319,10 +335,12 @@ export type PurchasePaymentFormInput = {
 };
 
 export type PurchaseInvoiceFormInput = {
+    currencyId: string;
     dueDate?: string;
     invoiceDate: string;
     lines: PurchaseLineFormInput[];
     sourceId: string;
-    sourceType: 'grn_header' | 'purchase_order';
+    sourceType: 'direct' | 'grn_header' | 'purchase_order';
+    supplierId: string;
     supplierInvoiceNumber?: string;
 };

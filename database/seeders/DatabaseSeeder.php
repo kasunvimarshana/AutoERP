@@ -42,13 +42,8 @@ class DatabaseSeeder extends Seeder
             class_exists(CustomerModuleSeeder::class) ? CustomerModuleSeeder::class : null,
             class_exists(SupplierModuleSeeder::class) ? SupplierModuleSeeder::class : null,
             class_exists(VehicleModuleSeeder::class) ? VehicleModuleSeeder::class : null,
+            class_exists(PurchaseModuleSeeder::class) ? PurchaseModuleSeeder::class : null,
         ]));
-
-        if ((bool) env('SEED_PURCHASE_MODULE', false) && class_exists(PurchaseModuleSeeder::class)) {
-            $this->call([
-                PurchaseModuleSeeder::class,
-            ]);
-        }
 
         if ((bool) env('SEED_VEHICLE_RENTAL_MODULE', false) && class_exists(VehicleRentalModuleSeeder::class)) {
             $this->call([

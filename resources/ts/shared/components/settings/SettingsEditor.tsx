@@ -234,7 +234,8 @@ export function SettingsEditor({ fields, initialValues, onInitialize, onSave, ti
                             const staticOptions = field.options ?? [];
                             const loadedOptions = state?.options ?? [];
                             const currentValue = fieldValue(values[field.key]);
-                            const currentOption = currentValue ? [{ label: field.currentLabel || 'Configured value', value: currentValue }] : [];
+                            const matchingOption = [...staticOptions, ...loadedOptions].find((option) => option.value === currentValue);
+                            const currentOption = currentValue ? [{ label: field.currentLabel || matchingOption?.label || 'Configured value', value: currentValue }] : [];
                             const options = [...currentOption, ...staticOptions, ...loadedOptions].filter(
                                 (option, index, list) => list.findIndex((candidate) => candidate.value === option.value && candidate.label === option.label) === index,
                             );

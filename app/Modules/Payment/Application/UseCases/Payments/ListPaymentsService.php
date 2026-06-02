@@ -26,8 +26,6 @@ final class ListPaymentsService implements ListPaymentsServiceInterface
                 ? min($perPage, (int) config('payment.pagination.max_per_page', PaymentDefaults::MAX_PER_PAGE))
                 : (int) config('payment.pagination.default_per_page', PaymentDefaults::DEFAULT_PER_PAGE);
 
-            unset($criteria['search']);
-
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
             return Result::failure(new Error(PaymentErrorCode::INVALID_VALUE, $exception->getMessage()));

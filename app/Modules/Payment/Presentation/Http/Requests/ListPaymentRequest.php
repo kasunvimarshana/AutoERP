@@ -28,6 +28,7 @@ final class ListPaymentRequest extends FormRequest
                 'min:1',
                 'max:' . (int) config('payment.pagination.max_per_page', 200),
             ],
+            'search' => ['nullable', 'string', 'max:255'],
             'payment_number' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'direction' => ['nullable', 'string', 'max:255'],

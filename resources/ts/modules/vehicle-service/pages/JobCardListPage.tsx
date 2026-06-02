@@ -10,15 +10,31 @@ export function JobCardListPage() {
     const [rows, setRows] = useState<VehicleServiceJobCard[]>([]);
     const [filters, setFilters] = useState<DataToolbarFilterValues>({});
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        const timeout = window.setTimeout(() => setDebouncedSearch(search), 300);
+
+        return () => window.clearTimeout(timeout);
+    }, [search]);
+
+    useEffect(() => {
+        let active = true;
         setLoading(true);
         vehicleServiceApi.jobCards.list({
-            search,
+            search: debouncedSearch,
             status: typeof filters.status === 'string' ? filters.status : undefined,
-        }).then((response) => setRows(response.data)).finally(() => setLoading(false));
-    }, [filters, search]);
+        }).then((response) => {
+            if (active) setRows(response.data);
+        }).finally(() => {
+            if (active) setLoading(false);
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [debouncedSearch, filters.status]);
 
     return (
         <div className="space-y-6">

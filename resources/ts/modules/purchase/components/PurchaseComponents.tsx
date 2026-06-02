@@ -39,6 +39,8 @@ import type {
 } from '../types/purchase.types';
 import { purchaseApi } from '../services/purchaseApi';
 
+type PurchaseLookupName = 'currencies' | 'items' | 'suppliers' | 'warehouses';
+
 export function PurchaseDashboardCards({ metrics }: { metrics: PurchaseDashboardMetric[] }) {
     return (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -59,7 +61,7 @@ export function PurchaseDashboardCards({ metrics }: { metrics: PurchaseDashboard
 
 export function PurchaseOrderForm({ initialOrder, mode = 'create' }: { initialOrder?: PurchaseOrder; mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, loadLookup, lookups, setField, setGlobalError, setLineField, submit, values } = usePurchaseOrderForm(initialOrder);
+    const { addLine, errors, globalError, isLoading, loadItemUoms, loadLookup, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = usePurchaseOrderForm(initialOrder);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -86,7 +88,7 @@ export function PurchaseOrderForm({ initialOrder, mode = 'create' }: { initialOr
                 </div>
             </FormSection>
             <FormSection description="Frontend collects item, UOM, quantity, price inputs. Backend resolves UOM conversion, discounts, tax, and totals." title="Order Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Ordered qty" />
+                <PurchaseLinesEditor addLine={addLine} errors={errors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Ordered qty" removeLine={removeLine} />
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     {globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}
                     <Button disabled={isLoading} type="submit" variant="blue">{mode === 'edit' ? 'Update With Lines' : 'Create With Lines'}</Button>
@@ -136,7 +138,7 @@ export function PurchaseOrderSummaryCard({ order }: { order: PurchaseOrder }) {
     );
 }
 
-export function PurchaseWorkflowActions({ entityId, entityType, status }: { entityId: string; entityType: string; status: string }) {
+export function PurchaseWorkflowActions({ entityId, entityType, sourceId, sourceType, status }: { entityId: string; entityType: string; sourceId?: string; sourceType?: string; status: string }) {
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -150,6 +152,14 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
                 await purchaseApi.grns.transition(entityId, action);
             } else if (entityType === 'purchase_return') {
                 await purchaseApi.returns.transition(entityId, action);
+            } else if (entityType === 'purchase_invoice') {
+                if (action === 'post') {
+                    await purchaseApi.invoices.post(entityId, sourceType, sourceId);
+                } else if (action === 'cancel') {
+                    await purchaseApi.invoices.cancel(entityId, sourceType, sourceId);
+                } else {
+                    await purchaseApi.invoices.reverse(entityId, sourceType, sourceId);
+                }
             } else {
                 setMessage('This entity type does not expose a Purchase workflow transition endpoint.');
                 return;
@@ -167,14 +177,14 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
             rows={[
                 { label: 'Entity', value: `${entityType} ${entityId}` },
                 { label: 'Current status', value: status },
-                { label: 'Allowed actions', value: entityType === 'purchase_invoice' ? 'Invoice status uses invoice-specific post/cancel/reverse endpoints.' : 'Validated by backend on submit.' },
+                { label: 'Allowed actions', value: entityType === 'purchase_invoice' ? 'Post, cancel, and reverse use invoice/document backend endpoints.' : 'Validated by backend on submit.' },
             ]}
             status="Workflow"
             title="Workflow Actions"
         >
             <div className="flex flex-wrap items-center gap-2">
-                {['submit', 'approve', 'cancel', 'reverse'].map((action) => (
-                    <Button disabled={isSubmitting || entityType === 'purchase_invoice'} key={action} onClick={() => void transition(action)} type="button" variant={action === 'submit' ? 'blue' : 'secondary'}>
+                {(entityType === 'purchase_invoice' ? ['post', 'cancel', 'reverse'] : ['submit', 'approve', 'cancel', 'reverse']).map((action) => (
+                    <Button disabled={isSubmitting} key={action} onClick={() => void transition(action)} type="button" variant={action === 'submit' || action === 'post' ? 'blue' : 'secondary'}>
                         {action.charAt(0).toUpperCase() + action.slice(1)}
                     </Button>
                 ))}
@@ -186,7 +196,7 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
 
 export function GrnForm({ initialGrn, mode = 'create' }: { initialGrn?: GoodsReceivedNote; mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, loadLookup, lookups, setField, setGlobalError, setLineField, submit, values } = useGrnForm(initialGrn);
+    const { addLine, errors, globalError, isLoading, loadItemUoms, loadLookup, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = useGrnForm(initialGrn);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -213,7 +223,7 @@ export function GrnForm({ initialGrn, mode = 'create' }: { initialGrn?: GoodsRec
                 </div>
             </FormSection>
             <FormSection description="Accepted/rejected quantities are submitted as inputs. Backend returns authoritative stock movement effect." title="Received Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Received qty" />
+                <PurchaseLinesEditor addLine={addLine} errors={errors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Received qty" removeLine={removeLine} />
                 <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} type="submit" variant="blue">{mode === 'edit' ? 'Update GRN' : 'Create GRN'}</Button></div>
             </FormSection>
         </form>
@@ -234,14 +244,16 @@ export function GrnInventoryEffectPanel({ effects }: { effects: PurchaseInventor
 
 export function PurchaseInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, loadLookup, lookups, preview, previewInvoice, setField, setGlobalError, setLineField, submit, values } = useInvoiceForm();
+    const { addLine, errors, globalError, isLoading, loadItemUoms, loadLookup, lookups, preview, previewInvoice, removeLine, setField, setGlobalError, setLineField, submit, values } = useInvoiceForm();
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
         setGlobalError('');
-        const response = await submit(() => values.sourceType === 'grn_header'
-            ? purchaseApi.invoices.createFromGrn(values.sourceId, values)
-            : purchaseApi.invoices.createFromPo(values.sourceId, values));
+        const response = await submit(() => values.sourceType === 'direct'
+            ? purchaseApi.invoices.createDirect(values)
+            : values.sourceType === 'grn_header'
+                ? purchaseApi.invoices.createFromGrn(values.sourceId, values)
+                : purchaseApi.invoices.createFromPo(values.sourceId, values));
         if (response) {
             navigate('/purchase/invoices');
         }
@@ -251,15 +263,17 @@ export function PurchaseInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'ed
         <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <FormSection description="Supports direct invoice, invoice from PO, GRN, or multiple GRNs according to backend settings." title="Supplier Invoice Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Invoice source"><Select onChange={(event) => setField('sourceType', event.target.value as PurchaseInvoiceFormInput['sourceType'])} value={values.sourceType}><option value="purchase_order">From PO</option><option value="grn_header">From GRN</option></Select></Field>
-                    <Field error={errors.source_id} label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Backend source id" value={values.sourceId} /></Field>
+                    <Field label="Invoice source"><Select onChange={(event) => setField('sourceType', event.target.value as PurchaseInvoiceFormInput['sourceType'])} value={values.sourceType}><option value="direct">Direct invoice</option><option value="purchase_order">From PO</option><option value="grn_header">From GRN</option></Select></Field>
+                    <Field error={errors.supplier_id ?? errors.party_id} label="Supplier"><LookupSelect disabled={isLoading} onChange={(value) => setField('supplierId', value)} onOpen={() => void loadLookup('suppliers')} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
+                    <Field error={errors.currency_id} label="Currency"><LookupSelect disabled={isLoading} onChange={(value) => setField('currencyId', value)} onOpen={() => void loadLookup('currencies')} options={lookups.currencies} placeholder="Select currency" value={values.currencyId} /></Field>
+                    {values.sourceType !== 'direct' ? <Field error={errors.source_id} label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Backend PO/GRN id" value={values.sourceId} /></Field> : null}
                     <Field error={errors.invoice_date} label="Invoice date"><Input onChange={(event) => setField('invoiceDate', event.target.value)} type="date" value={values.invoiceDate} /></Field>
                     <Field error={errors.due_date} label="Due date"><Input onChange={(event) => setField('dueDate', event.target.value)} type="date" value={values.dueDate ?? ''} /></Field>
                     <Field label="Supplier invoice no"><Input onChange={(event) => setField('supplierInvoiceNumber', event.target.value)} placeholder="Supplier reference" value={values.supplierInvoiceNumber ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Line amount, discounts, taxes, UOM conversion, payable amount, and balances are previewed by backend only." title="Invoice Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Invoice qty" />
+                <PurchaseLinesEditor addLine={addLine} errors={errors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Invoice qty" removeLine={removeLine} />
                 {preview ? <PurchaseInvoiceCalculationPanel preview={preview} /> : null}
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     {globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}
@@ -292,7 +306,7 @@ export function PurchaseInvoiceCalculationPanel({ preview }: { preview?: Purchas
     );
 }
 
-export function PurchaseInvoiceDocumentPanel({ entityId, entityType }: { entityId?: string; entityType?: 'grn_header' | 'purchase_order' | 'purchase_return' }) {
+export function PurchaseInvoiceDocumentPanel({ entityId, entityType, invoice }: { entityId?: string; entityType?: 'grn_header' | 'purchase_order' | 'purchase_return'; invoice?: PurchaseInvoice }) {
     const [message, setMessage] = useState('');
 
     async function generateDocument(): Promise<void> {
@@ -308,15 +322,15 @@ export function PurchaseInvoiceDocumentPanel({ entityId, entityType }: { entityI
     return (
         <PreviewPanel
             rows={[
-                { label: 'Document source', value: entityType && entityId ? `${entityType} ${entityId}` : 'No persisted source selected' },
-                { label: 'Document number', value: 'Generated by Sequence/Document backend' },
-                { label: 'Rendering', value: 'Document module backend' },
+                { label: 'Document source', value: invoice?.sourceType && invoice.sourceId ? `${invoice.sourceType} ${invoice.sourceId}` : entityType && entityId ? `${entityType} ${entityId}` : 'Direct purchase invoice document' },
+                { label: 'Document number', value: invoice?.invoiceNumber ?? 'Generated by Sequence/Document backend' },
+                { label: 'Document status', value: invoice?.documentStatus ?? 'Document module backend' },
             ]}
             status="Document"
             title="Document Invoice"
         >
             <div className="flex flex-wrap items-center gap-2">
-                <Button disabled={!entityId || !entityType} onClick={() => void generateDocument()} type="button" variant="secondary">Generate</Button>
+                <Button disabled={!entityId || !entityType} onClick={() => void generateDocument()} title={entityId && entityType ? 'Generate a backend document for the source record.' : 'Direct invoices are already Document module records.'} type="button" variant="secondary">Generate</Button>
                 {message ? <span className="text-sm text-slate-600">{message}</span> : null}
             </div>
         </PreviewPanel>
@@ -381,7 +395,7 @@ export function PurchaseAdvancePanel({ advances }: { advances: PurchaseAdvance[]
 
 export function PurchaseReturnForm({ initialReturn }: { initialReturn?: PurchaseReturn }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, loadLookup, lookups, setField, setGlobalError, setLineField, submit, values } = useReturnForm(initialReturn);
+    const { addLine, errors, globalError, isLoading, loadItemUoms, loadLookup, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = useReturnForm(initialReturn);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -408,7 +422,7 @@ export function PurchaseReturnForm({ initialReturn }: { initialReturn?: Purchase
                 </div>
             </FormSection>
             <FormSection description="Backend validates returnable quantities and previews inventory/AP effects." title="Return Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Return qty" />
+                <PurchaseLinesEditor addLine={addLine} errors={errors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onLineChange={setLineField} quantityLabel="Return qty" removeLine={removeLine} />
                 <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} type="submit">{initialReturn ? 'Update Return' : 'Create Return'}</Button></div>
             </FormSection>
         </form>
@@ -561,7 +575,7 @@ export function PurchaseInvoiceTable({ rows }: { rows: PurchaseInvoice[] }) {
                 { header: 'Paid', key: 'paidAmount' },
                 { header: 'Balance', key: 'balance' },
                 { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
-                { header: 'Actions', key: 'actions', render: (row) => <RowActions editPath={`/purchase/invoices/${row.id}/edit`} viewPath={`/purchase/invoices/${row.id}`} /> },
+                { header: 'Actions', key: 'actions', render: (row) => <RowActions disabledEditReason="Supplier invoice editing is source-scoped in the backend. Use source matching or create a correction/return from detail." editPath={`/purchase/invoices/${row.id}/edit`} viewPath={`/purchase/invoices/${row.id}`} /> },
             ]}
             getRowKey={(row) => row.id}
             rows={rows}
@@ -605,8 +619,13 @@ export function PurchaseReturnTable({ rows }: { rows: PurchaseReturn[] }) {
     );
 }
 
-function RowActions({ editPath, viewPath }: { editPath: string; viewPath: string }) {
-    return <div className="flex gap-2"><Link to={viewPath}><Button variant="secondary">View</Button></Link><Link to={editPath}><Button variant="ghost">Edit</Button></Link></div>;
+function RowActions({ disabledEditReason, editPath, viewPath }: { disabledEditReason?: string; editPath: string; viewPath: string }) {
+    return (
+        <div className="flex gap-2">
+            <Link to={viewPath}><Button variant="secondary">View</Button></Link>
+            {disabledEditReason ? <Button disabled title={disabledEditReason} variant="ghost">Edit</Button> : <Link to={editPath}><Button variant="ghost">Edit</Button></Link>}
+        </div>
+    );
 }
 
 function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Array<[keyof T & string, string]>; rows: T[] }) {
@@ -621,6 +640,7 @@ function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Arr
 
 function usePurchaseLookups() {
     const [lookups, setLookups] = useState({
+        currencies: [] as PurchaseLookupOption[],
         items: [] as PurchaseLookupOption[],
         suppliers: [] as PurchaseLookupOption[],
         uomsByItem: {} as Record<string, PurchaseLookupOption[]>,
@@ -634,7 +654,7 @@ function usePurchaseLookups() {
         mountedRef.current = false;
     }, []);
 
-    const loadLookup = useCallback(async (name: 'items' | 'suppliers' | 'warehouses'): Promise<void> => {
+    const loadLookup = useCallback(async (name: PurchaseLookupName): Promise<void> => {
         if (loadingRef.current.has(name)) {
             return;
         }
@@ -666,7 +686,7 @@ function usePurchaseLookups() {
         }
         let shouldLoad = false;
         setLookups((current) => {
-            shouldLoad = !current.uomsByItem[itemId];
+            shouldLoad = !current.uomsByItem[itemId] || current.uomsByItem[itemId].length === 0;
             return current;
         });
         if (!shouldLoad) {
@@ -679,6 +699,12 @@ function usePurchaseLookups() {
             setLookups((current) => current.uomsByItem[itemId]
                 ? current
                 : { ...current, uomsByItem: { ...current.uomsByItem, [itemId]: response.data } });
+        } catch {
+            if (mountedRef.current) {
+                setLookups((current) => current.uomsByItem[itemId]
+                    ? current
+                    : { ...current, uomsByItem: { ...current.uomsByItem, [itemId]: [] } });
+            }
         } finally {
             loadingRef.current.delete(`uom:${itemId}`);
         }
@@ -691,8 +717,13 @@ function today(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
+function lineClientKey(): string {
+    return `purchase-line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 function defaultLine(line?: Partial<PurchaseLineFormInput>): PurchaseLineFormInput {
     return {
+        clientKey: line?.clientKey ?? lineClientKey(),
         discountType: line?.discountType ?? '',
         discountValue: line?.discountValue ?? '',
         itemId: line?.itemId ?? '',
@@ -742,7 +773,7 @@ function usePurchaseOrderForm(initial?: PurchaseOrder) {
     const submitState = useSubmitState();
     const [values, setValues] = useState<PurchaseOrderFormInput>({
         expectedDate: initial?.expectedDate || '',
-        lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].orderedQuantity, unitPrice: initial.lines[0].unitPrice, uomId: initial.lines[0].uomId } : undefined)],
+        lines: initial?.lines.length ? initial.lines.map((line) => defaultLine({ itemId: line.itemId, quantity: line.orderedQuantity, unitPrice: line.unitPrice, uomId: line.uomId })) : [defaultLine()],
         notes: '',
         orderDate: initial?.orderDate || today(),
         poNumber: initial?.poNumber || `PO-${Date.now()}`,
@@ -760,7 +791,7 @@ function useGrnForm(initial?: GoodsReceivedNote) {
     const [values, setValues] = useState<GrnFormInput>({
         grnDate: initial?.grnDate || today(),
         grnNumber: initial?.grnNumber || `GRN-${Date.now()}`,
-        lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].acceptedQuantity, unitPrice: '0', uomId: initial.lines[0].uomId } : undefined)],
+        lines: initial?.lines.length ? initial.lines.map((line) => defaultLine({ itemId: line.itemId, quantity: line.acceptedQuantity, unitPrice: '0', uomId: line.uomId })) : [defaultLine()],
         notes: '',
         purchaseOrderId: initial?.sourcePo && /^\d+$/.test(initial.sourcePo) ? initial.sourcePo : '',
         status: initial?.status || 'draft',
@@ -775,7 +806,7 @@ function useReturnForm(initial?: PurchaseReturn) {
     const { isLoading, loadItemUoms, loadLookup, lookups } = usePurchaseLookups();
     const submitState = useSubmitState();
     const [values, setValues] = useState<PurchaseReturnFormInput>({
-        lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].returnQuantity, unitPrice: '0', uomId: initial.lines[0].uomId } : undefined)],
+        lines: initial?.lines.length ? initial.lines.map((line) => defaultLine({ itemId: line.itemId, quantity: line.returnQuantity, unitPrice: '0', uomId: line.uomId })) : [defaultLine()],
         notes: '',
         returnDate: today(),
         returnNumber: initial?.returnNumber || `PRET-${Date.now()}`,
@@ -794,11 +825,13 @@ function useInvoiceForm() {
     const submitState = useSubmitState();
     const [preview, setPreview] = useState<PurchaseCalculationPreview>();
     const [values, setValues] = useState<PurchaseInvoiceFormInput>({
+        currencyId: '',
         dueDate: '',
         invoiceDate: today(),
         lines: [defaultLine()],
         sourceId: '',
-        sourceType: 'purchase_order',
+        sourceType: 'direct',
+        supplierId: '',
         supplierInvoiceNumber: '',
     });
 
@@ -807,13 +840,15 @@ function useInvoiceForm() {
             lines: values.lines.map((line) => ({
                 discount_type: line.discountType || null,
                 discount_value: Number(line.discountValue || 0),
+                item_id: Number(line.itemId) || null,
                 quantity: Number(line.quantity),
                 unit_price: Number(line.unitPrice),
+                uom_id: Number(line.uomId) || null,
             })),
         }));
         if (result) {
             setPreview({
-                breakdown: result.breakdown as never,
+                breakdown: result.breakdown,
                 calculated: result.calculated,
                 errors: result.errors,
                 input: result.input as Record<string, unknown>,
@@ -862,7 +897,7 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
     setValues: Dispatch<SetStateAction<T>>,
     lookups: ReturnType<typeof usePurchaseLookups>['lookups'],
     loadItemUoms: (itemId: string) => Promise<void>,
-    loadLookup: (name: 'items' | 'suppliers' | 'warehouses') => Promise<void>,
+    loadLookup: (name: PurchaseLookupName) => Promise<void>,
     isLoading: boolean,
     submitState: ReturnType<typeof useSubmitState>,
 ) {
@@ -883,6 +918,20 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
         });
     }
 
+    function addLine(): void {
+        setValues((current) => ({ ...current, lines: [...current.lines, defaultLine()] }));
+    }
+
+    function removeLine(index: number): void {
+        setValues((current) => {
+            if (current.lines.length <= 1) {
+                return current;
+            }
+
+            return { ...current, lines: current.lines.filter((_, lineIndex) => lineIndex !== index) };
+        });
+    }
+
     useEffect(() => {
         values.lines.forEach((line) => {
             if (line.itemId) {
@@ -891,7 +940,28 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
         });
     }, [loadItemUoms, values.lines]);
 
-    return { ...submitState, errors: submitState.errors, globalError: submitState.globalError, isLoading, loadLookup, lookups, setField, setLineField, values };
+    useEffect(() => {
+        setValues((current) => {
+            let changed = false;
+            const lines = current.lines.map((line) => {
+                if (!line.itemId || line.uomId) {
+                    return line;
+                }
+
+                const defaultUom = lookups.uomsByItem[line.itemId]?.[0];
+                if (!defaultUom?.id) {
+                    return line;
+                }
+
+                changed = true;
+                return { ...line, uomId: defaultUom.id };
+            });
+
+            return changed ? { ...current, lines } : current;
+        });
+    }, [lookups.uomsByItem, setValues]);
+
+    return { ...submitState, addLine, errors: submitState.errors, globalError: submitState.globalError, isLoading, loadItemUoms, loadLookup, lookups, removeLine, setField, setLineField, values };
 }
 
 function LookupSelect({ disabled, onChange, onOpen, options, placeholder, value }: { disabled?: boolean; onChange: (value: string) => void; onOpen?: () => void; options: PurchaseLookupOption[]; placeholder: string; value: string }) {
@@ -903,10 +973,50 @@ function LookupSelect({ disabled, onChange, onOpen, options, placeholder, value 
     );
 }
 
+function PurchaseLinesEditor({
+    addLine,
+    errors,
+    lines,
+    loadItemUoms,
+    loadLookup,
+    lookups,
+    onLineChange,
+    quantityLabel,
+    removeLine,
+}: {
+    addLine: () => void;
+    errors: Record<string, string>;
+    lines: PurchaseLineFormInput[];
+    loadItemUoms: (itemId: string) => Promise<void>;
+    loadLookup: (name: PurchaseLookupName) => Promise<void>;
+    lookups: ReturnType<typeof usePurchaseLookups>['lookups'];
+    onLineChange: (index: number, field: keyof PurchaseLineFormInput, value: string) => void;
+    quantityLabel: string;
+    removeLine: (index: number) => void;
+}) {
+    return (
+        <div className="space-y-4">
+            {lines.map((line, index) => (
+                <div className="rounded-lg border border-slate-200 bg-white p-4" key={line.clientKey}>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-slate-800">Line {index + 1}</p>
+                        <Button disabled={lines.length === 1} onClick={() => removeLine(index)} title={lines.length === 1 ? 'At least one line is required.' : 'Remove this line'} type="button" variant="ghost">Remove</Button>
+                    </div>
+                    <PurchaseLineEditor errors={errors} line={line} lineIndex={index} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onLineChange={onLineChange} quantityLabel={quantityLabel} />
+                </div>
+            ))}
+            <div className="flex justify-end">
+                <Button onClick={addLine} type="button" variant="secondary">Add line</Button>
+            </div>
+        </div>
+    );
+}
+
 function PurchaseLineEditor({
     errors,
     line,
     lineIndex,
+    loadItemUoms,
     loadLookup,
     lookups,
     onLineChange,
@@ -915,12 +1025,14 @@ function PurchaseLineEditor({
     errors: Record<string, string>;
     line: PurchaseLineFormInput;
     lineIndex: number;
-    loadLookup: (name: 'items' | 'suppliers' | 'warehouses') => Promise<void>;
+    loadItemUoms: (itemId: string) => Promise<void>;
+    loadLookup: (name: PurchaseLookupName) => Promise<void>;
     lookups: ReturnType<typeof usePurchaseLookups>['lookups'];
     onLineChange: (index: number, field: keyof PurchaseLineFormInput, value: string) => void;
     quantityLabel: string;
 }) {
     const itemUoms = line.itemId ? lookups.uomsByItem[line.itemId] ?? [] : [];
+    const uomsLoaded = !line.itemId || Object.prototype.hasOwnProperty.call(lookups.uomsByItem, line.itemId);
 
     return (
         <div className="grid gap-4 md:grid-cols-6">
@@ -928,8 +1040,9 @@ function PurchaseLineEditor({
                 <LookupSelect onChange={(value) => onLineChange(lineIndex, 'itemId', value)} onOpen={() => void loadLookup('items')} options={lookups.items} placeholder="Select item" value={line.itemId} />
             </Field>
             <Field error={errors[`lines.${lineIndex}.uom_id`] ?? errors.uom_id} label="UOM">
-                <LookupSelect disabled={!line.itemId || itemUoms.length === 0} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
-                {line.itemId && itemUoms.length === 0 ? <span className="text-xs text-amber-600">No UOM configured for this item.</span> : null}
+                <LookupSelect disabled={!line.itemId || !uomsLoaded || itemUoms.length === 0} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} onOpen={() => line.itemId ? void loadItemUoms(line.itemId) : undefined} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
+                {line.itemId && !uomsLoaded ? <span className="text-xs text-slate-500">Loading UOMs for selected item...</span> : null}
+                {line.itemId && uomsLoaded && itemUoms.length === 0 ? <span className="text-xs text-amber-600">No purchasable UOM was returned. Re-select the item or refresh seeded Item/UOM data.</span> : null}
             </Field>
             <Field error={errors[`lines.${lineIndex}.quantity`] ?? errors[`lines.${lineIndex}.ordered_qty`] ?? errors[`lines.${lineIndex}.received_qty`] ?? errors[`lines.${lineIndex}.return_qty`]} label={quantityLabel}>
                 <Input min="0" onChange={(event) => onLineChange(lineIndex, 'quantity', event.target.value)} step="0.0001" type="number" value={line.quantity} />

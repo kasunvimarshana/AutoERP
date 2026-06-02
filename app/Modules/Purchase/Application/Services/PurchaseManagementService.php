@@ -8,6 +8,7 @@ use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Item\Application\Support\ItemUomOptions;
 use Modules\Purchase\Application\Contracts\Services\PurchaseAmountCalculatorInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
@@ -122,6 +123,11 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                         continue;
                     }
 
+                    $validation = $this->validateLinePayload($linePayload, $lineId, $tenantId, 'ordered_qty', true);
+                    if ($validation instanceof Result) {
+                        return $validation;
+                    }
+
                     $upsert = $this->normalizePurchaseOrderLinePayload(
                         $linePayload,
                         $tenantId,
@@ -231,6 +237,11 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                         continue;
                     }
 
+                    $validation = $this->validateLinePayload($linePayload, $lineId, $tenantId, 'received_qty', false);
+                    if ($validation instanceof Result) {
+                        return $validation;
+                    }
+
                     $upsert = $this->normalizeGrnLinePayload(
                         $linePayload,
                         $tenantId,
@@ -337,6 +348,11 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                         $this->purchaseReturnLineRepository->delete($lineId);
 
                         continue;
+                    }
+
+                    $validation = $this->validateLinePayload($linePayload, $lineId, $tenantId, 'return_qty', true);
+                    if ($validation instanceof Result) {
+                        return $validation;
                     }
 
                     $upsert = $this->normalizePurchaseReturnLinePayload(
@@ -751,6 +767,51 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         }
 
         return $payload;
+    }
+
+    private function validateLinePayload(
+        array $line,
+        ?int $lineId,
+        int $tenantId,
+        string $quantityField,
+        bool $requiresUnitPrice,
+    ): ?Result {
+        $requiredFields = ['item_id', 'uom_id', $quantityField];
+        if ($requiresUnitPrice) {
+            $requiredFields[] = 'unit_price';
+        }
+
+        foreach ($requiredFields as $field) {
+            if ($lineId === null && (! array_key_exists($field, $line) || $line[$field] === null || $line[$field] === '')) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, sprintf('lines.*.%s is required.', $field)));
+            }
+        }
+
+        foreach (['item_id', 'uom_id'] as $field) {
+            if (array_key_exists($field, $line) && (! is_numeric($line[$field]) || (int) $line[$field] < 1)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, sprintf('lines.*.%s must be a valid positive ID.', $field)));
+            }
+        }
+
+        if (array_key_exists($quantityField, $line) && (! is_numeric($line[$quantityField]) || (float) $line[$quantityField] <= 0.0)) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, sprintf('lines.*.%s must be greater than zero.', $quantityField)));
+        }
+
+        if (array_key_exists('unit_price', $line) && (! is_numeric($line['unit_price']) || (float) $line['unit_price'] < 0.0)) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'lines.*.unit_price must be zero or greater.'));
+        }
+
+        if (
+            $tenantId > 0
+            && isset($line['item_id'], $line['uom_id'])
+            && is_numeric($line['item_id'])
+            && is_numeric($line['uom_id'])
+            && ! ItemUomOptions::isAllowed($tenantId, (int) $line['item_id'], (int) $line['uom_id'], 'purchase')
+        ) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'The selected UOM is not configured for this item in purchase context.'));
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed> */

@@ -5,6 +5,7 @@ import type {
     DocumentActivity,
     DocumentAttachment,
     DocumentComment,
+    DocumentCreateInput,
     DocumentDefinition,
     DocumentDefinitionFormInput,
     DocumentEvent,
@@ -64,7 +65,11 @@ function normalizeDocument(raw: BackendRecord): DocumentRecord {
         dueDate: asString(raw.due_date),
         grandTotal: asString(raw.grand_total, '0.0000'),
         id: asString(raw.id),
+        items: asArray(raw.items).map(normalizeLine),
         notes: asString(raw.notes),
+        ownerId: raw.owner_id === null || raw.owner_id === undefined ? undefined : asString(raw.owner_id),
+        partyId: raw.party_id === null || raw.party_id === undefined ? undefined : asString(raw.party_id),
+        sourceId: raw.source_id === null || raw.source_id === undefined ? undefined : asString(raw.source_id),
         sourceModule: asString(raw.source_module ?? data.source_module, 'core') as DocumentRecord['sourceModule'],
         sourceReference: asString(raw.source_reference ?? data.external_reference ?? data.source_reference),
         sourceType: asString(raw.source_type),
@@ -151,6 +156,7 @@ function normalizeLine(raw: BackendRecord): DocumentLine {
     const data = nested(raw, 'data');
     return {
         description: asString(raw.description),
+        discountAmount: asString(raw.discount_amount ?? data.discount_amount, '0.0000'),
         displayOrder: Number(raw.display_order ?? raw.sequence ?? 1),
         documentId: asString(raw.document_id),
         id: asString(raw.id),
@@ -161,6 +167,7 @@ function normalizeLine(raw: BackendRecord): DocumentLine {
         quantity: asString(raw.quantity ?? data.quantity),
         sourceLineId: raw.source_line_id === null || raw.source_line_id === undefined ? undefined : asString(raw.source_line_id),
         sourceLineType: raw.source_line_type === null || raw.source_line_type === undefined ? undefined : asString(raw.source_line_type),
+        taxAmount: asString(raw.tax_amount ?? data.tax_amount, '0.0000'),
         unitPrice: asString(raw.unit_price ?? data.unit_price),
         uomLabel: asString(raw.uom_label ?? data.uom),
     };
@@ -330,6 +337,30 @@ function templatePayload(input: DocumentTemplateFormInput) {
     };
 }
 
+function documentPayload(input: DocumentCreateInput) {
+    return {
+        data: input.data ?? {},
+        document_date: input.documentDate,
+        document_definition_id: Number(input.documentDefinitionId) || null,
+        document_type_id: Number(input.documentTypeId),
+        due_date: input.dueDate || null,
+        items: input.items.map((item) => ({
+            data: item.data ?? {},
+            description: item.description || null,
+            item_type: item.itemType,
+            line_total: item.lineTotal,
+        })),
+        notes: input.notes || null,
+        owner_id: Number(input.ownerId) || null,
+        party_id: Number(input.partyId) || null,
+        source_id: Number(input.sourceId) || null,
+        source_module: input.sourceModule || null,
+        source_reference: input.sourceReference || null,
+        source_type: input.sourceType || null,
+        title: input.title || null,
+    };
+}
+
 function normalizedCollection<T>(response: ApiCollectionResponse<BackendRecord>, mapper: (row: BackendRecord) => T): ApiCollectionResponse<T> {
     return { ...response, data: response.data.map(mapper) };
 }
@@ -357,6 +388,10 @@ export const documentApi = {
     createDocumentType: async (input: DocumentTypeFormInput) => {
         const response = await httpClient<ApiResponse<BackendRecord>>('/api/document/types', { body: typePayload(input), method: 'POST' });
         return { ...response, data: normalizeDocumentType(response.data) };
+    },
+    createDocument: async (input: DocumentCreateInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/document/documents', { body: documentPayload(input), method: 'POST' });
+        return { ...response, data: normalizeDocument(response.data) };
     },
     createTemplate: async (input: DocumentTemplateFormInput) => {
         const response = await httpClient<ApiResponse<BackendRecord>>('/api/document/templates', { body: templatePayload(input), method: 'POST' });
@@ -393,6 +428,8 @@ export const documentApi = {
             query: {
                 page: query.page,
                 per_page: query.per_page ?? query.perPage,
+                search: query.search,
+                source_id: query.source_id,
                 source_module: query.source_module,
                 source_type: query.source_type,
                 status: query.status,

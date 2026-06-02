@@ -32,15 +32,21 @@ export function PurchaseLedgerNoteListPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [noteType, setNoteType] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [query, setQuery] = useState('');
     const [rows, setRows] = useState<PurchaseLedgerNote[]>([]);
     const filterValues = useMemo(() => ({ noteType }), [noteType]);
 
     useEffect(() => {
+        const timeoutId = window.setTimeout(() => setDebouncedQuery(query), 300);
+        return () => window.clearTimeout(timeoutId);
+    }, [query]);
+
+    useEffect(() => {
         let mounted = true;
         setError('');
         setIsLoading(true);
-        purchaseApi.ledgerNotes.list({ noteType, search: query })
+        purchaseApi.ledgerNotes.list({ noteType, search: debouncedQuery })
             .then((response) => {
                 if (mounted) setRows(response.data);
             })
@@ -52,7 +58,7 @@ export function PurchaseLedgerNoteListPage() {
             });
 
         return () => { mounted = false; };
-    }, [noteType, query]);
+    }, [debouncedQuery, noteType]);
 
     function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
         if (filterId === 'noteType') {
