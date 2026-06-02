@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('driver_id')->nullable()->constrained('employees')->nullOnDelete();
 
             $table->unsignedInteger('line_number');
+            $table->string('agreement_side')->default('lessee')->comment('lessee, lessor');
             $table->date('usage_date');
             $table->string('usage_type')->default('normal');
             $table->time('start_time')->nullable();
@@ -40,9 +41,12 @@ return new class extends Migration
             $table->unsignedInteger('day_out_count')->default(0);
             $table->unsignedInteger('night_out_count')->default(0);
             $table->decimal('fuel_amount', 20, 4)->default(0);
+            $table->decimal('driver_charge_amount', 20, 4)->default(0);
+            $table->decimal('mileage_charge_amount', 20, 4)->default(0);
             $table->decimal('toll_amount', 20, 4)->default(0);
             $table->decimal('parking_amount', 20, 4)->default(0);
             $table->decimal('other_expense_amount', 20, 4)->default(0);
+            $table->decimal('deduction_amount', 20, 4)->default(0);
             $table->decimal('customer_charge_amount', 20, 4)->default(0);
             $table->decimal('provider_cost_amount', 20, 4)->default(0);
             $table->string('status')->default('draft');

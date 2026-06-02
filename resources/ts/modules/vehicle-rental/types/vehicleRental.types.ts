@@ -1,4 +1,11 @@
 export type VehicleRentalAgreementStatus = 'draft' | 'active' | 'running' | 'invoiceable' | 'closed' | 'cancelled';
+export type VehicleRentalAgreementRole = 'lessee' | 'lessor';
+
+export type VehicleRentalLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
+};
 
 export type VehicleRentalSourceReference = {
     sourceId?: string;
@@ -86,6 +93,7 @@ export type VehicleRentalRunningChartLine = {
 };
 
 export type VehicleRentalRunningChart = {
+    agreementId: string;
     agreementNumber: string;
     billingPreview: VehicleRentalBillingPreview;
     chartNumber: string;
@@ -95,6 +103,7 @@ export type VehicleRentalRunningChart = {
     id: string;
     lines: VehicleRentalRunningChartLine[];
     providerPayablePreview: string;
+    side: VehicleRentalAgreementRole;
     startAt: string;
     status: string;
     vehicle: string;
@@ -177,6 +186,7 @@ export type VehicleRentalSettings = {
 export type VehicleRentalAgreement = {
     activity: VehicleRentalAuditEntry[];
     agreementNumber: string;
+    agreementRole: VehicleRentalAgreementRole;
     availabilityPreview: VehicleRentalAvailabilityPreview;
     billingPreview: VehicleRentalBillingPreview;
     customer: string;
@@ -186,6 +196,8 @@ export type VehicleRentalAgreement = {
     financePreview: VehicleRentalFinancePostingPreview;
     id: string;
     invoices: VehicleRentalInvoice[];
+    lesseeAgreementId?: string;
+    lessorAgreementId?: string;
     lines: VehicleRentalAgreementLine[];
     mode: 'with_driver' | 'without_driver';
     payments: VehicleRentalPayment[];
@@ -195,6 +207,7 @@ export type VehicleRentalAgreement = {
     rateRules: VehicleRentalRateRule[];
     replacements: VehicleRentalReplacement[];
     breakdowns: VehicleRentalBreakdown[];
+    rentalOperationUuid?: string;
     rentalUnit: 'km' | 'hour' | 'day' | 'week' | 'month';
     runningCharts: VehicleRentalRunningChart[];
     sourceReference: VehicleRentalSourceReference;
@@ -204,6 +217,52 @@ export type VehicleRentalAgreement = {
     vehicle: string;
     vehicleSource: 'own_fleet' | 'external_provider';
     workflowStatus: string;
+};
+
+export type VehicleRentalAgreementFormInput = {
+    agreementDate: string;
+    allowedDailyHours: string;
+    allowedDailyKm: string;
+    billingFrequency: string;
+    customerId: string;
+    depositAmount: string;
+    driverMode: 'with_driver' | 'without_driver';
+    endAt: string;
+    lesseeAgreementNumber: string;
+    lesseeBaseRate: string;
+    lesseeTerms: string;
+    lessorAgreementNumber: string;
+    lessorBaseRate: string;
+    lessorPartyId: string;
+    lessorPartyName: string;
+    lessorPartyType: 'supplier' | 'customer' | 'company' | 'external_party';
+    lessorTerms: string;
+    pickupLocation: string;
+    providerId: string;
+    rateModel: string;
+    rentalVehicleId: string;
+    returnLocation: string;
+    startAt: string;
+    status: VehicleRentalAgreementStatus;
+    terms: string;
+};
+
+export type VehicleRentalRunningChartFormInput = {
+    date: string;
+    deductions: string;
+    driverCharges: string;
+    driverId: string;
+    durationHours: string;
+    endMeter: string;
+    extraCharges: string;
+    fuel: string;
+    lesseeAgreementId: string;
+    lessorAgreementId: string;
+    mileageCharges: string;
+    notes: string;
+    rentalVehicleId: string;
+    runningDistance: string;
+    startMeter: string;
 };
 
 export type VehicleRentalDashboardMetric = {

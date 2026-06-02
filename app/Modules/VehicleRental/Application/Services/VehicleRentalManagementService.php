@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Application\Services;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
@@ -83,6 +85,14 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         try {
             return $this->agreementRepository->transaction(function () use ($id, $payload): Result {
                 $agreementPayload = $this->extractAgreementPayload($payload);
+                $agreementRole = $this->normalizeAgreementRole((string) ($agreementPayload['agreement_role'] ?? 'lessee'));
+                $agreementPayload['agreement_role'] = $agreementRole;
+                if ($id === null && trim((string) ($agreementPayload['agreement_number'] ?? '')) === '') {
+                    $agreementPayload['agreement_number'] = $this->nextAgreementNumber(
+                        (int) ($agreementPayload['tenant_id'] ?? 0),
+                        $agreementRole,
+                    );
+                }
                 $agreement = $id === null
                     ? $this->agreementRepository->create($this->withDefaultRowVersion($agreementPayload))
                     : $this->agreementRepository->update($id, $agreementPayload);
@@ -145,6 +155,78 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
                 }
 
                 return Result::success($this->buildAgreementAggregate($reloaded));
+            });
+        } catch (Throwable $exception) {
+            return $this->failure($exception);
+        }
+    }
+
+    public function upsertLinkedAgreementAggregate(array $payload): Result
+    {
+        try {
+            return $this->agreementRepository->transaction(function () use ($payload): Result {
+                $operationUuid = (string) ($payload['rental_operation_uuid'] ?? Str::uuid());
+                $shared = $this->extractSharedLinkedAgreementPayload($payload);
+                $lesseePayload = array_merge(
+                    $shared,
+                    is_array($payload['lessee_agreement'] ?? null) ? $payload['lessee_agreement'] : [],
+                    [
+                        'agreement_role' => 'lessee',
+                        'rental_operation_uuid' => $operationUuid,
+                        'customer_id' => $payload['customer_id'] ?? ($payload['lessee_customer_id'] ?? $shared['customer_id'] ?? null),
+                        'provider_id' => null,
+                    ],
+                );
+                $lessorPayload = array_merge(
+                    $shared,
+                    is_array($payload['lessor_agreement'] ?? null) ? $payload['lessor_agreement'] : [],
+                    [
+                        'agreement_role' => 'lessor',
+                        'rental_operation_uuid' => $operationUuid,
+                        'customer_id' => null,
+                        'provider_id' => $payload['provider_id'] ?? ($payload['lessor_provider_id'] ?? $shared['provider_id'] ?? null),
+                        'lessor_party_type' => $payload['lessor_party_type'] ?? ($shared['lessor_party_type'] ?? 'supplier'),
+                        'lessor_party_id' => $payload['lessor_party_id'] ?? ($payload['provider_id'] ?? null),
+                        'lessor_party_name' => $payload['lessor_party_name'] ?? null,
+                    ],
+                );
+
+                $lesseeResult = $this->upsertAgreementAggregate(null, array_merge($lesseePayload, [
+                    'lines' => $payload['lessee_lines'] ?? ($payload['lessee_agreement']['lines'] ?? []),
+                    'rates' => $payload['lessee_rates'] ?? ($payload['lessee_agreement']['rates'] ?? []),
+                    'rate_rules' => $payload['lessee_rate_rules'] ?? ($payload['lessee_agreement']['rate_rules'] ?? []),
+                ]));
+                if ($lesseeResult->isFailure()) {
+                    return $lesseeResult;
+                }
+
+                $lessee = $lesseeResult->valueOrFail();
+                $lesseeId = (int) ($lessee['id'] ?? 0);
+                $lessorResult = $this->upsertAgreementAggregate(null, array_merge($lessorPayload, [
+                    'parent_agreement_id' => $lesseeId,
+                    'lessee_agreement_id' => $lesseeId,
+                    'lines' => $payload['lessor_lines'] ?? ($payload['lessor_agreement']['lines'] ?? []),
+                    'rates' => $payload['lessor_rates'] ?? ($payload['lessor_agreement']['rates'] ?? []),
+                    'rate_rules' => $payload['lessor_rate_rules'] ?? ($payload['lessor_agreement']['rate_rules'] ?? []),
+                ]));
+                if ($lessorResult->isFailure()) {
+                    return $lessorResult;
+                }
+
+                $lessor = $lessorResult->valueOrFail();
+                $lessorId = (int) ($lessor['id'] ?? 0);
+                $this->agreementRepository->update($lesseeId, [
+                    'lessor_agreement_id' => $lessorId,
+                ]);
+                $this->agreementRepository->update($lessorId, [
+                    'lessee_agreement_id' => $lesseeId,
+                ]);
+
+                return Result::success([
+                    'rental_operation_uuid' => $operationUuid,
+                    'lessee_agreement' => $this->buildAgreementAggregate($this->agreementRepository->findOrFail($lesseeId)),
+                    'lessor_agreement' => $this->buildAgreementAggregate($this->agreementRepository->findOrFail($lessorId)),
+                ]);
             });
         } catch (Throwable $exception) {
             return $this->failure($exception);
@@ -225,12 +307,15 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         }
     }
 
-    public function listRunningCharts(int $tenantId, ?int $agreementId = null): Result
+    public function listRunningCharts(int $tenantId, ?int $agreementId = null, ?string $agreementSide = null): Result
     {
         try {
             $criteria = ['tenant_id' => $tenantId];
             if ($agreementId !== null) {
                 $criteria['agreement_id'] = $agreementId;
+            }
+            if ($agreementSide !== null && trim($agreementSide) !== '') {
+                $criteria['agreement_side'] = $this->normalizeAgreementRole($agreementSide);
             }
 
             return Result::success($this->normalizeRecords($this->runningChartRepository->list($criteria)));
@@ -258,6 +343,24 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         try {
             return $this->runningChartRepository->transaction(function () use ($id, $payload): Result {
                 $runningChartPayload = $this->extractRunningChartPayload($payload);
+                $agreement = $this->agreementRepository->findById((int) ($runningChartPayload['agreement_id'] ?? 0));
+                if (! $agreement instanceof DataRecord) {
+                    return Result::failure(new Error(VehicleRentalErrorCode::NOT_FOUND, 'Agreement not found.'));
+                }
+                $side = $this->normalizeAgreementRole((string) ($runningChartPayload['agreement_side'] ?? $agreement->get('agreement_role', 'lessee')));
+                $runningChartPayload['agreement_side'] = $side;
+                $runningChartPayload['lessee_agreement_id'] = $side === 'lessee'
+                    ? (int) $agreement->id()
+                    : ($agreement->get('lessee_agreement_id') !== null ? (int) $agreement->get('lessee_agreement_id') : null);
+                $runningChartPayload['lessor_agreement_id'] = $side === 'lessor'
+                    ? (int) $agreement->id()
+                    : ($agreement->get('lessor_agreement_id') !== null ? (int) $agreement->get('lessor_agreement_id') : null);
+                if ($id === null && trim((string) ($runningChartPayload['chart_number'] ?? '')) === '') {
+                    $runningChartPayload['chart_number'] = $this->nextRunningChartNumber(
+                        (int) ($runningChartPayload['tenant_id'] ?? 0),
+                        $side,
+                    );
+                }
                 $runningChart = $id === null
                     ? $this->runningChartRepository->create($this->withDefaultRowVersion($runningChartPayload))
                     : $this->runningChartRepository->update($id, $runningChartPayload);
@@ -313,6 +416,87 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
                 }
 
                 return Result::success($this->buildRunningChartAggregate($reloaded));
+            });
+        } catch (Throwable $exception) {
+            return $this->failure($exception);
+        }
+    }
+
+    public function createCombinedRunningChartEntry(array $payload): Result
+    {
+        try {
+            return $this->runningChartRepository->transaction(function () use ($payload): Result {
+                $lesseeAgreementId = (int) ($payload['lessee_agreement_id'] ?? 0);
+                $lessorAgreementId = (int) ($payload['lessor_agreement_id'] ?? 0);
+                $lesseeAgreement = $this->agreementRepository->findById($lesseeAgreementId);
+                $lessorAgreement = $this->agreementRepository->findById($lessorAgreementId);
+                if (! $lesseeAgreement instanceof DataRecord || ! $lessorAgreement instanceof DataRecord) {
+                    return Result::failure(new Error(VehicleRentalErrorCode::NOT_FOUND, 'Both lessee and lessor agreements are required.'));
+                }
+                if ($this->normalizeAgreementRole((string) $lesseeAgreement->get('agreement_role')) !== 'lessee') {
+                    return Result::failure(new Error(VehicleRentalErrorCode::INVALID_VALUE, 'Selected lessee agreement must have lessee role.'));
+                }
+                if ($this->normalizeAgreementRole((string) $lessorAgreement->get('agreement_role')) !== 'lessor') {
+                    return Result::failure(new Error(VehicleRentalErrorCode::INVALID_VALUE, 'Selected lessor agreement must have lessor role.'));
+                }
+
+                $line = $this->normalizeCombinedRunningChartLine($payload);
+                $chartDate = (string) ($payload['chart_date'] ?? $line['usage_date'] ?? now()->toDateString());
+                $base = [
+                    'tenant_id' => (int) $lesseeAgreement->get('tenant_id', 0),
+                    'organization_unit_id' => $lesseeAgreement->get('organization_unit_id'),
+                    'rental_vehicle_id' => $payload['rental_vehicle_id'] ?? $lesseeAgreement->get('rental_vehicle_id'),
+                    'driver_id' => $payload['driver_id'] ?? $lesseeAgreement->get('assigned_driver_id'),
+                    'chart_date' => $chartDate,
+                    'status' => $payload['status'] ?? 'draft',
+                    'remarks' => $payload['remarks'] ?? $payload['notes'] ?? null,
+                ];
+
+                $lesseeResult = $this->upsertRunningChartAggregate(null, [
+                    ...$base,
+                    'agreement_id' => $lesseeAgreementId,
+                    'agreement_side' => 'lessee',
+                    'lines' => [[...$line, 'agreement_side' => 'lessee']],
+                ]);
+                if ($lesseeResult->isFailure()) {
+                    return $lesseeResult;
+                }
+                $lesseeChart = $lesseeResult->valueOrFail();
+                $lesseeChartId = (int) ($lesseeChart['id'] ?? 0);
+
+                $lessorResult = $this->upsertRunningChartAggregate(null, [
+                    ...$base,
+                    'tenant_id' => (int) $lessorAgreement->get('tenant_id', 0),
+                    'organization_unit_id' => $lessorAgreement->get('organization_unit_id'),
+                    'rental_vehicle_id' => $payload['rental_vehicle_id'] ?? $lessorAgreement->get('rental_vehicle_id'),
+                    'driver_id' => $payload['driver_id'] ?? $lessorAgreement->get('assigned_driver_id'),
+                    'agreement_id' => $lessorAgreementId,
+                    'agreement_side' => 'lessor',
+                    'paired_running_chart_id' => $lesseeChartId,
+                    'lines' => [[...$line, 'agreement_side' => 'lessor']],
+                ]);
+                if ($lessorResult->isFailure()) {
+                    return $lessorResult;
+                }
+                $lessorChart = $lessorResult->valueOrFail();
+                $lessorChartId = (int) ($lessorChart['id'] ?? 0);
+                $this->runningChartRepository->update($lesseeChartId, [
+                    'paired_running_chart_id' => $lessorChartId,
+                    'lessor_agreement_id' => $lessorAgreementId,
+                ]);
+                $this->runningChartRepository->update($lessorChartId, [
+                    'paired_running_chart_id' => $lesseeChartId,
+                    'lessee_agreement_id' => $lesseeAgreementId,
+                ]);
+
+                return Result::success([
+                    'lessee_running_chart' => $this->buildRunningChartAggregate($this->runningChartRepository->findOrFail($lesseeChartId)),
+                    'lessor_running_chart' => $this->buildRunningChartAggregate($this->runningChartRepository->findOrFail($lessorChartId)),
+                    'margin_preview' => [
+                        'lessee_charge' => (float) ($this->runningChartRepository->findOrFail($lesseeChartId)->get('customer_bill_total', 0)),
+                        'lessor_payable' => (float) ($this->runningChartRepository->findOrFail($lessorChartId)->get('provider_cost_total', 0)),
+                    ],
+                ]);
             });
         } catch (Throwable $exception) {
             return $this->failure($exception);
@@ -937,22 +1121,102 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
 
     private function extractAgreementPayload(array $payload): array
     {
+        if (isset($payload['supplier_id']) && ! isset($payload['provider_id'])) {
+            $payload['provider_id'] = $payload['supplier_id'];
+        }
+        if (isset($payload['driver_id']) && ! isset($payload['assigned_driver_id'])) {
+            $payload['assigned_driver_id'] = $payload['driver_id'];
+        }
+
         return $this->withDefaultRowVersion(array_diff_key($payload, array_flip([
             'lines',
             'rates',
             'rate_rules',
             'metadata',
             'extra_charges',
+            'lessee_agreement',
+            'lessor_agreement',
+            'lessee_lines',
+            'lessor_lines',
+            'lessee_rates',
+            'lessor_rates',
+            'lessee_rate_rules',
+            'lessor_rate_rules',
+            'supplier_id',
+            'driver_id',
+            'lessee_customer_id',
+            'lessor_provider_id',
         ])));
     }
 
     private function extractRunningChartPayload(array $payload): array
     {
+        if (isset($payload['driver_id']) && ! isset($payload['assigned_driver_id'])) {
+            $payload['driver_id'] = $payload['driver_id'];
+        }
+
         return $this->withDefaultRowVersion(array_diff_key($payload, array_flip([
             'lines',
             'extra_charges',
             'metadata',
         ])));
+    }
+
+    private function extractSharedLinkedAgreementPayload(array $payload): array
+    {
+        return array_diff_key($payload, array_flip([
+            'agreement_number',
+            'agreement_role',
+            'lessee_agreement',
+            'lessor_agreement',
+            'lessee_lines',
+            'lessor_lines',
+            'lessee_rates',
+            'lessor_rates',
+            'lessee_rate_rules',
+            'lessor_rate_rules',
+            'lines',
+            'rates',
+            'rate_rules',
+            'metadata',
+        ]));
+    }
+
+    private function normalizeAgreementRole(string $role): string
+    {
+        $role = strtolower(trim($role));
+
+        return match ($role) {
+            'customer' => 'lessee',
+            'provider' => 'lessor',
+            'lessor' => 'lessor',
+            default => 'lessee',
+        };
+    }
+
+    private function normalizeCombinedRunningChartLine(array $payload): array
+    {
+        $startKm = round((float) ($payload['start_km'] ?? $payload['start_meter'] ?? 0), 4);
+        $endKm = round((float) ($payload['end_km'] ?? $payload['end_meter'] ?? 0), 4);
+        $totalKm = round((float) ($payload['total_km'] ?? $payload['running_distance'] ?? max(0, $endKm - $startKm)), 4);
+        $totalHours = round((float) ($payload['total_hours'] ?? $payload['duration_hours'] ?? 0), 4);
+
+        return [
+            'usage_date' => $payload['usage_date'] ?? $payload['date'] ?? now()->toDateString(),
+            'usage_type' => $payload['usage_type'] ?? 'normal',
+            'start_time' => $payload['start_time'] ?? null,
+            'end_time' => $payload['end_time'] ?? null,
+            'start_km' => $startKm,
+            'end_km' => $endKm,
+            'total_hours' => $totalHours,
+            'total_km' => $totalKm,
+            'fuel_amount' => round((float) ($payload['fuel_amount'] ?? $payload['fuel'] ?? 0), 4),
+            'driver_charge_amount' => round((float) ($payload['driver_charge_amount'] ?? $payload['driver_charges'] ?? 0), 4),
+            'mileage_charge_amount' => round((float) ($payload['mileage_charge_amount'] ?? $payload['mileage_charges'] ?? 0), 4),
+            'other_expense_amount' => round((float) ($payload['other_expense_amount'] ?? $payload['extra_charges'] ?? 0), 4),
+            'deduction_amount' => round((float) ($payload['deduction_amount'] ?? $payload['deductions'] ?? 0), 4),
+            'remarks' => $payload['remarks'] ?? $payload['notes'] ?? null,
+        ];
     }
 
     private function recalculateAgreementTotals(int $agreementId, int $tenantId): void
@@ -1105,6 +1369,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
     private function calculateRunningChartLineAmounts(int $agreementId, array $linePayload): array
     {
         $agreement = $this->agreementRepository->findById($agreementId);
+        $side = $this->normalizeAgreementRole((string) ($linePayload['agreement_side'] ?? $agreement?->get('agreement_role', 'lessee')));
         $rate = $this->resolveActiveRate($agreementId, $linePayload['usage_date'] ?? null);
         $allowedHours = (float) ($linePayload['allowed_hours']
             ?? ($agreement instanceof DataRecord ? $agreement->get('allowed_daily_hours', 0) : 0));
@@ -1119,14 +1384,25 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         $extraKmRate = $rate instanceof DataRecord ? (float) $rate->get('extra_km_rate', 0) : 0.0;
         $nightShiftRate = $rate instanceof DataRecord ? (float) $rate->get('night_shift_rate', 0) : 0.0;
         $driverRate = $rate instanceof DataRecord ? (float) $rate->get('driver_rate', 0) : 0.0;
-        $customerCharge = ($totalHours * $baseRate)
+        $calculatedAmount = ($totalHours * $baseRate)
             + ($extraHours * $extraHourRate)
             + ($extraKm * $extraKmRate)
             + ((float) ($linePayload['night_shift_hours'] ?? 0) * $nightShiftRate)
-            + ($driverRate > 0 ? $driverRate : 0);
-        $providerCost = (float) ($linePayload['provider_cost_amount'] ?? 0);
+            + ($driverRate > 0 ? $driverRate : 0)
+            + (float) ($linePayload['driver_charge_amount'] ?? 0)
+            + (float) ($linePayload['mileage_charge_amount'] ?? 0)
+            + (float) ($linePayload['other_expense_amount'] ?? 0)
+            - (float) ($linePayload['deduction_amount'] ?? 0);
+        $calculatedAmount = max(0.0, $calculatedAmount);
+        $customerCharge = $side === 'lessee'
+            ? (float) ($linePayload['customer_charge_amount'] ?? $calculatedAmount)
+            : 0.0;
+        $providerCost = $side === 'lessor'
+            ? (float) ($linePayload['provider_cost_amount'] ?? $calculatedAmount)
+            : (float) ($linePayload['provider_cost_amount'] ?? 0);
 
         return [
+            'agreement_side' => $side,
             'allowed_hours' => round($allowedHours, 4),
             'extra_hours' => round($extraHours, 4),
             'allowed_km' => round($allowedKm, 4),
@@ -1299,6 +1575,67 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         $tax = $result->valueOrFail();
 
         return round((float) ($tax['tax_amount'] ?? 0), 4);
+    }
+
+    private function nextAgreementNumber(int $tenantId, string $role): string
+    {
+        $prefix = $role === 'lessor' ? 'VR-LOR-' : 'VR-LES-';
+
+        return $this->nextSequenceNumber($tenantId, 'vehicle_rental_' . $role . '_agreement', $prefix);
+    }
+
+    private function nextRunningChartNumber(int $tenantId, string $side): string
+    {
+        $prefix = $side === 'lessor' ? 'VRC-LOR-' : 'VRC-LES-';
+
+        return $this->nextSequenceNumber($tenantId, 'vehicle_rental_running_chart_' . $side, $prefix);
+    }
+
+    private function nextSequenceNumber(int $tenantId, string $documentType, string $prefix): string
+    {
+        if ($tenantId < 1) {
+            return $prefix . now()->format('YmdHis');
+        }
+
+        $periodValue = now()->format('Y');
+        $sequence = DB::table('sequences')
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', $documentType)
+            ->where('period_value', $periodValue)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequence === null) {
+            $sequenceId = DB::table('sequences')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'document_type' => $documentType,
+                'prefix' => $prefix,
+                'suffix' => '',
+                'padding' => 5,
+                'next_number' => 1,
+                'period_type' => 'yearly',
+                'period_value' => $periodValue,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $sequence = DB::table('sequences')->where('id', $sequenceId)->lockForUpdate()->first();
+        }
+
+        $nextNumber = (int) ($sequence->next_number ?? 1);
+        DB::table('sequences')
+            ->where('id', $sequence->id)
+            ->update([
+                'next_number' => $nextNumber + 1,
+                'row_version' => ((int) ($sequence->row_version ?? 1)) + 1,
+                'updated_at' => now(),
+            ]);
+
+        return (string) ($sequence->prefix ?? $prefix)
+            . str_pad((string) $nextNumber, (int) ($sequence->padding ?? 5), '0', STR_PAD_LEFT)
+            . (string) ($sequence->suffix ?? '');
     }
 
     private function syncMetadataValues(

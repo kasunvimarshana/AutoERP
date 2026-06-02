@@ -16,10 +16,14 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('agreement_id')->constrained('vehicle_rental_agreements')->cascadeOnDelete();
+            $table->foreignId('lessee_agreement_id')->nullable()->constrained('vehicle_rental_agreements')->cascadeOnDelete();
+            $table->foreignId('lessor_agreement_id')->nullable()->constrained('vehicle_rental_agreements')->cascadeOnDelete();
+            $table->foreignId('paired_running_chart_id')->nullable()->constrained('vehicle_rental_running_charts')->nullOnDelete();
             $table->foreignId('rental_vehicle_id')->constrained('vehicle_rental_vehicles')->restrictOnDelete();
             $table->foreignId('driver_id')->nullable()->constrained('employees')->nullOnDelete();
 
             $table->string('chart_number');
+            $table->string('agreement_side')->default('lessee')->comment('lessee, lessor');
             $table->date('chart_date');
             $table->string('status')->default('draft');
             $table->decimal('total_hours', 20, 4)->default(0);
@@ -58,6 +62,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'chart_number'], 'vehicle_rental_running_charts_number_uk');
             $table->index(['tenant_id', 'agreement_id'], 'vehicle_rental_running_charts_agreement_idx');
+            $table->index(['tenant_id', 'agreement_side'], 'vehicle_rental_running_charts_side_idx');
         });
     }
 

@@ -71,6 +71,12 @@ final class VehicleRentalWorkflowService implements VehicleRentalWorkflowService
             if (! $agreement instanceof DataRecord) {
                 return Result::failure(new Error(VehicleRentalErrorCode::NOT_FOUND, 'Agreement not found.'));
             }
+            if ((string) $agreement->get('agreement_role', 'lessee') !== 'lessee') {
+                return Result::failure(new Error(
+                    VehicleRentalErrorCode::INVALID_VALUE,
+                    'Lessee invoice generation requires a lessee agreement.',
+                ));
+            }
 
             $targetStatus = strtolower(trim((string) ($payload['status'] ?? '')));
             if ($targetStatus === '') {
@@ -205,6 +211,12 @@ final class VehicleRentalWorkflowService implements VehicleRentalWorkflowService
             $agreement = $this->agreementRepository->findById((int) $agreementId);
             if (! $agreement instanceof DataRecord) {
                 return Result::failure(new Error(VehicleRentalErrorCode::NOT_FOUND, 'Agreement not found.'));
+            }
+            if ((string) $agreement->get('agreement_role', 'lessee') !== 'lessee') {
+                return Result::failure(new Error(
+                    VehicleRentalErrorCode::INVALID_VALUE,
+                    'Lessee payment allocation requires a lessee agreement.',
+                ));
             }
 
             $documentTypeId = isset($payload['document_type_id']) ? (int) $payload['document_type_id'] : 0;
@@ -381,16 +393,26 @@ final class VehicleRentalWorkflowService implements VehicleRentalWorkflowService
             if (! $agreement instanceof DataRecord) {
                 return Result::failure(new Error(VehicleRentalErrorCode::NOT_FOUND, 'Agreement not found.'));
             }
+            if ((string) $agreement->get('agreement_role', 'lessee') !== 'lessor') {
+                return Result::failure(new Error(
+                    VehicleRentalErrorCode::INVALID_VALUE,
+                    'Provider payable generation requires a lessor agreement.',
+                ));
+            }
 
             $grandTotal = (float) (
                 $payload['grand_total'] ?? $this->resolveDefaultProviderPayableAmount((int) $agreementId)
             );
+            $providerId = (int) ($payload['provider_id'] ?? $agreement->get('provider_id', 0));
             $payable = $this->providerPayableRepository->create([
                 'row_version' => 1,
                 'tenant_id' => (int) $agreement->get('tenant_id', 0),
                 'organization_unit_id' => $agreement->get('organization_unit_id'),
                 'agreement_id' => (int) $agreementId,
-                'provider_id' => (int) ($payload['provider_id'] ?? $agreement->get('provider_id', 0)),
+                'provider_id' => $providerId > 0 ? $providerId : null,
+                'provider_party_type' => $payload['provider_party_type'] ?? $agreement->get('lessor_party_type'),
+                'provider_party_id' => $payload['provider_party_id'] ?? $agreement->get('lessor_party_id'),
+                'provider_party_name' => $payload['provider_party_name'] ?? $agreement->get('lessor_party_name'),
                 'rental_vehicle_id' => $payload['rental_vehicle_id'] ?? $agreement->get('rental_vehicle_id'),
                 'replacement_id' => $payload['replacement_id'] ?? null,
                 'currency_id' => $payload['currency_id'] ?? $agreement->get('currency_id'),

@@ -21,8 +21,11 @@ final class VehicleRentalRunningChartController extends Controller
         $validated = $request->validated();
         $tenantId = (int) $validated['tenant_id'];
         $agreementId = isset($validated['agreement_id']) ? (int) $validated['agreement_id'] : null;
+        $agreementSide = isset($validated['agreement_side']) && is_string($validated['agreement_side'])
+            ? $validated['agreement_side']
+            : null;
 
-        return $this->respond($this->service->listRunningCharts($tenantId, $agreementId));
+        return $this->respond($this->service->listRunningCharts($tenantId, $agreementId, $agreementSide));
     }
 
     public function store(UpsertVehicleRentalAggregateRequest $request): JsonResponse

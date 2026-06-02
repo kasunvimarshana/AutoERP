@@ -27,6 +27,15 @@ Route::prefix('api/vehicle-rental')
     ])
     ->name('vehiclerental.')
     ->group(function (): void {
+        Route::post(
+            'agreements/linked',
+            [VehicleRentalManagementController::class, 'createLinkedAgreements'],
+        )->name('agreements.linked.store');
+        Route::post(
+            'running-charts/combined-entry',
+            [VehicleRentalManagementController::class, 'createCombinedRunningChart'],
+        )->name('running-charts.combined-entry.store');
+
         Route::apiResource('agreements', VehicleRentalAgreementController::class)
             ->only(['index', 'store', 'show', 'update'])
             ->parameters(['agreements' => 'agreement']);

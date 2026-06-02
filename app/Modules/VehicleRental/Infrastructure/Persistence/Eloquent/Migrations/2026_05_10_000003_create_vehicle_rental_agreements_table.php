@@ -27,7 +27,13 @@ return new class extends Migration
             $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
             $table->string('agreement_number');
-            $table->string('agreement_role')->default('customer')->comment('customer, provider');
+            $table->uuid('rental_operation_uuid')->nullable()->comment('Groups linked lessee and lessor agreements for one rental operation');
+            $table->string('agreement_role')->default('lessee')->comment('lessee, lessor');
+            $table->foreignId('lessee_agreement_id')->nullable()->constrained('vehicle_rental_agreements')->nullOnDelete();
+            $table->foreignId('lessor_agreement_id')->nullable()->constrained('vehicle_rental_agreements')->nullOnDelete();
+            $table->string('lessor_party_type')->nullable()->comment('supplier, customer, company, external_party');
+            $table->unsignedBigInteger('lessor_party_id')->nullable();
+            $table->string('lessor_party_name')->nullable();
             $table->string('status')->default('draft');
             $table->string('invoice_status')->default('pending');
             $table->string('payment_status')->default('unpaid');
@@ -48,6 +54,10 @@ return new class extends Migration
             $table->text('terms_and_conditions')->nullable();
             $table->text('customer_notes')->nullable();
             $table->text('internal_notes')->nullable();
+            $table->string('pickup_location')->nullable();
+            $table->string('return_location')->nullable();
+            $table->dateTime('actual_pickup_at')->nullable();
+            $table->dateTime('actual_return_at')->nullable();
 
             $table->decimal('estimated_subtotal', 20, 4)->default(0);
             $table->decimal('estimated_discount_total', 20, 4)->default(0);
@@ -82,6 +92,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'rental_vehicle_id'], 'vehicle_rental_agreements_vehicle_idx');
             $table->index(['tenant_id', 'customer_id'], 'vehicle_rental_agreements_customer_idx');
             $table->index(['tenant_id', 'provider_id'], 'vehicle_rental_agreements_provider_idx');
+            $table->index(['tenant_id', 'rental_operation_uuid'], 'vehicle_rental_agreements_operation_idx');
+            $table->index(['tenant_id', 'agreement_role'], 'vehicle_rental_agreements_role_idx');
         });
     }
 

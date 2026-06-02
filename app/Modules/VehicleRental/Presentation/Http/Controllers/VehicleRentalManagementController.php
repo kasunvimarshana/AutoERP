@@ -10,6 +10,7 @@ use Modules\Core\Application\Results\Result;
 use Modules\VehicleRental\Application\Contracts\Services\VehicleRentalManagementServiceInterface;
 use Modules\VehicleRental\Presentation\Http\Requests\ListVehicleRentalRunningChartRequest;
 use Modules\VehicleRental\Presentation\Http\Requests\SyncVehicleRentalLinesRequest;
+use Modules\VehicleRental\Presentation\Http\Requests\UpsertVehicleRentalAggregateRequest;
 use Modules\VehicleRental\Presentation\Http\Requests\VehicleRentalAvailabilityRequest;
 use Modules\VehicleRental\Presentation\Http\Requests\VehicleRentalBillingPreviewRequest;
 use Modules\VehicleRental\Presentation\Http\Requests\VehicleRentalRecordRequest;
@@ -20,6 +21,16 @@ use Modules\VehicleRental\Presentation\Http\Resources\VehicleRentalRecordResourc
 final class VehicleRentalManagementController extends Controller
 {
     public function __construct(private readonly VehicleRentalManagementServiceInterface $service) {}
+
+    public function createLinkedAgreements(UpsertVehicleRentalAggregateRequest $request): JsonResponse
+    {
+        return $this->respond($this->service->upsertLinkedAgreementAggregate($request->all()));
+    }
+
+    public function createCombinedRunningChart(UpsertVehicleRentalAggregateRequest $request): JsonResponse
+    {
+        return $this->respond($this->service->createCombinedRunningChartEntry($request->all()));
+    }
 
     public function syncAgreementLines(SyncVehicleRentalLinesRequest $request, int $agreementId): JsonResponse
     {

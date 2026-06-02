@@ -14,17 +14,21 @@ interface VehicleRentalManagementServiceInterface
 
     public function upsertAgreementAggregate(?int $id, array $payload): Result;
 
+    public function upsertLinkedAgreementAggregate(array $payload): Result;
+
     public function syncAgreementLines(int $agreementId, array $payload): Result;
 
     public function syncAgreementRates(int $agreementId, array $payload): Result;
 
     public function syncRateRules(int $agreementId, array $payload): Result;
 
-    public function listRunningCharts(int $tenantId, ?int $agreementId = null): Result;
+    public function listRunningCharts(int $tenantId, ?int $agreementId = null, ?string $agreementSide = null): Result;
 
     public function getRunningChart(int $runningChartId): Result;
 
     public function upsertRunningChartAggregate(?int $id, array $payload): Result;
+
+    public function createCombinedRunningChartEntry(array $payload): Result;
 
     public function syncRunningChartLines(int $runningChartId, array $payload): Result;
 

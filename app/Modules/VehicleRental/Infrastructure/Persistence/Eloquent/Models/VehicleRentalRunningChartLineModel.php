@@ -11,4 +11,12 @@ final class VehicleRentalRunningChartLineModel extends CoreModel
     protected $table = 'vehicle_rental_running_chart_lines';
 
     protected $guarded = ['id'];
+
+    protected function casts(): array
+    {
+        return array_merge(parent::casts(), [
+            'running_chart_id' => 'integer',
+            'rental_vehicle_id' => 'integer',
+        ]);
+    }
 }

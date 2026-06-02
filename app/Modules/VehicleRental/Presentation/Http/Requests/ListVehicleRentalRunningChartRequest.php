@@ -19,6 +19,9 @@ final class ListVehicleRentalRunningChartRequest extends FormRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'agreement_id' => ['nullable', 'integer', 'min:1'],
+            'lessee_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'lessor_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'agreement_side' => ['nullable', 'string', 'max:40'],
         ];
     }
 }

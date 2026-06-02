@@ -16,7 +16,10 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('agreement_id')->constrained('vehicle_rental_agreements')->cascadeOnDelete();
-            $table->foreignId('provider_id')->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('provider_id')->nullable()->constrained('suppliers')->nullOnDelete();
+            $table->string('provider_party_type')->nullable()->comment('supplier, customer, company, external_party');
+            $table->unsignedBigInteger('provider_party_id')->nullable();
+            $table->string('provider_party_name')->nullable();
             $table->foreignId('rental_vehicle_id')->nullable()->constrained('vehicle_rental_vehicles')->nullOnDelete();
             $table->foreignId('replacement_id')->nullable()->constrained('vehicle_rental_replacements')->nullOnDelete();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();

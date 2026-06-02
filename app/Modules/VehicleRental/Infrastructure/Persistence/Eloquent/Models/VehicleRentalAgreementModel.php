@@ -14,4 +14,17 @@ final class VehicleRentalAgreementModel extends CoreModel
     protected $table = 'vehicle_rental_agreements';
 
     protected $guarded = ['id'];
+
+    protected function casts(): array
+    {
+        return array_merge(parent::casts(), [
+            'customer_id' => 'integer',
+            'provider_id' => 'integer',
+            'rental_vehicle_id' => 'integer',
+            'parent_agreement_id' => 'integer',
+            'lessee_agreement_id' => 'integer',
+            'lessor_agreement_id' => 'integer',
+            'lessor_party_id' => 'integer',
+        ]);
+    }
 }

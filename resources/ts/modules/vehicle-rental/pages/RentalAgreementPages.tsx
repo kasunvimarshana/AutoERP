@@ -23,7 +23,6 @@ import {
     VehicleRentalPageHeader,
     VehicleRentalWorkflowActions,
 } from '../components/VehicleRentalComponents';
-import { getAgreementById } from '../mock/vehicleRentalMock';
 import { vehicleRentalApi } from '../services/vehicleRentalApi';
 import type { VehicleRentalAgreement } from '../types/vehicleRental.types';
 
@@ -58,27 +57,31 @@ export function RentalAgreementCreatePage() {
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<><Link to="/vehicle-rental/agreements"><Button variant="secondary">Cancel</Button></Link><Button>Save Draft</Button><Button variant="blue">Submit Backend Preview</Button></>}
-                subtitle="Create a rental agreement from availability, rental terms, rates, driver/provider assignment, and backend previews."
-                title="New Rental Agreement"
+                actions={<Link to="/vehicle-rental/agreements"><Button variant="secondary">Cancel</Button></Link>}
+                subtitle="Create linked lessee and lessor agreements. Backend generates agreement numbers and keeps receivable/payable sides separate."
+                title="New Dual Agreement"
             />
-            <RentalAgreementForm agreement={getAgreementById('agr-001')} />
+            <RentalAgreementForm />
         </div>
     );
 }
 
 export function RentalAgreementEditPage() {
-    const { id = 'agr-001' } = useParams();
-    const [agreement, setAgreement] = useState<VehicleRentalAgreement>(getAgreementById(id));
+    const { id = '' } = useParams();
+    const [agreement, setAgreement] = useState<VehicleRentalAgreement>();
 
     useEffect(() => {
-        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
+        if (id) vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
     }, [id]);
+
+    if (!agreement) {
+        return <div className="space-y-6"><VehicleRentalPageHeader title="Loading agreement" /></div>;
+    }
 
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<><Link to={`/vehicle-rental/agreements/${agreement.id}`}><Button variant="secondary">View</Button></Link><Button>Save Draft</Button><Button variant="blue">Preview Billing</Button></>}
+                actions={<Link to={`/vehicle-rental/agreements/${agreement.id}`}><Button variant="secondary">View</Button></Link>}
                 subtitle="Edit rental agreement inputs. Backend remains authoritative for availability, rates, billing, provider payable, payments, and finance."
                 title={`Edit ${agreement.agreementNumber}`}
             />
@@ -103,18 +106,22 @@ const detailTabs = [
 ];
 
 export function RentalAgreementDetailPage() {
-    const { id = 'agr-001' } = useParams();
+    const { id = '' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
-    const [agreement, setAgreement] = useState<VehicleRentalAgreement>(getAgreementById(id));
+    const [agreement, setAgreement] = useState<VehicleRentalAgreement>();
 
     useEffect(() => {
-        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
+        if (id) vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
     }, [id]);
+
+    if (!agreement) {
+        return <div className="space-y-6"><VehicleRentalPageHeader title="Loading agreement" /></div>;
+    }
 
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<><Link to={`/vehicle-rental/agreements/${agreement.id}/edit`}><Button>Edit</Button></Link><Button variant="blue">Preview Billing</Button></>}
+                actions={<Link to={`/vehicle-rental/agreements/${agreement.id}/edit`}><Button>Edit</Button></Link>}
                 subtitle="Agreement detail keeps rental workflow separate from Sales. Backend owns availability, rental billing, provider payable, payment allocation, workflow, documents, and finance."
                 title={agreement.agreementNumber}
             />
@@ -124,11 +131,14 @@ export function RentalAgreementDetailPage() {
                     <Card className="p-5">
                         <div className="grid gap-4 md:grid-cols-2">
                             {[
-                                ['Customer', agreement.customer],
+                                ['Side', agreement.agreementRole],
+                                ['Lessee', agreement.customer],
                                 ['Vehicle', agreement.vehicle],
                                 ['Vehicle source', agreement.vehicleSource],
                                 ['Driver', agreement.driver],
-                                ['Provider', agreement.provider],
+                                ['Lessor / Provider', agreement.provider],
+                                ['Linked lessee agreement', agreement.lesseeAgreementId ?? 'Not linked'],
+                                ['Linked lessor agreement', agreement.lessorAgreementId ?? 'Not linked'],
                                 ['Rental unit', agreement.rentalUnit],
                                 ['Start', agreement.startAt],
                                 ['End', agreement.endAt],

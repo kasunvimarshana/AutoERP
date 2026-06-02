@@ -14,16 +14,23 @@ import {
     RentalPaymentPanel,
     RentalProviderPayablePanel,
     ReplacementVehiclePanel,
-    VehicleAvailabilityCalendar,
-    VehicleAvailabilityTable,
     VehicleRentalFinancePostingPanel,
     VehicleRentalPageHeader,
 } from '../components/VehicleRentalComponents';
-import { getAgreementById, getProviderPayableById } from '../mock/vehicleRentalMock';
 import { vehicleRentalApi } from '../services/vehicleRentalApi';
-import type { VehicleRentalBreakdown, VehicleRentalInvoice, VehicleRentalPayment, VehicleRentalProviderPayable, VehicleRentalReplacement } from '../types/vehicleRental.types';
+import type { VehicleRentalAgreement, VehicleRentalBreakdown, VehicleRentalInvoice, VehicleRentalPayment, VehicleRentalProviderPayable, VehicleRentalReplacement } from '../types/vehicleRental.types';
 
 export function VehicleAvailabilityPage() {
+    const [vehicleId, setVehicleId] = useState('');
+    const [start, setStart] = useState('');
+    const [end, setEnd] = useState('');
+    const [result, setResult] = useState<string>();
+
+    async function preview() {
+        const response = await vehicleRentalApi.availability.preview({ end_datetime: end, rental_vehicle_id: vehicleId, start_datetime: start });
+        setResult(response.calculated.availabilityDecision);
+    }
+
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
@@ -32,14 +39,13 @@ export function VehicleAvailabilityPage() {
             />
             <FormSection description="No overlap or availability calculations run in the frontend." title="Availability preview input">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <Input placeholder="Vehicle / provider / fleet group" />
-                    <Input type="datetime-local" />
-                    <Input type="datetime-local" />
-                    <Button variant="blue">Preview Availability</Button>
+                    <Input onChange={(event) => setVehicleId(event.target.value)} placeholder="Rental vehicle id" value={vehicleId} />
+                    <Input onChange={(event) => setStart(event.target.value)} type="datetime-local" value={start} />
+                    <Input onChange={(event) => setEnd(event.target.value)} type="datetime-local" value={end} />
+                    <Button onClick={() => void preview()} type="button" variant="blue">Preview Availability</Button>
                 </div>
             </FormSection>
-            <VehicleAvailabilityCalendar />
-            <VehicleAvailabilityTable />
+            {result ? <PreviewPanel rows={[{ label: 'Backend decision', value: result }]} status="Availability" title="Availability Result" /> : null}
         </div>
     );
 }
@@ -61,7 +67,11 @@ export function RentalInvoiceListPage() {
 
 export function RentalInvoiceDetailPage() {
     const { id = 'inv-001' } = useParams();
-    const agreement = getAgreementById('agr-001');
+    const [agreement, setAgreement] = useState<VehicleRentalAgreement>();
+
+    useEffect(() => {
+        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data)).catch(() => undefined);
+    }, [id]);
 
     return (
         <div className="space-y-6">
@@ -70,8 +80,8 @@ export function RentalInvoiceDetailPage() {
                 subtitle="Readonly rental invoice view. Backend owns billing breakdown, document rendering, payment allocation, and finance posting."
                 title={id}
             />
-            <RentalBillingPreviewPanel agreement={agreement} />
-            <VehicleRentalFinancePostingPanel agreement={agreement} />
+            {agreement ? <RentalBillingPreviewPanel agreement={agreement} /> : null}
+            {agreement ? <VehicleRentalFinancePostingPanel agreement={agreement} /> : null}
         </div>
     );
 }
@@ -96,23 +106,34 @@ export function RentalPaymentListPage() {
 }
 
 export function RentalPaymentCreatePage() {
+    const [agreementId, setAgreementId] = useState('');
+    const [paymentId, setPaymentId] = useState('');
+    const [amount, setAmount] = useState('');
+    const [message, setMessage] = useState<string>();
+
+    async function allocate() {
+        await vehicleRentalApi.payments.allocateLessee(agreementId, { amount: Number(amount || 0), payment_id: Number(paymentId || 0) });
+        setMessage('Payment allocation submitted to backend.');
+    }
+
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<><Link to="/vehicle-rental/payments"><Button variant="secondary">Cancel</Button></Link><Button variant="blue">Preview Allocation</Button></>}
+                actions={<Link to="/vehicle-rental/payments"><Button variant="secondary">Cancel</Button></Link>}
                 subtitle="Collect customer rental payment inputs. Allocation and balance are backend-owned."
                 title="New Rental Payment"
             />
-            <FormSection description="Payment allocation preview is displayed as a backend/mock result." title="Rental payment">
+            <FormSection description="Payment allocation is sent to backend. Frontend does not calculate balances." title="Rental payment">
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Input placeholder="Agreement / invoice" />
+                    <Input onChange={(event) => setAgreementId(event.target.value)} placeholder="Lessee agreement id" value={agreementId} />
                     <Select options={[{ label: 'Cash', value: 'cash' }, { label: 'Bank', value: 'bank' }, { label: 'Card', value: 'card' }]} />
                     <Input type="date" />
-                    <Input placeholder="Amount" />
-                    <Input placeholder="Reference" />
-                    <Input readOnly value="Backend allocation preview" />
+                    <Input onChange={(event) => setAmount(event.target.value)} placeholder="Amount" value={amount} />
+                    <Input onChange={(event) => setPaymentId(event.target.value)} placeholder="Payment id" value={paymentId} />
                     <Textarea className="md:col-span-2" placeholder="Payment notes" />
                 </div>
+                <div className="mt-4 flex justify-end"><Button onClick={() => void allocate()} type="button" variant="blue">Allocate Payment</Button></div>
+                {message ? <p className="mt-3 text-sm font-semibold text-slate-600">{message}</p> : null}
             </FormSection>
         </div>
     );
@@ -135,7 +156,15 @@ export function ProviderPayableListPage() {
 
 export function ProviderPayableDetailPage() {
     const { id = 'payable-001' } = useParams();
-    const payable = getProviderPayableById(id);
+    const [payable, setPayable] = useState<VehicleRentalProviderPayable>();
+
+    useEffect(() => {
+        vehicleRentalApi.providerPayables.get(id).then((response) => setPayable(response.data));
+    }, [id]);
+
+    if (!payable) {
+        return <div className="space-y-6"><VehicleRentalPageHeader title="Loading payable" /></div>;
+    }
 
     return (
         <div className="space-y-6">
