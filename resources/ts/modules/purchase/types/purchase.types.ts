@@ -187,6 +187,7 @@ export type SupplierRefund = {
 };
 
 export type PurchaseSettings = {
+    _raw?: Record<string, unknown>;
     allowDirectInvoice: boolean;
     allowGrnWithoutPo: boolean;
     allowInvoiceWithoutGrn: boolean;

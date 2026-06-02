@@ -50,6 +50,22 @@ function decimal(value: unknown, fallback = '0.0000'): string {
     return Number.isFinite(parsed) ? parsed.toFixed(4) : fallback;
 }
 
+function asBoolean(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (value === 1 || value === '1' || value === 'true') {
+        return true;
+    }
+
+    if (value === 0 || value === '0' || value === 'false') {
+        return false;
+    }
+
+    return fallback;
+}
+
 function contextQuery(extra: Record<string, string | number | boolean | null | undefined> = {}) {
     return {
         organization_unit_id: numberOrUndefined(getStoredOrganizationUnitId()),
@@ -124,6 +140,21 @@ function normalizeServiceType(raw: BackendRecord): VehicleServiceType {
         name: asString(raw.name, 'Service type'),
         status: asString(raw.status, raw.is_active === false ? 'inactive' : 'active').toLowerCase() as VehicleServiceType['status'],
         updatedAt: asString(raw.updated_at),
+    };
+}
+
+function normalizeSettings(raw: BackendRecord): VehicleServiceSettings {
+    return {
+        _raw: raw,
+        allowCustomerSuppliedItems: asBoolean(raw.allow_customer_supplied_items, true),
+        allowExternalServices: asBoolean(raw.allow_external_services, true),
+        allowNegativeStock: asBoolean(raw.allow_negative_stock_for_service),
+        defaultTaxGroup: asString(raw.default_tax_group_label ?? raw.default_tax_group_id, 'Not configured'),
+        defaultWarehouse: asString(raw.default_warehouse_label ?? raw.default_warehouse_id, 'Not configured'),
+        documentDefinition: asString(raw.service_invoice_document_definition_label ?? raw.service_invoice_document_definition_id ?? raw.service_invoice_document_type_code, 'Not configured'),
+        invoiceSequence: asString(raw.invoice_sequence_label ?? raw.invoice_sequence_code ?? raw.service_invoice_document_type_code, 'Not configured'),
+        jobCardSequence: asString(raw.job_card_sequence_label ?? raw.job_card_sequence_code ?? raw.service_number_prefix, 'Not configured'),
+        stockConsumptionTiming: asString(raw.inventory_posting_trigger_status, 'Backend workflow'),
     };
 }
 
@@ -606,7 +637,10 @@ export const vehicleServiceApi = {
         update: (id: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-types/${id}`, { body: contextPayload(record(input)), method: 'PUT' }),
     },
     settings: {
-        get: () => httpClient<ApiResponse<VehicleServiceSettings>>('/api/vehicle-service/settings', { query: contextQuery() }),
+        get: async () => {
+            const response = await httpClient<ApiResponse<BackendRecord | null>>('/api/vehicle-service/settings', { query: contextQuery() });
+            return { ...response, data: normalizeSettings(record(response.data)) };
+        },
         initialize: () => httpClient<ApiResponse<unknown>>('/api/vehicle-service/settings/initialize', { body: contextPayload({}), method: 'POST' }),
         update: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/vehicle-service/settings', { body: contextPayload(record(input)), method: 'POST' }),
     },

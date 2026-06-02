@@ -317,8 +317,9 @@ function normalizeReturn(raw: BackendRecord, lookups: LookupContext, lines: Back
 
 function normalizeSettings(raw: BackendRecord): SalesSettings {
     return {
+        _raw: raw,
         allowDeliveryWithoutOrder: raw.allow_delivery_without_order !== false,
-        allowDirectInvoice: raw.allow_direct_sales_document !== false,
+        allowDirectInvoice: (raw.allow_direct_sales_invoice ?? raw.allow_direct_sales_document) !== false,
         allowInvoiceWithoutDelivery: raw.require_gdn_before_invoice !== true,
         allowNegativeStock: raw.allow_negative_stock === true,
         creditCheckBehavior: asString(raw.credit_check_behavior ?? 'Backend workflow'),

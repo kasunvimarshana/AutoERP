@@ -203,6 +203,7 @@ export type CustomerRefund = {
 };
 
 export type SalesSettings = {
+    _raw?: Record<string, unknown>;
     allowDeliveryWithoutOrder: boolean;
     allowDirectInvoice: boolean;
     allowInvoiceWithoutDelivery: boolean;

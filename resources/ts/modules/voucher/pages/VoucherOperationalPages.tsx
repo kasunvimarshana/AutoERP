@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
+import { SettingsEditor, type SettingsField, type SettingsOption } from '../../../shared/components/settings/SettingsEditor';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
+import { documentApi } from '../../document/services/documentApi';
+import { financeApi } from '../../finance/services/financeApi';
+import { paymentApi } from '../../payment/services/paymentApi';
 import { voucherApi } from '../services/voucherApi';
 import {
     VoucherActivityTimeline,
@@ -14,7 +18,6 @@ import {
     VoucherPageHeader,
     VoucherPaymentImpactPanel,
     VoucherPostingPreviewPanel,
-    VoucherSettingsForm,
     VoucherTable,
 } from '../components/VoucherComponents';
 import type { Voucher, VoucherAllocation, VoucherPaymentImpactPreview, VoucherPostingPreview, VoucherSettings } from '../types/voucher.types';
@@ -184,12 +187,47 @@ export function VoucherPostingPreviewPage() {
     );
 }
 
+async function voucherAccountOptions(): Promise<SettingsOption[]> {
+    const response = await financeApi.listAccounts({ is_active: true, per_page: 25 });
+    return response.data.map((account) => ({ label: `${account.accountCode} - ${account.accountName}`, value: account.id }));
+}
+
+async function voucherTaxGroupOptions(): Promise<SettingsOption[]> {
+    const response = await financeApi.listTaxGroups({ is_active: true, per_page: 25 });
+    return response.data.map((taxGroup) => ({ label: `${taxGroup.code} - ${taxGroup.name}`, value: taxGroup.id }));
+}
+
+async function voucherDocumentDefinitionOptions(): Promise<SettingsOption[]> {
+    const response = await documentApi.listDefinitions();
+    return response.data.map((definition) => ({ label: `${definition.code} - ${definition.name}`, value: definition.id }));
+}
+
+async function voucherPaymentMethodOptions(): Promise<SettingsOption[]> {
+    const response = await paymentApi.listPaymentMethods();
+    return response.data.map((method) => ({ label: `${method.code} - ${method.name}`, value: method.id }));
+}
+
 export function VoucherSettingsPage() {
     const [settings, setSettings] = useState<VoucherSettings | null>(null);
     const [error, setError] = useState<Error | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    async function reload() {
+        setIsLoading(true);
+        try {
+            const response = await voucherApi.settings.get();
+            setSettings(response.data);
+            setError(null);
+        } catch (caught) {
+            setError(caught as Error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     useEffect(() => {
         let active = true;
+        setIsLoading(true);
         voucherApi.settings.get()
             .then((response) => {
                 if (active) {
@@ -201,6 +239,11 @@ export function VoucherSettingsPage() {
                 if (active) {
                     setError(caught);
                 }
+            })
+            .finally(() => {
+                if (active) {
+                    setIsLoading(false);
+                }
             });
 
         return () => {
@@ -208,15 +251,54 @@ export function VoucherSettingsPage() {
         };
     }, []);
 
+    const fields = useMemo<SettingsField[]>(() => {
+        if (!settings) {
+            return [];
+        }
+
+        return [
+            { key: 'default_cash_account_id', label: 'Cash account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_bank_account_id', label: 'Bank account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_expense_account_id', label: 'Expense account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_advance_account_id', label: 'Advance account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_receivable_account_id', label: 'Receivable account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_payable_account_id', label: 'Payable account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_write_off_account_id', label: 'Write-off account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_tax_account_id', label: 'Tax account', loadOptions: voucherAccountOptions, section: 'Account mappings', type: 'select' },
+            { key: 'default_tax_group_id', label: 'Tax group', loadOptions: voucherTaxGroupOptions, section: 'Account mappings', type: 'select' },
+            { currentLabel: settings.defaultPaymentMethod, key: 'default_payment_method_id', label: 'Default payment method', loadOptions: voucherPaymentMethodOptions, section: 'Payment defaults', type: 'select' },
+            { currentLabel: settings.defaultDocumentDefinition, key: 'default_document_definition_id', label: 'Default document definition', loadOptions: voucherDocumentDefinitionOptions, section: 'Documents', type: 'select' },
+            { key: 'payment_voucher_document_definition_id', label: 'Payment voucher document', loadOptions: voucherDocumentDefinitionOptions, section: 'Documents', type: 'select' },
+            { key: 'receipt_voucher_document_definition_id', label: 'Receipt voucher document', loadOptions: voucherDocumentDefinitionOptions, section: 'Documents', type: 'select' },
+            { key: 'journal_voucher_document_definition_id', label: 'Journal voucher document', loadOptions: voucherDocumentDefinitionOptions, section: 'Documents', type: 'select' },
+            { key: 'default_sequence_period_type', label: 'Default sequence period', options: [{ label: 'Monthly', value: 'monthly' }, { label: 'Yearly', value: 'yearly' }, { label: 'Infinite', value: 'infinite' }], section: 'Documents', type: 'select' },
+            { key: 'require_approval', label: 'Require approval', section: 'Workflow controls', type: 'boolean' },
+            { key: 'allow_direct_posting', label: 'Allow direct posting', section: 'Workflow controls', type: 'boolean' },
+            { key: 'allow_reversal', label: 'Allow reversal', section: 'Workflow controls', type: 'boolean' },
+            { key: 'allow_partial_allocation', label: 'Allow partial allocation', section: 'Workflow controls', type: 'boolean' },
+            { key: 'is_active', label: 'Settings active', section: 'Workflow controls', type: 'boolean' },
+        ];
+    }, [settings]);
+
     return (
         <div className="space-y-6">
             <VoucherPageHeader
-                actions={<Button>Save Settings</Button>}
                 subtitle="Voucher settings are module defaults. They do not encode Purchase, Sales, Service, or Rental-specific workflow."
                 title="Voucher Settings"
             />
             {error ? <EmptyState description={error.message} title="Voucher settings failed" /> : null}
-            {settings ? <VoucherSettingsForm settings={settings} /> : <EmptyState description="Loading voucher settings from backend..." title="Loading settings" />}
+            {isLoading && !settings ? <EmptyState description="Loading voucher settings from backend..." title="Loading settings" /> : null}
+            {settings ? (
+                <SettingsEditor
+                    fields={fields}
+                    initialValues={settings._raw ?? {}}
+                    onSave={async (payload) => {
+                        await voucherApi.settings.update(payload);
+                        await reload();
+                    }}
+                    title="Voucher configuration"
+                />
+            ) : null}
             <VoucherActivityTimeline rows={[]} />
         </div>
     );

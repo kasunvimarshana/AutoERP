@@ -1,4 +1,5 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
+import { getStoredOrganizationUnitId, getStoredTenantId } from '../../../services/api/authTokenStorage';
 import { httpClient } from '../../../services/api/httpClient';
 import { mockCollectionResponse, mockPreviewResponse, mockResponse } from '../../../services/mock/mockResponse';
 import {
@@ -13,7 +14,6 @@ import {
     rentalDashboardMetrics,
     rentalInvoices,
     rentalPayments,
-    rentalSettings,
     replacements,
     runningCharts,
 } from '../mock/vehicleRentalMock';
@@ -24,6 +24,7 @@ import type {
     VehicleRentalDashboardMetric,
     VehicleRentalProviderPayable,
     VehicleRentalRunningChart,
+    VehicleRentalSettings,
 } from '../types/vehicleRental.types';
 
 type BackendRecord = Record<string, unknown>;
@@ -44,6 +45,48 @@ async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => P
 
 function asString(value: unknown, fallback = '') {
     return value === null || value === undefined ? fallback : String(value);
+}
+
+function record(value: unknown): BackendRecord {
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as BackendRecord : {};
+}
+
+function numberOrUndefined(value: string | number | null | undefined): number | undefined {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function asBoolean(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (value === 1 || value === '1' || value === 'true') {
+        return true;
+    }
+
+    if (value === 0 || value === '0' || value === 'false') {
+        return false;
+    }
+
+    return fallback;
+}
+
+function contextQuery(query: Record<string, string | number | boolean | undefined> = {}) {
+    return {
+        organization_unit_id: numberOrUndefined(getStoredOrganizationUnitId()),
+        per_page: 25,
+        tenant_id: numberOrUndefined(getStoredTenantId()),
+        ...query,
+    };
+}
+
+function contextPayload(input: BackendRecord = {}): BackendRecord {
+    return {
+        ...input,
+        organization_unit_id: input.organization_unit_id ?? numberOrUndefined(getStoredOrganizationUnitId()),
+        tenant_id: input.tenant_id ?? numberOrUndefined(getStoredTenantId()),
+    };
 }
 
 function normalizeAgreement(raw: BackendRecord): VehicleRentalAgreement {
@@ -92,6 +135,22 @@ function normalizeProviderPayable(raw: BackendRecord): VehicleRentalProviderPaya
         provider: asString(raw.provider_name ?? raw.provider_id, 'Backend provider'),
         sourceReference: asString(raw.source_reference ?? raw.source_entity_type, 'Backend source'),
         status: asString(raw.status, 'pending'),
+    };
+}
+
+function normalizeSettings(raw: BackendRecord): VehicleRentalSettings {
+    return {
+        _raw: raw,
+        allowExternalProviderVehicles: asBoolean(raw.allow_external_provider_vehicle),
+        allowReplacementVehicle: asBoolean(raw.allow_replacement_vehicle),
+        allowWithDriverRental: asBoolean(raw.allow_with_driver, true),
+        agreementSequence: asString(raw.rental_agreement_document_definition_label ?? raw.rental_agreement_document_definition_id, 'Not configured'),
+        defaultProviderPayableAccount: asString(raw.default_provider_payable_account_label ?? raw.default_provider_payable_account_id, 'Not configured'),
+        defaultRatePlan: asString(raw.default_price_list_label ?? raw.default_price_list_id, 'Not configured'),
+        defaultTaxGroup: asString(raw.default_tax_group_label ?? raw.default_tax_group_id, 'Not configured'),
+        invoiceDocumentDefinition: asString(raw.rental_invoice_document_definition_label ?? raw.rental_invoice_document_definition_id, 'Not configured'),
+        invoiceSequence: asString(raw.rental_invoice_sequence_label ?? raw.rental_invoice_sequence_code ?? raw.rental_invoice_document_definition_id, 'Not configured'),
+        runningChartSequence: asString(raw.running_chart_document_definition_label ?? raw.running_chart_document_definition_id, 'Not configured'),
     };
 }
 
@@ -198,8 +257,11 @@ export const vehicleRentalApi = {
         reverse: (entityType: string, entityId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/${entityType}/${entityId}/finance/reverse`, { method: 'POST' }), () => mockResponse({ action: 'reverse-finance', entityId, entityType })),
     },
     settings: {
-        get: () => withMockFallback(() => httpClient<ApiResponse<typeof rentalSettings>>('/api/vehicle-rental/settings'), () => mockResponse(rentalSettings)),
-        update: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings', { body: input, method: 'POST' }), () => mockResponse(input)),
-        initialize: () => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings/initialize', { method: 'POST' }), () => mockResponse(rentalSettings)),
+        get: async () => {
+            const response = await httpClient<ApiResponse<BackendRecord | null>>('/api/vehicle-rental/settings', { query: contextQuery() });
+            return { ...response, data: normalizeSettings(record(response.data)) };
+        },
+        update: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings', { body: contextPayload(record(input)), method: 'POST' }),
+        initialize: () => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings/initialize', { body: contextPayload(), method: 'POST' }),
     },
 };

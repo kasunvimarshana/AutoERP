@@ -352,11 +352,12 @@ function ledgerNotesFromSource(
 
 function normalizeSettings(raw: BackendRecord): PurchaseSettings {
     return {
+        _raw: raw,
         allowDirectInvoice: raw.allow_direct_purchase_document !== false,
         allowGrnWithoutPo: raw.allow_direct_grn !== false,
         allowInvoiceWithoutGrn: raw.require_grn_before_invoice !== true,
         allowOverReceipt: raw.allow_over_receipt === true,
-        defaultPayableAccount: asString(raw.default_payable_account_label ?? raw.default_payable_account_id, 'Not configured'),
+        defaultPayableAccount: asString(raw.default_supplier_payable_account_label ?? raw.default_supplier_payable_account_id ?? raw.default_payable_account_label ?? raw.default_payable_account_id, 'Not configured'),
         defaultPaymentTerm: asString(raw.default_payment_term_label ?? raw.default_payment_term_id, 'Not configured'),
         defaultTaxGroup: asString(raw.default_tax_group_label ?? raw.default_tax_group_id, 'Not configured'),
         defaultWarehouse: asString(raw.default_warehouse_label ?? raw.default_warehouse_id, 'Not configured'),

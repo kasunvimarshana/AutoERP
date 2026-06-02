@@ -145,6 +145,7 @@ export type VoucherDashboardMetric = {
 };
 
 export type VoucherSettings = {
+    _raw?: Record<string, unknown>;
     allowDirectPosting: boolean;
     allowPartialAllocation: boolean;
     defaultDocumentDefinition: string;

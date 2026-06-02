@@ -8,7 +8,6 @@ import {
     postingPreview,
     voucherDashboardMetrics,
     vouchers,
-    voucherSettings,
     voucherTypes,
 } from '../mock/voucherMock';
 import type {
@@ -150,6 +149,7 @@ function normalizeMetric(raw: BackendRecord): VoucherDashboardMetric {
 
 function normalizeSettings(raw: BackendRecord): VoucherSettings {
     return {
+        _raw: raw,
         allowDirectPosting: asBoolean(raw.allow_direct_posting ?? raw.allowDirectPosting),
         allowPartialAllocation: asBoolean(raw.allow_partial_allocation ?? raw.allowPartialAllocation, true),
         defaultDocumentDefinition: asString(raw.default_document_definition ?? raw.defaultDocumentDefinition),
@@ -347,14 +347,11 @@ export const voucherApi = {
         generate: (voucherId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/document/generate`, { method: 'POST' }), () => mockResponse({ action: 'generate-voucher-document', voucherId })),
     },
     settings: {
-        get: (): Promise<ApiResponse<VoucherSettings>> => withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/voucher/settings');
-                return { ...response, data: normalizeSettings(response.data) };
-            },
-            () => mockResponse(voucherSettings),
-        ),
-        update: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/settings', { body: input, method: 'PATCH' }), () => mockResponse(input)),
+        get: async (): Promise<ApiResponse<VoucherSettings>> => {
+            const response = await httpClient<ApiResponse<BackendRecord>>('/api/voucher/settings');
+            return { ...response, data: normalizeSettings(response.data) };
+        },
+        update: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/voucher/settings', { body: input, method: 'PATCH' }),
     },
     previews: {
         posting: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => withMockFallback(

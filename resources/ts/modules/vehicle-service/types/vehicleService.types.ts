@@ -188,6 +188,7 @@ export type VehicleServicePayment = {
 };
 
 export type VehicleServiceSettings = {
+    _raw?: Record<string, unknown>;
     allowCustomerSuppliedItems: boolean;
     allowExternalServices: boolean;
     allowNegativeStock: boolean;

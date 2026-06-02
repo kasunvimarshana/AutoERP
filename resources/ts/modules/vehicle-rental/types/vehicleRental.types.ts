@@ -161,6 +161,7 @@ export type VehicleRentalAuditEntry = {
 };
 
 export type VehicleRentalSettings = {
+    _raw?: Record<string, unknown>;
     allowExternalProviderVehicles: boolean;
     allowReplacementVehicle: boolean;
     allowWithDriverRental: boolean;
