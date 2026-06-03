@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Tests\Unit\Modules\Inventory;
 
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Inventory\Application\Contracts\InventoryEngines\InventoryStrategyRegistryInterface;
 use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
 use Modules\Inventory\Application\Services\ValuationConfigService;
 use PHPUnit\Framework\TestCase;
 
 final class ValuationConfigServiceTest extends TestCase
 {
-    public function testItCreatesValuationConfigWithDefaultRowVersion(): void
+    public function test_it_creates_valuation_config_with_default_row_version(): void
     {
         $repository = $this->createMock(ValuationConfigRepositoryInterface::class);
 
@@ -25,7 +26,12 @@ final class ValuationConfigServiceTest extends TestCase
             }))
             ->willReturn(new DataRecord(['id' => 50]));
 
-        $service = new ValuationConfigService($repository);
+        $strategyRegistry = $this->createMock(InventoryStrategyRegistryInterface::class);
+        $strategyRegistry
+            ->method('valuationMethods')
+            ->willReturn(['fifo', 'weighted_average']);
+
+        $service = new ValuationConfigService($repository, $strategyRegistry);
 
         $result = $service->createConfig([
             'tenant_id' => 1,
@@ -35,13 +41,18 @@ final class ValuationConfigServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
-    public function testItRejectsUnknownValuationMethod(): void
+    public function test_it_rejects_unknown_valuation_method(): void
     {
         $repository = $this->createMock(ValuationConfigRepositoryInterface::class);
 
         $repository->expects(self::never())->method('create');
 
-        $service = new ValuationConfigService($repository);
+        $strategyRegistry = $this->createMock(InventoryStrategyRegistryInterface::class);
+        $strategyRegistry
+            ->method('valuationMethods')
+            ->willReturn(['fifo', 'weighted_average']);
+
+        $service = new ValuationConfigService($repository, $strategyRegistry);
 
         $result = $service->createConfig([
             'tenant_id' => 1,

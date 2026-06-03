@@ -6,18 +6,18 @@ namespace Modules\Inventory\Application\Services;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Inventory\Application\Contracts\InventoryEngines\InventoryStrategyRegistryInterface;
 use Modules\Inventory\Application\Contracts\Services\ValuationConfigServiceInterface;
 use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
-use Modules\Inventory\Domain\Constants\InventoryValuationMethod;
 use Throwable;
 
 final class ValuationConfigService implements ValuationConfigServiceInterface
 {
     public function __construct(
         private readonly ValuationConfigRepositoryInterface $valuationConfigRepository,
-    ) {
-    }
+        private readonly InventoryStrategyRegistryInterface $strategyRegistry,
+    ) {}
 
     public function createConfig(array $payload): Result
     {
@@ -55,7 +55,7 @@ final class ValuationConfigService implements ValuationConfigServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function validatePayload(array $payload): Result
     {
@@ -69,10 +69,11 @@ final class ValuationConfigService implements ValuationConfigServiceInterface
 
         if (array_key_exists('valuation_method', $payload) && $payload['valuation_method'] !== null) {
             $method = strtolower((string) $payload['valuation_method']);
-            if (! in_array($method, InventoryValuationMethod::all(), true)) {
+            $registeredMethods = $this->strategyRegistry->valuationMethods();
+            if (! in_array($method, $registeredMethods, true)) {
                 return Result::failure(new Error(
                     InventoryErrorCode::INVALID_VALUE,
-                    'valuation_method must be one of: ' . implode(', ', InventoryValuationMethod::all()),
+                    'valuation_method must be one of: '.implode(', ', $registeredMethods),
                 ));
             }
         }

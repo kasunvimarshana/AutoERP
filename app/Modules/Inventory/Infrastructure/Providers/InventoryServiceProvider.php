@@ -5,32 +5,32 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Inventory\Application\Contracts\InventoryEngines\InventoryStrategyRegistryInterface;
+use Modules\Inventory\Application\Contracts\Services\BatchServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\CycleCountLineServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\CycleCountServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\ReceiptInspectionServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\InventoryAllocationServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\InventoryCostLayerServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\InventoryValuationServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\PickingTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\PutAwayTaskServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\ValuationConfigServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\ReceiptInspectionServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\SerialServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockAdjustmentLineServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockLevelServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockMovementServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockTransferLineServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockTransferServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\TraceLogServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\TransferOrderLineServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\TransferOrderServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\BatchServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\SerialServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\InventoryCostLayerServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockMovementServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockLevelServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\TraceLogServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockAdjustmentLineServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\CycleCountLineServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockTransferLineServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
-use Modules\Inventory\Application\Contracts\Services\StockTransferServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\ValuationConfigServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\AllocateInventoryStockServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\CalculateInventoryValuationServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\ResolveInventoryDimensionsServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\ListBatchesServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\UpdateBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\CycleCountHeaders\CreateCycleCountHeaderServiceInterface;
@@ -48,6 +48,9 @@ use Modules\Inventory\Application\Contracts\UseCases\InventoryCostLayers\DeleteI
 use Modules\Inventory\Application\Contracts\UseCases\InventoryCostLayers\GetInventoryCostLayerServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\InventoryCostLayers\ListInventoryCostLayersServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\InventoryCostLayers\UpdateInventoryCostLayerServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\AllocateInventoryStockServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\CalculateInventoryValuationServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\ResolveInventoryDimensionsServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\PickingTasks\CreatePickingTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\PickingTasks\DeletePickingTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\PickingTasks\GetPickingTaskServiceInterface;
@@ -142,6 +145,29 @@ use Modules\Inventory\Application\Repositories\TraceLogRepositoryInterface;
 use Modules\Inventory\Application\Repositories\TransferOrderLineRepositoryInterface;
 use Modules\Inventory\Application\Repositories\TransferOrderRepositoryInterface;
 use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
+use Modules\Inventory\Application\Services\BatchService;
+use Modules\Inventory\Application\Services\CycleCountLineService;
+use Modules\Inventory\Application\Services\CycleCountService;
+use Modules\Inventory\Application\Services\InventoryAllocationService;
+use Modules\Inventory\Application\Services\InventoryCostLayerService;
+use Modules\Inventory\Application\Services\InventoryEngines\ConfigurableInventoryStrategyRegistry;
+use Modules\Inventory\Application\Services\InventoryValuationService;
+use Modules\Inventory\Application\Services\PickingTaskService;
+use Modules\Inventory\Application\Services\PutAwayTaskService;
+use Modules\Inventory\Application\Services\ReceiptInspectionService;
+use Modules\Inventory\Application\Services\SerialService;
+use Modules\Inventory\Application\Services\StockAdjustmentLineService;
+use Modules\Inventory\Application\Services\StockAdjustmentService;
+use Modules\Inventory\Application\Services\StockLedgerService;
+use Modules\Inventory\Application\Services\StockLevelService;
+use Modules\Inventory\Application\Services\StockMovementService;
+use Modules\Inventory\Application\Services\StockReservationService;
+use Modules\Inventory\Application\Services\StockTransferLineService;
+use Modules\Inventory\Application\Services\StockTransferService;
+use Modules\Inventory\Application\Services\TraceLogService;
+use Modules\Inventory\Application\Services\TransferOrderLineService;
+use Modules\Inventory\Application\Services\TransferOrderService;
+use Modules\Inventory\Application\Services\ValuationConfigService;
 use Modules\Inventory\Application\UseCases\Batches\CreateBatchService;
 use Modules\Inventory\Application\UseCases\Batches\DeleteBatchService;
 use Modules\Inventory\Application\UseCases\Batches\GetBatchService;
@@ -162,26 +188,6 @@ use Modules\Inventory\Application\UseCases\InventoryCostLayers\DeleteInventoryCo
 use Modules\Inventory\Application\UseCases\InventoryCostLayers\GetInventoryCostLayerService;
 use Modules\Inventory\Application\UseCases\InventoryCostLayers\ListInventoryCostLayersService;
 use Modules\Inventory\Application\UseCases\InventoryCostLayers\UpdateInventoryCostLayerService;
-use Modules\Inventory\Application\Services\CycleCountService;
-use Modules\Inventory\Application\Services\ReceiptInspectionService;
-use Modules\Inventory\Application\Services\PickingTaskService;
-use Modules\Inventory\Application\Services\PutAwayTaskService;
-use Modules\Inventory\Application\Services\ValuationConfigService;
-use Modules\Inventory\Application\Services\TransferOrderLineService;
-use Modules\Inventory\Application\Services\TransferOrderService;
-use Modules\Inventory\Application\Services\BatchService;
-use Modules\Inventory\Application\Services\SerialService;
-use Modules\Inventory\Application\Services\InventoryCostLayerService;
-use Modules\Inventory\Application\Services\StockMovementService;
-use Modules\Inventory\Application\Services\StockLevelService;
-use Modules\Inventory\Application\Services\TraceLogService;
-use Modules\Inventory\Application\Services\StockAdjustmentLineService;
-use Modules\Inventory\Application\Services\CycleCountLineService;
-use Modules\Inventory\Application\Services\StockTransferLineService;
-use Modules\Inventory\Application\Services\StockLedgerService;
-use Modules\Inventory\Application\Services\StockAdjustmentService;
-use Modules\Inventory\Application\Services\StockReservationService;
-use Modules\Inventory\Application\Services\StockTransferService;
 use Modules\Inventory\Application\UseCases\InventoryEngines\AllocateInventoryStockService;
 use Modules\Inventory\Application\UseCases\InventoryEngines\CalculateInventoryValuationService;
 use Modules\Inventory\Application\UseCases\InventoryEngines\ResolveInventoryDimensionsService;
@@ -303,7 +309,7 @@ final class InventoryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../Config/inventory.php', 'inventory');
+        $this->mergeConfigFrom(__DIR__.'/../Config/inventory.php', 'inventory');
 
         foreach (
             [
@@ -412,6 +418,8 @@ final class InventoryServiceProvider extends ServiceProvider
                 BatchServiceInterface::class => BatchService::class,
                 SerialServiceInterface::class => SerialService::class,
                 InventoryCostLayerServiceInterface::class => InventoryCostLayerService::class,
+                InventoryValuationServiceInterface::class => InventoryValuationService::class,
+                InventoryAllocationServiceInterface::class => InventoryAllocationService::class,
                 StockMovementServiceInterface::class => StockMovementService::class,
                 StockLevelServiceInterface::class => StockLevelService::class,
                 TraceLogServiceInterface::class => TraceLogService::class,
@@ -423,6 +431,7 @@ final class InventoryServiceProvider extends ServiceProvider
                 StockReservationServiceInterface::class => StockReservationService::class,
                 StockTransferServiceInterface::class => StockTransferService::class,
                 ResolveInventoryDimensionsServiceInterface::class => ResolveInventoryDimensionsService::class,
+                InventoryStrategyRegistryInterface::class => ConfigurableInventoryStrategyRegistry::class,
                 CalculateInventoryValuationServiceInterface::class => CalculateInventoryValuationService::class,
                 AllocateInventoryStockServiceInterface::class => AllocateInventoryStockService::class,
             ] as $contract => $implementation
@@ -431,51 +440,51 @@ final class InventoryServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(BatchRepositoryInterface::class, function (): BatchRepositoryInterface {
-            return new EloquentBatchRepository(new BatchModel());
+            return new EloquentBatchRepository(new BatchModel);
         });
         $this->app->singleton(SerialRepositoryInterface::class, function (): SerialRepositoryInterface {
             return new EloquentSerialRepository(
-                new SerialModel(),
+                new SerialModel,
             );
         });
         $this->app->singleton(
             ValuationConfigRepositoryInterface::class,
             function (): ValuationConfigRepositoryInterface {
-                return new EloquentValuationConfigRepository(new ValuationConfigModel());
+                return new EloquentValuationConfigRepository(new ValuationConfigModel);
             },
         );
         $this->app->singleton(StockLevelRepositoryInterface::class, function (): StockLevelRepositoryInterface {
-            return new EloquentStockLevelRepository(new StockLevelModel());
+            return new EloquentStockLevelRepository(new StockLevelModel);
         });
         $this->app->singleton(StockMovementRepositoryInterface::class, function (): StockMovementRepositoryInterface {
             return new EloquentStockMovementRepository(
-                new StockMovementModel(),
+                new StockMovementModel,
             );
         });
         $this->app->singleton(
             InventoryCostLayerRepositoryInterface::class,
             function (): InventoryCostLayerRepositoryInterface {
                 return new EloquentInventoryCostLayerRepository(
-                    new InventoryCostLayerModel(),
+                    new InventoryCostLayerModel,
                 );
             },
         );
         $this->app->singleton(
             StockReservationRepositoryInterface::class,
             function (): StockReservationRepositoryInterface {
-                return new EloquentStockReservationRepository(new StockReservationModel());
+                return new EloquentStockReservationRepository(new StockReservationModel);
             },
         );
         $this->app->singleton(StockTransferRepositoryInterface::class, function (): StockTransferRepositoryInterface {
             return new EloquentStockTransferRepository(
-                new StockTransferModel(),
+                new StockTransferModel,
             );
         });
         $this->app->singleton(
             StockTransferLineRepositoryInterface::class,
             function (): StockTransferLineRepositoryInterface {
                 return new EloquentStockTransferLineRepository(
-                    new StockTransferLineModel(),
+                    new StockTransferLineModel,
                 );
             },
         );
@@ -483,7 +492,7 @@ final class InventoryServiceProvider extends ServiceProvider
             StockAdjustmentRepositoryInterface::class,
             function (): StockAdjustmentRepositoryInterface {
                 return new EloquentStockAdjustmentRepository(
-                    new StockAdjustmentModel(),
+                    new StockAdjustmentModel,
                 );
             },
         );
@@ -491,52 +500,52 @@ final class InventoryServiceProvider extends ServiceProvider
             StockAdjustmentLineRepositoryInterface::class,
             function (): StockAdjustmentLineRepositoryInterface {
                 return new EloquentStockAdjustmentLineRepository(
-                    new StockAdjustmentLineModel(),
+                    new StockAdjustmentLineModel,
                 );
             },
         );
         $this->app->singleton(
             CycleCountHeaderRepositoryInterface::class,
             function (): CycleCountHeaderRepositoryInterface {
-                return new EloquentCycleCountHeaderRepository(new CycleCountHeaderModel());
+                return new EloquentCycleCountHeaderRepository(new CycleCountHeaderModel);
             },
         );
         $this->app->singleton(CycleCountLineRepositoryInterface::class, function (): CycleCountLineRepositoryInterface {
-            return new EloquentCycleCountLineRepository(new CycleCountLineModel());
+            return new EloquentCycleCountLineRepository(new CycleCountLineModel);
         });
         $this->app->singleton(TransferOrderRepositoryInterface::class, function (): TransferOrderRepositoryInterface {
             return new EloquentTransferOrderRepository(
-                new TransferOrderModel(),
+                new TransferOrderModel,
             );
         });
         $this->app->singleton(
             TransferOrderLineRepositoryInterface::class,
             function (): TransferOrderLineRepositoryInterface {
-                return new EloquentTransferOrderLineRepository(new TransferOrderLineModel());
+                return new EloquentTransferOrderLineRepository(new TransferOrderLineModel);
             },
         );
         $this->app->singleton(TraceLogRepositoryInterface::class, function (): TraceLogRepositoryInterface {
             return new EloquentTraceLogRepository(
-                new TraceLogModel(),
+                new TraceLogModel,
             );
         });
         $this->app->singleton(
             ReceiptInspectionRepositoryInterface::class,
             function (): ReceiptInspectionRepositoryInterface {
-                return new EloquentReceiptInspectionRepository(new ReceiptInspectionModel());
+                return new EloquentReceiptInspectionRepository(new ReceiptInspectionModel);
             },
         );
         $this->app->singleton(PutAwayTaskRepositoryInterface::class, function (): PutAwayTaskRepositoryInterface {
-            return new EloquentPutAwayTaskRepository(new PutAwayTaskModel());
+            return new EloquentPutAwayTaskRepository(new PutAwayTaskModel);
         });
         $this->app->singleton(PickingTaskRepositoryInterface::class, function (): PickingTaskRepositoryInterface {
-            return new EloquentPickingTaskRepository(new PickingTaskModel());
+            return new EloquentPickingTaskRepository(new PickingTaskModel);
         });
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Persistence/Eloquent/Migrations');
     }
 }

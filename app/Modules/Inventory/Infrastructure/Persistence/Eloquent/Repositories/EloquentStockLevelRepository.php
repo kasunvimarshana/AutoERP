@@ -9,7 +9,6 @@ use InvalidArgumentException;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
-use Modules\Inventory\Domain\Constants\InventoryAllocationMethod;
 use Modules\Inventory\Domain\Constants\InventoryDimension;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockLevelModel;
 
@@ -51,29 +50,19 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
         $lotNumber = $criteria[InventoryDimension::LOT_NUMBER] ?? null;
         unset($criteria[InventoryDimension::LOT_NUMBER]);
 
-        $query = $this->applyCriteria($this->query(), $criteria)
-            ->whereRaw('(quantity_on_hand - quantity_reserved - quantity_blocked) > 0');
+        $query = $this->applyCriteria($this->query()->select('stock_levels.*'), $this->qualifyCriteria($criteria))
+            ->whereRaw('(stock_levels.quantity_on_hand - stock_levels.quantity_reserved - stock_levels.quantity_blocked) > 0');
 
         if (is_string($lotNumber) && trim($lotNumber) !== '') {
             $query
-                ->join('batches', 'stock_levels.batch_id', '=', 'batches.id')
+                ->join('batches as stock_level_lots', 'stock_levels.batch_id', '=', 'stock_level_lots.id')
                 ->select('stock_levels.*')
-                ->where('batches.lot_number', $lotNumber);
+                ->where('stock_level_lots.lot_number', $lotNumber);
         }
 
         $method = strtolower(trim($allocationMethod));
-        if ($method === InventoryAllocationMethod::FEFO) {
-            $query
-                ->leftJoin('batches', 'stock_levels.batch_id', '=', 'batches.id')
-                ->select('stock_levels.*')
-                ->orderByRaw('CASE WHEN batches.expiry_date IS NULL THEN 1 ELSE 0 END')
-                ->orderBy('batches.expiry_date')
-                ->orderBy('stock_levels.id');
-        } elseif ($method === InventoryAllocationMethod::FIFO) {
-            $query->orderBy('last_movement_at')->orderBy('id');
-        } else {
-            $query->orderByDesc('last_movement_at')->orderByDesc('id');
-        }
+        $this->applyConfiguredJoins($query, $method);
+        $this->applyConfiguredOrdering($query, $method);
 
         $models = $query->limit(max(1, $limit))->get();
         $records = [];
@@ -84,8 +73,126 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
         return $records;
     }
 
+    private function applyConfiguredJoins(Builder $query, string $method): void
+    {
+        $profile = $this->methodProfile($method);
+        $joins = (array) ($profile['joins'] ?? []);
+
+        foreach ($joins as $join) {
+            if (! is_array($join)) {
+                continue;
+            }
+
+            $table = $this->safeIdentifier($join['table'] ?? null);
+            $first = $this->safeColumn($join['first'] ?? null);
+            $second = $this->safeColumn($join['second'] ?? null);
+            $operator = $this->safeOperator($join['operator'] ?? '=');
+
+            if ($table === null || $first === null || $second === null || $operator === null) {
+                continue;
+            }
+
+            strtolower((string) ($join['type'] ?? 'left')) === 'inner'
+                ? $query->join($table, $first, $operator, $second)
+                : $query->leftJoin($table, $first, $operator, $second);
+        }
+    }
+
+    private function applyConfiguredOrdering(Builder $query, string $method): void
+    {
+        $profile = $this->methodProfile($method);
+        $ordering = (array) ($profile['ordering'] ?? []);
+
+        if ($ordering === []) {
+            $query->orderBy('stock_levels.id');
+
+            return;
+        }
+
+        foreach ($ordering as $rule) {
+            if (! is_array($rule)) {
+                continue;
+            }
+
+            $column = $this->safeColumn($rule['column'] ?? null);
+            if ($column === null) {
+                continue;
+            }
+
+            if (($rule['nulls_last'] ?? false) === true) {
+                $query->orderByRaw(sprintf('CASE WHEN %s IS NULL THEN 1 ELSE 0 END', $column));
+            }
+
+            strtolower((string) ($rule['direction'] ?? 'asc')) === 'desc'
+                ? $query->orderByDesc($column)
+                : $query->orderBy($column);
+        }
+    }
+
     /**
-     * @param array<string, mixed> $criteria
+     * @return array<string, mixed>
+     */
+    private function methodProfile(string $method): array
+    {
+        return (array) config(
+            sprintf('inventory.engines.allocation.methods.%s', $method),
+            config('inventory.engines.allocation.methods.default', []),
+        );
+    }
+
+    private function safeColumn(mixed $column): ?string
+    {
+        if (! is_string($column) || trim($column) === '') {
+            return null;
+        }
+
+        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/', $column) === 1
+            ? $column
+            : null;
+    }
+
+    private function safeIdentifier(mixed $identifier): ?string
+    {
+        if (! is_string($identifier) || trim($identifier) === '') {
+            return null;
+        }
+
+        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $identifier) === 1
+            ? $identifier
+            : null;
+    }
+
+    private function safeOperator(mixed $operator): ?string
+    {
+        if (! is_string($operator)) {
+            return null;
+        }
+
+        return in_array($operator, ['=', '<', '>', '<=', '>=', '<>'], true) ? $operator : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $criteria
+     * @return array<string, mixed>
+     */
+    private function qualifyCriteria(array $criteria): array
+    {
+        $qualified = [];
+        foreach ($criteria as $column => $value) {
+            if (! is_string($column) || str_contains($column, '.')) {
+                $qualified[$column] = $value;
+
+                continue;
+            }
+
+            $qualified['stock_levels.'.$column] = $value;
+        }
+
+        return $qualified;
+    }
+
+    /**
+     * @param  array<string, mixed>  $criteria
      */
     private function applyStockLevelCriteria(Builder $query, array $criteria): Builder
     {
@@ -109,7 +216,7 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
                 continue;
             }
 
-            $query->where('stock_levels.' . $column, $value);
+            $query->where('stock_levels.'.$column, $value);
         }
 
         if ($lowStock) {
@@ -123,7 +230,7 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
         }
 
         if ($search !== '') {
-            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
+            $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
             $query->where(function (Builder $nested) use ($like): void {
                 $nested
                     ->where('filter_items.sku', 'like', $like)
@@ -142,7 +249,7 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
         }
 
         if ($batchSerial !== '') {
-            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $batchSerial) . '%';
+            $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $batchSerial).'%';
             $query->where(function (Builder $nested) use ($like): void {
                 $nested
                     ->where('filter_batches.batch_number', 'like', $like)

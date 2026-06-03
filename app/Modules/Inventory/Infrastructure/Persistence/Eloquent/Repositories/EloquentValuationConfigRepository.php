@@ -6,8 +6,8 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
-use Modules\Inventory\Domain\Constants\InventoryDimension;
 use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
+use Modules\Inventory\Domain\Constants\InventoryDimension;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\ValuationConfigModel;
 
 final class EloquentValuationConfigRepository extends EloquentRepository implements ValuationConfigRepositoryInterface
@@ -24,16 +24,7 @@ final class EloquentValuationConfigRepository extends EloquentRepository impleme
             return null;
         }
 
-        $dimensionColumns = [
-            InventoryDimension::ORGANIZATION_UNIT_ID,
-            InventoryDimension::WAREHOUSE_ID,
-            InventoryDimension::LOCATION_ID,
-            InventoryDimension::ITEM_ID,
-            InventoryDimension::VARIANT_ID,
-            InventoryDimension::BATCH_ID,
-            InventoryDimension::SERIAL_ID,
-            'transaction_type',
-        ];
+        $dimensionColumns = $this->configurationDimensions();
 
         $query = $this->query()
             ->where(InventoryDimension::TENANT_ID, $tenantId)
@@ -59,10 +50,43 @@ final class EloquentValuationConfigRepository extends EloquentRepository impleme
         ));
 
         $model = $query
-            ->orderByRaw($scoreExpression . ' DESC')
+            ->orderByRaw($scoreExpression.' DESC')
             ->orderByDesc('id')
             ->first();
 
         return $model === null ? null : $this->toRecord($model);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configurationDimensions(): array
+    {
+        $configured = config('inventory.engines.valuation.configuration_dimensions', [
+            InventoryDimension::ORGANIZATION_UNIT_ID,
+            InventoryDimension::WAREHOUSE_ID,
+            InventoryDimension::LOCATION_ID,
+            InventoryDimension::ITEM_ID,
+            InventoryDimension::VARIANT_ID,
+            InventoryDimension::BATCH_ID,
+            InventoryDimension::SERIAL_ID,
+        ]);
+
+        $columns = [];
+        if (is_array($configured)) {
+            foreach ($configured as $column) {
+                if (
+                    is_string($column)
+                    && trim($column) !== ''
+                    && $column !== InventoryDimension::TENANT_ID
+                ) {
+                    $columns[] = $column;
+                }
+            }
+        }
+
+        $columns[] = 'transaction_type';
+
+        return array_values(array_unique($columns));
     }
 }
