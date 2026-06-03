@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 final class SalesRoutesTest extends TestCase
 {
-    public function test_sales_routes_are_registered(): void
+    public function testSalesRoutesAreRegistered(): void
     {
         self::assertTrue(Route::has('sales.sales-orders.index'));
         self::assertTrue(Route::has('sales.sales-orders.store'));
@@ -120,14 +120,14 @@ final class SalesRoutesTest extends TestCase
         self::assertTrue(Route::has('sales.stock-availability'));
     }
 
-    public function test_sales_routes_use_context_middlewares(): void
+    public function testSalesRoutesUseContextMiddlewares(): void
     {
         $route = Route::getRoutes()->getByName('sales.sales-orders.index');
 
         self::assertNotNull($route);
 
         $middlewares = $route->gatherMiddleware();
-        self::assertContains('auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
+        self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
         self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
         self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
         self::assertContains(

@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
-import { DataToolbar, type DataToolbarFilterConfig } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
-import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { Input } from '../../../shared/components/ui/Input';
+import { Select } from '../../../shared/components/ui/Select';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import {
     BreakdownPanel,
     RentalAgreementForm,
     RentalAgreementTable,
     RentalBillingPreviewPanel,
-    RentalExtraChargesTable,
     RentalInvoicePanel,
     RentalPaymentPanel,
     RentalProviderPanel,
@@ -24,62 +23,33 @@ import {
     VehicleRentalPageHeader,
     VehicleRentalWorkflowActions,
 } from '../components/VehicleRentalComponents';
+import { getAgreementById } from '../mock/vehicleRentalMock';
 import { vehicleRentalApi } from '../services/vehicleRentalApi';
 import type { VehicleRentalAgreement } from '../types/vehicleRental.types';
 
-const filters: DataToolbarFilterConfig[] = [
-    { id: 'status', label: 'Status', options: [{ label: 'Draft', value: 'draft' }, { label: 'Active', value: 'active' }, { label: 'Running', value: 'running' }, { label: 'Invoiceable', value: 'invoiceable' }, { label: 'Closed', value: 'closed' }], type: 'select' },
-    { id: 'agreement_role', label: 'Role', options: [{ label: 'Customer', value: 'customer' }, { label: 'Provider', value: 'provider' }], type: 'select' },
-];
-
 export function RentalAgreementListPage() {
     const [rows, setRows] = useState<VehicleRentalAgreement[]>([]);
-    const [search, setSearch] = useState('');
-    const [filterValues, setFilterValues] = useState<Record<string, string>>({});
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string>();
-
-    async function load(): Promise<void> {
-        setLoading(true);
-        setError(undefined);
-        try {
-            const response = await vehicleRentalApi.agreements.list({ search, ...filterValues });
-            setRows(response.data);
-        } catch (caught) {
-            setError(caught instanceof Error ? caught.message : 'Unable to load rental agreements.');
-        } finally {
-            setLoading(false);
-        }
-    }
 
     useEffect(() => {
-        void load();
-    }, [search, filterValues]);
-
-    const activeFilters = useMemo(() => Object.entries(filterValues).filter(([, value]) => value).map(([key, value]) => ({ key, label: key.replaceAll('_', ' '), value })), [filterValues]);
+        vehicleRentalApi.agreements.list().then((response) => setRows(response.data));
+    }, []);
 
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
                 actions={<Link to="/vehicle-rental/agreements/new"><Button>New Agreement</Button></Link>}
-                subtitle="Backend owns availability, rental billing, provider payable, payment allocation, finance posting, documents and workflow status."
+                subtitle="Rental agreements own the rental workflow. Backend owns availability, billing, provider payable, payment allocation, and status."
                 title="Rental Agreements"
             />
-            <DataToolbar
-                activeFilterChips={activeFilters.map((filter) => ({ id: filter.key, label: filter.label, value: filter.value }))}
-                disabled={loading}
-                filters={filters}
-                filterValues={filterValues}
-                isLoading={loading}
-                onFilterChange={(name, value) => setFilterValues((current) => ({ ...current, [name]: String(value ?? '') }))}
-                onRemoveFilter={(name) => setFilterValues((current) => ({ ...current, [name]: '' }))}
-                onResetFilters={() => setFilterValues({})}
-                onSearchChange={setSearch}
-                savedViewsDisabledReason="Saved views are not backed by a Vehicle Rental preference API yet."
-                searchPlaceholder="Search agreement, customer, vehicle, provider..."
-                searchValue={search}
-            />
-            {error ? <EmptyState description={error} title="Agreements unavailable" /> : <RentalAgreementTable rows={rows} />}
+            <Card className="p-4">
+                <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px]">
+                    <Input placeholder="Search agreement, customer, vehicle, provider..." />
+                    <Select options={[{ label: 'Any status', value: '' }, { label: 'Draft', value: 'draft' }, { label: 'Active', value: 'active' }, { label: 'Running', value: 'running' }, { label: 'Closed', value: 'closed' }]} />
+                    <Select options={[{ label: 'Any mode', value: '' }, { label: 'With driver', value: 'with_driver' }, { label: 'Without driver', value: 'without_driver' }]} />
+                    <Button variant="secondary">Filter</Button>
+                </div>
+            </Card>
+            <RentalAgreementTable rows={rows} />
         </div>
     );
 }
@@ -88,83 +58,64 @@ export function RentalAgreementCreatePage() {
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<Link to="/vehicle-rental/agreements"><Button variant="secondary">Cancel</Button></Link>}
-                subtitle="Create a rental agreement using real customer, rental vehicle, driver/provider, item and UOM APIs."
+                actions={<><Link to="/vehicle-rental/agreements"><Button variant="secondary">Cancel</Button></Link><Button>Save Draft</Button><Button variant="blue">Submit Backend Preview</Button></>}
+                subtitle="Create a rental agreement from availability, rental terms, rates, driver/provider assignment, and backend previews."
                 title="New Rental Agreement"
             />
-            <RentalAgreementForm />
+            <RentalAgreementForm agreement={getAgreementById('agr-001')} />
         </div>
     );
 }
 
 export function RentalAgreementEditPage() {
-    const { id = '' } = useParams();
-    const [agreement, setAgreement] = useState<VehicleRentalAgreement>();
-    const [error, setError] = useState<string>();
+    const { id = 'agr-001' } = useParams();
+    const [agreement, setAgreement] = useState<VehicleRentalAgreement>(getAgreementById(id));
 
     useEffect(() => {
-        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load agreement.'));
+        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
     }, [id]);
-
-    if (error) {
-        return <EmptyState description={error} title="Agreement unavailable" />;
-    }
-
-    if (!agreement) {
-        return <EmptyState description="Loading agreement from backend..." title="Loading agreement" />;
-    }
 
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<Link to={`/vehicle-rental/agreements/${agreement.id}`}><Button variant="secondary">View</Button></Link>}
+                actions={<><Link to={`/vehicle-rental/agreements/${agreement.id}`}><Button variant="secondary">View</Button></Link><Button>Save Draft</Button><Button variant="blue">Preview Billing</Button></>}
                 subtitle="Edit rental agreement inputs. Backend remains authoritative for availability, rates, billing, provider payable, payments, and finance."
                 title={`Edit ${agreement.agreementNumber}`}
             />
-            <RentalAgreementForm agreement={agreement} mode="edit" />
+            <RentalAgreementForm agreement={agreement} />
         </div>
     );
 }
 
 const detailTabs = [
     { label: 'Overview', value: 'overview' },
-    { label: 'Rental Period & Availability', value: 'terms' },
-    { label: 'Rates / Charges', value: 'rates' },
-    { label: 'Checkout / Check-in', value: 'running' },
+    { label: 'Rental Terms', value: 'terms' },
+    { label: 'Rates & Charges', value: 'rates' },
+    { label: 'Running Charts', value: 'running' },
     { label: 'Invoices', value: 'invoices' },
-    { label: 'Deposits / Payments', value: 'payments' },
+    { label: 'Payments', value: 'payments' },
     { label: 'Provider Payables', value: 'provider' },
     { label: 'Replacements', value: 'replacements' },
     { label: 'Breakdowns', value: 'breakdowns' },
     { label: 'Documents', value: 'documents' },
-    { label: 'History / Audit', value: 'history' },
+    { label: 'Workflow / History', value: 'history' },
+    { label: 'Audit', value: 'audit' },
 ];
 
 export function RentalAgreementDetailPage() {
-    const { id = '' } = useParams();
+    const { id = 'agr-001' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
-    const [agreement, setAgreement] = useState<VehicleRentalAgreement>();
-    const [error, setError] = useState<string>();
+    const [agreement, setAgreement] = useState<VehicleRentalAgreement>(getAgreementById(id));
 
-    function load(): void {
-        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load agreement.'));
-    }
-
-    useEffect(load, [id]);
-
-    if (error) {
-        return <EmptyState description={error} title="Agreement unavailable" />;
-    }
-
-    if (!agreement) {
-        return <EmptyState description="Loading agreement from backend..." title="Loading agreement" />;
-    }
+    useEffect(() => {
+        vehicleRentalApi.agreements.get(id).then((response) => setAgreement(response.data));
+    }, [id]);
 
     return (
         <div className="space-y-6">
             <VehicleRentalPageHeader
-                actions={<><Link to={`/vehicle-rental/agreements/${agreement.id}/edit`}><Button>Edit</Button></Link><Link to="/vehicle-rental/invoices/new"><Button variant="blue">Generate Invoice</Button></Link></>}
-                subtitle="Agreement detail keeps rental workflow separate from core modules. Backend owns availability, billing, provider payable, payments, documents, and finance."
+                actions={<><Link to={`/vehicle-rental/agreements/${agreement.id}/edit`}><Button>Edit</Button></Link><Button variant="blue">Preview Billing</Button></>}
+                subtitle="Agreement detail keeps rental workflow separate from Sales. Backend owns availability, rental billing, provider payable, payment allocation, workflow, documents, and finance."
                 title={agreement.agreementNumber}
             />
             <Card className="p-5"><Tabs active={activeTab} items={detailTabs} onChange={setActiveTab} /></Card>
@@ -177,7 +128,7 @@ export function RentalAgreementDetailPage() {
                                 ['Vehicle', agreement.vehicle],
                                 ['Vehicle source', agreement.vehicleSource],
                                 ['Driver', agreement.driver],
-                                ['Provider / payee', agreement.provider],
+                                ['Provider', agreement.provider],
                                 ['Rental unit', agreement.rentalUnit],
                                 ['Start', agreement.startAt],
                                 ['End', agreement.endAt],
@@ -189,19 +140,20 @@ export function RentalAgreementDetailPage() {
                             ))}
                         </div>
                     </Card>
-                    <VehicleRentalWorkflowActions agreement={agreement} onChanged={load} />
+                    <VehicleRentalWorkflowActions agreement={agreement} />
                 </div>
             ) : null}
-            {activeTab === 'terms' ? <PreviewPanel rows={[{ label: 'Mode', value: agreement.mode }, { label: 'Rental unit', value: agreement.rentalUnit }, { label: 'Rate plan', value: agreement.ratePlan.name }, { label: 'Availability', value: agreement.availabilityPreview.calculated.availabilityDecision }, { label: 'Status', value: agreement.status }]} title="Rental Period & Availability" /> : null}
-            {activeTab === 'rates' ? <div className="space-y-5"><RentalBillingPreviewPanel agreement={agreement} /><RentalRateRulesTable agreement={agreement} /><RentalExtraChargesTable rows={agreement.lines} /></div> : null}
-            {activeTab === 'running' ? <div className="space-y-5">{agreement.runningCharts.length ? agreement.runningCharts.map((chart) => <RunningChartLineTable chart={chart} key={chart.id} />) : <EmptyState description="No checkout/check-in running chart has been created for this agreement." title="No running charts" />}</div> : null}
+            {activeTab === 'terms' ? <PreviewPanel rows={[{ label: 'Mode', value: agreement.mode }, { label: 'Rental unit', value: agreement.rentalUnit }, { label: 'Rate plan', value: agreement.ratePlan.name }, { label: 'Status', value: agreement.status }]} title="Rental Terms" /> : null}
+            {activeTab === 'rates' ? <div className="space-y-5"><RentalBillingPreviewPanel agreement={agreement} /><RentalRateRulesTable agreement={agreement} /></div> : null}
+            {activeTab === 'running' ? <div className="space-y-5">{agreement.runningCharts.map((chart) => <RunningChartLineTable chart={chart} key={chart.id} />)}</div> : null}
             {activeTab === 'invoices' ? <RentalInvoicePanel rows={agreement.invoices} /> : null}
             {activeTab === 'payments' ? <RentalPaymentPanel rows={agreement.payments} /> : null}
             {activeTab === 'provider' ? <div className="space-y-5"><RentalProviderPanel agreement={agreement} /><RentalProviderPayablePanel rows={agreement.providerPayables} /></div> : null}
             {activeTab === 'replacements' ? <ReplacementVehiclePanel rows={agreement.replacements} /> : null}
             {activeTab === 'breakdowns' ? <BreakdownPanel rows={agreement.breakdowns} /> : null}
             {activeTab === 'documents' ? <PreviewPanel rows={[{ label: 'Document', value: agreement.documentPreview.documentNumber }, { label: 'Template', value: agreement.documentPreview.template }, { label: 'Status', value: agreement.documentPreview.status }]} title="Document Integration" /> : null}
-            {activeTab === 'history' ? <div className="space-y-5"><VehicleRentalActivityTimeline rows={agreement.activity} /><VehicleRentalFinancePostingPanel agreement={agreement} /></div> : null}
+            {activeTab === 'history' ? <VehicleRentalActivityTimeline rows={agreement.activity} /> : null}
+            {activeTab === 'audit' ? <div className="space-y-5"><VehicleRentalActivityTimeline rows={agreement.activity} /><VehicleRentalFinancePostingPanel agreement={agreement} /></div> : null}
         </div>
     );
 }

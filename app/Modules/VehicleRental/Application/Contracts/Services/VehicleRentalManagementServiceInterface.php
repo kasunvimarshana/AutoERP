@@ -10,8 +10,6 @@ interface VehicleRentalManagementServiceInterface
 {
     public function listAgreements(int $tenantId, ?string $agreementRole = null): Result;
 
-    public function listRentalVehicles(int $tenantId): Result;
-
     public function getAgreement(int $agreementId): Result;
 
     public function upsertAgreementAggregate(?int $id, array $payload): Result;

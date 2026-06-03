@@ -31,8 +31,6 @@ final class SalesSettingModel extends CoreModel
             'default_return_account_id' => 'integer',
             'default_rounding_account_id' => 'integer',
             'default_write_off_account_id' => 'integer',
-            'default_customer_advance_account_id' => 'integer',
-            'default_refund_account_id' => 'integer',
             'default_payment_term_id' => 'integer',
             'default_currency_id' => 'integer',
             'default_warehouse_id' => 'integer',

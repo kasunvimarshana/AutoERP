@@ -7,7 +7,6 @@ use Modules\Sales\Presentation\Http\Controllers\GdnHeaderController;
 use Modules\Sales\Presentation\Http\Controllers\GdnLineController;
 use Modules\Sales\Presentation\Http\Controllers\SalesIntegrationController;
 use Modules\Sales\Presentation\Http\Controllers\SalesInvoiceController;
-use Modules\Sales\Presentation\Http\Controllers\SalesLedgerNoteController;
 use Modules\Sales\Presentation\Http\Controllers\SalesManagementController;
 use Modules\Sales\Presentation\Http\Controllers\SalesOrderController;
 use Modules\Sales\Presentation\Http\Controllers\SalesOrderLineController;
@@ -40,8 +39,6 @@ Route::prefix('api/sales')
         Route::apiResource('gdn-lines', GdnLineController::class);
         Route::apiResource('sales-returns', SalesReturnController::class);
         Route::apiResource('sales-return-lines', SalesReturnLineController::class);
-        Route::apiResource('ledger-notes', SalesLedgerNoteController::class)
-            ->only(['index', 'store', 'update', 'destroy']);
 
         Route::get('sales-invoices', [SalesInvoiceController::class, 'index'])
             ->name('sales-invoices.index');
@@ -256,8 +253,6 @@ Route::prefix('api/sales')
                     ->name('workflows.inventory.post');
                 Route::post('finance/post', [SalesWorkflowController::class, 'postFinance'])
                     ->name('workflows.finance.post');
-                Route::post('finance/preview', [SalesWorkflowController::class, 'previewFinance'])
-                    ->name('workflows.finance.preview');
                 Route::post('finance/reverse', [SalesWorkflowController::class, 'reverseFinance'])
                     ->name('workflows.finance.reverse');
                 Route::get('history', [SalesManagementController::class, 'statusHistory'])

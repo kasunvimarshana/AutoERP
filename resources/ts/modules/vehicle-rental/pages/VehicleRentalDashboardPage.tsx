@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
-import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { RentalAgreementTable, VehicleRentalDashboardCards, VehicleRentalPageHeader } from '../components/VehicleRentalComponents';
 import { vehicleRentalApi } from '../services/vehicleRentalApi';
 import type { VehicleRentalAgreement, VehicleRentalDashboardMetric } from '../types/vehicleRental.types';
@@ -10,16 +9,10 @@ import type { VehicleRentalAgreement, VehicleRentalDashboardMetric } from '../ty
 export function VehicleRentalDashboardPage() {
     const [metrics, setMetrics] = useState<VehicleRentalDashboardMetric[]>([]);
     const [agreements, setAgreements] = useState<VehicleRentalAgreement[]>([]);
-    const [error, setError] = useState<string>();
 
     useEffect(() => {
-        Promise.all([
-            vehicleRentalApi.dashboard.summary(),
-            vehicleRentalApi.agreements.list(),
-        ]).then(([metricResponse, agreementResponse]) => {
-            setMetrics(metricResponse.data);
-            setAgreements(agreementResponse.data);
-        }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load Vehicle Rental dashboard.'));
+        vehicleRentalApi.dashboard.summary().then((response) => setMetrics(response.data));
+        vehicleRentalApi.agreements.list().then((response) => setAgreements(response.data));
     }, []);
 
     return (
@@ -39,7 +32,7 @@ export function VehicleRentalDashboardPage() {
             </PreviewPanel>
             <div className="space-y-3">
                 <h2 className="text-base font-bold text-slate-950">Recent Agreements</h2>
-                {error ? <EmptyState description={error} title="Vehicle Rental backend unavailable" /> : <RentalAgreementTable rows={agreements} />}
+                <RentalAgreementTable rows={agreements} />
             </div>
         </div>
     );

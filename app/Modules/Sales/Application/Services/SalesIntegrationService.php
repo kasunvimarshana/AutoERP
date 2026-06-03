@@ -36,14 +36,14 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
     public function __construct(
         private readonly SalesWorkflowServiceInterface $workflowService,
         private readonly DocumentOrchestrator $documentOrchestrator,
-        private readonly SalesDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
-        private readonly SalesPaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
-        private readonly SalesOrderRepositoryInterface $purchaseOrderRepository,
-        private readonly SalesOrderLineRepositoryInterface $purchaseOrderLineRepository,
+        private readonly SalesDocumentLinkRepositoryInterface $salesDocumentLinkRepository,
+        private readonly SalesPaymentAllocationRepositoryInterface $salesPaymentAllocationRepository,
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+        private readonly SalesOrderLineRepositoryInterface $salesOrderLineRepository,
         private readonly GdnHeaderRepositoryInterface $gdnHeaderRepository,
         private readonly GdnLineRepositoryInterface $gdnLineRepository,
-        private readonly SalesReturnRepositoryInterface $purchaseReturnRepository,
-        private readonly SalesReturnLineRepositoryInterface $purchaseReturnLineRepository,
+        private readonly SalesReturnRepositoryInterface $salesReturnRepository,
+        private readonly SalesReturnLineRepositoryInterface $salesReturnLineRepository,
         private readonly PaymentServiceInterface $paymentService,
         private readonly AdvancePaymentServiceInterface $advancePaymentService,
         private readonly PaymentPostingServiceInterface $paymentPostingService,
@@ -234,7 +234,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
 
             $resolvedLinkedAmount = $this->resolveLinkedAmount($payload, $linkedQuantity, $documentItem);
 
-            $created = $this->purchaseDocumentLinkRepository->create([
+            $created = $this->salesDocumentLinkRepository->create([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $record->get('organization_unit_id'),
                 'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
@@ -285,7 +285,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             $match = null;
             $linkId = (int) ($payload['link_id'] ?? 0);
             if ($linkId > 0) {
-                $byId = $this->purchaseDocumentLinkRepository->findById($linkId);
+                $byId = $this->salesDocumentLinkRepository->findById($linkId);
                 if (
                     $byId instanceof DataRecord
                     && (int) $byId->get('tenant_id', 0) === $tenantId
@@ -322,7 +322,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'Document line match not found.'));
             }
 
-            $updated = $this->purchaseDocumentLinkRepository->update((int) $match->id(), [
+            $updated = $this->salesDocumentLinkRepository->update((int) $match->id(), [
                 'status' => 'reversed',
                 'metadata' => array_merge(
                     is_array($match->get('metadata', [])) ? $match->get('metadata', []) : [],
@@ -384,19 +384,10 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 'currency_id' => $payload['currency_id'] ?? $record->get('currency_id'),
                 'exchange_rate' => $payload['exchange_rate'] ?? null,
                 'base_amount' => $payload['base_amount'] ?? $amount,
-                'direction' => 'inbound',
                 'payment_method_id' => $payload['payment_method_id'] ?? null,
                 'account_id' => $payload['account_id'] ?? null,
                 'status' => $payload['status'] ?? 'draft',
                 'reference' => $payload['reference'] ?? $record->get('reference'),
-                'source_module' => 'sales',
-                'source_type' => $entityType,
-                'source_id' => $sourceId,
-                'source_reference' => $this->resolveSourceReference($entityType, $record),
-                'source_context' => [
-                    'customer_id' => $record->get('customer_id'),
-                    'document_id' => $documentId,
-                ],
                 'notes' => $payload['notes'] ?? null,
                 'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
@@ -505,14 +496,6 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 'exchange_rate' => $payload['exchange_rate'] ?? null,
                 'base_amount' => $payload['base_amount'] ?? $amount,
                 'reference' => $payload['reference'] ?? $record->get('reference'),
-                'source_module' => 'sales',
-                'source_type' => $entityType,
-                'source_id' => $sourceId,
-                'source_reference' => $this->resolveSourceReference($entityType, $record),
-                'source_context' => [
-                    'customer_id' => $customerId,
-                    'document_id' => $documentId,
-                ],
                 'notes' => $payload['notes'] ?? null,
                 'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
@@ -594,7 +577,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                     continue;
                 }
 
-                $documentAllocations = $this->purchasePaymentAllocationRepository->list([
+                $documentAllocations = $this->salesPaymentAllocationRepository->list([
                     'tenant_id' => $tenantId,
                     'document_id' => $documentId,
                     'status' => 'active',
@@ -640,7 +623,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                     continue;
                 }
 
-                $documentAllocations = $this->purchasePaymentAllocationRepository->list([
+                $documentAllocations = $this->salesPaymentAllocationRepository->list([
                     'tenant_id' => $tenantId,
                     'document_id' => $documentId,
                     'status' => 'active',
@@ -678,7 +661,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'tenant_id is required.'));
             }
 
-            $sourceRecords = $this->purchaseOrderRepository->list([
+            $sourceRecords = $this->salesOrderRepository->list([
                 'tenant_id' => $tenantId,
                 'customer_id' => $customerId,
             ]);
@@ -837,31 +820,19 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
     private function findEntity(string $entityType, int|string $id): ?DataRecord
     {
         return match ($entityType) {
-            'sales_order' => $this->purchaseOrderRepository->findById($id),
+            'sales_order' => $this->salesOrderRepository->findById($id),
             'gdn_header' => $this->gdnHeaderRepository->findById($id),
-            'sales_return' => $this->purchaseReturnRepository->findById($id),
+            'sales_return' => $this->salesReturnRepository->findById($id),
             default => null,
         };
-    }
-
-    private function resolveSourceReference(string $entityType, DataRecord $record): string
-    {
-        $value = match ($entityType) {
-            'sales_order' => $record->get('so_number') ?? $record->get('reference'),
-            'gdn_header' => $record->get('gdn_number') ?? $record->get('reference'),
-            'sales_return' => $record->get('return_number') ?? $record->get('reference'),
-            default => $record->get('reference'),
-        };
-
-        return (string) ($value ?? ($entityType.'#'.$record->id()));
     }
 
     private function findSourceLine(string $entityType, int $sourceLineId, int $sourceId): ?DataRecord
     {
         $line = match ($entityType) {
-            'sales_order' => $this->purchaseOrderLineRepository->findById($sourceLineId),
+            'sales_order' => $this->salesOrderLineRepository->findById($sourceLineId),
             'gdn_header' => $this->gdnLineRepository->findById($sourceLineId),
-            'sales_return' => $this->purchaseReturnLineRepository->findById($sourceLineId),
+            'sales_return' => $this->salesReturnLineRepository->findById($sourceLineId),
             default => null,
         };
 
@@ -898,7 +869,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
         int $sourceLineId,
         int $documentLineId,
     ): ?DataRecord {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -934,7 +905,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             return 0.0;
         }
 
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -980,7 +951,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
     /** @return list<DataRecord> */
     private function sourceDocumentLinks(int $tenantId, string $entityType, int $sourceId): array
     {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -1017,7 +988,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
     /** @return list<array<string, mixed>> */
     private function serializeLineLinks(int $tenantId, string $entityType, int $sourceId, int $documentId): array
     {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,

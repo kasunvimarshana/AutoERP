@@ -8,7 +8,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Core\Application\Results\Result;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\CreatePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\ListPaymentAllocationsServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\Payments\CreatePaymentServiceInterface;
@@ -18,9 +17,12 @@ use Modules\Payment\Application\Contracts\UseCases\Payments\ListPaymentsServiceI
 use Modules\Payment\Application\Contracts\UseCases\Payments\UpdatePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\WriteOffs\CreateWriteOffServiceInterface;
 use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
+use Modules\Sales\Presentation\Http\Controllers\Concerns\RespondsWithSalesResult;
 
 final class SalesPaymentController extends Controller
 {
+    use RespondsWithSalesResult;
+
     public function __construct(
         private readonly SalesIntegrationServiceInterface $integration,
         private readonly ListPaymentsServiceInterface $listPayments,
@@ -280,17 +282,5 @@ final class SalesPaymentController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'SALES_NOT_FOUND' || $error->code === 'PAYMENT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message, 'code' => $error->code], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

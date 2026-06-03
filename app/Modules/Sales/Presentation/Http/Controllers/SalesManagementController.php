@@ -7,11 +7,13 @@ namespace Modules\Sales\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
+use Modules\Sales\Presentation\Http\Controllers\Concerns\RespondsWithSalesResult;
 
 final class SalesManagementController extends Controller
 {
+    use RespondsWithSalesResult;
+
     public function __construct(private readonly SalesManagementServiceInterface $service) {}
 
     public function upsertSalesOrderWithLines(Request $request): JsonResponse
@@ -125,17 +127,5 @@ final class SalesManagementController extends Controller
         $locationId = $request->has('location_id') ? (int) $request->input('location_id') : null;
 
         return $this->respond($this->service->getStockAvailability($tenantId, $itemId, $warehouseId, $locationId));
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'SALES_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

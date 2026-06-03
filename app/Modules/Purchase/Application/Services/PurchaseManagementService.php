@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Modules\Purchase\Application\Services;
 
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
+use Modules\Purchase\Application\Contracts\Services\PurchaseAmountCalculatorInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
@@ -35,7 +36,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         private readonly PurchaseStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
         private readonly PurchaseDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
         private readonly PurchasePaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
-        private readonly TaxCalculationServiceInterface $taxCalculationService,
+        private readonly PurchaseAmountCalculatorInterface $amountCalculator,
     ) {}
 
     public function upsertPurchaseOrderWithLines(?int $id, array $payload): Result
@@ -82,6 +83,13 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenant($header, $tenantId)) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'tenant_id must match the purchase order tenant.',
+                    ));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
@@ -91,6 +99,22 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if (
+                        $lineId !== null
+                        && ! $this->lineBelongsTo(
+                            $this->purchaseOrderLineRepository,
+                            $lineId,
+                            $tenantId,
+                            'purchase_order_id',
+                            $purchaseOrderId,
+                        )
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::NOT_FOUND,
+                            'Purchase order line not found for this purchase order.',
+                        ));
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->purchaseOrderLineRepository->delete($lineId);
@@ -168,6 +192,13 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenant($header, $tenantId)) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'tenant_id must match the GRN tenant.',
+                    ));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
@@ -177,6 +208,22 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if (
+                        $lineId !== null
+                        && ! $this->lineBelongsTo(
+                            $this->grnLineRepository,
+                            $lineId,
+                            $tenantId,
+                            'grn_header_id',
+                            $grnHeaderId,
+                        )
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::NOT_FOUND,
+                            'GRN line not found for this GRN.',
+                        ));
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->grnLineRepository->delete($lineId);
@@ -253,6 +300,13 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenant($header, $tenantId)) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'tenant_id must match the purchase return tenant.',
+                    ));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
@@ -262,6 +316,22 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if (
+                        $lineId !== null
+                        && ! $this->lineBelongsTo(
+                            $this->purchaseReturnLineRepository,
+                            $lineId,
+                            $tenantId,
+                            'purchase_return_id',
+                            $purchaseReturnId,
+                        )
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::NOT_FOUND,
+                            'Purchase return line not found for this purchase return.',
+                        ));
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->purchaseReturnLineRepository->delete($lineId);
@@ -394,8 +464,6 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
             'allow_line_discount' => true,
             'tax_calculation_level' => 'line',
             'header_discount_allocation_method' => 'proportional',
-            'default_advance_payment_account_id' => $payload['default_advance_payment_account_id'] ?? null,
-            'default_refund_account_id' => $payload['default_refund_account_id'] ?? null,
             'default_po_status' => 'draft',
             'default_grn_status' => 'draft',
             'default_document_status' => 'draft',
@@ -591,13 +659,13 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
                 $lineGross = round($qty * $unitPrice, 4);
 
-                $discountAmount = $this->resolveDiscountAmount(
+                $discountAmount = $this->amountCalculator->resolveDiscountAmount(
                     $lineGross,
                     (string) ($line['discount_type'] ?? ''),
                     round((float) ($line['discount_value'] ?? 0), 4),
                 );
                 $lineNet = round(max(0.0, $lineGross - $discountAmount), 4);
-                $lineTax = $this->resolveTaxAmount(
+                $lineTax = $this->amountCalculator->resolveTaxAmount(
                     (int) ($payload['tenant_id'] ?? $line['tenant_id'] ?? 0),
                     isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
                     $lineNet,
@@ -635,6 +703,25 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    private function isHeaderTenant(DataRecord $header, int $tenantId): bool
+    {
+        return $tenantId > 0 && (int) $header->get('tenant_id', 0) === $tenantId;
+    }
+
+    private function lineBelongsTo(
+        RepositoryPortInterface $repository,
+        int $lineId,
+        int $tenantId,
+        string $parentColumn,
+        int $parentId,
+    ): bool {
+        $line = $repository->findById($lineId);
+
+        return $line instanceof DataRecord
+            && (int) $line->get('tenant_id', 0) === $tenantId
+            && (int) $line->get($parentColumn, 0) === $parentId;
     }
 
     /** @return array<string, mixed> */
@@ -684,7 +771,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $orderedQty, $unitPrice);
+        return $this->amountCalculator->hydrateLineTotals($line, $orderedQty, $unitPrice);
     }
 
     /** @return array<string, mixed> */
@@ -709,7 +796,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $receivedQty, $unitPrice);
+        return $this->amountCalculator->hydrateLineTotals($line, $receivedQty, $unitPrice);
     }
 
     /** @return array<string, mixed> */
@@ -730,76 +817,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $returnQty, $unitPrice);
-    }
-
-    /** @param array<string, mixed> $line */
-    private function hydrateLineTotals(array $line, float $quantity, float $unitPrice): array
-    {
-        $grossAmount = round($quantity * $unitPrice, 4);
-        $discountType = (string) ($line['discount_type'] ?? '');
-        $discountValue = round((float) ($line['discount_value'] ?? 0), 4);
-        $discountAmount = $this->resolveDiscountAmount($grossAmount, $discountType, $discountValue);
-        $lineTotal = round(max(0.0, $grossAmount - $discountAmount), 4);
-        $taxAmount = $this->resolveTaxAmount(
-            (int) ($line['tenant_id'] ?? 0),
-            isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
-            $lineTotal,
-            $line['posting_date'] ?? null,
-        );
-
-        $line['gross_amount'] = $grossAmount;
-        $line['discount_amount'] = $discountAmount;
-        $line['tax_amount'] = $taxAmount;
-        $line['line_total'] = $lineTotal;
-        $line['line_total_with_tax'] = round($lineTotal + $taxAmount, 4);
-
-        return $line;
-    }
-
-    private function resolveDiscountAmount(float $grossAmount, string $discountType, float $discountValue): float
-    {
-        if ($discountValue <= 0) {
-            return 0.0;
-        }
-
-        $type = strtolower(trim($discountType));
-        if ($type === 'percentage') {
-            return round(min($grossAmount, ($grossAmount * $discountValue) / 100), 4);
-        }
-
-        return round(min($grossAmount, $discountValue), 4);
-    }
-
-    private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
-    {
-        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
-            return 0.0;
-        }
-
-        $result = $this->taxCalculationService->calculate(
-            $tenantId,
-            $taxGroupId,
-            $taxableAmount,
-            $postingDate !== null ? (string) $postingDate : null,
-        );
-
-        if ($result->isFailure()) {
-            return 0.0;
-        }
-
-        $tax = $result->valueOrFail();
-
-        return round((float) ($tax['tax_amount'] ?? 0), 4);
-    }
-
-    private function resolveHeaderDiscountAmount(DataRecord $header, float $discountableAmount): float
-    {
-        return $this->resolveDiscountAmount(
-            max(0.0, $discountableAmount),
-            (string) $header->get('header_discount_type', ''),
-            round((float) $header->get('header_discount_value', 0), 4),
-        );
+        return $this->amountCalculator->hydrateLineTotals($line, $returnQty, $unitPrice);
     }
 
     private function recalculatePurchaseOrderTotals(int $purchaseOrderId, int $tenantId): void
@@ -815,11 +833,11 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
@@ -864,15 +882,15 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
-                $header->get('grn_date') ?? $header->get('document_date') ?? null,
+                $header->get('received_date') ?? null,
             );
             $debitNoteTotal = round((float) $header->get('debit_note_total', 0), 4);
             $creditNoteTotal = round((float) $header->get('credit_note_total', 0), 4);
@@ -910,11 +928,11 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),

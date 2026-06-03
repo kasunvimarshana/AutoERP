@@ -17,7 +17,6 @@ final class VehicleRentalDocumentSeedCatalog
             [
                 'name' => 'Vehicle Rental Agreement',
                 'code' => 'VEHICLE_RENTAL_AGREEMENT',
-                'description' => 'Generic rental agreement document generated from VehicleRental workflow data.',
                 'default_status' => 'draft',
                 'is_active' => true,
                 'requires_source' => false,
@@ -25,7 +24,6 @@ final class VehicleRentalDocumentSeedCatalog
             [
                 'name' => 'Vehicle Rental Running Chart',
                 'code' => 'VEHICLE_RENTAL_RUNNING_CHART',
-                'description' => 'Generic running chart document for rental usage capture.',
                 'default_status' => 'draft',
                 'is_active' => true,
                 'requires_source' => true,
@@ -33,7 +31,6 @@ final class VehicleRentalDocumentSeedCatalog
             [
                 'name' => 'Vehicle Rental Invoice',
                 'code' => 'VEHICLE_RENTAL_INVOICE',
-                'description' => 'Generic rental invoice document generated from backend billing preview.',
                 'default_status' => 'draft',
                 'is_active' => true,
                 'requires_source' => true,
@@ -41,7 +38,6 @@ final class VehicleRentalDocumentSeedCatalog
             [
                 'name' => 'Vehicle Rental Replacement',
                 'code' => 'VEHICLE_RENTAL_REPLACEMENT',
-                'description' => 'Generic vehicle replacement document for rental workflow changes.',
                 'default_status' => 'draft',
                 'is_active' => true,
                 'requires_source' => true,

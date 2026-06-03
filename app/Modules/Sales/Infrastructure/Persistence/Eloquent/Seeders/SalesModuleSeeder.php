@@ -14,8 +14,6 @@ class SalesModuleSeeder extends Seeder
             SalesDocumentDefinitionsSeeder::class,
             SalesDocumentWorkflowSeeder::class,
             SalesDocumentSequenceSeeder::class,
-            SalesSettingsSeeder::class,
-            SalesSampleSeeder::class,
         ]);
     }
 }

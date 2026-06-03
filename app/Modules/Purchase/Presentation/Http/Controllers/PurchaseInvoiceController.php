@@ -7,13 +7,15 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
+use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
 use Modules\Purchase\Presentation\Http\Requests\CalculatePurchaseInvoiceRequest;
 
 final class PurchaseInvoiceController extends Controller
 {
+    use RespondsWithPurchaseResult;
+
     public function __construct(
         private readonly PurchaseIntegrationServiceInterface $integration,
         private readonly PurchaseManagementServiceInterface $management,
@@ -405,17 +407,5 @@ final class PurchaseInvoiceController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'PURCHASE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message, 'code' => $error->code], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

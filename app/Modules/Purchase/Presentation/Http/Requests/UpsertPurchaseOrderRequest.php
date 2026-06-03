@@ -36,6 +36,7 @@ final class UpsertPurchaseOrderRequest extends FormRequest
             'order_date' => array_merge($required, ['date']),
             'expected_date' => ['nullable', 'date'],
             'price_list_id' => ['nullable', 'integer', 'min:1', 'exists:price_lists,id'],
+            'payment_term_id' => ['nullable', 'integer', 'min:1', 'exists:payment_terms,id'],
             'subtotal' => ['nullable', 'numeric'],
             'line_tax_total' => ['nullable', 'numeric'],
             'line_discount_total' => ['nullable', 'numeric'],
@@ -51,8 +52,11 @@ final class UpsertPurchaseOrderRequest extends FormRequest
             'grand_total' => ['nullable', 'numeric'],
             'paid_amount' => ['nullable', 'numeric'],
             'balance' => ['nullable', 'numeric'],
+            'tax_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'discount_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'purchase_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
             'notes' => ['nullable', 'string'],
-            'created_by' => ['nullable', 'integer', 'min:1']
+            'created_by' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

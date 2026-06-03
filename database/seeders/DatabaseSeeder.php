@@ -10,10 +10,9 @@ use Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\DocumentModuleS
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Seeders\FinanceModuleSeeder;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Seeders\InventoryModuleSeeder;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemModuleSeeder;
-use Modules\Payment\Infrastructure\Persistence\Eloquent\Seeders\PaymentModuleSeeder;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Seeders\PricingModuleSeeder;
+use Modules\Payment\Infrastructure\Persistence\Eloquent\Seeders\PaymentModuleSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseModuleSeeder;
-use Modules\Sales\Infrastructure\Persistence\Eloquent\Seeders\SalesModuleSeeder;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Seeders\UomModuleSeeder;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Seeders\VehicleModuleSeeder;
 use Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Seeders\VehicleRentalModuleSeeder;
@@ -44,12 +43,6 @@ class DatabaseSeeder extends Seeder
         if ((bool) env('SEED_PURCHASE_MODULE', false) && class_exists(PurchaseModuleSeeder::class)) {
             $this->call([
                 PurchaseModuleSeeder::class,
-            ]);
-        }
-
-        if ((bool) env('SEED_SALES_MODULE', false) && class_exists(SalesModuleSeeder::class)) {
-            $this->call([
-                SalesModuleSeeder::class,
             ]);
         }
 

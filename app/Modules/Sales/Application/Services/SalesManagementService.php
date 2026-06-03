@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Modules\Sales\Application\Services;
 
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
+use Modules\Sales\Application\Contracts\Services\SalesAmountCalculatorInterface;
 use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
 use Modules\Sales\Application\Repositories\GdnHeaderRepositoryInterface;
 use Modules\Sales\Application\Repositories\GdnLineRepositoryInterface;
@@ -26,28 +27,28 @@ use Throwable;
 final class SalesManagementService implements SalesManagementServiceInterface
 {
     public function __construct(
-        private readonly SalesOrderRepositoryInterface $purchaseOrderRepository,
-        private readonly SalesOrderLineRepositoryInterface $purchaseOrderLineRepository,
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+        private readonly SalesOrderLineRepositoryInterface $salesOrderLineRepository,
         private readonly GdnHeaderRepositoryInterface $gdnHeaderRepository,
         private readonly GdnLineRepositoryInterface $gdnLineRepository,
-        private readonly SalesReturnRepositoryInterface $purchaseReturnRepository,
-        private readonly SalesReturnLineRepositoryInterface $purchaseReturnLineRepository,
-        private readonly SalesSettingRepositoryInterface $purchaseSettingRepository,
-        private readonly SalesStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
-        private readonly SalesDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
-        private readonly SalesPaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
+        private readonly SalesReturnRepositoryInterface $salesReturnRepository,
+        private readonly SalesReturnLineRepositoryInterface $salesReturnLineRepository,
+        private readonly SalesSettingRepositoryInterface $salesSettingRepository,
+        private readonly SalesStatusHistoryRepositoryInterface $salesStatusHistoryRepository,
+        private readonly SalesDocumentLinkRepositoryInterface $salesDocumentLinkRepository,
+        private readonly SalesPaymentAllocationRepositoryInterface $salesPaymentAllocationRepository,
         private readonly StockLevelRepositoryInterface $stockLevelRepository,
-        private readonly TaxCalculationServiceInterface $taxCalculationService,
+        private readonly SalesAmountCalculatorInterface $amountCalculator,
     ) {}
 
     public function upsertSalesOrderWithLines(?int $id, array $payload): Result
     {
         try {
-            return $this->purchaseOrderRepository->transaction(function () use ($id, $payload): Result {
+            return $this->salesOrderRepository->transaction(function () use ($id, $payload): Result {
                 $headerPayload = $this->extractHeaderPayload($payload);
                 $header = $id === null
-                    ? $this->purchaseOrderRepository->create($this->withDefaultRowVersion($headerPayload))
-                    : $this->purchaseOrderRepository->update($id, $headerPayload);
+                    ? $this->salesOrderRepository->create($this->withDefaultRowVersion($headerPayload))
+                    : $this->salesOrderRepository->update($id, $headerPayload);
 
                 if (is_array($payload['lines'] ?? null)) {
                     $sync = $this->syncSalesOrderLines((int) $header->id(), [
@@ -62,7 +63,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
                     $this->recalculateSalesOrderTotals((int) $header->id(), (int) $header->get('tenant_id'));
                 }
 
-                $reloaded = $this->purchaseOrderRepository->findById((int) $header->id());
+                $reloaded = $this->salesOrderRepository->findById((int) $header->id());
                 if (! $reloaded instanceof DataRecord) {
                     return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'Sales order not found.'));
                 }
@@ -77,25 +78,43 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function syncSalesOrderLines(int $salesOrderId, array $payload): Result
     {
         try {
-            return $this->purchaseOrderRepository->transaction(function () use ($salesOrderId, $payload): Result {
-                $header = $this->purchaseOrderRepository->findById($salesOrderId);
+            return $this->salesOrderRepository->transaction(function () use ($salesOrderId, $payload): Result {
+                $header = $this->salesOrderRepository->findById($salesOrderId);
                 if (! $header instanceof DataRecord) {
                     return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'Sales order not found.'));
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenantMatch($header, $tenantId)) {
+                    return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'Cross-tenant line sync is not allowed.'));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
+                // Line edits and header totals must commit together so totals cannot drift from detail rows.
                 foreach ($lines as $linePayload) {
                     if (! is_array($linePayload)) {
                         continue;
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if ($lineId !== null) {
+                        $ownership = $this->validateLineOwnership(
+                            $this->salesOrderLineRepository,
+                            $lineId,
+                            'sales_order_id',
+                            $salesOrderId,
+                            $tenantId,
+                        );
+                        if ($ownership->isFailure()) {
+                            return $ownership;
+                        }
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
-                        $this->purchaseOrderLineRepository->delete($lineId);
+                        $this->salesOrderLineRepository->delete($lineId);
 
                         continue;
                     }
@@ -108,9 +127,9 @@ final class SalesManagementService implements SalesManagementServiceInterface
                     );
 
                     if ($lineId === null) {
-                        $this->purchaseOrderLineRepository->create($this->withDefaultRowVersion($upsert));
+                        $this->salesOrderLineRepository->create($this->withDefaultRowVersion($upsert));
                     } else {
-                        $this->purchaseOrderLineRepository->update($lineId, $upsert);
+                        $this->salesOrderLineRepository->update($lineId, $upsert);
                     }
                 }
 
@@ -170,15 +189,33 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenantMatch($header, $tenantId)) {
+                    return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'Cross-tenant line sync is not allowed.'));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
+                // Line edits and header totals must commit together so totals cannot drift from detail rows.
                 foreach ($lines as $linePayload) {
                     if (! is_array($linePayload)) {
                         continue;
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if ($lineId !== null) {
+                        $ownership = $this->validateLineOwnership(
+                            $this->gdnLineRepository,
+                            $lineId,
+                            'gdn_header_id',
+                            $gdnHeaderId,
+                            $tenantId,
+                        );
+                        if ($ownership->isFailure()) {
+                            return $ownership;
+                        }
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->gdnLineRepository->delete($lineId);
@@ -214,11 +251,11 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function upsertSalesReturnWithLines(?int $id, array $payload): Result
     {
         try {
-            return $this->purchaseReturnRepository->transaction(function () use ($id, $payload): Result {
+            return $this->salesReturnRepository->transaction(function () use ($id, $payload): Result {
                 $headerPayload = $this->extractHeaderPayload($payload);
                 $header = $id === null
-                    ? $this->purchaseReturnRepository->create($this->withDefaultRowVersion($headerPayload))
-                    : $this->purchaseReturnRepository->update($id, $headerPayload);
+                    ? $this->salesReturnRepository->create($this->withDefaultRowVersion($headerPayload))
+                    : $this->salesReturnRepository->update($id, $headerPayload);
 
                 if (is_array($payload['lines'] ?? null)) {
                     $sync = $this->syncSalesReturnLines((int) $header->id(), [
@@ -233,7 +270,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
                     $this->recalculateSalesReturnTotals((int) $header->id(), (int) $header->get('tenant_id'));
                 }
 
-                $reloaded = $this->purchaseReturnRepository->findById((int) $header->id());
+                $reloaded = $this->salesReturnRepository->findById((int) $header->id());
                 if (! $reloaded instanceof DataRecord) {
                     return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'Sales return not found.'));
                 }
@@ -248,25 +285,43 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function syncSalesReturnLines(int $salesReturnId, array $payload): Result
     {
         try {
-            return $this->purchaseReturnRepository->transaction(function () use ($salesReturnId, $payload): Result {
-                $header = $this->purchaseReturnRepository->findById($salesReturnId);
+            return $this->salesReturnRepository->transaction(function () use ($salesReturnId, $payload): Result {
+                $header = $this->salesReturnRepository->findById($salesReturnId);
                 if (! $header instanceof DataRecord) {
                     return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'Sales return not found.'));
                 }
 
                 $tenantId = (int) ($payload['tenant_id'] ?? $header->get('tenant_id', 0));
+                if (! $this->isHeaderTenantMatch($header, $tenantId)) {
+                    return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'Cross-tenant line sync is not allowed.'));
+                }
+
                 $organizationUnitId = $payload['organization_unit_id'] ?? $header->get('organization_unit_id');
                 $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
+                // Line edits and header totals must commit together so totals cannot drift from detail rows.
                 foreach ($lines as $linePayload) {
                     if (! is_array($linePayload)) {
                         continue;
                     }
 
                     $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                    if ($lineId !== null) {
+                        $ownership = $this->validateLineOwnership(
+                            $this->salesReturnLineRepository,
+                            $lineId,
+                            'sales_return_id',
+                            $salesReturnId,
+                            $tenantId,
+                        );
+                        if ($ownership->isFailure()) {
+                            return $ownership;
+                        }
+                    }
+
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
-                        $this->purchaseReturnLineRepository->delete($lineId);
+                        $this->salesReturnLineRepository->delete($lineId);
 
                         continue;
                     }
@@ -279,9 +334,9 @@ final class SalesManagementService implements SalesManagementServiceInterface
                     );
 
                     if ($lineId === null) {
-                        $this->purchaseReturnLineRepository->create($this->withDefaultRowVersion($upsert));
+                        $this->salesReturnLineRepository->create($this->withDefaultRowVersion($upsert));
                     } else {
-                        $this->purchaseReturnLineRepository->update($lineId, $upsert);
+                        $this->salesReturnLineRepository->update($lineId, $upsert);
                     }
                 }
 
@@ -300,7 +355,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function getStatusHistory(string $entityType, int $entityId, int $tenantId): Result
     {
         try {
-            return Result::success($this->purchaseStatusHistoryRepository->list([
+            return Result::success($this->salesStatusHistoryRepository->list([
                 'tenant_id' => $tenantId,
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
@@ -314,7 +369,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
     {
         try {
             $records = $organizationUnitId !== null
-                ? $this->purchaseSettingRepository->list([
+                ? $this->salesSettingRepository->list([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'is_active' => true,
@@ -322,7 +377,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 : [];
 
             if ($records === []) {
-                $records = $this->purchaseSettingRepository->list([
+                $records = $this->salesSettingRepository->list([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => null,
                     'is_active' => true,
@@ -347,18 +402,18 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 ? (int) $payload['organization_unit_id']
                 : null;
 
-            $existing = $this->purchaseSettingRepository->list([
+            $existing = $this->salesSettingRepository->list([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
             ]);
 
             if ($existing !== []) {
-                $updated = $this->purchaseSettingRepository->update((int) $existing[0]->id(), $payload);
+                $updated = $this->salesSettingRepository->update((int) $existing[0]->id(), $payload);
 
                 return Result::success($updated);
             }
 
-            return Result::success($this->purchaseSettingRepository->create($this->withDefaultRowVersion($payload)));
+            return Result::success($this->salesSettingRepository->create($this->withDefaultRowVersion($payload)));
         } catch (Throwable $exception) {
             return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -375,7 +430,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
             ? (int) $payload['organization_unit_id']
             : null;
 
-        $existing = $this->purchaseSettingRepository->list([
+        $existing = $this->salesSettingRepository->list([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
         ]);
@@ -399,8 +454,6 @@ final class SalesManagementService implements SalesManagementServiceInterface
             'default_gdn_status' => 'draft',
             'default_sales_invoice_status' => 'draft',
             'default_sales_return_status' => 'draft',
-            'default_customer_advance_account_id' => $payload['default_customer_advance_account_id'] ?? null,
-            'default_refund_account_id' => $payload['default_refund_account_id'] ?? null,
             'require_sales_order_before_gdn' => false,
             'require_gdn_before_invoice' => false,
         ], $payload));
@@ -409,7 +462,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function getAvailableSalesOrderLinesForGdn(int $tenantId, int $salesOrderId): Result
     {
         try {
-            $lines = $this->purchaseOrderLineRepository->list([
+            $lines = $this->salesOrderLineRepository->list([
                 'tenant_id' => $tenantId,
                 'sales_order_id' => $salesOrderId,
             ]);
@@ -437,7 +490,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
     public function getAvailableSalesOrderLinesForInvoice(int $tenantId, int $salesOrderId): Result
     {
         try {
-            $lines = $this->purchaseOrderLineRepository->list([
+            $lines = $this->salesOrderLineRepository->list([
                 'tenant_id' => $tenantId,
                 'sales_order_id' => $salesOrderId,
             ]);
@@ -516,7 +569,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
             }
 
             if ($sourceType === 'sales_order') {
-                $lines = $this->purchaseOrderLineRepository->list([
+                $lines = $this->salesOrderLineRepository->list([
                     'tenant_id' => $tenantId,
                     'sales_order_id' => $sourceId,
                 ]);
@@ -552,8 +605,8 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 $criteria['source_type'] = 'sales_order';
             }
 
-            $links = $this->purchaseDocumentLinkRepository->list($criteria);
-            $allocations = $this->purchasePaymentAllocationRepository->list([
+            $links = $this->salesDocumentLinkRepository->list($criteria);
+            $allocations = $this->salesPaymentAllocationRepository->list([
                 'tenant_id' => $tenantId,
                 'status' => 'active',
             ]);
@@ -691,13 +744,13 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
                 $lineGross = round($qty * $unitPrice, 4);
 
-                $discountAmount = $this->resolveDiscountAmount(
+                $discountAmount = $this->amountCalculator->resolveDiscountAmount(
                     $lineGross,
                     (string) ($line['discount_type'] ?? ''),
                     round((float) ($line['discount_value'] ?? 0), 4),
                 );
                 $lineNet = round(max(0.0, $lineGross - $discountAmount), 4);
-                $lineTax = $this->resolveTaxAmount(
+                $lineTax = $this->amountCalculator->resolveTaxAmount(
                     (int) ($payload['tenant_id'] ?? $line['tenant_id'] ?? 0),
                     isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
                     $lineNet,
@@ -766,6 +819,33 @@ final class SalesManagementService implements SalesManagementServiceInterface
         return $payload;
     }
 
+    private function isHeaderTenantMatch(DataRecord $header, int $tenantId): bool
+    {
+        return $tenantId > 0 && $tenantId === (int) $header->get('tenant_id', 0);
+    }
+
+    private function validateLineOwnership(
+        RepositoryPortInterface $repository,
+        int $lineId,
+        string $parentColumn,
+        int $parentId,
+        int $tenantId,
+    ): Result {
+        $line = $repository->findById($lineId);
+        if (
+            ! $line instanceof DataRecord
+            || (int) $line->get('tenant_id', 0) !== $tenantId
+            || (int) $line->get($parentColumn, 0) !== $parentId
+        ) {
+            return Result::failure(new Error(
+                SalesErrorCode::INVALID_VALUE,
+                'Line does not belong to the requested Sales document.',
+            ));
+        }
+
+        return Result::success(true);
+    }
+
     /** @return array<string, mixed> */
     private function normalizeSalesOrderLinePayload(
         array $line,
@@ -803,7 +883,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $orderedQty, $unitPrice);
+        return $this->amountCalculator->hydrateLineTotals($line, $orderedQty, $unitPrice);
     }
 
     /** @return array<string, mixed> */
@@ -834,7 +914,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $deliveredQty, $unitPrice);
+        return $this->amountCalculator->hydrateLineTotals($line, $deliveredQty, $unitPrice);
     }
 
     /** @return array<string, mixed> */
@@ -865,96 +945,27 @@ final class SalesManagementService implements SalesManagementServiceInterface
             'unit_price' => $unitPrice,
         ]);
 
-        return $this->hydrateLineTotals($line, $returnQty, $unitPrice);
+        return $this->amountCalculator->hydrateLineTotals($line, $returnQty, $unitPrice);
     }
 
-    /** @param array<string, mixed> $line */
-    private function hydrateLineTotals(array $line, float $quantity, float $unitPrice): array
+    private function recalculateSalesOrderTotals(int $salesOrderId, int $tenantId): void
     {
-        $grossAmount = round($quantity * $unitPrice, 4);
-        $discountType = (string) ($line['discount_type'] ?? '');
-        $discountValue = round((float) ($line['discount_value'] ?? 0), 4);
-        $discountAmount = $this->resolveDiscountAmount($grossAmount, $discountType, $discountValue);
-        $lineTotal = round(max(0.0, $grossAmount - $discountAmount), 4);
-        $taxAmount = $this->resolveTaxAmount(
-            (int) ($line['tenant_id'] ?? 0),
-            isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
-            $lineTotal,
-            $line['posting_date'] ?? null,
-        );
-
-        $line['gross_amount'] = $grossAmount;
-        $line['discount_amount'] = $discountAmount;
-        $line['tax_amount'] = $taxAmount;
-        $line['line_total'] = $lineTotal;
-        $line['line_total_with_tax'] = round($lineTotal + $taxAmount, 4);
-
-        return $line;
-    }
-
-    private function resolveDiscountAmount(float $grossAmount, string $discountType, float $discountValue): float
-    {
-        if ($discountValue <= 0) {
-            return 0.0;
-        }
-
-        $type = strtolower(trim($discountType));
-        if ($type === 'percentage') {
-            return round(min($grossAmount, ($grossAmount * $discountValue) / 100), 4);
-        }
-
-        return round(min($grossAmount, $discountValue), 4);
-    }
-
-    private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
-    {
-        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
-            return 0.0;
-        }
-
-        $result = $this->taxCalculationService->calculate(
-            $tenantId,
-            $taxGroupId,
-            $taxableAmount,
-            $postingDate !== null ? (string) $postingDate : null,
-        );
-
-        if ($result->isFailure()) {
-            return 0.0;
-        }
-
-        $tax = $result->valueOrFail();
-
-        return round((float) ($tax['tax_amount'] ?? 0), 4);
-    }
-
-    private function resolveHeaderDiscountAmount(DataRecord $header, float $discountableAmount): float
-    {
-        return $this->resolveDiscountAmount(
-            max(0.0, $discountableAmount),
-            (string) $header->get('header_discount_type', ''),
-            round((float) $header->get('header_discount_value', 0), 4),
-        );
-    }
-
-    private function recalculateSalesOrderTotals(int $purchaseOrderId, int $tenantId): void
-    {
-        $lines = $this->purchaseOrderLineRepository->list([
+        $lines = $this->salesOrderLineRepository->list([
             'tenant_id' => $tenantId,
-            'sales_order_id' => $purchaseOrderId,
+            'sales_order_id' => $salesOrderId,
         ]);
 
-        $this->applyHeaderTotals($lines, function (array $totals) use ($purchaseOrderId, $lines): void {
-            $header = $this->purchaseOrderRepository->findById($purchaseOrderId);
+        $this->applyHeaderTotals($lines, function (array $totals) use ($salesOrderId, $lines): void {
+            $header = $this->salesOrderRepository->findById($salesOrderId);
             if (! $header instanceof DataRecord) {
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
@@ -992,7 +1003,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 $outstandingQtyTotal += (float) $line->get('outstanding_qty', 0);
             }
 
-            $this->purchaseOrderRepository->update($purchaseOrderId, [
+            $this->salesOrderRepository->update($salesOrderId, [
                 'subtotal' => $totals['subtotal'],
                 'line_tax_total' => $totals['line_tax_total'],
                 'line_discount_total' => $totals['line_discount_total'],
@@ -1027,11 +1038,11 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
@@ -1082,24 +1093,24 @@ final class SalesManagementService implements SalesManagementServiceInterface
         });
     }
 
-    private function recalculateSalesReturnTotals(int $purchaseReturnId, int $tenantId): void
+    private function recalculateSalesReturnTotals(int $salesReturnId, int $tenantId): void
     {
-        $lines = $this->purchaseReturnLineRepository->list([
+        $lines = $this->salesReturnLineRepository->list([
             'tenant_id' => $tenantId,
-            'sales_return_id' => $purchaseReturnId,
+            'sales_return_id' => $salesReturnId,
         ]);
 
-        $this->applyHeaderTotals($lines, function (array $totals) use ($purchaseReturnId, $lines): void {
-            $header = $this->purchaseReturnRepository->findById($purchaseReturnId);
+        $this->applyHeaderTotals($lines, function (array $totals) use ($salesReturnId, $lines): void {
+            $header = $this->salesReturnRepository->findById($salesReturnId);
             if (! $header instanceof DataRecord) {
                 return;
             }
 
-            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+            $headerDiscountAmount = $this->amountCalculator->resolveHeaderDiscountAmount(
                 $header,
                 $totals['subtotal'] - $totals['line_discount_total'],
             );
-            $headerTaxAmount = $this->resolveTaxAmount(
+            $headerTaxAmount = $this->amountCalculator->resolveTaxAmount(
                 (int) $header->get('tenant_id', 0),
                 $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
                 max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
@@ -1131,7 +1142,7 @@ final class SalesManagementService implements SalesManagementServiceInterface
                 $scrappedQtyTotal += (float) $line->get('scrap_qty', 0);
             }
 
-            $this->purchaseReturnRepository->update($purchaseReturnId, [
+            $this->salesReturnRepository->update($salesReturnId, [
                 'subtotal' => $totals['subtotal'],
                 'line_tax_total' => $totals['line_tax_total'],
                 'line_discount_total' => $totals['line_discount_total'],

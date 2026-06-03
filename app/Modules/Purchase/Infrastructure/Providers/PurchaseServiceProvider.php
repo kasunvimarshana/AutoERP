@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Purchase\Application\Contracts\Services\PurchaseAmountCalculatorInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
-use Modules\Purchase\Application\Contracts\Services\PurchaseLedgerNoteServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\GrnHeaders\CreateGrnHeaderServiceInterface;
@@ -42,7 +42,6 @@ use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\UpdatePurcha
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseDocumentLinkRepositoryInterface;
-use Modules\Purchase\Application\Repositories\PurchaseLedgerNoteRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseOrderLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchasePaymentAllocationRepositoryInterface;
@@ -50,8 +49,8 @@ use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterf
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
+use Modules\Purchase\Application\Services\PurchaseAmountCalculator;
 use Modules\Purchase\Application\Services\PurchaseIntegrationService;
-use Modules\Purchase\Application\Services\PurchaseLedgerNoteService;
 use Modules\Purchase\Application\Services\PurchaseManagementService;
 use Modules\Purchase\Application\Services\PurchaseWorkflowService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\CreateGrnHeaderService;
@@ -87,7 +86,6 @@ use Modules\Purchase\Application\UseCases\PurchaseReturns\UpdatePurchaseReturnSe
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\GrnHeaderModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\GrnLineModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseDocumentLinkModel;
-use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseLedgerNoteModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderLineModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchasePaymentAllocationModel;
@@ -98,7 +96,6 @@ use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseStatusHi
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnHeaderRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseDocumentLinkRepository;
-use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseLedgerNoteRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchasePaymentAllocationRepository;
@@ -147,7 +144,7 @@ final class PurchaseServiceProvider extends ServiceProvider
                 DeletePurchaseReturnLineServiceInterface::class => DeletePurchaseReturnLineService::class,
                 PurchaseManagementServiceInterface::class => PurchaseManagementService::class,
                 PurchaseIntegrationServiceInterface::class => PurchaseIntegrationService::class,
-                PurchaseLedgerNoteServiceInterface::class => PurchaseLedgerNoteService::class,
+                PurchaseAmountCalculatorInterface::class => PurchaseAmountCalculator::class,
                 PurchaseWorkflowServiceInterface::class => PurchaseWorkflowService::class,
             ] as $contract => $implementation
         ) {
@@ -188,12 +185,6 @@ final class PurchaseServiceProvider extends ServiceProvider
             PurchaseDocumentLinkRepositoryInterface::class,
             function (): PurchaseDocumentLinkRepositoryInterface {
                 return new EloquentPurchaseDocumentLinkRepository(new PurchaseDocumentLinkModel);
-            }
-        );
-        $this->app->singleton(
-            PurchaseLedgerNoteRepositoryInterface::class,
-            function (): PurchaseLedgerNoteRepositoryInterface {
-                return new EloquentPurchaseLedgerNoteRepository(new PurchaseLedgerNoteModel);
             }
         );
         $this->app->singleton(

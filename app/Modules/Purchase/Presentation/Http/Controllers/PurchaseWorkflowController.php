@@ -6,15 +6,15 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
+use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
 use Modules\Purchase\Presentation\Http\Requests\PurchaseWorkflowActionRequest;
 
 final class PurchaseWorkflowController extends Controller
 {
-    public function __construct(private readonly PurchaseWorkflowServiceInterface $workflowService)
-    {
-    }
+    use RespondsWithPurchaseResult;
+
+    public function __construct(private readonly PurchaseWorkflowServiceInterface $workflowService) {}
 
     public function transition(PurchaseWorkflowActionRequest $request, string $entityType, int|string $id): JsonResponse
     {
@@ -63,19 +63,6 @@ final class PurchaseWorkflowController extends Controller
         );
     }
 
-    public function previewFinance(
-        PurchaseWorkflowActionRequest $request,
-        string $entityType,
-        int|string $id
-    ): JsonResponse {
-        $payload = $this->withTenantContext($request);
-        $payload['preview_only'] = true;
-
-        return $this->respond(
-            $this->workflowService->postFinance($entityType, $id, $payload)
-        );
-    }
-
     public function reverseFinance(
         PurchaseWorkflowActionRequest $request,
         string $entityType,
@@ -111,17 +98,5 @@ final class PurchaseWorkflowController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'PURCHASE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }
