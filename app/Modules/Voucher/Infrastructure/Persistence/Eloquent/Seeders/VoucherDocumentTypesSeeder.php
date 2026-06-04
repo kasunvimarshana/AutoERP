@@ -12,10 +12,14 @@ class VoucherDocumentTypesSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('document_types')->upsert(
-            VoucherDocumentSeedCatalog::documentTypes(),
-            ['code'],
-            ['name', 'default_status', 'is_active', 'requires_source'],
-        );
+        foreach (VoucherDocumentSeedCatalog::documentTypes() as $documentType) {
+            DB::table('document_types')->updateOrInsert(
+                [
+                    'tenant_id' => $documentType['tenant_id'] ?? null,
+                    'code' => $documentType['code'],
+                ],
+                $documentType,
+            );
+        }
     }
 }

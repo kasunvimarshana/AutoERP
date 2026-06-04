@@ -12,10 +12,14 @@ class VehicleRentalDocumentTypesSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('document_types')->upsert(
-            VehicleRentalDocumentSeedCatalog::documentTypes(),
-            ['code'],
-            ['name', 'default_status', 'is_active', 'requires_source'],
-        );
+        foreach (VehicleRentalDocumentSeedCatalog::documentTypes() as $documentType) {
+            DB::table('document_types')->updateOrInsert(
+                [
+                    'tenant_id' => $documentType['tenant_id'] ?? null,
+                    'code' => $documentType['code'],
+                ],
+                $documentType,
+            );
+        }
     }
 }
