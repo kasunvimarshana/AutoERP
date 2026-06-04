@@ -32,6 +32,7 @@ final class CoreBootstrapSeeder extends Seeder
         'audit',
         'sequence',
         'document',
+        'invoice',
         'finance',
         'inventory',
         'payment',
