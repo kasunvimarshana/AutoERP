@@ -158,6 +158,7 @@ use Modules\Inventory\Application\Services\ReceiptInspectionService;
 use Modules\Inventory\Application\Services\SerialService;
 use Modules\Inventory\Application\Services\StockAdjustmentLineService;
 use Modules\Inventory\Application\Services\StockAdjustmentService;
+use Modules\Inventory\Application\Services\StockAvailabilityService;
 use Modules\Inventory\Application\Services\StockLedgerService;
 use Modules\Inventory\Application\Services\StockLevelService;
 use Modules\Inventory\Application\Services\StockMovementService;
@@ -424,6 +425,7 @@ final class InventoryServiceProvider extends ServiceProvider
                 StockLevelServiceInterface::class => StockLevelService::class,
                 TraceLogServiceInterface::class => TraceLogService::class,
                 StockAdjustmentLineServiceInterface::class => StockAdjustmentLineService::class,
+                StockAvailabilityService::class => StockAvailabilityService::class,
                 CycleCountLineServiceInterface::class => CycleCountLineService::class,
                 StockTransferLineServiceInterface::class => StockTransferLineService::class,
                 StockLedgerServiceInterface::class => StockLedgerService::class,

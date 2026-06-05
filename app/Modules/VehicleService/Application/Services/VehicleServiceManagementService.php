@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
+use Modules\Inventory\Application\Services\StockAvailabilityService;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceManagementServiceInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardLineRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardRepositoryInterface;
@@ -33,7 +33,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         private readonly VehicleServiceJobCustomerSuppliedItemRepositoryInterface $customerSuppliedItemRepository,
         private readonly VehicleServiceJobStatusHistoryRepositoryInterface $statusHistoryRepository,
         private readonly VehicleServiceSettingRepositoryInterface $settingRepository,
-        private readonly StockLevelRepositoryInterface $stockLevelRepository,
+        private readonly StockAvailabilityService $stockAvailabilityService,
         private readonly VehicleServiceCalculationService $calculationService,
     ) {}
 
@@ -469,24 +469,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
 
     public function getStockAvailability(int $tenantId, int $itemId, ?int $warehouseId, ?int $locationId): Result
     {
-        try {
-            $levels = $this->stockLevelRepository->list([
-                'tenant_id' => $tenantId,
-                'item_id' => $itemId,
-                'warehouse_id' => $warehouseId,
-                'warehouse_location_id' => $locationId,
-            ]);
-
-            return Result::success([
-                'tenant_id' => $tenantId,
-                'item_id' => $itemId,
-                'warehouse_id' => $warehouseId,
-                'location_id' => $locationId,
-                'stock_levels' => $levels,
-            ]);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
+        return $this->stockAvailabilityService->forItem($tenantId, $itemId, $warehouseId, $locationId);
     }
 
     public function getVehicleOwnerSummary(int $tenantId, int $vehicleId): Result
