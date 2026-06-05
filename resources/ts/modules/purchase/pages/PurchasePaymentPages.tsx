@@ -116,7 +116,7 @@ export function PurchaseAdvanceListPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<Button disabled title="Advance creation requires a purchase source document in the current backend route.">Create Advance</Button>} eyebrow="Purchase" subtitle="Supplier advances and later allocations. Remaining balance is backend-owned." title="Supplier Advances" />
+            <PageHeader actions={<Button disabled title="Advance creation requires a purchase source in the current backend route.">Create Advance</Button>} eyebrow="Purchase" subtitle="Supplier advances and later allocations. Remaining balance is backend-owned." title="Supplier Advances" />
             <DataToolbar onSearchChange={() => undefined} savedViewsDisabledReason="Saved views require a user-preferences backend for Purchase lists." searchPlaceholder="Search supplier advances..." />
             {advances.length ? <PurchaseAdvancePanel advances={advances} /> : <EmptyState description="No supplier advances returned by the backend." title="No advances" />}
         </div>

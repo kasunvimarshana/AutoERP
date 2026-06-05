@@ -9,7 +9,6 @@ import {
     PurchaseActivityTimeline,
     PurchaseFinancePostingPanel,
     PurchaseInvoiceCalculationPanel,
-    PurchaseInvoiceDocumentPanel,
     PurchaseInvoiceForm,
     PurchaseInvoiceLineTable,
     PurchaseInvoiceTable,
@@ -39,7 +38,7 @@ export function PurchaseInvoiceListPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<Link to="/purchase/invoices/new"><Button>Create Supplier Invoice</Button></Link>} eyebrow="Purchase" subtitle="Supplier invoices are payable authority. Backend previews totals, tax, discounts, UOM, AP, documents, and balances." title="Supplier Invoices" />
+            <PageHeader actions={<Link to="/purchase/invoices/new"><Button>Create Supplier Invoice</Button></Link>} eyebrow="Purchase" subtitle="Supplier invoices are payable authority. Backend previews totals, tax, discounts, UOM, AP, and balances." title="Supplier Invoices" />
             <DataToolbar isLoading={isLoading} onSearchChange={setQuery} savedViewsDisabledReason="Saved views require a user-preferences backend for Purchase lists." searchPlaceholder="Search invoice number..." searchValue={query} />
             {error ? <EmptyState description={error} title="Supplier invoice API unavailable" /> : null}
             {!error && rows.length ? <PurchaseInvoiceTable rows={rows} /> : null}
@@ -90,7 +89,7 @@ export function PurchaseInvoiceDetailPage() {
             <PageHeader
                 actions={<Link to={`/purchase/invoices/${invoice.id}/edit`}><Button variant="secondary">Edit</Button></Link>}
                 eyebrow="Supplier Invoice"
-                subtitle="Invoice detail with calculation preview, source matching, document, payment allocation, AP posting, returns, and audit."
+                subtitle="Invoice detail with calculation preview, source matching, payment allocation, AP posting, returns, and audit."
                 title={invoice.invoiceNumber}
             />
             <Tabs
@@ -100,7 +99,6 @@ export function PurchaseInvoiceDetailPage() {
                     { label: 'Lines', value: 'lines' },
                     { label: 'Calculation Preview', value: 'calculation' },
                     { label: 'Source PO/GRN', value: 'source' },
-                    { label: 'Document', value: 'document' },
                     { label: 'Payments / Allocations', value: 'payments' },
                     { label: 'Finance / AP Posting', value: 'finance' },
                     { label: 'Returns', value: 'returns' },
@@ -112,7 +110,6 @@ export function PurchaseInvoiceDetailPage() {
             {activeTab === 'lines' ? <PurchaseInvoiceLineTable rows={invoice.lines} /> : null}
             {activeTab === 'calculation' ? <PurchaseInvoiceCalculationPanel /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={invoice.sourceReference} /> : null}
-            {activeTab === 'document' ? <PurchaseInvoiceDocumentPanel /> : null}
             {activeTab === 'payments' ? <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === invoice.supplierId)} /> : null}
             {activeTab === 'finance' ? <EmptyState description="Posting preview requires a persisted purchase source context. Backend invoice detail is source-scoped." title="Finance preview unavailable" /> : null}
             {activeTab === 'returns' ? <PurchaseReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}

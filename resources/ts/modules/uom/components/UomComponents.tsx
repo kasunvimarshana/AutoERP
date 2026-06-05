@@ -173,10 +173,7 @@ export function UomItemUsagePanel({ usage }: { usage: UomItemUsage }) {
                 { label: 'Conversions to this unit', value: usage.conversionsTo },
                 { label: 'Inventory references', value: usage.inventory },
                 { label: 'Purchase references', value: usage.purchase },
-                { label: 'Sales references', value: usage.sales },
                 { label: 'Service references', value: usage.service },
-                { label: 'Rental references', value: usage.rental },
-                { label: 'Pricing references', value: usage.pricing },
             ]}
             status="Backend API"
             subtitle="Reference counts are read from tenant-scoped backend tables."

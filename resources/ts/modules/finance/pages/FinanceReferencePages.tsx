@@ -83,7 +83,7 @@ export function TaxRuleListPage() {
 }
 
 export function PaymentTermListPage() {
-    return <RemoteList loader={financeApi.listPaymentTerms} render={(rows: PaymentTerm[]) => <PaymentTermTable rows={rows} />} subtitle="Payment terms used by customers, suppliers, and documents. Due calculations stay backend-owned." title="Payment Terms" />;
+    return <RemoteList loader={financeApi.listPaymentTerms} render={(rows: PaymentTerm[]) => <PaymentTermTable rows={rows} />} subtitle="Payment terms used by customers, suppliers, and invoices. Due calculations stay backend-owned." title="Payment Terms" />;
 }
 
 export function CostCenterListPage() {

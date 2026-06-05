@@ -549,12 +549,11 @@ export function ServiceInvoicePreviewPanel({ jobCard }: { jobCard: VehicleServic
     ]} status="Backend" title="Service Invoice Preview" />;
 }
 
-export function ServiceInvoiceDocumentPanel({ jobCard }: { jobCard: VehicleServiceJobCard }) {
+export function ServiceInvoiceRecordPanel({ jobCard }: { jobCard: VehicleServiceJobCard }) {
     return <PreviewPanel rows={[
-        { label: 'Document number', value: jobCard.documentPreview.documentNumber },
-        { label: 'Template', value: jobCard.documentPreview.template },
-        { label: 'Status', value: jobCard.documentPreview.status },
-    ]} status="Document" title="Document Integration" />;
+        { label: 'Invoice number', value: jobCard.invoiceRecord.invoiceNumber },
+        { label: 'Status', value: jobCard.invoiceRecord.status },
+    ]} status="Invoice" title="Invoice Record" />;
 }
 
 export function VehicleServiceFinancePostingPanel({ jobCard }: { jobCard: VehicleServiceJobCard }) {
@@ -669,12 +668,12 @@ export function VehicleServiceSettingsForm({ settings }: { settings: VehicleServ
 }
 
 export function ServiceInvoiceTable({ rows }: { rows: VehicleServiceInvoice[] }) {
-    return <DataTable columns={[{ header: 'Invoice', key: 'invoiceNumber', render: (row) => <Link className="font-semibold text-blue-700 hover:underline" to={`/vehicle-service/invoices/${row.id}`}>{row.invoiceNumber}</Link> }, { header: 'Job card', key: 'jobCardNumber' }, { header: 'Billing customer', key: 'billingCustomer' }, { header: 'Backend total', key: 'previewTotal' }, { header: 'Document', key: 'documentStatus' }, { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> }, { header: 'Updated', key: 'updatedAt' }]} getRowKey={(row) => row.id} rows={rows} />;
+    return <DataTable columns={[{ header: 'Invoice', key: 'invoiceNumber', render: (row) => <Link className="font-semibold text-blue-700 hover:underline" to={`/vehicle-service/invoices/${row.id}`}>{row.invoiceNumber}</Link> }, { header: 'Job card', key: 'jobCardNumber' }, { header: 'Billing customer', key: 'billingCustomer' }, { header: 'Backend total', key: 'previewTotal' }, { header: 'Invoice status', key: 'invoiceStatus' }, { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> }, { header: 'Updated', key: 'updatedAt' }]} getRowKey={(row) => row.id} rows={rows} />;
 }
 
 export function PaymentCreateForm() {
     const navigate = useNavigate();
-    const [form, setForm] = useState<VehicleServicePaymentFormInput>({ amount: '', documentId: '', documentType: 'document', jobCardId: '', paymentId: '' });
+    const [form, setForm] = useState<VehicleServicePaymentFormInput>({ amount: '', invoiceId: '', invoiceType: 'invoice', jobCardId: '', paymentId: '' });
     const [jobs, setJobs] = useState<VehicleServiceJobCard[]>([]);
     const [preview, setPreview] = useState<VehicleServicePayment>();
     const [error, setError] = useState<string>();
@@ -708,11 +707,11 @@ export function PaymentCreateForm() {
     return (
         <form className="space-y-5" onSubmit={submit}>
             <FormError error={error} />
-            <FormSection description="Allocates an existing backend Payment to a service job/document. Backend owns balances and AR posting." title="Service payment allocation">
+            <FormSection description="Allocates an existing backend Payment to a service job or invoice. Backend owns balances and AR posting." title="Service payment allocation">
                 <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Job card"><Select onChange={(event) => update('jobCardId', event.target.value)} options={jobOptions} value={form.jobCardId} /></Field>
                     <Field label="Existing payment ID"><Input onChange={(event) => update('paymentId', event.target.value)} value={form.paymentId} /></Field>
-                    <Field label="Document ID"><Input onChange={(event) => update('documentId', event.target.value)} value={form.documentId} /></Field>
+                    <Field label="Invoice ID"><Input onChange={(event) => update('invoiceId', event.target.value)} value={form.invoiceId} /></Field>
                     <Field label="Amount"><Input onChange={(event) => update('amount', event.target.value)} type="number" value={form.amount} /></Field>
                 </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">

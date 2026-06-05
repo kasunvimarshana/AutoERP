@@ -12,7 +12,7 @@ import {
     JobCardLineTable,
     LabourAssignmentPanel,
     NonInventoryItemsSection,
-    ServiceInvoiceDocumentPanel,
+    ServiceInvoiceRecordPanel,
     ServiceInvoicePreviewPanel,
     ServicePaymentPanel,
     SparePartsSection,
@@ -34,7 +34,7 @@ const detailTabs = [
     { label: 'Inspections', value: 'inspections' },
     { label: 'Inventory / Stock Usage', value: 'inventory' },
     { label: 'Invoice / Payments', value: 'invoice' },
-    { label: 'Documents', value: 'documents' },
+    { label: 'Invoice Record', value: 'invoice-record' },
     { label: 'Workflow / History', value: 'history' },
     { label: 'Audit', value: 'audit' },
 ];
@@ -71,7 +71,7 @@ export function JobCardDetailPage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<><Link to={`/vehicle-service/job-cards/${jobCard.id}/diagnostics`}><Button variant="secondary">Diagnostics</Button></Link><Link to={`/vehicle-service/job-cards/${jobCard.id}/inspections`}><Button variant="secondary">Inspections</Button></Link><Link to={`/vehicle-service/job-cards/${jobCard.id}/edit`}><Button>Edit</Button></Link></>}
-                subtitle="Job card detail keeps workshop workflow separate from Sales. Backend owns calculations, workflow state, inventory effects, document generation, payment allocation, and finance posting."
+                subtitle="Job card detail keeps workshop workflow separate from Sales. Backend owns calculations, workflow state, inventory effects, invoice generation, payment allocation, and finance posting."
                 title={jobCard.jobCardNumber}
             />
             <Card className="p-5">
@@ -124,7 +124,7 @@ export function JobCardDetailPage() {
             {activeTab === 'inspections' ? <InspectionPanel rows={jobCard.inspections} /> : null}
             {activeTab === 'inventory' ? <StockAvailabilityPanel jobCard={jobCard} /> : null}
             {activeTab === 'invoice' ? <div className="space-y-5"><ServiceInvoicePreviewPanel jobCard={jobCard} /><ServicePaymentPanel payments={jobCard.payments} /><VehicleServiceFinancePostingPanel jobCard={jobCard} /></div> : null}
-            {activeTab === 'documents' ? <ServiceInvoiceDocumentPanel jobCard={jobCard} /> : null}
+            {activeTab === 'invoice-record' ? <ServiceInvoiceRecordPanel jobCard={jobCard} /> : null}
             {activeTab === 'history' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
             {activeTab === 'audit' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
         </div>

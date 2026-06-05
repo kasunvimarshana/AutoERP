@@ -114,7 +114,7 @@ export function ItemListPage() {
                 <Card className="p-5">
                     <p className="text-sm text-slate-500">Business calculations</p>
                     <p className="mt-2 text-2xl font-bold text-slate-950">Readonly</p>
-                    <p className="mt-1 text-xs text-slate-400">Stock, pricing, tax, and costing are loaded from API-backed module data</p>
+                    <p className="mt-1 text-xs text-slate-400">Stock, tax, and costing are loaded from API-backed module data</p>
                 </Card>
             </div>
             <DataToolbar

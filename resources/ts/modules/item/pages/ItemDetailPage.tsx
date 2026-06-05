@@ -6,10 +6,10 @@ import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { ItemSummaryCard } from '../components/ItemSummaryCard';
-import { ItemActivityTimeline, ItemAttributesTable, ItemCapabilityPanel, ItemComboComponentsTable, ItemIdentifiersTable, ItemInventorySummaryPanel, ItemPricingReferencesPanel, ItemUnitsPanel, ItemUsagePanel, ItemVariantsTable } from '../components/ItemPanels';
+import { ItemActivityTimeline, ItemAttributesTable, ItemCapabilityPanel, ItemComboComponentsTable, ItemIdentifiersTable, ItemInventorySummaryPanel, ItemUnitsPanel, ItemUsagePanel, ItemVariantsTable } from '../components/ItemPanels';
 import { ItemComboComponentCreateForm, ItemIdentifierCreateForm, ItemVariantCreateForm } from '../components/ItemSubResourceForms';
 import { itemApi } from '../services/itemApi';
-import type { Item, ItemAttribute, ItemAuditEntry, ItemComboComponent, ItemIdentifier, ItemInventorySummary, ItemPricingReference, ItemUnit, ItemUsageSummary, ItemVariant } from '../types/item.types';
+import type { Item, ItemAttribute, ItemAuditEntry, ItemComboComponent, ItemIdentifier, ItemInventorySummary, ItemUnit, ItemUsageSummary, ItemVariant } from '../types/item.types';
 
 const tabs = [
     { label: 'Overview', value: 'overview' },
@@ -18,7 +18,6 @@ const tabs = [
     { label: 'Variants', value: 'variants' },
     { label: 'Combo / Bundle Components', value: 'combo' },
     { label: 'Identifiers / Barcodes', value: 'identifiers' },
-    { label: 'Pricing References', value: 'pricing' },
     { label: 'Inventory Summary', value: 'inventory' },
     { label: 'Usage / Activity', value: 'usage' },
     { label: 'Audit / History', value: 'audit' },
@@ -31,7 +30,6 @@ type ItemDetailState = {
     identifiers: ItemIdentifier[];
     inventorySummary: ItemInventorySummary;
     item: Item;
-    pricingReferences: ItemPricingReference[];
     units: ItemUnit[];
     usage: ItemUsageSummary;
     variants: ItemVariant[];
@@ -56,13 +54,12 @@ export function ItemDetailPage() {
             itemApi.listVariants(itemId),
             itemApi.listComboComponents(itemId),
             itemApi.listIdentifiers(itemId),
-            itemApi.getPricingReferences(itemId),
             itemApi.getInventorySummary(itemId),
             itemApi.getItemUsage(itemId),
             itemApi.getItemActivity(itemId),
         ])
-            .then(([item, units, attributes, variants, comboComponents, identifiers, pricingReferences, inventorySummary, usage, activity]) => {
-                if (mounted) setDetail({ activity: activity.data, attributes: attributes.data, comboComponents: comboComponents.data, identifiers: identifiers.data, inventorySummary: inventorySummary.data, item: item.data, pricingReferences: pricingReferences.data, units: units.data, usage: usage.data, variants: variants.data });
+            .then(([item, units, attributes, variants, comboComponents, identifiers, inventorySummary, usage, activity]) => {
+                if (mounted) setDetail({ activity: activity.data, attributes: attributes.data, comboComponents: comboComponents.data, identifiers: identifiers.data, inventorySummary: inventorySummary.data, item: item.data, units: units.data, usage: usage.data, variants: variants.data });
             })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load item detail.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
@@ -72,7 +69,7 @@ export function ItemDetailPage() {
     if (isLoading) return <EmptyState description="Loading item setup, capability summaries, and audit..." title="Loading item detail" />;
     if (!detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
 
-    const { activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants } = detail;
+    const { activity, attributes, comboComponents, identifiers, inventorySummary, item, units, usage, variants } = detail;
 
     async function changeStatus(action: 'activate' | 'deactivate') {
         if (!detail) {
@@ -96,7 +93,7 @@ export function ItemDetailPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link>{item.status === 'inactive' ? <Button disabled={isChangingStatus} onClick={() => void changeStatus('activate')} variant="secondary">Activate</Button> : <Button disabled={isChangingStatus} onClick={() => void changeStatus('deactivate')} variant="secondary">Deactivate</Button>}<Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, pricing references, inventory summary, usage, and audit." title={item.name} />
+            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link>{item.status === 'inactive' ? <Button disabled={isChangingStatus} onClick={() => void changeStatus('activate')} variant="secondary">Activate</Button> : <Button disabled={isChangingStatus} onClick={() => void changeStatus('deactivate')} variant="secondary">Deactivate</Button>}<Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, inventory summary, usage, and audit." title={item.name} />
             {error ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div> : null}
             <ItemSummaryCard item={item} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
@@ -138,7 +135,6 @@ export function ItemDetailPage() {
                     <ItemIdentifiersTable identifiers={identifiers} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); setReloadKey((value) => value + 1); }} />
                 </div>
             ) : null}
-            {activeTab === 'pricing' ? <ItemPricingReferencesPanel references={pricingReferences} /> : null}
             {activeTab === 'inventory' ? <ItemInventorySummaryPanel summary={inventorySummary} /> : null}
             {activeTab === 'usage' ? <ItemUsagePanel summary={usage} /> : null}
             {activeTab === 'audit' ? <ItemActivityTimeline entries={activity} /> : null}

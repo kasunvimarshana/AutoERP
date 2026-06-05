@@ -11,7 +11,7 @@ import type { VehicleServiceJobCard } from '../types/vehicleService.types';
 
 export function ServiceInvoiceCreatePage() {
     const navigate = useNavigate();
-    const [documentTypeId, setDocumentTypeId] = useState('');
+    const [invoiceTypeId, setInvoiceTypeId] = useState('');
     const [error, setError] = useState<string>();
     const [jobCardId, setJobCardId] = useState('');
     const [jobCards, setJobCards] = useState<VehicleServiceJobCard[]>([]);
@@ -28,7 +28,7 @@ export function ServiceInvoiceCreatePage() {
         setError(undefined);
 
         try {
-            await vehicleServiceApi.invoices.generate(jobCardId, documentTypeId);
+            await vehicleServiceApi.invoices.generate(jobCardId, invoiceTypeId);
             navigate(`/vehicle-service/invoices/${jobCardId}`);
         } catch (caught) {
             setError(caught instanceof ApiError || caught instanceof Error ? caught.message : 'Unable to generate invoice.');
@@ -41,11 +41,11 @@ export function ServiceInvoiceCreatePage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<Link to="/vehicle-service/invoices"><Button variant="secondary">Cancel</Button></Link>}
-                subtitle="Generate a service invoice document from a backend job card. Backend owns document number, totals, tax, AR and posting eligibility."
+                subtitle="Generate a service invoice from a backend job card. Backend owns invoice number, totals, tax, AR and posting eligibility."
                 title="Generate Service Invoice"
             />
             {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
-            <FormSection description="Select a completed/invoiceable job card. Document type ID is required by the current backend workflow endpoint." title="Invoice source">
+            <FormSection description="Select a completed/invoiceable job card. Invoice type ID is required by the current backend workflow endpoint." title="Invoice source">
                 <div className="grid gap-4 md:grid-cols-2">
                     <label className="space-y-2 text-sm">
                         <span className="font-semibold text-slate-700">Job card</span>
@@ -56,12 +56,12 @@ export function ServiceInvoiceCreatePage() {
                         />
                     </label>
                     <label className="space-y-2 text-sm">
-                        <span className="font-semibold text-slate-700">Document type ID</span>
-                        <Input onChange={(event) => setDocumentTypeId(event.target.value)} placeholder="Vehicle Service Invoice document type id" value={documentTypeId} />
+                        <span className="font-semibold text-slate-700">Invoice type ID</span>
+                        <Input onChange={(event) => setInvoiceTypeId(event.target.value)} placeholder="Vehicle Service Invoice type id" value={invoiceTypeId} />
                     </label>
                 </div>
                 <div className="mt-4 flex justify-end">
-                    <Button disabled={saving || !jobCardId || !documentTypeId} onClick={generate} variant="blue">
+                    <Button disabled={saving || !jobCardId || !invoiceTypeId} onClick={generate} variant="blue">
                         {saving ? 'Generating...' : 'Generate Invoice'}
                     </Button>
                 </div>

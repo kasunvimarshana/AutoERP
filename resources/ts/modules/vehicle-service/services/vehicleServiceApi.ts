@@ -226,10 +226,9 @@ function normalizeJobCard(raw: BackendRecord, extras: Partial<VehicleServiceJobC
         customer: labelFrom(raw, 'customer', asString(raw.linked_customer_id, 'Customer not selected')),
         customerComplaint: asString(raw.reported_issue),
         diagnostics: extras.diagnostics ?? [],
-        documentPreview: extras.documentPreview ?? {
-            documentNumber: asString(raw.job_card_number, `Job #${asString(raw.id)}`),
+        invoiceRecord: extras.invoiceRecord ?? {
+            invoiceNumber: asString(raw.invoice_number ?? raw.job_card_number, `Job #${asString(raw.id)}`),
             status: asString(raw.invoice_status, 'pending'),
-            template: 'Vehicle service job/invoice document',
         },
         expectedCompletion: asString(raw.promised_delivery_date_time),
         financePreview: {
@@ -313,12 +312,12 @@ function normalizeJobCard(raw: BackendRecord, extras: Partial<VehicleServiceJobC
 function normalizeInvoice(jobCard: VehicleServiceJobCard): VehicleServiceInvoice {
     return {
         billingCustomer: jobCard.partyContext.billingCustomer.name,
-        documentStatus: jobCard.documentPreview.status,
         id: jobCard.id,
-        invoiceNumber: jobCard.documentPreview.documentNumber || jobCard.jobCardNumber,
+        invoiceNumber: jobCard.invoiceRecord.invoiceNumber || jobCard.jobCardNumber,
+        invoiceStatus: jobCard.invoiceRecord.status,
         jobCardNumber: jobCard.jobCardNumber,
         previewTotal: jobCard.invoicePreview.calculated.grandTotal,
-        status: String(jobCard.workflowStatus) === 'invoiced' ? 'invoiced' : jobCard.documentPreview.status,
+        status: String(jobCard.workflowStatus) === 'invoiced' ? 'invoiced' : jobCard.invoiceRecord.status,
         updatedAt: jobCard.updatedAt,
     };
 }
@@ -331,7 +330,7 @@ function normalizePaymentLink(raw: BackendRecord, jobCard?: VehicleServiceJobCar
         method: asString(raw.method ?? 'Backend payment'),
         payer: jobCard?.partyContext.payer.name ?? asString(raw.payer_name ?? raw.payment_id, 'Payer'),
         paymentNumber: asString(raw.payment_number ?? raw.reference ?? raw.payment_id, `Payment #${asString(raw.payment_id ?? raw.id)}`),
-        sourceInvoice: jobCard?.jobCardNumber ?? asString(raw.document_id ?? raw.job_card_id, 'Service job'),
+        sourceInvoice: jobCard?.jobCardNumber ?? asString(raw.invoice_id ?? raw.job_card_id, 'Service job'),
         status: asString(raw.status, 'active'),
     };
 }
@@ -352,7 +351,6 @@ function jobCardPayload(input: VehicleServiceJobCardFormInput): BackendRecord {
         payer_id: numberOrUndefined(input.payerId),
         payer_name: input.payerName || null,
         payer_type: input.payerType || 'customer',
-        price_list_id: numberOrUndefined(input.priceListId),
         priority: input.priority || 'medium',
         promised_delivery_date_time: input.expectedCompletion || null,
         received_at: input.receivedAt || null,
@@ -456,14 +454,14 @@ export const vehicleServiceApi = {
     },
     invoices: {
         cancel: (invoiceId: string) => vehicleServiceApi.jobCards.transition(invoiceId, 'cancelled'),
-        generate: (jobCardId: string, documentTypeId?: string) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/workflow/job-cards/${jobCardId}/invoice`, { body: contextPayload({ actor_id: userId(), document_type_id: numberOrUndefined(documentTypeId) }), method: 'POST' }),
+        generate: (jobCardId: string, invoiceTypeId?: string) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/workflow/job-cards/${jobCardId}/invoice`, { body: contextPayload({ actor_id: userId(), invoice_type_id: numberOrUndefined(invoiceTypeId) }), method: 'POST' }),
         get: async (id: string): Promise<ApiResponse<VehicleServiceInvoice>> => {
             const jobCard = await vehicleServiceApi.jobCards.get(id);
             return { data: normalizeInvoice(jobCard.data) };
         },
         list: async (): Promise<ApiCollectionResponse<VehicleServiceInvoice>> => {
             const response = await vehicleServiceApi.jobCards.list({ invoice_status: 'invoiced' });
-            return { data: response.data.filter((jobCard) => jobCard.documentPreview.status !== 'pending' || jobCard.workflowStatus === 'invoiced').map(normalizeInvoice) };
+            return { data: response.data.filter((jobCard) => jobCard.invoiceRecord.status !== 'pending' || jobCard.workflowStatus === 'invoiced').map(normalizeInvoice) };
         },
         preview: async (jobCardId: string): Promise<ApiPreviewResponse<unknown, VehicleServiceCalculationPreview['calculated']>> => {
             const response = await httpClient<ApiResponse<BackendRecord>>(`/api/vehicle-service/job-cards/${jobCardId}/invoice-preview`, { body: contextPayload({}), method: 'POST' });
@@ -572,7 +570,7 @@ export const vehicleServiceApi = {
         warehouses: inventoryApi.listWarehouses,
     },
     payments: {
-        allocate: (jobCardId: string, input: VehicleServicePaymentFormInput) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/workflow/job-cards/${jobCardId}/payments/allocate`, { body: contextPayload({ amount: Number(input.amount), document_id: numberOrUndefined(input.documentId), document_type: input.documentType || 'document', payment_id: numberOrUndefined(input.paymentId) }), method: 'POST' }),
+        allocate: (jobCardId: string, input: VehicleServicePaymentFormInput) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/workflow/job-cards/${jobCardId}/payments/allocate`, { body: contextPayload({ amount: Number(input.amount), invoice_id: numberOrUndefined(input.invoiceId), invoice_type: input.invoiceType || 'invoice', payment_id: numberOrUndefined(input.paymentId) }), method: 'POST' }),
         create: (input: VehicleServicePaymentFormInput) => vehicleServiceApi.payments.allocate(input.jobCardId, input),
         list: async (): Promise<ApiCollectionResponse<VehicleServicePayment>> => {
             const response = await httpClient<ApiResponse<{ job_cards?: BackendRecord[]; payment_links?: BackendRecord[] }>>('/api/vehicle-service/receivable-job-cards', { query: contextQuery() });
@@ -589,7 +587,7 @@ export const vehicleServiceApi = {
                 method: 'Existing payment allocation',
                 payer: 'Backend payer',
                 paymentNumber: input.paymentId ? `Payment #${input.paymentId}` : 'Select payment',
-                sourceInvoice: input.documentId ? `Document #${input.documentId}` : `Job #${input.jobCardId}`,
+                sourceInvoice: input.invoiceId ? `Invoice #${input.invoiceId}` : `Job #${input.jobCardId}`,
                 status: 'preview',
             },
         }),

@@ -115,7 +115,6 @@ export function GrnDetailPage() {
                     { label: 'Source PO', value: 'source' },
                     { label: 'Inventory Effect', value: 'inventory' },
                     { label: 'Invoices', value: 'invoices' },
-                    { label: 'Documents', value: 'documents' },
                     { label: 'History / Audit', value: 'history' },
                 ]}
                 onChange={setActiveTab}
@@ -125,7 +124,6 @@ export function GrnDetailPage() {
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={grn.sourcePo} /> : null}
             {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={[]} /> : null}
             {activeTab === 'invoices' ? <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === grn.grnNumber || invoice.sourceReference === grn.id)} /> : null}
-            {activeTab === 'documents' ? <PurchaseSourceReferencePanel reference={grn.grnNumber} /> : null}
             {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
         </div>
     );

@@ -34,7 +34,7 @@ export function UomDashboardPage() {
             <PageHeader
                 actions={<><Link to="/uom/units/new"><Button>New Unit</Button></Link><Link to="/uom/conversions/new"><Button variant="secondary">New Conversion</Button></Link></>}
                 eyebrow="Core Master Data"
-                subtitle="Units and conversions for item, inventory, pricing, service, and rental contexts."
+                subtitle="Units and conversions for item, inventory, service, purchase, and warehouse contexts."
                 title="UOM"
             />
             {isLoading ? <EmptyState description="Loading UOM summary..." title="Loading UOM" /> : null}

@@ -45,22 +45,22 @@ export type PaymentGroup = {
 };
 
 export type PaymentAllocationTarget = {
-    documentId: string;
-    documentNumber: string;
-    documentType: string;
     party: string;
     readonlyBalance: string;
+    targetId: string;
+    targetNumber: string;
+    targetType: string;
 };
 
 export type PaymentAllocation = {
     allocatedAmount: string;
     allocationDate: string;
-    documentNumber: string;
-    documentType: string;
     id: string;
     paymentId: string;
     reference?: string;
     status: string;
+    targetNumber: string;
+    targetType: string;
 };
 
 export type PaymentAllocationPreview = {
@@ -104,12 +104,12 @@ export type Refund = {
 
 export type WriteOff = {
     amount: string;
-    documentNumber: string;
-    documentType: string;
     id: string;
     reason: string;
     reference?: string;
     status: string;
+    targetNumber: string;
+    targetType: string;
 };
 
 export type CashRegister = {

@@ -13,7 +13,7 @@ export function ServiceHistoryPage() {
     return (
         <div className="space-y-6">
             <VehicleServicePageHeader
-                subtitle="Service history shows backend job-card workflow events, documents, payments, inventory, and finance actions."
+                subtitle="Service history shows backend job-card workflow events, invoices, payments, inventory, and finance actions."
                 title="Service History"
             />
             <VehicleServiceActivityTimeline rows={rows} />

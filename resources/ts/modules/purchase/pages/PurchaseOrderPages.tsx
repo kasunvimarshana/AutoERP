@@ -15,7 +15,6 @@ import {
     PurchaseOrderSummaryCard,
     PurchaseOrderTable,
     PurchasePaymentTable,
-    PurchaseSourceReferencePanel,
     PurchaseWorkflowActions,
 } from '../components/PurchaseComponents';
 import { purchaseApi } from '../services/purchaseApi';
@@ -68,7 +67,7 @@ export function PurchaseOrderListPage() {
 export function PurchaseOrderCreatePage() {
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Purchase Orders" subtitle="Create with lines. Backend validates supplier, item, UOM, pricing, tax, totals, and workflow." title="Create Purchase Order" />
+            <PageHeader eyebrow="Purchase Orders" subtitle="Create with lines. Backend validates supplier, item, UOM, unit price, tax, totals, and workflow." title="Create Purchase Order" />
             <PurchaseOrderForm />
         </div>
     );
@@ -116,7 +115,7 @@ export function PurchaseOrderDetailPage() {
             <PageHeader
                 actions={<Link to={`/purchase/orders/${order.id}/edit`}><Button variant="secondary">Edit</Button></Link>}
                 eyebrow="Purchase Order"
-                subtitle="Detail workspace for PO lines, receipts, invoices, documents, workflow, and audit."
+                subtitle="Detail workspace for PO lines, receipts, invoices, payments, workflow, and audit."
                 title={order.poNumber}
             />
             <PurchaseOrderSummaryCard order={order} />
@@ -128,7 +127,6 @@ export function PurchaseOrderDetailPage() {
                     { label: 'GRNs', value: 'grns' },
                     { label: 'Invoices', value: 'invoices' },
                     { label: 'Payments', value: 'payments' },
-                    { label: 'Documents', value: 'documents' },
                     { label: 'Workflow / History', value: 'workflow' },
                     { label: 'Audit', value: 'audit' },
                 ]}
@@ -139,7 +137,6 @@ export function PurchaseOrderDetailPage() {
             {activeTab === 'grns' ? <GrnTable rows={grns.filter((grn) => grn.sourcePo === order.poNumber || grn.sourcePo === order.id)} /> : null}
             {activeTab === 'invoices' ? <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.poNumber || invoice.sourceReference === order.id)} /> : null}
             {activeTab === 'payments' ? <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === order.supplierId)} /> : null}
-            {activeTab === 'documents' ? <PurchaseSourceReferencePanel reference={order.poNumber} /> : null}
             {activeTab === 'workflow' ? <PurchaseWorkflowActions entityId={order.id} entityType="purchase_order" status={order.status} /> : null}
             {activeTab === 'audit' ? <PurchaseActivityTimeline rows={history} /> : null}
         </div>

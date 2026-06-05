@@ -111,7 +111,7 @@ export function PurchaseReturnDetailPage() {
                 items={[
                     { label: 'Overview', value: 'overview' },
                     { label: 'Return Lines', value: 'lines' },
-                    { label: 'Source Document', value: 'source' },
+                    { label: 'Source Reference', value: 'source' },
                     { label: 'Inventory Effect', value: 'inventory' },
                     { label: 'AP/Finance Effect', value: 'finance' },
                     { label: 'Refunds', value: 'refunds' },

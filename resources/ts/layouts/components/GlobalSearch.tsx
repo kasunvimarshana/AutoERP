@@ -8,8 +8,6 @@ const searchIndex = [
     { category: 'Item', path: '/items/item-001', status: 'Active', subtitle: 'Oil Filter | stock item', title: 'ITM-001' },
     { category: 'Vehicle Service', path: '/vehicle-service/job-cards/JC-1001', status: 'In Progress', subtitle: 'Toyota HiAce service job', title: 'JC-1001' },
     { category: 'Purchase', path: '/purchase/invoices', status: 'Mocked', subtitle: 'Supplier invoice previews', title: 'Supplier Invoices' },
-    { category: 'Sales', path: '/sales/payments', status: 'Mocked', subtitle: 'Customer payment allocations', title: 'Customer Payments' },
-    { category: 'Vehicle Rental', path: '/vehicle-rental/running-charts', status: 'Mocked', subtitle: 'Running chart billing previews', title: 'Running Charts' },
 ];
 
 export function GlobalSearch() {

@@ -24,7 +24,7 @@ export function JobCardListPage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<Link to="/vehicle-service/job-cards/new"><Button>New Job Card</Button></Link>}
-                subtitle="Job cards are workshop records. Backend owns workflow state, pricing, UOM conversion, stock effects, invoice totals, payments, and finance posting."
+                subtitle="Job cards are workshop records. Backend owns workflow state, unit rates, UOM conversion, stock effects, invoice totals, payments, and finance posting."
                 title="Job Cards"
             />
             <DataToolbar

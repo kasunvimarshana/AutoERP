@@ -324,11 +324,11 @@ export function JournalStatusActionPanel({
 }
 
 export function ApTransactionTable({ rows }: { rows: ApTransaction[] }) {
-    return <SimpleTable rows={rows} columns={[['party', 'Supplier / Party'], ['sourceDocument', 'Document'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
+    return <SimpleTable rows={rows} columns={[['party', 'Supplier / Party'], ['sourceReference', 'Source'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
 }
 
 export function ArTransactionTable({ rows }: { rows: ArTransaction[] }) {
-    return <SimpleTable rows={rows} columns={[['party', 'Customer / Party'], ['sourceDocument', 'Document'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
+    return <SimpleTable rows={rows} columns={[['party', 'Customer / Party'], ['sourceReference', 'Source'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
 }
 
 export function TaxPreviewPanel({ preview }: { preview?: TaxPreviewResult }) {

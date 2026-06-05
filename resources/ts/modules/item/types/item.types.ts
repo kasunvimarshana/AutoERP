@@ -200,16 +200,6 @@ export type ItemIdentifierInput = {
     variantId?: string;
 };
 
-export type ItemPricingReference = {
-    currency: string;
-    discount: string;
-    id: string;
-    price: string;
-    priceList: string;
-    status: string;
-    uom?: string;
-};
-
 export type ItemInventorySummary = {
     availableQuantity: string;
     cogsAccountId?: string;
@@ -239,7 +229,6 @@ export type ItemCapabilitySummary = {
     hasVariants: boolean;
     inventoryReferencesCount: number;
     itemType: ItemType;
-    pricingReferencesCount: number;
     purchasable: boolean;
     rentalUsable: boolean;
     sellable: boolean;

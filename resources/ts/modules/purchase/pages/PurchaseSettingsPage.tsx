@@ -20,7 +20,7 @@ export function PurchaseSettingsPage() {
         <div className="space-y-6">
             <PageHeader
                 eyebrow="Purchase"
-                subtitle="Module settings for defaults, sequence references, document definition, workflow flexibility, stock timing, and invoice matching."
+                subtitle="Module settings for defaults, sequence references, invoice type, workflow flexibility, stock timing, and invoice matching."
                 title="Purchase Settings"
             />
             <PurchaseSettingsForm settings={settings} />

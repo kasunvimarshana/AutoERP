@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
-import { ServiceInvoiceDocumentPanel, ServiceInvoicePreviewPanel, VehicleServiceFinancePostingPanel, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
+import { ServiceInvoicePreviewPanel, ServiceInvoiceRecordPanel, VehicleServiceFinancePostingPanel, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
 import type { VehicleServiceInvoice, VehicleServiceJobCard } from '../types/vehicleService.types';
 
@@ -34,8 +34,8 @@ export function ServiceInvoiceDetailPage() {
     return (
         <div className="space-y-6">
             <VehicleServicePageHeader
-                actions={<><Link to="/vehicle-service/invoices"><Button variant="secondary">All Invoices</Button></Link><Link to="/vehicle-service/invoices/new"><Button variant="blue">Generate Document</Button></Link></>}
-                subtitle="Readonly service invoice view. Official totals, document rendering, finance posting, and payment allocations are backend-owned."
+                actions={<><Link to="/vehicle-service/invoices"><Button variant="secondary">All Invoices</Button></Link><Link to="/vehicle-service/invoices/new"><Button variant="blue">Generate Invoice</Button></Link></>}
+                subtitle="Readonly service invoice view. Official totals, finance posting, and payment allocations are backend-owned."
                 title={invoice.invoiceNumber}
             />
             <PreviewPanel
@@ -43,7 +43,7 @@ export function ServiceInvoiceDetailPage() {
                     { label: 'Job card', value: invoice.jobCardNumber },
                     { label: 'Billing customer', value: invoice.billingCustomer },
                     { label: 'Preview total', value: invoice.previewTotal },
-                    { label: 'Document status', value: invoice.documentStatus },
+                    { label: 'Invoice status', value: invoice.invoiceStatus },
                     { label: 'Status', value: invoice.status },
                 ]}
                 status="Invoice"
@@ -51,7 +51,7 @@ export function ServiceInvoiceDetailPage() {
             />
             <div className="grid gap-5 xl:grid-cols-3">
                 <ServiceInvoicePreviewPanel jobCard={jobCard} />
-                <ServiceInvoiceDocumentPanel jobCard={jobCard} />
+                <ServiceInvoiceRecordPanel jobCard={jobCard} />
                 <VehicleServiceFinancePostingPanel jobCard={jobCard} />
             </div>
         </div>

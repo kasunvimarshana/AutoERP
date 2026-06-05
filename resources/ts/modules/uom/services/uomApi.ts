@@ -148,10 +148,7 @@ function normalizeUsage(raw: BackendRecord): UomItemUsage {
         conversionsTo: Number(counts.conversions_to ?? 0),
         inventory: Number(counts.inventory ?? 0),
         items: Number(counts.items ?? 0),
-        pricing: Number(counts.pricing ?? 0),
         purchase: Number(counts.purchase ?? 0),
-        rental: Number(counts.rental ?? 0),
-        sales: Number(counts.sales ?? 0),
         service: Number(counts.service ?? 0),
     };
 }

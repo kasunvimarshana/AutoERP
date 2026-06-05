@@ -73,10 +73,7 @@ export type UomItemUsage = {
     conversionsTo: number;
     inventory: number;
     items: number;
-    pricing: number;
     purchase: number;
-    rental: number;
-    sales: number;
     service: number;
 };
 

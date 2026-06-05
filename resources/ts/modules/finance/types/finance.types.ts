@@ -105,7 +105,7 @@ export type JournalEntryFormValues = {
     status: JournalStatus;
 };
 
-export type ApTransaction = { agingBucket: string; dueDate: string; id: string; originalAmount: string; outstandingAmount: string; paidAmount: string; party: string; sourceDocument: string; status: string };
+export type ApTransaction = { agingBucket: string; dueDate: string; id: string; originalAmount: string; outstandingAmount: string; paidAmount: string; party: string; sourceReference: string; status: string };
 export type ArTransaction = ApTransaction;
 
 export type TaxGroup = { code: string; id: string; name: string; status: string };

@@ -167,9 +167,9 @@ export type VehicleServiceFinancePostingPreview = {
 
 export type VehicleServiceInvoice = {
     billingCustomer: string;
-    documentStatus: string;
     id: string;
     invoiceNumber: string;
+    invoiceStatus: string;
     jobCardNumber: string;
     previewTotal: string;
     status: string;
@@ -193,7 +193,7 @@ export type VehicleServiceSettings = {
     allowNegativeStock: boolean;
     defaultTaxGroup: string;
     defaultWarehouse: string;
-    documentDefinition: string;
+    invoiceDefinition: string;
     invoiceSequence: string;
     jobCardSequence: string;
     stockConsumptionTiming: string;
@@ -207,10 +207,9 @@ export type VehicleServiceAuditEntry = {
     type: string;
 };
 
-export type VehicleServiceDocumentPreview = {
-    documentNumber: string;
+export type VehicleServiceInvoiceRecord = {
+    invoiceNumber: string;
     status: string;
-    template: string;
 };
 
 export type VehicleServiceJobCard = {
@@ -218,7 +217,6 @@ export type VehicleServiceJobCard = {
     customer: string;
     customerComplaint: string;
     diagnostics: VehicleServiceDiagnostic[];
-    documentPreview: VehicleServiceDocumentPreview;
     expectedCompletion: string;
     financePreview: VehicleServiceFinancePostingPreview;
     id: string;
@@ -294,7 +292,6 @@ export type VehicleServiceJobCardFormInput = {
     payerId: string;
     payerName?: string;
     payerType: VehicleServicePartyReference['type'];
-    priceListId?: string;
     priority: string;
     receivedAt: string;
     serviceCustomerId: string;
@@ -309,8 +306,9 @@ export type VehicleServiceJobCardFormInput = {
 
 export type VehicleServicePaymentFormInput = {
     amount: string;
-    documentId: string;
-    documentType: string;
+    invoiceId: string;
+    invoiceType: string;
     jobCardId: string;
     paymentId: string;
 };
+    invoiceRecord: VehicleServiceInvoiceRecord;

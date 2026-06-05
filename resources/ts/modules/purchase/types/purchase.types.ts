@@ -93,12 +93,12 @@ export type PurchaseInvoiceLine = {
 
 export type PurchaseInvoice = {
     balance: string;
-    documentStatus: string;
     dueDate: string;
     grandTotal: string;
     id: string;
     invoiceDate: string;
     invoiceNumber: string;
+    invoiceStatus: string;
     lines: PurchaseInvoiceLine[];
     paidAmount: string;
     sourceReference?: string;
@@ -110,9 +110,9 @@ export type PurchaseInvoice = {
 
 export type PurchasePaymentAllocation = {
     allocatedAmount: string;
-    documentBalanceAfter: string;
+    balanceAfterAllocation: string;
     id: string;
-    sourceDocument: string;
+    sourceReference: string;
     status: string;
 };
 
@@ -197,7 +197,7 @@ export type PurchaseSettings = {
     defaultWarehouse: string;
     grnSequence: string;
     id: string;
-    invoiceDocumentDefinition: string;
+    invoiceTypeDefinition: string;
     invoiceMatchingRule: string;
     invoiceSequence: string;
     poSequence: string;

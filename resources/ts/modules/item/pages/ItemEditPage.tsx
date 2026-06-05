@@ -26,7 +26,7 @@ export function ItemEditPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Core Master Data" subtitle="Edit permitted setup fields. Backend validates UOM, stock behavior, pricing, tax, and finance references." title={`Edit ${item.name}`} />
+            <PageHeader eyebrow="Core Master Data" subtitle="Edit permitted setup fields. Backend validates UOM, stock behavior, tax, and finance references." title={`Edit ${item.name}`} />
             <ItemForm item={item} mode="edit" />
         </div>
     );

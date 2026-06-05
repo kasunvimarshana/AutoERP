@@ -10,7 +10,6 @@ import type {
     ItemComboComponent,
     ItemIdentifier,
     ItemInventorySummary,
-    ItemPricingReference,
     ItemUnit,
     ItemUsageSummary,
     ItemVariant,
@@ -67,17 +66,6 @@ export function ItemIdentifiersTable({ identifiers, onDelete }: { identifiers: I
     ]} getRowKey={(row) => row.id} rows={identifiers} />;
 }
 
-export function ItemPricingReferencesPanel({ references }: { references: ItemPricingReference[] }) {
-    if (!references.length) return <EmptyState description="No backend price-list records are linked to this item." title="No pricing references" />;
-    return <DataTable columns={[
-        { header: 'Price List', key: 'priceList' },
-        { header: 'Price', key: 'price' },
-        { header: 'Discount', key: 'discount' },
-        { header: 'Currency', key: 'currency' },
-        { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
-    ]} getRowKey={(row) => row.id} rows={references} />;
-}
-
 export function ItemInventorySummaryPanel({ summary }: { summary: ItemInventorySummary }) {
     return <PreviewPanel rows={[
         { label: 'Stockable', value: summary.isStockable ? 'Yes' : 'No' },
@@ -116,7 +104,6 @@ export function ItemCapabilityPanel({ capabilities }: { capabilities: ItemCapabi
     return (
         <div className="space-y-4">
             <PreviewPanel rows={[
-                { label: 'Pricing references', value: String(capabilities.pricingReferencesCount) },
                 { label: 'Inventory references', value: String(capabilities.inventoryReferencesCount) },
             ]} status="API" subtitle="Capability flags and counts come from the Item API." title="Item Usage & Capability" />
             <DataTable columns={[

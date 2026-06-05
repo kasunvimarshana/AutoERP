@@ -18,7 +18,6 @@ import type {
     ItemInventorySummary,
     ItemListQuery,
     ItemLookupOption,
-    ItemPricingReference,
     ItemStatus,
     ItemType,
     ItemTypeOption,
@@ -229,15 +228,6 @@ function normalizeLookupOption(raw: BackendRecord): ItemLookupOption {
     };
 }
 
-function normalizePriceList(raw: BackendRecord): ItemLookupOption {
-    return {
-        code: asOptionalString(raw.code),
-        id: asString(raw.id),
-        label: asOptionalString(raw.code) ? `${asString(raw.code)} - ${asString(raw.name)}` : asString(raw.name, `Price List #${asString(raw.id)}`),
-        name: asString(raw.name, `Price List #${asString(raw.id)}`),
-    };
-}
-
 function normalizeItem(raw: BackendRecord, lookups: LookupContext = {}): Item {
     const categoryId = asOptionalString(raw.category_id);
     const brandId = asOptionalString(raw.brand_id);
@@ -306,7 +296,6 @@ function normalizeCapabilities(raw: BackendRecord): ItemCapabilitySummary {
         hasVariants: asBool(raw.has_variants),
         inventoryReferencesCount: Number(raw.inventory_references_count ?? 0),
         itemType: normalizeItemType(raw.item_type),
-        pricingReferencesCount: Number(raw.pricing_references_count ?? 0),
         purchasable: asBool(raw.purchasable),
         rentalUsable: asBool(raw.rental_usable),
         sellable: asBool(raw.sellable),
@@ -431,12 +420,6 @@ async function fetchVariantAttributeValues() {
         variantId: asString(record.variant_id),
     }));
 
-    return { ...response, data, meta: collectionMeta({ ...response, data }) };
-}
-
-async function fetchPriceLists() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { is_active: true, per_page: 200 } });
-    const data = response.data.map(normalizePriceList);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
@@ -629,20 +612,6 @@ export const itemApi = {
     getItemUsage: async (itemId: string): Promise<ApiResponse<ItemUsageSummary>> => {
         const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/usage-summary`);
         return { ...response, data: { capabilities: normalizeCapabilities(response.data) } };
-    },
-    getPricingReferences: async (itemId: string): Promise<ApiCollectionResponse<ItemPricingReference>> => {
-        const response = await httpClient<ApiResponse<{ references?: BackendRecord[] }>>(`/api/item/items/${itemId}/pricing-references`);
-        const data = (response.data.references ?? []).map((record) => ({
-            currency: asString(record.currency_id, 'Default currency'),
-            discount: `${asDecimalString(record.discount_value)} ${asString(record.discount_type, 'percentage')}`,
-            id: asString(record.id),
-            price: asDecimalString(record.price),
-            priceList: asOptionalString(record.price_list_code) ? `${asString(record.price_list_code)} - ${asString(record.price_list_name)}` : asString(record.price_list_name, `Price List #${asString(record.price_list_id)}`),
-            status: asBool(record.is_active, true) ? 'Active' : 'Inactive',
-            uom: asOptionalString(record.uom_id),
-        }));
-
-        return { data, meta: collectionMeta({ data } as ApiCollectionResponse<ItemPricingReference>) };
     },
     getTypeSetupPreview: async (input: Partial<ItemFormInput>): Promise<ApiResponse<ItemTypeSetupPreview>> => {
         const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/items/preview-type-setup', {

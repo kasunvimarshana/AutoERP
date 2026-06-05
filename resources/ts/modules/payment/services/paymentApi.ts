@@ -139,12 +139,12 @@ function normalizeAllocation(raw: BackendRecord): PaymentAllocation {
     return {
         allocatedAmount: asNumberString(raw.allocated_amount),
         allocationDate: asString(raw.allocation_date ?? raw.created_at).slice(0, 10),
-        documentNumber: asString(raw.source_reference ?? raw.reference ?? raw.document_id),
-        documentType: asString(raw.document_type ?? raw.source_type),
         id: asString(raw.id),
         paymentId: asString(raw.payment_id),
         reference: asString(raw.reference),
         status: asString(raw.status, 'active'),
+        targetNumber: asString(raw.source_reference ?? raw.reference ?? raw.source_id),
+        targetType: asString(raw.source_type),
     };
 }
 
@@ -167,12 +167,12 @@ function normalizeAdvance(raw: BackendRecord): AdvancePayment {
 function normalizeWriteOff(raw: BackendRecord): WriteOff {
     return {
         amount: asNumberString(raw.amount),
-        documentNumber: asString(raw.source_reference ?? raw.reference ?? raw.document_id),
-        documentType: asString(raw.document_type),
         id: asString(raw.id),
         reason: asString(raw.reason),
         reference: asString(raw.reference),
         status: asString(raw.status, 'draft'),
+        targetNumber: asString(raw.source_reference ?? raw.reference ?? raw.source_id),
+        targetType: asString(raw.source_type),
     };
 }
 
@@ -231,12 +231,12 @@ function paymentPayload(input: PaymentFormInput): BackendRecord {
 }
 
 export const paymentApi = {
-    allocatePayment: (paymentId: string, input: { allocatedAmount: string; documentId: string; documentType: string; reference?: string }) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/allocate`, {
+    allocatePayment: (paymentId: string, input: { allocatedAmount: string; targetId: string; targetType: string; reference?: string }) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/allocate`, {
         body: contextPayload({
             allocated_amount: input.allocatedAmount,
-            document_id: Number(input.documentId),
-            document_type: input.documentType,
             reference: input.reference,
+            source_id: Number(input.targetId),
+            source_type: input.targetType,
         }),
         method: 'POST',
     }),
@@ -322,12 +322,12 @@ export const paymentApi = {
     },
     listWriteOffs: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/write-offs${contextQuery()}`), normalizeWriteOff),
     postPayment: (paymentId: string) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/post`, { method: 'POST' }),
-    previewAllocation: async (paymentId: string, input: { allocatedAmount: string; documentId: string; documentType: string }): Promise<ApiPreviewResponse<unknown, PaymentAllocationPreview['calculated']>> => {
+    previewAllocation: async (paymentId: string, input: { allocatedAmount: string; targetId: string; targetType: string }): Promise<ApiPreviewResponse<unknown, PaymentAllocationPreview['calculated']>> => {
         const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payments/${paymentId}/engines/preview-allocation`, {
             body: contextPayload({
                 allocated_amount: input.allocatedAmount,
-                document_id: Number(input.documentId),
-                document_type: input.documentType,
+                source_id: Number(input.targetId),
+                source_type: input.targetType,
             }),
             method: 'POST',
         });

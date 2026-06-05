@@ -47,7 +47,7 @@ export function VehicleServiceEstimatesPage() {
 }
 
 export function VehicleServicePartsIssuesPage() {
-    return <BackendGapPage reason="Parts consumption is posted from job cards through the backend inventory workflow endpoint. A standalone parts issue document route is not present in this repository." title="Parts Issues" />;
+    return <BackendGapPage reason="Parts consumption is posted from job cards through the backend inventory workflow endpoint. A standalone parts issue route is not present in this repository." title="Parts Issues" />;
 }
 
 export function VehicleServiceRefundsPage() {
@@ -55,7 +55,7 @@ export function VehicleServiceRefundsPage() {
 }
 
 export function VehicleServiceReturnsPage() {
-    return <BackendGapPage reason="No Vehicle Service return document migration, controller, or API route exists in the current backend. Inventory return can only be represented by backend stock reversal workflow today." title="Returns" />;
+    return <BackendGapPage reason="No Vehicle Service return migration, controller, or API route exists in the current backend. Inventory return can only be represented by backend stock reversal workflow today." title="Returns" />;
 }
 
 export function VehicleServiceWorkOrdersPage() {

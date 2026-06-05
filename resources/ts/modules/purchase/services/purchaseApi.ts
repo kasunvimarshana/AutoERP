@@ -1,7 +1,6 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
 import { getStoredAuthSession, getStoredOrganizationUnitId, getStoredTenantId } from '../../../services/api/authTokenStorage';
 import { httpClient } from '../../../services/api/httpClient';
-import { documentApi } from '../../document/services/documentApi';
 import { inventoryApi } from '../../inventory/services/inventoryApi';
 import { itemApi } from '../../item/services/itemApi';
 import { supplierApi } from '../../supplier/services/supplierApi';
@@ -245,12 +244,12 @@ function normalizeInvoice(raw: BackendRecord, lookups: LookupContext, lines: Bac
 
     return {
         balance: money(raw.balance ?? raw.outstanding_amount),
-        documentStatus: asString(raw.document_status ?? raw.status, 'draft'),
         dueDate: asString(raw.due_date),
         grandTotal: money(raw.grand_total ?? raw.linked_amount ?? raw.total_amount),
-        id: asString(raw.id ?? raw.document_id),
-        invoiceDate: asString(raw.invoice_date ?? raw.document_date ?? raw.created_at).slice(0, 10),
-        invoiceNumber: asString(raw.invoice_number ?? raw.document_number ?? raw.source_reference, `PINV-${asString(raw.id ?? raw.document_id)}`),
+        id: asString(raw.id ?? raw.invoice_id),
+        invoiceDate: asString(raw.invoice_date ?? raw.created_at).slice(0, 10),
+        invoiceNumber: asString(raw.invoice_number ?? raw.source_reference, `PINV-${asString(raw.id ?? raw.invoice_id)}`),
+        invoiceStatus: asString(raw.invoice_status ?? raw.status, 'draft'),
         lines: lines.map((line, index) => normalizeInvoiceLine(line, lookups, index)),
         paidAmount: money(raw.paid_amount ?? raw.allocated_amount),
         sourceReference: asString(raw.source_reference ?? raw.source_type),
@@ -264,9 +263,9 @@ function normalizeInvoice(raw: BackendRecord, lookups: LookupContext, lines: Bac
 function normalizePaymentAllocation(raw: BackendRecord, index = 0): PurchasePaymentAllocation {
     return {
         allocatedAmount: money(raw.allocated_amount),
-        documentBalanceAfter: money(raw.remaining_after_allocation ?? raw.document_balance_after),
+        balanceAfterAllocation: money(raw.remaining_after_allocation ?? raw.balance_after_allocation),
         id: asString(raw.id, `allocation-${index}`),
-        sourceDocument: asString(raw.source_reference ?? raw.document_number ?? raw.document_id, 'Linked document'),
+        sourceReference: asString(raw.source_reference ?? raw.invoice_number ?? raw.invoice_id, 'Linked source'),
         status: asString(raw.status, 'active'),
     };
 }
@@ -315,7 +314,7 @@ function normalizeReturn(raw: BackendRecord, lookups: LookupContext, lines: Back
         lines: lines.map((line, index) => normalizeReturnLine(line, lookups, index)),
         returnNumber: asString(raw.return_number, `PRET-${asString(raw.id)}`),
         returnTotal: money(raw.grand_total),
-        sourceReference: asString(raw.source_reference ?? raw.original_document_id ?? raw.original_grn_id ?? raw.original_purchase_order_id),
+        sourceReference: asString(raw.source_reference ?? raw.original_invoice_id ?? raw.original_grn_id ?? raw.original_purchase_order_id),
         status: asString(raw.status, 'draft') as PurchaseReturn['status'],
         supplier: directLabel(raw, ['supplier_label', 'supplier_name', 'supplier_code']) || lookupLabel(lookups.suppliers, supplierId, 'Supplier not loaded'),
         supplierId,
@@ -365,7 +364,7 @@ function ledgerNotesFromSource(
 
 function normalizeSettings(raw: BackendRecord): PurchaseSettings {
     return {
-        allowDirectInvoice: raw.allow_direct_purchase_document !== false,
+        allowDirectInvoice: raw.allow_direct_purchase_invoice !== false,
         allowGrnWithoutPo: raw.allow_direct_grn !== false,
         allowInvoiceWithoutGrn: raw.require_grn_before_invoice !== true,
         allowOverReceipt: raw.allow_over_receipt === true,
@@ -375,7 +374,7 @@ function normalizeSettings(raw: BackendRecord): PurchaseSettings {
         defaultWarehouse: asString(raw.default_warehouse_label ?? raw.default_warehouse_id, 'Not configured'),
         grnSequence: asString(raw.grn_sequence_label ?? raw.grn_sequence_id, 'Backend sequence'),
         id: asString(raw.id),
-        invoiceDocumentDefinition: asString(raw.purchase_invoice_document_definition_label ?? raw.purchase_invoice_document_definition_id, 'Document module'),
+        invoiceTypeDefinition: asString(raw.purchase_invoice_type_label ?? raw.purchase_invoice_type_code ?? raw.purchase_invoice_type_id, 'Invoice module'),
         invoiceMatchingRule: asString(raw.invoice_matching_rule ?? (raw.require_grn_before_invoice ? 'GRN required' : 'Flexible')),
         invoiceSequence: asString(raw.invoice_sequence_label ?? raw.purchase_invoice_sequence_id, 'Backend sequence'),
         poSequence: asString(raw.po_sequence_label ?? raw.purchase_order_sequence_id, 'Backend sequence'),
@@ -428,7 +427,7 @@ function returnPayload(input: PurchaseReturnFormInput): BackendRecord {
     return contextPayload({
         lines: input.lines.map((line) => linePayload(line, 'return_qty')),
         notes: input.notes || null,
-        original_document_id: input.sourceType === 'document' ? asOptionalNumber(input.sourceId) : undefined,
+        original_invoice_id: input.sourceType === 'purchase_invoice' ? asOptionalNumber(input.sourceId) : undefined,
         original_grn_id: input.sourceType === 'grn_header' ? asOptionalNumber(input.sourceId) : undefined,
         original_purchase_order_id: input.sourceType === 'purchase_order' ? asOptionalNumber(input.sourceId) : undefined,
         return_date: input.returnDate,
@@ -583,59 +582,23 @@ export const purchaseApi = {
         transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/grn_header/${id}/transition`, { body: contextPayload({ action }), method: 'POST' }),
     },
     invoices: {
-        list: async (_query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseInvoice>> => {
+        list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseInvoice>> => {
             const [response, lookups] = await Promise.all([
-                documentApi.listDocuments(),
+                httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-invoices', {
+                    query: contextQuery({ invoice_number: query.search, page: query.page, per_page: query.perPage ?? 50, status: query.status }),
+                }),
                 lookupContext(),
             ]);
-            const purchaseDocuments = response.data.filter((document) => (
-                document.sourceModule === 'purchase'
-                || ['purchase_invoice', 'supplier_invoice'].includes(document.typeCode)
-                || ['purchase_order', 'grn_header', 'purchase_return'].includes(document.sourceType)
-            ));
 
-            return {
-                data: purchaseDocuments.map((document) => normalizeInvoice({
-                    document_date: document.documentDate,
-                    document_id: document.id,
-                    document_number: document.documentNumber,
-                    due_date: document.dueDate,
-                    grand_total: document.grandTotal,
-                    source_reference: document.sourceReference,
-                    source_type: document.sourceType,
-                    status: document.status,
-                    updated_at: document.createdAt,
-                }, lookups)),
-                meta: response.meta,
-            };
+            return collection(response, (row) => normalizeInvoice(row, lookups));
         },
         get: async (id: string): Promise<ApiResponse<PurchaseInvoice>> => {
-            const lookups = await lookupContext();
-            const [document, lines] = await Promise.all([
-                documentApi.getDocument(id),
-                documentApi.listDocumentLines(id),
+            const [response, lines, lookups] = await Promise.all([
+                httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-invoices/${id}`),
+                httpClient<ApiCollectionResponse<BackendRecord>>(`/api/purchase/purchase-invoices/${id}/lines`, { query: contextQuery() }),
+                lookupContext(),
             ]);
-            return {
-                data: normalizeInvoice({
-                    document_date: document.data.documentDate,
-                    document_id: document.data.id,
-                    document_number: document.data.documentNumber,
-                    due_date: document.data.dueDate,
-                    grand_total: document.data.grandTotal,
-                    source_reference: document.data.sourceReference,
-                    source_type: document.data.sourceType,
-                    status: document.data.status,
-                    updated_at: document.data.createdAt,
-                }, lookups, lines.data.map((line) => ({
-                    id: line.id,
-                    item_label: line.itemLabel,
-                    line_total: line.lineTotal,
-                    quantity: line.quantity,
-                    source_line_id: line.sourceLineId,
-                    unit_price: line.unitPrice,
-                    uom_label: line.uomLabel,
-                }))),
-            };
+            return { ...response, data: normalizeInvoice(response.data, lookups, lines.data) };
         },
         preview: async (input: unknown): Promise<ApiPreviewResponse<unknown, PurchaseCalculationPreview['calculated']>> => {
             const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/calculate-invoice', { body: contextPayload(asRecord(input)), method: 'POST' });
@@ -659,7 +622,6 @@ export const purchaseApi = {
         post: (invoiceId: string, sourceType: string, sourceId: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/purchase-invoices/${invoiceId}/post`, { body: contextPayload({ source_id: Number(sourceId), source_type: sourceType }), method: 'POST' }),
         cancel: (invoiceId: string, sourceType: string, sourceId: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/purchase-invoices/${invoiceId}/cancel`, { body: contextPayload({ source_id: Number(sourceId), source_type: sourceType }), method: 'POST' }),
         reverse: (invoiceId: string, sourceType: string, sourceId: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/purchase-invoices/${invoiceId}/reverse`, { body: contextPayload({ source_id: Number(sourceId), source_type: sourceType }), method: 'POST' }),
-        generateDocument: (entityType: 'grn_header' | 'purchase_order' | 'purchase_return', entityId: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/${entityType}/${entityId}/document`, { body: contextPayload(), method: 'POST' }),
     },
     payments: {
         list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchasePayment>> => {
@@ -777,7 +739,7 @@ export const purchaseApi = {
         initialize: () => httpClient<ApiResponse<unknown>>('/api/purchase/settings/initialize', { body: contextPayload(), method: 'POST' }),
     },
     previews: {
-        document: (entityType: 'grn_header' | 'purchase_order' | 'purchase_return', entityId: string) => purchaseApi.invoices.generateDocument(entityType, entityId),
+        invoice: (entityType: 'grn_header' | 'purchase_order' | 'purchase_return', entityId: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/${entityType}/${entityId}/invoice`, { body: contextPayload(), method: 'POST' }),
         financePosting: (entityType: 'grn_header' | 'purchase_order' | 'purchase_return', entityId: string) => httpClient<ApiResponse<PurchaseFinancePostingPreview>>(`/api/purchase/workflows/${entityType}/${entityId}/finance/post`, { body: contextPayload({ preview_only: true }), method: 'POST' }),
         inventoryEffect: (entityType: 'grn_header' | 'purchase_order' | 'purchase_return', entityId: string) => httpClient<ApiResponse<PurchaseInventoryEffect[]>>(`/api/purchase/workflows/${entityType}/${entityId}/inventory/post`, { body: contextPayload({ preview_only: true }), method: 'POST' }),
     },

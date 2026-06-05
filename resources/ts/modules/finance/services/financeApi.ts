@@ -240,7 +240,7 @@ function normalizeApTransaction(raw: BackendRecord): ApTransaction {
         outstandingAmount: asNumberString(raw.outstanding_amount),
         paidAmount: asNumberString(raw.paid_amount),
         party: asString(raw.party_label ?? raw.party_type ?? 'Generic party'),
-        sourceDocument: asString(raw.source_reference ?? raw.reference_id ?? 'Unlinked'),
+        sourceReference: asString(raw.source_reference ?? raw.reference_id ?? 'Unlinked'),
         status: asString(raw.status, 'OPEN').toLowerCase(),
     };
 }

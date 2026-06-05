@@ -357,7 +357,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                         </div>
                     </div>
                 </FormSection>
-                <FormSection description="These are item setup flags only. Backend services remain authoritative for stock effects, UOM conversion, pricing, tax, and accounting." title="Usage / Behavior">
+                <FormSection description="These are item setup flags only. Backend services remain authoritative for stock effects, UOM conversion, tax, and accounting." title="Usage / Behavior">
                     <div className="grid gap-4 md:grid-cols-2">
                         {[
                             ['is_stockable', 'Stockable / affects inventory setup', 'stockable'],
@@ -463,7 +463,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                             </label>
                             <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
                                 <Checkbox checked={behavior.issuable} name="service_sellable_display" onChange={(event) => updateBehavior('issuable', event.target.checked)} />
-                                Available for sales/service documents
+                                Available for sales/service transactions
                             </label>
                         </div>
                     ) : null}

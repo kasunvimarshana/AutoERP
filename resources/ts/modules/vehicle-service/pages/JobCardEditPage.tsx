@@ -33,7 +33,7 @@ export function JobCardEditPage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<Link to={`/vehicle-service/job-cards/${jobCard.id}`}><Button variant="secondary">View</Button></Link>}
-                subtitle="Edit job-card inputs. Backend remains authoritative for workflow, stock, pricing, tax, invoice, payment, and labour incentive results."
+                subtitle="Edit job-card inputs. Backend remains authoritative for workflow, stock, unit rates, tax, invoice, payment, and labour incentive results."
                 title={`Edit ${jobCard.jobCardNumber}`}
             />
             <JobCardForm jobCard={jobCard} mode="edit" />

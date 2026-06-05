@@ -19,7 +19,7 @@ export function ServiceInvoiceListPage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<Link to="/vehicle-service/job-cards"><Button>Invoiceable Jobs</Button></Link>}
-                subtitle="Service invoices are generated from job cards. Backend owns totals, tax, discounts, documents, AR, and posting."
+                subtitle="Service invoices are generated from job cards. Backend owns totals, tax, discounts, AR, and posting."
                 title="Service Invoices"
             />
             <DataToolbar

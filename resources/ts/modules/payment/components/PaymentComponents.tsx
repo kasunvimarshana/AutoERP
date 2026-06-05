@@ -221,8 +221,8 @@ export function PaymentAllocationTable({ allocations }: { allocations: PaymentAl
     return (
         <DataTable
             columns={[
-                { header: 'Document', key: 'documentNumber' },
-                { header: 'Type', key: 'documentType' },
+                { header: 'Target', key: 'targetNumber' },
+                { header: 'Type', key: 'targetType' },
                 { header: 'Allocated', key: 'allocatedAmount' },
                 { header: 'Date', key: 'allocationDate' },
                 { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
@@ -255,8 +255,8 @@ export function PaymentAllocationPreviewPanel({ payment }: { payment: Payment })
         try {
             const response = await paymentApi.previewAllocation(payment.id, {
                 allocatedAmount: field(formData, 'allocated_amount'),
-                documentId: field(formData, 'document_id'),
-                documentType: field(formData, 'document_type'),
+                targetId: field(formData, 'target_id'),
+                targetType: field(formData, 'target_type'),
             });
             setRows([
                 ...response.breakdown.map((row) => ({ label: String(row.label), value: String(row.value) })),
@@ -274,8 +274,8 @@ export function PaymentAllocationPreviewPanel({ payment }: { payment: Payment })
     return (
         <PreviewPanel rows={rows} status="Backend Preview" subtitle="Allocation preview is returned by Payment API. The frontend does not derive balances." title="Allocation Preview">
             <form className="grid gap-3 md:grid-cols-4" onSubmit={submit}>
-                <Input name="document_type" />
-                <Input inputMode="numeric" name="document_id" />
+                <Input name="target_type" />
+                <Input inputMode="numeric" name="target_id" />
                 <Input inputMode="decimal" name="allocated_amount" />
                 <Button disabled={isSaving} type="submit" variant="blue">{isSaving ? 'Previewing...' : 'Preview allocation'}</Button>
             </form>
@@ -352,7 +352,7 @@ export function RefundPanel({ refunds: rows }: { refunds: Refund[] }) {
 }
 
 export function WriteOffPanel({ writeOffs: rows }: { writeOffs: WriteOff[] }) {
-    return rows.length ? <SimpleTable rows={rows} columns={[['documentNumber', 'Document'], ['documentType', 'Type'], ['amount', 'Amount'], ['reason', 'Reason'], ['status', 'Status']]} /> : <EmptyState description="No write-offs returned by backend." title="No write-offs" />;
+    return rows.length ? <SimpleTable rows={rows} columns={[['targetNumber', 'Target'], ['targetType', 'Type'], ['amount', 'Amount'], ['reason', 'Reason'], ['status', 'Status']]} /> : <EmptyState description="No write-offs returned by backend." title="No write-offs" />;
 }
 
 export function CashRegisterPanel({ registers }: { registers: CashRegister[] }) {

@@ -21,7 +21,7 @@ export function VehicleServiceSettingsPage() {
         <div className="space-y-6">
             <VehicleServicePageHeader
                 actions={<Button onClick={initialize} variant="secondary">Initialize Defaults</Button>}
-                subtitle="Module settings for workshop defaults, sequences, stock timing, document definition, and integration behavior."
+                subtitle="Module settings for workshop defaults, sequences, stock timing, invoice definition, and integration behavior."
                 title="Vehicle Service Settings"
             />
             {settings ? <VehicleServiceSettingsForm settings={settings} /> : null}
