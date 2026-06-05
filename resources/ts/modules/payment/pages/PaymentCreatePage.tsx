@@ -1,0 +1,18 @@
+import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../../../shared/components/ui/Button';
+import { Input } from '../../../shared/components/ui/Input';
+import { paymentApi } from '../services/paymentApi';
+import type { PaymentInput } from '../types/payment.types';
+
+export function PaymentCreatePage() {
+    const navigate = useNavigate();
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [form, setForm] = useState<PaymentInput>({ amount: '0', direction: 'inbound', partyId: 0, partyType: 'customer', paymentDate: new Date().toISOString().slice(0, 10), paymentMethodId: 1, allocations: [] });
+    async function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(''); try { const saved = await paymentApi.create(form); navigate(`/payments/${saved.id}`, { replace: true }); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to save payment.'); } finally { setSaving(false); } }
+    return <form className="mx-auto max-w-3xl space-y-5" onSubmit={(event) => void submit(event)}><header><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Payment</p><h1 className="text-3xl font-bold">Create payment</h1></header>{error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}<section className="grid gap-4 rounded-xl border bg-white p-5 sm:grid-cols-2"><Field label="Payment number"><Input value={form.paymentNumber || ''} onChange={(event) => setForm({ ...form, paymentNumber: event.target.value })} placeholder="Auto if blank" /></Field><Field label="Date"><Input required type="date" value={form.paymentDate} onChange={(event) => setForm({ ...form, paymentDate: event.target.value })} /></Field><Field label="Direction"><select className="h-11 rounded-lg border px-3 text-sm" value={form.direction} onChange={(event) => setForm({ ...form, direction: event.target.value as PaymentInput['direction'], partyType: event.target.value === 'outbound' ? 'supplier' : 'customer' })}><option value="inbound">Inbound</option><option value="outbound">Outbound</option></select></Field><Field label={`${form.partyType} ID`}><Input required min="1" type="number" value={form.partyId || ''} onChange={(event) => setForm({ ...form, partyId: Number(event.target.value) })} /></Field><Field label="Payment method ID"><Input required min="1" type="number" value={form.paymentMethodId} onChange={(event) => setForm({ ...form, paymentMethodId: Number(event.target.value) })} /></Field><Field label="Amount"><Input required min="0.0001" step="0.0001" type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></Field><Field label="Invoice ID to allocate"><Input type="number" onChange={(event) => setForm({ ...form, allocations: event.target.value ? [{ allocatedAmount: form.amount, invoiceId: Number(event.target.value) }] : [] })} /></Field><Field label="Allocated amount"><Input min="0" step="0.0001" type="number" value={form.allocations?.[0]?.allocatedAmount || ''} onChange={(event) => setForm({ ...form, allocations: form.allocations?.[0] ? [{ ...form.allocations[0], allocatedAmount: event.target.value }] : [] })} /></Field></section><div className="flex justify-end"><Button disabled={saving} type="submit">{saving ? 'Saving...' : 'Save payment'}</Button></div></form>;
+}
+
+function Field({ children, label }: { children: ReactNode; label: string }) { return <label className="grid gap-1 text-sm font-semibold text-slate-700"><span>{label}</span>{children}</label>; }

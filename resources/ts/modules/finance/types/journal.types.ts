@@ -1,0 +1,2 @@
+export type JournalEntry = { createdAt: string; description?: string | null; entryDate: string; entryNumber: string; entryType: string; id: number; sourceModule?: string | null; sourceReference?: string | null; status: string; totalCredit: string; totalDebit: string };
+export type JournalPage = { entries: JournalEntry[]; meta: { currentPage: number; lastPage: number; perPage: number; total: number } };

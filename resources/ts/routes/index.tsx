@@ -7,10 +7,19 @@ import { CustomerCreatePage } from '../modules/customer/pages/CustomerCreatePage
 import { CustomerDetailPage } from '../modules/customer/pages/CustomerDetailPage';
 import { CustomerEditPage } from '../modules/customer/pages/CustomerEditPage';
 import { CustomerListPage } from '../modules/customer/pages/CustomerListPage';
+import { JournalDetailPage } from '../modules/finance/pages/JournalDetailPage';
+import { JournalListPage } from '../modules/finance/pages/JournalListPage';
+import { InvoiceCreatePage } from '../modules/invoice/pages/InvoiceCreatePage';
+import { InvoiceDetailPage } from '../modules/invoice/pages/InvoiceDetailPage';
+import { InvoiceEditPage } from '../modules/invoice/pages/InvoiceEditPage';
+import { InvoiceListPage } from '../modules/invoice/pages/InvoiceListPage';
 import { ItemCreatePage } from '../modules/item/pages/ItemCreatePage';
 import { ItemDetailPage } from '../modules/item/pages/ItemDetailPage';
 import { ItemEditPage } from '../modules/item/pages/ItemEditPage';
 import { ItemListPage } from '../modules/item/pages/ItemListPage';
+import { PaymentCreatePage } from '../modules/payment/pages/PaymentCreatePage';
+import { PaymentDetailPage } from '../modules/payment/pages/PaymentDetailPage';
+import { PaymentListPage } from '../modules/payment/pages/PaymentListPage';
 import { SupplierCreatePage } from '../modules/supplier/pages/SupplierCreatePage';
 import { SupplierDetailPage } from '../modules/supplier/pages/SupplierDetailPage';
 import { SupplierEditPage } from '../modules/supplier/pages/SupplierEditPage';
@@ -58,6 +67,15 @@ const router = createBrowserRouter([
                     { element: <ItemCreatePage />, path: 'items/new' },
                     { element: <ItemDetailPage />, path: 'items/:id' },
                     { element: <ItemEditPage />, path: 'items/:id/edit' },
+                    { element: <InvoiceListPage />, path: 'invoices' },
+                    { element: <InvoiceCreatePage />, path: 'invoices/new' },
+                    { element: <InvoiceDetailPage />, path: 'invoices/:id' },
+                    { element: <InvoiceEditPage />, path: 'invoices/:id/edit' },
+                    { element: <PaymentListPage />, path: 'payments' },
+                    { element: <PaymentCreatePage />, path: 'payments/new' },
+                    { element: <PaymentDetailPage />, path: 'payments/:id' },
+                    { element: <JournalListPage />, path: 'finance/journals' },
+                    { element: <JournalDetailPage />, path: 'finance/journals/:id' },
                 ],
             },
         ],
