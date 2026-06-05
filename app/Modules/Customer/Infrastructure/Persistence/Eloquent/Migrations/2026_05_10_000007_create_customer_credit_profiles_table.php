@@ -25,9 +25,6 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('customer_id')->constrained('customers', 'id')->cascadeOnDelete();
-            $table->decimal('credit_limit', 20, 4)->nullable();
-            $table->unsignedInteger('credit_days')->nullable();
-            $table->boolean('credit_hold')->default(false);
             $table->string('credit_hold_reason', 255)->nullable();
             $table->boolean('allow_credit_override')->default(false);
             $table->unsignedBigInteger('credit_hold_by')->nullable();

@@ -41,10 +41,10 @@ return new class extends Migration
             $table->foreignId('default_payment_term_id')->nullable()->constrained('payment_terms', 'id')->nullOnDelete();
             $table->foreignId('default_receivable_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('default_income_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->decimal('credit_limit', 20, 4)->nullable();
-            $table->unsignedInteger('credit_days')->nullable();
+            $table->decimal('credit_limit', 20, 4)->default(0);
+            $table->unsignedInteger('payment_terms_days')->default(0);
             $table->boolean('credit_hold')->default(false);
-            $table->string('status', 60)->default('draft')->comment('draft, pending_approval, active, inactive, blocked, suspended, archived');
+            $table->string('status', 60)->default('active')->comment('active, inactive');
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -67,9 +67,12 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'customer_code'], 'customers_customer_code_uk');
             $table->unique(['tenant_id', 'registration_number'], 'customers_registration_number_uk');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customers_organization_unit_idx');
             $table->index(['tenant_id', 'customer_name'], 'customers_customer_name_idx');
             $table->index(['tenant_id', 'status', 'is_active'], 'customers_status_active_idx');
             $table->index(['tenant_id', 'email'], 'customers_email_idx');
+            $table->index(['tenant_id', 'phone'], 'customers_phone_idx');
+            $table->index(['tenant_id', 'mobile'], 'customers_mobile_idx');
             $table->index(['tenant_id', 'credit_hold'], 'customers_credit_hold_idx');
         });
     }

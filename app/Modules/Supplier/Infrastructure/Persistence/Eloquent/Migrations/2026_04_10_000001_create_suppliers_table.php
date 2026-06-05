@@ -46,10 +46,11 @@ return new class extends Migration
                 ->nullOnDelete();
             $table->foreignId('default_payable_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('default_expense_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->decimal('credit_limit', 20, 4)->nullable();
+            $table->decimal('credit_limit', 20, 4)->default(0);
+            $table->unsignedInteger('payment_terms_days')->default(0);
             $table->string('status', 60)
-                ->default('draft')
-                ->comment('draft, pending_approval, active, inactive, blocked, suspended, archived');
+                ->default('active')
+                ->comment('active, inactive');
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -70,9 +71,12 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'supplier_code'], 'suppliers_supplier_code_uk');
             $table->unique(['tenant_id', 'registration_number'], 'suppliers_registration_number_uk');
+            $table->index(['tenant_id', 'organization_unit_id'], 'suppliers_organization_unit_idx');
             $table->index(['tenant_id', 'supplier_name'], 'suppliers_supplier_name_idx');
             $table->index(['tenant_id', 'status', 'is_active'], 'suppliers_status_active_idx');
             $table->index(['tenant_id', 'email'], 'suppliers_email_idx');
+            $table->index(['tenant_id', 'phone'], 'suppliers_phone_idx');
+            $table->index(['tenant_id', 'mobile'], 'suppliers_mobile_idx');
         });
     }
 

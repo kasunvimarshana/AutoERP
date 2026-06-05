@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
 import { FieldError } from '../../../shared/components/forms/FieldError';
 import { Button } from '../../../shared/components/ui/Button';
@@ -32,7 +32,7 @@ function loginErrorMessage(error: ApiError): string {
 }
 
 export function LoginPage() {
-    const { isAuthenticated, isLoading, login, logout, user } = useAuthContext();
+    const { isAuthenticated, isLoading, login, user } = useAuthContext();
     const location = useLocation();
     const state = location.state as LoginLocationState | null;
     const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -63,18 +63,7 @@ export function LoginPage() {
     }
 
     if (isAuthenticated && user) {
-        return (
-            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70 md:p-8">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Signed in</p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-950">{user.name}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Your authentication session is active. Business application screens are not included in this frontend.
-                </p>
-                <Button className="mt-6 w-full" onClick={() => void logout()} variant="secondary">
-                    Sign out
-                </Button>
-            </div>
-        );
+        return <Navigate replace to={state?.from?.pathname ?? '/customers'} />;
     }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {

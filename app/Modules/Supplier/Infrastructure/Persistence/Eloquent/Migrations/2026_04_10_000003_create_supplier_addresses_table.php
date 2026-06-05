@@ -35,6 +35,7 @@ return new class extends Migration
             $table->string('state')->nullable();
             $table->string('postal_code');
             $table->foreignId('country_id')->nullable()->constrained('countries', 'id')->nullOnDelete();
+            $table->string('country_name')->nullable();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_default_billing')->default(false);
             $table->boolean('is_default_shipping')->default(false);
