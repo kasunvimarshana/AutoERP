@@ -25,7 +25,7 @@ final class UpsertGrnRequest extends FormRequest
 
         return [
             'organization_unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('organization_units', 'id')->where('tenant_id', $tenantId)],
-            'purchase_order_id' => ['sometimes', 'nullable', 'integer', Rule::exists('purchase_orders', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'purchase_order_id' => ['required', 'integer', Rule::exists('purchase_orders', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'supplier_id' => ['sometimes', 'nullable', 'integer', Rule::exists('suppliers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'warehouse_id' => ['sometimes', 'nullable', 'integer', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'grn_number' => ['sometimes', 'nullable', 'string', 'max:100', Rule::unique('grn_headers', 'grn_number')->where('tenant_id', $tenantId)->ignore($grnId)],

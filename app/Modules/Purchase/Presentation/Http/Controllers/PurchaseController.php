@@ -7,11 +7,9 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Invoice\Presentation\Http\Resources\InvoiceResource;
-use Modules\Payment\Presentation\Http\Resources\PaymentResource;
 use Modules\Purchase\Application\Services\PurchaseService;
 use Modules\Purchase\Presentation\Http\Requests\ListPurchaseRequest;
 use Modules\Purchase\Presentation\Http\Requests\LookupPurchaseRequest;
-use Modules\Purchase\Presentation\Http\Requests\PayPurchaseInvoiceRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertGrnRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertPurchaseOrderRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertPurchaseReturnRequest;
@@ -61,6 +59,11 @@ final class PurchaseController extends Controller
     public function cancelOrder(int $purchaseOrder): PurchaseOrderResource
     {
         return new PurchaseOrderResource($this->purchases->cancelOrder($purchaseOrder, request('reason')));
+    }
+
+    public function closeOrder(int $purchaseOrder): PurchaseOrderResource
+    {
+        return new PurchaseOrderResource($this->purchases->closeOrder($purchaseOrder, request('reason')));
     }
 
     public function destroyOrder(int $purchaseOrder): JsonResponse
@@ -137,10 +140,5 @@ final class PurchaseController extends Controller
         $this->purchases->deleteReturn($purchaseReturn);
 
         return response()->json(null, 204);
-    }
-
-    public function payInvoice(PayPurchaseInvoiceRequest $request, int $invoice): PaymentResource
-    {
-        return new PaymentResource($this->purchases->payInvoice($invoice, $request->validated()));
     }
 }

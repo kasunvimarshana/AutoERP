@@ -24,6 +24,7 @@ Route::prefix('api/purchase')
         Route::delete('purchase-orders/{purchaseOrder}', [PurchaseController::class, 'destroyOrder'])->name('purchase-orders.destroy');
         Route::post('purchase-orders/{purchaseOrder}/confirm', [PurchaseController::class, 'confirmOrder'])->name('purchase-orders.confirm');
         Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseController::class, 'cancelOrder'])->name('purchase-orders.cancel');
+        Route::post('purchase-orders/{purchaseOrder}/close', [PurchaseController::class, 'closeOrder'])->name('purchase-orders.close');
 
         Route::get('grns', [PurchaseController::class, 'grns'])->name('grns.index');
         Route::post('grns', [PurchaseController::class, 'storeGrn'])->name('grns.store');
@@ -39,6 +40,4 @@ Route::prefix('api/purchase')
         Route::match(['put', 'patch'], 'purchase-returns/{purchaseReturn}', [PurchaseController::class, 'updateReturn'])->name('purchase-returns.update');
         Route::delete('purchase-returns/{purchaseReturn}', [PurchaseController::class, 'destroyReturn'])->name('purchase-returns.destroy');
         Route::post('purchase-returns/{purchaseReturn}/post', [PurchaseController::class, 'postReturn'])->name('purchase-returns.post');
-
-        Route::post('invoices/{invoice}/payments', [PurchaseController::class, 'payInvoice'])->name('invoices.pay');
     });

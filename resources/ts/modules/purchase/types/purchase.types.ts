@@ -1,4 +1,4 @@
-export type PurchaseStatus = 'draft' | 'confirmed' | 'partially_received' | 'fully_received' | 'closed' | 'cancelled' | string;
+export type PurchaseStatus = 'draft' | 'confirmed' | 'partially_received' | 'received' | 'closed' | 'cancelled' | string;
 
 export type PurchaseLineInput = {
     acceptedQty?: string;

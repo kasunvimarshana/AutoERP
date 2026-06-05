@@ -13,7 +13,6 @@ use Modules\Finance\Application\Support\FinancialServiceSupport;
 use Modules\Inventory\Application\Services\StockIssuingService;
 use Modules\Inventory\Application\Services\StockReceivingService;
 use Modules\Invoice\Application\Services\InvoiceService;
-use Modules\Payment\Application\Services\PaymentService;
 
 final class PurchaseService
 {
@@ -22,7 +21,6 @@ final class PurchaseService
         private readonly StockReceivingService $stockReceiving,
         private readonly StockIssuingService $stockIssuing,
         private readonly InvoiceService $invoices,
-        private readonly PaymentService $payments,
     ) {}
 
     /**
@@ -181,6 +179,20 @@ final class PurchaseService
     public function confirmOrder(int $id): object
     {
         return $this->transitionOrder($id, ['draft'], 'confirmed', ['confirmed_by' => $this->support->userId(), 'confirmed_at' => now()]);
+    }
+
+    public function closeOrder(int $id, ?string $reason = null): object
+    {
+        return DB::transaction(function () use ($id, $reason): object {
+            $order = $this->lockedRow('purchase_orders', $id);
+            if (! in_array($order->status, ['confirmed', 'partially_received', 'received'], true)) {
+                throw ValidationException::withMessages(['status' => ['Only confirmed or received purchase orders can be closed.']]);
+            }
+
+            $this->updateStatus('purchase_orders', $id, $order->status, 'closed', [], $reason);
+
+            return $this->findOrder($id);
+        });
     }
 
     public function cancelOrder(int $id, ?string $reason = null): object
@@ -614,64 +626,6 @@ final class PurchaseService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
-     */
-    public function payInvoice(int $invoiceId, array $payload): object
-    {
-        return DB::transaction(function () use ($invoiceId, $payload): object {
-            $invoice = DB::table('invoices')
-                ->where('tenant_id', $this->support->tenantId())
-                ->where('id', $invoiceId)
-                ->where('ledger_direction', 'payable')
-                ->whereNull('deleted_at')
-                ->lockForUpdate()
-                ->first();
-            if ($invoice === null) {
-                abort(404);
-            }
-
-            $amount = (float) ($payload['amount'] ?? $invoice->balance_total);
-            $payment = $this->payments->create([
-                'organization_unit_id' => $invoice->organization_unit_id,
-                'party_type' => 'supplier',
-                'party_id' => (int) $invoice->supplier_id,
-                'direction' => 'outbound',
-                'payment_method_id' => (int) $payload['payment_method_id'],
-                'payment_date' => $payload['payment_date'],
-                'amount' => $amount,
-                'reference' => $payload['reference'] ?? null,
-                'notes' => $payload['notes'] ?? null,
-                'source_module' => 'purchase',
-                'source_type' => 'purchase_invoice_payment',
-                'source_id' => $invoiceId,
-                'source_reference' => $invoice->invoice_number,
-                'allocations' => [[
-                    'invoice_id' => $invoiceId,
-                    'allocated_amount' => min($amount, (float) $invoice->balance_total),
-                ]],
-            ]);
-
-            DB::table('purchase_payment_allocations')->insert([
-                'tenant_id' => (int) $invoice->tenant_id,
-                'organization_unit_id' => $invoice->organization_unit_id,
-                'invoice_id' => $invoiceId,
-                'payment_id' => (int) $payment->id,
-                'allocated_amount' => min($amount, (float) $invoice->balance_total),
-                'currency_id' => $invoice->currency_id,
-                'base_allocated_amount' => min($amount, (float) $invoice->balance_total),
-                'status' => 'active',
-                'allocated_at' => now(),
-                'created_by' => $this->support->userId(),
-                'row_version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return $payment;
-        });
-    }
-
-    /**
      * @return array<string, mixed>
      */
     public function dashboard(): array
@@ -679,11 +633,17 @@ final class PurchaseService
         $tenantId = $this->support->tenantId();
 
         return [
+            'total_purchase_orders' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->count(),
             'open_purchase_orders' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereNotIn('status', ['closed', 'cancelled'])->count(),
+            'pending_receive_count' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'confirmed')->count(),
+            'partially_received_count' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'partially_received')->count(),
+            'received_count' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'received')->count(),
+            'pending_invoice_count' => DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereIn('invoice_status', ['not_invoiced', 'partially_invoiced'])->whereIn('status', ['partially_received', 'received', 'closed'])->count(),
             'pending_grns' => DB::table('grn_headers')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereIn('status', ['draft', 'confirmed'])->count(),
             'posted_grns' => DB::table('grn_headers')->where('tenant_id', $tenantId)->whereNull('deleted_at')->where('status', 'posted')->count(),
             'open_returns' => DB::table('purchase_returns')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereIn('status', ['draft', 'posted'])->count(),
             'purchase_order_total' => $this->money(DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereNotIn('status', ['cancelled'])->sum('grand_total')),
+            'total_purchase_value' => $this->money(DB::table('purchase_orders')->where('tenant_id', $tenantId)->whereNull('deleted_at')->whereNotIn('status', ['cancelled'])->sum('grand_total')),
             'supplier_outstanding' => $this->money(DB::table('ap_transactions')->where('tenant_id', $tenantId)->where('status', 'OPEN')->sum('outstanding_amount')),
             'unpaid_purchase_invoices' => [
                 'count' => DB::table('invoices')->where('tenant_id', $tenantId)->where('ledger_direction', 'payable')->whereNull('deleted_at')->where('balance_total', '>', 0)->count(),
@@ -752,12 +712,27 @@ final class PurchaseService
                 ->get()
                 ->map(fn (object $row): array => (array) $row)
                 ->all(),
-            'payment-methods' => DB::table('payment_methods')
-                ->select(['id', 'code', 'name', 'type'])
-                ->where('tenant_id', $tenantId)
-                ->whereNull('deleted_at')
-                ->where('is_active', true)
-                ->orderBy('name')
+            'open-purchase-orders' => DB::table('purchase_orders')
+                ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+                ->select(['purchase_orders.id', 'purchase_orders.po_number as code', 'suppliers.supplier_name as name', 'purchase_orders.supplier_id', 'purchase_orders.warehouse_id', 'purchase_orders.status'])
+                ->where('purchase_orders.tenant_id', $tenantId)
+                ->whereNull('purchase_orders.deleted_at')
+                ->whereIn('purchase_orders.status', ['confirmed', 'partially_received'])
+                ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q->where('purchase_orders.po_number', 'like', "%$search%")->orWhere('suppliers.supplier_name', 'like', "%$search%")))
+                ->orderByDesc('purchase_orders.order_date')
+                ->limit($limit)
+                ->get()
+                ->map(fn (object $row): array => (array) $row)
+                ->all(),
+            'receivable-po-lines' => $this->receivablePoLineLookup($filters, $limit),
+            'received-grns' => DB::table('grn_headers')
+                ->leftJoin('suppliers', 'suppliers.id', '=', 'grn_headers.supplier_id')
+                ->select(['grn_headers.id', 'grn_headers.grn_number as code', 'suppliers.supplier_name as name', 'grn_headers.supplier_id', 'grn_headers.warehouse_id', 'grn_headers.status'])
+                ->where('grn_headers.tenant_id', $tenantId)
+                ->whereNull('grn_headers.deleted_at')
+                ->whereIn('grn_headers.status', ['posted', 'partially_invoiced', 'invoiced'])
+                ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q->where('grn_headers.grn_number', 'like', "%$search%")->orWhere('suppliers.supplier_name', 'like', "%$search%")))
+                ->orderByDesc('grn_headers.received_date')
                 ->limit($limit)
                 ->get()
                 ->map(fn (object $row): array => (array) $row)
@@ -779,6 +754,9 @@ final class PurchaseService
                 if (in_array($po->status, ['cancelled', 'closed'], true)) {
                     throw ValidationException::withMessages(['purchase_order_id' => ['The selected purchase order is not receivable.']]);
                 }
+            }
+            if ($po === null) {
+                throw ValidationException::withMessages(['purchase_order_id' => ['GRN must reference a purchase order.']]);
             }
 
             $organizationUnitId = $this->support->organizationUnitId($payload['organization_unit_id'] ?? $po?->organization_unit_id);
@@ -1207,7 +1185,23 @@ final class PurchaseService
                 if ((float) $line['received_qty'] > $remaining + 0.0001) {
                     throw ValidationException::withMessages(['received_qty' => ['Received quantity cannot exceed remaining PO quantity.']]);
                 }
-                $line = array_merge((array) $poLine, $line);
+                $receivedQuantity = (float) $line['received_qty'];
+                $acceptedQuantity = (float) ($line['accepted_qty'] ?? $line['received_qty']);
+                $line = array_merge($line, [
+                    'item_id' => (int) $poLine->item_id,
+                    'variant_id' => $poLine->variant_id,
+                    'description' => $line['description'] ?? $poLine->description,
+                    'uom_id' => (int) $poLine->uom_id,
+                    'received_qty' => $receivedQuantity,
+                    'accepted_qty' => $acceptedQuantity,
+                    'unit_price' => (float) $poLine->unit_price,
+                    'discount_type' => $poLine->discount_type,
+                    'discount_value' => (float) $poLine->discount_value,
+                    'discount_amount' => (float) $poLine->discount_amount,
+                    'tax_group_id' => $poLine->tax_group_id,
+                    'tax_amount' => (float) $poLine->tax_amount,
+                    'account_id' => $poLine->account_id,
+                ]);
                 $line['expected_qty'] = $remaining;
             }
             $line['accepted_qty'] = (float) ($line['accepted_qty'] ?? $line['received_qty']);
@@ -1244,7 +1238,23 @@ final class PurchaseService
                 if ((float) $line['return_qty'] > $remaining + 0.0001) {
                     throw ValidationException::withMessages(['return_qty' => ['Return quantity cannot exceed remaining received quantity.']]);
                 }
-                $line = array_merge((array) $grnLine, $line);
+                $returnQuantity = (float) $line['return_qty'];
+                $line = array_merge($line, [
+                    'item_id' => (int) $grnLine->item_id,
+                    'variant_id' => $grnLine->variant_id,
+                    'description' => $line['description'] ?? $grnLine->description,
+                    'uom_id' => (int) $grnLine->uom_id,
+                    'warehouse_id' => (int) ($grnLine->warehouse_id ?? $grn->warehouse_id),
+                    'location_id' => $line['location_id'] ?? $grnLine->location_id,
+                    'return_qty' => $returnQuantity,
+                    'unit_price' => (float) $grnLine->unit_price,
+                    'discount_type' => $grnLine->discount_type,
+                    'discount_value' => (float) $grnLine->discount_value,
+                    'discount_amount' => (float) $grnLine->discount_amount,
+                    'tax_group_id' => $grnLine->tax_group_id,
+                    'tax_amount' => (float) $grnLine->tax_amount,
+                    'account_id' => $grnLine->account_id,
+                ]);
                 $line['original_grn_line_id'] = $grnLineId;
                 $line['original_purchase_order_line_id'] = $grnLine->purchase_order_line_id;
             }
@@ -1287,7 +1297,7 @@ final class PurchaseService
             ->where('purchase_order_id', $orderId)
             ->whereNull('deleted_at')
             ->first();
-        $status = (float) $totals->received <= 0 ? 'confirmed' : ((float) $totals->received + 0.0001 >= (float) $totals->ordered ? 'fully_received' : 'partially_received');
+        $status = (float) $totals->received <= 0 ? 'confirmed' : ((float) $totals->received + 0.0001 >= (float) $totals->ordered ? 'received' : 'partially_received');
         $order = $this->lockedRow('purchase_orders', $orderId);
         if ($order->status !== $status) {
             $this->updateStatus('purchase_orders', $orderId, $order->status, $status);
@@ -1356,5 +1366,34 @@ final class PurchaseService
     private function money(mixed $value): string
     {
         return number_format((float) $value, 4, '.', '');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function receivablePoLineLookup(array $filters, int $limit): array
+    {
+        if (empty($filters['purchase_order_id'])) {
+            return [];
+        }
+
+        return $this->orderLines((int) $filters['purchase_order_id'])
+            ->filter(fn (object $line): bool => round((float) $line->ordered_qty - $this->grnCommittedQuantity((int) $line->id), 4) > 0)
+            ->take($limit)
+            ->map(fn (object $line): array => [
+                'id' => (int) $line->id,
+                'item_id' => (int) $line->item_id,
+                'item_code' => $line->item_code,
+                'name' => $line->item_name,
+                'uom_id' => (int) $line->uom_id,
+                'uom_code' => $line->uom_code,
+                'ordered_qty' => $this->money($line->ordered_qty),
+                'received_qty' => $this->money($line->received_qty),
+                'remaining_qty' => $this->money(round((float) $line->ordered_qty - $this->grnCommittedQuantity((int) $line->id), 4)),
+                'unit_price' => $this->money($line->unit_price),
+            ])
+            ->values()
+            ->all();
     }
 }

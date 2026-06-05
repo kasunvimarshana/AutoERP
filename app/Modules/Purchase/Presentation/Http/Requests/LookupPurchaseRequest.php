@@ -26,6 +26,8 @@ final class LookupPurchaseRequest extends FormRequest
             'search' => ['sometimes', 'nullable', 'string', 'max:180'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'warehouse_id' => ['sometimes', 'nullable', 'integer', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
+            'purchase_order_id' => ['sometimes', 'nullable', 'integer', Rule::exists('purchase_orders', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'grn_id' => ['sometimes', 'nullable', 'integer', Rule::exists('grn_headers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
         ];
     }
 }

@@ -116,15 +116,22 @@ final class PurchaseFlowTest extends TestCase
         $this->assertDatabaseHas('ap_transactions', ['tenant_id' => 1, 'source_id' => $invoiceId, 'outstanding_amount' => 550]);
 
         $payment = $this->withHeaders($this->headers)
-            ->postJson("/api/purchase/invoices/$invoiceId/payments", [
+            ->postJson('/api/payment/payments', [
+                'party_type' => 'supplier',
+                'party_id' => $supplierId,
                 'payment_date' => '2026-06-09',
-                'payment_method_id' => $paymentMethodId,
                 'amount' => 550,
+                'direction' => 'outbound',
+                'payment_method_id' => $paymentMethodId,
+                'allocations' => [[
+                    'invoice_id' => $invoiceId,
+                    'allocated_amount' => 550,
+                ]],
             ])
-            ->assertOk()
+            ->assertCreated()
             ->assertJsonPath('data.allocated_amount', '550.0000');
 
-        $this->assertDatabaseHas('purchase_payment_allocations', [
+        $this->assertDatabaseHas('payment_allocations', [
             'tenant_id' => 1,
             'invoice_id' => $invoiceId,
             'payment_id' => (int) $payment->json('data.id'),
