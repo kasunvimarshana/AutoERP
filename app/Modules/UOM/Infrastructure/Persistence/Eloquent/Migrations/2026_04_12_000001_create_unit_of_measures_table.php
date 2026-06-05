@@ -25,11 +25,6 @@ return new class extends Migration
             $table->unsignedTinyInteger('decimal_precision')->default(0);
             $table->boolean('allow_fractional_quantity')->default(false);
             $table->boolean('is_base')->default(false);
-            $table->boolean('usable_for_purchase')->default(true);
-            $table->boolean('usable_for_sales')->default(true);
-            $table->boolean('usable_for_inventory')->default(true);
-            $table->boolean('usable_for_service')->default(true);
-            $table->boolean('usable_for_rental')->default(false);
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
 
