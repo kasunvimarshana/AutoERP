@@ -35,7 +35,7 @@ return new class extends Migration
             $table->decimal('inspected_qty', 20, 4)->default(0);
             $table->decimal('putaway_qty', 20, 4)->default(0);
             $table->decimal('returned_qty', 20, 4)->default(0);
-            $table->decimal('documented_qty', 20, 4)->default(0);
+            $table->decimal('invoiced_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
 
             // Discount stored as both configuration and calculated amount

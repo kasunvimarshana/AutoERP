@@ -16,11 +16,6 @@ final class VehicleServiceIntegrationController extends Controller
     {
     }
 
-    public function createServiceInvoice(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->createServiceInvoice($jobCardId, $request->all()));
-    }
-
     public function allocateServicePayment(Request $request, int $jobCardId): JsonResponse
     {
         return $this->respond($this->service->allocateServicePayment($jobCardId, $request->all()));

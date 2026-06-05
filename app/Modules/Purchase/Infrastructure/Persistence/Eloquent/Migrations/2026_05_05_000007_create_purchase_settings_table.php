@@ -32,15 +32,15 @@ return new class extends Migration
             $table->foreignId('default_price_list_id')->nullable()->constrained('price_lists')->nullOnDelete();
             $table->foreignId('default_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
-            $table->foreignId('purchase_order_document_definition_id')->nullable()->constrained('document_definitions')->nullOnDelete();
-            $table->foreignId('grn_document_definition_id')->nullable()->constrained('document_definitions')->nullOnDelete();
-            $table->foreignId('purchase_invoice_document_definition_id')->nullable()->constrained('document_definitions')->nullOnDelete();
-            $table->foreignId('purchase_return_document_definition_id')->nullable()->constrained('document_definitions')->nullOnDelete();
+            $table->string('purchase_order_sequence_code')->nullable();
+            $table->string('grn_sequence_code')->nullable();
+            $table->string('purchase_invoice_type_code')->nullable();
+            $table->string('purchase_return_invoice_type_code')->nullable();
 
             $table->boolean('require_po_before_grn')->default(false);
             $table->boolean('require_grn_before_invoice')->default(false);
             $table->boolean('allow_direct_grn')->default(true);
-            $table->boolean('allow_direct_purchase_document')->default(true);
+            $table->boolean('allow_direct_purchase_invoice')->default(true);
             $table->boolean('allow_return_without_original')->default(true);
             $table->boolean('allow_negative_stock_on_return')->default(false);
             $table->boolean('allow_header_discount')->default(true);
@@ -49,7 +49,7 @@ return new class extends Migration
             $table->string('header_discount_allocation_method')->default('proportional')->comment('proportional, equal, value_based');
             $table->string('default_po_status')->default('draft');
             $table->string('default_grn_status')->default('draft');
-            $table->string('default_document_status')->default('draft');
+            $table->string('default_invoice_status')->default('draft');
             $table->string('default_return_status')->default('draft');
             $table->string('numbering_sequence_code')->nullable();
             $table->boolean('is_active')->default(true);

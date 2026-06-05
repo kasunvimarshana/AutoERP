@@ -275,14 +275,6 @@ final class VehicleServiceServiceProvider extends ServiceProvider
             },
         );
         $this->app->singleton(
-            \Modules\VehicleService\Application\Repositories\VehicleServiceJobDocumentLinkRepositoryInterface::class,
-            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobDocumentLinkRepositoryInterface {
-                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobDocumentLinkRepository(
-                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobDocumentLinkModel(),
-                );
-            },
-        );
-        $this->app->singleton(
             \Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface::class,
             function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface {
                 return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobPaymentLinkRepository(

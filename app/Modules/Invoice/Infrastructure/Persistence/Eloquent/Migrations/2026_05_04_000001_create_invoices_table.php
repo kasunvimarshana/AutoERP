@@ -25,7 +25,9 @@ return new class extends Migration
             $table->string('direction', 30);
             // inbound, outbound
 
-            $table->foreignId('party_id')->constrained('parties')->restrictOnDelete();
+            $table->string('party_type', 80)->nullable();
+            $table->unsignedBigInteger('party_id')->nullable();
+            $table->string('party_name')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
 
             $table->decimal('exchange_rate', 20, 10)->default(1);
@@ -57,7 +59,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'invoice_number']);
             $table->index(['tenant_id', 'organization_unit_id']);
-            $table->index(['tenant_id', 'party_id']);
+            $table->index(['tenant_id', 'party_type', 'party_id']);
             $table->index(['tenant_id', 'invoice_type', 'status']);
             $table->index(['tenant_id', 'direction', 'status']);
             $table->index(['invoice_date', 'due_date']);

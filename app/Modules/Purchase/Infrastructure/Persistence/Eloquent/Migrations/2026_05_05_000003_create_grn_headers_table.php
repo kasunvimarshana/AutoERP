@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id')->nullOnDelete();
             $table->string('grn_number');
             $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_documented, documented, cancelled, reversed');
-            $table->string('document_status')->default('not_documented')->comment('not_documented, partially_documented, documented, reversed');
+            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, invoiced, reversed');
             $table->string('inspection_status')->default('pending');
             $table->string('putaway_status')->default('pending');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();

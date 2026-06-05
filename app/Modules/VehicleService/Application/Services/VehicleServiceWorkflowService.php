@@ -7,19 +7,15 @@ namespace Modules\VehicleService\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Document\Application\DTOs\CreateDocumentDTO;
-use Modules\Document\Application\Services\DocumentOrchestrator;
 use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\StockMovements\CreateStockMovementServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceWorkflowServiceInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardLineRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardRepositoryInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceJobDocumentLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobInventoryLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceSettingRepositoryInterface;
 use Modules\VehicleService\Domain\Constants\VehicleServiceErrorCode;
 use Throwable;
 
@@ -47,11 +43,8 @@ final class VehicleServiceWorkflowService implements VehicleServiceWorkflowServi
         private readonly VehicleServiceJobCardRepositoryInterface $jobCardRepository,
         private readonly VehicleServiceJobCardLineRepositoryInterface $jobCardLineRepository,
         private readonly VehicleServiceJobStatusHistoryRepositoryInterface $statusHistoryRepository,
-        private readonly VehicleServiceJobDocumentLinkRepositoryInterface $documentLinkRepository,
         private readonly VehicleServiceJobPaymentLinkRepositoryInterface $paymentLinkRepository,
         private readonly VehicleServiceJobInventoryLinkRepositoryInterface $inventoryLinkRepository,
-        private readonly VehicleServiceSettingRepositoryInterface $settingRepository,
-        private readonly DocumentOrchestrator $documentOrchestrator,
         private readonly PaymentAllocationServiceInterface $paymentAllocationService,
         private readonly CreateStockMovementServiceInterface $createStockMovementService,
         private readonly FinancePostingServiceInterface $financePostingService,
@@ -112,84 +105,6 @@ final class VehicleServiceWorkflowService implements VehicleServiceWorkflowServi
             ]);
 
             return Result::success($updated);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function createInvoice(int|string $jobCardId, array $payload): Result
-    {
-        try {
-            $jobCard = $this->jobCardRepository->findById((int) $jobCardId);
-            if (! $jobCard instanceof DataRecord) {
-                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
-            }
-
-            $tenantId = (int) $jobCard->get('tenant_id', 0);
-            $settings = $this->resolveSettings($tenantId, $jobCard->get('organization_unit_id'));
-            $documentTypeCode = (string) ($payload['document_type_code']
-                ?? $settings?->get('service_invoice_document_type_code', 'VEHICLE_SERVICE_INVOICE')
-                ?? 'VEHICLE_SERVICE_INVOICE');
-            $documentTypeId = isset($payload['document_type_id']) ? (int) $payload['document_type_id'] : 0;
-            if ($documentTypeId < 1) {
-                return Result::failure(new Error(
-                    VehicleServiceErrorCode::INVALID_VALUE,
-                    'document_type_id is required.',
-                ));
-            }
-
-            $dto = new CreateDocumentDTO(
-                tenantId: $tenantId,
-                documentTypeId: $documentTypeId,
-                documentDate: now()->toDateString(),
-                organizationUnitId: $jobCard->get('organization_unit_id') !== null
-                    ? (int) $jobCard->get('organization_unit_id')
-                    : null,
-                ownerId: isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
-                partyId: $jobCard->get('customer_id') !== null ? (int) $jobCard->get('customer_id') : null,
-                dueDate: $payload['due_date'] ?? null,
-                notes: $payload['notes'] ?? null,
-                data: [
-                    'source_type' => 'vehicle_service_job_card',
-                    'source_id' => (int) $jobCardId,
-                    'currency_id' => $jobCard->get('currency_id'),
-                    'exchange_rate' => (float) $jobCard->get('exchange_rate', 1),
-                    'document_type_code' => $documentTypeCode,
-                    'job_card_number' => $jobCard->get('job_card_number'),
-                ],
-                items: (array) ($payload['items'] ?? []),
-            );
-
-            $document = $this->documentOrchestrator->create($dto);
-            $documentId = (int) ($document->document->id ?? 0);
-            if ($documentId < 1) {
-                return Result::failure(new Error(
-                    VehicleServiceErrorCode::INVALID_VALUE,
-                    'Document creation did not return a persisted document id.',
-                ));
-            }
-
-            $this->documentLinkRepository->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                'job_card_id' => (int) $jobCardId,
-                'document_id' => $documentId,
-                'document_type_code' => $documentTypeCode,
-                'direction' => 'outbound',
-                'status' => 'active',
-                'linked_by' => $payload['actor_id'] ?? null,
-                'linked_at' => now()->toDateTimeString(),
-            ]);
-
-            $this->jobCardRepository->update((int) $jobCardId, [
-                'invoice_status' => 'invoiced',
-                'status' => 'invoiced',
-            ]);
-
-            return Result::success([
-                'job_card_id' => (int) $jobCardId,
-                'document' => $document,
-            ]);
         } catch (Throwable $exception) {
             return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -403,26 +318,5 @@ final class VehicleServiceWorkflowService implements VehicleServiceWorkflowServi
         }
 
         return in_array($toStatus, self::STATUS_TRANSITION_MATRIX[$fromStatus], true);
-    }
-
-    private function resolveSettings(int $tenantId, mixed $organizationUnitId): ?DataRecord
-    {
-        $records = $organizationUnitId !== null
-            ? $this->settingRepository->list([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => (int) $organizationUnitId,
-                'is_active' => true,
-            ])
-            : [];
-
-        if ($records === []) {
-            $records = $this->settingRepository->list([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
-                'is_active' => true,
-            ]);
-        }
-
-        return $records[0] ?? null;
     }
 }

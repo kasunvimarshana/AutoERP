@@ -26,7 +26,7 @@ return new class extends Migration
             // item, service, charge, discount, tax, adjustment, note
 
             $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
-            $table->foreignId('uom_id')->nullable()->constrained('uoms')->nullOnDelete();
+            $table->foreignId('uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
 
             // Snapshot fields - important
             $table->string('item_code', 100)->nullable();

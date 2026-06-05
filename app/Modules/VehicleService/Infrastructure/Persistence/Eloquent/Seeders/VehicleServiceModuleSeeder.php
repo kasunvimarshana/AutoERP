@@ -10,9 +10,6 @@ class VehicleServiceModuleSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
-            VehicleServiceDocumentTypesSeeder::class,
-            VehicleServiceDocumentDefinitionsSeeder::class,
-        ]);
+        //
     }
 }

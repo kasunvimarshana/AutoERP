@@ -21,11 +21,6 @@ final class VehicleServiceWorkflowController extends Controller
         return $this->respond($this->service->transition($jobCardId, $request->all()));
     }
 
-    public function createInvoice(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->createInvoice($jobCardId, $request->all()));
-    }
-
     public function allocatePayment(Request $request, int $jobCardId): JsonResponse
     {
         return $this->respond($this->service->allocatePayment($jobCardId, $request->all()));

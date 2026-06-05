@@ -141,10 +141,6 @@ Route::prefix('api/vehicle-service')
             [VehicleServiceWorkflowController::class, 'transition'],
         )->name('workflow.transition');
         Route::post(
-            'workflow/job-cards/{jobCardId}/invoice',
-            [VehicleServiceWorkflowController::class, 'createInvoice'],
-        )->name('workflow.invoice');
-        Route::post(
             'workflow/job-cards/{jobCardId}/payments/allocate',
             [VehicleServiceWorkflowController::class, 'allocatePayment'],
         )->name('workflow.payments.allocate');
@@ -161,10 +157,6 @@ Route::prefix('api/vehicle-service')
             [VehicleServiceWorkflowController::class, 'reverseFinance'],
         )->name('workflow.finance.reverse');
 
-        Route::post(
-            'integration/job-cards/{jobCardId}/invoice',
-            [VehicleServiceIntegrationController::class, 'createServiceInvoice'],
-        )->name('integration.invoice');
         Route::post(
             'integration/job-cards/{jobCardId}/payments/allocate',
             [VehicleServiceIntegrationController::class, 'allocateServicePayment'],

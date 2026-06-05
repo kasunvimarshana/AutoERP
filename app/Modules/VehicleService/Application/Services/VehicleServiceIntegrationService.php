@@ -14,11 +14,6 @@ final class VehicleServiceIntegrationService implements VehicleServiceIntegratio
     {
     }
 
-    public function createServiceInvoice(int $jobCardId, array $payload): Result
-    {
-        return $this->workflowService->createInvoice($jobCardId, $payload);
-    }
-
     public function allocateServicePayment(int $jobCardId, array $payload): Result
     {
         return $this->workflowService->allocatePayment($jobCardId, $payload);

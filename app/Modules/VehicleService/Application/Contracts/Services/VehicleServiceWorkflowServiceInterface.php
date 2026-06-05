@@ -10,8 +10,6 @@ interface VehicleServiceWorkflowServiceInterface
 {
     public function transition(int|string $jobCardId, array $payload): Result;
 
-    public function createInvoice(int|string $jobCardId, array $payload): Result;
-
     public function allocatePayment(int|string $jobCardId, array $payload): Result;
 
     public function postInventory(int|string $jobCardId, array $payload): Result;
