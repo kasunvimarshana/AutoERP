@@ -20,6 +20,15 @@ import { ItemListPage } from '../modules/item/pages/ItemListPage';
 import { PaymentCreatePage } from '../modules/payment/pages/PaymentCreatePage';
 import { PaymentDetailPage } from '../modules/payment/pages/PaymentDetailPage';
 import { PaymentListPage } from '../modules/payment/pages/PaymentListPage';
+import { GrnDetailPage } from '../modules/purchase/pages/GrnDetailPage';
+import { GrnEditorPage } from '../modules/purchase/pages/GrnEditorPage';
+import { GrnListPage } from '../modules/purchase/pages/GrnListPage';
+import { PurchaseOrderDetailPage } from '../modules/purchase/pages/PurchaseOrderDetailPage';
+import { PurchaseOrderEditorPage } from '../modules/purchase/pages/PurchaseOrderEditorPage';
+import { PurchaseOrderListPage } from '../modules/purchase/pages/PurchaseOrderListPage';
+import { PurchaseReturnDetailPage } from '../modules/purchase/pages/PurchaseReturnDetailPage';
+import { PurchaseReturnEditorPage } from '../modules/purchase/pages/PurchaseReturnEditorPage';
+import { PurchaseReturnListPage } from '../modules/purchase/pages/PurchaseReturnListPage';
 import { SupplierCreatePage } from '../modules/supplier/pages/SupplierCreatePage';
 import { SupplierDetailPage } from '../modules/supplier/pages/SupplierDetailPage';
 import { SupplierEditPage } from '../modules/supplier/pages/SupplierEditPage';
@@ -74,6 +83,18 @@ const router = createBrowserRouter([
                     { element: <PaymentListPage />, path: 'payments' },
                     { element: <PaymentCreatePage />, path: 'payments/new' },
                     { element: <PaymentDetailPage />, path: 'payments/:id' },
+                    { element: <PurchaseOrderListPage />, path: 'purchase/orders' },
+                    { element: <PurchaseOrderEditorPage mode="create" />, path: 'purchase/orders/new' },
+                    { element: <PurchaseOrderDetailPage />, path: 'purchase/orders/:id' },
+                    { element: <PurchaseOrderEditorPage mode="edit" />, path: 'purchase/orders/:id/edit' },
+                    { element: <GrnListPage />, path: 'purchase/grns' },
+                    { element: <GrnEditorPage mode="create" />, path: 'purchase/grns/new' },
+                    { element: <GrnDetailPage />, path: 'purchase/grns/:id' },
+                    { element: <GrnEditorPage mode="edit" />, path: 'purchase/grns/:id/edit' },
+                    { element: <PurchaseReturnListPage />, path: 'purchase/returns' },
+                    { element: <PurchaseReturnEditorPage mode="create" />, path: 'purchase/returns/new' },
+                    { element: <PurchaseReturnDetailPage />, path: 'purchase/returns/:id' },
+                    { element: <PurchaseReturnEditorPage mode="edit" />, path: 'purchase/returns/:id/edit' },
                     { element: <JournalListPage />, path: 'finance/journals' },
                     { element: <JournalDetailPage />, path: 'finance/journals/:id' },
                 ],

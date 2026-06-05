@@ -30,6 +30,7 @@ export function AppLayout() {
                             <AppLink to="/items">Items</AppLink>
                             <AppLink to="/invoices">Invoices</AppLink>
                             <AppLink to="/payments">Payments</AppLink>
+                            <AppLink to="/purchase/orders">Purchase</AppLink>
                             <AppLink to="/finance/journals">Finance</AppLink>
                         </nav>
                     </div>
@@ -46,6 +47,7 @@ export function AppLayout() {
                     <AppLink to="/items">Items</AppLink>
                     <AppLink to="/invoices">Invoices</AppLink>
                     <AppLink to="/payments">Payments</AppLink>
+                    <AppLink to="/purchase/orders">Purchase</AppLink>
                     <AppLink to="/finance/journals">Finance</AppLink>
                 </nav>
             </header>
