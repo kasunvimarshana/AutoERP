@@ -121,6 +121,35 @@ final class PaymentService
         return $this->find($paymentId);
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $allocations
+     */
+    public function allocateAdvance(int $advancePaymentId, array $allocations): object
+    {
+        $this->allocations->allocateAdvance($advancePaymentId, $allocations);
+
+        return $this->findAdvance($advancePaymentId);
+    }
+
+    public function findAdvance(int $advancePaymentId): object
+    {
+        $advance = DB::table('advance_payments')
+            ->where('tenant_id', $this->support->tenantId())
+            ->whereNull('deleted_at')
+            ->where('id', $advancePaymentId)
+            ->first();
+        if ($advance === null) {
+            abort(404);
+        }
+        $advance->allocations = DB::table('advance_payment_allocations')
+            ->where('tenant_id', $this->support->tenantId())
+            ->where('advance_payment_id', $advancePaymentId)
+            ->where('status', 'active')
+            ->get();
+
+        return $advance;
+    }
+
     public function delete(int $paymentId): void
     {
         DB::transaction(function () use ($paymentId): void {

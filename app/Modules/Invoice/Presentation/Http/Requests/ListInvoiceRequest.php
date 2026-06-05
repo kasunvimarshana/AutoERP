@@ -21,7 +21,7 @@ final class ListInvoiceRequest extends FormRequest
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:200'],
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', Rule::in(['draft', 'issued', 'partially_paid', 'paid', 'cancelled', 'credited'])],
-            'document_type' => ['sometimes', Rule::in(['invoice', 'debit_adjustment', 'credit_adjustment', 'refund', 'reversal', 'write_off'])],
+            'document_type' => ['sometimes', Rule::in(['invoice', 'purchase_invoice', 'debit_adjustment', 'credit_adjustment', 'refund', 'reversal', 'write_off'])],
         ];
     }
 }

@@ -27,6 +27,16 @@ return new class extends Migration
                 ->nullOnDelete();
             $table->decimal('linked_quantity', 20, 4)->nullable();
             $table->decimal('linked_amount', 20, 4)->default(0);
+            $table->decimal('source_quantity', 20, 4)->nullable()->comment('Original source line quantity available for allocation');
+            $table->decimal('source_amount', 20, 4)->default(0)->comment('Original source line gross amount');
+            $table->decimal('allocated_line_discount_amount', 20, 4)->default(0);
+            $table->decimal('allocated_header_discount_amount', 20, 4)->default(0);
+            $table->decimal('allocated_line_tax_amount', 20, 4)->default(0);
+            $table->decimal('allocated_header_tax_amount', 20, 4)->default(0);
+            $table->decimal('allocated_charge_amount', 20, 4)->default(0);
+            $table->decimal('allocated_debit_adjustment_amount', 20, 4)->default(0);
+            $table->decimal('allocated_credit_adjustment_amount', 20, 4)->default(0);
+            $table->decimal('allocation_ratio', 12, 8)->default(0);
             $table->string('status')->default('active')->comment('active, reversed');
             $table->timestamp('linked_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();

@@ -25,6 +25,7 @@ Route::prefix('api/purchase')
         Route::post('purchase-orders/{purchaseOrder}/confirm', [PurchaseController::class, 'confirmOrder'])->name('purchase-orders.confirm');
         Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseController::class, 'cancelOrder'])->name('purchase-orders.cancel');
         Route::post('purchase-orders/{purchaseOrder}/close', [PurchaseController::class, 'closeOrder'])->name('purchase-orders.close');
+        Route::post('purchase-orders/{purchaseOrder}/invoice', [PurchaseController::class, 'invoiceOrder'])->name('purchase-orders.invoice');
 
         Route::get('grns', [PurchaseController::class, 'grns'])->name('grns.index');
         Route::post('grns', [PurchaseController::class, 'storeGrn'])->name('grns.store');

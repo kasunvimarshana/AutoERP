@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Invoice\Presentation\Http\Resources\InvoiceResource;
 use Modules\Purchase\Application\Services\PurchaseService;
+use Modules\Purchase\Presentation\Http\Requests\CreatePurchaseInvoiceRequest;
 use Modules\Purchase\Presentation\Http\Requests\ListPurchaseRequest;
 use Modules\Purchase\Presentation\Http\Requests\LookupPurchaseRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertGrnRequest;
@@ -66,6 +67,11 @@ final class PurchaseController extends Controller
         return new PurchaseOrderResource($this->purchases->closeOrder($purchaseOrder, request('reason')));
     }
 
+    public function invoiceOrder(CreatePurchaseInvoiceRequest $request, int $purchaseOrder): InvoiceResource
+    {
+        return new InvoiceResource($this->purchases->createInvoiceFromOrder($purchaseOrder, $request->validated()));
+    }
+
     public function destroyOrder(int $purchaseOrder): JsonResponse
     {
         $this->purchases->deleteOrder($purchaseOrder);
@@ -98,9 +104,9 @@ final class PurchaseController extends Controller
         return new GrnResource($this->purchases->postGrn($grn));
     }
 
-    public function invoiceGrn(int $grn): InvoiceResource
+    public function invoiceGrn(CreatePurchaseInvoiceRequest $request, int $grn): InvoiceResource
     {
-        return new InvoiceResource($this->purchases->createInvoiceFromGrn($grn));
+        return new InvoiceResource($this->purchases->createInvoiceFromGrn($grn, $request->validated()));
     }
 
     public function destroyGrn(int $grn): JsonResponse

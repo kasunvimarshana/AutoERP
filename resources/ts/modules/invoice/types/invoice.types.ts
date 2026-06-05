@@ -1,5 +1,5 @@
 export type InvoiceStatus = 'draft' | 'issued' | 'partially_paid' | 'paid' | 'cancelled' | 'credited';
-export type InvoiceDocumentType = 'invoice' | 'debit_adjustment' | 'credit_adjustment' | 'refund' | 'reversal' | 'write_off';
+export type InvoiceDocumentType = 'invoice' | 'purchase_invoice' | 'debit_adjustment' | 'credit_adjustment' | 'refund' | 'reversal' | 'write_off';
 export type LedgerDirection = 'receivable' | 'payable';
 
 export type InvoiceLineInput = { chargeTotal?: string; description: string; discountTotal?: string; itemId?: number; quantity: string; taxTotal: string; unitPrice: string };

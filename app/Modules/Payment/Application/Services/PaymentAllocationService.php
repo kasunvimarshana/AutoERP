@@ -105,4 +105,92 @@ final class PaymentAllocationService
             return $created;
         });
     }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $allocations
+     * @return array<int, int>
+     */
+    public function allocateAdvance(int $advancePaymentId, array $allocations): array
+    {
+        return DB::transaction(function () use ($advancePaymentId, $allocations): array {
+            $tenantId = $this->support->tenantId();
+            $advance = DB::table('advance_payments')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $advancePaymentId)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first();
+            if ($advance === null) {
+                throw ValidationException::withMessages(['advance_payment_id' => ['Advance payment was not found.']]);
+            }
+            if ($allocations === []) {
+                return [];
+            }
+
+            $available = (float) $advance->remaining_amount;
+            $created = [];
+            foreach (array_values($allocations) as $index => $allocation) {
+                $amount = (float) ($allocation['allocated_amount'] ?? $allocation['amount'] ?? 0);
+                if ($amount <= 0) {
+                    throw ValidationException::withMessages(["allocations.$index.allocated_amount" => ['Allocated amount must be positive.']]);
+                }
+                if ($amount > $available + 0.0001) {
+                    throw ValidationException::withMessages(['allocations' => ['Total allocations cannot exceed advance balance.']]);
+                }
+
+                $invoice = DB::table('invoices')
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', (int) $allocation['invoice_id'])
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->first();
+                if ($invoice === null) {
+                    throw ValidationException::withMessages(["allocations.$index.invoice_id" => ['Invoice was not found.']]);
+                }
+                if ($invoice->ledger_direction === 'receivable' && $advance->party_type !== 'customer') {
+                    throw ValidationException::withMessages(['party_type' => ['Customer advances can only settle receivable invoices.']]);
+                }
+                if ($invoice->ledger_direction === 'payable' && $advance->party_type !== 'supplier') {
+                    throw ValidationException::withMessages(['party_type' => ['Supplier advances can only settle payable invoices.']]);
+                }
+                if ((int) $invoice->customer_id !== (int) $advance->party_id && (int) $invoice->supplier_id !== (int) $advance->party_id) {
+                    throw ValidationException::withMessages(['party_id' => ['Advance party must match the invoice party.']]);
+                }
+                if ($amount > (float) $invoice->balance_total + 0.0001) {
+                    throw ValidationException::withMessages(["allocations.$index.allocated_amount" => ['Allocated amount cannot exceed invoice balance.']]);
+                }
+
+                $allocationId = DB::table('advance_payment_allocations')->insertGetId([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $advance->organization_unit_id,
+                    'advance_payment_id' => $advancePaymentId,
+                    'invoice_id' => (int) $allocation['invoice_id'],
+                    'invoice_line_id' => $allocation['invoice_line_id'] ?? null,
+                    'reference' => $allocation['reference'] ?? null,
+                    'allocated_amount' => $amount,
+                    'currency_id' => $advance->currency_id,
+                    'base_allocated_amount' => $amount,
+                    'allocation_date' => $allocation['allocation_date'] ?? now()->toDateString(),
+                    'status' => 'active',
+                    'row_version' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->invoices->applySettlement((int) $allocation['invoice_id'], 'advance_payment', $allocationId, $amount, $allocation['allocation_date'] ?? now()->toDateString());
+                $available -= $amount;
+                $created[] = $allocationId;
+            }
+
+            $allocated = round((float) $advance->amount - $available, 4);
+            DB::table('advance_payments')->where('id', $advancePaymentId)->update([
+                'remaining_amount' => round(max(0, $available), 4),
+                'status' => $allocated <= 0 ? 'open' : ($available <= 0.0001 ? 'fully_applied' : 'partially_applied'),
+                'updated_at' => now(),
+                'row_version' => ((int) $advance->row_version) + 1,
+            ]);
+
+            return $created;
+        });
+    }
 }

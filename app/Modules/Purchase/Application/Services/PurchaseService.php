@@ -388,80 +388,38 @@ final class PurchaseService
         });
     }
 
-    public function createInvoiceFromGrn(int $id): object
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    public function createInvoiceFromOrder(int $id, array $options = []): object
     {
-        return DB::transaction(function () use ($id): object {
-            $tenantId = $this->support->tenantId();
+        return DB::transaction(function () use ($id, $options): object {
+            $order = $this->lockedRow('purchase_orders', $id);
+            if (in_array($order->status, ['draft', 'cancelled'], true)) {
+                throw ValidationException::withMessages(['status' => ['Only confirmed or received purchase orders can be invoiced.']]);
+            }
+
+            $entries = $this->invoiceEntriesForOrder($order, $options);
+            $invoice = $this->createPurchaseInvoiceFromEntries('purchase_order', $order, $entries, $options);
+            $this->refreshOrderInvoiceStatus($id);
+
+            return $invoice;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    public function createInvoiceFromGrn(int $id, array $options = []): object
+    {
+        return DB::transaction(function () use ($id, $options): object {
             $grn = $this->lockedRow('grn_headers', $id);
             if ($grn->status !== 'posted') {
                 throw ValidationException::withMessages(['status' => ['Only posted GRNs can be invoiced.']]);
             }
 
-            $lines = $this->grnLines($id)
-                ->map(function (object $line): array {
-                    $quantity = round((float) $line->accepted_qty - (float) $line->returned_qty - (float) $line->invoiced_qty, 4);
-
-                    return ['line' => $line, 'quantity' => $quantity];
-                })
-                ->filter(fn (array $entry): bool => $entry['quantity'] > 0)
-                ->values();
-            if ($lines->isEmpty()) {
-                throw ValidationException::withMessages(['lines' => ['This GRN has no uninvoiced quantity.']]);
-            }
-
-            $supplier = DB::table('suppliers')->where('tenant_id', $tenantId)->where('id', (int) $grn->supplier_id)->first();
-            $invoice = $this->invoices->create([
-                'organization_unit_id' => $grn->organization_unit_id,
-                'external_reference_number' => $grn->grn_number,
-                'document_type' => 'invoice',
-                'business_context' => 'purchase',
-                'ledger_direction' => 'payable',
-                'balance_effect' => 'increase',
-                'supplier_id' => (int) $grn->supplier_id,
-                'invoice_date' => now()->toDateString(),
-                'due_date' => now()->addDays((int) ($supplier->payment_terms_days ?? 0))->toDateString(),
-                'notes' => 'Generated from GRN '.$grn->grn_number,
-                'adjustments' => $this->invoiceHeaderAdjustments($grn),
-                'lines' => $lines->map(fn (array $entry): array => [
-                    'item_id' => (int) $entry['line']->item_id,
-                    'uom_id' => (int) $entry['line']->uom_id,
-                    'description' => $entry['line']->description,
-                    'quantity' => $entry['quantity'],
-                    'unit_price' => (float) $entry['line']->unit_price,
-                    'discount_total' => round((float) $entry['line']->discount_amount * $this->quantityRatio((float) $entry['quantity'], (float) $entry['line']->accepted_qty), 4),
-                    'tax_total' => round((float) $entry['line']->tax_amount * $this->quantityRatio((float) $entry['quantity'], (float) $entry['line']->accepted_qty), 4),
-                    'charge_total' => 0,
-                ])->all(),
-            ]);
-            $invoice = $this->invoices->issue((int) $invoice->id);
-
-            $invoiceLines = collect($invoice->lines ?? [])->values();
-            foreach ($lines as $index => $entry) {
-                $grnLine = $entry['line'];
-                $invoiceLine = $invoiceLines->get($index);
-                DB::table('purchase_invoice_links')->insert([
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $grn->organization_unit_id,
-                    'source_type' => 'grn',
-                    'source_id' => $id,
-                    'source_line_id' => (int) $grnLine->id,
-                    'invoice_id' => (int) $invoice->id,
-                    'invoice_line_id' => $invoiceLine->id ?? null,
-                    'linked_quantity' => $entry['quantity'],
-                    'linked_amount' => round($entry['quantity'] * (float) $grnLine->unit_price, 4),
-                    'status' => 'active',
-                    'linked_at' => now(),
-                    'created_by' => $this->support->userId(),
-                    'row_version' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                DB::table('grn_lines')->where('id', (int) $grnLine->id)->increment('invoiced_qty', $entry['quantity'], ['updated_at' => now()]);
-                if ($grnLine->purchase_order_line_id !== null) {
-                    DB::table('purchase_order_lines')->where('id', (int) $grnLine->purchase_order_line_id)->increment('invoiced_qty', $entry['quantity'], ['updated_at' => now()]);
-                }
-            }
-
+            $entries = $this->invoiceEntriesForGrn($grn, $options);
+            $invoice = $this->createPurchaseInvoiceFromEntries('grn', $grn, $entries, $options);
             $this->refreshGrnInvoiceStatus($id);
             if ($grn->purchase_order_id !== null) {
                 $this->refreshOrderInvoiceStatus((int) $grn->purchase_order_id);
@@ -469,6 +427,188 @@ final class PurchaseService
 
             return $invoice;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function invoiceEntriesForOrder(object $order, array $options): Collection
+    {
+        $requested = $this->requestedInvoiceQuantities($options);
+        $lines = DB::table('purchase_order_lines')
+            ->where('tenant_id', $this->support->tenantId())
+            ->where('purchase_order_id', (int) $order->id)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
+            ->orderBy('id')
+            ->get();
+
+        return $this->buildInvoiceEntries($lines, $requested, 'ordered_qty', 'purchase_order_line_id');
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function invoiceEntriesForGrn(object $grn, array $options): Collection
+    {
+        $requested = $this->requestedInvoiceQuantities($options);
+        $lines = DB::table('grn_lines')
+            ->where('tenant_id', $this->support->tenantId())
+            ->where('grn_header_id', (int) $grn->id)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
+            ->orderBy('id')
+            ->get();
+
+        return $this->buildInvoiceEntries($lines, $requested, 'received_qty', 'grn_line_id');
+    }
+
+    /**
+     * @param  Collection<int, object>  $lines
+     * @param  array<int, float>  $requested
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildInvoiceEntries(Collection $lines, array $requested, string $sourceQuantityMode, string $errorKey): Collection
+    {
+        $entries = $lines
+            ->map(function (object $line) use ($requested, $sourceQuantityMode, $errorKey): ?array {
+                $sourceQuantity = $sourceQuantityMode === 'ordered_qty'
+                    ? (float) $line->ordered_qty
+                    : max(0, (float) $line->accepted_qty - (float) $line->returned_qty);
+                $remaining = round($sourceQuantity - (float) $line->invoiced_qty, 4);
+                if ($remaining <= 0) {
+                    return null;
+                }
+                if ($requested !== [] && ! array_key_exists((int) $line->id, $requested)) {
+                    return null;
+                }
+                $quantity = $requested[(int) $line->id] ?? $remaining;
+                if ($quantity <= 0 || $quantity > $remaining + 0.0001) {
+                    throw ValidationException::withMessages([$errorKey => ['Invoice quantity cannot exceed remaining source quantity.']]);
+                }
+                $ratio = $this->quantityRatio((float) $quantity, $sourceQuantity);
+
+                return [
+                    'line' => $line,
+                    'quantity' => round((float) $quantity, 4),
+                    'remaining_quantity' => $remaining,
+                    'source_quantity' => round($sourceQuantity, 4),
+                    'source_amount' => round($sourceQuantity * (float) $line->unit_price, 4),
+                    'linked_amount' => round((float) $quantity * (float) $line->unit_price, 4),
+                    'line_discount' => round((float) $line->discount_amount * $ratio, 4),
+                    'line_tax' => round((float) $line->tax_amount * $ratio, 4),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        if ($entries->isEmpty()) {
+            throw ValidationException::withMessages(['lines' => ['The selected source has no uninvoiced quantity.']]);
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return array<int, float>
+     */
+    private function requestedInvoiceQuantities(array $options): array
+    {
+        $requested = [];
+        foreach (array_values($options['lines'] ?? []) as $line) {
+            $requested[(int) $line['source_line_id']] = (float) $line['quantity'];
+        }
+
+        return $requested;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $entries
+     * @param  array<string, mixed>  $options
+     */
+    private function createPurchaseInvoiceFromEntries(string $sourceType, object $source, Collection $entries, array $options): object
+    {
+        $tenantId = $this->support->tenantId();
+        $supplier = DB::table('suppliers')->where('tenant_id', $tenantId)->where('id', (int) $source->supplier_id)->first();
+        $headerAllocations = $this->sourceHeaderAllocations($sourceType, $source, $entries);
+        $invoice = $this->invoices->create([
+            'organization_unit_id' => $source->organization_unit_id,
+            'external_reference_number' => $sourceType === 'grn' ? $source->grn_number : $source->po_number,
+            'document_type' => 'purchase_invoice',
+            'business_context' => 'purchase',
+            'ledger_direction' => 'payable',
+            'balance_effect' => 'increase',
+            'supplier_id' => (int) $source->supplier_id,
+            'invoice_date' => $options['invoice_date'] ?? now()->toDateString(),
+            'due_date' => $options['due_date'] ?? now()->addDays((int) ($supplier->payment_terms_days ?? 0))->toDateString(),
+            'notes' => $options['notes'] ?? 'Generated from '.($sourceType === 'grn' ? 'GRN '.$source->grn_number : 'PO '.$source->po_number),
+            'adjustments' => $this->invoiceHeaderAdjustmentsFromAmounts($headerAllocations['totals']),
+            'lines' => $entries->map(fn (array $entry): array => [
+                'item_id' => (int) $entry['line']->item_id,
+                'uom_id' => (int) $entry['line']->uom_id,
+                'description' => $entry['line']->description,
+                'quantity' => $entry['quantity'],
+                'unit_price' => (float) $entry['line']->unit_price,
+                'discount_total' => $entry['line_discount'],
+                'tax_total' => $entry['line_tax'],
+                'charge_total' => 0,
+            ])->all(),
+        ]);
+        $invoice = $this->invoices->issue((int) $invoice->id);
+
+        $invoiceLines = collect($invoice->lines ?? [])->values();
+        foreach ($entries as $index => $entry) {
+            $sourceLine = $entry['line'];
+            $invoiceLine = $invoiceLines->get($index);
+            $header = $headerAllocations['lines'][$index] ?? [];
+            DB::table('purchase_invoice_links')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $source->organization_unit_id,
+                'source_type' => $sourceType,
+                'source_id' => (int) $source->id,
+                'source_line_id' => (int) $sourceLine->id,
+                'invoice_id' => (int) $invoice->id,
+                'invoice_line_id' => $invoiceLine->id ?? null,
+                'linked_quantity' => $entry['quantity'],
+                'linked_amount' => $entry['linked_amount'],
+                'source_quantity' => $entry['source_quantity'],
+                'source_amount' => $entry['source_amount'],
+                'allocated_line_discount_amount' => $entry['line_discount'],
+                'allocated_header_discount_amount' => $header['header_discount_amount'] ?? 0,
+                'allocated_line_tax_amount' => $entry['line_tax'],
+                'allocated_header_tax_amount' => $header['header_tax_amount'] ?? 0,
+                'allocated_charge_amount' => $header['charge_amount'] ?? 0,
+                'allocated_debit_adjustment_amount' => $header['debit_adjustment_amount'] ?? 0,
+                'allocated_credit_adjustment_amount' => $header['credit_adjustment_amount'] ?? 0,
+                'allocation_ratio' => $entry['source_amount'] > 0 ? round($entry['linked_amount'] / $entry['source_amount'], 8) : 0,
+                'status' => 'active',
+                'linked_at' => now(),
+                'created_by' => $this->support->userId(),
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->incrementInvoicedQuantity($sourceType, $sourceLine, (float) $entry['quantity']);
+        }
+
+        return $invoice;
+    }
+
+    private function incrementInvoicedQuantity(string $sourceType, object $sourceLine, float $quantity): void
+    {
+        if ($sourceType === 'purchase_order') {
+            DB::table('purchase_order_lines')->where('id', (int) $sourceLine->id)->increment('invoiced_qty', $quantity, ['updated_at' => now()]);
+
+            return;
+        }
+
+        DB::table('grn_lines')->where('id', (int) $sourceLine->id)->increment('invoiced_qty', $quantity, ['updated_at' => now()]);
+        if ($sourceLine->purchase_order_line_id !== null) {
+            DB::table('purchase_order_lines')->where('id', (int) $sourceLine->purchase_order_line_id)->increment('invoiced_qty', $quantity, ['updated_at' => now()]);
+        }
     }
 
     /**
@@ -744,7 +884,8 @@ final class PurchaseService
                 ->select(['grn_headers.id', 'grn_headers.grn_number as code', 'suppliers.supplier_name as name', 'grn_headers.supplier_id', 'grn_headers.warehouse_id', 'grn_headers.status'])
                 ->where('grn_headers.tenant_id', $tenantId)
                 ->whereNull('grn_headers.deleted_at')
-                ->whereIn('grn_headers.status', ['posted', 'partially_invoiced', 'invoiced'])
+                ->where('grn_headers.status', 'posted')
+                ->whereIn('grn_headers.invoice_status', ['not_invoiced', 'partially_invoiced'])
                 ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q->where('grn_headers.grn_number', 'like', "%$search%")->orWhere('suppliers.supplier_name', 'like', "%$search%")))
                 ->orderByDesc('grn_headers.received_date')
                 ->limit($limit)
@@ -1128,6 +1269,115 @@ final class PurchaseService
             ->all();
     }
 
+    /**
+     * @param  array<string, float>  $amounts
+     * @return array<int, array<string, mixed>>
+     */
+    private function invoiceHeaderAdjustmentsFromAmounts(array $amounts): array
+    {
+        return collect([
+            ['adjustment_type' => 'discount', 'effect' => 'deduct', 'amount' => $amounts['header_discount_amount'] ?? 0, 'name' => 'Header discount'],
+            ['adjustment_type' => 'tax', 'effect' => 'add', 'amount' => $amounts['header_tax_amount'] ?? 0, 'name' => 'Header tax'],
+            ['adjustment_type' => 'charge', 'effect' => 'add', 'amount' => $amounts['charge_amount'] ?? 0, 'name' => 'Header charge'],
+            ['adjustment_type' => 'debit_adjustment', 'effect' => 'add', 'amount' => $amounts['debit_adjustment_amount'] ?? 0, 'name' => 'Debit adjustment'],
+            ['adjustment_type' => 'credit_adjustment', 'effect' => 'deduct', 'amount' => $amounts['credit_adjustment_amount'] ?? 0, 'name' => 'Credit adjustment'],
+        ])
+            ->filter(fn (array $adjustment): bool => (float) $adjustment['amount'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $entries
+     * @return array{totals: array<string, float>, lines: array<int, array<string, float>>}
+     */
+    private function sourceHeaderAllocations(string $sourceType, object $source, Collection $entries): array
+    {
+        $currentGross = round((float) $entries->sum('linked_amount'), 4);
+        $remainingGross = $this->sourceRemainingGross($sourceType, (int) $source->id);
+        $isFinalAllocation = $currentGross + 0.0001 >= $remainingGross;
+        $ratio = $remainingGross > 0 ? min(1.0, max(0.0, $currentGross / $remainingGross)) : 0.0;
+        $remaining = [
+            'header_discount_amount' => $this->remainingSourceAllocation($sourceType, (int) $source->id, (float) ($source->header_discount_amount ?? 0), 'allocated_header_discount_amount'),
+            'header_tax_amount' => $this->remainingSourceAllocation($sourceType, (int) $source->id, (float) ($source->header_tax_amount ?? 0), 'allocated_header_tax_amount'),
+            'charge_amount' => $this->remainingSourceAllocation($sourceType, (int) $source->id, (float) ($source->debit_note_total ?? 0), 'allocated_charge_amount'),
+            'debit_adjustment_amount' => 0.0,
+            'credit_adjustment_amount' => $this->remainingSourceAllocation($sourceType, (int) $source->id, (float) ($source->credit_note_total ?? 0), 'allocated_credit_adjustment_amount'),
+        ];
+        $totals = [];
+        foreach ($remaining as $key => $amount) {
+            $totals[$key] = $isFinalAllocation ? round($amount, 4) : round($amount * $ratio, 4);
+        }
+
+        $weights = $entries->map(fn (array $entry): float => (float) $entry['linked_amount'])->all();
+        $lines = [];
+        foreach ($totals as $key => $amount) {
+            foreach ($this->allocateByWeights($amount, $weights) as $index => $allocation) {
+                $lines[$index][$key] = $allocation;
+            }
+        }
+
+        return ['totals' => $totals, 'lines' => $lines];
+    }
+
+    private function sourceRemainingGross(string $sourceType, int $sourceId): float
+    {
+        $query = $sourceType === 'purchase_order'
+            ? DB::table('purchase_order_lines')
+                ->where('purchase_order_id', $sourceId)
+                ->selectRaw('coalesce(sum((ordered_qty - invoiced_qty) * unit_price), 0) as remaining_gross')
+            : DB::table('grn_lines')
+                ->where('grn_header_id', $sourceId)
+                ->selectRaw('coalesce(sum((accepted_qty - returned_qty - invoiced_qty) * unit_price), 0) as remaining_gross');
+
+        $row = $query
+            ->where('tenant_id', $this->support->tenantId())
+            ->whereNull('deleted_at')
+            ->first();
+
+        return round(max(0, (float) ($row->remaining_gross ?? 0)), 4);
+    }
+
+    private function remainingSourceAllocation(string $sourceType, int $sourceId, float $originalAmount, string $column): float
+    {
+        $allocated = (float) DB::table('purchase_invoice_links')
+            ->where('tenant_id', $this->support->tenantId())
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->where('status', 'active')
+            ->sum($column);
+
+        return round(max(0, $originalAmount - $allocated), 4);
+    }
+
+    /**
+     * @param  array<int, float>  $weights
+     * @return array<int, float>
+     */
+    private function allocateByWeights(float $amount, array $weights): array
+    {
+        $amount = round($amount, 4);
+        $totalWeight = array_sum($weights);
+        if ($amount <= 0 || $totalWeight <= 0) {
+            return array_fill(0, count($weights), 0.0);
+        }
+
+        $allocated = [];
+        $running = 0.0;
+        $lastIndex = count($weights) - 1;
+        foreach (array_values($weights) as $index => $weight) {
+            if ($index === $lastIndex) {
+                $allocated[$index] = round($amount - $running, 4);
+                break;
+            }
+            $share = round($amount * ($weight / $totalWeight), 4);
+            $allocated[$index] = $share;
+            $running += $share;
+        }
+
+        return $allocated;
+    }
+
     private function discountAmount(float $gross, string $type, float $value, float $explicit): float
     {
         if ($type === 'percentage') {
@@ -1417,18 +1667,18 @@ final class PurchaseService
             ->where('grn_header_id', $grnId)
             ->whereNull('deleted_at')
             ->first();
-        $status = (float) $totals->invoiced + 0.0001 >= (float) $totals->receivable ? 'invoiced' : 'partially_invoiced';
+        $status = (float) $totals->invoiced + 0.0001 >= (float) $totals->receivable ? 'fully_invoiced' : 'partially_invoiced';
         DB::table('grn_headers')->where('id', $grnId)->update(['invoice_status' => $status, 'updated_at' => now()]);
     }
 
     private function refreshOrderInvoiceStatus(int $orderId): void
     {
         $totals = DB::table('purchase_order_lines')
-            ->selectRaw('coalesce(sum(received_qty - returned_qty), 0) as receivable, coalesce(sum(invoiced_qty), 0) as invoiced')
+            ->selectRaw('coalesce(sum(ordered_qty - returned_qty), 0) as receivable, coalesce(sum(invoiced_qty), 0) as invoiced')
             ->where('purchase_order_id', $orderId)
             ->whereNull('deleted_at')
             ->first();
-        $status = (float) $totals->invoiced <= 0 ? 'not_invoiced' : ((float) $totals->invoiced + 0.0001 >= (float) $totals->receivable ? 'invoiced' : 'partially_invoiced');
+        $status = (float) $totals->invoiced <= 0 ? 'not_invoiced' : ((float) $totals->invoiced + 0.0001 >= (float) $totals->receivable ? 'fully_invoiced' : 'partially_invoiced');
         DB::table('purchase_orders')->where('id', $orderId)->update(['invoice_status' => $status, 'updated_at' => now()]);
     }
 

@@ -37,6 +37,11 @@ final class PaymentController extends Controller
         return new PaymentResource($this->payments->allocate($payment, $request->validated()['allocations']));
     }
 
+    public function allocateAdvance(AllocatePaymentRequest $request, int $advance): JsonResponse
+    {
+        return response()->json(['data' => $this->payments->allocateAdvance($advance, $request->validated()['allocations'])]);
+    }
+
     public function destroy(int $payment): JsonResponse
     {
         $this->payments->delete($payment);
