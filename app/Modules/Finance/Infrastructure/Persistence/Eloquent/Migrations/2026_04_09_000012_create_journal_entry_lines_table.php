@@ -36,10 +36,11 @@ return new class extends Migration
             $table->foreignId('cost_center_id')->nullable()->constrained('cost_centers')->nullOnDelete();
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
-            $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete();
-            $table->decimal('tax_amount', 20, 4)->default(0);
             $table->unsignedInteger('line_number')->default(1);
             $table->string('source_line_reference')->nullable()->comment('Generic source line reference');
+            // $table->string('source_module')->nullable();
+            // $table->string('source_type')->nullable();
+            // $table->unsignedBigInteger('source_id')->nullable();
 
             $table->timestamps();
             // No softDeletes - immutable
