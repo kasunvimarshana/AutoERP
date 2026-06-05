@@ -15,37 +15,32 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->string('vehicle_code')->nullable();
-            $table->string('vin')->nullable()->comment('Vehicle Identification Number');
-            $table->string('license_plate')->nullable();
+            $table->string('vehicle_code', 60);
+            $table->string('registration_number', 100);
+            $table->string('chassis_number', 100)->nullable();
+            $table->string('engine_number', 100)->nullable();
             $table->string('make')->nullable();
             $table->string('model')->nullable();
-            $table->year('year')->nullable();
+            $table->unsignedSmallInteger('year')->nullable();
             $table->string('color')->nullable();
-            $table->string('category')->nullable();
-            $table->string('usage_profile')->default('dual')->comment('rent_only, service_only, dual, internal');
-            $table->boolean('service_enabled')->default(true)->comment('Vehicle can be validated for service workflows');
-            $table->boolean('rental_enabled')->default(false)->comment('Vehicle can be validated for rental workflows');
+            $table->string('vehicle_type')->nullable();
             $table->string('fuel_type')->nullable();
-            $table->string('transmission')->nullable();
-            $table->unsignedTinyInteger('seating_capacity')->nullable();
-            $table->unsignedBigInteger('current_odometer')->default(0);
-            $table->string('status')->default('active')->comment('draft, active, inactive, in_service, in_rental, under_maintenance, unavailable, sold, archived');
-            $table->date('registration_expiry')->nullable();
-            $table->date('insurance_expiry')->nullable();
-            $table->date('last_service_date')->nullable();
-            $table->unsignedBigInteger('last_service_odometer')->nullable();
-            $table->date('next_service_due_date')->nullable();
-            $table->unsignedBigInteger('next_service_due_odometer')->nullable();
+            $table->string('transmission_type')->nullable();
+            $table->string('ownership_type')->nullable();
+            $table->string('status', 60)->default('active')->comment('active, inactive');
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'vehicle_code'], 'vehicles_vehicle_code_uk');
-            $table->unique(['tenant_id', 'vin'], 'vehicles_vin_uk');
+            $table->unique(['tenant_id', 'registration_number'], 'vehicles_registration_number_uk');
+            $table->index(['tenant_id', 'organization_unit_id'], 'vehicles_organization_unit_idx');
             $table->index(['tenant_id', 'status'], 'vehicles_status_idx');
+            $table->index(['tenant_id', 'make', 'model'], 'vehicles_make_model_idx');
         });
     }
 

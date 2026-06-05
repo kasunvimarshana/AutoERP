@@ -20,11 +20,12 @@ export function AppLayout() {
                     <div className="flex items-center gap-8">
                         <NavLink className="flex items-center gap-3" to="/customers">
                             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-xs font-bold text-white">AE</span>
-                            <span><span className="block text-sm font-bold text-slate-950">AutoERP</span><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Party management</span></span>
+                            <span><span className="block text-sm font-bold text-slate-950">AutoERP</span><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Master data</span></span>
                         </NavLink>
                         <nav className="hidden items-center gap-1 sm:flex">
                             <AppLink to="/customers">Customers</AppLink>
                             <AppLink to="/suppliers">Suppliers</AppLink>
+                            <AppLink to="/vehicles">Vehicles</AppLink>
                         </nav>
                     </div>
                     <div className="flex items-center gap-3">
@@ -35,6 +36,7 @@ export function AppLayout() {
                 <nav className="flex border-t border-slate-100 px-4 py-2 sm:hidden">
                     <AppLink to="/customers">Customers</AppLink>
                     <AppLink to="/suppliers">Suppliers</AppLink>
+                    <AppLink to="/vehicles">Vehicles</AppLink>
                 </nav>
             </header>
             <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8"><Outlet /></main>

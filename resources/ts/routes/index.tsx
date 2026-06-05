@@ -11,6 +11,10 @@ import { SupplierCreatePage } from '../modules/supplier/pages/SupplierCreatePage
 import { SupplierDetailPage } from '../modules/supplier/pages/SupplierDetailPage';
 import { SupplierEditPage } from '../modules/supplier/pages/SupplierEditPage';
 import { SupplierListPage } from '../modules/supplier/pages/SupplierListPage';
+import { VehicleCreatePage } from '../modules/vehicle/pages/VehicleCreatePage';
+import { VehicleDetailPage } from '../modules/vehicle/pages/VehicleDetailPage';
+import { VehicleEditPage } from '../modules/vehicle/pages/VehicleEditPage';
+import { VehicleListPage } from '../modules/vehicle/pages/VehicleListPage';
 
 const router = createBrowserRouter([
     {
@@ -34,6 +38,10 @@ const router = createBrowserRouter([
                     { element: <SupplierCreatePage />, path: 'suppliers/new' },
                     { element: <SupplierDetailPage />, path: 'suppliers/:id' },
                     { element: <SupplierEditPage />, path: 'suppliers/:id/edit' },
+                    { element: <VehicleListPage />, path: 'vehicles' },
+                    { element: <VehicleCreatePage />, path: 'vehicles/new' },
+                    { element: <VehicleDetailPage />, path: 'vehicles/:id' },
+                    { element: <VehicleEditPage />, path: 'vehicles/:id/edit' },
                 ],
             },
         ],
