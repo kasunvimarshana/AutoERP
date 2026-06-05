@@ -7,6 +7,10 @@ import { CustomerCreatePage } from '../modules/customer/pages/CustomerCreatePage
 import { CustomerDetailPage } from '../modules/customer/pages/CustomerDetailPage';
 import { CustomerEditPage } from '../modules/customer/pages/CustomerEditPage';
 import { CustomerListPage } from '../modules/customer/pages/CustomerListPage';
+import { ItemCreatePage } from '../modules/item/pages/ItemCreatePage';
+import { ItemDetailPage } from '../modules/item/pages/ItemDetailPage';
+import { ItemEditPage } from '../modules/item/pages/ItemEditPage';
+import { ItemListPage } from '../modules/item/pages/ItemListPage';
 import { SupplierCreatePage } from '../modules/supplier/pages/SupplierCreatePage';
 import { SupplierDetailPage } from '../modules/supplier/pages/SupplierDetailPage';
 import { SupplierEditPage } from '../modules/supplier/pages/SupplierEditPage';
@@ -15,6 +19,10 @@ import { VehicleCreatePage } from '../modules/vehicle/pages/VehicleCreatePage';
 import { VehicleDetailPage } from '../modules/vehicle/pages/VehicleDetailPage';
 import { VehicleEditPage } from '../modules/vehicle/pages/VehicleEditPage';
 import { VehicleListPage } from '../modules/vehicle/pages/VehicleListPage';
+import { UomCreatePage } from '../modules/uom/pages/UomCreatePage';
+import { UomDetailPage } from '../modules/uom/pages/UomDetailPage';
+import { UomEditPage } from '../modules/uom/pages/UomEditPage';
+import { UomListPage } from '../modules/uom/pages/UomListPage';
 
 const router = createBrowserRouter([
     {
@@ -42,6 +50,14 @@ const router = createBrowserRouter([
                     { element: <VehicleCreatePage />, path: 'vehicles/new' },
                     { element: <VehicleDetailPage />, path: 'vehicles/:id' },
                     { element: <VehicleEditPage />, path: 'vehicles/:id/edit' },
+                    { element: <UomListPage />, path: 'uoms' },
+                    { element: <UomCreatePage />, path: 'uoms/new' },
+                    { element: <UomDetailPage />, path: 'uoms/:id' },
+                    { element: <UomEditPage />, path: 'uoms/:id/edit' },
+                    { element: <ItemListPage />, path: 'items' },
+                    { element: <ItemCreatePage />, path: 'items/new' },
+                    { element: <ItemDetailPage />, path: 'items/:id' },
+                    { element: <ItemEditPage />, path: 'items/:id/edit' },
                 ],
             },
         ],

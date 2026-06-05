@@ -26,6 +26,8 @@ export function AppLayout() {
                             <AppLink to="/customers">Customers</AppLink>
                             <AppLink to="/suppliers">Suppliers</AppLink>
                             <AppLink to="/vehicles">Vehicles</AppLink>
+                            <AppLink to="/uoms">UOM</AppLink>
+                            <AppLink to="/items">Items</AppLink>
                         </nav>
                     </div>
                     <div className="flex items-center gap-3">
@@ -37,6 +39,8 @@ export function AppLayout() {
                     <AppLink to="/customers">Customers</AppLink>
                     <AppLink to="/suppliers">Suppliers</AppLink>
                     <AppLink to="/vehicles">Vehicles</AppLink>
+                    <AppLink to="/uoms">UOM</AppLink>
+                    <AppLink to="/items">Items</AppLink>
                 </nav>
             </header>
             <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8"><Outlet /></main>
