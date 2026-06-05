@@ -37,6 +37,10 @@ import { VehicleCreatePage } from '../modules/vehicle/pages/VehicleCreatePage';
 import { VehicleDetailPage } from '../modules/vehicle/pages/VehicleDetailPage';
 import { VehicleEditPage } from '../modules/vehicle/pages/VehicleEditPage';
 import { VehicleListPage } from '../modules/vehicle/pages/VehicleListPage';
+import { JobCardDetailPage } from '../modules/vehicleService/pages/JobCardDetailPage';
+import { JobCardEditorPage } from '../modules/vehicleService/pages/JobCardEditorPage';
+import { JobCardListPage } from '../modules/vehicleService/pages/JobCardListPage';
+import { ServiceTypePage } from '../modules/vehicleService/pages/ServiceTypePage';
 import { UomCreatePage } from '../modules/uom/pages/UomCreatePage';
 import { UomDetailPage } from '../modules/uom/pages/UomDetailPage';
 import { UomEditPage } from '../modules/uom/pages/UomEditPage';
@@ -68,6 +72,11 @@ const router = createBrowserRouter([
                     { element: <VehicleCreatePage />, path: 'vehicles/new' },
                     { element: <VehicleDetailPage />, path: 'vehicles/:id' },
                     { element: <VehicleEditPage />, path: 'vehicles/:id/edit' },
+                    { element: <JobCardListPage />, path: 'vehicle-service/jobs' },
+                    { element: <JobCardEditorPage mode="create" />, path: 'vehicle-service/jobs/new' },
+                    { element: <JobCardDetailPage />, path: 'vehicle-service/jobs/:id' },
+                    { element: <JobCardEditorPage mode="edit" />, path: 'vehicle-service/jobs/:id/edit' },
+                    { element: <ServiceTypePage />, path: 'vehicle-service/types' },
                     { element: <UomListPage />, path: 'uoms' },
                     { element: <UomCreatePage />, path: 'uoms/new' },
                     { element: <UomDetailPage />, path: 'uoms/:id' },

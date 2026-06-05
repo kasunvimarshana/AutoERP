@@ -26,6 +26,7 @@ export function AppLayout() {
                             <AppLink to="/customers">Customers</AppLink>
                             <AppLink to="/suppliers">Suppliers</AppLink>
                             <AppLink to="/vehicles">Vehicles</AppLink>
+                            <AppLink to="/vehicle-service/jobs">Service</AppLink>
                             <AppLink to="/uoms">UOM</AppLink>
                             <AppLink to="/items">Items</AppLink>
                             <AppLink to="/invoices">Invoices</AppLink>
@@ -43,6 +44,7 @@ export function AppLayout() {
                     <AppLink to="/customers">Customers</AppLink>
                     <AppLink to="/suppliers">Suppliers</AppLink>
                     <AppLink to="/vehicles">Vehicles</AppLink>
+                    <AppLink to="/vehicle-service/jobs">Service</AppLink>
                     <AppLink to="/uoms">UOM</AppLink>
                     <AppLink to="/items">Items</AppLink>
                     <AppLink to="/invoices">Invoices</AppLink>

@@ -25,7 +25,7 @@ final class UpsertInvoiceRequest extends FormRequest
             'organization_unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('organization_units', 'id')->where('tenant_id', $tenantId)],
             'invoice_number' => ['sometimes', 'nullable', 'string', 'max:100', Rule::unique('invoices', 'invoice_number')->where('tenant_id', $tenantId)->ignore($invoiceId)],
             'external_reference_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'document_type' => ['sometimes', Rule::in(['invoice', 'purchase_invoice', 'debit_adjustment', 'credit_adjustment', 'refund', 'reversal', 'write_off'])],
+            'document_type' => ['sometimes', Rule::in(['invoice', 'purchase_invoice', 'service_invoice', 'debit_adjustment', 'credit_adjustment', 'refund', 'reversal', 'write_off'])],
             'business_context' => ['sometimes', 'string', 'max:50'],
             'ledger_direction' => [...$required, Rule::in(['receivable', 'payable'])],
             'balance_effect' => ['sometimes', Rule::in(['increase', 'decrease', 'none'])],
