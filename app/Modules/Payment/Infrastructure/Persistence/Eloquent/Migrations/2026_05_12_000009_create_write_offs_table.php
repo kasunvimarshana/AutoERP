@@ -17,8 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->string('document_type')->comment('the invoice being written off');
-            $table->unsignedBigInteger('document_id');
+            $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
             $table->decimal('amount', 20, 4);
             $table->string('reason')->nullable();
             $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
@@ -32,7 +31,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'document_type', 'document_id'], 'write_offs_document_idx');
+            $table->index(['tenant_id', 'invoice_id'], 'write_offs_invoice_idx');
             $table->index(['tenant_id', 'status'], 'write_offs_status_idx');
         });
     }

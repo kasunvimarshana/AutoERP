@@ -44,7 +44,7 @@ return new class extends Migration
             $table->decimal('outstanding_qty', 20, 4)->default(0);
             $table->string('reservation_status')->default('not_reserved');
             $table->string('delivery_status')->default('not_delivered');
-            $table->string('document_status')->default('not_documented');
+            $table->string('invoice_status')->default('not_invoiced');
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 

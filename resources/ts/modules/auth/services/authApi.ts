@@ -2,7 +2,7 @@ import type { ApiResponse } from '../../../services/api/apiResponse';
 import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
 import { getStoredAccessToken, getStoredAuthSession } from '../../../services/api/authTokenStorage';
-import type { AuthSession, AuthUser, ChangePasswordInput, ForgotPasswordInput, LoginInput, ResetPasswordInput } from '../types/auth.types';
+import type { AuthSession, AuthUser, LoginInput } from '../types/auth.types';
 
 type BackendRecord = Record<string, unknown>;
 
@@ -56,12 +56,6 @@ function asStringList(value: unknown): string[] {
 
 function authShapeError(message = 'Unexpected authentication response from server.'): ApiError {
     return new ApiError(message, 502, {}, 'AUTH_UNEXPECTED_RESPONSE', 'response');
-}
-
-function unsupportedEndpoint(feature: string): Promise<never> {
-    return Promise.reject(
-        new ApiError(`${feature} is not available from the current backend auth API.`, 501, {}, 'AUTH_ENDPOINT_UNAVAILABLE', 'unsupported'),
-    );
 }
 
 function normalizeUser(raw: BackendRecord, context: BackendRecord = {}): AuthUser {
@@ -148,8 +142,6 @@ function userFromContext(context: BackendRecord): AuthUser {
 }
 
 export const authApi = {
-    changePassword: (_input: ChangePasswordInput): Promise<never> => unsupportedEndpoint('Password change'),
-    forgotPassword: (_input: ForgotPasswordInput): Promise<never> => unsupportedEndpoint('Password recovery'),
     getCurrentUser: async (): Promise<AuthUser> => {
         if (!getStoredAccessToken()) {
             throw new ApiError('No stored authentication session exists.', 401, {}, 'AUTH_SESSION_MISSING', 'authentication');
@@ -191,44 +183,4 @@ export const authApi = {
             method: 'POST',
         });
     },
-    refreshToken: async (): Promise<AuthSession> => {
-        const stored = getStoredAuthSession();
-
-        if (!stored.refreshToken) {
-            throw new ApiError('Refresh token is not available.', 401, {}, 'AUTH_REFRESH_TOKEN_MISSING', 'authentication');
-        }
-
-        const response = await httpClient<ApiResponse<BackendRecord>>('/api/auth/refresh', {
-            body: {
-                refresh_token: stored.refreshToken,
-                tenant_id: stored.tenantId ? Number(stored.tenantId) : undefined,
-            },
-            method: 'POST',
-        });
-
-        const tokens = asRecord(response.data);
-        const user = stored.user;
-        const accessToken = asString(tokens.access_token);
-
-        if (!user) {
-            throw authShapeError('Stored user context is required before refreshing a token.');
-        }
-
-        if (accessToken === '') {
-            throw authShapeError('Access token was missing from the refresh response.');
-        }
-
-        return {
-            accessToken,
-            accessTokenExpiresAt: asOptionalString(tokens.access_token_expires_at),
-            organizationUnitId: stored.organizationUnitId ?? undefined,
-            refreshToken: asOptionalString(tokens.refresh_token) ?? stored.refreshToken,
-            refreshTokenExpiresAt: asOptionalString(tokens.refresh_token_expires_at),
-            sessionId: stored.sessionId ?? undefined,
-            tenantId: stored.tenantId ?? undefined,
-            tokenType: asString(tokens.token_type, stored.tokenType ?? 'Bearer'),
-            user,
-        };
-    },
-    resetPassword: (_input: ResetPasswordInput): Promise<never> => unsupportedEndpoint('Password reset'),
 };

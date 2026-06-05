@@ -39,8 +39,6 @@ return new class extends Migration
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('order_date');
             $table->date('requested_delivery_date')->nullable();
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
-
             // Operational quantity rollups derived from line lifecycle quantities.
             $table->decimal('ordered_qty_total', 20, 4)->default(0);
             $table->decimal('reserved_qty_total', 20, 4)->default(0);

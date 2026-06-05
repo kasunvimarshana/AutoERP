@@ -26,7 +26,7 @@ return new class extends Migration
             $table->foreignId('customer_id')->constrained('customers', 'id')->restrictOnDelete();
             $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders', 'id')->nullOnDelete();
             $table->foreignId('original_gdn_id')->nullable()->constrained('gdn_headers', 'id')->nullOnDelete();
-            $table->foreignId('original_document_id')->nullable()->constrained('documents', 'id')->nullOnDelete();
+            $table->foreignId('original_invoice_id')->nullable()->constrained('invoices', 'id')->nullOnDelete();
             $table->string('return_number');
             $table->string('status')->default('draft')->comment('draft, approved, closed, cancelled');
             $table->string('refund_status')

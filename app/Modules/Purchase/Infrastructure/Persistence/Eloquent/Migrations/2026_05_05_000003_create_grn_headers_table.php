@@ -20,15 +20,13 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id')->nullOnDelete();
             $table->string('grn_number');
-            $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_documented, documented, cancelled, reversed');
-            $table->string('document_status')->default('not_documented')->comment('not_documented, partially_documented, documented, reversed');
+            $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_invoiced, invoiced, cancelled, reversed');
+            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, invoiced, reversed');
             $table->string('inspection_status')->default('pending');
             $table->string('putaway_status')->default('pending');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('received_date');
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
-
             // Line-derived totals - strictly SUM over lines
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
             $table->decimal('line_tax_total', 20, 4)->default(0)->comment('SUM(line.tax_amount)');

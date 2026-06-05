@@ -27,8 +27,8 @@ return new class extends Migration
             $table->string('default_priority')->default('medium');
             $table->string('auto_invoice_trigger_status')->default('completed');
             $table->string('inventory_posting_trigger_status')->default('completed');
-            $table->string('service_invoice_document_type_code')->nullable();
-            $table->string('service_refund_document_type_code')->nullable();
+            $table->string('service_invoice_type')->default('invoice');
+            $table->string('service_credit_type')->default('credit_adjustment');
             $table->string('service_number_prefix')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

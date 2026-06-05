@@ -14,7 +14,9 @@ use RuntimeException;
 final class CoreBootstrapSeeder extends Seeder
 {
     private const DEFAULT_LOCALE = 'en';
+
     private const DEFAULT_TIMEZONE = 'UTC';
+
     private const DEFAULT_CURRENCY = 'USD';
 
     /**
@@ -31,13 +33,11 @@ final class CoreBootstrapSeeder extends Seeder
         'permission',
         'audit',
         'sequence',
-        'document',
         'finance',
         'inventory',
         'payment',
         'item',
         'uom',
-        'pricing',
         'warehouse',
         'customer',
         'supplier',
@@ -46,8 +46,6 @@ final class CoreBootstrapSeeder extends Seeder
         'purchase',
         'sales',
         'vehicle_service',
-        'vehicle_rental',
-        'voucher',
     ];
 
     /**
@@ -163,22 +161,22 @@ final class CoreBootstrapSeeder extends Seeder
         ];
 
         $values = [
-                'configuration_scope' => 'tenant',
-                'cross_org_transactions' => false,
-                'currency_id' => $currencyId,
-                'is_active' => true,
-                'is_isolated' => true,
-                'isolation_key' => strtolower($tenantCode),
-                'logo_path' => null,
-                'metadata' => $this->json($metadata),
-                'name' => $this->defaultTenantName(),
-                'row_version' => 1,
-                'slug' => Str::slug($tenantCode),
-                'status' => 'active',
-                'subscription_ends_at' => null,
-                'tenant_plan_id' => null,
-                'trial_ends_at' => null,
-                'updated_at' => now(),
+            'configuration_scope' => 'tenant',
+            'cross_org_transactions' => false,
+            'currency_id' => $currencyId,
+            'is_active' => true,
+            'is_isolated' => true,
+            'isolation_key' => strtolower($tenantCode),
+            'logo_path' => null,
+            'metadata' => $this->json($metadata),
+            'name' => $this->defaultTenantName(),
+            'row_version' => 1,
+            'slug' => Str::slug($tenantCode),
+            'status' => 'active',
+            'subscription_ends_at' => null,
+            'tenant_plan_id' => null,
+            'trial_ends_at' => null,
+            'updated_at' => now(),
         ];
 
         if ($existing !== null) {
@@ -240,7 +238,7 @@ final class CoreBootstrapSeeder extends Seeder
                 'is_active' => true,
                 'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
                 'parent_id' => null,
-                'path' => '/' . strtolower($code),
+                'path' => '/'.strtolower($code),
                 'row_version' => 1,
                 'type_id' => $typeId,
                 'updated_at' => now(),
@@ -301,7 +299,7 @@ final class CoreBootstrapSeeder extends Seeder
 
         foreach (self::PERMISSION_MODULES as $module) {
             foreach (self::PERMISSION_ACTIONS as $action) {
-                $name = $module . '.' . $action;
+                $name = $module.'.'.$action;
                 DB::table('permissions')->updateOrInsert(
                     [
                         'tenant_id' => $tenantId,
@@ -309,7 +307,7 @@ final class CoreBootstrapSeeder extends Seeder
                         'guard_name' => $guardName,
                     ],
                     [
-                        'description' => 'Allows ' . str_replace('_', ' ', $action) . ' access for ' . str_replace('_', ' ', $module) . '.',
+                        'description' => 'Allows '.str_replace('_', ' ', $action).' access for '.str_replace('_', ' ', $module).'.',
                         'module' => $module,
                         'organization_unit_id' => null,
                         'row_version' => 1,
@@ -331,7 +329,7 @@ final class CoreBootstrapSeeder extends Seeder
     }
 
     /**
-     * @param list<int> $permissionIds
+     * @param  list<int>  $permissionIds
      */
     private function grantAllPermissionsToRole(int $tenantId, int $roleId, array $permissionIds): void
     {
@@ -435,7 +433,7 @@ final class CoreBootstrapSeeder extends Seeder
     }
 
     /**
-     * @param list<int> $permissionIds
+     * @param  list<int>  $permissionIds
      */
     private function grantAllPermissionsToUser(int $tenantId, int $organizationUnitId, int $userId, array $permissionIds): void
     {
@@ -467,7 +465,7 @@ final class CoreBootstrapSeeder extends Seeder
                         'value' => (string) $value,
                         'value_type' => 'string',
                         'source' => 'database',
-                        'description' => 'Bootstrap default for ' . $key . '.',
+                        'description' => 'Bootstrap default for '.$key.'.',
                         'row_version' => 1,
                         'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
                         'updated_at' => now(),
@@ -491,7 +489,7 @@ final class CoreBootstrapSeeder extends Seeder
                     'value' => (string) $value,
                     'value_type' => 'string',
                     'source' => 'database',
-                    'description' => 'Tenant bootstrap default for ' . $key . '.',
+                    'description' => 'Tenant bootstrap default for '.$key.'.',
                     'row_version' => 1,
                     'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
                     'updated_at' => now(),
@@ -539,7 +537,7 @@ final class CoreBootstrapSeeder extends Seeder
                     'normal_balance' => $account['normal_balance'],
                     'organization_unit_id' => $organizationUnitId,
                     'parent_id' => null,
-                    'path' => '/' . $account['code'],
+                    'path' => '/'.$account['code'],
                     'row_version' => 1,
                     'type' => $account['type'],
                     'updated_at' => now(),
@@ -670,11 +668,6 @@ final class CoreBootstrapSeeder extends Seeder
                     'row_version' => 1,
                     'symbol' => $uom['symbol'],
                     'type' => $uom['type'],
-                    'usable_for_inventory' => in_array($uom['type'], ['UNIT', 'MASS', 'VOLUME'], true),
-                    'usable_for_purchase' => true,
-                    'usable_for_rental' => in_array($uom['type'], ['TIME', 'DISTANCE'], true),
-                    'usable_for_sales' => true,
-                    'usable_for_service' => true,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],
@@ -765,7 +758,7 @@ final class CoreBootstrapSeeder extends Seeder
                     'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
                     'organization_unit_id' => $organizationUnitId,
                     'parent_id' => null,
-                    'path' => '/' . strtolower($category['code']),
+                    'path' => '/'.strtolower($category['code']),
                     'row_version' => 1,
                     'updated_at' => now(),
                     'created_at' => now(),
@@ -894,7 +887,7 @@ final class CoreBootstrapSeeder extends Seeder
     }
 
     /**
-     * @param array<string,mixed> $criteria
+     * @param  array<string,mixed>  $criteria
      */
     private function idBy(string $table, array $criteria): ?int
     {
@@ -913,20 +906,20 @@ final class CoreBootstrapSeeder extends Seeder
     }
 
     /**
-     * @param array<string,mixed> $criteria
+     * @param  array<string,mixed>  $criteria
      */
     private function requiredIdBy(string $table, array $criteria): int
     {
         $id = $this->idBy($table, $criteria);
         if ($id === null) {
-            throw new RuntimeException('Failed to resolve seeded record id for table [' . $table . '].');
+            throw new RuntimeException('Failed to resolve seeded record id for table ['.$table.'].');
         }
 
         return $id;
     }
 
     /**
-     * @param array<string,mixed> $value
+     * @param  array<string,mixed>  $value
      */
     private function json(array $value): string
     {

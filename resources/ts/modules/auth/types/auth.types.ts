@@ -31,19 +31,3 @@ export type LoginInput = {
     remember: boolean;
     tenantId?: string;
 };
-
-export type ForgotPasswordInput = {
-    loginIdentifier: string;
-};
-
-export type ResetPasswordInput = {
-    password: string;
-    passwordConfirmation: string;
-    token: string;
-};
-
-export type ChangePasswordInput = {
-    currentPassword: string;
-    newPassword: string;
-    newPasswordConfirmation: string;
-};

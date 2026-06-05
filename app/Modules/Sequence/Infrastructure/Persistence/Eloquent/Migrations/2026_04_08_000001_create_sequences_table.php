@@ -24,7 +24,7 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->string('document_type')->comment('Generic sequence key supplied by a module, such as invoice, order, journal, voucher, or agreement.');
+            $table->string('document_type')->comment('Generic sequence key supplied by a module, such as invoice, order, journal, or payment.');
             $table->string('prefix')->default('');
             $table->string('suffix')->default('');
             $table->unsignedInteger('padding')->default(5);
@@ -44,7 +44,6 @@ return new class extends Migration
             );
         });
     }
-
 
     public function down(): void
     {

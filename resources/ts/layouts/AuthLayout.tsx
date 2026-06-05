@@ -11,17 +11,17 @@ export function AuthLayout() {
                         </div>
                         <div>
                             <p className="text-sm font-bold text-slate-950">AutoERP</p>
-                            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Enterprise operations</p>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Secure access</p>
                         </div>
                     </div>
 
                     <div className="max-w-lg">
                         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Secure workspace</p>
                         <h1 className="mt-5 text-4xl font-bold leading-tight tracking-normal text-slate-950">
-                            Sign in to manage finance, inventory, vehicles, service, rental, and operations.
+                            Sign in to your AutoERP account.
                         </h1>
                         <p className="mt-5 text-base leading-7 text-slate-500">
-                            Authentication is connected to the backend auth service. Tenant and organization context is attached to API calls after sign-in.
+                            Authentication is connected to the backend auth service. Your tenant and organization context is restored with the session.
                         </p>
                     </div>
 
@@ -47,7 +47,7 @@ export function AuthLayout() {
                             </div>
                             <div>
                                 <p className="text-sm font-bold text-slate-950">AutoERP</p>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Enterprise operations</p>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Secure access</p>
                             </div>
                         </div>
                         <Outlet />

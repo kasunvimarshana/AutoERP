@@ -16,7 +16,6 @@ return [
         'capture_wildcard' => false,
         'listen' => [
             'auth.lifecycle',
-            'document.lifecycle',
             'finance.posting',
             'inventory.movement',
             'payment.lifecycle',

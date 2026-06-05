@@ -19,13 +19,12 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers', 'id')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->string('po_number');
-            $table->string('status')->default('draft')->comment('draft, submitted, approved, confirmed, partially_received, received, partially_documented, documented, closed, cancelled, reversed');
-            $table->string('document_status')->default('not_documented')->comment('not_documented, partially_documented, documented, reversed');
+            $table->string('status')->default('draft')->comment('draft, submitted, approved, confirmed, partially_received, received, partially_invoiced, invoiced, closed, cancelled, reversed');
+            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, invoiced, reversed');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('order_date');
             $table->date('expected_date')->nullable();
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
             $table->foreignId('payment_term_id')->nullable()->constrained('payment_terms', 'id')->nullOnDelete();
 
             // Line-derived totals - strictly SUM over lines

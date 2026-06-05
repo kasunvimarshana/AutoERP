@@ -1,1 +1,0 @@
-export { ItemAttributesTable } from './ItemPanels';

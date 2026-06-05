@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('fiscal_period_id')->nullable()->constrained('fiscal_periods')->nullOnDelete();
             $table->string('entry_number');
             $table->string('entry_type')->default('MANUAL')->comment('MANUAL, AUTO, SYSTEM, OPENING, CLOSING, ADJUSTMENT');
-            $table->string('reference_type')->nullable()->comment('Polymorphic reference (Document, Payment, etc.)');
+            $table->string('reference_type')->nullable()->comment('Polymorphic reference (Invoice, Payment, etc.)');
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->string('source_module')->nullable()->comment('Generic source module key');
             $table->string('source_type')->nullable()->comment('Generic source document/event type');

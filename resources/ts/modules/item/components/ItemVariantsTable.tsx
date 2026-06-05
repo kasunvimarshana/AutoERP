@@ -1,1 +1,0 @@
-export { ItemVariantsTable } from './ItemPanels';

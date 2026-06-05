@@ -19,9 +19,9 @@ return new class extends Migration
             $table->foreignId('purchase_return_id')->constrained('purchase_returns', 'id')->cascadeOnDelete();
             $table->foreignId('original_grn_line_id')->nullable()->constrained('grn_lines', 'id')->nullOnDelete();
             $table->foreignId('original_purchase_order_line_id')->nullable()->constrained('purchase_order_lines', 'id')->nullOnDelete();
-            $table->foreignId('original_document_line_id')
+            $table->foreignId('original_invoice_line_id')
                 ->nullable()
-                ->constrained('document_items')
+                ->constrained('invoice_lines')
                 ->nullOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
