@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->string('entity_type')->comment('purchase_order, grn_header, purchase_return, purchase_document');
+            $table->string('entity_type')->comment('purchase_order, grn_header, purchase_return, purchase_invoice');
             $table->unsignedBigInteger('entity_id');
             $table->string('from_status')->nullable();
             $table->string('to_status');

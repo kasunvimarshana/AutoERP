@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers', 'id')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->string('po_number');
-            $table->string('status')->default('draft')->comment('draft, submitted, approved, confirmed, partially_received, received, partially_documented, documented, closed, cancelled, reversed');
+            $table->string('status')->default('draft')->comment('draft, submitted, approved, confirmed, partially_received, received, partially_invoiced, invoiced, closed, cancelled, reversed');
             $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, invoiced, reversed');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
@@ -43,9 +43,8 @@ return new class extends Migration
             // Final totals combine line rollups and header adjustments
             $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');
             $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + header_tax_amount');
-            $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
-            $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + debit_note_total - credit_note_total');
+            $table->decimal('charge_total', 20, 4)->default(0);
+            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + charge_total');
 
             $table->decimal('paid_amount', 20, 4)->default(0);
             $table->decimal('balance', 20, 4)->default(0)->comment('Application-calculated: grand_total - paid_amount');

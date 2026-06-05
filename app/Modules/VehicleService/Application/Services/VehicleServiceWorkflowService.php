@@ -7,14 +7,8 @@ namespace Modules\VehicleService\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\StockMovements\CreateStockMovementServiceInterface;
-use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceWorkflowServiceInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardLineRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardRepositoryInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceJobInventoryLinkRepositoryInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface;
 use Modules\VehicleService\Domain\Constants\VehicleServiceErrorCode;
 use Throwable;
@@ -41,13 +35,7 @@ final class VehicleServiceWorkflowService implements VehicleServiceWorkflowServi
 
     public function __construct(
         private readonly VehicleServiceJobCardRepositoryInterface $jobCardRepository,
-        private readonly VehicleServiceJobCardLineRepositoryInterface $jobCardLineRepository,
         private readonly VehicleServiceJobStatusHistoryRepositoryInterface $statusHistoryRepository,
-        private readonly VehicleServiceJobPaymentLinkRepositoryInterface $paymentLinkRepository,
-        private readonly VehicleServiceJobInventoryLinkRepositoryInterface $inventoryLinkRepository,
-        private readonly PaymentAllocationServiceInterface $paymentAllocationService,
-        private readonly CreateStockMovementServiceInterface $createStockMovementService,
-        private readonly FinancePostingServiceInterface $financePostingService,
     ) {
     }
 
@@ -105,207 +93,6 @@ final class VehicleServiceWorkflowService implements VehicleServiceWorkflowServi
             ]);
 
             return Result::success($updated);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function allocatePayment(int|string $jobCardId, array $payload): Result
-    {
-        try {
-            $jobCard = $this->jobCardRepository->findById((int) $jobCardId);
-            if (! $jobCard instanceof DataRecord) {
-                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
-            }
-
-            $documentId = isset($payload['document_id']) ? (int) $payload['document_id'] : null;
-            if ($documentId === null) {
-                return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'document_id is required.'));
-            }
-
-            $allocation = $this->paymentAllocationService->createAllocation([
-                'tenant_id' => (int) $jobCard->get('tenant_id', 0),
-                'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                'payment_id' => (int) ($payload['payment_id'] ?? 0),
-                'document_type' => (string) ($payload['document_type'] ?? 'document'),
-                'document_id' => $documentId,
-                'allocated_amount' => (float) ($payload['amount'] ?? 0),
-                'metadata' => [
-                    'source_type' => 'vehicle_service_job_card',
-                    'source_id' => (int) $jobCardId,
-                ],
-            ]);
-            if ($allocation->isFailure()) {
-                return Result::failure($allocation->errorOrFail());
-            }
-            $allocationRecord = $allocation->valueOrFail();
-
-            $this->paymentLinkRepository->create([
-                'tenant_id' => (int) $jobCard->get('tenant_id', 0),
-                'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                'job_card_id' => (int) $jobCardId,
-                'payment_id' => (int) ($payload['payment_id'] ?? 0),
-                'payment_allocation_id' => is_object($allocationRecord) && method_exists($allocationRecord, 'id')
-                    ? $allocationRecord->id()
-                    : null,
-                'allocated_amount' => (float) ($payload['amount'] ?? 0),
-                'advance_amount' => (float) ($payload['advance_amount'] ?? 0),
-                'refund_amount' => (float) ($payload['refund_amount'] ?? 0),
-                'write_off_amount' => (float) ($payload['write_off_amount'] ?? 0),
-                'status' => 'active',
-                'linked_by' => $payload['actor_id'] ?? null,
-                'linked_at' => now()->toDateTimeString(),
-            ]);
-
-            return Result::success($allocationRecord);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function postInventory(int|string $jobCardId, array $payload): Result
-    {
-        try {
-            $jobCard = $this->jobCardRepository->findById((int) $jobCardId);
-            if (! $jobCard instanceof DataRecord) {
-                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
-            }
-
-            $tenantId = (int) $jobCard->get('tenant_id', 0);
-            $lines = $this->jobCardLineRepository->list([
-                'tenant_id' => $tenantId,
-                'job_card_id' => (int) $jobCardId,
-                'requires_stock_movement' => true,
-            ]);
-
-            $postedLinks = [];
-            foreach ($lines as $line) {
-                $movementPayload = [
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                    'movement_type' => $payload['movement_type'] ?? 'issue',
-                    'item_id' => $line->get('item_id'),
-                    'warehouse_id' => $line->get('warehouse_id') ?? $jobCard->get('warehouse_id'),
-                    'warehouse_location_id' => $line->get('location_id'),
-                    'quantity' => (float) $line->get('quantity', 0),
-                    'uom_id' => $line->get('uom_id'),
-                    'reference_type' => 'vehicle_service_job_card',
-                    'reference_id' => (int) $jobCardId,
-                    'notes' => $payload['notes'] ?? null,
-                ];
-
-                $movement = $this->createStockMovementService->execute($movementPayload);
-                if ($movement->isFailure()) {
-                    return Result::failure($movement->errorOrFail());
-                }
-
-                $movementValue = $movement->valueOrFail();
-                $movementId = is_array($movementValue)
-                    ? ($movementValue['id'] ?? null)
-                    : (is_object($movementValue) && method_exists($movementValue, 'id')
-                        ? $movementValue->id()
-                        : null);
-
-                $postedLinks[] = $this->inventoryLinkRepository->create([
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                    'job_card_id' => (int) $jobCardId,
-                    'job_card_line_id' => $line->id(),
-                    'stock_movement_id' => $movementId,
-                    'movement_type' => (string) ($payload['movement_type'] ?? 'consume'),
-                    'quantity' => (float) $line->get('quantity', 0),
-                    'quantity_base' => (float) $line->get('quantity_base', $line->get('quantity', 0)),
-                    'unit_cost' => (float) $line->get('unit_cost', 0),
-                    'total_cost' => round(
-                        (float) $line->get('quantity', 0) * (float) $line->get('unit_cost', 0),
-                        4,
-                    ),
-                    'status' => 'posted',
-                    'posted_by' => $payload['actor_id'] ?? null,
-                    'posted_at' => now()->toDateTimeString(),
-                ]);
-            }
-
-            $this->jobCardRepository->update((int) $jobCardId, ['inventory_status' => 'consumed']);
-
-            return Result::success([
-                'job_card_id' => (int) $jobCardId,
-                'posted_links' => $postedLinks,
-            ]);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function postFinance(int|string $jobCardId, array $payload): Result
-    {
-        try {
-            $jobCard = $this->jobCardRepository->findById((int) $jobCardId);
-            if (! $jobCard instanceof DataRecord) {
-                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
-            }
-
-            $posting = $this->financePostingService->postFromSource([
-                'tenant_id' => (int) $jobCard->get('tenant_id', 0),
-                'organization_unit_id' => $jobCard->get('organization_unit_id'),
-                'entry_date' => now()->toDateString(),
-                'posting_date' => now()->toDateString(),
-                'reference_type' => 'vehicle_service_job_card',
-                'reference_id' => (int) $jobCardId,
-                'currency_id' => $jobCard->get('currency_id'),
-                'exchange_rate' => (float) $jobCard->get('exchange_rate', 1),
-                'amount' => (float) $jobCard->get('grand_total', 0),
-                'posted_by' => $payload['actor_id'] ?? null,
-                'notes' => $payload['notes'] ?? null,
-                'metadata' => [
-                    'job_card_number' => $jobCard->get('job_card_number'),
-                ],
-            ], (array) ($payload['lines'] ?? []));
-            if ($posting->isFailure()) {
-                return Result::failure($posting->errorOrFail());
-            }
-
-            $this->jobCardRepository->update((int) $jobCardId, ['finance_status' => 'posted']);
-
-            return Result::success($posting);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function reverseFinance(int|string $jobCardId, array $payload): Result
-    {
-        try {
-            $jobCard = $this->jobCardRepository->findById((int) $jobCardId);
-            if (! $jobCard instanceof DataRecord) {
-                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
-            }
-
-            $journalEntryId = isset($payload['journal_entry_id']) ? (int) $payload['journal_entry_id'] : 0;
-            if ($journalEntryId < 1) {
-                return Result::failure(new Error(
-                    VehicleServiceErrorCode::INVALID_VALUE,
-                    'journal_entry_id is required for finance reversal.',
-                ));
-            }
-
-            $reversal = $this->financePostingService->reverseByEntryId($journalEntryId, [
-                'reason' => $payload['reason'] ?? 'Vehicle service reversal',
-                'metadata' => [
-                    'job_card_number' => $jobCard->get('job_card_number'),
-                ],
-            ]);
-            if ($reversal->isFailure()) {
-                return Result::failure($reversal->errorOrFail());
-            }
-
-            $this->jobCardRepository->update((int) $jobCardId, [
-                'finance_status' => 'reversed',
-                'status' => 'reversed',
-                'reversed_at' => now()->toDateTimeString(),
-            ]);
-
-            return Result::success($reversal);
         } catch (Throwable $exception) {
             return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
         }

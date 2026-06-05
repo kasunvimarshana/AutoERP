@@ -9,14 +9,12 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceManagementServiceInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardLineRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCustomerSuppliedItemRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobExternalServiceRepositoryInterface;
-use Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceLaborItemRepositoryInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceNonInventoryItemRepositoryInterface;
@@ -35,9 +33,8 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         private readonly VehicleServiceJobCustomerSuppliedItemRepositoryInterface $customerSuppliedItemRepository,
         private readonly VehicleServiceJobStatusHistoryRepositoryInterface $statusHistoryRepository,
         private readonly VehicleServiceSettingRepositoryInterface $settingRepository,
-        private readonly VehicleServiceJobPaymentLinkRepositoryInterface $paymentLinkRepository,
         private readonly StockLevelRepositoryInterface $stockLevelRepository,
-        private readonly TaxCalculationServiceInterface $taxCalculationService,
+        private readonly VehicleServiceCalculationService $calculationService,
     ) {}
 
     public function upsertJobCardAggregate(?int $id, array $payload): Result
@@ -594,14 +591,8 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             }
 
             $jobCards = $this->jobCardRepository->list($filters);
-            $paymentLinks = $this->paymentLinkRepository->list([
-                'tenant_id' => $tenantId,
-                'status' => 'active',
-            ]);
-
             return Result::success([
                 'job_cards' => $jobCards,
-                'payment_links' => $paymentLinks,
             ]);
         } catch (Throwable $exception) {
             return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
@@ -737,7 +728,9 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         );
         $discountTotal = $lineDiscountTotal + $headerDiscountAmount;
         $taxTotal = $lineTaxTotal + $headerTaxAmount;
-        $grandTotal = $subtotal - $discountTotal + $taxTotal;
+        $chargeTotal = round((float) $jobCard->get('charge_total', 0), 4);
+        $grandTotal = round($subtotal - $discountTotal + $taxTotal + $chargeTotal, 4);
+        $paidAmount = round((float) $jobCard->get('paid_amount', 0), 4);
 
         $this->jobCardRepository->update($jobCardId, [
             'subtotal' => $partsSubtotal,
@@ -753,8 +746,9 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             'header_tax_amount' => $headerTaxAmount,
             'discount_total' => $discountTotal,
             'tax_total' => $taxTotal,
+            'charge_total' => $chargeTotal,
             'grand_total' => $grandTotal,
-            'balance' => $grandTotal,
+            'balance' => round($grandTotal - $paidAmount, 4),
         ]);
     }
 
@@ -969,95 +963,22 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
 
     private function hydrateLineTotals(array $line, bool $includeIncentive = false): array
     {
-        $quantity = round((float) ($line['quantity'] ?? 0), 4);
-        $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
-        $grossAmount = round($quantity * $unitPrice, 4);
-        $discountAmount = $this->resolveDiscountAmount(
-            $grossAmount,
-            (string) ($line['discount_type'] ?? ''),
-            round((float) ($line['discount_value'] ?? 0), 4),
-        );
-        $lineTotal = round(max(0.0, $grossAmount - $discountAmount), 4);
-        $taxAmount = $this->resolveTaxAmount(
-            (int) ($line['tenant_id'] ?? 0),
-            isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
-            $lineTotal,
-            $line['posting_date'] ?? null,
-        );
-
-        $line['quantity'] = $quantity;
-        $line['unit_price'] = $unitPrice;
-        $line['gross_amount'] = $grossAmount;
-        $line['discount_amount'] = $discountAmount;
-        $line['tax_amount'] = $taxAmount;
-        $line['line_total'] = $lineTotal;
-        $line['line_total_with_tax'] = round($lineTotal + $taxAmount, 4);
-
-        if ($includeIncentive) {
-            $line['incentive_amount'] = $this->resolveDiscountAmount(
-                $lineTotal,
-                (string) ($line['incentive_type'] ?? ''),
-                round((float) ($line['incentive_value'] ?? 0), 4),
-            );
-        }
-
-        return $line;
+        return $this->calculationService->calculateLine($line, $includeIncentive);
     }
 
     private function hydrateExternalServiceTotals(array $line): array
     {
-        $quantity = round((float) ($line['quantity'] ?? 1), 4);
-        $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
-        $grossAmount = round($quantity * $unitPrice, 4);
-        $discountAmount = $this->resolveDiscountAmount(
-            $grossAmount,
-            (string) ($line['discount_type'] ?? ''),
-            round((float) ($line['discount_value'] ?? 0), 4),
-        );
-
-        $line['quantity'] = $quantity;
-        $line['unit_price'] = $unitPrice;
-        $line['discount_amount'] = $discountAmount;
-        $line['tax_amount'] = 0.0;
-        $line['line_total'] = $grossAmount;
-
-        return $line;
+        return $this->calculationService->calculateExternalService($line);
     }
 
     private function resolveDiscountAmount(float $grossAmount, string $discountType, float $discountValue): float
     {
-        if ($discountValue <= 0) {
-            return 0.0;
-        }
-
-        $type = strtolower(trim($discountType));
-        if ($type === 'percentage') {
-            return round(min($grossAmount, ($grossAmount * $discountValue) / 100), 4);
-        }
-
-        return round(min($grossAmount, $discountValue), 4);
+        return $this->calculationService->discountAmount($grossAmount, $discountType, $discountValue);
     }
 
     private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
     {
-        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
-            return 0.0;
-        }
-
-        $result = $this->taxCalculationService->calculate(
-            $tenantId,
-            $taxGroupId,
-            $taxableAmount,
-            $postingDate !== null ? (string) $postingDate : null,
-        );
-
-        if ($result->isFailure()) {
-            return 0.0;
-        }
-
-        $tax = $result->valueOrFail();
-
-        return round((float) ($tax['tax_amount'] ?? 0), 4);
+        return $this->calculationService->taxAmount($tenantId, $taxGroupId, $taxableAmount, $postingDate);
     }
 
     private function withDefaultRowVersion(array $payload): array

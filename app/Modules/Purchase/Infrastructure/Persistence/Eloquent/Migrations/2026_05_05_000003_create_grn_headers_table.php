@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id')->nullOnDelete();
             $table->string('grn_number');
-            $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_documented, documented, cancelled, reversed');
+            $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_invoiced, invoiced, cancelled, reversed');
             $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, invoiced, reversed');
             $table->string('inspection_status')->default('pending');
             $table->string('putaway_status')->default('pending');
@@ -44,9 +44,8 @@ return new class extends Migration
             // Final totals combine line rollups and header adjustments
             $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');
             $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + header_tax_amount');
-            $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
-            $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + debit_note_total - credit_note_total');
+            $table->decimal('charge_total', 20, 4)->default(0);
+            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + charge_total');
 
             $table->foreignId('tax_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('discount_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();

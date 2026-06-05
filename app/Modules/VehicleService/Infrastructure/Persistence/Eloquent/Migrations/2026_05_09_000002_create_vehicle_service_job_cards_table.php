@@ -96,9 +96,8 @@ return new class extends Migration
             // Final totals combine line rollups and header adjustments
             $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + non_inventory_item_discount_total + labor_item_discount_total + header_discount_amount');
             $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + non_inventory_item_tax_total + labor_item_tax_total + header_tax_amount');
-            $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
-            $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: all subtotals - discount_total + tax_total + debit_note_total - credit_note_total');
+            $table->decimal('charge_total', 20, 4)->default(0);
+            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: all subtotals - discount_total + tax_total + charge_total');
 
             $table->decimal('advance_amount', 20, 4)->default(0);
             $table->decimal('paid_amount', 20, 4)->default(0);

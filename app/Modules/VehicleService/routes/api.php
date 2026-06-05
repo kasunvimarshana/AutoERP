@@ -7,7 +7,6 @@ use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosti
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosticLineController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionLineController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceIntegrationController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardLineController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceLaborAssignmentController;
@@ -140,29 +139,4 @@ Route::prefix('api/vehicle-service')
             'workflow/job-cards/{jobCardId}/transition',
             [VehicleServiceWorkflowController::class, 'transition'],
         )->name('workflow.transition');
-        Route::post(
-            'workflow/job-cards/{jobCardId}/payments/allocate',
-            [VehicleServiceWorkflowController::class, 'allocatePayment'],
-        )->name('workflow.payments.allocate');
-        Route::post(
-            'workflow/job-cards/{jobCardId}/inventory/post',
-            [VehicleServiceWorkflowController::class, 'postInventory'],
-        )->name('workflow.inventory.post');
-        Route::post(
-            'workflow/job-cards/{jobCardId}/finance/post',
-            [VehicleServiceWorkflowController::class, 'postFinance'],
-        )->name('workflow.finance.post');
-        Route::post(
-            'workflow/job-cards/{jobCardId}/finance/reverse',
-            [VehicleServiceWorkflowController::class, 'reverseFinance'],
-        )->name('workflow.finance.reverse');
-
-        Route::post(
-            'integration/job-cards/{jobCardId}/payments/allocate',
-            [VehicleServiceIntegrationController::class, 'allocateServicePayment'],
-        )->name('integration.payments.allocate');
-        Route::post(
-            'integration/job-cards/{jobCardId}/inventory/post',
-            [VehicleServiceIntegrationController::class, 'postServiceInventory'],
-        )->name('integration.inventory.post');
     });

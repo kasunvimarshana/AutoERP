@@ -21,26 +21,6 @@ final class VehicleServiceWorkflowController extends Controller
         return $this->respond($this->service->transition($jobCardId, $request->all()));
     }
 
-    public function allocatePayment(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->allocatePayment($jobCardId, $request->all()));
-    }
-
-    public function postInventory(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->postInventory($jobCardId, $request->all()));
-    }
-
-    public function postFinance(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->postFinance($jobCardId, $request->all()));
-    }
-
-    public function reverseFinance(Request $request, int $jobCardId): JsonResponse
-    {
-        return $this->respond($this->service->reverseFinance($jobCardId, $request->all()));
-    }
-
     private function respond(Result $result): JsonResponse
     {
         if ($result->isFailure()) {
