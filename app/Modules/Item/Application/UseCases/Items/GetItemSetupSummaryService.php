@@ -55,50 +55,6 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
         });
     }
 
-    public function pricingReferences(int|string $id): Result
-    {
-        return $this->forItem($id, function (DataRecord $item, int $tenantId): array {
-            if (! Schema::hasTable('price_list_items')) {
-                return ['item_id' => (int) $item->id(), 'count' => 0, 'references' => []];
-            }
-
-            $rows = DB::table('price_list_items')
-                ->leftJoin('price_lists', 'price_list_items.price_list_id', '=', 'price_lists.id')
-                ->where('price_list_items.tenant_id', $tenantId)
-                ->where('price_list_items.item_id', (int) $item->id())
-                ->select([
-                    'price_list_items.id',
-                    'price_list_items.price_list_id',
-                    'price_list_items.uom_id',
-                    'price_list_items.currency_id',
-                    'price_list_items.price',
-                    'price_list_items.discount_type',
-                    'price_list_items.discount_value',
-                    'price_list_items.is_active',
-                    'price_lists.code as price_list_code',
-                    'price_lists.name as price_list_name',
-                ])
-                ->orderBy('price_list_items.id')
-                ->limit(200)
-                ->get()
-                ->map(fn (object $row): array => [
-                    'id' => (int) $row->id,
-                    'price_list_id' => $row->price_list_id,
-                    'price_list_code' => $row->price_list_code,
-                    'price_list_name' => $row->price_list_name,
-                    'uom_id' => $row->uom_id,
-                    'currency_id' => $row->currency_id,
-                    'price' => $this->number($row->price),
-                    'discount_type' => $row->discount_type,
-                    'discount_value' => $this->number($row->discount_value),
-                    'is_active' => (bool) $row->is_active,
-                ])
-                ->all();
-
-            return ['item_id' => (int) $item->id(), 'count' => count($rows), 'references' => $rows];
-        });
-    }
-
     public function uomSetup(int|string $id, ?string $context = null): Result
     {
         return $this->forItem($id, function (DataRecord $item, int $tenantId) use ($context): array {
@@ -217,7 +173,6 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
             'has_combo_components' => $this->exists('combo_items', $tenantId, 'combo_item_id', $itemId),
             'has_identifiers' => $this->exists('item_identifiers', $tenantId, 'item_id', $itemId),
             'uom_configured' => $item->get('base_uom_id') !== null,
-            'pricing_references_count' => $this->count('price_list_items', $tenantId, 'item_id', $itemId),
             'inventory_references_count' => $this->count('stock_levels', $tenantId, 'item_id', $itemId),
         ];
     }

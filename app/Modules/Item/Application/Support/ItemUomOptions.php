@@ -141,7 +141,7 @@ final class ItemUomOptions
             'purchase' => (int) ($item->default_receipt_uom_id ?? 0),
             'sales' => (int) ($item->default_issue_uom_id ?? 0),
             'service', 'inventory' => (int) ($item->default_consumption_uom_id ?? 0),
-            'rental', 'pricing' => (int) ($item->default_charge_uom_id ?? 0),
+            'rental' => (int) ($item->default_charge_uom_id ?? 0),
             default => 0,
         } ?: (int) ($item->base_uom_id ?? 0);
     }

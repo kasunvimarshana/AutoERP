@@ -29,7 +29,6 @@ return new class extends Migration
             $table->foreignId('default_payment_term_id')->nullable()->constrained('payment_terms')->nullOnDelete();
             $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->foreignId('default_warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
-            $table->foreignId('default_price_list_id')->nullable()->constrained('price_lists')->nullOnDelete();
             $table->foreignId('default_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
             $table->string('purchase_order_sequence_code')->nullable();

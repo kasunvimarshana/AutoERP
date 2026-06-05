@@ -35,7 +35,6 @@ final class PurchaseOrder extends CoreModel
             'supplier_id' => 'integer',
             'warehouse_id' => 'integer',
             'currency_id' => 'integer',
-            'price_list_id' => 'integer',
             'payment_term_id' => 'integer',
             'order_date' => 'date',
             'expected_date' => 'date',

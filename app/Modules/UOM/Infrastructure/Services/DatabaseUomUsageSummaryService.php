@@ -24,12 +24,6 @@ final class DatabaseUomUsageSummaryService implements UomUsageSummaryServiceInte
                 'default_charge_uom_id',
             ]),
             'inventory' => $this->countInventory($tenantId, $unitId),
-            'pricing' => $this->countAnyAcrossTables($tenantId, $unitId, [
-                'price_list_items' => ['uom_id'],
-                'pricing_rules' => ['uom_id'],
-                'pricing_tiers' => ['uom_id'],
-                'discounts' => ['uom_id'],
-            ]),
             'purchase' => $this->countAnyAcrossTables($tenantId, $unitId, [
                 'purchase_order_lines' => ['uom_id'],
                 'grn_lines' => ['uom_id'],

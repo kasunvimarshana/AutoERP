@@ -25,7 +25,6 @@ return new class extends Migration
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('order_date');
             $table->date('expected_date')->nullable();
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
             $table->foreignId('payment_term_id')->nullable()->constrained('payment_terms', 'id')->nullOnDelete();
 
             // Line-derived totals - strictly SUM over lines

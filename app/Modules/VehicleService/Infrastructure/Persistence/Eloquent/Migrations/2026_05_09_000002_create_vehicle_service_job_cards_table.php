@@ -66,7 +66,6 @@ return new class extends Migration
             $table->unsignedBigInteger('customer_approved_by')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists')->nullOnDelete();
             $table->unsignedBigInteger('start_odometer')->nullable();
             $table->unsignedBigInteger('end_odometer')->nullable();
             $table->unsignedBigInteger('next_service_odometer')->nullable();

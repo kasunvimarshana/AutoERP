@@ -27,7 +27,6 @@ return new class extends Migration
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('received_date');
-            $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
 
             // Line-derived totals - strictly SUM over lines
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');

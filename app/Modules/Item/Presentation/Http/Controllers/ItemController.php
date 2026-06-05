@@ -128,11 +128,6 @@ final class ItemController extends Controller
         return $this->summaryResponse($this->setupSummaryService->inventorySummary($id));
     }
 
-    public function pricingReferences(int|string $id): JsonResponse
-    {
-        return $this->summaryResponse($this->setupSummaryService->pricingReferences($id));
-    }
-
     public function usageSummary(int|string $id): JsonResponse
     {
         return $this->summaryResponse($this->setupSummaryService->capabilities($id));

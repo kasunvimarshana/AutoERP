@@ -12,8 +12,6 @@ interface GetItemSetupSummaryServiceInterface
 
     public function inventorySummary(int|string $id): Result;
 
-    public function pricingReferences(int|string $id): Result;
-
     public function uomSetup(int|string $id, ?string $context = null): Result;
 
     /**

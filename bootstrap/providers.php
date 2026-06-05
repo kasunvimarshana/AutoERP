@@ -21,7 +21,6 @@ return [
     Modules\Customer\Infrastructure\Providers\CustomerServiceProvider::class,
     Modules\Extension\Infrastructure\Providers\ExtensionServiceProvider::class,
     Modules\Payment\Infrastructure\Providers\PaymentServiceProvider::class,
-    Modules\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
     Modules\Invoice\Infrastructure\Providers\InvoiceServiceProvider::class,
     Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider::class,
     Modules\Sales\Infrastructure\Providers\SalesServiceProvider::class,

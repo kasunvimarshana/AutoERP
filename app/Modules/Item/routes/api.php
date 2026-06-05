@@ -40,7 +40,6 @@ Route::prefix('api/item')
         Route::post('items/preview-type-setup', [ItemController::class, 'previewTypeSetup'])->name('items.preview-type-setup');
         Route::get('items/{item}/capabilities', [ItemController::class, 'capabilities'])->name('items.capabilities');
         Route::get('items/{item}/inventory-summary', [ItemController::class, 'inventorySummary'])->name('items.inventory-summary');
-        Route::get('items/{item}/pricing-references', [ItemController::class, 'pricingReferences'])->name('items.pricing-references');
         Route::get('items/{item}/usage-summary', [ItemController::class, 'usageSummary'])->name('items.usage-summary');
         Route::get('items/{item}/uom-setup', [ItemController::class, 'uomSetup'])->name('items.uom-setup');
         Route::apiResource('items', ItemController::class);
