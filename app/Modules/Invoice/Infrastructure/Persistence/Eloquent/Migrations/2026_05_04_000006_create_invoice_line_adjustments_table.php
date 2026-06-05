@@ -10,11 +10,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('invoice_adjustments', function (Blueprint $table): void {
+        Schema::create('invoice_line_adjustments', function (Blueprint $table): void {
             $table->id();
 
-            $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
-
+            $table->foreignId('invoice_line_id')->constrained('invoice_lines')->cascadeOnDelete();
             $table->string('direction', 20);
             $table->string('adjustment_type', 50);
             $table->string('code', 100)->nullable();
@@ -27,14 +26,14 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['invoice_id', 'adjustment_type'], 'invoice_adjustments_invoice_type_idx');
-            $table->index(['invoice_id', 'direction'], 'invoice_adjustments_invoice_direction_idx');
-            $table->index(['code'], 'invoice_adjustments_code_idx');
+            $table->index(['invoice_line_id', 'adjustment_type'], 'invoice_line_adjustments_line_type_idx');
+            $table->index(['invoice_line_id', 'direction'], 'invoice_line_adjustments_line_direction_idx');
+            $table->index(['code'], 'invoice_line_adjustments_code_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('invoice_adjustments');
+        Schema::dropIfExists('invoice_line_adjustments');
     }
 };
