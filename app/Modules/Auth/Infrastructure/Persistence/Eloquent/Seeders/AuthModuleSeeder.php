@@ -6,6 +6,7 @@ namespace Modules\Auth\Infrastructure\Persistence\Eloquent\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 final class AuthModuleSeeder extends Seeder
@@ -17,8 +18,20 @@ final class AuthModuleSeeder extends Seeder
             $organizationUnitId = $this->seedLocalOrganizationUnit($tenantId);
 
             $this->seedInternalProvider(null, null);
-            $this->seedInternalProvider($tenantId, $organizationUnitId);
+            $providerId = $this->seedInternalProvider($tenantId, $organizationUnitId);
+
+            if ($this->shouldSeedLocalAdmin()) {
+                $email = strtolower(trim((string) env('AUTH_LOCAL_ADMIN_EMAIL', 'admin@example.com')));
+                $userId = $this->seedLocalAdminUser($tenantId, $organizationUnitId, $email);
+
+                $this->seedLocalAdminIdentity($tenantId, $organizationUnitId, $providerId, $userId, $email);
+            }
         });
+    }
+
+    private function shouldSeedLocalAdmin(): bool
+    {
+        return filter_var(env('SEED_AUTH_LOCAL_ADMIN', true), FILTER_VALIDATE_BOOLEAN);
     }
 
     private function seedLocalTenant(): int
@@ -96,7 +109,7 @@ final class AuthModuleSeeder extends Seeder
         ]);
     }
 
-    private function seedInternalProvider(?int $tenantId, ?int $organizationUnitId): void
+    private function seedInternalProvider(?int $tenantId, ?int $organizationUnitId): int
     {
         DB::table('auth_providers')->updateOrInsert(
             [
@@ -116,6 +129,90 @@ final class AuthModuleSeeder extends Seeder
                 'status' => 'active',
                 'updated_at' => now(),
                 'created_at' => now(),
+            ],
+        );
+
+        $query = DB::table('auth_providers')
+            ->where('provider_key', 'internal');
+
+        if ($tenantId === null) {
+            $query->whereNull('tenant_id');
+        } else {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        return (int) $query->value('id');
+    }
+
+    private function seedLocalAdminUser(int $tenantId, int $organizationUnitId, string $email): int
+    {
+        $existing = DB::table('users')
+            ->where('tenant_id', $tenantId)
+            ->where('email', $email)
+            ->first();
+
+        $payload = [
+            'avatar_path' => null,
+            'date_of_birth' => null,
+            'email_verified_at' => now(),
+            'first_name' => (string) env('AUTH_LOCAL_ADMIN_FIRST_NAME', 'System'),
+            'gender' => null,
+            'last_name' => (string) env('AUTH_LOCAL_ADMIN_LAST_NAME', 'Administrator'),
+            'marital_status' => null,
+            'metadata' => json_encode([
+                'identity_references' => ['internal' => $email],
+                'roles' => ['admin'],
+                'seed_source' => 'auth_module_local_admin',
+            ]),
+            'organization_unit_id' => $organizationUnitId,
+            'password' => Hash::make((string) env('AUTH_LOCAL_ADMIN_PASSWORD', 'password')),
+            'phone' => null,
+            'preferences' => null,
+            'remember_token' => null,
+            'row_version' => 1,
+            'status' => 'active',
+            'tenant_id' => $tenantId,
+            'updated_at' => now(),
+        ];
+
+        if ($existing !== null) {
+            DB::table('users')->where('id', $existing->id)->update($payload);
+
+            return (int) $existing->id;
+        }
+
+        return (int) DB::table('users')->insertGetId([
+            ...$payload,
+            'created_at' => now(),
+            'email' => $email,
+        ]);
+    }
+
+    private function seedLocalAdminIdentity(
+        int $tenantId,
+        int $organizationUnitId,
+        int $providerId,
+        int $userId,
+        string $email,
+    ): void {
+        DB::table('auth_identities')->updateOrInsert(
+            [
+                'provider_id' => $providerId,
+                'provider_user_key' => $email,
+                'tenant_id' => $tenantId,
+            ],
+            [
+                'claims' => json_encode(['email' => $email]),
+                'is_primary' => true,
+                'last_authenticated_at' => null,
+                'metadata' => json_encode(['seed_source' => 'auth_module_local_admin']),
+                'organization_unit_id' => $organizationUnitId,
+                'row_version' => 1,
+                'status' => 'active',
+                'updated_at' => now(),
+                'created_at' => now(),
+                'user_id' => $userId,
+                'verified_at' => now(),
             ],
         );
     }
