@@ -12,10 +12,24 @@ export type PurchaseLineInput = {
     returnQty?: string;
     originalGrnLineId?: number;
     taxAmount?: string;
+    taxGroupId?: number;
     unitPrice: string;
     uomId: number;
     warehouseId?: number;
     locationId?: number;
+};
+
+export type PurchaseHeaderTotalsInput = {
+    creditNoteTotal?: string;
+    debitNoteTotal?: string;
+    headerChargeTotal?: string;
+    headerCreditAdjustmentTotal?: string;
+    headerDebitAdjustmentTotal?: string;
+    headerDiscountAmount?: string;
+    headerDiscountType?: 'percentage' | 'fixed' | '';
+    headerDiscountValue?: string;
+    headerTaxAmount?: string;
+    headerTaxGroupId?: number;
 };
 
 export type PurchaseOrderInput = {
@@ -27,7 +41,7 @@ export type PurchaseOrderInput = {
     reference?: string;
     supplierId: number;
     warehouseId: number;
-};
+} & PurchaseHeaderTotalsInput;
 
 export type GrnInput = {
     grnNumber?: string;
@@ -38,7 +52,7 @@ export type GrnInput = {
     reference?: string;
     supplierId?: number;
     warehouseId?: number;
-};
+} & PurchaseHeaderTotalsInput;
 
 export type PurchaseReturnInput = {
     lines: PurchaseLineInput[];
@@ -49,6 +63,21 @@ export type PurchaseReturnInput = {
     returnDate: string;
     returnNumber?: string;
     returnReason?: string;
+} & PurchaseHeaderTotalsInput;
+
+export type PurchaseHeaderTotals = {
+    chargeTotal: string;
+    creditNoteTotal: string;
+    debitNoteTotal: string;
+    discountTotal: string;
+    headerDiscountAmount: string;
+    headerDiscountType?: 'percentage' | 'fixed' | null;
+    headerDiscountValue?: string | null;
+    headerTaxAmount: string;
+    lineDiscountTotal: string;
+    lineTaxTotal: string;
+    subtotal: string;
+    taxTotal: string;
 };
 
 export type PurchaseOrder = {
@@ -70,7 +99,7 @@ export type PurchaseOrder = {
     supplierName?: string | null;
     warehouseId: number;
     warehouseName?: string | null;
-};
+} & PurchaseHeaderTotals;
 
 export type Grn = {
     grandTotal: string;
@@ -88,7 +117,7 @@ export type Grn = {
     supplierId: number;
     supplierName?: string | null;
     warehouseId: number;
-};
+} & PurchaseHeaderTotals;
 
 export type PurchaseReturn = {
     grandTotal: string;
@@ -106,7 +135,7 @@ export type PurchaseReturn = {
     status: string;
     supplierId: number;
     supplierName?: string | null;
-};
+} & PurchaseHeaderTotals;
 
 export type PurchaseLine = {
     accepted_qty?: string;
@@ -119,6 +148,7 @@ export type PurchaseLine = {
     item_name?: string | null;
     line_total_with_tax: string;
     original_grn_line_id?: number | null;
+    ordered_qty?: string;
     purchase_order_line_id?: number | null;
     received_qty?: string;
     returned_qty?: string;

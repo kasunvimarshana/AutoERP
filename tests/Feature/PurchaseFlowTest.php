@@ -59,11 +59,23 @@ final class PurchaseFlowTest extends TestCase
                     'uom_id' => $uomId,
                     'ordered_qty' => 5,
                     'unit_price' => 100,
+                    'discount_amount' => 10,
                     'tax_amount' => 50,
                 ]],
+                'header_discount_amount' => 20,
+                'header_tax_amount' => 5,
+                'header_charge_total' => 15,
+                'credit_note_total' => 3,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.grand_total', '550.0000');
+            ->assertJsonPath('data.subtotal', '500.0000')
+            ->assertJsonPath('data.line_discount_total', '10.0000')
+            ->assertJsonPath('data.header_discount_amount', '20.0000')
+            ->assertJsonPath('data.line_tax_total', '50.0000')
+            ->assertJsonPath('data.header_tax_amount', '5.0000')
+            ->assertJsonPath('data.charge_total', '15.0000')
+            ->assertJsonPath('data.credit_note_total', '3.0000')
+            ->assertJsonPath('data.grand_total', '537.0000');
 
         $poId = (int) $po->json('data.id');
         $poLineId = (int) $po->json('data.lines.0.id');
@@ -109,33 +121,39 @@ final class PurchaseFlowTest extends TestCase
             ->postJson("/api/purchase/grns/$grnId/invoice")
             ->assertOk()
             ->assertJsonPath('data.ledger_direction', 'payable')
+            ->assertJsonPath('data.line_discount_total', '10.0000')
+            ->assertJsonPath('data.header_discount_total', '20.0000')
+            ->assertJsonPath('data.tax_total', '55.0000')
+            ->assertJsonPath('data.charge_total', '15.0000')
+            ->assertJsonPath('data.credit_adjustment_total', '3.0000')
+            ->assertJsonPath('data.grand_total', '537.0000')
             ->assertJsonPath('data.status', 'issued');
 
         $invoiceId = (int) $invoice->json('data.id');
         $this->assertDatabaseHas('journal_entries', ['tenant_id' => 1, 'source_module' => 'invoice', 'reference_id' => $invoiceId]);
-        $this->assertDatabaseHas('ap_transactions', ['tenant_id' => 1, 'source_id' => $invoiceId, 'outstanding_amount' => 550]);
+        $this->assertDatabaseHas('ap_transactions', ['tenant_id' => 1, 'source_id' => $invoiceId, 'outstanding_amount' => 537]);
 
         $payment = $this->withHeaders($this->headers)
             ->postJson('/api/payment/payments', [
                 'party_type' => 'supplier',
                 'party_id' => $supplierId,
                 'payment_date' => '2026-06-09',
-                'amount' => 550,
+                'amount' => 537,
                 'direction' => 'outbound',
                 'payment_method_id' => $paymentMethodId,
                 'allocations' => [[
                     'invoice_id' => $invoiceId,
-                    'allocated_amount' => 550,
+                    'allocated_amount' => 537,
                 ]],
             ])
             ->assertCreated()
-            ->assertJsonPath('data.allocated_amount', '550.0000');
+            ->assertJsonPath('data.allocated_amount', '537.0000');
 
         $this->assertDatabaseHas('payment_allocations', [
             'tenant_id' => 1,
             'invoice_id' => $invoiceId,
             'payment_id' => (int) $payment->json('data.id'),
-            'allocated_amount' => 550,
+            'allocated_amount' => 537,
         ]);
 
         $return = $this->withHeaders($this->headers)

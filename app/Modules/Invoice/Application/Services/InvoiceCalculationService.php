@@ -39,6 +39,8 @@ final class InvoiceCalculationService
         }
 
         $headerDiscount = 0.0;
+        $headerTax = 0.0;
+        $headerCharges = 0.0;
         $debitAdjustments = 0.0;
         $creditAdjustments = 0.0;
         $writeOff = 0.0;
@@ -51,8 +53,16 @@ final class InvoiceCalculationService
             }
             if ($type === 'discount') {
                 $headerDiscount += $amount;
+            } elseif ($type === 'tax') {
+                $headerTax += $amount;
+            } elseif ($type === 'charge') {
+                $headerCharges += $amount;
             } elseif ($type === 'write_off') {
                 $writeOff += $amount;
+            } elseif ($type === 'credit_adjustment') {
+                $creditAdjustments += $amount;
+            } elseif ($type === 'debit_adjustment') {
+                $debitAdjustments += $amount;
             } elseif ($effect === 'add') {
                 $debitAdjustments += $amount;
             } else {
@@ -60,15 +70,15 @@ final class InvoiceCalculationService
             }
         }
 
-        $grand = max(0, $gross - $lineDiscount - $headerDiscount + $tax + $charges + $debitAdjustments - $creditAdjustments + $roundingAdjustment - $writeOff);
+        $grand = max(0, $gross - $lineDiscount - $headerDiscount + $tax + $headerTax + $charges + $headerCharges + $debitAdjustments - $creditAdjustments + $roundingAdjustment - $writeOff);
 
         return [
             'gross_total' => round($gross, 4),
             'line_discount_total' => round($lineDiscount, 4),
             'header_discount_total' => round($headerDiscount, 4),
             'taxable_total' => round($taxable, 4),
-            'tax_total' => round($tax, 4),
-            'charge_total' => round($charges, 4),
+            'tax_total' => round($tax + $headerTax, 4),
+            'charge_total' => round($charges + $headerCharges, 4),
             'rounding_adjustment' => round($roundingAdjustment, 4),
             'debit_adjustment_total' => round($debitAdjustments, 4),
             'credit_adjustment_total' => round($creditAdjustments, 4),

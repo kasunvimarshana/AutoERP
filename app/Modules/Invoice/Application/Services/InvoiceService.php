@@ -28,7 +28,7 @@ final class InvoiceService
         $search = trim((string) ($filters['search'] ?? ''));
 
         return DB::table('invoices')
-            ->select(['id', 'invoice_number', 'document_type', 'business_context', 'ledger_direction', 'customer_id', 'supplier_id', 'invoice_date', 'due_date', 'status', 'grand_total', 'settled_total', 'balance_total', 'created_at'])
+            ->select(['id', 'invoice_number', 'external_reference_number', 'document_type', 'business_context', 'ledger_direction', 'balance_effect', 'customer_id', 'supplier_id', 'invoice_date', 'due_date', 'status', 'gross_total', 'line_discount_total', 'header_discount_total', 'taxable_total', 'tax_total', 'charge_total', 'rounding_adjustment', 'debit_adjustment_total', 'credit_adjustment_total', 'refund_total', 'write_off_total', 'grand_total', 'settled_total', 'balance_total', 'notes', 'created_at'])
             ->where('tenant_id', $this->support->tenantId())
             ->whereNull('deleted_at')
             ->when(isset($filters['status']), fn (Builder $query): Builder => $query->where('status', (string) $filters['status']))

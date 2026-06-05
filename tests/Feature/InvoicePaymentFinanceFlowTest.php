@@ -58,17 +58,43 @@ final class InvoicePaymentFinanceFlowTest extends TestCase
                     'description' => 'Workshop service',
                     'quantity' => 2,
                     'unit_price' => 100,
+                    'discount_total' => 5,
                     'tax_total' => 20,
+                    'charge_total' => 3,
                 ]],
                 'adjustments' => [[
                     'effect' => 'deduct',
                     'adjustment_type' => 'discount',
                     'amount' => 10,
+                ], [
+                    'effect' => 'add',
+                    'adjustment_type' => 'tax',
+                    'amount' => 2,
+                ], [
+                    'effect' => 'add',
+                    'adjustment_type' => 'charge',
+                    'amount' => 4,
+                ], [
+                    'effect' => 'add',
+                    'adjustment_type' => 'debit_adjustment',
+                    'amount' => 6,
+                ], [
+                    'effect' => 'deduct',
+                    'adjustment_type' => 'credit_adjustment',
+                    'amount' => 1,
                 ]],
+                'rounding_adjustment' => 0.5,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.grand_total', '210.0000')
-            ->assertJsonPath('data.balance_due', '210.0000');
+            ->assertJsonPath('data.gross_total', '200.0000')
+            ->assertJsonPath('data.line_discount_total', '5.0000')
+            ->assertJsonPath('data.header_discount_total', '10.0000')
+            ->assertJsonPath('data.tax_total', '22.0000')
+            ->assertJsonPath('data.charge_total', '7.0000')
+            ->assertJsonPath('data.debit_adjustment_total', '6.0000')
+            ->assertJsonPath('data.credit_adjustment_total', '1.0000')
+            ->assertJsonPath('data.grand_total', '219.5000')
+            ->assertJsonPath('data.balance_due', '219.5000');
 
         $invoiceId = (int) $created->json('data.id');
 
@@ -81,13 +107,13 @@ final class InvoicePaymentFinanceFlowTest extends TestCase
             'tenant_id' => 1,
             'source_module' => 'invoice',
             'source_reference' => 'INV-TEST-100',
-            'total_debit' => 210,
-            'total_credit' => 210,
+            'total_debit' => 219.5,
+            'total_credit' => 219.5,
         ]);
         $this->assertDatabaseHas('ar_transactions', [
             'tenant_id' => 1,
             'source_reference' => 'INV-TEST-100',
-            'outstanding_amount' => 210,
+            'outstanding_amount' => 219.5,
         ]);
 
         $payment = $this->withHeaders($this->headers)
@@ -111,7 +137,7 @@ final class InvoicePaymentFinanceFlowTest extends TestCase
             ->getJson("/api/invoice/invoices/$invoiceId")
             ->assertOk()
             ->assertJsonPath('data.status', 'partially_paid')
-            ->assertJsonPath('data.balance_due', '110.0000');
+            ->assertJsonPath('data.balance_due', '119.5000');
 
         $this->assertDatabaseHas('journal_entries', [
             'tenant_id' => 1,
@@ -139,7 +165,7 @@ final class InvoicePaymentFinanceFlowTest extends TestCase
                 'lines' => [[
                     'description' => 'Goodwill credit',
                     'quantity' => 1,
-                    'unit_price' => 110,
+                    'unit_price' => 119.5,
                 ]],
             ])
             ->assertCreated();

@@ -45,6 +45,18 @@ final class PurchaseService
                 'purchase_orders.expected_date',
                 'purchase_orders.status',
                 'purchase_orders.invoice_status',
+                'purchase_orders.subtotal',
+                'purchase_orders.line_tax_total',
+                'purchase_orders.line_discount_total',
+                'purchase_orders.header_discount_type',
+                'purchase_orders.header_discount_value',
+                'purchase_orders.header_discount_amount',
+                'purchase_orders.header_tax_group_id',
+                'purchase_orders.header_tax_amount',
+                'purchase_orders.discount_total',
+                'purchase_orders.tax_total',
+                'purchase_orders.debit_note_total',
+                'purchase_orders.credit_note_total',
                 'purchase_orders.grand_total',
                 'purchase_orders.paid_amount',
                 'purchase_orders.balance',
@@ -101,7 +113,7 @@ final class PurchaseService
             $lines = array_values($payload['lines'] ?? []);
             $this->validateOrderHeader($payload);
             $this->validateLines($lines);
-            $totals = $this->totals($lines, 'ordered_qty');
+            $totals = $this->totals($lines, 'ordered_qty', false, $payload);
 
             $orderId = DB::table('purchase_orders')->insertGetId([
                 'tenant_id' => $tenantId,
@@ -152,7 +164,7 @@ final class PurchaseService
                 : $order->organization_unit_id;
             $this->validateOrderHeader($merged);
             $this->validateLines($lines);
-            $totals = $this->totals($lines, 'ordered_qty');
+            $totals = $this->totals($lines, 'ordered_qty', false, $merged);
 
             DB::table('purchase_orders')->where('id', $id)->update([
                 'organization_unit_id' => $organizationUnitId,
@@ -409,14 +421,16 @@ final class PurchaseService
                 'invoice_date' => now()->toDateString(),
                 'due_date' => now()->addDays((int) ($supplier->payment_terms_days ?? 0))->toDateString(),
                 'notes' => 'Generated from GRN '.$grn->grn_number,
+                'adjustments' => $this->invoiceHeaderAdjustments($grn),
                 'lines' => $lines->map(fn (array $entry): array => [
                     'item_id' => (int) $entry['line']->item_id,
                     'uom_id' => (int) $entry['line']->uom_id,
                     'description' => $entry['line']->description,
                     'quantity' => $entry['quantity'],
                     'unit_price' => (float) $entry['line']->unit_price,
-                    'discount_total' => (float) $entry['line']->discount_amount,
-                    'tax_total' => (float) $entry['line']->tax_amount,
+                    'discount_total' => round((float) $entry['line']->discount_amount * $this->quantityRatio((float) $entry['quantity'], (float) $entry['line']->accepted_qty), 4),
+                    'tax_total' => round((float) $entry['line']->tax_amount * $this->quantityRatio((float) $entry['quantity'], (float) $entry['line']->accepted_qty), 4),
+                    'charge_total' => 0,
                 ])->all(),
             ]);
             $invoice = $this->invoices->issue((int) $invoice->id);
@@ -765,7 +779,8 @@ final class PurchaseService
             $this->support->assertTenantRow('suppliers', $supplierId, 'supplier_id');
             $this->support->assertTenantRow('warehouses', $warehouseId, 'warehouse_id');
             $lines = $this->normalizeGrnLines($payload, $po, $id);
-            $totals = $this->totals($lines, 'received_qty');
+            $headerPayload = $this->headerPayload($payload, $po, $lines, 'received_qty');
+            $totals = $this->totals($lines, 'received_qty', false, $headerPayload);
 
             $attributes = [
                 'tenant_id' => $tenantId,
@@ -828,7 +843,7 @@ final class PurchaseService
             }
 
             $lines = $this->normalizeReturnLines($payload, $grn, $id);
-            $totals = $this->totals($lines, 'return_qty', true);
+            $totals = $this->totals($lines, 'return_qty', true, $payload);
 
             $attributes = [
                 'tenant_id' => $tenantId,
@@ -1006,7 +1021,7 @@ final class PurchaseService
      * @param  array<int, array<string, mixed>>  $lines
      * @return array<string, float>
      */
-    private function totals(array $lines, string $quantityKey, bool $includeRestocking = false): array
+    private function totals(array $lines, string $quantityKey, bool $includeRestocking = false, array $header = []): array
     {
         $subtotal = $discount = $tax = $restocking = 0.0;
         foreach ($lines as $line) {
@@ -1016,14 +1031,31 @@ final class PurchaseService
             $tax += (float) $attrs['tax_amount'];
             $restocking += $includeRestocking ? (float) ($line['restocking_fee'] ?? 0) : 0;
         }
+        $headerBase = max(0, $subtotal - $discount);
+        $headerDiscount = $this->discountAmount(
+            $headerBase,
+            (string) ($header['header_discount_type'] ?? ''),
+            (float) ($header['header_discount_value'] ?? 0),
+            (float) ($header['header_discount_amount'] ?? 0)
+        );
+        $headerTax = round((float) ($header['header_tax_amount'] ?? 0), 4);
+        $debitNotes = round($this->firstAmount($header, ['debit_note_total', 'header_charge_total', 'header_debit_adjustment_total']), 4);
+        $creditNotes = round($this->firstAmount($header, ['credit_note_total', 'header_credit_adjustment_total']), 4);
 
         $totals = [
             'subtotal' => round($subtotal, 4),
             'line_tax_total' => round($tax, 4),
             'line_discount_total' => round($discount, 4),
-            'discount_total' => round($discount, 4),
-            'tax_total' => round($tax, 4),
-            'grand_total' => round($subtotal - $discount + $tax - $restocking, 4),
+            'header_discount_type' => $header['header_discount_type'] ?? null,
+            'header_discount_value' => isset($header['header_discount_value']) ? round((float) $header['header_discount_value'], 4) : null,
+            'header_discount_amount' => $headerDiscount,
+            'header_tax_group_id' => $header['header_tax_group_id'] ?? null,
+            'header_tax_amount' => $headerTax,
+            'discount_total' => round($discount + $headerDiscount, 4),
+            'tax_total' => round($tax + $headerTax, 4),
+            'debit_note_total' => $debitNotes,
+            'credit_note_total' => $creditNotes,
+            'grand_total' => round(max(0, $subtotal - $discount - $headerDiscount + $tax + $headerTax + $debitNotes - $creditNotes - $restocking), 4),
         ];
 
         if ($includeRestocking) {
@@ -1031,6 +1063,69 @@ final class PurchaseService
         }
 
         return $totals;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $keys
+     */
+    private function firstAmount(array $payload, array $keys): float
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload)) {
+                return max(0, (float) $payload[$key]);
+            }
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function headerPayload(array $payload, ?object $source, array $lines, string $quantityKey): array
+    {
+        $keys = ['header_discount_type', 'header_discount_value', 'header_discount_amount', 'header_tax_group_id', 'header_tax_amount', 'debit_note_total', 'credit_note_total', 'header_charge_total', 'header_debit_adjustment_total', 'header_credit_adjustment_total'];
+        $header = [];
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload)) {
+                $header[$key] = $payload[$key];
+            }
+        }
+        if ($header !== [] || $source === null) {
+            return $header;
+        }
+
+        $lineSubtotal = array_reduce($lines, fn (float $sum, array $line): float => $sum + round((float) $line[$quantityKey] * (float) ($line['unit_price'] ?? $line['unit_cost'] ?? 0), 4), 0.0);
+        $sourceSubtotal = max(0.0001, (float) ($source->subtotal ?? $lineSubtotal));
+        $ratio = min(1.0, max(0.0, $lineSubtotal / $sourceSubtotal));
+
+        return [
+            'header_discount_type' => null,
+            'header_discount_value' => null,
+            'header_discount_amount' => round((float) ($source->header_discount_amount ?? 0) * $ratio, 4),
+            'header_tax_group_id' => $source->header_tax_group_id ?? null,
+            'header_tax_amount' => round((float) ($source->header_tax_amount ?? 0) * $ratio, 4),
+            'debit_note_total' => round((float) ($source->debit_note_total ?? 0) * $ratio, 4),
+            'credit_note_total' => round((float) ($source->credit_note_total ?? 0) * $ratio, 4),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function invoiceHeaderAdjustments(object $document): array
+    {
+        return collect([
+            ['adjustment_type' => 'discount', 'effect' => 'deduct', 'amount' => (float) ($document->header_discount_amount ?? 0), 'name' => 'Header discount'],
+            ['adjustment_type' => 'tax', 'effect' => 'add', 'amount' => (float) ($document->header_tax_amount ?? 0), 'name' => 'Header tax'],
+            ['adjustment_type' => 'charge', 'effect' => 'add', 'amount' => (float) ($document->debit_note_total ?? 0), 'name' => 'Header charge / debit adjustment'],
+            ['adjustment_type' => 'credit_adjustment', 'effect' => 'deduct', 'amount' => (float) ($document->credit_note_total ?? 0), 'name' => 'Header credit adjustment'],
+        ])
+            ->filter(fn (array $adjustment): bool => (float) $adjustment['amount'] > 0)
+            ->values()
+            ->all();
     }
 
     private function discountAmount(float $gross, string $type, float $value, float $explicit): float
@@ -1043,6 +1138,15 @@ final class PurchaseService
         }
 
         return round(min($gross, $explicit), 4);
+    }
+
+    private function quantityRatio(float $quantity, float $sourceQuantity): float
+    {
+        if ($sourceQuantity <= 0) {
+            return 0.0;
+        }
+
+        return min(1.0, max(0.0, $quantity / $sourceQuantity));
     }
 
     private function transitionOrder(int $id, array $fromStatuses, string $toStatus, array $extra = []): object
@@ -1187,6 +1291,7 @@ final class PurchaseService
                 }
                 $receivedQuantity = (float) $line['received_qty'];
                 $acceptedQuantity = (float) ($line['accepted_qty'] ?? $line['received_qty']);
+                $lineRatio = $this->quantityRatio($receivedQuantity, (float) $poLine->ordered_qty);
                 $line = array_merge($line, [
                     'item_id' => (int) $poLine->item_id,
                     'variant_id' => $poLine->variant_id,
@@ -1195,11 +1300,11 @@ final class PurchaseService
                     'received_qty' => $receivedQuantity,
                     'accepted_qty' => $acceptedQuantity,
                     'unit_price' => (float) $poLine->unit_price,
-                    'discount_type' => $poLine->discount_type,
-                    'discount_value' => (float) $poLine->discount_value,
-                    'discount_amount' => (float) $poLine->discount_amount,
+                    'discount_type' => $poLine->discount_type === 'percentage' ? 'percentage' : null,
+                    'discount_value' => $poLine->discount_type === 'percentage' ? (float) $poLine->discount_value : 0,
+                    'discount_amount' => round((float) $poLine->discount_amount * $lineRatio, 4),
                     'tax_group_id' => $poLine->tax_group_id,
-                    'tax_amount' => (float) $poLine->tax_amount,
+                    'tax_amount' => round((float) $poLine->tax_amount * $lineRatio, 4),
                     'account_id' => $poLine->account_id,
                 ]);
                 $line['expected_qty'] = $remaining;
@@ -1239,6 +1344,7 @@ final class PurchaseService
                     throw ValidationException::withMessages(['return_qty' => ['Return quantity cannot exceed remaining received quantity.']]);
                 }
                 $returnQuantity = (float) $line['return_qty'];
+                $lineRatio = $this->quantityRatio($returnQuantity, (float) $grnLine->accepted_qty);
                 $line = array_merge($line, [
                     'item_id' => (int) $grnLine->item_id,
                     'variant_id' => $grnLine->variant_id,
@@ -1248,11 +1354,11 @@ final class PurchaseService
                     'location_id' => $line['location_id'] ?? $grnLine->location_id,
                     'return_qty' => $returnQuantity,
                     'unit_price' => (float) $grnLine->unit_price,
-                    'discount_type' => $grnLine->discount_type,
-                    'discount_value' => (float) $grnLine->discount_value,
-                    'discount_amount' => (float) $grnLine->discount_amount,
+                    'discount_type' => $grnLine->discount_type === 'percentage' ? 'percentage' : null,
+                    'discount_value' => $grnLine->discount_type === 'percentage' ? (float) $grnLine->discount_value : 0,
+                    'discount_amount' => round((float) $grnLine->discount_amount * $lineRatio, 4),
                     'tax_group_id' => $grnLine->tax_group_id,
-                    'tax_amount' => (float) $grnLine->tax_amount,
+                    'tax_amount' => round((float) $grnLine->tax_amount * $lineRatio, 4),
                     'account_id' => $grnLine->account_id,
                 ]);
                 $line['original_grn_line_id'] = $grnLineId;
@@ -1339,6 +1445,7 @@ final class PurchaseService
             'original_invoice_id' => (int) $return->original_invoice_id,
             'invoice_date' => $return->return_date,
             'notes' => 'Generated from purchase return '.$return->return_number,
+            'adjustments' => $this->invoiceHeaderAdjustments($return),
             'lines' => $lines->map(fn (object $line): array => [
                 'item_id' => (int) $line->item_id,
                 'uom_id' => (int) $line->uom_id,
@@ -1347,6 +1454,7 @@ final class PurchaseService
                 'unit_price' => (float) $line->unit_price,
                 'discount_total' => (float) $line->discount_amount,
                 'tax_total' => (float) $line->tax_amount,
+                'charge_total' => 0,
             ])->all(),
         ]);
 
