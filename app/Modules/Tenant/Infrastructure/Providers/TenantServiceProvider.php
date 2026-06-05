@@ -77,79 +77,10 @@ final class TenantServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../Config/tenant.php', 'tenant');
-
-        $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
-        $this->app->singleton(TenantDomainServiceInterface::class, TenantDomainService::class);
-        $this->app->singleton(TenantRecordMapperInterface::class, TenantRecordMapper::class);
-
-        foreach (
-            [
-                ListTenantsServiceInterface::class => ListTenantsService::class,
-                GetTenantServiceInterface::class => GetTenantService::class,
-                CreateTenantServiceInterface::class => CreateTenantService::class,
-                UpdateTenantServiceInterface::class => UpdateTenantService::class,
-                ActivateTenantServiceInterface::class => ActivateTenantService::class,
-                SuspendTenantServiceInterface::class => SuspendTenantService::class,
-                DeactivateTenantServiceInterface::class => DeactivateTenantService::class,
-                ListTenantPlansServiceInterface::class => ListTenantPlansService::class,
-                GetTenantPlanServiceInterface::class => GetTenantPlanService::class,
-                CreateTenantPlanServiceInterface::class => CreateTenantPlanService::class,
-                UpdateTenantPlanServiceInterface::class => UpdateTenantPlanService::class,
-                DeleteTenantPlanServiceInterface::class => DeleteTenantPlanService::class,
-                TenantSettingGroupServiceInterface::class => TenantSettingGroupService::class,
-                TenantSettingServiceInterface::class => TenantSettingService::class,
-                TenantDocumentServiceInterface::class => TenantDocumentService::class,
-                \Modules\Tenant\Application\Contracts\UseCases\Domains\TenantDomainServiceInterface::class
-                    => TenantDomainCrudService::class,
-            ] as $contract => $implementation
-        ) {
-            $this->app->singleton($contract, $implementation);
-        }
-
-        $this->app->singleton(TenantRepositoryInterface::class, function (): TenantRepositoryInterface {
-            return new EloquentTenantRepository(new TenantModel());
-        });
-
-        $this->app->singleton(TenantPlanRepositoryInterface::class, function (): TenantPlanRepositoryInterface {
-            return new EloquentTenantPlanRepository(new TenantPlanModel());
-        });
-
-        $this->app->singleton(
-            TenantSettingGroupRepositoryInterface::class,
-            function (): TenantSettingGroupRepositoryInterface {
-                return new EloquentTenantSettingGroupRepository(new TenantSettingGroupModel());
-            },
-        );
-
-        $this->app->singleton(TenantSettingRepositoryInterface::class, function (): TenantSettingRepositoryInterface {
-            return new EloquentTenantSettingRepository(new TenantSettingModel());
-        });
-
-        $this->app->singleton(TenantDocumentRepositoryInterface::class, function (): TenantDocumentRepositoryInterface {
-            return new EloquentTenantDocumentRepository(new TenantDocumentModel());
-        });
-
-        $this->app->singleton(TenantDomainRepositoryInterface::class, function (): TenantDomainRepositoryInterface {
-            return new EloquentTenantDomainRepository(new TenantDomainModel());
-        });
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
         $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
-
-        Gate::policy(TenantModel::class, TenantPolicy::class);
-        Event::listen(TenantCreated::class, SyncTenantIsolationContextListener::class);
-        Event::listen(TenantStatusChanged::class, RecordTenantLifecycleAuditListener::class);
-
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                TenantCreateCommand::class,
-                TenantActivateCommand::class,
-                TenantSuspendCommand::class,
-                TenantDeactivateCommand::class,
-            ]);
-        }
     }
 }
