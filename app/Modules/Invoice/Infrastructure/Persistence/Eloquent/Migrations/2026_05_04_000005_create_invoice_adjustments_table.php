@@ -20,6 +20,8 @@ return new class extends Migration
                 ->constrained('invoice_lines')
                 ->cascadeOnDelete();
 
+            $table->string('effect', 20); // add, subtract
+
             $table->string('level', 30);
             // header, line
 

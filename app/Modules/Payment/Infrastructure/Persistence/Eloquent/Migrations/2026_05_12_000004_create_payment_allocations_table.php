@@ -18,11 +18,11 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('payment_id')->constrained('payments')->cascadeOnDelete();
-            $table->string('document_type')->comment('the invoice/credit note being settled');
-            $table->unsignedBigInteger('document_id');
-            $table->unsignedBigInteger('document_line_id')->nullable();
+            $table->string('invoice_type')->comment('the invoice/credit note being settled');
+            $table->unsignedBigInteger('invoice_id');
+            $table->unsignedBigInteger('invoice_line_id')->nullable();
             $table->string('source_module')->nullable()->comment('Generic source module key for allocated target');
-            $table->string('source_type')->nullable()->comment('Generic source document/event type for allocated target');
+            $table->string('source_type')->nullable()->comment('Generic source invoice/event type for allocated target');
             $table->unsignedBigInteger('source_id')->nullable()->comment('Generic source identifier for allocated target');
             $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
             $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
@@ -35,8 +35,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'payment_id', 'document_type', 'document_id'], 'payment_allocations_payment_document_uk');
-            $table->index(['tenant_id', 'document_type', 'document_id'], 'payment_allocations_document_idx');
+            $table->unique(['tenant_id', 'payment_id', 'invoice_type', 'invoice_id'], 'payment_allocations_payment_invoice_uk');
+            $table->index(['tenant_id', 'invoice_type', 'invoice_id'], 'payment_allocations_invoice_idx');
             $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'payment_allocations_source_idx');
             $table->index(['tenant_id', 'payment_id', 'status'], 'payment_allocations_status_idx');
         });

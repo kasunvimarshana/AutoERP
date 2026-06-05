@@ -27,6 +27,5 @@ return [
     Modules\Sales\Infrastructure\Providers\SalesServiceProvider::class,
     Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider::class,
     Modules\VehicleService\Infrastructure\Providers\VehicleServiceServiceProvider::class,
-    Modules\Voucher\Infrastructure\Providers\VoucherServiceProvider::class,
     Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider::class,
 ];
