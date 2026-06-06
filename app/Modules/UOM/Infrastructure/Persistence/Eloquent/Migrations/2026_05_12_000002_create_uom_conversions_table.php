@@ -24,8 +24,6 @@ return new class extends Migration
             $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->boolean('is_bidirectional')->default(true);
             $table->boolean('is_active')->default(true);
-            $table->date('effective_from')->nullable();
-            $table->date('effective_to')->nullable();
             $table->text('notes')->nullable();
 
             $table->timestamps();
