@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;

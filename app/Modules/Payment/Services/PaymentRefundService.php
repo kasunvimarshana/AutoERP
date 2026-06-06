@@ -6,7 +6,7 @@ namespace Modules\Payment\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Invoice\Services\DecimalMath;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\PaymentRefundData;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentRefund;

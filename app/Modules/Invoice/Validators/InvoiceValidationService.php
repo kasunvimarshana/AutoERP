@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Invoice\Validators;
 
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
-use Modules\Invoice\Services\DecimalMath;
 
 final class InvoiceValidationService
 {

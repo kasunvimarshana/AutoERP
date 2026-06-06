@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Services;
 
 use InvalidArgumentException;
-use Modules\Invoice\Services\DecimalMath;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 

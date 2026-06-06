@@ -18,6 +18,7 @@ use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
+use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\FileStorageService;
 use Modules\Core\Services\PasswordHasher;
 use Modules\Core\Services\SlugGenerator;
@@ -37,6 +38,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/core.php', 'core');
 
         $this->app->singleton(ClockInterface::class, SystemClock::class);
+        $this->app->singleton(DecimalMath::class);
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
         $this->app->bind(CurrentUserContextAccessorInterface::class, RequestCurrentUserContextAccessor::class);
         $this->app->bind(CurrentTenantContextAccessorInterface::class, RequestCurrentTenantContextAccessor::class);

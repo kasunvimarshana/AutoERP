@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Payment\Validators;
 
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;

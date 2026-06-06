@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
-use Modules\Invoice\Services\DecimalMath;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\PaymentBalanceResult;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Payment\Models\Payment;

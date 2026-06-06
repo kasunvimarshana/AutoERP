@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Invoice\Services\DecimalMath;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;

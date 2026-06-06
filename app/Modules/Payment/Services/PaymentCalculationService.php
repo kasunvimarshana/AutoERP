@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
-use Modules\Invoice\Services\DecimalMath;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentCalculationResult;
 use Modules\Payment\Models\Payment;

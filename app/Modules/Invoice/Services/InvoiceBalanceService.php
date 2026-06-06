@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\InvoiceBalanceResult;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Enums\InvoiceStatus;

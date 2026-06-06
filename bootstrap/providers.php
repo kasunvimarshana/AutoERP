@@ -6,6 +6,7 @@ use Modules\Auth\Providers\AuthServiceProvider;
 use Modules\Configuration\Providers\ConfigurationServiceProvider;
 use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Extension\Providers\ExtensionServiceProvider;
+use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
@@ -26,6 +27,7 @@ return [
     OrganizationUnitServiceProvider::class,
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
+    FinanceServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     ExtensionServiceProvider::class,

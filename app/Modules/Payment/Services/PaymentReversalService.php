@@ -6,8 +6,8 @@ namespace Modules\Payment\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\DecimalMath;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
