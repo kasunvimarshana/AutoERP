@@ -43,6 +43,7 @@ final class NormalizeApiErrorResponseMiddleware
         $details = $fields !== [] ? ['fields' => $fields] : [];
 
         return new JsonResponse([
+            'success' => false,
             'message' => $message,
             'error' => [
                 'code' => $code,

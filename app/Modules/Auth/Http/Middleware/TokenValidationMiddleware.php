@@ -7,7 +7,6 @@ namespace Modules\Auth\Http\Middleware;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Modules\Auth\Services\ValidateTokenService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,10 +16,6 @@ final class TokenValidationMiddleware
 
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check()) {
-            return $next($request);
-        }
-
         $bearerToken = $request->bearerToken();
         if (! is_string($bearerToken) || trim($bearerToken) === '') {
             return new JsonResponse([

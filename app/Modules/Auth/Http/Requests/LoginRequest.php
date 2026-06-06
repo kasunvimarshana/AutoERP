@@ -8,6 +8,16 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class LoginRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('login_identifier')) {
+            $identifier = $this->input('email', $this->input('username'));
+            if ($identifier !== null) {
+                $this->merge(['login_identifier' => $identifier]);
+            }
+        }
+    }
+
     public function authorize(): bool
     {
         return true;

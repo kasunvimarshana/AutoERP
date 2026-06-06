@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getStoredApiContext } from '@/app/providers/AppProviders';
+import { clearStoredAuthSession, getStoredApiContext } from './authSessionStorage';
 import { toApiError } from './apiError';
 
 export const apiClient = axios.create({
@@ -27,5 +27,12 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
     (response) => response,
-    (error: unknown) => Promise.reject(toApiError(error)),
+    (error: unknown) => {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+            clearStoredAuthSession();
+            window.dispatchEvent(new Event('autoerp:auth-unauthorized'));
+        }
+
+        return Promise.reject(toApiError(error));
+    },
 );

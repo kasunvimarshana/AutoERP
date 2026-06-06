@@ -7,6 +7,8 @@ namespace Modules\Auth\Services;
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
+use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -16,6 +18,8 @@ final class GetCurrentAuthProfileService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
         private readonly RolePermissionRepositoryInterface $rolePermissions,
@@ -83,6 +87,8 @@ final class GetCurrentAuthProfileService
                 'permissions' => $permissions,
                 'metadata' => $this->safeMetadata($user->get('metadata')),
             ],
+            'tenant' => $this->tenantSummary($resolvedTenantId),
+            'organization_unit' => $this->organizationUnitSummary($resolvedOrganizationUnitId),
             'token_payload' => $this->sanitizeTokenPayload($tokenPayload),
         ]);
     }
@@ -112,6 +118,40 @@ final class GetCurrentAuthProfileService
         $normalized = trim((string) $value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function tenantSummary(?int $tenantId): ?array
+    {
+        if ($tenantId === null) {
+            return null;
+        }
+
+        $tenant = $this->tenants->findById($tenantId);
+        if ($tenant === null) {
+            return ['id' => $tenantId, 'name' => null];
+        }
+
+        return [
+            'id' => (int) $tenant->id(),
+            'name' => $this->nullableString($tenant->get('name')),
+        ];
+    }
+
+    private function organizationUnitSummary(?int $organizationUnitId): ?array
+    {
+        if ($organizationUnitId === null) {
+            return null;
+        }
+
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+        if ($organizationUnit === null) {
+            return ['id' => $organizationUnitId, 'name' => null];
+        }
+
+        return [
+            'id' => (int) $organizationUnit->id(),
+            'name' => $this->nullableString($organizationUnit->get('name')),
+        ];
     }
 
     /**

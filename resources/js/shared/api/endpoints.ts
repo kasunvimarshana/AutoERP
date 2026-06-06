@@ -1,4 +1,5 @@
 export const endpoints = {
+    auth: '/api/v1/auth',
     suppliers: '/api/v1/suppliers',
     items: '/api/v1/items',
     inventory: '/api/v1/inventory',

@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { useAppContext } from '@/app/providers/AppProviders';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
-import { Input } from '@/shared/components/Input';
-import { Modal } from '@/shared/components/Modal';
 
 const navigation = [
     { to: '/dashboard', label: 'Dashboard' },
@@ -16,41 +14,11 @@ const navigation = [
     { to: '/finance/accounts', label: 'Finance' },
 ];
 
-function ContextSettings({ open, onClose }: { open: boolean; onClose: () => void }) {
-    const context = useAppContext();
-    const [token, setToken] = useState(context.accessToken ?? '');
-    const [tenant, setTenant] = useState(context.tenantId?.toString() ?? '');
-    const [organizationUnit, setOrganizationUnit] = useState(context.organizationUnitId?.toString() ?? '');
-
-    return (
-        <Modal open={open} title="API context" onClose={onClose}>
-            <form
-                className="space-y-4"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    context.setAccessToken(token.trim() || null);
-                    context.setScope(tenant ? Number(tenant) : null, organizationUnit ? Number(organizationUnit) : null);
-                    onClose();
-                }}
-            >
-                <Input label="Access token" type="password" value={token} onChange={(event) => setToken(event.target.value)} hint="Stored in this browser and sent as a Bearer token." />
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Input label="Tenant ID" type="number" min="1" value={tenant} onChange={(event) => setTenant(event.target.value)} required />
-                    <Input label="Organization unit ID" type="number" min="1" value={organizationUnit} onChange={(event) => setOrganizationUnit(event.target.value)} />
-                </div>
-                <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit">Apply context</Button>
-                </div>
-            </form>
-        </Modal>
-    );
-}
-
 export function AppLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const { tenantId, organizationUnitId } = useAppContext();
+    const [loggingOut, setLoggingOut] = useState(false);
+    const navigate = useNavigate();
+    const auth = useAuth();
 
     return (
         <div className="min-h-screen bg-slate-100">
@@ -76,18 +44,37 @@ export function AppLayout() {
             <div className="lg:pl-64">
                 <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
                     <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm lg:hidden" onClick={() => setSidebarOpen(true)}>Menu</button>
-                    <div className="hidden text-sm text-slate-500 sm:block">
-                        Tenant <strong className="text-slate-800">{tenantId ?? 'not set'}</strong>
-                        <span className="mx-2 text-slate-300">/</span>
-                        Org unit <strong className="text-slate-800">{organizationUnitId ?? 'not set'}</strong>
+                    <div className="min-w-0 text-sm text-slate-500">
+                        <div className="truncate">
+                            <strong className="text-slate-900">{auth.user?.name ?? auth.user?.email}</strong>
+                            <span className="hidden sm:inline">
+                                <span className="mx-2 text-slate-300">/</span>
+                                Tenant <strong className="text-slate-800">{auth.tenant?.name ?? auth.tenant?.id ?? 'not set'}</strong>
+                                <span className="mx-2 text-slate-300">/</span>
+                                Org <strong className="text-slate-800">{auth.organizationUnit?.name ?? auth.organizationUnit?.id ?? 'not set'}</strong>
+                            </span>
+                        </div>
                     </div>
-                    <Button variant="secondary" onClick={() => setSettingsOpen(true)}>API context</Button>
+                    <Button
+                        variant="secondary"
+                        loading={loggingOut}
+                        onClick={async () => {
+                            setLoggingOut(true);
+                            try {
+                                await auth.logout();
+                            } finally {
+                                setLoggingOut(false);
+                                navigate('/login', { replace: true });
+                            }
+                        }}
+                    >
+                        Logout
+                    </Button>
                 </header>
                 <main className="p-4 sm:p-6 lg:p-8">
                     <Outlet />
                 </main>
             </div>
-            <ContextSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </div>
     );
 }

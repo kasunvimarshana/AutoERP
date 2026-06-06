@@ -16,10 +16,19 @@ $authContextMiddleware = (string) config('module-auth.middleware.context_alias',
 $tokenValidationMiddleware = (string) config('module-auth.middleware.token_validation_alias', 'auth.module.token');
 $ssoContextMiddleware = (string) config('module-auth.middleware.sso_context_alias', 'auth.module.sso-context');
 
-Route::prefix('api/auth')
-    ->middleware('api')
-    ->name('auth.')
-    ->group(function () use (
+$registerAuthRoutes = static function (string $prefix, string $namePrefix) use (
+    $protectedGuard,
+    $currentUserMiddleware,
+    $currentTenantMiddleware,
+    $currentOrganizationUnitMiddleware,
+    $authContextMiddleware,
+    $tokenValidationMiddleware,
+    $ssoContextMiddleware,
+): void {
+    Route::prefix($prefix)
+        ->middleware('api')
+        ->name($namePrefix)
+        ->group(function () use (
         $protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
@@ -66,3 +75,7 @@ Route::prefix('api/auth')
             Route::post('authorize-client', [AuthController::class, 'authorizeClient'])->name('client.authorize');
         });
     });
+};
+
+$registerAuthRoutes('api/auth', 'auth.');
+$registerAuthRoutes('api/v1/auth', 'api.v1.auth.');

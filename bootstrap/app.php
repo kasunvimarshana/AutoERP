@@ -24,6 +24,7 @@ if (! function_exists('api_error_response')) {
         array $details = [],
     ) {
         $payload = [
+            'success' => false,
             'message' => $message,
             'error' => [
                 'code' => $code,
@@ -77,7 +78,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
                 return api_error_response(
                     'VALIDATION_FAILED',
-                    'The given data was invalid.',
+                    'Validation failed.',
                     422,
                     'validation',
                     ['fields' => $exception->errors()],

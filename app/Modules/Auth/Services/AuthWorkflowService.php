@@ -25,6 +25,8 @@ use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
+use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Services\UserService;
 use Throwable;
 
@@ -39,6 +41,8 @@ final class AuthWorkflowService
         private readonly UserService $userService,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly OrganizationUnitRepositoryInterface $organizationUnits,
     ) {}
 
     public function login(LoginData $data): Result
@@ -64,6 +68,11 @@ final class AuthWorkflowService
                 $user = $context['user'];
                 $providerRecord = $context['provider'];
                 $identity = $context['identity'] ?? null;
+                if (! $this->isActiveUser($user)) {
+                    $this->recordAttempt($data, false, AuthErrorCode::USER_INACTIVE, null, null, (int) $user['id']);
+
+                    return $this->failure(AuthErrorCode::USER_INACTIVE, 'User account is not active.');
+                }
 
                 $session = $this->registry->sessionProvider()->create([
                     'tenant_id' => $data->tenantId,
@@ -103,6 +112,10 @@ final class AuthWorkflowService
                     'provider' => $providerRecord,
                     'identity' => $identity,
                     'user' => $user,
+                    'tenant' => $this->tenantSummary($data->tenantId ?? $this->toNullableInt($user['tenant_id'] ?? null)),
+                    'organization_unit' => $this->organizationUnitSummary(
+                        $data->organizationUnitId ?? $this->toNullableInt($user['organization_unit_id'] ?? null),
+                    ),
                     'session' => $session,
                     'tokens' => $tokenPair,
                 ]);
@@ -425,6 +438,70 @@ final class AuthWorkflowService
     private function failure(string $code, string $message): Result
     {
         return Result::failure(new Error($code, $message));
+    }
+
+    /**
+     * @param  array<string,mixed>  $user
+     */
+    private function isActiveUser(array $user): bool
+    {
+        return strtolower(trim((string) ($user['status'] ?? ''))) === 'active';
+    }
+
+    private function tenantSummary(?int $tenantId): ?array
+    {
+        if ($tenantId === null) {
+            return null;
+        }
+
+        $tenant = $this->tenants->findById($tenantId);
+        if ($tenant === null) {
+            return ['id' => $tenantId, 'name' => null];
+        }
+
+        return [
+            'id' => (int) $tenant->id(),
+            'name' => $this->nullableString($tenant->get('name')),
+        ];
+    }
+
+    private function organizationUnitSummary(?int $organizationUnitId): ?array
+    {
+        if ($organizationUnitId === null) {
+            return null;
+        }
+
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+        if ($organizationUnit === null) {
+            return ['id' => $organizationUnitId, 'name' => null];
+        }
+
+        return [
+            'id' => (int) $organizationUnit->id(),
+            'name' => $this->nullableString($organizationUnit->get('name')),
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function toNullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        $normalized = (int) $value;
+
+        return $normalized > 0 ? $normalized : null;
     }
 
     private function fromThrowable(Throwable $throwable): Result

@@ -12,6 +12,8 @@ final class AuthErrorCode
 
     public const PROVIDER_DISABLED = 'AUTH_PROVIDER_DISABLED';
 
+    public const USER_INACTIVE = 'AUTH_USER_INACTIVE';
+
     public const CLIENT_NOT_FOUND = 'AUTH_CLIENT_NOT_FOUND';
 
     public const CLIENT_NOT_ALLOWED = 'AUTH_CLIENT_NOT_ALLOWED';

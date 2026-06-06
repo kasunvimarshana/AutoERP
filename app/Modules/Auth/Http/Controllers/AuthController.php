@@ -6,6 +6,7 @@ namespace Modules\Auth\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\DTOs\AuthorizeClientData;
 use Modules\Auth\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\DTOs\LinkExternalIdentityData;
@@ -125,8 +126,16 @@ final class AuthController extends Controller
 
     public function logout(LogoutRequest $request): JsonResponse|AuthPayloadResource
     {
+        $payload = $this->mergeProtectedContext($request->validated());
+        $context = $this->currentUser->requireCurrent();
+        $tokenPayload = $context->tokenPayload();
+        $payload['access_token'] ??= $request->bearerToken();
+        if (! isset($payload['session_id']) && isset($tokenPayload['session_id'])) {
+            $payload['session_id'] = $tokenPayload['session_id'];
+        }
+
         $result = $this->logoutService->logout(
-            LogoutData::fromArray($this->mergeProtectedContext($request->validated())),
+            LogoutData::fromArray($payload),
         );
 
         return $this->respond($result);
@@ -206,8 +215,14 @@ final class AuthController extends Controller
         $context = $this->currentUser->current();
         if ($context === null) {
             return response()->json([
+                'success' => false,
                 'message' => 'Authenticated user context is not available.',
-                'code' => 'AUTH_UNAUTHORIZED_ACCESS',
+                'error' => [
+                    'code' => AuthErrorCode::UNAUTHORIZED_ACCESS,
+                    'type' => 'authentication',
+                    'message' => 'Authenticated user context is not available.',
+                    'details' => (object) [],
+                ],
             ], 401);
         }
 
@@ -257,12 +272,54 @@ final class AuthController extends Controller
     private function respond(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource
     {
         if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $this->statusForErrorCode($error->code);
+            $type = $this->typeForStatus($status);
+
             return response()->json([
-                'message' => $result->errorOrFail()->message,
-                'code' => $result->errorOrFail()->code,
-            ], 422);
+                'success' => false,
+                'message' => $error->message,
+                'error' => [
+                    'code' => $error->code,
+                    'type' => $type,
+                    'message' => $error->message,
+                    'details' => (object) [],
+                ],
+            ], $status);
         }
 
-        return (new AuthPayloadResource($result->valueOrFail()))->response()->setStatusCode($successStatus);
+        return response()->json(
+            (new AuthPayloadResource($result->valueOrFail()))->resolve(request()),
+            $successStatus,
+        );
+    }
+
+    private function statusForErrorCode(string $code): int
+    {
+        return match ($code) {
+            AuthErrorCode::INVALID_CREDENTIALS,
+            AuthErrorCode::PROVIDER_NOT_FOUND,
+            AuthErrorCode::TOKEN_INVALID,
+            AuthErrorCode::TOKEN_EXPIRED,
+            AuthErrorCode::TOKEN_REVOKED,
+            AuthErrorCode::UNAUTHORIZED_ACCESS,
+            AuthErrorCode::AUTHORIZATION_CODE_INVALID => 401,
+            AuthErrorCode::USER_INACTIVE,
+            AuthErrorCode::PROVIDER_DISABLED,
+            AuthErrorCode::TENANT_MISMATCH,
+            AuthErrorCode::CLIENT_NOT_ALLOWED => 403,
+            default => 422,
+        };
+    }
+
+    private function typeForStatus(int $status): string
+    {
+        return match ($status) {
+            401 => 'authentication',
+            403 => 'authorization',
+            404 => 'not_found',
+            409 => 'conflict',
+            default => $status >= 500 ? 'infrastructure' : 'domain',
+        };
     }
 }
