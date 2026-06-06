@@ -61,7 +61,8 @@ final class SupplierController
     {
         return new SupplierResource($this->query($request)->with([
             'contacts', 'addresses', 'bankAccounts', 'categories', 'documents',
-            'itemMappings', 'creditProfile', 'statusHistories',
+            'itemMappings.item', 'itemMappings.variant', 'itemMappings.defaultPurchaseUom',
+            'creditProfile', 'statusHistories',
         ])->findOrFail($supplier));
     }
 
@@ -108,7 +109,9 @@ final class SupplierController
             $query->where('item_id', (int) $request->input('item_id'));
         }
 
-        return SupplierItemMappingResource::collection($query->with('supplier')->paginate($request->perPage()));
+        return SupplierItemMappingResource::collection($query
+            ->with(['supplier', 'item', 'variant', 'defaultPurchaseUom'])
+            ->paginate($request->perPage()));
     }
 
     private function query(ListSupplierRequest|UpdateSupplierRequest|ChangeSupplierStatusRequest $request): Builder

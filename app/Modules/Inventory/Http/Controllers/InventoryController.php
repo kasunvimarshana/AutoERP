@@ -39,7 +39,8 @@ final class InventoryController
 {
     public function stockBalances(InventoryLookupRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(InventoryStockBalance::query(), $request);
+        $query = $this->scope(InventoryStockBalance::query(), $request)
+            ->with(['item', 'variant', 'warehouse', 'warehouseLocation', 'batch']);
         foreach (['item_id', 'item_variant_id', 'warehouse_id', 'warehouse_location_id', 'batch_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, (int) $request->input($filter));

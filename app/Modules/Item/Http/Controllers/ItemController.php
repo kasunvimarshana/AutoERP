@@ -56,8 +56,9 @@ final class ItemController
     public function show(ListItemRequest $request, int $item): ItemResource
     {
         return new ItemResource($this->query($request)->with([
-            'category', 'brand', 'baseUom', 'units', 'variants', 'bundleLines',
-            'prices', 'codes', 'usageRules',
+            'category', 'brand', 'baseUom', 'units.uom', 'variants',
+            'bundleLines.childItem', 'bundleLines.childVariant', 'bundleLines.uom',
+            'prices.currency', 'prices.uom', 'codes', 'usageRules',
         ])->findOrFail($item));
     }
 

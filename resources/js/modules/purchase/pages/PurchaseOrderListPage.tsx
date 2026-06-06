@@ -1,0 +1,39 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { listPurchaseOrders, type PurchaseOrder } from '../purchaseApi';
+import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
+import { ContentHeader } from '@/shared/components/ContentHeader';
+import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { Pagination } from '@/shared/components/Pagination';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { formatDate } from '@/shared/utils/formatDate';
+import { readableRelation } from '@/shared/utils/object';
+
+export default function PurchaseOrderListPage() {
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const debounced = useDebounce(search);
+    const result = useApi((signal) => listPurchaseOrders({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
+    const columns: DataColumn<PurchaseOrder>[] = [
+        { key: 'number', header: 'Order', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? `PO #${row.id}`}</Link> },
+        { key: 'date', header: 'Date', render: (row) => formatDate(row.purchase_order_date) },
+        { key: 'supplier', header: 'Supplier', render: (row) => readableRelation(row.supplier) },
+        { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total ?? row.subtotal} /> },
+        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+    ];
+    return (
+        <>
+            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={<Link to="/purchase/orders/create"><Button>New purchase order</Button></Link>} />
+            <div className="mb-4 max-w-md"><Input type="search" placeholder="Search order number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
+            <ErrorAlert error={result.error} />
+            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+            <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        </>
+    );
+}

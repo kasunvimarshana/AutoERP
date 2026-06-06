@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use Modules\Invoice\Enums\InvoiceLineType;
+use Modules\Item\Models\Item;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -57,6 +58,11 @@ final class InvoiceLine extends CoreModel
     public function uom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'uom_id');
+    }
+
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(Item::class, 'item_id');
     }
 
     public function sourceLines(): HasMany

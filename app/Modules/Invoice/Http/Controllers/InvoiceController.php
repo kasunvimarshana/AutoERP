@@ -21,7 +21,7 @@ final class InvoiceController
 {
     public function index(ListInvoiceRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(Invoice::query(), $request)->with('balance');
+        $query = $this->scope(Invoice::query(), $request)->with(['balance', 'currency']);
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
@@ -46,7 +46,7 @@ final class InvoiceController
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
         return new InvoiceResource($this->scope(Invoice::query(), $request)->with([
-            'lines', 'sources', 'sourceLines', 'adjustments',
+            'currency', 'lines.item', 'lines.uom', 'sources', 'sourceLines', 'adjustments',
             'adjustmentAllocations', 'balance', 'creditAllocations',
         ])->findOrFail($invoice));
     }

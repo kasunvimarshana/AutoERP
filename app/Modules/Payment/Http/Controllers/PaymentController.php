@@ -26,7 +26,7 @@ final class PaymentController
 {
     public function index(ListPaymentRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(Payment::query(), $request);
+        $query = $this->scope(Payment::query(), $request)->with('currency');
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
@@ -56,7 +56,10 @@ final class PaymentController
     public function show(ListPaymentRequest $request, int $payment): PaymentResource
     {
         return new PaymentResource($this->scope(Payment::query(), $request)
-            ->with(['lines', 'allocations', 'unappliedBalance', 'refunds', 'reversals'])->findOrFail($payment));
+            ->with([
+                'currency', 'lines.paymentMethod', 'allocations.invoice',
+                'unappliedBalance', 'refunds', 'reversals',
+            ])->findOrFail($payment));
     }
 
     public function approve(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
@@ -92,7 +95,7 @@ final class PaymentController
 
     public function allocations(PaymentActionRequest $request, int $payment): JsonResponse
     {
-        return response()->json(['data' => $this->find($request, $payment)->allocations()->get()]);
+        return response()->json(['data' => $this->find($request, $payment)->allocations()->with('invoice')->get()]);
     }
 
     public function unappliedBalance(PaymentActionRequest $request, int $payment): JsonResponse

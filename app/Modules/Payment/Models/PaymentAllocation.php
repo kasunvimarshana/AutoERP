@@ -6,6 +6,7 @@ namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
+use Modules\Invoice\Models\Invoice;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Tenant\Models\TenantModel;
@@ -36,6 +37,11 @@ final class PaymentAllocation extends CoreModel
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
     }
 
     public function tenant(): BelongsTo

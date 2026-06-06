@@ -30,7 +30,9 @@ final class PurchaseController
 {
     public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(PurchaseOrder::query(), $request)->with(['lines', 'adjustments']);
+        $query = $this->scope(PurchaseOrder::query(), $request)->with([
+            'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
+        ]);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where('purchase_order_number', 'like', "%{$search}%");
@@ -58,7 +60,10 @@ final class PurchaseController
     public function show(ListPurchaseOrderRequest $request, int $order): PurchaseOrderResource
     {
         return new PurchaseOrderResource($this->scope(PurchaseOrder::query(), $request)
-            ->with(['lines', 'adjustments', 'goodsReceiptNotes.lines'])->findOrFail($order));
+            ->with([
+                'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
+                'goodsReceiptNotes.lines.item', 'goodsReceiptNotes.lines.variant', 'goodsReceiptNotes.lines.uom',
+            ])->findOrFail($order));
     }
 
     public function approve(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource

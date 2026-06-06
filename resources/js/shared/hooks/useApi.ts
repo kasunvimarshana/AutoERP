@@ -1,0 +1,48 @@
+import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react';
+import { ApiError, toApiError } from '@/shared/api/apiError';
+
+interface ApiState<T> {
+    data: T | null;
+    error: ApiError | null;
+    loading: boolean;
+}
+
+export function useApi<T>(
+    request: (signal: AbortSignal) => Promise<T>,
+    dependencies: DependencyList,
+    enabled = true,
+) {
+    const requestRef = useRef(request);
+    requestRef.current = request;
+    const [state, setState] = useState<ApiState<T>>({ data: null, error: null, loading: enabled });
+    const [version, setVersion] = useState(0);
+
+    const reload = useCallback(() => setVersion((current) => current + 1), []);
+
+    useEffect(() => {
+        if (!enabled) {
+            setState((current) => ({ ...current, loading: false }));
+            return;
+        }
+
+        const controller = new AbortController();
+        setState((current) => ({ ...current, loading: true, error: null }));
+        requestRef.current(controller.signal)
+            .then((data) => {
+                if (!controller.signal.aborted) {
+                    setState({ data, error: null, loading: false });
+                }
+            })
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    setState((current) => ({ ...current, error: toApiError(error), loading: false }));
+                }
+            });
+
+        return () => controller.abort();
+        // Dependencies are deliberately supplied by each caller.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [...dependencies, enabled, version]);
+
+    return { ...state, reload, setData: (data: T) => setState({ data, error: null, loading: false }) };
+}
