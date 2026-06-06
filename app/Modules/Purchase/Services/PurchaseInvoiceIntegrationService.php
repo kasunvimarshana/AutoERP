@@ -29,6 +29,8 @@ use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
+use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Models\PurchaseOrderLine;
 
 final class PurchaseInvoiceIntegrationService
 {
@@ -59,14 +61,23 @@ final class PurchaseInvoiceIntegrationService
                 ]);
             }
 
-            foreach ($normalized['lineQuantities'] as $lineId => $quantity) {
-                $line = GoodsReceiptNoteLine::query()->findOrFail($lineId);
-                $line->invoiced_quantity = $this->math->add((string) $line->invoiced_quantity, $quantity);
-                $line->remaining_quantity = $this->math->sub((string) $line->accepted_quantity, (string) $line->invoiced_quantity);
-                $line->save();
+            foreach ($normalized['lineQuantities'] as $lineKey => $quantity) {
+                [$lineType, $lineId] = explode(':', (string) $lineKey, 2);
+                if ($lineType === 'goods_receipt_note_line') {
+                    $line = GoodsReceiptNoteLine::query()->findOrFail((int) $lineId);
+                    $line->invoiced_quantity = $this->math->add((string) $line->invoiced_quantity, $quantity);
+                    $line->remaining_quantity = $this->math->sub((string) $line->accepted_quantity, (string) $line->invoiced_quantity);
+                    $line->save();
 
-                if ($line->purchaseOrderLine !== null) {
-                    $this->orders->applyInvoiced($line->purchaseOrderLine, $quantity);
+                    if ($line->purchaseOrderLine !== null) {
+                        $this->orders->applyInvoiced($line->purchaseOrderLine, $quantity);
+                    }
+
+                    continue;
+                }
+
+                if ($lineType === 'purchase_order_line') {
+                    $this->orders->applyInvoiced(PurchaseOrderLine::query()->findOrFail((int) $lineId), $quantity);
                 }
             }
 
@@ -84,7 +95,7 @@ final class PurchaseInvoiceIntegrationService
     }
 
     /**
-     * @return array{invoiceData: CreateInvoiceData, sourceTotals: array<string, array{line_total: string, adjustment_total: string}>, lineQuantities: array<int, string>, grns: Collection<int, GoodsReceiptNote>}
+     * @return array{invoiceData: CreateInvoiceData, sourceTotals: array<string, array{line_total: string, adjustment_total: string}>, lineQuantities: array<string, string>, grns: Collection<int, GoodsReceiptNote>, purchaseOrders: Collection<int, PurchaseOrder>}
      */
     private function normalizeInvoiceData(CreatePurchaseInvoiceData $data): array
     {
@@ -96,10 +107,20 @@ final class PurchaseInvoiceIntegrationService
         $lineQuantities = [];
         $lineNumber = 1;
         $grns = collect();
+        $purchaseOrders = collect();
 
         foreach ($data->sources as $source) {
-            if (! $source instanceof PurchaseInvoiceSourceData || $source->sourceType !== 'goods_receipt_note') {
-                throw new InvalidArgumentException('Purchase supplier invoices currently require goods receipt note sources.');
+            if (! $source instanceof PurchaseInvoiceSourceData) {
+                throw new InvalidArgumentException('Purchase supplier invoice sources are invalid.');
+            }
+
+            if ($source->sourceType === 'purchase_order') {
+                $lineNumber = $this->appendPurchaseOrderSource($data, $source, $lineNumber, $sources, $sourceLines, $invoiceLines, $adjustments, $sourceTotals, $lineQuantities, $purchaseOrders);
+                continue;
+            }
+
+            if ($source->sourceType !== 'goods_receipt_note') {
+                throw new InvalidArgumentException('Purchase supplier invoices require purchase order or goods receipt note sources.');
             }
 
             $grn = GoodsReceiptNote::query()->with(['lines', 'adjustments'])->findOrFail($source->sourceId);
@@ -125,7 +146,7 @@ final class PurchaseInvoiceIntegrationService
 
                 $lineBase = $this->math->mul($quantity, (string) $sourceLine->unit_price);
                 $selectedTotal = $this->math->add($selectedTotal, $lineBase);
-                $lineQuantities[(int) $sourceLine->getKey()] = $quantity;
+                $lineQuantities['goods_receipt_note_line:'.$sourceLine->getKey()] = $quantity;
 
                 $invoiceLines[] = new InvoiceLineData(
                     lineNumber: $lineNumber++,
@@ -135,6 +156,9 @@ final class PurchaseInvoiceIntegrationService
                     lineType: InvoiceLineType::Item,
                     itemId: (int) $sourceLine->item_id,
                     uomId: $sourceLine->uom_id,
+                    discountAmount: $this->proportionalAmount((string) $sourceLine->discount_amount, $quantity, (string) $sourceLine->accepted_quantity),
+                    taxAmount: $this->proportionalAmount((string) $sourceLine->tax_amount, $quantity, (string) $sourceLine->accepted_quantity),
+                    chargeAmount: $this->proportionalAmount((string) $sourceLine->charge_amount, $quantity, (string) $sourceLine->accepted_quantity),
                     sourceLineType: 'goods_receipt_note_line',
                     sourceLineId: (int) $sourceLine->getKey(),
                 );
@@ -203,19 +227,118 @@ final class PurchaseInvoiceIntegrationService
             'sourceTotals' => $sourceTotals,
             'lineQuantities' => $lineQuantities,
             'grns' => $grns,
+            'purchaseOrders' => $purchaseOrders,
         ];
     }
 
-    private function toInvoiceAdjustment(PurchaseHeaderAdjustment $adjustment, int $sourceId): InvoiceAdjustmentData
+    private function appendPurchaseOrderSource(
+        CreatePurchaseInvoiceData $data,
+        PurchaseInvoiceSourceData $source,
+        int $lineNumber,
+        array &$sources,
+        array &$sourceLines,
+        array &$invoiceLines,
+        array &$adjustments,
+        array &$sourceTotals,
+        array &$lineQuantities,
+        Collection $purchaseOrders,
+    ): int {
+        $order = PurchaseOrder::query()->with(['lines', 'adjustments'])->findOrFail($source->sourceId);
+        if ((int) $order->tenant_id !== $data->tenantId) {
+            throw new InvalidArgumentException('Purchase invoice source belongs to a different tenant.');
+        }
+        if ($data->organizationUnitId !== null && $order->organization_unit_id !== null && (int) $order->organization_unit_id !== $data->organizationUnitId) {
+            throw new InvalidArgumentException('Purchase invoice source belongs to a different organization unit.');
+        }
+
+        $purchaseOrders->push($order);
+        $selectedTotal = '0.000000';
+
+        foreach ($order->lines as $sourceLine) {
+            /** @var PurchaseOrderLine $sourceLine */
+            $remaining = $this->math->sub((string) $sourceLine->ordered_quantity, (string) $sourceLine->invoiced_quantity);
+            $remaining = $this->math->sub($remaining, (string) $sourceLine->cancelled_quantity);
+            $quantity = $source->lineQuantities[(int) $sourceLine->getKey()] ?? $remaining;
+            $quantity = $this->math->normalize($quantity);
+            if ($this->math->isZero($quantity)) {
+                continue;
+            }
+            if ($this->math->compare($quantity, $remaining) > 0) {
+                throw new InvalidArgumentException('Purchase invoice quantity cannot exceed PO remaining quantity.');
+            }
+
+            $lineBase = $this->math->mul($quantity, (string) $sourceLine->unit_price);
+            $selectedTotal = $this->math->add($selectedTotal, $lineBase);
+            $lineQuantities['purchase_order_line:'.$sourceLine->getKey()] = $quantity;
+
+            $invoiceLines[] = new InvoiceLineData(
+                lineNumber: $lineNumber++,
+                description: $sourceLine->description ?? 'Purchase item',
+                quantity: $quantity,
+                unitPrice: (string) $sourceLine->unit_price,
+                lineType: InvoiceLineType::Item,
+                itemId: (int) $sourceLine->item_id,
+                uomId: $sourceLine->uom_id,
+                discountAmount: $this->proportionalAmount((string) $sourceLine->discount_amount, $quantity, (string) $sourceLine->ordered_quantity),
+                taxAmount: $this->proportionalAmount((string) $sourceLine->tax_amount, $quantity, (string) $sourceLine->ordered_quantity),
+                chargeAmount: $this->proportionalAmount((string) $sourceLine->charge_amount, $quantity, (string) $sourceLine->ordered_quantity),
+                sourceLineType: 'purchase_order_line',
+                sourceLineId: (int) $sourceLine->getKey(),
+            );
+
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $data->tenantId,
+                sourceType: 'purchase_order',
+                sourceId: (int) $order->getKey(),
+                sourceLineType: 'purchase_order_line',
+                sourceLineId: (int) $sourceLine->getKey(),
+                sourceQuantity: (string) $sourceLine->ordered_quantity,
+                invoicedQuantity: $quantity,
+                sourceUnitPrice: (string) $sourceLine->unit_price,
+                sourceLineTotal: (string) $sourceLine->line_subtotal,
+                organizationUnitId: $data->organizationUnitId,
+                previouslyInvoicedQuantity: (string) $sourceLine->invoiced_quantity,
+            );
+        }
+
+        $sourceAdjustmentTotal = $this->adjustmentTotal($order->adjustments);
+        $sourceKey = 'purchase_order:'.$order->getKey();
+        $sourceTotals[$sourceKey] = [
+            'line_total' => $selectedTotal,
+            'adjustment_total' => $sourceAdjustmentTotal,
+        ];
+
+        $sources[] = new InvoiceSourceData(
+            tenantId: $data->tenantId,
+            sourceType: 'purchase_order',
+            sourceId: (int) $order->getKey(),
+            organizationUnitId: $data->organizationUnitId,
+            sourceDocumentNumber: $order->purchase_order_number,
+            sourceDocumentDate: $order->purchase_order_date->toDateString(),
+            sourceSubtotal: (string) $order->subtotal,
+            sourceAdjustmentTotal: $sourceAdjustmentTotal,
+            sourceGrandTotal: (string) $order->grand_total,
+        );
+
+        foreach ($order->adjustments as $adjustment) {
+            if ($adjustment instanceof PurchaseHeaderAdjustment && (bool) $adjustment->is_allocatable) {
+                $adjustments[] = $this->toInvoiceAdjustment($adjustment, (int) $order->getKey(), 'purchase_order');
+            }
+        }
+
+        return $lineNumber;
+    }
+
+    private function toInvoiceAdjustment(PurchaseHeaderAdjustment $adjustment, int $sourceId, string $sourceType = 'goods_receipt_note'): InvoiceAdjustmentData
     {
         return new InvoiceAdjustmentData(
             name: (string) $adjustment->name,
-            adjustmentType: AdjustmentType::from($adjustment->adjustment_type->value),
+            adjustmentType: $this->toInvoiceAdjustmentType($adjustment),
             effect: AdjustmentEffect::from($adjustment->effect->value),
             amount: (string) $adjustment->amount,
             sourceAdjustmentType: 'purchase_header_adjustment',
             sourceAdjustmentId: (int) $adjustment->getKey(),
-            sourceType: 'goods_receipt_note',
+            sourceType: $sourceType,
             sourceId: $sourceId,
             calculationType: $adjustment->calculation_type->value,
             rate: (string) $adjustment->rate,
@@ -239,6 +362,30 @@ final class PurchaseInvoiceIntegrationService
         }
 
         return $total;
+    }
+
+    private function toInvoiceAdjustmentType(PurchaseHeaderAdjustment $adjustment): AdjustmentType
+    {
+        return match ($adjustment->adjustment_type->value) {
+            'discount' => AdjustmentType::Discount,
+            'tax' => AdjustmentType::Tax,
+            'freight' => AdjustmentType::Freight,
+            'charge', 'insurance', 'service_charge', 'duty', 'levy' => AdjustmentType::Charge,
+            'credit_note' => AdjustmentType::CreditNote,
+            'debit_note' => AdjustmentType::DebitNote,
+            'withholding' => AdjustmentType::Withholding,
+            'rounding' => AdjustmentType::Rounding,
+            default => AdjustmentType::Other,
+        };
+    }
+
+    private function proportionalAmount(string $amount, string $selectedQuantity, string $sourceQuantity): string
+    {
+        if ($this->math->isZero($amount) || $this->math->isZero($sourceQuantity)) {
+            return '0.000000';
+        }
+
+        return $this->math->mul($amount, $this->math->div($selectedQuantity, $sourceQuantity, 12));
     }
 
     private function refreshGrnInvoiceStatuses(Collection $grns): void

@@ -28,6 +28,10 @@ final class StoreGoodsReceiptNoteRequest extends TenantScopedRequest
             'lines.*.received_quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.accepted_quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.unit_price' => ['required', 'decimal:0,6', 'min:0'],
+            'lines.*.purchase_order_line_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.uom_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.ordered_uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.rejected_quantity' => ['nullable', 'decimal:0,6', 'min:0'],
         ];
     }
@@ -55,6 +59,8 @@ final class StoreGoodsReceiptNoteRequest extends TenantScopedRequest
                 itemVariantId: isset($row['item_variant_id']) ? (int) $row['item_variant_id'] : null,
                 description: $row['description'] ?? null,
                 uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
+                orderedUomId: isset($row['ordered_uom_id']) ? (int) $row['ordered_uom_id'] : null,
+                baseUomId: isset($row['base_uom_id']) ? (int) $row['base_uom_id'] : null,
                 orderedQuantity: (string) ($row['ordered_quantity'] ?? '0.000000'),
                 rejectedQuantity: (string) ($row['rejected_quantity'] ?? '0.000000'),
                 discountAmount: (string) ($row['discount_amount'] ?? '0.000000'),

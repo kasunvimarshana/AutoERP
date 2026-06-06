@@ -24,7 +24,7 @@ final class StorePurchaseInvoiceRequest extends TenantScopedRequest
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'notes' => ['nullable', 'string'],
             'sources' => ['required', 'array', 'min:1'],
-            'sources.*.source_type' => ['required', 'in:goods_receipt_note'],
+            'sources.*.source_type' => ['required', 'in:goods_receipt_note,purchase_order'],
             'sources.*.source_id' => ['required', 'integer', 'min:1'],
             'sources.*.line_quantities' => ['nullable', 'array'],
             'sources.*.line_quantities.*' => ['decimal:0,6', 'gt:0'],

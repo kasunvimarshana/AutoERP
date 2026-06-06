@@ -4,6 +4,85 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Resources;
 
+use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
 
-final class PurchaseReturnResource extends ModuleResource {}
+final class PurchaseReturnResource extends ModuleResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => (int) $this->getKey(),
+            'return_number' => $this->return_number,
+            'return_date' => $this->return_date?->toDateString(),
+            'return_type' => $this->enumValue($this->return_type),
+            'source_type' => $this->source_type,
+            'source_id' => $this->source_id,
+            'status' => $this->enumValue($this->status),
+            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
+            'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
+            'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),
+            'approval_required' => (bool) $this->approval_required,
+            'affects_supplier_balance' => (bool) $this->affects_supplier_balance,
+            'cost_basis' => $this->cost_basis === null ? null : (string) $this->cost_basis,
+            'reason' => $this->reason,
+            'subtotal' => (string) $this->subtotal,
+            'adjustment_return_total' => (string) $this->adjustment_return_total,
+            'grand_total' => (string) $this->grand_total,
+            'debit_note_id' => $this->debit_note_id,
+            'lines' => $this->whenLoaded('lines', fn () => $this->lines->map(fn ($line): array => [
+                'id' => (int) $line->getKey(),
+                'source_line_type' => $line->source_line_type,
+                'source_line_id' => (int) $line->source_line_id,
+                'item' => $line->relationLoaded('item') ? $this->summary($line->item, ['code', 'name', 'sku']) : null,
+                'item_variant' => $line->relationLoaded('variant') ? $this->summary($line->variant, ['code', 'name', 'sku']) : null,
+                'uom' => $line->relationLoaded('uom') ? $this->summary($line->uom, ['code', 'name', 'symbol']) : null,
+                'returned_quantity' => (string) $line->returned_quantity,
+                'source_quantity' => (string) $line->source_quantity,
+                'previously_returned_quantity' => (string) $line->previously_returned_quantity,
+                'remaining_quantity' => (string) $line->remaining_quantity,
+                'unit_price' => (string) $line->unit_price,
+                'cost_basis' => $line->cost_basis === null ? null : (string) $line->cost_basis,
+                'line_total' => (string) $line->line_total,
+                'reason' => $line->reason,
+            ])->all(), []),
+            'adjustment_allocations' => $this->whenLoaded('adjustmentAllocations', fn () => $this->adjustmentAllocations->map(fn ($allocation): array => [
+                'id' => (int) $allocation->getKey(),
+                'adjustment_type' => $this->enumValue($allocation->adjustment_type),
+                'effect' => $this->enumValue($allocation->effect),
+                'source_amount' => (string) $allocation->source_amount,
+                'previously_returned_amount' => (string) $allocation->previously_returned_amount,
+                'returned_amount' => (string) $allocation->returned_amount,
+                'remaining_amount' => (string) $allocation->remaining_amount,
+            ])->all(), []),
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
+        ];
+    }
+
+    private function enumValue(mixed $value): mixed
+    {
+        return $value instanceof \BackedEnum ? $value->value : $value;
+    }
+
+    private function summary(mixed $model, array $fields): ?array
+    {
+        if ($model === null) {
+            return null;
+        }
+
+        $data = ['id' => (int) $model->getKey()];
+        foreach ($fields as $field) {
+            if ($model->{$field} ?? null) {
+                $data[$field] = $this->enumValue($model->{$field});
+            }
+        }
+
+        if (! isset($data['name']) && isset($data['display_name'])) {
+            $data['name'] = $data['display_name'];
+        }
+
+        return $data;
+    }
+}

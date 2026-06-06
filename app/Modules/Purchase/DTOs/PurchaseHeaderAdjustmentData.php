@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\DTOs;
 
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
@@ -17,6 +18,7 @@ final readonly class PurchaseHeaderAdjustmentData
         public PurchaseAdjustmentEffect $effect,
         public string $amount,
         public PurchaseAdjustmentCalculationType $calculationType = PurchaseAdjustmentCalculationType::Fixed,
+        public PurchaseAdjustmentCalculationBase $calculationBase = PurchaseAdjustmentCalculationBase::Subtotal,
         public string $rate = '0.000000',
         public PurchaseAdjustmentAllocationMethod $allocationMethod = PurchaseAdjustmentAllocationMethod::Proportional,
         public bool $isAllocatable = true,

@@ -17,5 +17,7 @@ final readonly class PurchaseCalculationResult
         public string $adjustmentTotal,
         public string $grandTotal,
         public array $lineTotals = [],
+        public string $headerIncreaseTotal = '0.000000',
+        public string $headerDecreaseTotal = '0.000000',
     ) {}
 }

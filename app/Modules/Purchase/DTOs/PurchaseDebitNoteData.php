@@ -15,6 +15,8 @@ final readonly class PurchaseDebitNoteData
         public ?string $supplierType = null,
         public ?int $supplierId = null,
         public ?int $purchaseReturnId = null,
+        public ?string $sourceType = null,
+        public ?int $sourceId = null,
         public ?string $reason = null,
     ) {}
 }

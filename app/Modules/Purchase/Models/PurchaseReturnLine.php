@@ -32,6 +32,7 @@ final class PurchaseReturnLine extends CoreModel
             'previously_returned_quantity' => 'decimal:6',
             'remaining_quantity' => 'decimal:6',
             'unit_price' => 'decimal:6',
+            'cost_basis' => 'decimal:6',
             'discount_amount' => 'decimal:6',
             'tax_amount' => 'decimal:6',
             'charge_amount' => 'decimal:6',

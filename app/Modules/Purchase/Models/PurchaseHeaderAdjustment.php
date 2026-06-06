@@ -7,6 +7,7 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
@@ -28,6 +29,7 @@ final class PurchaseHeaderAdjustment extends CoreModel
             'adjustment_type' => PurchaseAdjustmentType::class,
             'effect' => PurchaseAdjustmentEffect::class,
             'calculation_type' => PurchaseAdjustmentCalculationType::class,
+            'calculation_base' => PurchaseAdjustmentCalculationBase::class,
             'allocation_method' => PurchaseAdjustmentAllocationMethod::class,
             'rate' => 'decimal:6',
             'amount' => 'decimal:6',

@@ -24,11 +24,13 @@ final class PurchaseDebitNote extends CoreModel
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
             'purchase_return_id' => 'integer',
+            'source_id' => 'integer',
             'debit_note_date' => 'date',
             'status' => PurchaseDebitNoteStatus::class,
             'amount' => 'decimal:6',
             'allocated_amount' => 'decimal:6',
             'remaining_amount' => 'decimal:6',
+            'approved_at' => 'datetime',
         ]);
     }
 

@@ -10,9 +10,14 @@ enum PurchaseAdjustmentType: string
     case Tax = 'tax';
     case Freight = 'freight';
     case Charge = 'charge';
+    case Insurance = 'insurance';
+    case ServiceCharge = 'service_charge';
+    case Duty = 'duty';
+    case Levy = 'levy';
     case CreditNote = 'credit_note';
     case DebitNote = 'debit_note';
     case Withholding = 'withholding';
     case Rounding = 'rounding';
+    case Custom = 'custom';
     case Other = 'other';
 }

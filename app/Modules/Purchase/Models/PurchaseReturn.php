@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
+use Modules\Purchase\Enums\PurchaseReturnType;
+use Modules\Supplier\Models\Supplier;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\Warehouse\Models\WarehouseModel;
 
 final class PurchaseReturn extends CoreModel
 {
@@ -27,6 +32,12 @@ final class PurchaseReturn extends CoreModel
             'warehouse_location_id' => 'integer',
             'return_date' => 'date',
             'status' => PurchaseReturnStatus::class,
+            'return_type' => PurchaseReturnType::class,
+            'source_id' => 'integer',
+            'approval_required' => 'boolean',
+            'affects_supplier_balance' => 'boolean',
+            'cost_basis' => 'decimal:6',
+            'audit_metadata' => 'array',
             'subtotal' => 'decimal:6',
             'adjustment_return_total' => 'decimal:6',
             'grand_total' => 'decimal:6',
@@ -39,6 +50,21 @@ final class PurchaseReturn extends CoreModel
     public function lines(): HasMany
     {
         return $this->hasMany(PurchaseReturnLine::class, 'purchase_return_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
+    }
+
+    public function warehouseLocation(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseLocationModel::class, 'warehouse_location_id');
     }
 
     public function adjustmentAllocations(): HasMany

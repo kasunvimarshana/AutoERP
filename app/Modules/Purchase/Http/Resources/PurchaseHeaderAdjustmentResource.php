@@ -17,6 +17,7 @@ final class PurchaseHeaderAdjustmentResource extends JsonResource
             'adjustment_type' => $this->enumValue($this->adjustment_type),
             'effect' => $this->enumValue($this->effect),
             'calculation_type' => $this->enumValue($this->calculation_type),
+            'calculation_base' => $this->enumValue($this->calculation_base),
             'rate' => (string) $this->rate,
             'amount' => (string) $this->amount,
             'allocated_amount' => (string) $this->allocated_amount,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Modules\Payment\DTOs\CreatePaymentData;
+use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
@@ -15,6 +16,7 @@ final class PurchasePaymentIntegrationService
      * Prepare a supplier payment DTO. Payment owns persistence and invoice settlement.
      *
      * @param  list<PaymentLineData>  $lines
+     * @param  list<PaymentAllocationData>  $allocations
      */
     public function prepareSupplierPayment(
         int $tenantId,
@@ -27,6 +29,7 @@ final class PurchasePaymentIntegrationService
         string $exchangeRate = '1.000000',
         ?string $referenceNumber = null,
         array $lines = [],
+        array $allocations = [],
     ): CreatePaymentData {
         return new CreatePaymentData(
             tenantId: $tenantId,
@@ -40,6 +43,7 @@ final class PurchasePaymentIntegrationService
             exchangeRate: $exchangeRate,
             referenceNumber: $referenceNumber,
             lines: $lines === [] ? [new PaymentLineData($amount, referenceNumber: $referenceNumber)] : $lines,
+            allocations: $allocations,
         );
     }
 }

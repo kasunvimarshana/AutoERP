@@ -7,7 +7,9 @@ namespace Modules\Purchase\Services;
 use InvalidArgumentException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Models\Item;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
@@ -21,6 +23,7 @@ final class PurchaseOrderService
         private readonly PurchaseValidationService $validator,
         private readonly PurchaseOrderCalculationService $calculator,
         private readonly PurchaseHeaderAdjustmentService $adjustments,
+        private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
         private readonly PurchaseStatusService $statuses,
     ) {}
@@ -51,7 +54,9 @@ final class PurchaseOrderService
                 'discount_total' => $calculation->discountTotal,
                 'tax_total' => $calculation->taxTotal,
                 'charge_total' => $calculation->chargeTotal,
-                'adjustment_total' => $calculation->adjustmentTotal,
+            'adjustment_total' => $calculation->adjustmentTotal,
+                'header_increase_total' => $calculation->headerIncreaseTotal,
+                'header_decrease_total' => $calculation->headerDecreaseTotal,
                 'grand_total' => $calculation->grandTotal,
                 'notes' => $data->notes,
                 'created_by' => $data->createdBy,
@@ -88,6 +93,8 @@ final class PurchaseOrderService
                 'tax_total' => $calculation->taxTotal,
                 'charge_total' => $calculation->chargeTotal,
                 'adjustment_total' => $calculation->adjustmentTotal,
+                'header_increase_total' => $calculation->headerIncreaseTotal,
+                'header_decrease_total' => $calculation->headerDecreaseTotal,
                 'grand_total' => $calculation->grandTotal,
                 'notes' => $data->notes,
             ]);
@@ -144,15 +151,26 @@ final class PurchaseOrderService
             $this->validator->assertNonNegative($line->discountAmount, 'Purchase line discount cannot be negative.');
             $this->validator->assertNonNegative($line->taxAmount, 'Purchase line tax cannot be negative.');
             $this->validator->assertNonNegative($line->chargeAmount, 'Purchase line charge cannot be negative.');
-            $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
-            if ($line->uomId === null) {
+            $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
+            $uomId = $line->orderedUomId ?? $line->uomId;
+            if ($uomId === null) {
                 throw new InvalidArgumentException('Purchase line UOM is required.');
             }
-            $this->validator->uom($data->tenantId, $data->organizationUnitId, $line->uomId);
+            $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId);
+            $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->orderedQuantity);
             if ($line->itemVariantId !== null) {
                 $this->validator->itemVariant($data->tenantId, $data->organizationUnitId, $line->itemId, $line->itemVariantId);
             }
-            $key = implode(':', [$line->itemId, $line->itemVariantId ?? 0, $line->uomId]);
+            foreach ([
+                [$line->discountCalculationType, $line->discountRate],
+                [$line->taxCalculationType, $line->taxRate],
+                [$line->chargeCalculationType, $line->chargeRate],
+            ] as [$type, $rate]) {
+                if ($type === PurchaseAdjustmentCalculationType::Percentage && $this->math->compare($rate, '100.000000') > 0) {
+                    throw new InvalidArgumentException('Purchase percentage rates cannot exceed 100.');
+                }
+            }
+            $key = implode(':', [$line->itemId, $line->itemVariantId ?? 0, $uomId]);
             if (isset($seen[$key])) {
                 throw new InvalidArgumentException('Duplicate purchase order line for item, variant, and UOM.');
             }
@@ -162,7 +180,21 @@ final class PurchaseOrderService
         foreach ($data->adjustments as $adjustment) {
             $this->validator->assertNonNegative($adjustment->amount, 'Purchase header adjustment amount cannot be negative.');
             $this->validator->assertNonNegative($adjustment->rate, 'Purchase header adjustment rate cannot be negative.');
+            if ($adjustment->calculationType === PurchaseAdjustmentCalculationType::Percentage && $this->math->compare($adjustment->rate, '100.000000') > 0) {
+                throw new InvalidArgumentException('Purchase percentage rates cannot exceed 100.');
+            }
         }
+    }
+
+    public function submit(PurchaseOrder $order, ?int $submittedBy = null): PurchaseOrder
+    {
+        $this->statuses->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::PendingApproval);
+        $order->status = PurchaseOrderStatus::PendingApproval;
+        $order->submitted_by = $submittedBy;
+        $order->submitted_at = now();
+        $order->save();
+
+        return $this->loadOrder($order);
     }
 
     public function approve(PurchaseOrder $order, ?int $approvedBy = null): PurchaseOrder
@@ -200,8 +232,13 @@ final class PurchaseOrderService
     public function applyReceived(PurchaseOrderLine $line, string $quantity): void
     {
         $line->received_quantity = $this->math->add((string) $line->received_quantity, $quantity);
-        $line->remaining_quantity = $this->math->sub((string) $line->ordered_quantity, (string) $line->received_quantity);
-        $line->status = $this->math->isZero((string) $line->remaining_quantity)
+        $remaining = $this->math->sub((string) $line->ordered_quantity, (string) $line->received_quantity);
+        $remaining = $this->math->sub($remaining, (string) $line->cancelled_quantity);
+        $line->remaining_quantity = $remaining;
+        $line->remaining_receivable_quantity = $remaining;
+        $line->remaining_invoiceable_quantity = $this->math->sub((string) $line->received_quantity, (string) $line->invoiced_quantity);
+        $line->remaining_returnable_quantity = $this->math->sub((string) $line->received_quantity, (string) $line->returned_quantity);
+        $line->status = $this->math->isZero($remaining)
             ? PurchaseOrderLineStatus::Received
             : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
@@ -211,11 +248,41 @@ final class PurchaseOrderService
     public function applyInvoiced(PurchaseOrderLine $line, string $quantity): void
     {
         $line->invoiced_quantity = $this->math->add((string) $line->invoiced_quantity, $quantity);
+        $invoiceableBasis = $this->math->compare((string) $line->received_quantity, '0.000000') > 0
+            ? (string) $line->received_quantity
+            : (string) $line->ordered_quantity;
+        $line->remaining_invoiceable_quantity = $this->math->sub($invoiceableBasis, (string) $line->invoiced_quantity);
         if ($this->math->compare((string) $line->invoiced_quantity, (string) $line->ordered_quantity) >= 0) {
             $line->status = PurchaseOrderLineStatus::Invoiced;
         } elseif ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
             $line->status = PurchaseOrderLineStatus::PartiallyInvoiced;
         }
+        $line->save();
+        $this->refreshOrderStatus($line->order);
+    }
+
+    public function applyReturned(PurchaseOrderLine $line, string $quantity): void
+    {
+        $line->returned_quantity = $this->math->add((string) $line->returned_quantity, $quantity);
+        $line->remaining_returnable_quantity = $this->math->sub((string) $line->received_quantity, (string) $line->returned_quantity);
+        $line->save();
+        $this->refreshOrderStatus($line->order);
+    }
+
+    public function reverseReceived(PurchaseOrderLine $line, string $quantity): void
+    {
+        $line->received_quantity = $this->math->sub((string) $line->received_quantity, $quantity);
+        if ($this->math->isNegative((string) $line->received_quantity)) {
+            $line->received_quantity = '0.000000';
+        }
+        $remaining = $this->math->sub((string) $line->ordered_quantity, (string) $line->received_quantity);
+        $line->remaining_quantity = $remaining;
+        $line->remaining_receivable_quantity = $remaining;
+        $line->remaining_invoiceable_quantity = $this->math->sub((string) $line->received_quantity, (string) $line->invoiced_quantity);
+        $line->remaining_returnable_quantity = $this->math->sub((string) $line->received_quantity, (string) $line->returned_quantity);
+        $line->status = $this->math->isZero((string) $line->received_quantity)
+            ? PurchaseOrderLineStatus::Open
+            : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
         $this->refreshOrderStatus($line->order);
     }
@@ -230,8 +297,13 @@ final class PurchaseOrderService
         $ordered = $this->math->sum($order->lines->pluck('ordered_quantity')->all());
         $received = $this->math->sum($order->lines->pluck('received_quantity')->all());
         $invoiced = $this->math->sum($order->lines->pluck('invoiced_quantity')->all());
+        $returned = $this->math->sum($order->lines->pluck('returned_quantity')->all());
 
-        if ($this->math->compare($invoiced, $ordered) >= 0) {
+        if ($this->math->compare($returned, $ordered) >= 0) {
+            $order->status = PurchaseOrderStatus::Returned;
+        } elseif ($this->math->compare($returned, '0.000000') > 0) {
+            $order->status = PurchaseOrderStatus::PartiallyReturned;
+        } elseif ($this->math->compare($invoiced, $ordered) >= 0) {
             $order->status = PurchaseOrderStatus::Invoiced;
         } elseif ($this->math->compare($invoiced, '0.000000') > 0) {
             $order->status = PurchaseOrderStatus::PartiallyInvoiced;
@@ -246,7 +318,13 @@ final class PurchaseOrderService
 
     private function replaceLinesAndAdjustments(PurchaseOrder $order, CreatePurchaseOrderData $data, array $lineTotals): void
     {
+        $adjustmentAmounts = $this->calculator->headerAdjustmentAmounts($data->lines, $data->adjustments);
+
         foreach ($data->lines as $index => $line) {
+            $item = Item::query()->findOrFail($line->itemId);
+            $uomId = $line->orderedUomId ?? $line->uomId;
+            $uom = $this->uoms->resolveLineUom($data->tenantId, $item, (int) $uomId, $line->orderedQuantity);
+            $amounts = $this->calculator->lineAmounts($line);
             $order->lines()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -254,20 +332,34 @@ final class PurchaseOrderService
                 'item_id' => $line->itemId,
                 'item_variant_id' => $line->itemVariantId,
                 'description' => $line->description,
-                'uom_id' => $line->uomId,
+                'uom_id' => $uom['ordered_uom_id'],
+                'ordered_uom_id' => $uom['ordered_uom_id'],
+                'base_uom_id' => $uom['base_uom_id'],
+                'uom_conversion_factor' => $uom['conversion_factor'],
                 'ordered_quantity' => $this->math->normalize($line->orderedQuantity),
+                'base_quantity' => $line->baseQuantity ?? $uom['base_quantity'],
                 'remaining_quantity' => $this->math->normalize($line->orderedQuantity),
+                'remaining_receivable_quantity' => $this->math->normalize($line->orderedQuantity),
+                'remaining_invoiceable_quantity' => '0.000000',
+                'remaining_returnable_quantity' => '0.000000',
                 'unit_price' => $this->math->normalize($line->unitPrice),
-                'discount_amount' => $this->math->normalize($line->discountAmount),
-                'tax_amount' => $this->math->normalize($line->taxAmount),
-                'charge_amount' => $this->math->normalize($line->chargeAmount),
+                'line_subtotal' => $amounts['subtotal'],
+                'discount_calculation_type' => $line->discountCalculationType,
+                'discount_rate' => $this->math->normalize($line->discountRate),
+                'discount_amount' => $amounts['discount'],
+                'tax_calculation_type' => $line->taxCalculationType,
+                'tax_rate' => $this->math->normalize($line->taxRate),
+                'tax_amount' => $amounts['tax'],
+                'charge_calculation_type' => $line->chargeCalculationType,
+                'charge_rate' => $this->math->normalize($line->chargeRate),
+                'charge_amount' => $amounts['charge'],
                 'line_total' => $lineTotals[$index],
                 'status' => PurchaseOrderLineStatus::Open,
             ]);
         }
 
-        foreach ($data->adjustments as $adjustment) {
-            $this->adjustments->create($data->tenantId, $data->organizationUnitId, 'purchase_order', (int) $order->getKey(), $adjustment);
+        foreach ($data->adjustments as $index => $adjustment) {
+            $this->adjustments->create($data->tenantId, $data->organizationUnitId, 'purchase_order', (int) $order->getKey(), $adjustment, $adjustmentAmounts[$index] ?? null);
         }
     }
 

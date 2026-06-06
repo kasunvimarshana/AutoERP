@@ -14,11 +14,14 @@ final class PurchaseStatusService
     public function assertPurchaseOrderTransition(PurchaseOrderStatus $from, PurchaseOrderStatus $to): void
     {
         $allowed = [
-            PurchaseOrderStatus::Draft->value => [PurchaseOrderStatus::Approved, PurchaseOrderStatus::Cancelled],
+            PurchaseOrderStatus::Draft->value => [PurchaseOrderStatus::PendingApproval, PurchaseOrderStatus::Approved, PurchaseOrderStatus::Cancelled],
+            PurchaseOrderStatus::PendingApproval->value => [PurchaseOrderStatus::Approved, PurchaseOrderStatus::Cancelled],
             PurchaseOrderStatus::Approved->value => [PurchaseOrderStatus::PartiallyReceived, PurchaseOrderStatus::Received, PurchaseOrderStatus::Closed, PurchaseOrderStatus::Cancelled],
-            PurchaseOrderStatus::PartiallyReceived->value => [PurchaseOrderStatus::Received, PurchaseOrderStatus::PartiallyInvoiced, PurchaseOrderStatus::Closed],
-            PurchaseOrderStatus::Received->value => [PurchaseOrderStatus::PartiallyInvoiced, PurchaseOrderStatus::Invoiced, PurchaseOrderStatus::Closed],
-            PurchaseOrderStatus::PartiallyInvoiced->value => [PurchaseOrderStatus::Invoiced, PurchaseOrderStatus::Closed],
+            PurchaseOrderStatus::PartiallyReceived->value => [PurchaseOrderStatus::Received, PurchaseOrderStatus::PartiallyInvoiced, PurchaseOrderStatus::PartiallyReturned, PurchaseOrderStatus::Returned, PurchaseOrderStatus::Closed],
+            PurchaseOrderStatus::Received->value => [PurchaseOrderStatus::PartiallyInvoiced, PurchaseOrderStatus::Invoiced, PurchaseOrderStatus::PartiallyReturned, PurchaseOrderStatus::Returned, PurchaseOrderStatus::Closed],
+            PurchaseOrderStatus::PartiallyInvoiced->value => [PurchaseOrderStatus::Invoiced, PurchaseOrderStatus::PartiallyReturned, PurchaseOrderStatus::Returned, PurchaseOrderStatus::Closed],
+            PurchaseOrderStatus::Invoiced->value => [PurchaseOrderStatus::PartiallyReturned, PurchaseOrderStatus::Returned, PurchaseOrderStatus::Closed],
+            PurchaseOrderStatus::PartiallyReturned->value => [PurchaseOrderStatus::Returned, PurchaseOrderStatus::Closed],
         ];
 
         $this->assertAllowed($from->value, $to->value, $allowed, 'Invalid purchase order status transition.');

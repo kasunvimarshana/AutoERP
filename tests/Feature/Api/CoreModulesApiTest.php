@@ -86,15 +86,19 @@ final class CoreModulesApiTest extends TestCase
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         $warehouseId = $this->warehouse($tenantId, $organizationUnitId);
+        $supplierId = $this->supplier($tenantId, $organizationUnitId);
+        $uomId = $this->uom($tenantId, $organizationUnitId);
         $item = $this->createItemViaApi($tenantId, $organizationUnitId, 'PUR-ITEM');
 
         $order = $this->postJson('/api/v1/purchase/orders', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'purchase_order_date' => '2026-06-06',
+            'supplier_id' => $supplierId,
             'warehouse_id' => $warehouseId,
             'lines' => [[
                 'item_id' => $item['id'],
+                'uom_id' => $uomId,
                 'ordered_quantity' => '5.000000',
                 'unit_price' => '100.000000',
             ]],
@@ -109,6 +113,7 @@ final class CoreModulesApiTest extends TestCase
             'lines' => [[
                 'purchase_order_line_id' => $order['lines'][0]['id'],
                 'item_id' => $item['id'],
+                'uom_id' => $uomId,
                 'received_quantity' => '2.000000',
                 'accepted_quantity' => '2.000000',
                 'ordered_quantity' => '5.000000',
@@ -267,6 +272,48 @@ final class CoreModulesApiTest extends TestCase
             'type' => 'standard',
             'is_active' => true,
             'is_default' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function supplier(int $tenantId, int $organizationUnitId): int
+    {
+        $code = 'SUP-'.Str::upper(Str::random(6));
+
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'supplier_number' => $code,
+            'code' => $code,
+            'name' => 'Supplier '.$code,
+            'display_name' => 'Supplier '.$code,
+            'supplier_type' => 'local',
+            'status' => 'active',
+            'is_credit_allowed' => true,
+            'is_advance_allowed' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function uom(int $tenantId, int $organizationUnitId): int
+    {
+        $code = 'PCS-'.Str::upper(Str::random(6));
+
+        return (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'row_version' => 1,
+            'code' => $code,
+            'name' => 'Pieces',
+            'symbol' => 'pcs',
+            'type' => 'unit',
+            'category' => 'quantity',
+            'decimal_precision' => 6,
+            'allow_fractional_quantity' => true,
+            'is_base' => true,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

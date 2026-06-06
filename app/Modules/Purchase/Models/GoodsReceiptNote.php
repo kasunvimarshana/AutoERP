@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Supplier\Models\Supplier;
+use Modules\User\Models\UserModel;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\Warehouse\Models\WarehouseModel;
 
 final class GoodsReceiptNote extends CoreModel
 {
@@ -37,6 +41,26 @@ final class GoodsReceiptNote extends CoreModel
             'posted_at' => 'datetime',
             'reversed_at' => 'datetime',
         ]);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
+    }
+
+    public function warehouseLocation(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseLocationModel::class, 'warehouse_location_id');
+    }
+
+    public function postedBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'posted_by');
     }
 
     public function purchaseOrder(): BelongsTo

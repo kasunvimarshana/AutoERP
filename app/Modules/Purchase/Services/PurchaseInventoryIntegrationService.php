@@ -72,6 +72,32 @@ final class PurchaseInventoryIntegrationService
         ), $postedBy);
     }
 
+    public function reverseReceipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
+    {
+        if (! $this->affectsStock((int) $line->item_id)) {
+            return null;
+        }
+
+        return $this->movements->record(new StockMovementData(
+            tenantId: (int) $grn->tenant_id,
+            movementDate: now()->toDateString(),
+            movementType: InventoryMovementType::ReturnOut,
+            direction: InventoryDirection::Out,
+            itemId: (int) $line->item_id,
+            warehouseId: (int) $grn->warehouse_id,
+            quantity: (string) $line->accepted_quantity,
+            organizationUnitId: $grn->organization_unit_id,
+            itemVariantId: $line->item_variant_id,
+            warehouseLocationId: $grn->warehouse_location_id,
+            unitCost: (string) $line->unit_price,
+            sourceType: 'goods_receipt_note_reversal',
+            sourceId: (int) $grn->getKey(),
+            sourceLineType: 'goods_receipt_note_line',
+            sourceLineId: (int) $line->getKey(),
+            description: 'GRN reversal '.$grn->grn_number,
+        ), $postedBy);
+    }
+
     private function affectsStock(int $itemId): bool
     {
         $item = Item::query()->findOrFail($itemId);

@@ -40,7 +40,10 @@ final class PurchaseOrder extends CoreModel
             'tax_total' => 'decimal:6',
             'charge_total' => 'decimal:6',
             'adjustment_total' => 'decimal:6',
+            'header_increase_total' => 'decimal:6',
+            'header_decrease_total' => 'decimal:6',
             'grand_total' => 'decimal:6',
+            'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
             'closed_at' => 'datetime',
         ]);

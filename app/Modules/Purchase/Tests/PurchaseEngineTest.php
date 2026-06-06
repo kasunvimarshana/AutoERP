@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Finance\DTOs\JournalLineData;
+use Modules\Inventory\DTOs\StockAdjustmentData;
+use Modules\Inventory\DTOs\StockAdjustmentLineData;
+use Modules\Inventory\Enums\AdjustmentType as InventoryAdjustmentType;
 use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAvailabilityService;
@@ -20,19 +23,25 @@ use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\DTOs\PaymentAllocationData;
+use Modules\Payment\Models\Payment;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
+use Modules\Purchase\DTOs\PurchaseDebitNoteData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\DTOs\PurchaseReturnLineData;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
@@ -43,7 +52,9 @@ use Modules\Purchase\Services\PurchaseFinancePreparationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
+use Modules\Purchase\Services\PurchaseDebitNoteService;
 use Modules\Purchase\Services\PurchaseReturnService;
+use Modules\Inventory\Services\StockAdjustmentService;
 use Tests\TestCase;
 
 final class PurchaseEngineTest extends TestCase
@@ -63,6 +74,59 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('10000.000000', (string) $order->charge_total);
         $this->assertSame('123000.000000', (string) $order->grand_total);
         $this->assertCount(3, $order->adjustments);
+    }
+
+    public function test_line_and_header_percentage_adjustments_and_uom_conversion(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId, $pcsUomId] = $this->purchaseContext();
+        $boxUomId = $this->createUom($tenantId, 'BOX-'.Str::upper(Str::random(4)), false);
+        DB::table('item_units')->insert([
+            'tenant_id' => $tenantId,
+            'item_id' => $item->getKey(),
+            'uom_id' => $boxUomId,
+            'unit_role' => 'purchase',
+            'conversion_factor' => '12.000000',
+            'is_default' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData(
+                itemId: (int) $item->getKey(),
+                orderedQuantity: '10.000000',
+                unitPrice: '100.000000',
+                uomId: $boxUomId,
+                discountCalculationType: PurchaseAdjustmentCalculationType::Percentage,
+                discountRate: '10.000000',
+                taxCalculationType: PurchaseAdjustmentCalculationType::Percentage,
+                taxRate: '15.000000',
+                chargeCalculationType: PurchaseAdjustmentCalculationType::Fixed,
+                chargeAmount: '25.000000',
+            )],
+            adjustments: [new PurchaseHeaderAdjustmentData(
+                name: 'Service',
+                adjustmentType: PurchaseAdjustmentType::ServiceCharge,
+                effect: PurchaseAdjustmentEffect::Increase,
+                amount: '0.000000',
+                calculationType: PurchaseAdjustmentCalculationType::Percentage,
+                calculationBase: PurchaseAdjustmentCalculationBase::SubtotalAfterLineDiscount,
+                rate: '5.000000',
+            )],
+        ));
+
+        $line = $order->lines->first();
+        $this->assertSame('120.000000', (string) $line->base_quantity);
+        $this->assertSame('100.000000', (string) $line->discount_amount);
+        $this->assertSame('135.000000', (string) $line->tax_amount);
+        $this->assertSame('45.000000', (string) $order->adjustments->first()->amount);
+        $this->assertSame('1105.000000', (string) $order->grand_total);
     }
 
     public function test_partial_grn_posts_inventory_and_skips_service_items(): void
@@ -199,6 +263,63 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(1, PurchaseDebitNote::query()->count());
         $this->assertSame('9840.000000', (string) PurchaseDebitNote::query()->firstOrFail()->amount);
         $this->assertSame(1, InventoryMovement::query()->where('source_type', 'purchase_return')->count());
+    }
+
+    public function test_manual_return_debit_note_only_inventory_adjustment_only_and_payment_prepare_boundaries(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+
+        try {
+            app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+                tenantId: $tenantId,
+                returnDate: '2026-06-06',
+                warehouseId: $warehouseId,
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                reason: 'Unknown old receipt',
+                returnType: PurchaseReturnType::ManualSupplierReturn,
+                costBasis: '10.000000',
+                lines: [new PurchaseReturnLineData('manual_supplier_return', 0, '1.000000', itemId: (int) $item->getKey(), uomId: $uomId, costBasis: '10.000000')],
+            ));
+            $this->fail('Expected manual supplier return approval validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Unreferenced supplier return requires approval.', $exception->getMessage());
+        }
+
+        $note = app(PurchaseDebitNoteService::class)->create(new PurchaseDebitNoteData(
+            tenantId: $tenantId,
+            debitNoteDate: '2026-06-06',
+            amount: '20.000000',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            sourceType: 'price_dispute',
+            reason: 'Price dispute',
+        ));
+        $this->assertSame('20.000000', (string) $note->amount);
+        $this->assertSame(0, InventoryMovement::query()->where('source_type', 'purchase_debit_note')->count());
+
+        $adjustment = app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+            tenantId: $tenantId,
+            adjustmentDate: '2026-06-06',
+            adjustmentType: InventoryAdjustmentType::OpeningBalance,
+            warehouseId: $warehouseId,
+            reason: 'Opening correction',
+            lines: [new StockAdjustmentLineData((int) $item->getKey(), '0.000000', '1.000000', '1.000000', '10.000000')],
+        ));
+        app(StockAdjustmentService::class)->post($adjustment);
+        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'inventory_adjustment')->count());
+        $this->assertSame(1, PurchaseDebitNote::query()->count());
+
+        $payment = app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
+            tenantId: $tenantId,
+            paymentDate: '2026-06-06',
+            amount: '20.000000',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            allocations: [new PaymentAllocationData(1, '20.000000', '2026-06-06')],
+        );
+        $this->assertCount(1, $payment->allocations);
+        $this->assertSame(0, Payment::query()->count());
     }
 
     public function test_tenant_isolation_is_enforced(): void
@@ -344,7 +465,7 @@ final class PurchaseEngineTest extends TestCase
         ]);
     }
 
-    private function createUom(int $tenantId, string $code): int
+    private function createUom(int $tenantId, string $code, bool $isBase = true): int
     {
         return (int) DB::table('unit_of_measures')->insertGetId([
             'tenant_id' => $tenantId,
@@ -356,7 +477,7 @@ final class PurchaseEngineTest extends TestCase
             'category' => 'quantity',
             'decimal_precision' => 6,
             'allow_fractional_quantity' => true,
-            'is_base' => true,
+            'is_base' => $isBase,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),

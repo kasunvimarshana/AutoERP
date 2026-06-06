@@ -10,11 +10,12 @@ use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 
-final class StorePurchaseOrderRequest extends TenantScopedRequest
+class StorePurchaseOrderRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
@@ -36,18 +37,27 @@ final class StorePurchaseOrderRequest extends TenantScopedRequest
             'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.description' => ['nullable', 'string'],
             'lines.*.uom_id' => ['required', 'integer', 'min:1'],
+            'lines.*.ordered_uom_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.base_uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.ordered_quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.unit_price' => ['required', 'decimal:0,6', 'min:0'],
+            'lines.*.discount_calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
+            'lines.*.discount_rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
             'lines.*.discount_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.tax_calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
+            'lines.*.tax_rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
             'lines.*.tax_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.charge_calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
+            'lines.*.charge_rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
             'lines.*.charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'adjustments' => ['nullable', 'array'],
             'adjustments.*.name' => ['required', 'string', 'max:255'],
             'adjustments.*.adjustment_type' => ['required', Rule::enum(PurchaseAdjustmentType::class)],
             'adjustments.*.effect' => ['required', Rule::enum(PurchaseAdjustmentEffect::class)],
             'adjustments.*.calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
-            'adjustments.*.rate' => ['nullable', 'decimal:0,6', 'min:0'],
-            'adjustments.*.amount' => ['required', 'decimal:0,6', 'min:0'],
+            'adjustments.*.calculation_base' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationBase::class)],
+            'adjustments.*.rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
+            'adjustments.*.amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'adjustments.*.allocation_method' => ['nullable', Rule::enum(PurchaseAdjustmentAllocationMethod::class)],
             'adjustments.*.is_allocatable' => ['nullable', 'boolean'],
             'adjustments.*.sort_order' => ['nullable', 'integer'],
@@ -78,16 +88,25 @@ final class StorePurchaseOrderRequest extends TenantScopedRequest
                 itemVariantId: isset($row['item_variant_id']) ? (int) $row['item_variant_id'] : null,
                 description: $row['description'] ?? null,
                 uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
+                orderedUomId: isset($row['ordered_uom_id']) ? (int) $row['ordered_uom_id'] : null,
+                baseUomId: isset($row['base_uom_id']) ? (int) $row['base_uom_id'] : null,
+                discountCalculationType: PurchaseAdjustmentCalculationType::from((string) ($row['discount_calculation_type'] ?? 'fixed')),
+                discountRate: (string) ($row['discount_rate'] ?? '0.000000'),
                 discountAmount: (string) ($row['discount_amount'] ?? '0.000000'),
+                taxCalculationType: PurchaseAdjustmentCalculationType::from((string) ($row['tax_calculation_type'] ?? 'fixed')),
+                taxRate: (string) ($row['tax_rate'] ?? '0.000000'),
                 taxAmount: (string) ($row['tax_amount'] ?? '0.000000'),
+                chargeCalculationType: PurchaseAdjustmentCalculationType::from((string) ($row['charge_calculation_type'] ?? 'fixed')),
+                chargeRate: (string) ($row['charge_rate'] ?? '0.000000'),
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
             ), $this->input('lines')),
             adjustments: array_map(static fn (array $row): PurchaseHeaderAdjustmentData => new PurchaseHeaderAdjustmentData(
                 name: (string) $row['name'],
                 adjustmentType: PurchaseAdjustmentType::from((string) $row['adjustment_type']),
                 effect: PurchaseAdjustmentEffect::from((string) $row['effect']),
-                amount: (string) $row['amount'],
+                amount: (string) ($row['amount'] ?? '0.000000'),
                 calculationType: PurchaseAdjustmentCalculationType::from((string) ($row['calculation_type'] ?? 'fixed')),
+                calculationBase: PurchaseAdjustmentCalculationBase::from((string) ($row['calculation_base'] ?? 'subtotal')),
                 rate: (string) ($row['rate'] ?? '0.000000'),
                 allocationMethod: PurchaseAdjustmentAllocationMethod::from((string) ($row['allocation_method'] ?? 'proportional')),
                 isAllocatable: (bool) ($row['is_allocatable'] ?? true),
