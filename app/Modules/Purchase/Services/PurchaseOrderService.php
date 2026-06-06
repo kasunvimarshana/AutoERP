@@ -21,6 +21,7 @@ final class PurchaseOrderService
         private readonly PurchaseOrderCalculationService $calculator,
         private readonly PurchaseHeaderAdjustmentService $adjustments,
         private readonly PurchaseNumberService $numbers,
+        private readonly PurchaseStatusService $statuses,
     ) {}
 
     public function create(CreatePurchaseOrderData $data): PurchaseOrder
@@ -90,9 +91,30 @@ final class PurchaseOrderService
 
     public function approve(PurchaseOrder $order, ?int $approvedBy = null): PurchaseOrder
     {
+        $this->statuses->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Approved);
         $order->status = PurchaseOrderStatus::Approved;
         $order->approved_by = $approvedBy;
         $order->approved_at = now();
+        $order->save();
+
+        return $order->refresh();
+    }
+
+    public function cancel(PurchaseOrder $order): PurchaseOrder
+    {
+        $this->statuses->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Cancelled);
+        $order->status = PurchaseOrderStatus::Cancelled;
+        $order->save();
+
+        return $order->refresh();
+    }
+
+    public function close(PurchaseOrder $order, ?int $closedBy = null): PurchaseOrder
+    {
+        $this->statuses->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Closed);
+        $order->status = PurchaseOrderStatus::Closed;
+        $order->closed_by = $closedBy;
+        $order->closed_at = now();
         $order->save();
 
         return $order->refresh();

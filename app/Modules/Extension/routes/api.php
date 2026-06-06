@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Extension\Http\Controllers\AttachmentController;
-use Modules\Extension\Http\Controllers\EntityAttributeController;
 use Modules\Extension\Http\Controllers\CommentController;
+use Modules\Extension\Http\Controllers\EntityAttributeController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -18,7 +18,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/extension')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,

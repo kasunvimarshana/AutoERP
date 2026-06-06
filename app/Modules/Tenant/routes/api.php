@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Tenant\Http\Controllers\TenantController;
 use Modules\Tenant\Http\Controllers\TenantDocumentController;
 use Modules\Tenant\Http\Controllers\TenantDomainController;
 use Modules\Tenant\Http\Controllers\TenantPlanController;
 use Modules\Tenant\Http\Controllers\TenantSettingController;
 use Modules\Tenant\Http\Controllers\TenantSettingGroupController;
-use Modules\Tenant\Http\Controllers\TenantController;
 use Modules\Tenant\Http\Middleware\TenantResolutionMiddleware;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -22,7 +22,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/tenant')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         TenantResolutionMiddleware::class,

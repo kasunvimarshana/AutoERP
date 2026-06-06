@@ -25,7 +25,7 @@ $currentUserRecordMiddleware = (string) config('user.context.middleware_alias', 
 Route::prefix('api/user')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,

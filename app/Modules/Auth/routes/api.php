@@ -48,7 +48,7 @@ Route::prefix('api/auth')
         Route::middleware([
             'throttle:60,1',
             $tokenValidationMiddleware,
-            'auth:' . $protectedGuard,
+            'auth:'.$protectedGuard,
             $currentUserMiddleware,
             $currentTenantMiddleware,
             $currentOrganizationUnitMiddleware,

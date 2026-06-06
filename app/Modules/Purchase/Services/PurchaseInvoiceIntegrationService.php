@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
+use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
@@ -73,6 +74,13 @@ final class PurchaseInvoiceIntegrationService
 
             return $invoice;
         });
+    }
+
+    public function previewSupplierInvoice(CreatePurchaseInvoiceData $data): InvoiceCalculationResult
+    {
+        $normalized = $this->normalizeInvoiceData($data);
+
+        return $this->invoices->preview($normalized['invoiceData']);
     }
 
     /**

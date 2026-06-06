@@ -87,6 +87,15 @@ final class InvoiceCreationService
         });
     }
 
+    public function preview(CreateInvoiceData $data): InvoiceCalculationResult
+    {
+        $this->validator->validateForCreation($data);
+        $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data);
+        $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
+
+        return $this->calculations->calculate($this->withAllocatedAdjustments($data, $preparedAdjustments));
+    }
+
     /**
      * @param  list<array{adjustment: object, allocation: array<string, mixed>|null}>  $preparedAdjustments
      */

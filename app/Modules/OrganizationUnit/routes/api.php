@@ -21,7 +21,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/organization-unit')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,

@@ -6,6 +6,7 @@ namespace Modules\Payment\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 
@@ -91,6 +92,43 @@ final class PaymentStatusService
         $payment->forceFill([
             'status' => $this->statusForAmounts($totalAmount, $allocatedAmount)->value,
             'posted_at' => $payment->posted_at ?? now(),
+        ])->save();
+
+        return $payment->refresh();
+    }
+
+    public function transition(Payment $payment, PaymentStatus $to, ?int $actorId = null): Payment
+    {
+        $from = $payment->status instanceof PaymentStatus
+            ? $payment->status
+            : PaymentStatus::from((string) $payment->status);
+        $this->assertCanTransition($from, $to);
+
+        $updates = ['status' => $to->value];
+        if ($to === PaymentStatus::Approved) {
+            $updates['approved_by'] = $actorId;
+            $updates['approved_at'] = now();
+        }
+        if ($to === PaymentStatus::Posted) {
+            $updates['posted_at'] = now();
+        }
+
+        $payment->forceFill($updates)->save();
+
+        return $payment->refresh();
+    }
+
+    public function void(Payment $payment, ?int $voidedBy = null, ?string $reason = null): Payment
+    {
+        if ($payment->allocations()->where('status', AllocationStatus::Active->value)->exists()) {
+            throw new InvalidArgumentException('Allocated payments must be reversed before they can be voided.');
+        }
+
+        $payment = $this->transition($payment, PaymentStatus::Void, $voidedBy);
+        $payment->forceFill([
+            'voided_by' => $voidedBy,
+            'voided_at' => now(),
+            'void_reason' => $reason,
         ])->save();
 
         return $payment->refresh();

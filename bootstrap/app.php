@@ -95,6 +95,19 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
 
+        $exceptions->render(function (InvalidArgumentException $exception, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return api_error_response(
+                    'BUSINESS_RULE_VIOLATION',
+                    $exception->getMessage(),
+                    422,
+                    'domain',
+                );
+            }
+
+            return null;
+        });
+
         $exceptions->render(function (HttpResponseException $exception, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return $exception->getResponse();
