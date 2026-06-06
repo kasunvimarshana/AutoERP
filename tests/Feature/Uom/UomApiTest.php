@@ -79,7 +79,27 @@ final class UomApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.from_uom.code', 'BOX')
             ->assertJsonPath('data.to_uom.code', 'PCS')
-            ->assertJsonPath('data.conversion_factor', '12');
+            ->assertJsonPath('data.conversion_factor', '12.000000')
+            ->assertJsonMissingPath('data.from_uom_id')
+            ->assertJsonMissingPath('data.to_uom_id');
+    }
+
+    public function test_duplicate_conversion_prevention(): void
+    {
+        $context = $this->createAuthContext();
+        [$boxId, $pcsId] = $this->createBoxAndPieces($context);
+
+        $payload = [
+            'from_uom_id' => $boxId,
+            'to_uom_id' => $pcsId,
+            'conversion_factor' => '12',
+        ];
+
+        $this->withAuth($context)->postJson('/api/v1/uom-conversions', $payload)->assertCreated();
+
+        $this->withAuth($context)->postJson('/api/v1/uom-conversions', $payload)
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_conversion_factor_validation(): void
@@ -126,11 +146,47 @@ final class UomApiTest extends TestCase
             'quantity' => '5',
         ])
             ->assertOk()
-            ->assertJsonPath('quantity', '5')
+            ->assertJsonPath('quantity', '5.000000')
             ->assertJsonPath('from_uom.code', 'BOX')
             ->assertJsonPath('to_uom.code', 'PCS')
-            ->assertJsonPath('conversion_factor', '12')
-            ->assertJsonPath('converted_quantity', '60');
+            ->assertJsonPath('conversion_factor', '12.000000')
+            ->assertJsonPath('converted_quantity', '60.000000');
+    }
+
+    public function test_decimal_safe_fractional_conversion(): void
+    {
+        $context = $this->createAuthContext();
+        [$boxId, $pcsId] = $this->createBoxAndPieces($context);
+        $this->withAuth($context)->postJson('/api/v1/uom-conversions', [
+            'from_uom_id' => $boxId,
+            'to_uom_id' => $pcsId,
+            'conversion_factor' => '2.5',
+        ])->assertCreated();
+
+        $this->withAuth($context)->postJson('/api/v1/uom-conversions/convert', [
+            'from_uom_id' => $boxId,
+            'to_uom_id' => $pcsId,
+            'quantity' => '1.5',
+        ])
+            ->assertOk()
+            ->assertJsonPath('quantity', '1.500000')
+            ->assertJsonPath('conversion_factor', '2.500000')
+            ->assertJsonPath('converted_quantity', '3.750000');
+    }
+
+    public function test_inactive_uom_cannot_be_used_in_conversion(): void
+    {
+        $context = $this->createAuthContext();
+        [$boxId, $pcsId] = $this->createBoxAndPieces($context);
+        $this->withAuth($context)->patchJson('/api/v1/uoms/'.$pcsId.'/deactivate')->assertOk();
+
+        $this->withAuth($context)->postJson('/api/v1/uom-conversions', [
+            'from_uom_id' => $boxId,
+            'to_uom_id' => $pcsId,
+            'conversion_factor' => '12',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_tenant_isolation(): void

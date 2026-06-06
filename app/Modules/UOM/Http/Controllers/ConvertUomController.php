@@ -7,6 +7,7 @@ namespace Modules\UOM\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\Services\DecimalMath;
 use Modules\UOM\DTOs\UomConversionResultData;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Contracts\Services\UomConversionServiceInterface;
@@ -19,11 +20,9 @@ final class ConvertUomController extends Controller
         private readonly UomConversionServiceInterface $conversionService,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly UnitOfMeasureRepositoryInterface $uoms,
+        private readonly DecimalMath $math,
     ) {}
 
-    /**
-     * POST api/uom/convert
-     */
     public function __invoke(ConvertUomRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -35,7 +34,7 @@ final class ConvertUomController extends Controller
             ], 422);
         }
 
-        $quantity = (string) $validated['quantity'];
+        $quantity = $this->math->normalize((string) $validated['quantity']);
         $fromUomId = (int) $validated['from_uom_id'];
         $toUomId = (int) $validated['to_uom_id'];
 
@@ -47,7 +46,7 @@ final class ConvertUomController extends Controller
             return response()->json(['message' => $error->message, 'code' => $error->code], $status);
         }
 
-        $result = $this->conversionService->convert((float) $quantity, $fromUomId, $toUomId, $tenantId);
+        $result = $this->conversionService->convert($quantity, $fromUomId, $toUomId, $tenantId);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -63,8 +62,8 @@ final class ConvertUomController extends Controller
             quantity: $quantity,
             fromUom: $this->uomSummary($fromUom?->toArray() ?? []),
             toUom: $this->uomSummary($toUom?->toArray() ?? []),
-            conversionFactor: $this->decimalString($factorResult->valueOrFail()),
-            convertedQuantity: $this->decimalString($result->valueOrFail()),
+            conversionFactor: (string) $factorResult->valueOrFail(),
+            convertedQuantity: (string) $result->valueOrFail(),
         ))->toArray());
     }
 
@@ -78,8 +77,4 @@ final class ConvertUomController extends Controller
         ];
     }
 
-    private function decimalString(mixed $value): string
-    {
-        return rtrim(rtrim(number_format((float) $value, 10, '.', ''), '0'), '.');
-    }
 }

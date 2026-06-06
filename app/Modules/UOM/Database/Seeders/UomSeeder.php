@@ -75,12 +75,12 @@ final class UomSeeder extends Seeder
         }
 
         $conversions = [
-            ['from' => 'BOX', 'to' => 'PCS', 'factor' => '12'],
-            ['from' => 'PACK', 'to' => 'PCS', 'factor' => '6'],
-            ['from' => 'KG', 'to' => 'G', 'factor' => '1000'],
-            ['from' => 'L', 'to' => 'ML', 'factor' => '1000'],
-            ['from' => 'DAY', 'to' => 'HOUR', 'factor' => '24'],
-            ['from' => 'MONTH', 'to' => 'DAY', 'factor' => '30'],
+            ['from' => 'BOX', 'to' => 'PCS', 'conversion_factor' => '12'],
+            ['from' => 'PACK', 'to' => 'PCS', 'conversion_factor' => '6'],
+            ['from' => 'KG', 'to' => 'G', 'conversion_factor' => '1000'],
+            ['from' => 'L', 'to' => 'ML', 'conversion_factor' => '1000'],
+            ['from' => 'DAY', 'to' => 'HOUR', 'conversion_factor' => '24'],
+            ['from' => 'MONTH', 'to' => 'DAY', 'conversion_factor' => '30'],
         ];
 
         foreach ($conversions as $conversion) {
@@ -97,7 +97,7 @@ final class UomSeeder extends Seeder
                     'to_uom_id' => $to->id,
                 ],
                 [
-                    'conversion_factor' => $conversion['factor'],
+                    'conversion_factor' => $conversion['conversion_factor'],
                     'is_active' => true,
                     'description' => 'Default generic conversion.',
                     'organization_unit_id' => $organizationUnitId,

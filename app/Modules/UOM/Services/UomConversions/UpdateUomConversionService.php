@@ -8,6 +8,7 @@ use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\Core\Services\DecimalMath;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Repositories\UomConversionRepositoryInterface;
@@ -22,6 +23,7 @@ final class UpdateUomConversionService
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly UomValidationService $validation,
+        private readonly DecimalMath $math,
     ) {}
 
     public function execute(int|string $id, array $payload): Result
@@ -48,43 +50,29 @@ final class UpdateUomConversionService
             }
             $fromUomId = (int) ($payload['from_uom_id'] ?? $current->get('from_uom_id'));
             $toUomId = (int) ($payload['to_uom_id'] ?? $current->get('to_uom_id'));
-            $factor = (float) ($payload['conversion_factor'] ?? $current->get('conversion_factor'));
-
-            if ($fromUomId === $toUomId) {
-                return Result::failure(new Error(
-                    UomErrorCode::SELF_REFERENCE_CONVERSION,
-                    'From and to UOM cannot be the same.',
-                ));
+            $factor = $this->math->normalize((string) ($payload['conversion_factor'] ?? $current->get('conversion_factor')));
+            $validated = $this->validation->validateConversion($fromUomId, $toUomId, $factor, $tenantId);
+            if (! $validated['valid']) {
+                return Result::failure(new Error((string) $validated['code'], (string) $validated['message']));
             }
 
-            if ($factor <= 0) {
-                return Result::failure(new Error(
-                    UomErrorCode::INVALID_FACTOR,
-                    'Conversion factor must be greater than zero.',
-                ));
-            }
-
-            $fromUom = $this->uomRepository->findByIdInTenant($fromUomId, $tenantId);
-            $toUom = $this->uomRepository->findByIdInTenant($toUomId, $tenantId);
-
-            if ($fromUom === null || $toUom === null) {
-                return Result::failure(new Error(
-                    UomErrorCode::NOT_FOUND,
-                    'One or both units of measure were not found.',
-                ));
-            }
-
-            if ((string) $fromUom->get('type') !== (string) $toUom->get('type')) {
-                return Result::failure(new Error(
-                    UomErrorCode::INCOMPATIBLE_UOM_TYPE,
-                    'Conversion types are incompatible.',
-                ));
+            $organizationUnitId = isset($payload['organization_unit_id']) ? (int) $payload['organization_unit_id'] : null;
+            foreach ([$validated['from'], $validated['to']] as $uom) {
+                $uomOrganizationUnitId = $uom?->get('organization_unit_id');
+                if ($organizationUnitId !== null && $uomOrganizationUnitId !== null && (int) $uomOrganizationUnitId !== $organizationUnitId) {
+                    return Result::failure(new Error(
+                        UomErrorCode::INVALID_VALUE,
+                        'Conversion UOMs must belong to the active organization unit.',
+                    ));
+                }
             }
 
             $existing = $this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId);
             if ($existing !== null && (int) $existing->get('id') !== (int) $id) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }
+
+            $payload['conversion_factor'] = $factor;
 
             return Result::success($this->repository->update($id, $payload));
         } catch (Throwable $exception) {

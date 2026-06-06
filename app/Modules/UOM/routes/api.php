@@ -48,21 +48,3 @@ Route::prefix('api/v1')
             ->name('uom-conversions.deactivate');
         Route::apiResource('uom-conversions', UomConversionController::class);
     });
-
-Route::prefix('api/uom')
-    ->middleware($middleware)
-    ->name('uom.')
-    ->group(function (): void {
-        Route::post('convert', ConvertUomController::class)->name('convert');
-        Route::get('categories', [UnitOfMeasureController::class, 'categories'])->name('categories.index');
-        Route::get('units-of-measure/lookup', [UnitOfMeasureController::class, 'lookup'])->name('units-of-measure.lookup');
-        Route::get('units-of-measure/base', [UnitOfMeasureController::class, 'base'])->name('units-of-measure.base');
-        Route::patch('units-of-measure/{units_of_measure}/activate', [UnitOfMeasureController::class, 'activate'])
-            ->whereNumber('units_of_measure')
-            ->name('units-of-measure.activate');
-        Route::patch('units-of-measure/{units_of_measure}/deactivate', [UnitOfMeasureController::class, 'deactivate'])
-            ->whereNumber('units_of_measure')
-            ->name('units-of-measure.deactivate');
-        Route::apiResource('units-of-measure', UnitOfMeasureController::class);
-        Route::apiResource('uom-conversions', UomConversionController::class);
-    });

@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import type { NamedResource } from '@/shared/types/common';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
-import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
-import { convertUom, searchUoms } from './uomApi';
-import type { UomConvertResult } from './uomTypes';
+import { convertUom } from './uomApi';
+import { UomLookupSelect } from './UomLookupSelect';
+import type { UomConvertResult, UomSummary } from './uomTypes';
 
 export default function UomConvertTool() {
-    const [fromUom, setFromUom] = useState<NamedResource | null>(null);
-    const [toUom, setToUom] = useState<NamedResource | null>(null);
+    const [fromUom, setFromUom] = useState<UomSummary | null>(null);
+    const [toUom, setToUom] = useState<UomSummary | null>(null);
     const [quantity, setQuantity] = useState('1');
     const [result, setResult] = useState<UomConvertResult | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
@@ -32,6 +31,9 @@ export default function UomConvertTool() {
                         if (!fromUom || !toUom) {
                             throw new ApiError('Select both UOMs.', 422);
                         }
+                        if (Number(fromUom.id) === Number(toUom.id)) {
+                            throw new ApiError('From UOM and To UOM cannot be the same.', 422);
+                        }
                         setResult(await convertUom({
                             from_uom_id: Number(fromUom.id),
                             to_uom_id: Number(toUom.id),
@@ -44,8 +46,8 @@ export default function UomConvertTool() {
                     }
                 }}>
                     <div className="grid gap-4 md:grid-cols-3">
-                        <LookupSelect label="From UOM" value={fromUom} onChange={setFromUom} search={searchUoms} error={fieldError(error, 'from_uom_id')} />
-                        <LookupSelect label="To UOM" value={toUom} onChange={setToUom} search={searchUoms} error={fieldError(error, 'to_uom_id')} />
+                        <UomLookupSelect label="From UOM" value={fromUom} onChange={setFromUom} excludeId={toUom?.id ?? null} error={fieldError(error, 'from_uom_id')} />
+                        <UomLookupSelect label="To UOM" value={toUom} onChange={setToUom} excludeId={fromUom?.id ?? null} error={fieldError(error, 'to_uom_id')} />
                         <Input label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
                     </div>
                     <div className="flex justify-end"><Button type="submit" loading={loading}>Convert</Button></div>

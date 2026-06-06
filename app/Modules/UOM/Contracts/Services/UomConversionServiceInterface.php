@@ -13,10 +13,10 @@ interface UomConversionServiceInterface
      * Convert a quantity from one unit to another within a tenant scope.
      * Resolves direct tenant conversions, then attempts base-unit mediation.
      *
-     * @return Result<float>
+     * @return Result<string>
      */
     public function convert(
-        float $quantity,
+        int|string $quantity,
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
@@ -34,7 +34,7 @@ interface UomConversionServiceInterface
     /**
      * Return the net conversion factor from fromUom to toUom.
      *
-     * @return Result<float>
+     * @return Result<string>
      */
     public function getConversionFactor(
         int|string $fromUomId,
@@ -52,10 +52,10 @@ interface UomConversionServiceInterface
     /**
      * Convert a quantity to its base unit within the tenant.
      *
-     * @return Result<float>
+     * @return Result<string>
      */
     public function normalizeToBase(
-        float $quantity,
+        int|string $quantity,
         int|string $uomId,
         int $tenantId,
     ): Result;
@@ -63,10 +63,10 @@ interface UomConversionServiceInterface
     /**
      * Convert a quantity from a base unit to a target unit within the tenant.
      *
-     * @return Result<float>
+     * @return Result<string>
      */
     public function convertFromBase(
-        float $quantity,
+        int|string $quantity,
         int|string $baseUomId,
         int|string $targetUomId,
         int $tenantId,

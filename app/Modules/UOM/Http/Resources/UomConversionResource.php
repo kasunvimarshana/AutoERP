@@ -25,9 +25,7 @@ final class UomConversionResource extends JsonResource
             'organization_unit_id' => $data['organization_unit_id'] ?? null,
             'from_uom' => $this->uomSummary($data['from_uom'] ?? null, $data['from_uom_id'] ?? null),
             'to_uom' => $this->uomSummary($data['to_uom'] ?? null, $data['to_uom_id'] ?? null),
-            'conversion_factor' => isset($data['conversion_factor'])
-                ? rtrim(rtrim((string) $data['conversion_factor'], '0'), '.')
-                : null,
+            'conversion_factor' => isset($data['conversion_factor']) ? (string) $data['conversion_factor'] : null,
             'is_active' => $data['is_active'] ?? true,
             'description' => $data['description'] ?? null,
             'created_at' => $data['created_at'] ?? null,

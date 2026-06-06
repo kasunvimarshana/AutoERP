@@ -1,7 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
-import type { NamedResource } from '@/shared/types/common';
 import type {
     UnitOfMeasure,
     UomConversion,
@@ -37,12 +36,17 @@ export async function deactivateUom(id: number): Promise<UnitOfMeasure> {
     return response.data.data;
 }
 
-export async function searchUoms(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
+export async function searchUoms(search: string, signal?: AbortSignal): Promise<UomSummary[]> {
     const response = await apiClient.get<ApiCollection<UnitOfMeasure>>(`${endpoints.uoms}/lookup`, {
         params: { search, per_page: 20 },
         signal,
     });
-    return response.data.data.map((uom) => ({ id: uom.id, name: `${uom.code} - ${uom.name}`, code: uom.symbol ?? uom.code }));
+    return response.data.data.map((uom) => ({
+        id: uom.id,
+        code: uom.code,
+        name: uom.name,
+        symbol: uom.symbol,
+    }));
 }
 
 export async function listUomConversions(params: ListParams, signal?: AbortSignal): Promise<UomListResponse<UomConversion>> {
@@ -68,11 +72,6 @@ export async function updateUomConversion(id: number, payload: Partial<UomConver
 export async function convertUom(payload: { from_uom_id: number; to_uom_id: number; quantity: string }): Promise<UomConvertResult> {
     const response = await apiClient.post<UomConvertResult>(`${endpoints.uomConversions}/convert`, payload);
     return response.data;
-}
-
-export function namedToUomSummary(resource: NamedResource | null): UomSummary | null {
-    if (!resource) return null;
-    return { id: Number(resource.id), code: resource.code ?? String(resource.id), name: resource.name };
 }
 
 function withMeta<T>(response: ApiCollection<T>): UomListResponse<T> {

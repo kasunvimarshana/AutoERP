@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomErrorCode;
@@ -13,15 +14,14 @@ use Modules\UOM\Repositories\UomConversionRepositoryInterface;
 
 final class UomConversionService implements UomConversionServiceInterface
 {
-    private const PRECISION = 10;
-
     public function __construct(
         private readonly UnitOfMeasureRepositoryInterface $uomRepository,
         private readonly UomConversionRepositoryInterface $conversionRepository,
+        private readonly DecimalMath $math,
     ) {}
 
     public function convert(
-        float $quantity,
+        int|string $quantity,
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
@@ -32,9 +32,7 @@ final class UomConversionService implements UomConversionServiceInterface
             return $factorResult;
         }
 
-        $factor = (float) $factorResult->valueOrFail();
-
-        return Result::success(round($quantity * $factor, self::PRECISION));
+        return Result::success($this->math->mul($quantity, (string) $factorResult->valueOrFail()));
     }
 
     public function canConvert(
@@ -52,7 +50,7 @@ final class UomConversionService implements UomConversionServiceInterface
     ): Result {
         // Trivial: same unit
         if ($fromUomId == $toUomId) {
-            return Result::success(1.0);
+            return Result::success('1.000000');
         }
 
         // 1. Tenant-wide direct conversion
@@ -77,7 +75,7 @@ final class UomConversionService implements UomConversionServiceInterface
     }
 
     public function normalizeToBase(
-        float $quantity,
+        int|string $quantity,
         int|string $uomId,
         int $tenantId,
     ): Result {
@@ -88,7 +86,7 @@ final class UomConversionService implements UomConversionServiceInterface
         }
 
         if ($uom->get('is_base')) {
-            return Result::success($quantity);
+            return Result::success($this->math->normalize($quantity));
         }
 
         $base = $this->uomRepository->findBaseUomForType((string) $uom->get('type'), $tenantId);
@@ -101,7 +99,7 @@ final class UomConversionService implements UomConversionServiceInterface
     }
 
     public function convertFromBase(
-        float $quantity,
+        int|string $quantity,
         int|string $baseUomId,
         int|string $targetUomId,
         int $tenantId,
@@ -121,21 +119,21 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-    ): ?float {
+    ): ?string {
         // Forward
         $record = $this->conversionRepository->findConversionBetween($fromUomId, $toUomId, $tenantId);
 
         if ($record !== null && $record->get('is_active')) {
-            return (float) $record->get('conversion_factor');
+            return $this->math->normalize((string) $record->get('conversion_factor'));
         }
 
         // Reverse conversion is available when the opposite direct conversion exists.
         $reverse = $this->conversionRepository->findConversionBetween($toUomId, $fromUomId, $tenantId);
 
         if ($reverse !== null && $reverse->get('is_active')) {
-            $factor = (float) $reverse->get('conversion_factor');
+            $factor = $this->math->normalize((string) $reverse->get('conversion_factor'));
 
-            return $factor != 0.0 ? round(1.0 / $factor, self::PRECISION) : null;
+            return $this->math->isZero($factor) ? null : $this->math->div('1', $factor);
         }
 
         return null;
@@ -176,12 +174,12 @@ final class UomConversionService implements UomConversionServiceInterface
 
         // from -> base
         $fromToBase = ($fromUomId == $baseId)
-            ? 1.0
+            ? '1.000000'
             : $this->resolveDirectFactor($fromUomId, $baseId, $tenantId);
 
         // base -> target
         $baseToTarget = ($toUomId == $baseId)
-            ? 1.0
+            ? '1.000000'
             : $this->resolveDirectFactor($baseId, $toUomId, $tenantId);
 
         if ($fromToBase === null || $baseToTarget === null) {
@@ -191,6 +189,6 @@ final class UomConversionService implements UomConversionServiceInterface
             ));
         }
 
-        return Result::success(round($fromToBase * $baseToTarget, self::PRECISION));
+        return Result::success($this->math->mul($fromToBase, $baseToTarget));
     }
 }
