@@ -1,1 +1,0 @@
-export { ItemInventorySummaryPanel } from './ItemPanels';

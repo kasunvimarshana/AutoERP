@@ -1,1 +1,0 @@
-export { ItemStockBehaviorBadge } from './ItemBadges';
