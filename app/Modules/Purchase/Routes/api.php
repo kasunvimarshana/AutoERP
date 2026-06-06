@@ -17,9 +17,14 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('orders', [PurchaseController::class, 'index'])->name('orders.index');
     Route::post('orders', [PurchaseController::class, 'store'])->name('orders.store');
     Route::get('orders/{order}', [PurchaseController::class, 'show'])->whereNumber('order')->name('orders.show');
+    Route::put('orders/{order}', [PurchaseController::class, 'update'])->whereNumber('order')->name('orders.update');
+    Route::delete('orders/{order}', [PurchaseController::class, 'destroy'])->whereNumber('order')->name('orders.destroy');
     Route::post('orders/{order}/approve', [PurchaseController::class, 'approve'])->whereNumber('order')->name('orders.approve');
+    Route::patch('orders/{order}/approve', [PurchaseController::class, 'approve'])->whereNumber('order')->name('orders.approve.patch');
     Route::post('orders/{order}/cancel', [PurchaseController::class, 'cancel'])->whereNumber('order')->name('orders.cancel');
+    Route::patch('orders/{order}/cancel', [PurchaseController::class, 'cancel'])->whereNumber('order')->name('orders.cancel.patch');
     Route::post('orders/{order}/close', [PurchaseController::class, 'close'])->whereNumber('order')->name('orders.close');
+    Route::patch('orders/{order}/close', [PurchaseController::class, 'close'])->whereNumber('order')->name('orders.close.patch');
     Route::post('goods-receipts', [PurchaseController::class, 'createGrn'])->name('goods-receipts.store');
     Route::post('goods-receipts/{grn}/post', [PurchaseController::class, 'postGrn'])->whereNumber('grn')->name('goods-receipts.post');
     Route::post('returns', [PurchaseController::class, 'createReturn'])->name('returns.store');

@@ -14,7 +14,7 @@ use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 
-final class StorePurchaseOrderRequest extends TenantScopedRequest
+final class UpdatePurchaseOrderRequest extends TenantScopedRequest
 {
     public function rules(): array
     {

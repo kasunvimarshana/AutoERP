@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Supplier\Models\Supplier;
+use Modules\User\Models\UserModel;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\Warehouse\Models\WarehouseModel;
 
 final class PurchaseOrder extends CoreModel
 {
@@ -43,6 +49,41 @@ final class PurchaseOrder extends CoreModel
     public function lines(): HasMany
     {
         return $this->hasMany(PurchaseOrderLine::class, 'purchase_order_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
+    }
+
+    public function warehouseLocation(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseLocationModel::class, 'warehouse_location_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'created_by');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'approved_by');
+    }
+
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'closed_by');
     }
 
     public function adjustments(): HasMany

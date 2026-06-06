@@ -46,6 +46,9 @@ final class PurchaseOrderCalculationService
                 $line->taxAmount,
                 $line->chargeAmount,
             );
+            if ($this->math->isNegative($lineTotals[array_key_last($lineTotals)])) {
+                throw new \InvalidArgumentException('Purchase line total cannot be negative.');
+            }
             $subtotal = $this->math->add($subtotal, $base);
             $discountTotal = $this->math->add($discountTotal, $line->discountAmount);
             $taxTotal = $this->math->add($taxTotal, $line->taxAmount);
@@ -57,7 +60,7 @@ final class PurchaseOrderCalculationService
                 continue;
             }
 
-            $amount = $adjustment->amount;
+            $amount = $this->math->normalize($adjustment->amount);
             if ($adjustment->adjustmentType === PurchaseAdjustmentType::Discount
                 || $adjustment->adjustmentType === PurchaseAdjustmentType::CreditNote
                 || $adjustment->adjustmentType === PurchaseAdjustmentType::Withholding) {
@@ -68,17 +71,18 @@ final class PurchaseOrderCalculationService
                 || $adjustment->adjustmentType === PurchaseAdjustmentType::Charge
                 || $adjustment->adjustmentType === PurchaseAdjustmentType::DebitNote) {
                 $chargeTotal = $this->math->add($chargeTotal, $amount);
-            } else {
-                $adjustmentTotal = $adjustment->effect === PurchaseAdjustmentEffect::Increase
-                    ? $this->math->add($adjustmentTotal, $amount)
-                    : $this->math->sub($adjustmentTotal, $amount);
             }
+
+            $adjustmentTotal = $adjustment->effect === PurchaseAdjustmentEffect::Increase
+                ? $this->math->add($adjustmentTotal, $amount)
+                : $this->math->sub($adjustmentTotal, $amount);
         }
 
-        $grandTotal = $this->math->add($subtotal, $taxTotal);
-        $grandTotal = $this->math->add($grandTotal, $chargeTotal);
+        $grandTotal = $this->math->sum($lineTotals);
         $grandTotal = $this->math->add($grandTotal, $adjustmentTotal);
-        $grandTotal = $this->math->sub($grandTotal, $discountTotal);
+        if ($this->math->isNegative($grandTotal)) {
+            throw new \InvalidArgumentException('Purchase order total cannot be negative.');
+        }
 
         return new PurchaseCalculationResult($subtotal, $discountTotal, $taxTotal, $chargeTotal, $adjustmentTotal, $grandTotal, $lineTotals);
     }

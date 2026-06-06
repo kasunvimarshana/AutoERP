@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Modules\Purchase\Validators;
 
 use InvalidArgumentException;
+use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
+use Modules\Item\Models\ItemVariant;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Supplier\Models\Supplier;
 use Modules\Warehouse\Models\WarehouseModel;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class PurchaseValidationService
 {
@@ -41,6 +46,49 @@ final class PurchaseValidationService
         return $item;
     }
 
+    public function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId): Supplier
+    {
+        $supplier = Supplier::query()->findOrFail($supplierId);
+        $this->assertTenantOrg((int) $supplier->tenant_id, $supplier->organization_unit_id, $tenantId, $organizationUnitId);
+
+        $status = $supplier->status instanceof \BackedEnum
+            ? $supplier->status->value
+            : (string) $supplier->status;
+        if ($status !== 'active') {
+            throw new InvalidArgumentException('Purchase supplier must be active.');
+        }
+
+        return $supplier;
+    }
+
+    public function uom(int $tenantId, ?int $organizationUnitId, int $uomId): UnitOfMeasureModel
+    {
+        $uom = UnitOfMeasureModel::query()->findOrFail($uomId);
+        $this->assertTenantOrg((int) $uom->tenant_id, $uom->organization_unit_id, $tenantId, $organizationUnitId);
+
+        if (isset($uom->is_active) && ! (bool) $uom->is_active) {
+            throw new InvalidArgumentException('Purchase UOM must be active.');
+        }
+
+        return $uom;
+    }
+
+    public function itemVariant(int $tenantId, ?int $organizationUnitId, int $itemId, int $variantId): ItemVariant
+    {
+        $variant = ItemVariant::query()->findOrFail($variantId);
+        $this->assertTenantOrg((int) $variant->tenant_id, $variant->organization_unit_id, $tenantId, $organizationUnitId);
+
+        if ((int) $variant->item_id !== $itemId) {
+            throw new InvalidArgumentException('Purchase item variant must belong to the selected item.');
+        }
+
+        if (isset($variant->is_active) && ! (bool) $variant->is_active) {
+            throw new InvalidArgumentException('Purchase item variant must be active.');
+        }
+
+        return $variant;
+    }
+
     public function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId): WarehouseModel
     {
         $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
@@ -51,6 +99,34 @@ final class PurchaseValidationService
         }
 
         return $warehouse;
+    }
+
+    public function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId): WarehouseLocationModel
+    {
+        $location = WarehouseLocationModel::query()->findOrFail($locationId);
+        $this->assertTenantOrg((int) $location->tenant_id, $location->organization_unit_id ?? null, $tenantId, $organizationUnitId);
+
+        if ((int) $location->warehouse_id !== $warehouseId) {
+            throw new InvalidArgumentException('Purchase warehouse location must belong to the selected warehouse.');
+        }
+
+        if (isset($location->is_active) && ! (bool) $location->is_active) {
+            throw new InvalidArgumentException('Purchase warehouse location must be active.');
+        }
+
+        return $location;
+    }
+
+    public function currency(int $tenantId, ?int $organizationUnitId, int $currencyId): CurrencyModel
+    {
+        $currency = CurrencyModel::query()->findOrFail($currencyId);
+        $this->assertTenantOrg((int) $currency->tenant_id, $currency->organization_unit_id ?? null, $tenantId, $organizationUnitId);
+
+        if (isset($currency->is_active) && ! (bool) $currency->is_active) {
+            throw new InvalidArgumentException('Purchase currency must be active.');
+        }
+
+        return $currency;
     }
 
     public function assertTenantOrg(?int $actualTenantId, ?int $actualOrgId, int $tenantId, ?int $organizationUnitId): void

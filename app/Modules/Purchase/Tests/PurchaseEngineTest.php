@@ -67,15 +67,17 @@ final class PurchaseEngineTest extends TestCase
 
     public function test_partial_grn_posts_inventory_and_skips_service_items(): void
     {
-        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
-        $service = $this->createItem($tenantId, 'SVC-'.Str::upper(Str::random(4)), ItemType::Service, false);
+        [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+        $service = $this->createItem($tenantId, 'SVC-'.Str::upper(Str::random(4)), ItemType::Service, false, $uomId);
         $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
             warehouseId: $warehouseId,
             lines: [
-                new PurchaseOrderLineData((int) $item->getKey(), '10.000000', '100.000000'),
-                new PurchaseOrderLineData((int) $service->getKey(), '1.000000', '50.000000'),
+                new PurchaseOrderLineData((int) $item->getKey(), '10.000000', '100.000000', uomId: $uomId),
+                new PurchaseOrderLineData((int) $service->getKey(), '1.000000', '50.000000', uomId: $uomId),
             ],
         ));
 
@@ -201,7 +203,7 @@ final class PurchaseEngineTest extends TestCase
 
     public function test_tenant_isolation_is_enforced(): void
     {
-        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
         $otherTenant = $this->createTenant('OTHER');
         $otherWarehouse = $this->createWarehouse($otherTenant, 'WH-OTHER');
 
@@ -211,8 +213,10 @@ final class PurchaseEngineTest extends TestCase
         app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
             warehouseId: $otherWarehouse,
-            lines: [new PurchaseOrderLineData((int) $item->getKey(), '1.000000', '1.000000')],
+            lines: [new PurchaseOrderLineData((int) $item->getKey(), '1.000000', '1.000000', uomId: $uomId)],
         ));
     }
 
@@ -239,10 +243,10 @@ final class PurchaseEngineTest extends TestCase
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
-            supplierId: 10,
+            supplierId: $this->supplierId($tenantId),
             warehouseId: $warehouseId,
             lines: [
-                new PurchaseOrderLineData((int) $item->getKey(), '100.000000', '1000.000000'),
+                new PurchaseOrderLineData((int) $item->getKey(), '100.000000', '1000.000000', uomId: (int) $item->base_uom_id),
             ],
             adjustments: [
                 new PurchaseHeaderAdjustmentData('Discount', PurchaseAdjustmentType::Discount, PurchaseAdjustmentEffect::Decrease, '5000.000000'),
@@ -286,13 +290,15 @@ final class PurchaseEngineTest extends TestCase
     private function purchaseContext(): array
     {
         $tenantId = $this->createTenant();
+        $uomId = $this->createUom($tenantId, 'PCS-'.Str::upper(Str::random(4)));
+        $supplierId = $this->createSupplier($tenantId, 'SUP-'.Str::upper(Str::random(4)));
         $warehouseId = $this->createWarehouse($tenantId, 'WH-'.Str::upper(Str::random(4)));
-        $item = $this->createItem($tenantId, 'ITEM-'.Str::upper(Str::random(4)));
+        $item = $this->createItem($tenantId, 'ITEM-'.Str::upper(Str::random(4)), uomId: $uomId);
 
-        return [$tenantId, $warehouseId, $item];
+        return [$tenantId, $warehouseId, $item, $supplierId, $uomId];
     }
 
-    private function createItem(int $tenantId, string $code, ItemType $type = ItemType::Stock, bool $stockable = true): Item
+    private function createItem(int $tenantId, string $code, ItemType $type = ItemType::Stock, bool $stockable = true, ?int $uomId = null): Item
     {
         return app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,
@@ -301,6 +307,7 @@ final class PurchaseEngineTest extends TestCase
             itemType: $type,
             trackingType: TrackingType::None,
             costingMethod: CostingMethod::Fifo,
+            baseUomId: $uomId,
             isStockable: $stockable,
         ));
     }
@@ -335,5 +342,46 @@ final class PurchaseEngineTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function createUom(int $tenantId, string $code): int
+    {
+        return (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'code' => $code,
+            'name' => 'Unit '.$code,
+            'symbol' => 'pcs',
+            'type' => 'unit',
+            'category' => 'quantity',
+            'decimal_precision' => 6,
+            'allow_fractional_quantity' => true,
+            'is_base' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createSupplier(int $tenantId, string $code): int
+    {
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_number' => $code,
+            'code' => $code,
+            'name' => 'Supplier '.$code,
+            'display_name' => 'Supplier '.$code,
+            'supplier_type' => 'local',
+            'status' => 'active',
+            'is_credit_allowed' => true,
+            'is_advance_allowed' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function supplierId(int $tenantId): int
+    {
+        return (int) DB::table('suppliers')->where('tenant_id', $tenantId)->value('id');
     }
 }

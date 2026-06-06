@@ -18,3 +18,19 @@ export async function searchWarehouses(search: string, signal?: AbortSignal): Pr
     });
     return response.data.data;
 }
+
+export async function searchWarehouseLocations(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
+    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/warehouse/warehouse-locations', {
+        params: { search, per_page: 20 },
+        signal,
+    });
+    return response.data.data;
+}
+
+export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
+    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/configuration/currencies', {
+        params: { code: search, per_page: 20 },
+        signal,
+    });
+    return response.data.data;
+}

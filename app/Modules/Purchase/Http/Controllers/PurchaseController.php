@@ -14,6 +14,7 @@ use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInvoiceRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseReturnRequest;
+use Modules\Purchase\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
 use Modules\Purchase\Http\Resources\PurchaseOrderResource;
 use Modules\Purchase\Http\Resources\PurchaseReturnResource;
@@ -31,11 +32,19 @@ final class PurchaseController
     public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(PurchaseOrder::query(), $request)->with([
+            'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
             'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
         ]);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
-            $query->where('purchase_order_number', 'like', "%{$search}%");
+            $query->where(function (Builder $scope) use ($search): void {
+                $scope->where('purchase_order_number', 'like', "%{$search}%")
+                    ->orWhereHas('supplier', function (Builder $supplier) use ($search): void {
+                        $supplier->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%")
+                            ->orWhere('supplier_number', 'like', "%{$search}%");
+                    });
+            });
         }
         foreach (['status', 'supplier_id'] as $filter) {
             if ($request->filled($filter)) {
@@ -52,18 +61,32 @@ final class PurchaseController
         return PurchaseOrderResource::collection($query->latest('purchase_order_date')->paginate($request->perPage()));
     }
 
-    public function store(StorePurchaseOrderRequest $request, PurchaseOrderService $service): PurchaseOrderResource
+    public function store(StorePurchaseOrderRequest $request, PurchaseOrderService $service): JsonResponse
     {
-        return new PurchaseOrderResource($service->create($request->toData()));
+        return (new PurchaseOrderResource($service->create($request->toData())))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(ListPurchaseOrderRequest $request, int $order): PurchaseOrderResource
     {
         return new PurchaseOrderResource($this->scope(PurchaseOrder::query(), $request)
             ->with([
+                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy', 'closedBy',
                 'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
-                'goodsReceiptNotes.lines.item', 'goodsReceiptNotes.lines.variant', 'goodsReceiptNotes.lines.uom',
             ])->findOrFail($order));
+    }
+
+    public function update(UpdatePurchaseOrderRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
+    {
+        return new PurchaseOrderResource($service->update($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->toData()));
+    }
+
+    public function destroy(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): JsonResponse
+    {
+        $service->delete($this->scope(PurchaseOrder::query(), $request)->findOrFail($order));
+
+        return response()->json(status: 204);
     }
 
     public function approve(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
@@ -130,7 +153,7 @@ final class PurchaseController
         return response()->json(['data' => $data]);
     }
 
-    private function scope(Builder $query, ListPurchaseOrderRequest|PurchaseActionRequest $request): Builder
+    private function scope(Builder $query, ListPurchaseOrderRequest|PurchaseActionRequest|UpdatePurchaseOrderRequest $request): Builder
     {
         $query->where('tenant_id', $request->tenantId());
 

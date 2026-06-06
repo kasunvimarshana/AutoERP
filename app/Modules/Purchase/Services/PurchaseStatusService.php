@@ -53,8 +53,13 @@ final class PurchaseStatusService
             return;
         }
 
-        if (! in_array($to, $allowed[$from] ?? [], true)) {
-            throw new InvalidArgumentException($message);
+        foreach ($allowed[$from] ?? [] as $candidate) {
+            $candidateValue = $candidate instanceof \BackedEnum ? $candidate->value : (string) $candidate;
+            if ($candidateValue === $to) {
+                return;
+            }
         }
+
+        throw new InvalidArgumentException($message);
     }
 }
