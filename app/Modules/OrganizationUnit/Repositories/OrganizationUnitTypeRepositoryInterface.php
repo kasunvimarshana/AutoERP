@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\OrganizationUnit\Repositories;
+
+use Modules\Core\DTOs\DataRecord;
+use Modules\Core\Repositories\Contracts\RepositoryPortInterface;
+
+interface OrganizationUnitTypeRepositoryInterface extends RepositoryPortInterface
+{
+    /**
+     * @return list<DataRecord>
+     */
+    public function listByTenant(int|string $tenantId): array;
+
+    public function findByTenantAndName(int|string $tenantId, string $name): ?DataRecord;
+}

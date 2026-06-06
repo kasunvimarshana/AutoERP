@@ -4,6 +4,10 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Modules\Auth\Database\Seeders\AuthSeeder;
+use Modules\Core\Database\Seeders\CoreSeeder;
+use Modules\UOM\Database\Seeders\UomSeeder;
+use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,6 +18,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        $this->call([
+            CoreSeeder::class,
+            AuthSeeder::class,
+            UomSeeder::class,
+            WarehouseSeeder::class,
+        ]);
     }
 }

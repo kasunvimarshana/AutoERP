@@ -1,6 +1,6 @@
 <?php
 
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Modules\User\Models\UserModel;
 
 return [
 

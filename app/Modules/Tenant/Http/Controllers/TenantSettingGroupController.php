@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Tenant\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
+use Modules\Tenant\Http\Requests\ListTenantSettingGroupRequest;
+use Modules\Tenant\Http\Requests\UpsertTenantSettingGroupRequest;
+use Modules\Tenant\Http\Resources\TenantSettingGroupResource;
+use Modules\Tenant\Services\SettingGroups\TenantSettingGroupService;
+
+final class TenantSettingGroupController extends Controller
+{
+    public function __construct(private readonly TenantSettingGroupService $groups) {}
+
+    public function index(ListTenantSettingGroupRequest $request): JsonResponse
+    {
+        $result = $this->groups->listByTenant((int) $request->validated('tenant_id'));
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => TenantSettingGroupResource::collection($result->valueOrFail())->resolve()]);
+    }
+
+    public function show(int|string $tenantSettingGroup): JsonResponse|TenantSettingGroupResource
+    {
+        $result = $this->groups->get($tenantSettingGroup);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return new TenantSettingGroupResource($result->valueOrFail());
+    }
+
+    public function store(UpsertTenantSettingGroupRequest $request): JsonResponse|TenantSettingGroupResource
+    {
+        $result = $this->groups->create($request->validated());
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return (new TenantSettingGroupResource($result->valueOrFail()))->response()->setStatusCode(201);
+    }
+
+    public function update(
+        UpsertTenantSettingGroupRequest $request,
+        int|string $tenantSettingGroup,
+    ): JsonResponse|TenantSettingGroupResource {
+        $result = $this->groups->update($tenantSettingGroup, $request->validated());
+        if ($result->isFailure()) {
+            $status = $result->errorOrFail()->code === 'TENANT_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $result->errorOrFail()->message], $status);
+        }
+
+        return new TenantSettingGroupResource($result->valueOrFail());
+    }
+
+    public function destroy(int|string $tenantSettingGroup): JsonResponse
+    {
+        $result = $this->groups->delete($tenantSettingGroup);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return response()->json(null, 204);
+    }
+}

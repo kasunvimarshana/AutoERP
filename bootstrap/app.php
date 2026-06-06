@@ -9,10 +9,10 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Presentation\Http\Middleware\CurrentOrganizationUnitMiddleware;
-use Modules\Core\Presentation\Http\Middleware\CurrentTenantMiddleware;
-use Modules\Core\Presentation\Http\Middleware\CurrentUserMiddleware;
-use Modules\Core\Presentation\Http\Middleware\NormalizeApiErrorResponseMiddleware;
+use Modules\Core\Http\Middleware\CurrentOrganizationUnitMiddleware;
+use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
+use Modules\Core\Http\Middleware\CurrentUserMiddleware;
+use Modules\Core\Http\Middleware\NormalizeApiErrorResponseMiddleware;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 if (! function_exists('api_error_response')) {

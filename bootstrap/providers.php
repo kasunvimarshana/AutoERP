@@ -1,18 +1,29 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use Modules\Audit\Providers\AuditServiceProvider;
+use Modules\Auth\Providers\AuthServiceProvider;
+use Modules\Configuration\Providers\ConfigurationServiceProvider;
+use Modules\Core\Providers\CoreServiceProvider;
+use Modules\Extension\Providers\ExtensionServiceProvider;
+use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
+use Modules\Sequence\Providers\SequenceServiceProvider;
+use Modules\Tenant\Providers\TenantServiceProvider;
+use Modules\UOM\Providers\UomServiceProvider;
+use Modules\User\Providers\UserServiceProvider;
+use Modules\Warehouse\Providers\WarehouseServiceProvider;
 
 return [
     AppServiceProvider::class,
-    Modules\Core\Infrastructure\Providers\CoreServiceProvider::class,
-    Modules\Configuration\Infrastructure\Providers\ConfigurationServiceProvider::class,
-    Modules\Auth\Infrastructure\Providers\AuthServiceProvider::class,
-    Modules\User\Infrastructure\Providers\UserServiceProvider::class,
-    Modules\Tenant\Infrastructure\Providers\TenantServiceProvider::class,
-    Modules\Sequence\Infrastructure\Providers\SequenceServiceProvider::class,
-    Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
-    Modules\UOM\Infrastructure\Providers\UomServiceProvider::class,
-    Modules\Audit\Infrastructure\Providers\AuditServiceProvider::class,
-    Modules\Extension\Infrastructure\Providers\ExtensionServiceProvider::class,
-    Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider::class,
+    CoreServiceProvider::class,
+    ConfigurationServiceProvider::class,
+    AuthServiceProvider::class,
+    UserServiceProvider::class,
+    TenantServiceProvider::class,
+    SequenceServiceProvider::class,
+    OrganizationUnitServiceProvider::class,
+    UomServiceProvider::class,
+    AuditServiceProvider::class,
+    ExtensionServiceProvider::class,
+    WarehouseServiceProvider::class,
 ];

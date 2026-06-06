@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Tenant\Presentation\Http\Controllers\TenantDocumentController;
-use Modules\Tenant\Presentation\Http\Controllers\TenantDomainController;
-use Modules\Tenant\Presentation\Http\Controllers\TenantPlanController;
-use Modules\Tenant\Presentation\Http\Controllers\TenantSettingController;
-use Modules\Tenant\Presentation\Http\Controllers\TenantSettingGroupController;
-use Modules\Tenant\Presentation\Http\Controllers\TenantController;
-use Modules\Tenant\Presentation\Http\Middleware\TenantResolutionMiddleware;
+use Modules\Tenant\Http\Controllers\TenantDocumentController;
+use Modules\Tenant\Http\Controllers\TenantDomainController;
+use Modules\Tenant\Http\Controllers\TenantPlanController;
+use Modules\Tenant\Http\Controllers\TenantSettingController;
+use Modules\Tenant\Http\Controllers\TenantSettingGroupController;
+use Modules\Tenant\Http\Controllers\TenantController;
+use Modules\Tenant\Http\Middleware\TenantResolutionMiddleware;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');

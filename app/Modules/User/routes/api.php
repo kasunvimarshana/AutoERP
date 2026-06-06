@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\User\Presentation\Http\Controllers\PermissionController;
-use Modules\User\Presentation\Http\Controllers\RoleController;
-use Modules\User\Presentation\Http\Controllers\RolePermissionController;
-use Modules\User\Presentation\Http\Controllers\UserController;
-use Modules\User\Presentation\Http\Controllers\UserDeviceController;
-use Modules\User\Presentation\Http\Controllers\UserDocumentController;
-use Modules\User\Presentation\Http\Controllers\UserPermissionController;
-use Modules\User\Presentation\Http\Controllers\UserRoleController;
-use Modules\User\Presentation\Http\Controllers\UserTenantController;
+use Modules\User\Http\Controllers\PermissionController;
+use Modules\User\Http\Controllers\RoleController;
+use Modules\User\Http\Controllers\RolePermissionController;
+use Modules\User\Http\Controllers\UserController;
+use Modules\User\Http\Controllers\UserDeviceController;
+use Modules\User\Http\Controllers\UserDocumentController;
+use Modules\User\Http\Controllers\UserPermissionController;
+use Modules\User\Http\Controllers\UserRoleController;
+use Modules\User\Http\Controllers\UserTenantController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');

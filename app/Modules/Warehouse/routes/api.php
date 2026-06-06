@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Warehouse\Presentation\Http\Controllers\WarehouseController;
-use Modules\Warehouse\Presentation\Http\Controllers\WarehouseLocationController;
+use Modules\Warehouse\Http\Controllers\WarehouseController;
+use Modules\Warehouse\Http\Controllers\WarehouseLocationController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');

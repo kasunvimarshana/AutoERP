@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitController;
-use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitDocumentController;
-use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitSettingController;
-use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitSettingGroupController;
-use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitTypeController;
-use Modules\OrganizationUnit\Presentation\Http\Middleware\OrganizationUnitResolutionMiddleware;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitController;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitDocumentController;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitSettingController;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitSettingGroupController;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitTypeController;
+use Modules\OrganizationUnit\Http\Middleware\OrganizationUnitResolutionMiddleware;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');

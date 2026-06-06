@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Configuration\Presentation\Http\Controllers\ConfigurationController;
-use Modules\Configuration\Presentation\Http\Controllers\CountryController;
-use Modules\Configuration\Presentation\Http\Controllers\CurrencyController;
-use Modules\Configuration\Presentation\Http\Controllers\LanguageController;
-use Modules\Configuration\Presentation\Http\Controllers\TimezoneController;
+use Modules\Configuration\Http\Controllers\ConfigurationController;
+use Modules\Configuration\Http\Controllers\CountryController;
+use Modules\Configuration\Http\Controllers\CurrencyController;
+use Modules\Configuration\Http\Controllers\LanguageController;
+use Modules\Configuration\Http\Controllers\TimezoneController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');

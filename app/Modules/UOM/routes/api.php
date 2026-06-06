@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\UOM\Presentation\Http\Controllers\ConvertUomController;
-use Modules\UOM\Presentation\Http\Controllers\UnitOfMeasureController;
-use Modules\UOM\Presentation\Http\Controllers\UomConversionController;
+use Modules\UOM\Http\Controllers\ConvertUomController;
+use Modules\UOM\Http\Controllers\UnitOfMeasureController;
+use Modules\UOM\Http\Controllers\UomConversionController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
