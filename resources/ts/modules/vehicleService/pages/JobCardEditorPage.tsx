@@ -61,7 +61,7 @@ function LookupNative({ onChange, options = [], required, value }: { onChange: (
     const selected = options.find((option) => option.id === value);
     const [text, setText] = useState(selected ? label(selected) : '');
     useEffect(() => { setText(selected ? label(selected) : ''); }, [selected?.id, options.length]);
-    return <><Input list={listId} placeholder="Search and select" required={required} value={text} onChange={(event) => { const next = event.target.value; setText(next); const match = options.find((option) => label(option) === next); if (match) onChange(match.id); }} /><datalist id={listId}>{options.map((option) => <option key={option.id} value={label(option)} />)}</datalist></>;
+    return <><Input list={listId} placeholder="Search and select" required={required} value={text} onChange={(event) => { const next = event.target.value; setText(next); const match = options.find((option) => label(option) === next); if (match) onChange(match.id); else if (value) onChange(0); }} /><datalist id={listId}>{options.map((option) => <option key={option.id} value={label(option)} />)}</datalist></>;
 }
 function LineSection({ items = [], lines, onAdd, onChoose, onRemove, onUpdate, title, uoms = [] }: { items?: Lookup[]; lines: JobLineInput[]; onAdd: () => void; onChoose: (index: number, itemId: number) => void; onRemove: (index: number) => void; onUpdate: (index: number, value: Partial<JobLineInput>) => void; title: string; uoms?: Lookup[] }) {
     const isLabor = title === 'Labor';

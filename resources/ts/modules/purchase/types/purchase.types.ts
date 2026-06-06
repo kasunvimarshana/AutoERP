@@ -7,9 +7,11 @@ export type PurchaseLineInput = {
     discountType?: 'percentage' | 'fixed' | '';
     discountValue?: string;
     itemId: number;
+    orderedQty?: string;
     purchaseOrderLineId?: number;
     receivedQty?: string;
     returnQty?: string;
+    quantity?: string;
     originalGrnLineId?: number;
     taxAmount?: string;
     taxGroupId?: number;
