@@ -10,15 +10,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Finance\Application\Support\FinancialServiceSupport;
-use Modules\Inventory\Application\Services\StockIssuingService;
-use Modules\Invoice\Application\Services\InvoiceService;
 
 final class VehicleServiceService
 {
     public function __construct(
         private readonly FinancialServiceSupport $support,
-        private readonly StockIssuingService $stockIssuing,
-        private readonly InvoiceService $invoices,
+        private readonly VehicleServiceInventoryService $inventory,
+        private readonly VehicleServiceInvoiceService $invoiceOrchestrator,
+        private readonly VehicleServicePaymentService $paymentOrchestrator,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -165,43 +164,12 @@ final class VehicleServiceService
             ->where('vehicle_service_job_invoice_links.status', 'active')
             ->whereNull('vehicle_service_job_invoice_links.deleted_at')
             ->get();
-        $this->syncPaymentLinks($job);
-        $job->payments = DB::table('vehicle_service_job_payment_links')
-            ->join('payments', 'payments.id', '=', 'vehicle_service_job_payment_links.payment_id')
-            ->select(['payments.id', 'payments.payment_number', 'payments.payment_date', 'payments.status', 'vehicle_service_job_payment_links.allocated_amount'])
-            ->where('vehicle_service_job_payment_links.tenant_id', $this->support->tenantId())
-            ->where('vehicle_service_job_payment_links.job_card_id', $id)
-            ->where('vehicle_service_job_payment_links.status', 'active')
-            ->whereNull('vehicle_service_job_payment_links.deleted_at')
-            ->get();
-
-        $storedPaid = round((float) $job->paid_amount, 4);
-        $storedBalance = round((float) $job->balance, 4);
-        $storedPaymentStatus = (string) $job->payment_status;
-        $paid = round((float) $job->invoice_links->sum('settled_total'), 4);
-        $balance = round((float) $job->invoice_links->sum('balance_total'), 4);
-        $job->paid_amount = $paid;
-        $job->balance = $job->invoice_links->isEmpty() ? $job->grand_total : $balance;
-        $job->payment_status = $paid <= 0 ? 'unpaid' : ($balance <= 0.0001 ? 'paid' : 'partially_paid');
-        $derivedStatus = $job->status === 'invoiced' && $job->payment_status === 'paid' ? 'paid' : $job->status;
-        if (
-            $storedPaid !== $paid
-            || $storedBalance !== round((float) $job->balance, 4)
-            || $storedPaymentStatus !== $job->payment_status
-            || $derivedStatus !== $job->status
-        ) {
-            DB::table('vehicle_service_job_cards')->where('id', $id)->update([
-                'paid_amount' => $paid,
-                'balance' => $balance,
-                'payment_status' => $job->payment_status,
-                'status' => $derivedStatus,
-                'updated_at' => now(),
-            ]);
-        }
-        if ($derivedStatus !== $job->status) {
-            $this->recordStatus($id, $job->status, $derivedStatus, 'settlement');
-            $job->status = $derivedStatus;
-        }
+        $payment = $this->paymentOrchestrator->visibility($id, (string) $job->status);
+        $job->paid_amount = $payment['paid_amount'];
+        $job->balance = $job->invoice_links->isEmpty() ? $job->grand_total : $payment['balance'];
+        $job->payment_status = $payment['payment_status'];
+        $job->status = $payment['job_status'];
+        $job->payments = $payment['payments'];
 
         return $job;
     }
@@ -248,7 +216,7 @@ final class VehicleServiceService
             if (in_array($job->status, ['cancelled'], true)) {
                 throw ValidationException::withMessages(['status' => ['Cancelled jobs cannot consume inventory.']]);
             }
-            $this->consumeInventoryLines($job);
+            $this->inventory->consumeJobParts($job);
 
             return $this->findJob($id);
         });
@@ -268,7 +236,7 @@ final class VehicleServiceService
                 throw ValidationException::withMessages(['lines' => ['At least one part, labor, or non-inventory item is required.']]);
             }
 
-            $this->consumeInventoryLines($job);
+            $this->inventory->consumeJobParts($job);
             $this->updateJobStatus($job, 'completed', ['completed_datetime' => now()]);
 
             return $this->findJob($id);
@@ -303,64 +271,7 @@ final class VehicleServiceService
 
     public function createInvoice(int $id): object
     {
-        return DB::transaction(function () use ($id): object {
-            $job = $this->tenantRow('vehicle_service_job_cards', $id, true);
-            $existing = DB::table('vehicle_service_job_invoice_links')
-                ->where('tenant_id', $this->support->tenantId())
-                ->where('job_card_id', $id)
-                ->where('status', 'active')
-                ->whereNull('deleted_at')
-                ->first();
-            if ($existing !== null) {
-                return $this->invoices->find((int) $existing->invoice_id);
-            }
-            if ($job->status !== 'completed') {
-                throw ValidationException::withMessages(['status' => ['Only completed jobs can be invoiced.']]);
-            }
-            if ($job->linked_customer_id === null) {
-                throw ValidationException::withMessages(['linked_customer_id' => ['A customer is required before invoicing this job.']]);
-            }
-
-            $lines = $this->invoiceLines($id);
-            if ($lines === []) {
-                throw ValidationException::withMessages(['lines' => ['The job has no billable lines.']]);
-            }
-            $invoice = $this->invoices->create([
-                'organization_unit_id' => $job->organization_unit_id,
-                'external_reference_number' => $job->job_card_number,
-                'document_type' => 'service_invoice',
-                'business_context' => 'vehicle_service',
-                'ledger_direction' => 'receivable',
-                'balance_effect' => 'increase',
-                'customer_id' => (int) $job->linked_customer_id,
-                'invoice_date' => now()->toDateString(),
-                'notes' => 'Generated from vehicle service job '.$job->job_card_number,
-                'adjustments' => $this->invoiceAdjustments($job),
-                'lines' => $lines,
-            ]);
-            $invoice = $this->invoices->issue((int) $invoice->id);
-
-            DB::table('vehicle_service_job_invoice_links')->insert([
-                'tenant_id' => $this->support->tenantId(),
-                'organization_unit_id' => $job->organization_unit_id,
-                'job_card_id' => $id,
-                'invoice_id' => (int) $invoice->id,
-                'invoice_type' => 'service_invoice',
-                'direction' => 'outbound',
-                'status' => 'active',
-                'linked_by' => $this->support->userId(),
-                'linked_at' => now(),
-                'row_version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $this->updateJobStatus($job, 'invoiced', [
-                'invoice_status' => 'invoiced',
-                'finance_status' => 'posted',
-            ]);
-
-            return $invoice;
-        });
+        return $this->invoiceOrchestrator->generateFinalInvoice($id);
     }
 
     /** @return array<string, mixed> */
@@ -395,6 +306,11 @@ final class VehicleServiceService
             'items' => DB::table('items')->select(['id', 'item_code as code', 'name', 'base_uom_id', 'sales_uom_id', 'cost_price', 'sales_price', 'track_inventory', 'is_service_item'])->where('tenant_id', $tenantId)->where('status', 'active')->whereNull('deleted_at'),
             'uoms' => DB::table('unit_of_measures')->select(['id', 'uom_code as code', 'name', 'symbol'])->where('tenant_id', $tenantId)->where('status', 'active')->whereNull('deleted_at'),
             'warehouses' => DB::table('warehouses')->select(['id', 'code', 'name'])->where('tenant_id', $tenantId)->where('is_active', true)->whereNull('deleted_at'),
+            'employees' => DB::table('employees')
+                ->select(['id', 'employee_code as code', DB::raw('coalesce(display_name, full_name, first_name) as name')])
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->whereNull('deleted_at'),
             default => throw ValidationException::withMessages(['type' => ['Unsupported lookup type.']]),
         };
 
@@ -497,9 +413,18 @@ final class VehicleServiceService
         if (! empty($payload['service_type_id'])) {
             $this->support->assertTenantRow('vehicle_service_types', (int) $payload['service_type_id'], 'service_type_id');
         }
-        foreach (array_merge($payload['parts'] ?? [], $payload['labor_items'] ?? []) as $line) {
+        foreach ($payload['parts'] ?? [] as $line) {
             $this->support->assertTenantRow('items', (int) $line['item_id'], 'item_id');
             $this->support->assertTenantRow('unit_of_measures', (int) $line['uom_id'], 'uom_id');
+        }
+        foreach ($payload['labor_items'] ?? [] as $line) {
+            if (! empty($line['item_id'])) {
+                $this->support->assertTenantRow('items', (int) $line['item_id'], 'item_id');
+            }
+            $this->support->assertTenantRow('unit_of_measures', (int) $line['uom_id'], 'uom_id');
+            if (! empty($line['employee_id'])) {
+                $this->support->assertTenantRow('employees', (int) $line['employee_id'], 'employee_id');
+            }
         }
         foreach ($payload['non_inventory_items'] ?? [] as $line) {
             $this->support->assertTenantRow('unit_of_measures', (int) $line['uom_id'], 'uom_id');
@@ -532,7 +457,8 @@ final class VehicleServiceService
         $grand = round(max(0, $gross - $discount + $tax + $debit - $credit), 4);
 
         return [
-            'subtotal' => $parts['gross'],
+            'parts_subtotal' => $parts['gross'],
+            'subtotal' => $gross,
             'line_tax_total' => $parts['tax'],
             'line_discount_total' => $parts['discount'],
             'non_inventory_item_subtotal' => $nonInventory['gross'],
@@ -543,6 +469,9 @@ final class VehicleServiceService
             'labor_item_discount_total' => $labor['discount'],
             'header_discount_amount' => $headerDiscount,
             'header_tax_amount' => $headerTax,
+            'header_charge_total' => $charge,
+            'header_debit_adjustment_total' => $effect === 'add' ? $adjustment : 0,
+            'header_credit_adjustment_total' => $effect === 'deduct' ? $adjustment : 0,
             'discount_total' => $discount,
             'tax_total' => $tax,
             'debit_note_total' => $debit,
@@ -610,24 +539,41 @@ final class VehicleServiceService
     {
         foreach ($lines as $line) {
             $values = $this->calculatedLine($line);
-            DB::table('vehicle_service_labor_items')->insert([
+            $laborItemId = DB::table('vehicle_service_labor_items')->insertGetId([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
                 'job_card_id' => $jobId,
-                'item_id' => $line['item_id'],
+                'item_id' => $line['item_id'] ?? null,
                 'status' => 'planned',
-                'requires_assignment' => false,
+                'requires_assignment' => ! empty($line['employee_id']),
                 'description' => $line['description'] ?? null,
                 'uom_id' => $line['uom_id'],
                 'quantity' => $line['quantity'],
                 'unit_price' => $line['unit_price'],
                 'unit_cost' => $line['unit_cost'] ?? null,
+                'actual_hours' => $line['actual_hours'] ?? null,
                 ...$values,
                 'tax_group_id' => $line['tax_group_id'] ?? null,
                 'row_version' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            if (! empty($line['employee_id'])) {
+                DB::table('vehicle_service_labor_assignments')->insert([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'job_card_id' => $jobId,
+                    'labor_item_id' => $laborItemId,
+                    'employee_id' => (int) $line['employee_id'],
+                    'hours_worked' => $line['actual_hours'] ?? null,
+                    'hourly_rate' => $line['unit_price'],
+                    'status' => 'assigned',
+                    'assigned_by' => $this->support->userId(),
+                    'row_version' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
     }
 
@@ -675,95 +621,12 @@ final class VehicleServiceService
         ];
     }
 
-    private function consumeInventoryLines(object $job): void
-    {
-        $lines = DB::table('vehicle_service_job_card_lines')
-            ->where('tenant_id', $this->support->tenantId())
-            ->where('job_card_id', (int) $job->id)
-            ->where('requires_stock_movement', true)
-            ->whereColumn('consumed_qty', '<', 'quantity')
-            ->lockForUpdate()
-            ->get();
-        if ($lines->isEmpty()) {
-            if ($job->inventory_status !== 'consumed') {
-                DB::table('vehicle_service_job_cards')->where('id', (int) $job->id)->update(['inventory_status' => 'consumed', 'updated_at' => now()]);
-            }
-
-            return;
-        }
-
-        $result = $this->stockIssuing->issue([
-            'tenant_id' => $this->support->tenantId(),
-            'organization_unit_id' => $job->organization_unit_id,
-            'source_module' => 'vehicle_service',
-            'source_type' => 'vehicle_service_job',
-            'source_id' => (int) $job->id,
-            'source_reference' => $job->job_card_number,
-            'movement_type' => 'SERVICE_CONSUMPTION',
-            'warehouse_id' => $job->warehouse_id,
-            'lines' => $lines->map(fn (object $line): array => [
-                'source_line_id' => (int) $line->id,
-                'item_id' => (int) $line->item_id,
-                'uom_id' => (int) $line->uom_id,
-                'warehouse_id' => (int) ($line->warehouse_id ?? $job->warehouse_id),
-                'location_id' => $line->location_id,
-                'quantity' => round((float) $line->quantity - (float) $line->consumed_qty, 4),
-            ])->all(),
-        ]);
-
-        foreach ($lines as $index => $line) {
-            $movement = $result['movements'][$index];
-            $quantity = round((float) $line->quantity - (float) $line->consumed_qty, 4);
-            DB::table('vehicle_service_job_card_lines')->where('id', (int) $line->id)->update([
-                'consumed_qty' => $line->quantity,
-                'outstanding_qty' => 0,
-                'inventory_status' => 'consumed',
-                'updated_at' => now(),
-            ]);
-            DB::table('vehicle_service_job_inventory_links')->insert([
-                'tenant_id' => $this->support->tenantId(),
-                'organization_unit_id' => $job->organization_unit_id,
-                'job_card_id' => (int) $job->id,
-                'job_card_line_id' => (int) $line->id,
-                'stock_movement_id' => $movement['movement_id'],
-                'movement_type' => 'consume',
-                'quantity' => $quantity,
-                'quantity_base' => $movement['base_quantity'],
-                'unit_cost' => $movement['unit_cost'] ?? 0,
-                'total_cost' => $movement['total_cost'],
-                'status' => 'posted',
-                'posted_by' => $this->support->userId(),
-                'posted_at' => now(),
-                'row_version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-        DB::table('vehicle_service_job_cards')->where('id', (int) $job->id)->update(['inventory_status' => 'consumed', 'updated_at' => now()]);
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function invoiceLines(int $jobId): array
-    {
-        return $this->allBillableLines($jobId)->map(fn (array $line): array => [
-            'line_type' => $line['line_type'],
-            'item_id' => $line['item_id'],
-            'uom_id' => $line['uom_id'],
-            'description' => $line['description'],
-            'quantity' => $line['quantity'],
-            'unit_price' => $line['unit_price'],
-            'discount_total' => $line['discount_amount'],
-            'tax_total' => $line['tax_amount'],
-            'charge_total' => 0,
-        ])->all();
-    }
-
     /** @return Collection<int, array<string, mixed>> */
     private function allBillableLines(int $jobId): Collection
     {
         return $this->partLines($jobId)->map(fn (object $line): array => [
             'line_type' => 'inventory_item',
-            'item_id' => (int) $line->item_id,
+            'item_id' => $line->item_id === null ? null : (int) $line->item_id,
             'uom_id' => (int) $line->uom_id,
             'description' => $line->description ?? $line->item_name,
             'quantity' => (float) $line->quantity,
@@ -789,55 +652,6 @@ final class VehicleServiceService
             'discount_amount' => (float) $line->discount_amount,
             'tax_amount' => (float) $line->tax_amount,
         ]))->values();
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function invoiceAdjustments(object $job): array
-    {
-        return collect([
-            ['adjustment_type' => 'discount', 'effect' => 'deduct', 'amount' => $job->header_discount_amount, 'name' => 'Service header discount'],
-            ['adjustment_type' => 'tax', 'effect' => 'add', 'amount' => $job->header_tax_amount, 'name' => 'Service header tax'],
-            ['adjustment_type' => 'charge', 'effect' => 'add', 'amount' => $job->debit_note_total, 'name' => 'Service charge and debit adjustment'],
-            ['adjustment_type' => 'credit_adjustment', 'effect' => 'deduct', 'amount' => $job->credit_note_total, 'name' => 'Service credit adjustment'],
-        ])->filter(fn (array $adjustment): bool => (float) $adjustment['amount'] > 0)->values()->all();
-    }
-
-    private function syncPaymentLinks(object $job): void
-    {
-        $allocations = DB::table('payment_allocations')
-            ->join('vehicle_service_job_invoice_links', 'vehicle_service_job_invoice_links.invoice_id', '=', 'payment_allocations.invoice_id')
-            ->select(['payment_allocations.id', 'payment_allocations.payment_id', 'payment_allocations.allocated_amount'])
-            ->where('payment_allocations.tenant_id', $this->support->tenantId())
-            ->where('vehicle_service_job_invoice_links.job_card_id', (int) $job->id)
-            ->where('payment_allocations.status', 'active')
-            ->where('vehicle_service_job_invoice_links.status', 'active')
-            ->get();
-
-        foreach ($allocations as $allocation) {
-            $exists = DB::table('vehicle_service_job_payment_links')
-                ->where('tenant_id', $this->support->tenantId())
-                ->where('job_card_id', (int) $job->id)
-                ->where('payment_allocation_id', (int) $allocation->id)
-                ->whereNull('deleted_at')
-                ->exists();
-            if ($exists) {
-                continue;
-            }
-            DB::table('vehicle_service_job_payment_links')->insert([
-                'tenant_id' => $this->support->tenantId(),
-                'organization_unit_id' => $job->organization_unit_id,
-                'job_card_id' => (int) $job->id,
-                'payment_id' => (int) $allocation->payment_id,
-                'payment_allocation_id' => (int) $allocation->id,
-                'allocated_amount' => $allocation->allocated_amount,
-                'status' => 'active',
-                'linked_by' => $this->support->userId(),
-                'linked_at' => now(),
-                'row_version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
     }
 
     private function updateJobStatus(object $job, string $status, array $extra = [], ?string $reason = null): void
@@ -902,7 +716,7 @@ final class VehicleServiceService
 
     private function laborLines(int $jobId): Collection
     {
-        return DB::table('vehicle_service_labor_items')
+        $lines = DB::table('vehicle_service_labor_items')
             ->leftJoin('items', 'items.id', '=', 'vehicle_service_labor_items.item_id')
             ->leftJoin('unit_of_measures', 'unit_of_measures.id', '=', 'vehicle_service_labor_items.uom_id')
             ->select(['vehicle_service_labor_items.*', 'items.item_code', 'items.name as item_name', 'unit_of_measures.uom_code'])
@@ -910,6 +724,33 @@ final class VehicleServiceService
             ->where('vehicle_service_labor_items.job_card_id', $jobId)
             ->orderBy('vehicle_service_labor_items.id')
             ->get();
+        $assignments = DB::table('vehicle_service_labor_assignments')
+            ->leftJoin('employees', 'employees.id', '=', 'vehicle_service_labor_assignments.employee_id')
+            ->select([
+                'vehicle_service_labor_assignments.labor_item_id',
+                'vehicle_service_labor_assignments.employee_id',
+                'vehicle_service_labor_assignments.hours_worked',
+                'employees.employee_code',
+                'employees.first_name',
+                'employees.last_name',
+                'employees.display_name',
+            ])
+            ->where('vehicle_service_labor_assignments.tenant_id', $this->support->tenantId())
+            ->where('vehicle_service_labor_assignments.job_card_id', $jobId)
+            ->orderBy('vehicle_service_labor_assignments.id')
+            ->get()
+            ->keyBy('labor_item_id');
+
+        return $lines->map(function (object $line) use ($assignments): object {
+            $assignment = $assignments->get($line->id);
+            $line->employee_id = $assignment?->employee_id;
+            $line->employee_name = $assignment === null
+                ? null
+                : ($assignment->display_name ?: trim($assignment->first_name.' '.($assignment->last_name ?? '')));
+            $line->hours_worked = $assignment?->hours_worked;
+
+            return $line;
+        });
     }
 
     private function nonInventoryLines(int $jobId): Collection

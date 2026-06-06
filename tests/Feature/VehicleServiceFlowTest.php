@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Application\Services\StockReceivingService;
+use Modules\VehicleService\Application\Services\VehicleServicePaymentService;
 use Tests\TestCase;
 
 final class VehicleServiceFlowTest extends TestCase
@@ -45,7 +46,10 @@ final class VehicleServiceFlowTest extends TestCase
         $customerId = $this->customerId();
         $vehicleId = $this->vehicleId();
         $partId = $this->itemId($uomId, 'VS-PART-100', 'Brake Pad', true, false, 100, 150);
-        $laborItemId = $this->itemId($uomId, 'VS-LAB-100', 'Brake Labor', false, true, 0, 200);
+
+        $this->withHeaders($this->headers)
+            ->getJson('/api/vehicle-service/lookups/employees')
+            ->assertOk();
 
         app(StockReceivingService::class)->receive([
             'tenant_id' => 1,
@@ -93,9 +97,10 @@ final class VehicleServiceFlowTest extends TestCase
                     'tax_amount' => 30,
                 ]],
                 'labor_items' => [[
-                    'item_id' => $laborItemId,
                     'uom_id' => $uomId,
+                    'description' => 'Brake inspection and fitting',
                     'quantity' => 1,
+                    'actual_hours' => 1,
                     'unit_price' => 200,
                     'tax_amount' => 20,
                 ]],
@@ -117,11 +122,20 @@ final class VehicleServiceFlowTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('data.status', 'open')
+            ->assertJsonPath('data.parts_subtotal', '300.0000')
+            ->assertJsonPath('data.labor_item_subtotal', '200.0000')
+            ->assertJsonPath('data.non_inventory_item_subtotal', '50.0000')
+            ->assertJsonPath('data.gross_total', '550.0000')
             ->assertJsonPath('data.discount_total', '35.0000')
             ->assertJsonPath('data.tax_total', '65.0000')
             ->assertJsonPath('data.grand_total', '583.0000');
 
         $jobId = (int) $job->json('data.id');
+        $this->assertDatabaseHas('vehicle_service_labor_items', [
+            'job_card_id' => $jobId,
+            'item_id' => null,
+            'description' => 'Brake inspection and fitting',
+        ]);
         $this->withHeaders($this->headers)
             ->postJson("/api/vehicle-service/job-cards/$jobId/complete")
             ->assertOk()
@@ -183,6 +197,14 @@ final class VehicleServiceFlowTest extends TestCase
             ->assertJsonPath('data.balance', '0.0000');
 
         $this->assertDatabaseCount('payment_allocations', 2);
+        $this->assertDatabaseCount('vehicle_service_job_payment_links', 0);
+        $this->assertDatabaseHas('vehicle_service_job_cards', [
+            'id' => $jobId,
+            'status' => 'invoiced',
+            'paid_amount' => 0,
+        ]);
+        app(VehicleServicePaymentService::class)->syncLinks($jobId);
+        app(VehicleServicePaymentService::class)->syncLinks($jobId);
         $this->assertDatabaseCount('vehicle_service_job_payment_links', 2);
         $this->assertDatabaseCount('vehicle_service_job_status_histories', 4);
     }

@@ -33,8 +33,8 @@ function linePayload(line: any, mode: 'grn' | 'order' | 'return') {
 function headerPayload(input: any) {
     const body: RecordAny = {};
     const set = (key: string, value: unknown) => { if (value !== undefined && value !== '') body[key] = value; };
-    set('credit_note_total', input.creditNoteTotal ?? input.headerCreditAdjustmentTotal);
-    set('debit_note_total', input.debitNoteTotal ?? input.headerChargeTotal ?? input.headerDebitAdjustmentTotal);
+    set('credit_note_total', input.creditNoteTotal);
+    set('debit_note_total', input.debitNoteTotal);
     set('header_charge_total', input.headerChargeTotal);
     set('header_credit_adjustment_total', input.headerCreditAdjustmentTotal);
     set('header_debit_adjustment_total', input.headerDebitAdjustmentTotal);
@@ -48,7 +48,9 @@ function headerPayload(input: any) {
 function totals(record: RecordAny) {
     return {
         chargeTotal: money(record.charge_total),
+        creditAdjustmentTotal: money(record.credit_adjustment_total),
         creditNoteTotal: money(record.credit_note_total),
+        debitAdjustmentTotal: money(record.debit_adjustment_total),
         debitNoteTotal: money(record.debit_note_total),
         discountTotal: money(record.discount_total),
         headerDiscountAmount: money(record.header_discount_amount),

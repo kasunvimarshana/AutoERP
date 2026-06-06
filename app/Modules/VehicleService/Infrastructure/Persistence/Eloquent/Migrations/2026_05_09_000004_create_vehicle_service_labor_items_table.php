@@ -19,7 +19,8 @@ return new class extends Migration
 
             $table->string('reference')->nullable();
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
+            $table->foreignId('item_id')->nullable()->constrained('items', 'id')->nullOnDelete()
+                ->comment('Optional service catalog item; free-form labor uses description, quantity, and rate');
             $table->foreignId('combo_item_id')->nullable()->constrained('combo_items', 'id')->nullOnDelete();
             $table->unsignedBigInteger('combo_group_key')->nullable();
             $table->foreignId('combo_parent_line_id')->nullable()->constrained('vehicle_service_labor_items', 'id')->nullOnDelete();

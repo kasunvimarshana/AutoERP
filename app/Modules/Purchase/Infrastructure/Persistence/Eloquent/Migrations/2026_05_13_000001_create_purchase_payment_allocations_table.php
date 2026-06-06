@@ -32,6 +32,14 @@ return new class extends Migration
             $table->index(['tenant_id', 'invoice_id', 'status'], 'purchase_payment_allocations_invoice_status_idx');
             $table->index(['tenant_id', 'payment_id', 'status'], 'purchase_payment_allocations_payment_status_idx');
             $table->index(['tenant_id', 'advance_payment_id', 'status'], 'purchase_payment_allocations_advance_status_idx');
+            $table->unique(
+                ['tenant_id', 'invoice_id', 'payment_id'],
+                'purchase_payment_allocations_payment_uk'
+            );
+            $table->unique(
+                ['tenant_id', 'invoice_id', 'advance_payment_id'],
+                'purchase_payment_allocations_advance_uk'
+            );
         });
     }
 

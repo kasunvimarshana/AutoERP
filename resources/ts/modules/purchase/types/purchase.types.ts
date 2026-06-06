@@ -67,7 +67,9 @@ export type PurchaseReturnInput = {
 
 export type PurchaseHeaderTotals = {
     chargeTotal: string;
+    creditAdjustmentTotal: string;
     creditNoteTotal: string;
+    debitAdjustmentTotal: string;
     debitNoteTotal: string;
     discountTotal: string;
     headerDiscountAmount: string;

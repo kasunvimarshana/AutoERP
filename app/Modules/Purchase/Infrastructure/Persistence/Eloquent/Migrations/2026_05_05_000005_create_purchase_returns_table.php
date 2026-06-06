@@ -40,6 +40,9 @@ return new class extends Migration
             $table->decimal('header_discount_amount', 20, 4)->default(0);
             $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('header_tax_amount', 20, 4)->default(0);
+            $table->decimal('header_charge_total', 20, 4)->default(0);
+            $table->decimal('header_debit_adjustment_total', 20, 4)->default(0);
+            $table->decimal('header_credit_adjustment_total', 20, 4)->default(0);
 
             // Final totals combine line rollups and header adjustments
             $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');

@@ -28,7 +28,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'job_card_id', 'invoice_id'], 'vehicle_service_invoice_links_unique');
+            $table->unique(['tenant_id', 'job_card_id'], 'vehicle_service_invoice_links_job_unique');
+            $table->unique(['tenant_id', 'invoice_id'], 'vehicle_service_invoice_links_invoice_unique');
             $table->index(['tenant_id', 'invoice_id'], 'vehicle_service_invoice_links_invoice_idx');
         });
     }

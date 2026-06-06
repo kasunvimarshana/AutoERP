@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards', 'id')->cascadeOnDelete();
             $table->unsignedBigInteger('payment_id')->nullable();
             $table->unsignedBigInteger('payment_allocation_id')->nullable();
+            $table->unsignedBigInteger('advance_payment_allocation_id')->nullable();
             $table->decimal('allocated_amount', 20, 4)->default(0);
             $table->decimal('advance_amount', 20, 4)->default(0);
             $table->decimal('refund_amount', 20, 4)->default(0);
@@ -33,6 +34,14 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_payment_links_job_card_idx');
             $table->index(['tenant_id', 'payment_id'], 'vehicle_service_payment_links_payment_idx');
+            $table->unique(
+                ['tenant_id', 'job_card_id', 'payment_allocation_id'],
+                'vehicle_service_payment_links_allocation_uk'
+            );
+            $table->unique(
+                ['tenant_id', 'job_card_id', 'advance_payment_allocation_id'],
+                'vehicle_service_payment_links_advance_allocation_uk'
+            );
         });
     }
 

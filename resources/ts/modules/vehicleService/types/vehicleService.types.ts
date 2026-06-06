@@ -22,9 +22,11 @@ export type ServiceType = {
 };
 
 export type JobLineInput = {
-    itemId: number;
+    itemId?: number;
     uomId: number;
     description?: string;
+    employeeId?: number;
+    actualHours?: string;
     quantity: string;
     unitPrice: string;
     unitCost?: string;
@@ -87,6 +89,8 @@ export type JobCard = {
     estimatedHours?: string;
     promisedDeliveryDateTime?: string;
     subtotal: string;
+    partsSubtotal: string;
+    grossTotal: string;
     laborSubtotal: string;
     nonInventorySubtotal: string;
     lineDiscountTotal: string;
@@ -97,6 +101,7 @@ export type JobCard = {
     taxTotal: string;
     chargeTotal: string;
     adjustmentTotal: string;
+    debitAdjustmentTotal: string;
     creditAdjustmentTotal: string;
     grandTotal: string;
     paidAmount: string;

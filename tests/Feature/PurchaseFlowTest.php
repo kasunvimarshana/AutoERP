@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Purchase\Application\Services\PurchasePaymentService;
 use Tests\TestCase;
 
 final class PurchaseFlowTest extends TestCase
@@ -133,26 +134,25 @@ final class PurchaseFlowTest extends TestCase
         $this->assertDatabaseHas('journal_entries', ['tenant_id' => 1, 'source_module' => 'invoice', 'reference_id' => $invoiceId]);
         $this->assertDatabaseHas('ap_transactions', ['tenant_id' => 1, 'source_id' => $invoiceId, 'outstanding_amount' => 537]);
 
-        $payment = $this->withHeaders($this->headers)
-            ->postJson('/api/payment/payments', [
-                'party_type' => 'supplier',
-                'party_id' => $supplierId,
-                'payment_date' => '2026-06-09',
-                'amount' => 537,
-                'direction' => 'outbound',
-                'payment_method_id' => $paymentMethodId,
-                'allocations' => [[
-                    'invoice_id' => $invoiceId,
-                    'allocated_amount' => 537,
-                ]],
-            ])
-            ->assertCreated()
-            ->assertJsonPath('data.allocated_amount', '537.0000');
+        $payment = app(PurchasePaymentService::class)->createSupplierPayment($invoiceId, [
+            'payment_date' => '2026-06-09',
+            'amount' => 537,
+            'payment_method_id' => $paymentMethodId,
+        ]);
+        $this->assertSame(537.0, (float) $payment->allocated_amount);
 
         $this->assertDatabaseHas('payment_allocations', [
             'tenant_id' => 1,
             'invoice_id' => $invoiceId,
-            'payment_id' => (int) $payment->json('data.id'),
+            'payment_id' => (int) $payment->id,
+            'allocated_amount' => 537,
+        ]);
+        app(PurchasePaymentService::class)->syncInvoiceLinks($invoiceId);
+        app(PurchasePaymentService::class)->syncInvoiceLinks($invoiceId);
+        $this->assertDatabaseHas('purchase_payment_allocations', [
+            'tenant_id' => 1,
+            'invoice_id' => $invoiceId,
+            'payment_id' => (int) $payment->id,
             'allocated_amount' => 537,
         ]);
 
@@ -322,35 +322,30 @@ final class PurchaseFlowTest extends TestCase
         $invoice = $this->withHeaders($this->headers)->postJson("/api/purchase/purchase-orders/$poId/invoice")->assertOk();
         $invoiceId = (int) $invoice->json('data.id');
 
-        $this->withHeaders($this->headers)
-            ->postJson('/api/payment/payments', [
-                'party_type' => 'supplier',
-                'party_id' => $supplierId,
-                'payment_date' => '2026-06-07',
-                'amount' => 40,
-                'direction' => 'outbound',
-                'payment_method_id' => $paymentMethodId,
-            ])
-            ->assertCreated()
-            ->assertJsonPath('data.allocated_amount', '0.0000');
+        app(PurchasePaymentService::class)->createSupplierAdvance($supplierId, [
+            'payment_date' => '2026-06-07',
+            'amount' => 40,
+            'payment_method_id' => $paymentMethodId,
+        ]);
 
         $advanceId = (int) DB::table('advance_payments')->where('tenant_id', 1)->where('party_type', 'supplier')->where('party_id', $supplierId)->value('id');
 
-        $this->withHeaders($this->headers)
-            ->postJson("/api/payment/advances/$advanceId/allocations", [
-                'allocations' => [[
-                    'invoice_id' => $invoiceId,
-                    'allocated_amount' => 40,
-                ]],
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.remaining_amount', 0)
-            ->assertJsonPath('data.status', 'fully_applied');
+        $advance = app(PurchasePaymentService::class)->allocateAdvance($invoiceId, $advanceId, 40);
+        $this->assertSame(0.0, (float) $advance->remaining_amount);
+        $this->assertSame('fully_applied', $advance->status);
 
         $this->assertDatabaseHas('advance_payment_allocations', [
             'tenant_id' => 1,
             'advance_payment_id' => $advanceId,
             'invoice_id' => $invoiceId,
+            'allocated_amount' => 40,
+        ]);
+        app(PurchasePaymentService::class)->syncInvoiceLinks($invoiceId);
+        app(PurchasePaymentService::class)->syncInvoiceLinks($invoiceId);
+        $this->assertDatabaseHas('purchase_payment_allocations', [
+            'tenant_id' => 1,
+            'invoice_id' => $invoiceId,
+            'advance_payment_id' => $advanceId,
             'allocated_amount' => 40,
         ]);
 

@@ -19,7 +19,7 @@ final class UpsertJobCardRequest extends FormRequest
     {
         $tenantId = app(CurrentTenantContextAccessorInterface::class)->currentTenantId();
         $jobId = $this->route('jobCard');
-        $lineRules = [
+        $partRules = [
             '*.item_id' => ['required', 'integer', Rule::exists('items', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             '*.uom_id' => ['required', 'integer', Rule::exists('unit_of_measures', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             '*.quantity' => ['required', 'numeric', 'gt:0'],
@@ -32,6 +32,11 @@ final class UpsertJobCardRequest extends FormRequest
             '*.tax_group_id' => ['sometimes', 'nullable', 'integer', Rule::exists('tax_groups', 'id')->where('tenant_id', $tenantId)],
             '*.tax_amount' => ['sometimes', 'numeric', 'min:0'],
         ];
+        $laborRules = $partRules;
+        $laborRules['*.item_id'] = ['sometimes', 'nullable', 'integer', Rule::exists('items', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')];
+        $laborRules['*.description'] = ['required_without:labor_items.*.item_id', 'nullable', 'string'];
+        $laborRules['*.employee_id'] = ['sometimes', 'nullable', 'integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)];
+        $laborRules['*.actual_hours'] = ['sometimes', 'nullable', 'numeric', 'min:0'];
 
         return [
             'organization_unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('organization_units', 'id')->where('tenant_id', $tenantId)],
@@ -63,8 +68,8 @@ final class UpsertJobCardRequest extends FormRequest
             'parts' => ['sometimes', 'array'],
             'labor_items' => ['sometimes', 'array'],
             'non_inventory_items' => ['sometimes', 'array'],
-            ...$this->prefixedRules('parts', $lineRules),
-            ...$this->prefixedRules('labor_items', $lineRules),
+            ...$this->prefixedRules('parts', $partRules),
+            ...$this->prefixedRules('labor_items', $laborRules),
             'parts.*.warehouse_id' => ['sometimes', 'nullable', 'integer', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'parts.*.location_id' => ['sometimes', 'nullable', 'integer', Rule::exists('warehouse_locations', 'id')->where('tenant_id', $tenantId)],
             'non_inventory_items.*.name' => ['required', 'string', 'max:255'],

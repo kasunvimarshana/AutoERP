@@ -34,6 +34,10 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_inventory_links_job_card_idx');
             $table->index(['tenant_id', 'stock_movement_id'], 'vehicle_service_inventory_links_movement_idx');
+            $table->unique(
+                ['tenant_id', 'job_card_id', 'job_card_line_id', 'movement_type'],
+                'vehicle_service_inventory_links_job_line_type_uk'
+            );
         });
     }
 

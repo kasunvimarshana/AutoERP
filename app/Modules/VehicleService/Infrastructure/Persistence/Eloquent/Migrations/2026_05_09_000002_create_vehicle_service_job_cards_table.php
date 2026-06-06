@@ -73,7 +73,8 @@ return new class extends Migration
             $table->foreignId('assigned_to')->nullable()->constrained('employees', 'id')->nullOnDelete()->comment('supervisor assigned to the job card');
 
             // Line-derived totals - strictly SUM over lines
-            $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
+            $table->decimal('parts_subtotal', 20, 4)->default(0)->comment('SUM(inventory part gross_amount)');
+            $table->decimal('subtotal', 20, 4)->default(0)->comment('Gross total across parts, labor, and non-inventory lines');
             $table->decimal('line_tax_total', 20, 4)->default(0)->comment('SUM(line.tax_amount)');
             $table->decimal('line_discount_total', 20, 4)->default(0)->comment('SUM(line.discount_amount)');
 
@@ -91,12 +92,15 @@ return new class extends Migration
             $table->decimal('header_discount_amount', 20, 4)->default(0);
             $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('header_tax_amount', 20, 4)->default(0);
+            $table->decimal('header_charge_total', 20, 4)->default(0);
+            $table->decimal('header_debit_adjustment_total', 20, 4)->default(0);
+            $table->decimal('header_credit_adjustment_total', 20, 4)->default(0);
 
             // Final totals combine line rollups and header adjustments
             $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + non_inventory_item_discount_total + labor_item_discount_total + header_discount_amount');
             $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + non_inventory_item_tax_total + labor_item_tax_total + header_tax_amount');
-            $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
-            $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
+            $table->decimal('debit_note_total', 20, 4)->default(0)->comment('Header charges plus additive adjustments');
+            $table->decimal('credit_note_total', 20, 4)->default(0)->comment('Deductive header adjustments');
             $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: all subtotals - discount_total + tax_total + debit_note_total - credit_note_total');
 
             $table->decimal('advance_amount', 20, 4)->default(0);
