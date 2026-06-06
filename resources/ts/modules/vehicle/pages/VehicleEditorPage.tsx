@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Spinner } from '../../../shared/components/ui/Spinner';
+import { PageHeader } from '../../../shared/components/erp/ErpUi';
 import { VehicleForm } from '../components/VehicleForm';
 import { vehicleApi } from '../services/vehicleApi';
 import type { Vehicle, VehicleInput } from '../types/vehicle.types';
@@ -58,7 +59,7 @@ export function VehicleEditorPage({ mode }: { mode: 'create' | 'edit' }) {
 
     return (
         <div className="mx-auto max-w-5xl space-y-5">
-            <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">{editing ? 'Edit record' : 'New record'}</p><h1 className="mt-1 text-3xl font-bold text-slate-950">{editing ? 'Edit vehicle' : 'Create vehicle'}</h1></header>
+            <PageHeader eyebrow={editing ? 'Edit record' : 'New record'} subtitle="Maintain registration, ownership, and technical vehicle information." title={editing ? 'Edit vehicle' : 'Create vehicle'} />
             {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
             {!error ? <VehicleForm initialValue={vehicle ? toInput(vehicle) : undefined} onCancel={() => navigate('/vehicles')} onSubmit={submit} submitLabel={editing ? 'Update vehicle' : 'Create vehicle'} /> : null}
         </div>

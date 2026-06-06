@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
+import { FormSection, PageHeader, TotalsSummaryCard } from '../../../shared/components/erp/ErpUi';
 import { purchaseApi } from '../services/purchaseApi';
 import type { PurchaseHeaderTotalsInput, PurchaseLineInput, PurchaseLookup, PurchaseOrderInput } from '../types/purchase.types';
 
@@ -75,11 +76,11 @@ export function PurchaseOrderEditorPage({ mode }: { mode: 'create' | 'edit' }) {
     </form>;
 }
 
-export function Header({ title }: { title: string }) { return <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Procurement</p><h1 className="mt-1 text-3xl font-bold text-slate-950">{title}</h1></header>; }
+export function Header({ title }: { title: string }) { return <PageHeader eyebrow="Operations" subtitle="Supplier, warehouse, line, adjustment, and total information." title={title} />; }
 export function Alert({ message }: { message: string }) { return <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{message}</div>; }
-export function Section({ children, title }: { children: ReactNode; title: string }) { return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-base font-bold text-slate-950">{title}</h2><div className="mt-4">{children}</div></section>; }
+export function Section({ children, title }: { children: ReactNode; title: string }) { return <FormSection title={title}>{children}</FormSection>; }
 export function Field({ children, label }: { children: ReactNode; label: string }) { return <label className="space-y-2 text-sm font-semibold text-slate-700"><span>{label}</span>{children}</label>; }
-export function Lookup({ label, onChange, options, value }: { label: string; onChange: (id: number) => void; options: PurchaseLookup[]; value?: number }) { return <Field label={label}><select className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm" value={value || ''} onChange={(event) => onChange(Number(event.target.value))}><option value="">Select {label.toLowerCase()}</option>{options.map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ''}{item.name}</option>)}</select></Field>; }
+export function Lookup({ label, onChange, options, value }: { label: string; onChange: (id: number) => void; options: PurchaseLookup[]; value?: number }) { return <Field label={label}><select className="erp-select" value={value || ''} onChange={(event) => onChange(Number(event.target.value))}><option value="">Select {label.toLowerCase()}</option>{options.map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ''}{item.name}</option>)}</select></Field>; }
 export function HeaderTotalsFields({ onChange, value }: { onChange: (next: Partial<PurchaseHeaderTotalsInput>) => void; value: PurchaseHeaderTotalsInput }) {
     return <div className="grid gap-4 md:grid-cols-3">
         <Field label="Header discount type"><select className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm" value={value.headerDiscountType ?? ''} onChange={(event) => onChange({ headerDiscountType: event.target.value as PurchaseHeaderTotalsInput['headerDiscountType'] })}><option value="">Amount</option><option value="percentage">Percentage</option><option value="fixed">Fixed</option></select></Field>
@@ -101,6 +102,6 @@ export function TotalsPreview({ totals }: { totals: ReturnType<typeof purchasePr
         ['Credit adjustment deduct', -totals.deductions],
     ];
 
-    return <div className="space-y-2 text-sm">{rows.map(([label, amount]) => <div className="flex justify-between" key={label as string}><span className="text-slate-500">{label}</span><span className="font-semibold text-slate-900">{Number(amount).toLocaleString()}</span></div>)}<div className="mt-3 flex justify-between border-t border-slate-200 pt-3"><span className="font-bold">Grand total</span><span className="text-2xl font-bold text-slate-950">{totals.grandTotal.toLocaleString()}</span></div></div>;
+    return <TotalsSummaryCard grandTotal={totals.grandTotal} rows={rows.map(([label, amount]) => ({ label: String(label), value: Number(amount) }))} />;
 }
 function Lines({ items, lines, onAdd, onChange, onItem, onRemove, uoms }: { items: PurchaseLookup[]; lines: PurchaseLineInput[]; onAdd: () => void; onChange: (index: number, line: Partial<PurchaseLineInput>) => void; onItem: (index: number, itemId: number) => void; onRemove: (index: number) => void; uoms: PurchaseLookup[] }) { return <div className="space-y-3">{lines.map((line, index) => <div className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 md:grid-cols-[1.4fr_1fr_90px_110px_110px_110px_70px]" key={index}><Lookup label="Item" options={items} value={line.itemId} onChange={(id) => onItem(index, id)} /><Lookup label="UOM" options={uoms} value={line.uomId} onChange={(uomId) => onChange(index, { uomId })} /><Field label="Qty"><Input inputMode="decimal" value={line.receivedQty ?? line.returnQty ?? '1'} onChange={(event) => onChange(index, { receivedQty: event.target.value, returnQty: event.target.value })} /></Field><Field label="Unit cost"><Input inputMode="decimal" value={line.unitPrice} onChange={(event) => onChange(index, { unitPrice: event.target.value })} /></Field><Field label="Line discount"><Input inputMode="decimal" value={line.discountAmount ?? '0'} onChange={(event) => onChange(index, { discountAmount: event.target.value })} /></Field><Field label="Line tax"><Input inputMode="decimal" value={line.taxAmount ?? '0'} onChange={(event) => onChange(index, { taxAmount: event.target.value })} /></Field><button className="mt-7 rounded-md px-2 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50" onClick={() => onRemove(index)} type="button">Remove</button></div>)}<Button onClick={onAdd} variant="secondary">Add line</Button></div>; }

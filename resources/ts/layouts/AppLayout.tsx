@@ -1,12 +1,14 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
-import { Button } from '../shared/components/ui/Button';
-import { cn } from '../shared/utils/cn';
+import { Sidebar } from '../shared/components/layout/Sidebar';
+import { Topbar } from '../shared/components/layout/Topbar';
 
 export function AppLayout() {
     const { logout, user } = useAuthContext();
     const navigate = useNavigate();
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     async function signOut() {
         await logout();
@@ -14,50 +16,25 @@ export function AppLayout() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-                    <div className="flex items-center gap-8">
-                        <NavLink className="flex items-center gap-3" to="/customers">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-xs font-bold text-white">AE</span>
-                            <span><span className="block text-sm font-bold text-slate-950">AutoERP</span><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Master data</span></span>
-                        </NavLink>
-                        <nav className="hidden items-center gap-1 sm:flex">
-                            <AppLink to="/customers">Customers</AppLink>
-                            <AppLink to="/suppliers">Suppliers</AppLink>
-                            <AppLink to="/vehicles">Vehicles</AppLink>
-                            <AppLink to="/vehicle-service/jobs">Service</AppLink>
-                            <AppLink to="/uoms">UOM</AppLink>
-                            <AppLink to="/items">Items</AppLink>
-                            <AppLink to="/invoices">Invoices</AppLink>
-                            <AppLink to="/payments">Payments</AppLink>
-                            <AppLink to="/purchase/orders">Purchase</AppLink>
-                            <AppLink to="/finance/journals">Finance</AppLink>
-                        </nav>
+        <div className="min-h-screen bg-slate-100">
+            <Sidebar
+                collapsed={sidebarCollapsed}
+                mobileOpen={mobileSidebarOpen}
+                onCloseMobile={() => setMobileSidebarOpen(false)}
+                onToggle={() => setSidebarCollapsed((current) => !current)}
+            />
+            <div className={sidebarCollapsed ? 'min-h-screen transition-[padding] duration-200 lg:pl-20' : 'min-h-screen transition-[padding] duration-200 lg:pl-64'}>
+                <Topbar
+                    onOpenMobile={() => setMobileSidebarOpen(true)}
+                    onSignOut={() => void signOut()}
+                    user={user}
+                />
+                <main className="px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-[1600px]">
+                        <Outlet />
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="hidden text-right md:block"><p className="text-sm font-semibold text-slate-800">{user?.name}</p><p className="text-xs text-slate-400">{user?.email}</p></div>
-                        <Button onClick={() => void signOut()} variant="secondary">Sign out</Button>
-                    </div>
-                </div>
-                <nav className="flex border-t border-slate-100 px-4 py-2 sm:hidden">
-                    <AppLink to="/customers">Customers</AppLink>
-                    <AppLink to="/suppliers">Suppliers</AppLink>
-                    <AppLink to="/vehicles">Vehicles</AppLink>
-                    <AppLink to="/vehicle-service/jobs">Service</AppLink>
-                    <AppLink to="/uoms">UOM</AppLink>
-                    <AppLink to="/items">Items</AppLink>
-                    <AppLink to="/invoices">Invoices</AppLink>
-                    <AppLink to="/payments">Payments</AppLink>
-                    <AppLink to="/purchase/orders">Purchase</AppLink>
-                    <AppLink to="/finance/journals">Finance</AppLink>
-                </nav>
-            </header>
-            <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8"><Outlet /></main>
+                </main>
+            </div>
         </div>
     );
-}
-
-function AppLink({ children, to }: { children: ReactNode; to: string }) {
-    return <NavLink className={({ isActive }) => cn('rounded-lg px-3 py-2 text-sm font-semibold transition', isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950')} to={to}>{children}</NavLink>;
 }

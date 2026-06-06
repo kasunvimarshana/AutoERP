@@ -1,5 +1,6 @@
 import { FormEvent, useState, type ReactNode } from 'react';
 import { ApiError } from '../../../services/api/apiErrors';
+import { FormSection } from '../../../shared/components/erp/ErpUi';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
 import type { UomInput } from '../types/uom.types';
@@ -67,9 +68,8 @@ export function UomForm({
     return (
         <form className="space-y-6" onSubmit={handleSubmit}>
             {formError ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div> : null}
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Unit details</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection title="Unit details">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field error={errors.uom_code?.[0]} label="UOM code">
                         <Input value={value.uomCode} onChange={(event) => update('uomCode', event.target.value)} placeholder="e.g. PCS" />
                     </Field>
@@ -93,12 +93,12 @@ export function UomForm({
                         Base unit
                     </label>
                 </div>
-            </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            </FormSection>
+            <FormSection title="Status and notes">
                 <Field label="Notes">
-                    <textarea className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
+                    <textarea className="erp-textarea min-h-28" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
                 </Field>
-            </section>
+            </FormSection>
             <div className="flex justify-end gap-3">
                 <Button disabled={submitting} onClick={onCancel} variant="secondary">Cancel</Button>
                 <Button disabled={submitting} type="submit" variant="blue">{submitting ? 'Saving' : submitLabel}</Button>

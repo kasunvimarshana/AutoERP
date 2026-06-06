@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Spinner } from '../../../shared/components/ui/Spinner';
+import { PageHeader } from '../../../shared/components/erp/ErpUi';
 import type { UomLookup } from '../../uom/types/uom.types';
 import { uomApi } from '../../uom/services/uomApi';
 import { ItemForm } from '../components/ItemForm';
@@ -71,5 +72,5 @@ export function ItemEditorPage({ mode }: { mode: 'create' | 'edit' }) {
 
     if ((!uoms || (editing && !item)) && !error) return <div className="flex items-center justify-center p-16 text-sm font-semibold text-slate-500"><Spinner /><span className="ml-3">Loading item form</span></div>;
 
-    return <div className="mx-auto max-w-5xl space-y-5"><header><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">{editing ? 'Edit record' : 'New record'}</p><h1 className="mt-1 text-3xl font-bold text-slate-950">{editing ? 'Edit item' : 'Create item'}</h1></header>{error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}{!error && uoms ? <ItemForm initialValue={item ? toInput(item) : undefined} onCancel={() => navigate('/items')} onSubmit={submit} submitLabel={editing ? 'Update item' : 'Create item'} uoms={uoms} /> : null}</div>;
+    return <div className="mx-auto max-w-5xl space-y-5"><PageHeader eyebrow={editing ? 'Edit record' : 'New record'} subtitle="Configure identity, UOM classification, pricing, and inventory settings." title={editing ? 'Edit item' : 'Create item'} />{error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}{!error && uoms ? <ItemForm initialValue={item ? toInput(item) : undefined} onCancel={() => navigate('/items')} onSubmit={submit} submitLabel={editing ? 'Update item' : 'Create item'} uoms={uoms} /> : null}</div>;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../../../shared/components/ui/Button';
+import { EmptyState, FilterCard, LoadingState, MoneyDisplay, PageHeader, Pagination, PrimaryLink, SecondaryLink, StatCard, StatusBadge, TableCard } from '../../../shared/components/erp/ErpUi';
 import { Input } from '../../../shared/components/ui/Input';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
 import type { Dashboard, JobCard, Page } from '../types/vehicleService.types';
@@ -15,13 +15,68 @@ export function JobCardListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => { const timer = window.setTimeout(() => { setPage(1); setSearch(searchInput.trim()); }, 350); return () => window.clearTimeout(timer); }, [searchInput]);
-    useEffect(() => { let active = true; setLoading(true); void vehicleServiceApi.listJobs({ page, perPage: 20, search: search || undefined, status: status || undefined }).then((result) => { if (active) setData(result); }).catch((requestError) => { if (active) setError(requestError instanceof Error ? requestError.message : 'Unable to load jobs.'); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [page, search, status]);
-    useEffect(() => { void vehicleServiceApi.dashboard().then(setDashboard); }, []);
-    async function remove(job: JobCard) { if (!window.confirm(`Delete ${job.jobCardNumber}?`)) return; try { await vehicleServiceApi.removeJob(job.id); setData((current) => current ? { ...current, items: current.items.filter((item) => item.id !== job.id), meta: { ...current.meta, total: current.meta.total - 1 } } : current); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Unable to delete job.'); } }
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setPage(1);
+            setSearch(searchInput.trim());
+        }, 350);
+        return () => window.clearTimeout(timer);
+    }, [searchInput]);
 
-    return <div className="space-y-5"><header className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Vehicle service</p><h1 className="mt-1 text-3xl font-bold">Job cards</h1></div><div className="flex gap-2"><Link className="inline-flex h-10 items-center rounded-lg border bg-white px-4 text-sm font-semibold" to="/vehicle-service/types">Service types</Link><Link className="inline-flex h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white" to="/vehicle-service/jobs/new">Create job</Link></div></header>{dashboard ? <div className="grid gap-3 sm:grid-cols-4"><Metric label="Open jobs" value={dashboard.open_jobs} /><Metric label="Completed" value={dashboard.completed_jobs} /><Metric label="Pending invoice" value={dashboard.pending_invoice_jobs} /><Metric label="Unpaid" value={Number(dashboard.unpaid_amount).toLocaleString()} /></div> : null}<div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-[1fr_190px]"><Input placeholder="Search job, customer, or vehicle" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} /><select className="h-11 rounded-lg border px-3 text-sm" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}><option value="">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="invoiced">Invoiced</option><option value="cancelled">Cancelled</option></select></div>{error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}<div className="overflow-x-auto rounded-xl border bg-white shadow-sm">{loading ? <p className="p-12 text-center text-sm text-slate-500">Loading jobs...</p> : data?.items.length ? <table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Job</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Vehicle</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Status</th><th /></tr></thead><tbody>{data.items.map((job) => <tr className="border-t" key={job.id}><td className="px-4 py-4 font-semibold">{job.jobCardNumber}</td><td className="px-4 py-4">{job.customerName || '-'}</td><td className="px-4 py-4">{job.registrationNumber || '-'}</td><td className="px-4 py-4">{job.serviceTypeName || '-'}</td><td className="px-4 py-4">{Number(job.grandTotal).toLocaleString()}</td><td className="px-4 py-4"><Badge value={job.status} /></td><td className="px-4 py-4 text-right"><Link className="mr-3 font-semibold text-blue-700" to={`/vehicle-service/jobs/${job.id}`}>View</Link>{['open', 'in_progress'].includes(job.status) ? <Link className="mr-3 font-semibold text-slate-700" to={`/vehicle-service/jobs/${job.id}/edit`}>Edit</Link> : null}{job.status === 'open' ? <button className="font-semibold text-red-600" onClick={() => void remove(job)} type="button">Delete</button> : null}</td></tr>)}</tbody></table> : <p className="p-12 text-center text-sm text-slate-500">No job cards found.</p>}</div>{data ? <div className="flex justify-end gap-2"><Button disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)} variant="secondary">Previous</Button><Button disabled={page >= data.meta.lastPage || loading} onClick={() => setPage((value) => value + 1)} variant="secondary">Next</Button></div> : null}</div>;
+    useEffect(() => {
+        let active = true;
+        setLoading(true);
+        void vehicleServiceApi.listJobs({ page, perPage: 20, search: search || undefined, status: status || undefined })
+            .then((result) => {
+                if (active) setData(result);
+            })
+            .catch((requestError) => {
+                if (active) setError(requestError instanceof Error ? requestError.message : 'Unable to load jobs.');
+            })
+            .finally(() => {
+                if (active) setLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [page, search, status]);
+
+    useEffect(() => {
+        void vehicleServiceApi.dashboard().then(setDashboard).catch(() => undefined);
+    }, []);
+
+    async function remove(job: JobCard) {
+        if (!window.confirm(`Delete ${job.jobCardNumber}?`)) return;
+        try {
+            await vehicleServiceApi.removeJob(job.id);
+            setData((current) => current ? { ...current, items: current.items.filter((item) => item.id !== job.id), meta: { ...current.meta, total: current.meta.total - 1 } } : current);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : 'Unable to delete job.');
+        }
+    }
+
+    return (
+        <div className="space-y-5">
+            <PageHeader actions={<><SecondaryLink to="/vehicle-service/types">Service types</SecondaryLink><PrimaryLink to="/vehicle-service/jobs/new">Create job</PrimaryLink></>} eyebrow="Operations" subtitle="Manage customer service work, parts consumption, labor, invoicing, and settlement visibility." title="Vehicle service jobs" />
+            {dashboard ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatCard label="Open jobs" value={dashboard.open_jobs} /><StatCard label="Completed" value={dashboard.completed_jobs} /><StatCard label="Pending invoice" value={dashboard.pending_invoice_jobs} /><StatCard label="Unpaid" value={<MoneyDisplay value={dashboard.unpaid_amount} />} /></div> : null}
+            <FilterCard className="sm:grid-cols-[1fr_190px]">
+                <Input placeholder="Search job, customer, or vehicle" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
+                <select className="erp-select" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}><option value="">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="invoiced">Invoiced</option><option value="cancelled">Cancelled</option></select>
+            </FilterCard>
+            {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+            <TableCard>
+                {loading ? <LoadingState label="Loading service jobs" /> : data?.items.length ? (
+                    <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-sm">
+                        <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Job</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Vehicle</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">{data.items.map((job) => <tr className="transition hover:bg-slate-50/70" key={job.id}><td className="px-4 py-4 font-semibold text-slate-900">{job.jobCardNumber}</td><td className="px-4 py-4">{job.customerName || '-'}</td><td className="px-4 py-4">{job.registrationNumber || '-'}</td><td className="px-4 py-4">{job.serviceTypeName || '-'}</td><td className="px-4 py-4 font-semibold"><MoneyDisplay value={job.grandTotal} /></td><td className="px-4 py-4"><StatusBadge value={job.status} /></td><td className="px-4 py-4 text-right"><Link className="mr-3 font-semibold text-blue-700" to={`/vehicle-service/jobs/${job.id}`}>View</Link>{['open', 'in_progress'].includes(job.status) ? <Link className="mr-3 font-semibold text-slate-700" to={`/vehicle-service/jobs/${job.id}/edit`}>Edit</Link> : null}{job.status === 'open' ? <button className="font-semibold text-red-600" onClick={() => void remove(job)} type="button">Delete</button> : null}</td></tr>)}</tbody>
+                    </table></div>
+                ) : <EmptyState action={<PrimaryLink to="/vehicle-service/jobs/new">Create job</PrimaryLink>} title="No job cards found" />}
+            </TableCard>
+            {data ? <Pagination current={data.meta.currentPage} last={data.meta.lastPage} loading={loading} onPage={setPage} total={data.meta.total} /> : null}
+        </div>
+    );
 }
 
-export function Badge({ value }: { value: string }) { return <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{value.replaceAll('_', ' ')}</span>; }
-function Metric({ label, value }: { label: string; value: number | string }) { return <div className="rounded-xl border bg-white p-4 shadow-sm"><p className="text-xs font-bold uppercase text-slate-400">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>; }
+export function Badge({ value }: { value: string }) {
+    return <StatusBadge value={value} />;
+}

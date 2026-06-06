@@ -21,9 +21,58 @@
         background: #f5f7fb;
         color: #111827;
         font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
     }
 
     * {
         box-sizing: border-box;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font: inherit;
+    }
+}
+
+@layer components {
+    .erp-select {
+        height: 2.75rem;
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        padding: 0 0.75rem;
+        font-size: 0.875rem;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 150ms, box-shadow 150ms;
+    }
+
+    .erp-select:hover {
+        border-color: #cbd5e1;
+    }
+
+    .erp-select:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px #eff6ff;
+    }
+
+    .erp-textarea {
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        background: white;
+        padding: 0.75rem;
+        font-size: 0.875rem;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 150ms, box-shadow 150ms;
+    }
+
+    .erp-textarea:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px #eff6ff;
     }
 }

@@ -1,5 +1,6 @@
 import { FormEvent, useState, type ReactNode } from 'react';
 import { ApiError } from '../../services/api/apiErrors';
+import { FormSection } from '../components/erp/ErpUi';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import type { PartyInput } from './party.types';
@@ -115,9 +116,8 @@ export function PartyForm({
         <form className="space-y-6" onSubmit={handleSubmit}>
             {formError ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div> : null}
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Basic information</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection title="Basic information">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field label={`${noun} code`} error={errors[codeField]?.[0]}>
                         <Input className={fieldClass(Boolean(errors[codeField]))} value={value.code} onChange={(event) => update('code', event.target.value)} />
                     </Field>
@@ -146,12 +146,10 @@ export function PartyForm({
                         <Input inputMode="numeric" value={value.organizationUnitId ?? ''} onChange={(event) => update('organizationUnitId', event.target.value ? Number(event.target.value) : undefined)} />
                     </Field>
                 </div>
-            </section>
+            </FormSection>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Credit and tax</h2>
-                <p className="mt-1 text-sm text-slate-500">Amounts are stored without a hardcoded currency. Live balance integration is intentionally separate.</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection description="Amounts are stored without a hardcoded currency. Live balance integration remains separate." title="Credit and payment terms">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Credit limit" error={errors.credit_limit?.[0]}>
                         <Input className={fieldClass(Boolean(errors.credit_limit))} inputMode="decimal" value={value.creditLimit} onChange={(event) => update('creditLimit', event.target.value)} />
                     </Field>
@@ -165,12 +163,10 @@ export function PartyForm({
                         <Input value={value.vatNumber ?? ''} onChange={(event) => update('vatNumber', event.target.value)} />
                     </Field>
                 </div>
-            </section>
+            </FormSection>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Primary address</h2>
-                <p className="mt-1 text-sm text-slate-500">Leave all address fields blank when no primary address is required.</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection description="Leave all address fields blank when no primary address is required." title="Contact address">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Label">
                         <Input value={address.label ?? ''} onChange={(event) => updateAddress('label', event.target.value)} />
                     </Field>
@@ -193,13 +189,13 @@ export function PartyForm({
                         <Input value={address.countryName ?? ''} onChange={(event) => updateAddress('countryName', event.target.value)} />
                     </Field>
                 </div>
-            </section>
+            </FormSection>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <FormSection title="Status and notes">
                 <Field label="Notes">
-                    <textarea className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
+                    <textarea className="erp-textarea min-h-28" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
                 </Field>
-            </section>
+            </FormSection>
 
             <div className="flex justify-end gap-3">
                 <Button disabled={submitting} onClick={onCancel} variant="secondary">Cancel</Button>

@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState, type ReactNode } from 'react';
 import { ApiError } from '../../../services/api/apiErrors';
+import { FormSection } from '../../../shared/components/erp/ErpUi';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
 import type { UomLookup } from '../../uom/types/uom.types';
@@ -129,7 +130,7 @@ export function ItemForm({
 }
 
 function Section({ children, title }: { children: ReactNode; title: string }) {
-    return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-base font-bold text-slate-950">{title}</h2><div className="mt-4">{children}</div></section>;
+    return <FormSection title={title}>{children}</FormSection>;
 }
 
 function Field({ children, error, label }: { children: ReactNode; error?: string; label: string }) {

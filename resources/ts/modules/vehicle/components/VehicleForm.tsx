@@ -1,5 +1,6 @@
 import { FormEvent, useState, type ReactNode } from 'react';
 import { ApiError } from '../../../services/api/apiErrors';
+import { FormSection } from '../../../shared/components/erp/ErpUi';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
 import type { VehicleInput } from '../types/vehicle.types';
@@ -76,9 +77,8 @@ export function VehicleForm({
         <form className="space-y-6" onSubmit={handleSubmit}>
             {formError ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div> : null}
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Identity</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection title="Basic information">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Vehicle code" error={errors.vehicle_code?.[0]}>
                         <Input className={fieldClass(Boolean(errors.vehicle_code))} value={value.vehicleCode} onChange={(event) => update('vehicleCode', event.target.value)} />
                     </Field>
@@ -101,11 +101,10 @@ export function VehicleForm({
                         </select>
                     </Field>
                 </div>
-            </section>
+            </FormSection>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-base font-bold text-slate-950">Vehicle details</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormSection title="Registration and technical details">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Make">
                         <Input value={value.make ?? ''} onChange={(event) => update('make', event.target.value)} />
                     </Field>
@@ -131,13 +130,13 @@ export function VehicleForm({
                         <Input value={value.ownershipType ?? ''} onChange={(event) => update('ownershipType', event.target.value)} />
                     </Field>
                 </div>
-            </section>
+            </FormSection>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <FormSection title="Status and notes">
                 <Field label="Notes">
-                    <textarea className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
+                    <textarea className="erp-textarea min-h-28" value={value.notes ?? ''} onChange={(event) => update('notes', event.target.value)} />
                 </Field>
-            </section>
+            </FormSection>
 
             <div className="flex justify-end gap-3">
                 <Button disabled={submitting} onClick={onCancel} variant="secondary">Cancel</Button>

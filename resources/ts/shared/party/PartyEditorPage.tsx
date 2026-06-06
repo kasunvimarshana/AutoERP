@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Spinner } from '../components/ui/Spinner';
+import { PageHeader } from '../components/erp/ErpUi';
 import { PartyForm } from './PartyForm';
 import type { PartyApi, PartyDetail, PartyInput } from './party.types';
 
@@ -64,7 +65,7 @@ export function PartyEditorPage({ api, basePath, codeField, mode, noun }: PartyE
 
     return (
         <div className="mx-auto max-w-5xl space-y-5">
-            <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">{editing ? 'Edit record' : 'New record'}</p><h1 className="mt-1 text-3xl font-bold text-slate-950">{editing ? `Edit ${noun.toLowerCase()}` : `Create ${noun.toLowerCase()}`}</h1></header>
+            <PageHeader eyebrow={editing ? 'Edit record' : 'New record'} subtitle={`Maintain ${noun.toLowerCase()} identity, contact, address, and commercial settings.`} title={editing ? `Edit ${noun.toLowerCase()}` : `Create ${noun.toLowerCase()}`} />
             {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
             {!error ? <PartyForm codeField={codeField} initialValue={party ? toInput(party) : undefined} noun={noun} onCancel={() => navigate(basePath)} onSubmit={submit} submitLabel={editing ? `Update ${noun.toLowerCase()}` : `Create ${noun.toLowerCase()}`} /> : null}
         </div>
