@@ -10,6 +10,7 @@ use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
+use Modules\UOM\Services\UomValidationService;
 use Throwable;
 
 final class UpdateUnitOfMeasureService
@@ -18,6 +19,7 @@ final class UpdateUnitOfMeasureService
         private readonly UnitOfMeasureRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+        private readonly UomValidationService $validation,
     ) {}
 
     public function execute(int|string $id, array $payload): Result
@@ -36,8 +38,18 @@ final class UpdateUnitOfMeasureService
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $current->get('organization_unit_id') ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
-            $payload['category'] ??= $payload['type'] ?? $current->get('category') ?? $current->get('type');
-            $payload['type'] ??= $payload['category'];
+            if (! $this->validation->organizationBelongsToTenant(
+                isset($payload['organization_unit_id']) ? (int) $payload['organization_unit_id'] : null,
+                $tenantId,
+            )) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Organization unit does not belong to the active tenant.'));
+            }
+            if (array_key_exists('type', $payload)) {
+                $payload['type'] = strtolower((string) $payload['type']);
+            }
+            if (array_key_exists('category', $payload)) {
+                $payload['category'] = strtolower((string) $payload['category']);
+            }
             if (array_key_exists('code', $payload)) {
                 $payload['code'] = strtoupper(trim((string) $payload['code']));
             }

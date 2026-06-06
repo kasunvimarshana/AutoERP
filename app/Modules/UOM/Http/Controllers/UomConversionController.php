@@ -9,7 +9,8 @@ use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Http\Requests\ListUomConversionRequest;
-use Modules\UOM\Http\Requests\UpsertUomConversionRequest;
+use Modules\UOM\Http\Requests\StoreUomConversionRequest;
+use Modules\UOM\Http\Requests\UpdateUomConversionRequest;
 use Modules\UOM\Http\Resources\UomConversionResource;
 use Modules\UOM\Services\UomConversions\CreateUomConversionService;
 use Modules\UOM\Services\UomConversions\DeleteUomConversionService;
@@ -68,7 +69,7 @@ final class UomConversionController extends Controller
         return new UomConversionResource($result->valueOrFail());
     }
 
-    public function store(UpsertUomConversionRequest $request): JsonResponse|UomConversionResource
+    public function store(StoreUomConversionRequest $request): JsonResponse|UomConversionResource
     {
         $result = $this->createService->execute($request->validated());
 
@@ -79,7 +80,7 @@ final class UomConversionController extends Controller
         return (new UomConversionResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function update(UpsertUomConversionRequest $request, int|string $id): JsonResponse|UomConversionResource
+    public function update(UpdateUomConversionRequest $request, int|string $id): JsonResponse|UomConversionResource
     {
         $result = $this->updateService->execute($id, $request->validated());
 

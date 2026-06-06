@@ -4,6 +4,8 @@ import { Panel } from '@/shared/components/Panel';
 
 const modules = [
     ['/suppliers', 'Suppliers', 'Supplier profiles and relation-aware onboarding'],
+    ['/uoms', 'UOM', 'Generic units, categories, and conversion factors'],
+    ['/uom-convert', 'UOM Convert', 'Backend-powered quantity conversion'],
     ['/items', 'Items', 'Catalog, units, variants, pricing, and codes'],
     ['/inventory', 'Inventory', 'Stock balances and availability'],
     ['/purchase/orders', 'Purchase', 'Purchase orders and receipts'],

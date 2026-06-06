@@ -5,10 +5,29 @@ declare(strict_types=1);
 namespace Modules\UOM\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\UOM\Constants\UomCategory;
 use Modules\UOM\Constants\UomType;
 
-final class UpsertUnitOfMeasureRequest extends FormRequest
+class UpsertUnitOfMeasureRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+        foreach (['type', 'category'] as $field) {
+            if ($this->filled($field)) {
+                $normalized[$field] = strtolower(trim((string) $this->input($field)));
+            }
+        }
+
+        if ($this->filled('code')) {
+            $normalized['code'] = strtoupper(trim((string) $this->input('code')));
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -29,8 +48,8 @@ final class UpsertUnitOfMeasureRequest extends FormRequest
             'code' => array_merge($required, ['string', 'max:50']),
             'name' => array_merge($required, ['string', 'max:255']),
             'symbol' => array_merge($required, ['string', 'max:255']),
-            'category' => ['nullable', 'string', 'in:'.implode(',', UomType::all())],
             'type' => ['nullable', 'string', 'in:'.implode(',', UomType::all())],
+            'category' => ['nullable', 'string', 'in:'.implode(',', UomCategory::all())],
             'decimal_precision' => ['nullable', 'integer', 'min:0', 'max:8'],
             'allow_fractional_quantity' => ['nullable', 'boolean'],
             'is_base' => ['nullable', 'boolean'],

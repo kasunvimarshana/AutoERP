@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\UOM\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
 
 final class UomConversionModel extends CoreModel
@@ -15,6 +16,16 @@ final class UomConversionModel extends CoreModel
 
     protected $guarded = ['id'];
 
+    public function fromUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'from_uom_id');
+    }
+
+    public function toUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'to_uom_id');
+    }
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
@@ -24,8 +35,7 @@ final class UomConversionModel extends CoreModel
             'metadata' => 'array',
             'from_uom_id' => 'integer',
             'to_uom_id' => 'integer',
-            'factor' => 'decimal:8',
-            'is_bidirectional' => 'boolean',
+            'conversion_factor' => 'decimal:6',
             'is_active' => 'boolean',
         ]);
     }

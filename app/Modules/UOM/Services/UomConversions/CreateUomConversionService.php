@@ -11,6 +11,7 @@ use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Repositories\UomConversionRepositoryInterface;
+use Modules\UOM\Services\UomValidationService;
 use Throwable;
 
 final class CreateUomConversionService
@@ -20,6 +21,7 @@ final class CreateUomConversionService
         private readonly UnitOfMeasureRepositoryInterface $uomRepository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+        private readonly UomValidationService $validation,
     ) {}
 
     public function execute(array $payload): Result
@@ -32,11 +34,17 @@ final class CreateUomConversionService
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
+            if (! $this->validation->organizationBelongsToTenant(
+                isset($payload['organization_unit_id']) ? (int) $payload['organization_unit_id'] : null,
+                $tenantId,
+            )) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Organization unit does not belong to the active tenant.'));
+            }
             $payload['row_version'] ??= 1;
 
             $fromUomId = (int) ($payload['from_uom_id'] ?? 0);
             $toUomId = (int) ($payload['to_uom_id'] ?? 0);
-            $factor = (float) ($payload['factor'] ?? 0);
+            $factor = (float) ($payload['conversion_factor'] ?? 0);
 
             if ($fromUomId === $toUomId) {
                 return Result::failure(new Error(
@@ -72,8 +80,6 @@ final class CreateUomConversionService
             if ($this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId) !== null) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }
-
-            $payload['category'] ??= $fromUom->get('category') ?? $fromUom->get('type');
 
             return Result::success($this->repository->create($payload));
         } catch (Throwable $exception) {

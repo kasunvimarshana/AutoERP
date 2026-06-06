@@ -114,7 +114,7 @@ final class UomConversionService implements UomConversionServiceInterface
     // -------------------------------------------------------------------------
 
     /**
-     * Attempt to resolve a direct conversion factor (forward or bidirectional reverse).
+     * Attempt to resolve a direct conversion factor.
      * Returns null when no active conversion record is found.
      */
     private function resolveDirectFactor(
@@ -126,14 +126,14 @@ final class UomConversionService implements UomConversionServiceInterface
         $record = $this->conversionRepository->findConversionBetween($fromUomId, $toUomId, $tenantId);
 
         if ($record !== null && $record->get('is_active')) {
-            return (float) $record->get('factor');
+            return (float) $record->get('conversion_factor');
         }
 
-        // Bidirectional reverse
+        // Reverse conversion is available when the opposite direct conversion exists.
         $reverse = $this->conversionRepository->findConversionBetween($toUomId, $fromUomId, $tenantId);
 
-        if ($reverse !== null && $reverse->get('is_active') && $reverse->get('is_bidirectional')) {
-            $factor = (float) $reverse->get('factor');
+        if ($reverse !== null && $reverse->get('is_active')) {
+            $factor = (float) $reverse->get('conversion_factor');
 
             return $factor != 0.0 ? round(1.0 / $factor, self::PRECISION) : null;
         }

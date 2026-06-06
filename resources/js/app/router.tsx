@@ -5,6 +5,13 @@ import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
+const UomListPage = lazy(() => import('@/modules/uom/UomListPage'));
+const UomCreatePage = lazy(() => import('@/modules/uom/UomCreatePage'));
+const UomEditPage = lazy(() => import('@/modules/uom/UomEditPage'));
+const UomDetailPage = lazy(() => import('@/modules/uom/UomDetailPage'));
+const UomConversionListPage = lazy(() => import('@/modules/uom/UomConversionListPage'));
+const UomConversionForm = lazy(() => import('@/modules/uom/UomConversionForm'));
+const UomConvertTool = lazy(() => import('@/modules/uom/UomConvertTool'));
 const SupplierListPage = lazy(() => import('@/modules/supplier/pages/SupplierListPage'));
 const SupplierFormPage = lazy(() => import('@/modules/supplier/pages/SupplierFormPage'));
 const SupplierDetailPage = lazy(() => import('@/modules/supplier/pages/SupplierDetailPage'));
@@ -32,6 +39,14 @@ export function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/uoms" element={<UomListPage />} />
+                    <Route path="/uoms/create" element={<UomCreatePage />} />
+                    <Route path="/uoms/:id/edit" element={<UomEditPage />} />
+                    <Route path="/uoms/:id" element={<UomDetailPage />} />
+                    <Route path="/uom-conversions" element={<UomConversionListPage />} />
+                    <Route path="/uom-conversions/create" element={<UomConversionForm />} />
+                    <Route path="/uom-conversions/:id/edit" element={<UomConversionForm />} />
+                    <Route path="/uom-convert" element={<UomConvertTool />} />
                     <Route path="/suppliers" element={<SupplierListPage />} />
                     <Route path="/suppliers/create" element={<SupplierFormPage />} />
                     <Route path="/suppliers/:id/edit" element={<SupplierFormPage />} />

@@ -4,7 +4,7 @@ import type { ApiCollection } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 
 export async function listUoms(search = '', signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.uom}/units-of-measure`, {
+    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.uoms}/lookup`, {
         params: { search, per_page: 50, page: 1 },
         signal,
     });

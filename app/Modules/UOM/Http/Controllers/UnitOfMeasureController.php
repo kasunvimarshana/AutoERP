@@ -8,17 +8,21 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\DTOs\PagedResult;
+use Modules\UOM\Constants\UomCategory;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Constants\UomType;
 use Modules\UOM\Contracts\Services\UomUsageSummaryServiceInterface;
 use Modules\UOM\Http\Requests\ListUnitOfMeasureRequest;
-use Modules\UOM\Http\Requests\UpsertUnitOfMeasureRequest;
+use Modules\UOM\Http\Requests\StoreUomRequest;
+use Modules\UOM\Http\Requests\UpdateUomRequest;
+use Modules\UOM\Http\Resources\UomLookupResource;
 use Modules\UOM\Http\Resources\UnitOfMeasureResource;
 use Modules\UOM\Services\UnitOfMeasures\CreateUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\DeleteUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\GetUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\ListUnitOfMeasuresService;
 use Modules\UOM\Services\UnitOfMeasures\UpdateUnitOfMeasureService;
+use Modules\UOM\Services\UomLookupService;
 
 final class UnitOfMeasureController extends Controller
 {
@@ -30,6 +34,7 @@ final class UnitOfMeasureController extends Controller
         private readonly DeleteUnitOfMeasureService $deleteService,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly UomUsageSummaryServiceInterface $usageSummary,
+        private readonly UomLookupService $lookupService,
     ) {}
 
     public function categories(): JsonResponse
@@ -44,22 +49,48 @@ final class UnitOfMeasureController extends Controller
 
         if ($result->isSuccess() && $result->valueOrFail() instanceof PagedResult) {
             foreach ($result->valueOrFail()->items as $record) {
-                $type = (string) ($record->get('type') ?? $record->get('category') ?? UomType::OTHER);
-                $counts[$type] = ($counts[$type] ?? 0) + 1;
+                $category = (string) ($record->get('category') ?? UomCategory::OTHER);
+                $counts[$category] = ($counts[$category] ?? 0) + 1;
             }
         }
 
         return response()->json([
             'data' => array_map(
-                static fn (string $type): array => [
-                    'id' => $type,
-                    'name' => ucfirst(strtolower(str_replace('_', ' ', $type))),
-                    'type' => $type,
-                    'unit_count' => $counts[$type] ?? 0,
+                static fn (string $category): array => [
+                    'id' => $category,
+                    'name' => ucfirst(strtolower(str_replace('_', ' ', $category))),
+                    'category' => $category,
+                    'unit_count' => $counts[$category] ?? 0,
                 ],
-                UomType::all(),
+                UomCategory::all(),
             ),
         ]);
+    }
+
+    public function types(): JsonResponse
+    {
+        return response()->json(['data' => array_map(
+            static fn (string $type): array => ['id' => $type, 'name' => ucfirst($type)],
+            UomType::all(),
+        )]);
+    }
+
+    public function lookup(ListUnitOfMeasureRequest $request): JsonResponse
+    {
+        return $this->respondLookup($this->lookupService->activeLookup(
+            $this->lookupCriteria($request->validated()),
+            (int) $request->input('per_page', 20),
+            (int) $request->input('page', 1),
+        ));
+    }
+
+    public function base(ListUnitOfMeasureRequest $request): JsonResponse
+    {
+        return $this->respondLookup($this->lookupService->baseLookup(
+            $this->lookupCriteria($request->validated()),
+            (int) $request->input('per_page', 20),
+            (int) $request->input('page', 1),
+        ));
     }
 
     public function index(ListUnitOfMeasureRequest $request): JsonResponse
@@ -123,7 +154,7 @@ final class UnitOfMeasureController extends Controller
         ]);
     }
 
-    public function store(UpsertUnitOfMeasureRequest $request): JsonResponse|UnitOfMeasureResource
+    public function store(StoreUomRequest $request): JsonResponse|UnitOfMeasureResource
     {
         $result = $this->createService->execute($request->validated());
 
@@ -134,7 +165,7 @@ final class UnitOfMeasureController extends Controller
         return (new UnitOfMeasureResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function update(UpsertUnitOfMeasureRequest $request, int|string $id): JsonResponse|UnitOfMeasureResource
+    public function update(UpdateUomRequest $request, int|string $id): JsonResponse|UnitOfMeasureResource
     {
         $result = $this->updateService->execute($id, $request->validated());
 
@@ -181,5 +212,35 @@ final class UnitOfMeasureController extends Controller
         }
 
         return new UnitOfMeasureResource($result->valueOrFail());
+    }
+
+    private function respondLookup(\Modules\Core\Results\Result $result): JsonResponse
+    {
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        $pageResult = $result->valueOrFail();
+        if (! $pageResult instanceof PagedResult) {
+            return response()->json(['message' => 'Unexpected lookup response.'], 500);
+        }
+
+        return response()->json([
+            'data' => UomLookupResource::collection($pageResult->items)->resolve(),
+            'meta' => [
+                'total' => $pageResult->total,
+                'page' => $pageResult->page,
+                'per_page' => $pageResult->perPage,
+                'page_count' => $pageResult->pageCount(),
+                'has_more' => $pageResult->hasMore(),
+            ],
+        ]);
+    }
+
+    private function lookupCriteria(array $validated): array
+    {
+        unset($validated['page'], $validated['per_page'], $validated['tenant_id'], $validated['organization_unit_id']);
+
+        return $validated;
     }
 }

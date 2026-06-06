@@ -23,16 +23,34 @@ final class UomConversionResource extends JsonResource
             'id' => $data['id'] ?? null,
             'tenant_id' => $data['tenant_id'] ?? null,
             'organization_unit_id' => $data['organization_unit_id'] ?? null,
-            'from_uom_id' => $data['from_uom_id'] ?? null,
-            'to_uom_id' => $data['to_uom_id'] ?? null,
-            'factor' => $data['factor'] ?? null,
-            'category' => $data['category'] ?? null,
-            'is_bidirectional' => $data['is_bidirectional'] ?? true,
+            'from_uom' => $this->uomSummary($data['from_uom'] ?? null, $data['from_uom_id'] ?? null),
+            'to_uom' => $this->uomSummary($data['to_uom'] ?? null, $data['to_uom_id'] ?? null),
+            'conversion_factor' => isset($data['conversion_factor'])
+                ? rtrim(rtrim((string) $data['conversion_factor'], '0'), '.')
+                : null,
             'is_active' => $data['is_active'] ?? true,
-            'notes' => $data['notes'] ?? null,
-            'metadata' => $data['metadata'] ?? null,
+            'description' => $data['description'] ?? null,
             'created_at' => $data['created_at'] ?? null,
             'updated_at' => $data['updated_at'] ?? null,
+        ];
+    }
+
+    private function uomSummary(mixed $uom, mixed $fallbackId): ?array
+    {
+        if (! is_array($uom)) {
+            return $fallbackId === null ? null : [
+                'id' => $fallbackId,
+                'code' => null,
+                'name' => null,
+                'symbol' => null,
+            ];
+        }
+
+        return [
+            'id' => $uom['id'] ?? $fallbackId,
+            'code' => $uom['code'] ?? null,
+            'name' => $uom['name'] ?? null,
+            'symbol' => $uom['symbol'] ?? null,
         ];
     }
 }

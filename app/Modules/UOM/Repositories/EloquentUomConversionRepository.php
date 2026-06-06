@@ -17,6 +17,11 @@ final class EloquentUomConversionRepository extends EloquentRepository implement
         parent::__construct($model);
     }
 
+    public function query(array $with = []): Builder
+    {
+        return parent::query($with === [] ? ['fromUom', 'toUom'] : $with);
+    }
+
     public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord
     {
         $model = $this->query()
@@ -25,6 +30,24 @@ final class EloquentUomConversionRepository extends EloquentRepository implement
             ->first();
 
         return $model instanceof Model ? $this->toRecord($model) : null;
+    }
+
+    public function create(array $attributes): DataRecord
+    {
+        $model = $this->model->newQuery()->create($attributes);
+        $model->load(['fromUom', 'toUom']);
+
+        return $this->toRecord($model);
+    }
+
+    public function update(int|string $id, array $attributes): DataRecord
+    {
+        $model = $this->resolveModel($id);
+        $model->fill($attributes);
+        $model->save();
+        $model->load(['fromUom', 'toUom']);
+
+        return $this->toRecord($model);
     }
 
     public function findConversionBetween(
@@ -65,8 +88,35 @@ final class EloquentUomConversionRepository extends EloquentRepository implement
 
     protected function applyCriteria(Builder $query, array $criteria): Builder
     {
-        unset($criteria['search']);
+        if (array_key_exists('search', $criteria)) {
+            $search = trim((string) $criteria['search']);
+            unset($criteria['search']);
+
+            if ($search !== '') {
+                $query->where(function (Builder $builder) use ($search): void {
+                    $builder
+                        ->whereHas('fromUom', function (Builder $uom) use ($search): void {
+                            $uom->where('code', 'like', '%'.$search.'%')
+                                ->orWhere('name', 'like', '%'.$search.'%')
+                                ->orWhere('symbol', 'like', '%'.$search.'%');
+                        })
+                        ->orWhereHas('toUom', function (Builder $uom) use ($search): void {
+                            $uom->where('code', 'like', '%'.$search.'%')
+                                ->orWhere('name', 'like', '%'.$search.'%')
+                                ->orWhere('symbol', 'like', '%'.$search.'%');
+                        });
+                });
+            }
+        }
 
         return parent::applyCriteria($query, $criteria);
+    }
+
+    protected function toRecord(Model $model): DataRecord
+    {
+        /** @var array<string,mixed> $payload */
+        $payload = $model->toArray();
+
+        return new DataRecord($payload);
     }
 }

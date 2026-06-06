@@ -7,5 +7,6 @@ export const endpoints = {
     invoices: '/api/v1/invoices',
     payments: '/api/v1/payments',
     finance: '/api/v1/finance',
-    uom: '/api/uom',
+    uoms: '/api/v1/uoms',
+    uomConversions: '/api/v1/uom-conversions',
 } as const;

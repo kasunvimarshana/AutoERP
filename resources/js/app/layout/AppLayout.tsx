@@ -5,6 +5,9 @@ import { Button } from '@/shared/components/Button';
 
 const navigation = [
     { to: '/dashboard', label: 'Dashboard' },
+    { to: '/uoms', label: 'UOM' },
+    { to: '/uom-conversions', label: 'UOM Conversions' },
+    { to: '/uom-convert', label: 'UOM Convert' },
     { to: '/suppliers', label: 'Suppliers' },
     { to: '/items', label: 'Items' },
     { to: '/inventory', label: 'Inventory' },

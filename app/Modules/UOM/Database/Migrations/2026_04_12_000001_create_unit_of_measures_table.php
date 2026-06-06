@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('code', 50);
             $table->string('name');
             $table->string('symbol');
-            $table->string('category')->default('UNIT')->comment('Generic UOM category such as UNIT, MASS, VOLUME, LENGTH, TIME, DISTANCE, OTHER');
-            $table->string('type')->default('UNIT')->comment('UNIT, MASS, VOLUME, LENGTH, TIME, DISTANCE, OTHER');
+            $table->string('type')->default('unit')->comment('Generic UOM type such as unit, weight, volume, length, area, time, service, other');
+            $table->string('category')->default('quantity')->comment('Generic UOM category such as quantity, weight, volume, length, area, time, service, other');
             $table->unsignedTinyInteger('decimal_precision')->default(0);
             $table->boolean('allow_fractional_quantity')->default(false);
             $table->boolean('is_base')->default(false);
@@ -33,7 +33,10 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'code'], 'unit_of_measures_code_uk');
             $table->unique(['tenant_id', 'name'], 'unit_of_measures_name_uk');
+            $table->index('tenant_id', 'unit_of_measures_tenant_idx');
+            $table->index('organization_unit_id', 'unit_of_measures_org_idx');
             $table->index(['tenant_id', 'type', 'is_active'], 'unit_of_measures_type_active_idx');
+            $table->index(['tenant_id', 'category', 'is_active'], 'unit_of_measures_category_active_idx');
         });
     }
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Constants;
 
-final class UomType
+final class UomCategory
 {
-    public const UNIT = 'unit';
+    public const QUANTITY = 'quantity';
 
     public const WEIGHT = 'weight';
 
@@ -26,7 +26,7 @@ final class UomType
     public static function all(): array
     {
         return [
-            self::UNIT,
+            self::QUANTITY,
             self::WEIGHT,
             self::VOLUME,
             self::LENGTH,

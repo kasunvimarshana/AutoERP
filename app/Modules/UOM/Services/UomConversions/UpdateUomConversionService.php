@@ -11,6 +11,7 @@ use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Repositories\UomConversionRepositoryInterface;
+use Modules\UOM\Services\UomValidationService;
 use Throwable;
 
 final class UpdateUomConversionService
@@ -20,6 +21,7 @@ final class UpdateUomConversionService
         private readonly UnitOfMeasureRepositoryInterface $uomRepository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+        private readonly UomValidationService $validation,
     ) {}
 
     public function execute(int|string $id, array $payload): Result
@@ -38,9 +40,15 @@ final class UpdateUomConversionService
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $current->get('organization_unit_id') ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
+            if (! $this->validation->organizationBelongsToTenant(
+                isset($payload['organization_unit_id']) ? (int) $payload['organization_unit_id'] : null,
+                $tenantId,
+            )) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Organization unit does not belong to the active tenant.'));
+            }
             $fromUomId = (int) ($payload['from_uom_id'] ?? $current->get('from_uom_id'));
             $toUomId = (int) ($payload['to_uom_id'] ?? $current->get('to_uom_id'));
-            $factor = (float) ($payload['factor'] ?? $current->get('factor'));
+            $factor = (float) ($payload['conversion_factor'] ?? $current->get('conversion_factor'));
 
             if ($fromUomId === $toUomId) {
                 return Result::failure(new Error(
@@ -77,8 +85,6 @@ final class UpdateUomConversionService
             if ($existing !== null && (int) $existing->get('id') !== (int) $id) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }
-
-            $payload['category'] ??= $fromUom->get('category') ?? $fromUom->get('type');
 
             return Result::success($this->repository->update($id, $payload));
         } catch (Throwable $exception) {

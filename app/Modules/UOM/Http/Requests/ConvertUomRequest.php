@@ -20,7 +20,7 @@ final class ConvertUomRequest extends FormRequest
     {
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
-            'quantity' => ['required', 'numeric'],
+            'quantity' => ['required', 'numeric', 'gt:0'],
             'from_uom_id' => ['required', 'integer', 'min:1', 'exists:unit_of_measures,id'],
             'to_uom_id' => ['required', 'integer', 'min:1', 'exists:unit_of_measures,id', 'different:from_uom_id'],
         ];

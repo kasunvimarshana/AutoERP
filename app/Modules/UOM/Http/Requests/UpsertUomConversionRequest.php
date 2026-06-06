@@ -6,7 +6,7 @@ namespace Modules\UOM\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class UpsertUomConversionRequest extends FormRequest
+class UpsertUomConversionRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -32,11 +32,9 @@ final class UpsertUomConversionRequest extends FormRequest
                 'exists:unit_of_measures,id',
                 'different:from_uom_id',
             ]),
-            'factor' => array_merge($required, ['numeric', 'gt:0']),
-            'category' => ['nullable', 'string', 'max:50'],
-            'is_bidirectional' => ['nullable', 'boolean'],
+            'conversion_factor' => array_merge($required, ['numeric', 'gt:0']),
             'is_active' => ['nullable', 'boolean'],
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'description' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

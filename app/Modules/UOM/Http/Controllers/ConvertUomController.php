@@ -7,15 +7,18 @@ namespace Modules\UOM\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\UOM\DTOs\UomConversionResultData;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Contracts\Services\UomConversionServiceInterface;
 use Modules\UOM\Http\Requests\ConvertUomRequest;
+use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
 
 final class ConvertUomController extends Controller
 {
     public function __construct(
         private readonly UomConversionServiceInterface $conversionService,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly UnitOfMeasureRepositoryInterface $uoms,
     ) {}
 
     /**
@@ -32,7 +35,7 @@ final class ConvertUomController extends Controller
             ], 422);
         }
 
-        $quantity = (float) $validated['quantity'];
+        $quantity = (string) $validated['quantity'];
         $fromUomId = (int) $validated['from_uom_id'];
         $toUomId = (int) $validated['to_uom_id'];
 
@@ -44,7 +47,7 @@ final class ConvertUomController extends Controller
             return response()->json(['message' => $error->message, 'code' => $error->code], $status);
         }
 
-        $result = $this->conversionService->convert($quantity, $fromUomId, $toUomId, $tenantId);
+        $result = $this->conversionService->convert((float) $quantity, $fromUomId, $toUomId, $tenantId);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -53,20 +56,30 @@ final class ConvertUomController extends Controller
             return response()->json(['message' => $error->message, 'code' => $error->code], $status);
         }
 
-        return response()->json([
-            'input' => [
-                'from_uom_id' => $fromUomId,
-                'to_uom_id' => $toUomId,
-                'quantity' => $quantity,
-            ],
-            'calculated' => [
-                'converted_quantity' => $result->valueOrFail(),
-                'factor' => $factorResult->valueOrFail(),
-                'precision' => 10,
-            ],
-            'breakdown' => [],
-            'warnings' => [],
-            'errors' => [],
-        ]);
+        $fromUom = $this->uoms->findByIdInTenant($fromUomId, $tenantId);
+        $toUom = $this->uoms->findByIdInTenant($toUomId, $tenantId);
+
+        return response()->json((new UomConversionResultData(
+            quantity: $quantity,
+            fromUom: $this->uomSummary($fromUom?->toArray() ?? []),
+            toUom: $this->uomSummary($toUom?->toArray() ?? []),
+            conversionFactor: $this->decimalString($factorResult->valueOrFail()),
+            convertedQuantity: $this->decimalString($result->valueOrFail()),
+        ))->toArray());
+    }
+
+    private function uomSummary(array $uom): array
+    {
+        return [
+            'id' => $uom['id'] ?? null,
+            'code' => $uom['code'] ?? null,
+            'name' => $uom['name'] ?? null,
+            'symbol' => $uom['symbol'] ?? null,
+        ];
+    }
+
+    private function decimalString(mixed $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 10, '.', ''), '0'), '.');
     }
 }

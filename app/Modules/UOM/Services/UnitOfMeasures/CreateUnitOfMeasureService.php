@@ -8,8 +8,11 @@ use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\UOM\Constants\UomCategory;
 use Modules\UOM\Constants\UomErrorCode;
+use Modules\UOM\Constants\UomType;
 use Modules\UOM\Repositories\UnitOfMeasureRepositoryInterface;
+use Modules\UOM\Services\UomValidationService;
 use Throwable;
 
 final class CreateUnitOfMeasureService
@@ -18,6 +21,7 @@ final class CreateUnitOfMeasureService
         private readonly UnitOfMeasureRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+        private readonly UomValidationService $validation,
     ) {}
 
     public function execute(array $payload): Result
@@ -30,9 +34,15 @@ final class CreateUnitOfMeasureService
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
+            if (! $this->validation->organizationBelongsToTenant(
+                isset($payload['organization_unit_id']) ? (int) $payload['organization_unit_id'] : null,
+                $tenantId,
+            )) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Organization unit does not belong to the active tenant.'));
+            }
             $payload['row_version'] ??= 1;
-            $payload['category'] ??= $payload['type'] ?? 'UNIT';
-            $payload['type'] ??= $payload['category'];
+            $payload['type'] = strtolower((string) ($payload['type'] ?? UomType::UNIT));
+            $payload['category'] = strtolower((string) ($payload['category'] ?? UomCategory::QUANTITY));
             $payload['code'] = strtoupper(trim((string) ($payload['code'] ?? $payload['symbol'] ?? '')));
 
             if ($payload['code'] === '') {
