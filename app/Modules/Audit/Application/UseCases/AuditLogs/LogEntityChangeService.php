@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Application\UseCases\AuditLogs;
 
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\LogEntityChangeServiceInterface;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\LogActivityServiceInterface;
 use Modules\Audit\Application\DTOs\AuditLogActivityData;
 use Modules\Audit\Application\DTOs\AuditLogEntityChangeData;
 use Modules\Audit\Domain\Constants\AuditEventType;
 use Modules\Core\Application\Results\Result;
 
-final class LogEntityChangeService implements LogEntityChangeServiceInterface
+final class LogEntityChangeService
 {
-    public function __construct(private readonly LogActivityServiceInterface $logActivity)
-    {
-    }
+    public function __construct(private readonly LogActivityService $logActivity) {}
 
     public function execute(AuditLogEntityChangeData $data): Result
     {
@@ -41,8 +37,8 @@ final class LogEntityChangeService implements LogEntityChangeServiceInterface
     }
 
     /**
-     * @param array<string, mixed>|null $oldValues
-     * @param array<string, mixed>|null $newValues
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
      * @return list<string>
      */
     private function detectChangedFields(?array $oldValues, ?array $newValues): array

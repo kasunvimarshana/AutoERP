@@ -5,19 +5,17 @@ declare(strict_types=1);
 namespace Modules\User\Application\UseCases;
 
 use Modules\Core\Application\Results\Result;
-use Modules\User\Application\Contracts\UseCases\RoleServiceInterface;
 use Modules\User\Application\Repositories\RoleRepositoryInterface;
 use Modules\User\Domain\Constants\UserErrorCode;
 use Modules\User\Domain\Contracts\UserDomainServiceInterface;
 use Throwable;
 
-final class RoleService extends AbstractUserCrudService implements RoleServiceInterface
+final class RoleService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly RoleRepositoryInterface $roles,
         private readonly UserDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function list(array $filters): Result
     {

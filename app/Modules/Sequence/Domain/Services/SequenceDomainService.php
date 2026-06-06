@@ -58,7 +58,6 @@ final class SequenceDomainService implements SequenceDomainServiceInterface
     }
 
     /**
-     * @param mixed $value
      * @return array<string, mixed>
      */
     public function normalizeMetadata(mixed $value): array
@@ -112,8 +111,16 @@ final class SequenceDomainService implements SequenceDomainServiceInterface
         return $date->format('Y');
     }
 
+    public function scopeKey(?int $organizationUnitId, ?string $periodValue): string
+    {
+        $organizationScope = $organizationUnitId === null ? 'global' : (string) $organizationUnitId;
+        $periodScope = $this->normalizePeriodValue($periodValue) ?? 'none';
+
+        return $organizationScope.':'.$periodScope;
+    }
+
     /**
-     * @param array<string, scalar|null> $tokens
+     * @param  array<string, scalar|null>  $tokens
      */
     public function formatSequenceNumber(
         string $prefix,
@@ -132,12 +139,12 @@ final class SequenceDomainService implements SequenceDomainServiceInterface
                 continue;
             }
 
-            $replacements['{' . strtoupper(trim($key)) . '}'] = (string) ($value ?? '');
+            $replacements['{'.strtoupper(trim($key)).'}'] = (string) ($value ?? '');
         }
 
         $resolvedPrefix = strtr($prefix, $replacements);
         $resolvedSuffix = strtr($suffix, $replacements);
 
-        return $resolvedPrefix . str_pad((string) $number, $padding, '0', STR_PAD_LEFT) . $resolvedSuffix;
+        return $resolvedPrefix.str_pad((string) $number, $padding, '0', STR_PAD_LEFT).$resolvedSuffix;
     }
 }

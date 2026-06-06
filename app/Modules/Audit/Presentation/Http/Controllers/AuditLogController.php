@@ -6,9 +6,9 @@ namespace Modules\Audit\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\GetAuditLogServiceInterface;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\ListAuditLogsServiceInterface;
 use Modules\Audit\Application\DTOs\AuditLogQueryData;
+use Modules\Audit\Application\UseCases\AuditLogs\GetAuditLogService;
+use Modules\Audit\Application\UseCases\AuditLogs\ListAuditLogsService;
 use Modules\Audit\Presentation\Http\Requests\ListAuditLogRequest;
 use Modules\Audit\Presentation\Http\Resources\AuditLogResource;
 use Modules\Core\Application\DTO\PagedResult;
@@ -16,10 +16,9 @@ use Modules\Core\Application\DTO\PagedResult;
 final class AuditLogController extends Controller
 {
     public function __construct(
-        private readonly ListAuditLogsServiceInterface $listService,
-        private readonly GetAuditLogServiceInterface $getService,
-    ) {
-    }
+        private readonly ListAuditLogsService $listService,
+        private readonly GetAuditLogService $getService,
+    ) {}
 
     public function index(ListAuditLogRequest $request): JsonResponse
     {

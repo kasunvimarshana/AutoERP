@@ -7,11 +7,11 @@ namespace Modules\Extension\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Extension\Application\Contracts\UseCases\Comments\CreateCommentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Comments\DeleteCommentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Comments\GetCommentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Comments\ListCommentsServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Comments\UpdateCommentServiceInterface;
+use Modules\Extension\Application\UseCases\Comments\CreateCommentService;
+use Modules\Extension\Application\UseCases\Comments\DeleteCommentService;
+use Modules\Extension\Application\UseCases\Comments\GetCommentService;
+use Modules\Extension\Application\UseCases\Comments\ListCommentsService;
+use Modules\Extension\Application\UseCases\Comments\UpdateCommentService;
 use Modules\Extension\Presentation\Http\Requests\ListCommentRequest;
 use Modules\Extension\Presentation\Http\Requests\UpsertCommentRequest;
 use Modules\Extension\Presentation\Http\Resources\CommentResource;
@@ -19,13 +19,12 @@ use Modules\Extension\Presentation\Http\Resources\CommentResource;
 final class CommentController extends Controller
 {
     public function __construct(
-        private readonly ListCommentsServiceInterface $listService,
-        private readonly GetCommentServiceInterface $getService,
-        private readonly CreateCommentServiceInterface $createService,
-        private readonly UpdateCommentServiceInterface $updateService,
-        private readonly DeleteCommentServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListCommentsService $listService,
+        private readonly GetCommentService $getService,
+        private readonly CreateCommentService $createService,
+        private readonly UpdateCommentService $updateService,
+        private readonly DeleteCommentService $deleteService,
+    ) {}
 
     public function index(ListCommentRequest $request): JsonResponse
     {

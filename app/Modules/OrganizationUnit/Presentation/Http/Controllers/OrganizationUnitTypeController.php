@@ -6,16 +6,14 @@ namespace Modules\OrganizationUnit\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitTypes\OrganizationUnitTypeServiceInterface;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitTypes\OrganizationUnitTypeService;
 use Modules\OrganizationUnit\Presentation\Http\Requests\ListOrganizationUnitTypeRequest;
 use Modules\OrganizationUnit\Presentation\Http\Requests\UpsertOrganizationUnitTypeRequest;
 use Modules\OrganizationUnit\Presentation\Http\Resources\OrganizationUnitTypeResource;
 
 final class OrganizationUnitTypeController extends Controller
 {
-    public function __construct(private readonly OrganizationUnitTypeServiceInterface $types)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitTypeService $types) {}
 
     public function index(ListOrganizationUnitTypeRequest $request): JsonResponse
     {

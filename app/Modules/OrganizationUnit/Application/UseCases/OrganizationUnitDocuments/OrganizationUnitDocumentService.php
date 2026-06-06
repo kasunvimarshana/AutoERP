@@ -8,7 +8,6 @@ use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitDocuments\OrganizationUnitDocumentServiceInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitDocumentRepositoryInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Domain\Constants\OrganizationUnitErrorCode;
@@ -16,7 +15,7 @@ use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInter
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Throwable;
 
-final class OrganizationUnitDocumentService implements OrganizationUnitDocumentServiceInterface
+final class OrganizationUnitDocumentService
 {
     public function __construct(
         private readonly OrganizationUnitDocumentRepositoryInterface $documents,
@@ -25,8 +24,7 @@ final class OrganizationUnitDocumentService implements OrganizationUnitDocumentS
         private readonly OrganizationUnitDomainServiceInterface $domain,
         private readonly FileStorageServiceInterface $files,
         private readonly UuidGeneratorInterface $uuid,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {
@@ -156,7 +154,7 @@ final class OrganizationUnitDocumentService implements OrganizationUnitDocumentS
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function resolveFilePath(array $payload, int $tenantId, int $organizationUnitId): string
     {

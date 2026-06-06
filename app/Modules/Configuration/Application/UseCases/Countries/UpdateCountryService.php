@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Countries;
 
-use Modules\Configuration\Application\Contracts\UseCases\Countries\UpdateCountryServiceInterface;
+use InvalidArgumentException;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use InvalidArgumentException;
 use Throwable;
 
-final class UpdateCountryService implements UpdateCountryServiceInterface
+final class UpdateCountryService
 {
-    public function __construct(private readonly CountryRepositoryInterface $countries)
-    {
-    }
+    public function __construct(private readonly CountryRepositoryInterface $countries) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(int|string $id, array $payload): Result
     {
@@ -57,7 +54,7 @@ final class UpdateCountryService implements UpdateCountryServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function requiredString(array $payload, string $field): string
     {

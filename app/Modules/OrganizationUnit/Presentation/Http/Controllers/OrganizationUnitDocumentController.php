@@ -7,16 +7,14 @@ namespace Modules\OrganizationUnit\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitDocuments\OrganizationUnitDocumentServiceInterface;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitDocuments\OrganizationUnitDocumentService;
 use Modules\OrganizationUnit\Presentation\Http\Requests\ListOrganizationUnitDocumentRequest;
 use Modules\OrganizationUnit\Presentation\Http\Requests\UpsertOrganizationUnitDocumentRequest;
 use Modules\OrganizationUnit\Presentation\Http\Resources\OrganizationUnitDocumentResource;
 
 final class OrganizationUnitDocumentController extends Controller
 {
-    public function __construct(private readonly OrganizationUnitDocumentServiceInterface $documents)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitDocumentService $documents) {}
 
     public function index(ListOrganizationUnitDocumentRequest $request): JsonResponse
     {

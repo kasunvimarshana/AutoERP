@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Configuration\Application\Contracts\UseCases\GetConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
+use Modules\Configuration\Application\UseCases\GetConfigurationService;
 
 final class ConfigGetCommand extends Command
 {
@@ -14,7 +14,7 @@ final class ConfigGetCommand extends Command
 
     protected $description = 'Get a configuration value';
 
-    public function __construct(private readonly GetConfigurationServiceInterface $service)
+    public function __construct(private readonly GetConfigurationService $service)
     {
         parent::__construct();
     }

@@ -9,12 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Core\Application\Contracts\RepositoryPortInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Constants\SchemaColumns;
 
-abstract class EloquentRepository implements RepositoryPortInterface
+abstract class EloquentRepository
 {
     public function __construct(
         protected Model $model,

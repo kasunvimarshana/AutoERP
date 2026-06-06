@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\User\Application\Contracts\UseCases\RoleServiceInterface;
+use Modules\User\Application\UseCases\RoleService;
 use Modules\User\Presentation\Http\Requests\ListUserEntityRequest;
 use Modules\User\Presentation\Http\Requests\UpsertRoleRequest;
 use Modules\User\Presentation\Http\Resources\UserRecordResource;
 
 final class RoleController extends AbstractUserCrudController
 {
-    public function __construct(private readonly RoleServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly RoleService $service) {}
 
     public function index(ListUserEntityRequest $request): JsonResponse
     {

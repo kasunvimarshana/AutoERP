@@ -5,19 +5,17 @@ declare(strict_types=1);
 namespace Modules\User\Application\UseCases;
 
 use Modules\Core\Application\Results\Result;
-use Modules\User\Application\Contracts\UseCases\PermissionServiceInterface;
 use Modules\User\Application\Repositories\PermissionRepositoryInterface;
 use Modules\User\Domain\Constants\UserErrorCode;
 use Modules\User\Domain\Contracts\UserDomainServiceInterface;
 use Throwable;
 
-final class PermissionService extends AbstractUserCrudService implements PermissionServiceInterface
+final class PermissionService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly PermissionRepositoryInterface $permissions,
         private readonly UserDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function list(array $filters): Result
     {
@@ -107,22 +105,22 @@ final class PermissionService extends AbstractUserCrudService implements Permiss
 
             return $this->success(
                 $this->permissions->update($id, [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt(
-                    $payload['organization_unit_id'] ?? $existing->get('organization_unit_id'),
-                ),
-                'metadata' => array_key_exists('metadata', $payload)
-                    ? $this->domain->normalizeMetadata($payload['metadata'])
-                    : $existing->get('metadata'),
-                'name' => $name,
-                'guard_name' => $guardName,
-                'module' => array_key_exists('module', $payload)
-                    ? $this->domain->normalizeNullableString($payload['module'])
-                    : $existing->get('module'),
-                'description' => array_key_exists('description', $payload)
-                    ? $this->domain->normalizeNullableString($payload['description'])
-                    : $existing->get('description'),
-                'row_version' => (int) $existing->get('row_version', 1) + 1,
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $this->toNullableInt(
+                        $payload['organization_unit_id'] ?? $existing->get('organization_unit_id'),
+                    ),
+                    'metadata' => array_key_exists('metadata', $payload)
+                        ? $this->domain->normalizeMetadata($payload['metadata'])
+                        : $existing->get('metadata'),
+                    'name' => $name,
+                    'guard_name' => $guardName,
+                    'module' => array_key_exists('module', $payload)
+                        ? $this->domain->normalizeNullableString($payload['module'])
+                        : $existing->get('module'),
+                    'description' => array_key_exists('description', $payload)
+                        ? $this->domain->normalizeNullableString($payload['description'])
+                        : $existing->get('description'),
+                    'row_version' => (int) $existing->get('row_version', 1) + 1,
                 ]),
             );
         } catch (Throwable $exception) {

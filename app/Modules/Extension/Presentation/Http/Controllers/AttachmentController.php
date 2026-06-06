@@ -7,11 +7,11 @@ namespace Modules\Extension\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\CreateAttachmentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\DeleteAttachmentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\GetAttachmentServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\ListAttachmentsServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\UpdateAttachmentServiceInterface;
+use Modules\Extension\Application\UseCases\Attachments\CreateAttachmentService;
+use Modules\Extension\Application\UseCases\Attachments\DeleteAttachmentService;
+use Modules\Extension\Application\UseCases\Attachments\GetAttachmentService;
+use Modules\Extension\Application\UseCases\Attachments\ListAttachmentsService;
+use Modules\Extension\Application\UseCases\Attachments\UpdateAttachmentService;
 use Modules\Extension\Presentation\Http\Requests\ListAttachmentRequest;
 use Modules\Extension\Presentation\Http\Requests\UpsertAttachmentRequest;
 use Modules\Extension\Presentation\Http\Resources\AttachmentResource;
@@ -19,13 +19,12 @@ use Modules\Extension\Presentation\Http\Resources\AttachmentResource;
 final class AttachmentController extends Controller
 {
     public function __construct(
-        private readonly ListAttachmentsServiceInterface $listService,
-        private readonly GetAttachmentServiceInterface $getService,
-        private readonly CreateAttachmentServiceInterface $createService,
-        private readonly UpdateAttachmentServiceInterface $updateService,
-        private readonly DeleteAttachmentServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListAttachmentsService $listService,
+        private readonly GetAttachmentService $getService,
+        private readonly CreateAttachmentService $createService,
+        private readonly UpdateAttachmentService $updateService,
+        private readonly DeleteAttachmentService $deleteService,
+    ) {}
 
     public function index(ListAttachmentRequest $request): JsonResponse
     {

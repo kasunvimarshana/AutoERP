@@ -6,11 +6,11 @@ namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\CreateCurrencyServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\DeleteCurrencyServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\GetCurrencyServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\ListCurrenciesServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\UpdateCurrencyServiceInterface;
+use Modules\Configuration\Application\UseCases\Currencies\CreateCurrencyService;
+use Modules\Configuration\Application\UseCases\Currencies\DeleteCurrencyService;
+use Modules\Configuration\Application\UseCases\Currencies\GetCurrencyService;
+use Modules\Configuration\Application\UseCases\Currencies\ListCurrenciesService;
+use Modules\Configuration\Application\UseCases\Currencies\UpdateCurrencyService;
 use Modules\Configuration\Presentation\Http\Requests\ListCurrencyRequest;
 use Modules\Configuration\Presentation\Http\Requests\UpsertCurrencyRequest;
 use Modules\Configuration\Presentation\Http\Resources\CurrencyResource;
@@ -19,13 +19,12 @@ use Modules\Core\Application\DTO\PagedResult;
 final class CurrencyController extends Controller
 {
     public function __construct(
-        private readonly ListCurrenciesServiceInterface $listCurrencies,
-        private readonly GetCurrencyServiceInterface $getCurrency,
-        private readonly CreateCurrencyServiceInterface $createCurrency,
-        private readonly UpdateCurrencyServiceInterface $updateCurrency,
-        private readonly DeleteCurrencyServiceInterface $deleteCurrency,
-    ) {
-    }
+        private readonly ListCurrenciesService $listCurrencies,
+        private readonly GetCurrencyService $getCurrency,
+        private readonly CreateCurrencyService $createCurrency,
+        private readonly UpdateCurrencyService $updateCurrency,
+        private readonly DeleteCurrencyService $deleteCurrency,
+    ) {}
 
     public function index(ListCurrencyRequest $request): JsonResponse
     {

@@ -7,11 +7,11 @@ namespace Modules\Extension\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\CreateEntityAttributeServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\DeleteEntityAttributeServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\GetEntityAttributeServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\ListEntityAttributesServiceInterface;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\UpdateEntityAttributeServiceInterface;
+use Modules\Extension\Application\UseCases\EntityAttributes\CreateEntityAttributeService;
+use Modules\Extension\Application\UseCases\EntityAttributes\DeleteEntityAttributeService;
+use Modules\Extension\Application\UseCases\EntityAttributes\GetEntityAttributeService;
+use Modules\Extension\Application\UseCases\EntityAttributes\ListEntityAttributesService;
+use Modules\Extension\Application\UseCases\EntityAttributes\UpdateEntityAttributeService;
 use Modules\Extension\Presentation\Http\Requests\ListEntityAttributeRequest;
 use Modules\Extension\Presentation\Http\Requests\UpsertEntityAttributeRequest;
 use Modules\Extension\Presentation\Http\Resources\EntityAttributeResource;
@@ -19,13 +19,12 @@ use Modules\Extension\Presentation\Http\Resources\EntityAttributeResource;
 final class EntityAttributeController extends Controller
 {
     public function __construct(
-        private readonly ListEntityAttributesServiceInterface $listService,
-        private readonly GetEntityAttributeServiceInterface $getService,
-        private readonly CreateEntityAttributeServiceInterface $createService,
-        private readonly UpdateEntityAttributeServiceInterface $updateService,
-        private readonly DeleteEntityAttributeServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListEntityAttributesService $listService,
+        private readonly GetEntityAttributeService $getService,
+        private readonly CreateEntityAttributeService $createService,
+        private readonly UpdateEntityAttributeService $updateService,
+        private readonly DeleteEntityAttributeService $deleteService,
+    ) {}
 
     public function index(ListEntityAttributeRequest $request): JsonResponse
     {

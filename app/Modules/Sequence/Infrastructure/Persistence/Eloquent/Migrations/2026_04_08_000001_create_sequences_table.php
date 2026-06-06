@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')
                 ->nullable()
                 ->constrained('organization_units', 'id')
-                ->cascadeOnDelete()
+                ->nullOnDelete()
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
@@ -31,6 +31,7 @@ return new class extends Migration
             $table->bigInteger('next_number')->default(1);
             $table->enum('period_type', ['yearly', 'monthly', 'infinite'])->default('yearly');
             $table->string('period_value')->nullable()->comment('e.g., 2025');
+            $table->string('scope_key')->comment('Non-null organization/period scope used for portable uniqueness.');
             $table->unsignedBigInteger('created_by')->nullable()->index('sequences_created_by_idx');
             $table->unsignedBigInteger('updated_by')->nullable()->index('sequences_updated_by_idx');
             $table->unsignedBigInteger('deleted_by')->nullable()->index('sequences_deleted_by_idx');
@@ -39,12 +40,11 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'document_type', 'period_value'],
+                ['tenant_id', 'document_type', 'scope_key'],
                 'sequences_document_period_uk'
             );
         });
     }
-
 
     public function down(): void
     {

@@ -27,7 +27,6 @@ interface TenantDomainServiceInterface
     public function ensureIsolationKey(bool $isIsolated, ?string $isolationKey, string $fallback): ?string;
 
     /**
-     * @param mixed $value
      * @return array<string, mixed>
      */
     public function normalizeMetadata(mixed $value): array;

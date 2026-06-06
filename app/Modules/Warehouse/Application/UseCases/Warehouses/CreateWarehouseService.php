@@ -6,16 +6,13 @@ namespace Modules\Warehouse\Application\UseCases\Warehouses;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\CreateWarehouseServiceInterface;
 use Modules\Warehouse\Application\Repositories\WarehouseRepositoryInterface;
 use Modules\Warehouse\Domain\Constants\WarehouseErrorCode;
 use Throwable;
 
-final class CreateWarehouseService implements CreateWarehouseServiceInterface
+final class CreateWarehouseService
 {
-    public function __construct(private readonly WarehouseRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly WarehouseRepositoryInterface $repository) {}
 
     public function execute(array $payload): Result
     {

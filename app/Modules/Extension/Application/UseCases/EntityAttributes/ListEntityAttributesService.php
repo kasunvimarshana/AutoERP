@@ -6,17 +6,14 @@ namespace Modules\Extension\Application\UseCases\EntityAttributes;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\ListEntityAttributesServiceInterface;
 use Modules\Extension\Application\Repositories\EntityAttributeRepositoryInterface;
 use Modules\Extension\Domain\Constants\ExtensionDefaults;
 use Modules\Extension\Domain\Constants\ExtensionErrorCode;
 use Throwable;
 
-final class ListEntityAttributesService implements ListEntityAttributesServiceInterface
+final class ListEntityAttributesService
 {
-    public function __construct(private readonly EntityAttributeRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly EntityAttributeRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

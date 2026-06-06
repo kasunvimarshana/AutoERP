@@ -6,16 +6,13 @@ namespace Modules\Sequence\Application\UseCases\Sequences;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\DeleteSequenceServiceInterface;
 use Modules\Sequence\Application\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Domain\Constants\SequenceErrorCode;
 use Throwable;
 
-final class DeleteSequenceService implements DeleteSequenceServiceInterface
+final class DeleteSequenceService
 {
-    public function __construct(private readonly SequenceRepositoryInterface $sequences)
-    {
-    }
+    public function __construct(private readonly SequenceRepositoryInterface $sequences) {}
 
     public function execute(int|string $id): Result
     {

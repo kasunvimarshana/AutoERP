@@ -7,14 +7,14 @@ namespace Modules\Sequence\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\CreateSequenceServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\DeleteSequenceServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\GenerateSequenceNumberServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\GetSequenceServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\ListSequencesServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\PreviewSequenceNumberServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\RollbackSequenceNumberServiceInterface;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\UpdateSequenceServiceInterface;
+use Modules\Sequence\Application\UseCases\Sequences\CreateSequenceService;
+use Modules\Sequence\Application\UseCases\Sequences\DeleteSequenceService;
+use Modules\Sequence\Application\UseCases\Sequences\GenerateSequenceNumberService;
+use Modules\Sequence\Application\UseCases\Sequences\GetSequenceService;
+use Modules\Sequence\Application\UseCases\Sequences\ListSequencesService;
+use Modules\Sequence\Application\UseCases\Sequences\PreviewSequenceNumberService;
+use Modules\Sequence\Application\UseCases\Sequences\RollbackSequenceNumberService;
+use Modules\Sequence\Application\UseCases\Sequences\UpdateSequenceService;
 use Modules\Sequence\Presentation\Http\Requests\GenerateSequenceNumberRequest;
 use Modules\Sequence\Presentation\Http\Requests\ListSequenceRequest;
 use Modules\Sequence\Presentation\Http\Requests\PreviewSequenceNumberRequest;
@@ -25,16 +25,15 @@ use Modules\Sequence\Presentation\Http\Resources\SequenceResource;
 final class SequenceController extends Controller
 {
     public function __construct(
-        private readonly ListSequencesServiceInterface $listSequences,
-        private readonly GetSequenceServiceInterface $getSequence,
-        private readonly CreateSequenceServiceInterface $createSequence,
-        private readonly UpdateSequenceServiceInterface $updateSequence,
-        private readonly DeleteSequenceServiceInterface $deleteSequence,
-        private readonly PreviewSequenceNumberServiceInterface $previewSequenceNumber,
-        private readonly GenerateSequenceNumberServiceInterface $generateSequenceNumber,
-        private readonly RollbackSequenceNumberServiceInterface $rollbackSequenceNumber,
-    ) {
-    }
+        private readonly ListSequencesService $listSequences,
+        private readonly GetSequenceService $getSequence,
+        private readonly CreateSequenceService $createSequence,
+        private readonly UpdateSequenceService $updateSequence,
+        private readonly DeleteSequenceService $deleteSequence,
+        private readonly PreviewSequenceNumberService $previewSequenceNumber,
+        private readonly GenerateSequenceNumberService $generateSequenceNumber,
+        private readonly RollbackSequenceNumberService $rollbackSequenceNumber,
+    ) {}
 
     public function index(ListSequenceRequest $request): JsonResponse
     {

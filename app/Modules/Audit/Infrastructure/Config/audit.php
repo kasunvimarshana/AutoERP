@@ -11,16 +11,4 @@ return [
     'fail_safe' => [
         'swallow_exceptions' => false,
     ],
-
-    'events' => [
-        'capture_wildcard' => false,
-        'listen' => [
-            'auth.lifecycle',
-            'configuration.changed',
-            'user.lifecycle',
-        ],
-        'ignore_prefixes' => [
-            'Modules\\Audit\\',
-        ],
-    ],
 ];

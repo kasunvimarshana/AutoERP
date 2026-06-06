@@ -8,24 +8,21 @@ use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits as OrganizationUnitUseCases;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\Support\OrganizationUnitContext;
 use Modules\OrganizationUnit\Domain\Constants\OrganizationUnitErrorCode;
-use Modules\User\Application\Contracts\UseCases\UserTenantServiceInterface;
+use Modules\User\Application\UseCases\UserTenantService;
 use Throwable;
 
-final class AssignUserToOrganizationUnitService implements
-    OrganizationUnitUseCases\AssignUserToOrganizationUnitServiceInterface
+final class AssignUserToOrganizationUnitService
 {
     public function __construct(
         private readonly OrganizationUnitRepositoryInterface $units,
-        private readonly UserTenantServiceInterface $userTenants,
+        private readonly UserTenantService $userTenants,
         private readonly OrganizationUnitContext $organizationUnitContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $organizationUnitId, array $payload): Result
     {

@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Languages;
 
-use Modules\Configuration\Application\Contracts\UseCases\Languages\UpdateLanguageServiceInterface;
+use InvalidArgumentException;
 use Modules\Configuration\Application\Repositories\LanguageRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use InvalidArgumentException;
 use Throwable;
 
-final class UpdateLanguageService implements UpdateLanguageServiceInterface
+final class UpdateLanguageService
 {
-    public function __construct(private readonly LanguageRepositoryInterface $languages)
-    {
-    }
+    public function __construct(private readonly LanguageRepositoryInterface $languages) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(int|string $id, array $payload): Result
     {
@@ -54,7 +51,7 @@ final class UpdateLanguageService implements UpdateLanguageServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function requiredString(array $payload, string $field): string
     {

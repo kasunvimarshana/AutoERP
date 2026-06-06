@@ -6,16 +6,14 @@ namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\Contracts\UseCases\Settings\TenantSettingServiceInterface;
+use Modules\Tenant\Application\UseCases\Settings\TenantSettingService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantSettingRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantSettingRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantSettingResource;
 
 final class TenantSettingController extends Controller
 {
-    public function __construct(private readonly TenantSettingServiceInterface $settings)
-    {
-    }
+    public function __construct(private readonly TenantSettingService $settings) {}
 
     public function index(ListTenantSettingRequest $request): JsonResponse
     {

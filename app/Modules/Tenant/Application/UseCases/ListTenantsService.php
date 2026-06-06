@@ -6,20 +6,17 @@ namespace Modules\Tenant\Application\UseCases;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Contracts\UseCases\ListTenantsServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantQueryData;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Throwable;
 
-final class ListTenantsService implements ListTenantsServiceInterface
+final class ListTenantsService
 {
-    public function __construct(private readonly TenantRepositoryInterface $tenants)
-    {
-    }
+    public function __construct(private readonly TenantRepositoryInterface $tenants) {}
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function execute(array $filters): Result
     {

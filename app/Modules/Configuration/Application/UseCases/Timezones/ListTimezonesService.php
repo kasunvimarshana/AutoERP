@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Timezones;
 
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\ListTimezonesServiceInterface;
 use Modules\Configuration\Application\Repositories\TimezoneRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -12,14 +11,12 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ListTimezonesService implements ListTimezonesServiceInterface
+final class ListTimezonesService
 {
-    public function __construct(private readonly TimezoneRepositoryInterface $timezones)
-    {
-    }
+    public function __construct(private readonly TimezoneRepositoryInterface $timezones) {}
 
     /**
-     * @param array<string, mixed> $criteria
+     * @param  array<string, mixed>  $criteria
      */
     public function execute(array $criteria, int $perPage, int $page): Result
     {

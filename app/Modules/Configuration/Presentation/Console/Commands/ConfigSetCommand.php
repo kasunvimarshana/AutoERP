@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationFromCliServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
+use Modules\Configuration\Application\UseCases\SetConfigurationFromCliService;
 
 final class ConfigSetCommand extends Command
 {
@@ -18,7 +18,7 @@ final class ConfigSetCommand extends Command
 
     protected $description = 'Set a configuration value';
 
-    public function __construct(private readonly SetConfigurationFromCliServiceInterface $service)
+    public function __construct(private readonly SetConfigurationFromCliService $service)
     {
         parent::__construct();
     }

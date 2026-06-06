@@ -6,16 +6,14 @@ namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\Contracts\UseCases\SettingGroups\TenantSettingGroupServiceInterface;
+use Modules\Tenant\Application\UseCases\SettingGroups\TenantSettingGroupService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantSettingGroupRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantSettingGroupRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantSettingGroupResource;
 
 final class TenantSettingGroupController extends Controller
 {
-    public function __construct(private readonly TenantSettingGroupServiceInterface $groups)
-    {
-    }
+    public function __construct(private readonly TenantSettingGroupService $groups) {}
 
     public function index(ListTenantSettingGroupRequest $request): JsonResponse
     {

@@ -9,13 +9,13 @@ use Illuminate\Routing\Controller;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\UOM\Application\Contracts\Services\UomUsageSummaryServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\CreateUnitOfMeasureServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasureServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\GetUnitOfMeasureServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\ListUnitOfMeasuresServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\UpdateUnitOfMeasureServiceInterface;
-use Modules\UOM\Domain\Constants\UomType;
+use Modules\UOM\Application\UseCases\UnitOfMeasures\CreateUnitOfMeasureService;
+use Modules\UOM\Application\UseCases\UnitOfMeasures\DeleteUnitOfMeasureService;
+use Modules\UOM\Application\UseCases\UnitOfMeasures\GetUnitOfMeasureService;
+use Modules\UOM\Application\UseCases\UnitOfMeasures\ListUnitOfMeasuresService;
+use Modules\UOM\Application\UseCases\UnitOfMeasures\UpdateUnitOfMeasureService;
 use Modules\UOM\Domain\Constants\UomErrorCode;
+use Modules\UOM\Domain\Constants\UomType;
 use Modules\UOM\Presentation\Http\Requests\ListUnitOfMeasureRequest;
 use Modules\UOM\Presentation\Http\Requests\UpsertUnitOfMeasureRequest;
 use Modules\UOM\Presentation\Http\Resources\UnitOfMeasureResource;
@@ -23,15 +23,14 @@ use Modules\UOM\Presentation\Http\Resources\UnitOfMeasureResource;
 final class UnitOfMeasureController extends Controller
 {
     public function __construct(
-        private readonly ListUnitOfMeasuresServiceInterface $listService,
-        private readonly GetUnitOfMeasureServiceInterface $getService,
-        private readonly CreateUnitOfMeasureServiceInterface $createService,
-        private readonly UpdateUnitOfMeasureServiceInterface $updateService,
-        private readonly DeleteUnitOfMeasureServiceInterface $deleteService,
+        private readonly ListUnitOfMeasuresService $listService,
+        private readonly GetUnitOfMeasureService $getService,
+        private readonly CreateUnitOfMeasureService $createService,
+        private readonly UpdateUnitOfMeasureService $updateService,
+        private readonly DeleteUnitOfMeasureService $deleteService,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly UomUsageSummaryServiceInterface $usageSummary,
-    ) {
-    }
+    ) {}
 
     public function categories(): JsonResponse
     {

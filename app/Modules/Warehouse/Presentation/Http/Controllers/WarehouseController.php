@@ -7,11 +7,11 @@ namespace Modules\Warehouse\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\CreateWarehouseServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\DeleteWarehouseServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\GetWarehouseServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\ListWarehousesServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\UpdateWarehouseServiceInterface;
+use Modules\Warehouse\Application\UseCases\Warehouses\CreateWarehouseService;
+use Modules\Warehouse\Application\UseCases\Warehouses\DeleteWarehouseService;
+use Modules\Warehouse\Application\UseCases\Warehouses\GetWarehouseService;
+use Modules\Warehouse\Application\UseCases\Warehouses\ListWarehousesService;
+use Modules\Warehouse\Application\UseCases\Warehouses\UpdateWarehouseService;
 use Modules\Warehouse\Presentation\Http\Requests\ListWarehouseRequest;
 use Modules\Warehouse\Presentation\Http\Requests\UpsertWarehouseRequest;
 use Modules\Warehouse\Presentation\Http\Resources\WarehouseResource;
@@ -19,13 +19,12 @@ use Modules\Warehouse\Presentation\Http\Resources\WarehouseResource;
 final class WarehouseController extends Controller
 {
     public function __construct(
-        private readonly ListWarehousesServiceInterface $listService,
-        private readonly GetWarehouseServiceInterface $getService,
-        private readonly CreateWarehouseServiceInterface $createService,
-        private readonly UpdateWarehouseServiceInterface $updateService,
-        private readonly DeleteWarehouseServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListWarehousesService $listService,
+        private readonly GetWarehouseService $getService,
+        private readonly CreateWarehouseService $createService,
+        private readonly UpdateWarehouseService $updateService,
+        private readonly DeleteWarehouseService $deleteService,
+    ) {}
 
     public function index(ListWarehouseRequest $request): JsonResponse
     {

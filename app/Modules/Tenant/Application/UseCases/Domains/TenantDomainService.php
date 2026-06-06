@@ -10,7 +10,6 @@ use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Contracts\UseCases\Domains\TenantDomainServiceInterface;
 use Modules\Tenant\Application\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Application\Support\TenantContext;
@@ -18,7 +17,7 @@ use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Modules\Tenant\Domain\Contracts\TenantDomainServiceInterface as TenantBusinessRules;
 use Throwable;
 
-final class TenantDomainService implements TenantDomainServiceInterface
+final class TenantDomainService
 {
     public function __construct(
         private readonly TenantDomainRepositoryInterface $domains,
@@ -27,8 +26,7 @@ final class TenantDomainService implements TenantDomainServiceInterface
         private readonly TenantContext $tenantContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {

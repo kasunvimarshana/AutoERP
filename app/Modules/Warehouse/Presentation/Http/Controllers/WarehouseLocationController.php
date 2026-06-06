@@ -7,11 +7,11 @@ namespace Modules\Warehouse\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\CreateWarehouseLocationServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\DeleteWarehouseLocationServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\GetWarehouseLocationServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\ListWarehouseLocationsServiceInterface;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\UpdateWarehouseLocationServiceInterface;
+use Modules\Warehouse\Application\UseCases\WarehouseLocations\CreateWarehouseLocationService;
+use Modules\Warehouse\Application\UseCases\WarehouseLocations\DeleteWarehouseLocationService;
+use Modules\Warehouse\Application\UseCases\WarehouseLocations\GetWarehouseLocationService;
+use Modules\Warehouse\Application\UseCases\WarehouseLocations\ListWarehouseLocationsService;
+use Modules\Warehouse\Application\UseCases\WarehouseLocations\UpdateWarehouseLocationService;
 use Modules\Warehouse\Presentation\Http\Requests\ListWarehouseLocationRequest;
 use Modules\Warehouse\Presentation\Http\Requests\UpsertWarehouseLocationRequest;
 use Modules\Warehouse\Presentation\Http\Resources\WarehouseLocationResource;
@@ -19,13 +19,12 @@ use Modules\Warehouse\Presentation\Http\Resources\WarehouseLocationResource;
 final class WarehouseLocationController extends Controller
 {
     public function __construct(
-        private readonly ListWarehouseLocationsServiceInterface $listService,
-        private readonly GetWarehouseLocationServiceInterface $getService,
-        private readonly CreateWarehouseLocationServiceInterface $createService,
-        private readonly UpdateWarehouseLocationServiceInterface $updateService,
-        private readonly DeleteWarehouseLocationServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListWarehouseLocationsService $listService,
+        private readonly GetWarehouseLocationService $getService,
+        private readonly CreateWarehouseLocationService $createService,
+        private readonly UpdateWarehouseLocationService $updateService,
+        private readonly DeleteWarehouseLocationService $deleteService,
+    ) {}
 
     public function index(ListWarehouseLocationRequest $request): JsonResponse
     {

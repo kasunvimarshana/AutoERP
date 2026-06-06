@@ -6,24 +6,19 @@ namespace Modules\OrganizationUnit\Application\UseCases\OrganizationUnitTypes;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitTypes\OrganizationUnitTypeServiceInterface;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitCreated;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitDeleted;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitUpdated;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitTypeRepositoryInterface;
 use Modules\OrganizationUnit\Domain\Constants\OrganizationUnitErrorCode;
 use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInterface;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Throwable;
 
-final class OrganizationUnitTypeService implements OrganizationUnitTypeServiceInterface
+final class OrganizationUnitTypeService
 {
     public function __construct(
         private readonly OrganizationUnitTypeRepositoryInterface $types,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {
@@ -70,8 +65,6 @@ final class OrganizationUnitTypeService implements OrganizationUnitTypeServiceIn
                 'row_version' => 1,
             ]);
 
-            $this->dispatchEvent(new OrganizationUnitCreated('organization_unit_type', $record->id(), $tenantId));
-
             return Result::success($record);
         } catch (Throwable $exception) {
             return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
@@ -111,8 +104,6 @@ final class OrganizationUnitTypeService implements OrganizationUnitTypeServiceIn
                 'row_version' => ((int) $existing->get('row_version', 1)) + 1,
             ]);
 
-            $this->dispatchEvent(new OrganizationUnitUpdated('organization_unit_type', $record->id(), $tenantId));
-
             return Result::success($record);
         } catch (Throwable $exception) {
             return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
@@ -131,20 +122,11 @@ final class OrganizationUnitTypeService implements OrganizationUnitTypeServiceIn
             $deleted = $this->types->delete($id);
 
             if ($deleted) {
-                $this->dispatchEvent(new OrganizationUnitDeleted('organization_unit_type', $id, $tenantId));
             }
 
             return Result::success($deleted);
         } catch (Throwable $exception) {
             return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    private function dispatchEvent(object $event): void
-    {
-        try {
-            event($event);
-        } catch (Throwable) {
         }
     }
 }

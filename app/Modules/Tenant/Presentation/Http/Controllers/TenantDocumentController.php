@@ -7,16 +7,14 @@ namespace Modules\Tenant\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\Contracts\UseCases\Documents\TenantDocumentServiceInterface;
+use Modules\Tenant\Application\UseCases\Documents\TenantDocumentService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantDocumentRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantDocumentRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantDocumentResource;
 
 final class TenantDocumentController extends Controller
 {
-    public function __construct(private readonly TenantDocumentServiceInterface $documents)
-    {
-    }
+    public function __construct(private readonly TenantDocumentService $documents) {}
 
     public function index(ListTenantDocumentRequest $request): JsonResponse
     {

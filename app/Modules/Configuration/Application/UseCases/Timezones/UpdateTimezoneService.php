@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Timezones;
 
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\UpdateTimezoneServiceInterface;
+use InvalidArgumentException;
 use Modules\Configuration\Application\Repositories\TimezoneRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use InvalidArgumentException;
 use Throwable;
 
-final class UpdateTimezoneService implements UpdateTimezoneServiceInterface
+final class UpdateTimezoneService
 {
-    public function __construct(private readonly TimezoneRepositoryInterface $timezones)
-    {
-    }
+    public function __construct(private readonly TimezoneRepositoryInterface $timezones) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(int|string $id, array $payload): Result
     {
@@ -54,7 +51,7 @@ final class UpdateTimezoneService implements UpdateTimezoneServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function requiredString(array $payload, string $field): string
     {

@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Timezones;
 
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\GetTimezoneServiceInterface;
 use Modules\Configuration\Application\Repositories\TimezoneRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class GetTimezoneService implements GetTimezoneServiceInterface
+final class GetTimezoneService
 {
-    public function __construct(private readonly TimezoneRepositoryInterface $timezones)
-    {
-    }
+    public function __construct(private readonly TimezoneRepositoryInterface $timezones) {}
 
     public function execute(int|string $id): Result
     {

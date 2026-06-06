@@ -8,21 +8,19 @@ use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInt
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\CreateUomConversionServiceInterface;
 use Modules\UOM\Application\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Application\Repositories\UomConversionRepositoryInterface;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Throwable;
 
-final class CreateUomConversionService implements CreateUomConversionServiceInterface
+final class CreateUomConversionService
 {
     public function __construct(
         private readonly UomConversionRepositoryInterface $repository,
         private readonly UnitOfMeasureRepositoryInterface $uomRepository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
-    ) {
-    }
+    ) {}
 
     public function execute(array $payload): Result
     {

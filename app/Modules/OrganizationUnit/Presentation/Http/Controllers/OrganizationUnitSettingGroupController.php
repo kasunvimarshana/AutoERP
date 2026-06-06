@@ -6,16 +6,14 @@ namespace Modules\OrganizationUnit\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitSettingGroups\OrganizationUnitSettingGroupServiceInterface;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitSettingGroups\OrganizationUnitSettingGroupService;
 use Modules\OrganizationUnit\Presentation\Http\Requests\ListOrganizationUnitSettingGroupRequest;
 use Modules\OrganizationUnit\Presentation\Http\Requests\UpsertOrganizationUnitSettingGroupRequest;
 use Modules\OrganizationUnit\Presentation\Http\Resources\OrganizationUnitSettingGroupResource;
 
 final class OrganizationUnitSettingGroupController extends Controller
 {
-    public function __construct(private readonly OrganizationUnitSettingGroupServiceInterface $groups)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitSettingGroupService $groups) {}
 
     public function index(ListOrganizationUnitSettingGroupRequest $request): JsonResponse
     {

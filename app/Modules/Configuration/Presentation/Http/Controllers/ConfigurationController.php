@@ -6,16 +6,16 @@ namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\Contracts\UseCases\ClearConfigurationCacheServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\DeleteConfigurationServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\GetConfigurationServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\IsFeatureEnabledServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\ListConfigurationsServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\ResolveConfigurationServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\UpdateConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationMutationData;
 use Modules\Configuration\Application\DTOs\ConfigurationQueryData;
+use Modules\Configuration\Application\UseCases\ClearConfigurationCacheService;
+use Modules\Configuration\Application\UseCases\DeleteConfigurationService;
+use Modules\Configuration\Application\UseCases\GetConfigurationService;
+use Modules\Configuration\Application\UseCases\IsFeatureEnabledService;
+use Modules\Configuration\Application\UseCases\ListConfigurationsService;
+use Modules\Configuration\Application\UseCases\ResolveConfigurationService;
+use Modules\Configuration\Application\UseCases\SetConfigurationService;
+use Modules\Configuration\Application\UseCases\UpdateConfigurationService;
 use Modules\Configuration\Presentation\Http\Requests\ListConfigurationRequest;
 use Modules\Configuration\Presentation\Http\Requests\ResolveConfigurationRequest;
 use Modules\Configuration\Presentation\Http\Requests\UpsertConfigurationRequest;
@@ -25,16 +25,15 @@ use Modules\Core\Application\DTO\PagedResult;
 final class ConfigurationController extends Controller
 {
     public function __construct(
-        private readonly ListConfigurationsServiceInterface $listConfigurations,
-        private readonly GetConfigurationServiceInterface $getConfiguration,
-        private readonly ResolveConfigurationServiceInterface $resolveConfiguration,
-        private readonly IsFeatureEnabledServiceInterface $isFeatureEnabled,
-        private readonly SetConfigurationServiceInterface $setConfiguration,
-        private readonly UpdateConfigurationServiceInterface $updateConfiguration,
-        private readonly DeleteConfigurationServiceInterface $deleteConfiguration,
-        private readonly ClearConfigurationCacheServiceInterface $clearConfigurationCache,
-    ) {
-    }
+        private readonly ListConfigurationsService $listConfigurations,
+        private readonly GetConfigurationService $getConfiguration,
+        private readonly ResolveConfigurationService $resolveConfiguration,
+        private readonly IsFeatureEnabledService $isFeatureEnabled,
+        private readonly SetConfigurationService $setConfiguration,
+        private readonly UpdateConfigurationService $updateConfiguration,
+        private readonly DeleteConfigurationService $deleteConfiguration,
+        private readonly ClearConfigurationCacheService $clearConfigurationCache,
+    ) {}
 
     public function index(ListConfigurationRequest $request): JsonResponse
     {

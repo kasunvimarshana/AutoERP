@@ -7,19 +7,17 @@ namespace Modules\UOM\Application\UseCases\UomConversions;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\ListUomConversionsServiceInterface;
 use Modules\UOM\Application\Repositories\UomConversionRepositoryInterface;
 use Modules\UOM\Domain\Constants\UomDefaults;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Throwable;
 
-final class ListUomConversionsService implements ListUomConversionsServiceInterface
+final class ListUomConversionsService
 {
     public function __construct(
         private readonly UomConversionRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
-    ) {
-    }
+    ) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

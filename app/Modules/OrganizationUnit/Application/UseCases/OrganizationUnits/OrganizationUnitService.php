@@ -9,10 +9,6 @@ use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits\OrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitCreated;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitDeleted;
-use Modules\OrganizationUnit\Application\Events\OrganizationUnitUpdated;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitTypeRepositoryInterface;
 use Modules\OrganizationUnit\Application\Support\OrganizationUnitContext;
@@ -21,7 +17,7 @@ use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInter
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Throwable;
 
-final class OrganizationUnitService implements OrganizationUnitServiceInterface
+final class OrganizationUnitService
 {
     public function __construct(
         private readonly OrganizationUnitRepositoryInterface $units,
@@ -31,8 +27,7 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
         private readonly OrganizationUnitContext $organizationUnitContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {
@@ -136,8 +131,6 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
                     'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                 ]);
-
-                $this->dispatchEvent(new OrganizationUnitCreated('organization_unit', $record->id(), $tenantId));
 
                 return Result::success($record);
             });
@@ -257,8 +250,6 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
                     'row_version' => ((int) $existing->get('row_version', 1)) + 1,
                 ]);
 
-                $this->dispatchEvent(new OrganizationUnitUpdated('organization_unit', $record->id(), $tenantId));
-
                 return Result::success($record);
             });
         } catch (Throwable $exception) {
@@ -296,7 +287,6 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
                 $deleted = $this->units->delete($id);
 
                 if ($deleted) {
-                    $this->dispatchEvent(new OrganizationUnitDeleted('organization_unit', $id, $tenantId));
                 }
 
                 return Result::success($deleted);
@@ -327,12 +317,6 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
                     'row_version' => ((int) $existing->get('row_version', 1)) + 1,
                 ]);
 
-                $this->dispatchEvent(new OrganizationUnitUpdated(
-                    'organization_unit',
-                    $record->id(),
-                    (int) $existing->require('tenant_id'),
-                ));
-
                 return Result::success($record);
             });
         } catch (Throwable $exception) {
@@ -361,13 +345,5 @@ final class OrganizationUnitService implements OrganizationUnitServiceInterface
         $normalized = (int) $value;
 
         return $normalized > 0 ? $normalized : null;
-    }
-
-    private function dispatchEvent(object $event): void
-    {
-        try {
-            event($event);
-        } catch (Throwable) {
-        }
     }
 }

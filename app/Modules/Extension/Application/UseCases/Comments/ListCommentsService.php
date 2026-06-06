@@ -6,17 +6,14 @@ namespace Modules\Extension\Application\UseCases\Comments;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Extension\Application\Contracts\UseCases\Comments\ListCommentsServiceInterface;
 use Modules\Extension\Application\Repositories\CommentRepositoryInterface;
 use Modules\Extension\Domain\Constants\ExtensionDefaults;
 use Modules\Extension\Domain\Constants\ExtensionErrorCode;
 use Throwable;
 
-final class ListCommentsService implements ListCommentsServiceInterface
+final class ListCommentsService
 {
-    public function __construct(private readonly CommentRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly CommentRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

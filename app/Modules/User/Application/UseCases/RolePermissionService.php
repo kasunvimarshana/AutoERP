@@ -5,19 +5,17 @@ declare(strict_types=1);
 namespace Modules\User\Application\UseCases;
 
 use Modules\Core\Application\Results\Result;
-use Modules\User\Application\Contracts\UseCases\RolePermissionServiceInterface;
 use Modules\User\Application\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Domain\Constants\UserErrorCode;
 use Modules\User\Domain\Contracts\UserDomainServiceInterface;
 use Throwable;
 
-final class RolePermissionService extends AbstractUserCrudService implements RolePermissionServiceInterface
+final class RolePermissionService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly RolePermissionRepositoryInterface $rolePermissions,
         private readonly UserDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function list(array $filters): Result
     {
@@ -110,7 +108,7 @@ final class RolePermissionService extends AbstractUserCrudService implements Rol
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     private function criteria(array $filters): array

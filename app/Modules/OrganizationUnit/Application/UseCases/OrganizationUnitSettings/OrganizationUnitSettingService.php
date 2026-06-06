@@ -6,7 +6,6 @@ namespace Modules\OrganizationUnit\Application\UseCases\OrganizationUnitSettings
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitSettings\OrganizationUnitSettingServiceInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitSettingGroupRepositoryInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitSettingRepositoryInterface;
@@ -15,7 +14,7 @@ use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInter
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Throwable;
 
-final class OrganizationUnitSettingService implements OrganizationUnitSettingServiceInterface
+final class OrganizationUnitSettingService
 {
     public function __construct(
         private readonly OrganizationUnitSettingRepositoryInterface $settings,
@@ -23,8 +22,7 @@ final class OrganizationUnitSettingService implements OrganizationUnitSettingSer
         private readonly OrganizationUnitRepositoryInterface $units,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {

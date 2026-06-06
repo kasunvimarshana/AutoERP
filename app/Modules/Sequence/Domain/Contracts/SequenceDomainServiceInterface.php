@@ -15,7 +15,6 @@ interface SequenceDomainServiceInterface
     public function normalizeOptionalText(?string $value): ?string;
 
     /**
-     * @param mixed $value
      * @return array<string, mixed>
      */
     public function normalizeMetadata(mixed $value): array;
@@ -26,8 +25,10 @@ interface SequenceDomainServiceInterface
 
     public function resolvePeriodValue(string $periodType, ?string $periodValue, ?string $atDate = null): ?string;
 
+    public function scopeKey(?int $organizationUnitId, ?string $periodValue): string;
+
     /**
-     * @param array<string, scalar|null> $tokens
+     * @param  array<string, scalar|null>  $tokens
      */
     public function formatSequenceNumber(
         string $prefix,

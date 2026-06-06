@@ -8,19 +8,17 @@ use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInt
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\UpdateUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Throwable;
 
-final class UpdateUnitOfMeasureService implements UpdateUnitOfMeasureServiceInterface
+final class UpdateUnitOfMeasureService
 {
     public function __construct(
         private readonly UnitOfMeasureRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id, array $payload): Result
     {

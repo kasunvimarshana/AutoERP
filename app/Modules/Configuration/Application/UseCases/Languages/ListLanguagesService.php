@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Languages;
 
-use Modules\Configuration\Application\Contracts\UseCases\Languages\ListLanguagesServiceInterface;
 use Modules\Configuration\Application\Repositories\LanguageRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -12,14 +11,12 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ListLanguagesService implements ListLanguagesServiceInterface
+final class ListLanguagesService
 {
-    public function __construct(private readonly LanguageRepositoryInterface $languages)
-    {
-    }
+    public function __construct(private readonly LanguageRepositoryInterface $languages) {}
 
     /**
-     * @param array<string, mixed> $criteria
+     * @param  array<string, mixed>  $criteria
      */
     public function execute(array $criteria, int $perPage, int $page): Result
     {

@@ -6,7 +6,6 @@ namespace Modules\Configuration\Application\UseCases;
 
 use Modules\Configuration\Application\Contracts\ConfigurationCacheInterface;
 use Modules\Configuration\Application\Contracts\ConfigurationCacheKeyFactoryInterface;
-use Modules\Configuration\Application\Contracts\UseCases\DeleteConfigurationServiceInterface;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Configuration\Domain\Constants\ConfigurationScope;
@@ -19,7 +18,7 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class DeleteConfigurationService implements DeleteConfigurationServiceInterface
+final class DeleteConfigurationService
 {
     public function __construct(
         private readonly ConfigurationRepositoryInterface $repository,
@@ -29,8 +28,7 @@ final class DeleteConfigurationService implements DeleteConfigurationServiceInte
         private readonly CurrentTenantContextAccessorInterface $tenantContext,
         private readonly TransactionManagerInterface $transactionManager,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(string $key, ?string $scope = null, ?int $tenantId = null): Result
     {
@@ -70,14 +68,14 @@ final class DeleteConfigurationService implements DeleteConfigurationServiceInte
 
         if ($scope === ConfigurationScope::ORGANIZATION_UNIT) {
             throw new \InvalidArgumentException(
-                ConfigurationErrorCode::INVALID_SCOPE . ': Organization unit scope is not supported by current schema.',
+                ConfigurationErrorCode::INVALID_SCOPE.': Organization unit scope is not supported by current schema.',
             );
         }
 
         $resolved = $tenantId ?? $this->tenantContext->currentTenantId();
         if ($resolved === null) {
             throw new \InvalidArgumentException(
-                ConfigurationErrorCode::TENANT_CONTEXT_REQUIRED . ': Tenant scope requires tenant context.',
+                ConfigurationErrorCode::TENANT_CONTEXT_REQUIRED.': Tenant scope requires tenant context.',
             );
         }
 

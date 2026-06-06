@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Countries;
 
-use Modules\Configuration\Application\Contracts\UseCases\Countries\CreateCountryServiceInterface;
+use InvalidArgumentException;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use InvalidArgumentException;
 use Throwable;
 
-final class CreateCountryService implements CreateCountryServiceInterface
+final class CreateCountryService
 {
-    public function __construct(private readonly CountryRepositoryInterface $countries)
-    {
-    }
+    public function __construct(private readonly CountryRepositoryInterface $countries) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(array $payload): Result
     {
@@ -39,11 +36,11 @@ final class CreateCountryService implements CreateCountryServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function requiredString(array $payload, string $field): string
     {
-        if (!array_key_exists($field, $payload)) {
+        if (! array_key_exists($field, $payload)) {
             throw new InvalidArgumentException(sprintf('Missing required field "%s".', $field));
         }
 

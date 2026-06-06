@@ -6,17 +6,14 @@ namespace Modules\Warehouse\Application\UseCases\Warehouses;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Warehouse\Application\Contracts\UseCases\Warehouses\ListWarehousesServiceInterface;
 use Modules\Warehouse\Application\Repositories\WarehouseRepositoryInterface;
 use Modules\Warehouse\Domain\Constants\WarehouseDefaults;
 use Modules\Warehouse\Domain\Constants\WarehouseErrorCode;
 use Throwable;
 
-final class ListWarehousesService implements ListWarehousesServiceInterface
+final class ListWarehousesService
 {
-    public function __construct(private readonly WarehouseRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly WarehouseRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

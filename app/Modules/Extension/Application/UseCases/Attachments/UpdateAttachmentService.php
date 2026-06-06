@@ -6,16 +6,13 @@ namespace Modules\Extension\Application\UseCases\Attachments;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Extension\Application\Contracts\UseCases\Attachments\UpdateAttachmentServiceInterface;
 use Modules\Extension\Application\Repositories\AttachmentRepositoryInterface;
 use Modules\Extension\Domain\Constants\ExtensionErrorCode;
 use Throwable;
 
-final class UpdateAttachmentService implements UpdateAttachmentServiceInterface
+final class UpdateAttachmentService
 {
-    public function __construct(private readonly AttachmentRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly AttachmentRepositoryInterface $repository) {}
 
     public function execute(int|string $id, array $payload): Result
     {

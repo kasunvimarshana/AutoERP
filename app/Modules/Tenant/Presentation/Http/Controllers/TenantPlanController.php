@@ -7,11 +7,11 @@ namespace Modules\Tenant\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\CreateTenantPlanServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\DeleteTenantPlanServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\GetTenantPlanServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\ListTenantPlansServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\UpdateTenantPlanServiceInterface;
+use Modules\Tenant\Application\UseCases\Plans\CreateTenantPlanService;
+use Modules\Tenant\Application\UseCases\Plans\DeleteTenantPlanService;
+use Modules\Tenant\Application\UseCases\Plans\GetTenantPlanService;
+use Modules\Tenant\Application\UseCases\Plans\ListTenantPlansService;
+use Modules\Tenant\Application\UseCases\Plans\UpdateTenantPlanService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantPlanRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantPlanRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantPlanResource;
@@ -19,13 +19,12 @@ use Modules\Tenant\Presentation\Http\Resources\TenantPlanResource;
 final class TenantPlanController extends Controller
 {
     public function __construct(
-        private readonly ListTenantPlansServiceInterface $listPlans,
-        private readonly GetTenantPlanServiceInterface $getPlan,
-        private readonly CreateTenantPlanServiceInterface $createPlan,
-        private readonly UpdateTenantPlanServiceInterface $updatePlan,
-        private readonly DeleteTenantPlanServiceInterface $deletePlan,
-    ) {
-    }
+        private readonly ListTenantPlansService $listPlans,
+        private readonly GetTenantPlanService $getPlan,
+        private readonly CreateTenantPlanService $createPlan,
+        private readonly UpdateTenantPlanService $updatePlan,
+        private readonly DeleteTenantPlanService $deletePlan,
+    ) {}
 
     public function index(ListTenantPlanRequest $request): JsonResponse
     {

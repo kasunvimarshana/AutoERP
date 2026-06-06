@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\User\Application\Contracts\UseCases\PermissionServiceInterface;
+use Modules\User\Application\UseCases\PermissionService;
 use Modules\User\Presentation\Http\Requests\ListUserEntityRequest;
 use Modules\User\Presentation\Http\Requests\UpsertPermissionRequest;
 use Modules\User\Presentation\Http\Resources\UserRecordResource;
 
 final class PermissionController extends AbstractUserCrudController
 {
-    public function __construct(private readonly PermissionServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly PermissionService $service) {}
 
     public function index(ListUserEntityRequest $request): JsonResponse
     {

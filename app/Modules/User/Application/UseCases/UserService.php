@@ -13,8 +13,6 @@ use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Result;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
-use Modules\User\Application\Events\UserCreated;
 use Modules\User\Application\Repositories\UserRepositoryInterface;
 use Modules\User\Application\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Domain\Constants\UserErrorCode;
@@ -22,7 +20,7 @@ use Modules\User\Domain\Constants\UserStatus;
 use Modules\User\Domain\Contracts\UserDomainServiceInterface;
 use Throwable;
 
-final class UserService extends AbstractUserCrudService implements UserServiceInterface
+final class UserService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
@@ -34,8 +32,7 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function list(array $filters): Result
     {
@@ -109,8 +106,6 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
                     'marital_status' => $this->domain->normalizeNullableString($payload['marital_status'] ?? null),
                     'row_version' => 1,
                 ]);
-
-                $this->dispatchEvent(new UserCreated($created->id(), $tenantId, $email));
 
                 return $this->success($created);
             });
@@ -441,7 +436,7 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
     }
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     private function mergeIdentityReferences(?array $metadata, mixed $identityReferences): ?array
     {
@@ -478,7 +473,7 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
     }
 
     /**
-     * @param array<string, scalar|array|null> $context
+     * @param  array<string, scalar|array|null>  $context
      */
     private function normalizeFailure(Throwable $exception, string $operation, array $context = []): Result
     {
@@ -487,14 +482,5 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
             UserErrorCode::INVALID_VALUE,
             array_merge(['operation' => $operation], $context),
         ));
-    }
-
-    private function dispatchEvent(object $event): void
-    {
-        try {
-            event($event);
-        } catch (Throwable) {
-            // Allows isolated unit tests without a booted Laravel dispatcher.
-        }
     }
 }

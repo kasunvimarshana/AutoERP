@@ -7,11 +7,11 @@ namespace Modules\UOM\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\CreateUomConversionServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\DeleteUomConversionServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\GetUomConversionServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\ListUomConversionsServiceInterface;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\UpdateUomConversionServiceInterface;
+use Modules\UOM\Application\UseCases\UomConversions\CreateUomConversionService;
+use Modules\UOM\Application\UseCases\UomConversions\DeleteUomConversionService;
+use Modules\UOM\Application\UseCases\UomConversions\GetUomConversionService;
+use Modules\UOM\Application\UseCases\UomConversions\ListUomConversionsService;
+use Modules\UOM\Application\UseCases\UomConversions\UpdateUomConversionService;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Modules\UOM\Presentation\Http\Requests\ListUomConversionRequest;
 use Modules\UOM\Presentation\Http\Requests\UpsertUomConversionRequest;
@@ -20,13 +20,12 @@ use Modules\UOM\Presentation\Http\Resources\UomConversionResource;
 final class UomConversionController extends Controller
 {
     public function __construct(
-        private readonly ListUomConversionsServiceInterface $listService,
-        private readonly GetUomConversionServiceInterface $getService,
-        private readonly CreateUomConversionServiceInterface $createService,
-        private readonly UpdateUomConversionServiceInterface $updateService,
-        private readonly DeleteUomConversionServiceInterface $deleteService,
-    ) {
-    }
+        private readonly ListUomConversionsService $listService,
+        private readonly GetUomConversionService $getService,
+        private readonly CreateUomConversionService $createService,
+        private readonly UpdateUomConversionService $updateService,
+        private readonly DeleteUomConversionService $deleteService,
+    ) {}
 
     public function index(ListUomConversionRequest $request): JsonResponse
     {

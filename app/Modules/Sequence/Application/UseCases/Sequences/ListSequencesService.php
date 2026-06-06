@@ -6,16 +6,13 @@ namespace Modules\Sequence\Application\UseCases\Sequences;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\ListSequencesServiceInterface;
 use Modules\Sequence\Application\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Domain\Constants\SequenceErrorCode;
 use Throwable;
 
-final class ListSequencesService implements ListSequencesServiceInterface
+final class ListSequencesService
 {
-    public function __construct(private readonly SequenceRepositoryInterface $sequences)
-    {
-    }
+    public function __construct(private readonly SequenceRepositoryInterface $sequences) {}
 
     public function execute(array $filters): Result
     {

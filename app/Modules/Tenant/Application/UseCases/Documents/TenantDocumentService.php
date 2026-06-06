@@ -11,7 +11,6 @@ use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Contracts\UseCases\Documents\TenantDocumentServiceInterface;
 use Modules\Tenant\Application\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Application\Support\TenantContext;
@@ -19,7 +18,7 @@ use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Modules\Tenant\Domain\Contracts\TenantDomainServiceInterface;
 use Throwable;
 
-final class TenantDocumentService implements TenantDocumentServiceInterface
+final class TenantDocumentService
 {
     public function __construct(
         private readonly TenantDocumentRepositoryInterface $documents,
@@ -30,8 +29,7 @@ final class TenantDocumentService implements TenantDocumentServiceInterface
         private readonly TenantContext $tenantContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {
@@ -178,7 +176,7 @@ final class TenantDocumentService implements TenantDocumentServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function resolveFilePath(array $payload, int $tenantId): string
     {

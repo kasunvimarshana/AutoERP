@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Configuration\Application\UseCases;
 
 use Modules\Configuration\Application\Contracts\ConfigurationRecordMapperInterface;
-use Modules\Configuration\Application\Contracts\UseCases\ListConfigurationsServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationQueryData;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
@@ -19,7 +18,7 @@ use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ListConfigurationsService implements ListConfigurationsServiceInterface
+final class ListConfigurationsService
 {
     public function __construct(
         private readonly ConfigurationRepositoryInterface $repository,
@@ -27,8 +26,7 @@ final class ListConfigurationsService implements ListConfigurationsServiceInterf
         private readonly ConfigurationRecordMapperInterface $recordMapper,
         private readonly CurrentTenantContextAccessorInterface $tenantContext,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(ConfigurationQueryData $query): Result
     {

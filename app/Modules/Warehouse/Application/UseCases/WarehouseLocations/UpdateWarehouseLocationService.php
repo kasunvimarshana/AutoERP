@@ -6,16 +6,13 @@ namespace Modules\Warehouse\Application\UseCases\WarehouseLocations;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Warehouse\Application\Contracts\UseCases\WarehouseLocations\UpdateWarehouseLocationServiceInterface;
 use Modules\Warehouse\Application\Repositories\WarehouseLocationRepositoryInterface;
 use Modules\Warehouse\Domain\Constants\WarehouseErrorCode;
 use Throwable;
 
-final class UpdateWarehouseLocationService implements UpdateWarehouseLocationServiceInterface
+final class UpdateWarehouseLocationService
 {
-    public function __construct(private readonly WarehouseLocationRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly WarehouseLocationRepositoryInterface $repository) {}
 
     public function execute(int|string $id, array $payload): Result
     {

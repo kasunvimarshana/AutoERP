@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Currencies;
 
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\ListCurrenciesServiceInterface;
 use Modules\Configuration\Application\Repositories\CurrencyRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -12,14 +11,12 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ListCurrenciesService implements ListCurrenciesServiceInterface
+final class ListCurrenciesService
 {
-    public function __construct(private readonly CurrencyRepositoryInterface $currencies)
-    {
-    }
+    public function __construct(private readonly CurrencyRepositoryInterface $currencies) {}
 
     /**
-     * @param array<string, mixed> $criteria
+     * @param  array<string, mixed>  $criteria
      */
     public function execute(array $criteria, int $perPage, int $page): Result
     {

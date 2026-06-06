@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Configuration\Application\Contracts\UseCases\ListConfigurationsServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationQueryData;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
+use Modules\Configuration\Application\UseCases\ListConfigurationsService;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
 use Modules\Core\Application\DTO\PagedResult;
 
@@ -17,11 +17,11 @@ final class ConfigListCommand extends Command
         {--prefix= : Filter keys by prefix}
         {--source= : Filter by persisted source column value}
         {--page=1 : Result page number}
-        {--per-page=' . ConfigurationDefaults::DEFAULT_PER_PAGE . ' : Items per page}';
+        {--per-page='.ConfigurationDefaults::DEFAULT_PER_PAGE.' : Items per page}';
 
     protected $description = 'List configuration entries';
 
-    public function __construct(private readonly ListConfigurationsServiceInterface $service)
+    public function __construct(private readonly ListConfigurationsService $service)
     {
         parent::__construct();
     }

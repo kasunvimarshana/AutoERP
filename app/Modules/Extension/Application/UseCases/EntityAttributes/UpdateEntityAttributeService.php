@@ -6,16 +6,13 @@ namespace Modules\Extension\Application\UseCases\EntityAttributes;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Extension\Application\Contracts\UseCases\EntityAttributes\UpdateEntityAttributeServiceInterface;
 use Modules\Extension\Application\Repositories\EntityAttributeRepositoryInterface;
 use Modules\Extension\Domain\Constants\ExtensionErrorCode;
 use Throwable;
 
-final class UpdateEntityAttributeService implements UpdateEntityAttributeServiceInterface
+final class UpdateEntityAttributeService
 {
-    public function __construct(private readonly EntityAttributeRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly EntityAttributeRepositoryInterface $repository) {}
 
     public function execute(int|string $id, array $payload): Result
     {

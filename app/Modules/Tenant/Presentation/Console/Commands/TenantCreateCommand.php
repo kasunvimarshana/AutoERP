@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Tenant\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Tenant\Application\Contracts\UseCases\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantValueData;
+use Modules\Tenant\Application\UseCases\CreateTenantService;
 
 final class TenantCreateCommand extends Command
 {
@@ -21,7 +21,7 @@ final class TenantCreateCommand extends Command
 
     protected $description = 'Create a tenant';
 
-    public function __construct(private readonly CreateTenantServiceInterface $service)
+    public function __construct(private readonly CreateTenantService $service)
     {
         parent::__construct();
     }

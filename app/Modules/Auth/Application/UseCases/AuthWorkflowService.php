@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Modules\Auth\Application\UseCases;
 
 use Modules\Auth\Application\Contracts\Providers\AuthProviderRegistryInterface;
-use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
-use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\ExchangeAuthorizationCodeData;
+use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
 use Modules\Auth\Application\DTOs\LoginData;
 use Modules\Auth\Application\DTOs\LogoutData;
 use Modules\Auth\Application\DTOs\RegistrationData;
@@ -26,24 +25,10 @@ use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
+use Modules\User\Application\UseCases\UserService;
 use Throwable;
 
-final class AuthWorkflowService implements
-    LoginServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\LogoutServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\RegisterServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\RefreshTokenServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\RevokeSessionServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\RequestVerificationChallengeServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\UnlinkExternalIdentityServiceInterface
+final class AuthWorkflowService
 {
     public function __construct(
         private readonly AuthProviderRegistryInterface $registry,
@@ -51,11 +36,10 @@ final class AuthWorkflowService implements
         private readonly AuthIdentityRepositoryInterface $identities,
         private readonly AuthLoginAttemptRepositoryInterface $loginAttempts,
         private readonly AuthDomainServiceInterface $domain,
-        private readonly UserServiceInterface $userService,
+        private readonly UserService $userService,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function login(LoginData $data): Result
     {
@@ -73,11 +57,6 @@ final class AuthWorkflowService implements
                 $context = $provider->authenticate($data);
                 if ($context === null) {
                     $this->recordAttempt($data, false, AuthErrorCode::INVALID_CREDENTIALS, null, null, null);
-                    $this->publishLifecycleEvent('LoginFailed', [
-                        'tenant_id' => $data->tenantId,
-                        'provider_key' => $data->providerKey,
-                        'login_identifier' => strtolower($data->loginIdentifier),
-                    ]);
 
                     return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
                 }
@@ -119,19 +98,6 @@ final class AuthWorkflowService implements
                 );
 
                 $this->clearRecentFailures($data);
-                $this->publishLifecycleEvent('LoginSuccess', [
-                    'tenant_id' => $data->tenantId,
-                    'user_id' => $user['id'] ?? null,
-                    'provider_id' => $providerRecord['id'] ?? null,
-                    'identity_id' => $identity['id'] ?? null,
-                    'session_id' => $session['id'] ?? null,
-                ]);
-                $this->publishLifecycleEvent('TokenIssued', [
-                    'tenant_id' => $data->tenantId,
-                    'user_id' => $user['id'] ?? null,
-                    'access_token_id' => $tokenPair['access_token_id'] ?? null,
-                    'refresh_token_id' => $tokenPair['refresh_token_id'] ?? null,
-                ]);
 
                 return Result::success([
                     'provider' => $providerRecord,
@@ -158,16 +124,7 @@ final class AuthWorkflowService implements
                     $sessionTenantId = $this->resolveSessionTenantId($data->sessionId, $data->tenantId);
                     $this->registry->tokenProvider()->revokeSessionTokens($data->sessionId, $sessionTenantId);
                     $this->registry->sessionProvider()->revoke($data->sessionId, $sessionTenantId);
-                    $this->publishLifecycleEvent('TokenRevoked', [
-                        'tenant_id' => $sessionTenantId,
-                        'session_id' => $data->sessionId,
-                    ]);
                 }
-
-                $this->publishLifecycleEvent('Logout', [
-                    'tenant_id' => $data->tenantId,
-                    'session_id' => $data->sessionId,
-                ]);
 
                 return Result::success(true);
             });
@@ -227,12 +184,6 @@ final class AuthWorkflowService implements
                             'row_version' => 1,
                         ]);
 
-                        $this->publishLifecycleEvent('IdentityLinked', [
-                            'tenant_id' => $data->tenantId,
-                            'user_id' => $userRecord['id'] ?? null,
-                            'identity_id' => $identity->id(),
-                            'provider_id' => $providerRecord->id(),
-                        ]);
                     }
                 }
 
@@ -263,12 +214,6 @@ final class AuthWorkflowService implements
                     return $this->failure(AuthErrorCode::TOKEN_INVALID, 'Refresh token is invalid or expired.');
                 }
 
-                $this->publishLifecycleEvent('TokenIssued', [
-                    'tenant_id' => $data->tenantId,
-                    'access_token_id' => $tokens['access_token_id'] ?? null,
-                    'refresh_token_id' => $tokens['refresh_token_id'] ?? null,
-                ]);
-
                 return Result::success($tokens);
             });
         } catch (Throwable $exception) {
@@ -286,11 +231,6 @@ final class AuthWorkflowService implements
                 if (! $revoked) {
                     return $this->failure(AuthErrorCode::SESSION_NOT_FOUND, 'Session not found.');
                 }
-
-                $this->publishLifecycleEvent('TokenRevoked', [
-                    'tenant_id' => $sessionTenantId,
-                    'session_id' => $sessionId,
-                ]);
 
                 return Result::success(true);
             });
@@ -358,13 +298,6 @@ final class AuthWorkflowService implements
                     return $this->failure(AuthErrorCode::CLIENT_NOT_ALLOWED, 'Client authorization failed.');
                 }
 
-                $this->publishLifecycleEvent('SSOLogin', [
-                    'tenant_id' => $data->tenantId,
-                    'client_key' => $data->clientKey,
-                    'user_id' => $data->userId,
-                    'authorization_code_id' => $authorizationCode['authorization_code_id'] ?? null,
-                ]);
-
                 return Result::success($authorizationCode);
             });
         } catch (Throwable $exception) {
@@ -400,13 +333,6 @@ final class AuthWorkflowService implements
                         'authorization_code_id' => $context['authorization_code_id'] ?? null,
                     ],
                 ]));
-
-                $this->publishLifecycleEvent('TokenIssued', [
-                    'tenant_id' => $context['tenant_id'] ?? $data->tenantId,
-                    'user_id' => $context['user_id'] ?? null,
-                    'access_token_id' => $tokenPair['access_token_id'] ?? null,
-                    'refresh_token_id' => $tokenPair['refresh_token_id'] ?? null,
-                ]);
 
                 return Result::success($tokenPair);
             });
@@ -448,13 +374,6 @@ final class AuthWorkflowService implements
                         'row_version' => ((int) $existing->get('row_version', 1)) + 1,
                     ]);
 
-                    $this->publishLifecycleEvent('IdentityLinked', [
-                        'tenant_id' => $data->tenantId,
-                        'user_id' => $data->userId,
-                        'identity_id' => $updated->id(),
-                        'provider_id' => $providerId,
-                    ]);
-
                     return Result::success($updated);
                 }
 
@@ -469,13 +388,6 @@ final class AuthWorkflowService implements
                     'claims' => $data->claims,
                     'metadata' => $data->metadata,
                     'row_version' => 1,
-                ]);
-
-                $this->publishLifecycleEvent('IdentityLinked', [
-                    'tenant_id' => $data->tenantId,
-                    'user_id' => $data->userId,
-                    'identity_id' => $created->id(),
-                    'provider_id' => $providerId,
                 ]);
 
                 return Result::success($created);
@@ -503,33 +415,10 @@ final class AuthWorkflowService implements
 
                 $this->identities->delete($existing->id());
 
-                $this->publishLifecycleEvent('IdentityUnlinked', [
-                    'tenant_id' => $data->tenantId,
-                    'user_id' => $data->userId,
-                    'identity_id' => $existing->id(),
-                    'provider_id' => $providerId,
-                ]);
-
                 return Result::success(true);
             });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function publishLifecycleEvent(string $name, array $context = []): void
-    {
-        try {
-            event('auth.lifecycle', [
-                'name' => $name,
-                'context' => $context,
-                'occurred_at' => now()->toIso8601String(),
-            ]);
-        } catch (Throwable) {
-            // Allows isolated unit tests and non-framework adapters to exercise auth logic without an event bus.
         }
     }
 
@@ -625,7 +514,7 @@ final class AuthWorkflowService implements
     private function readModuleAuthIntConfig(string $key, int $default): int
     {
         try {
-            return (int) config('module-auth.' . $key, $default);
+            return (int) config('module-auth.'.$key, $default);
         } catch (Throwable) {
             return $default;
         }

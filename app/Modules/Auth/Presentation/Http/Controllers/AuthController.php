@@ -6,24 +6,6 @@ namespace Modules\Auth\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
-use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\GetCurrentAuthProfileServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\LogoutServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\RefreshTokenServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\RegisterServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\RequestVerificationChallengeServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\RevokeSessionServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface;
-use Modules\Auth\Application\Contracts\UseCases\UnlinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
@@ -35,6 +17,21 @@ use Modules\Auth\Application\DTOs\TokenRefreshData;
 use Modules\Auth\Application\DTOs\UnlinkExternalIdentityData;
 use Modules\Auth\Application\DTOs\VerificationChallengeRequestData;
 use Modules\Auth\Application\DTOs\VerificationChallengeVerifyData;
+use Modules\Auth\Application\UseCases\AuthorizeClientService;
+use Modules\Auth\Application\UseCases\ExchangeAuthorizationCodeService;
+use Modules\Auth\Application\UseCases\GetCurrentAuthProfileService;
+use Modules\Auth\Application\UseCases\IssueTokenService;
+use Modules\Auth\Application\UseCases\LinkExternalIdentityService;
+use Modules\Auth\Application\UseCases\ListSessionsService;
+use Modules\Auth\Application\UseCases\LoginService;
+use Modules\Auth\Application\UseCases\LogoutService;
+use Modules\Auth\Application\UseCases\RefreshTokenService;
+use Modules\Auth\Application\UseCases\RegisterService;
+use Modules\Auth\Application\UseCases\RequestVerificationChallengeService;
+use Modules\Auth\Application\UseCases\RevokeSessionService;
+use Modules\Auth\Application\UseCases\UnlinkExternalIdentityService;
+use Modules\Auth\Application\UseCases\ValidateTokenService;
+use Modules\Auth\Application\UseCases\VerifyChallengeService;
 use Modules\Auth\Presentation\Http\Requests\AuthorizeClientRequest;
 use Modules\Auth\Presentation\Http\Requests\ExchangeAuthorizationCodeRequest;
 use Modules\Auth\Presentation\Http\Requests\IssueTokenRequest;
@@ -50,31 +47,33 @@ use Modules\Auth\Presentation\Http\Requests\UnlinkExternalIdentityRequest;
 use Modules\Auth\Presentation\Http\Requests\ValidateTokenRequest;
 use Modules\Auth\Presentation\Http\Requests\VerifyChallengeRequest;
 use Modules\Auth\Presentation\Http\Resources\AuthPayloadResource;
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Application\Results\Result;
 
 final class AuthController extends Controller
 {
     public function __construct(
-        private readonly LoginServiceInterface $loginService,
-        private readonly LogoutServiceInterface $logoutService,
-        private readonly RegisterServiceInterface $registerService,
-        private readonly IssueTokenServiceInterface $issueTokenService,
-        private readonly LinkExternalIdentityServiceInterface $linkExternalIdentityService,
-        private readonly UnlinkExternalIdentityServiceInterface $unlinkExternalIdentityService,
-        private readonly RefreshTokenServiceInterface $refreshTokenService,
-        private readonly RevokeSessionServiceInterface $revokeSessionService,
-        private readonly ListSessionsServiceInterface $listSessionsService,
-        private readonly ValidateTokenServiceInterface $validateTokenService,
-        private readonly RequestVerificationChallengeServiceInterface $requestVerificationService,
-        private readonly VerifyChallengeServiceInterface $verifyChallengeService,
-        private readonly AuthorizeClientServiceInterface $authorizeClientService,
-        private readonly ExchangeAuthorizationCodeServiceInterface $exchangeAuthorizationCodeService,
-        private readonly GetCurrentAuthProfileServiceInterface $currentAuthProfileService,
+        private readonly LoginService $loginService,
+        private readonly LogoutService $logoutService,
+        private readonly RegisterService $registerService,
+        private readonly IssueTokenService $issueTokenService,
+        private readonly LinkExternalIdentityService $linkExternalIdentityService,
+        private readonly UnlinkExternalIdentityService $unlinkExternalIdentityService,
+        private readonly RefreshTokenService $refreshTokenService,
+        private readonly RevokeSessionService $revokeSessionService,
+        private readonly ListSessionsService $listSessionsService,
+        private readonly ValidateTokenService $validateTokenService,
+        private readonly RequestVerificationChallengeService $requestVerificationService,
+        private readonly VerifyChallengeService $verifyChallengeService,
+        private readonly AuthorizeClientService $authorizeClientService,
+        private readonly ExchangeAuthorizationCodeService $exchangeAuthorizationCodeService,
+        private readonly GetCurrentAuthProfileService $currentAuthProfileService,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
-    ) {
-    }
+    ) {}
 
     public function login(LoginRequest $request): JsonResponse|AuthPayloadResource
     {
@@ -232,7 +231,7 @@ final class AuthController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function mergeProtectedContext(array $payload): array

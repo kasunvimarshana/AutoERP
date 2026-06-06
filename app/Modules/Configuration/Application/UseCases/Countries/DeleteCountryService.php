@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Countries;
 
-use Modules\Configuration\Application\Contracts\UseCases\Countries\DeleteCountryServiceInterface;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class DeleteCountryService implements DeleteCountryServiceInterface
+final class DeleteCountryService
 {
-    public function __construct(private readonly CountryRepositoryInterface $countries)
-    {
-    }
+    public function __construct(private readonly CountryRepositoryInterface $countries) {}
 
     public function execute(int|string $id): Result
     {

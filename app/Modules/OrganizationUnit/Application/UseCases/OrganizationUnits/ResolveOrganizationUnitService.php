@@ -7,20 +7,18 @@ namespace Modules\OrganizationUnit\Application\UseCases\OrganizationUnits;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits\ResolveOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\Support\OrganizationUnitContext;
 use Modules\OrganizationUnit\Domain\Constants\OrganizationUnitErrorCode;
 use Throwable;
 
-final class ResolveOrganizationUnitService implements ResolveOrganizationUnitServiceInterface
+final class ResolveOrganizationUnitService
 {
     public function __construct(
         private readonly OrganizationUnitRepositoryInterface $units,
         private readonly OrganizationUnitContext $organizationUnitContext,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(?int $organizationUnitId = null): Result
     {

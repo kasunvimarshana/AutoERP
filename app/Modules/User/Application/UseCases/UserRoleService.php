@@ -5,19 +5,17 @@ declare(strict_types=1);
 namespace Modules\User\Application\UseCases;
 
 use Modules\Core\Application\Results\Result;
-use Modules\User\Application\Contracts\UseCases\UserRoleServiceInterface;
 use Modules\User\Application\Repositories\UserRoleRepositoryInterface;
 use Modules\User\Domain\Constants\UserErrorCode;
 use Modules\User\Domain\Contracts\UserDomainServiceInterface;
 use Throwable;
 
-final class UserRoleService extends AbstractUserCrudService implements UserRoleServiceInterface
+final class UserRoleService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function list(array $filters): Result
     {
@@ -108,7 +106,7 @@ final class UserRoleService extends AbstractUserCrudService implements UserRoleS
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     private function criteria(array $filters): array

@@ -8,13 +8,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Tenant\Application\Contracts\UseCases\ActivateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\CreateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\DeactivateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\GetTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\ListTenantsServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\SuspendTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UseCases\UpdateTenantServiceInterface;
+use Modules\Tenant\Application\UseCases\ActivateTenantService;
+use Modules\Tenant\Application\UseCases\CreateTenantService;
+use Modules\Tenant\Application\UseCases\DeactivateTenantService;
+use Modules\Tenant\Application\UseCases\GetTenantService;
+use Modules\Tenant\Application\UseCases\ListTenantsService;
+use Modules\Tenant\Application\UseCases\SuspendTenantService;
+use Modules\Tenant\Application\UseCases\UpdateTenantService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantResource;
@@ -22,15 +22,14 @@ use Modules\Tenant\Presentation\Http\Resources\TenantResource;
 final class TenantController extends Controller
 {
     public function __construct(
-        private readonly ListTenantsServiceInterface $listTenants,
-        private readonly GetTenantServiceInterface $getTenant,
-        private readonly CreateTenantServiceInterface $createTenant,
-        private readonly UpdateTenantServiceInterface $updateTenant,
-        private readonly ActivateTenantServiceInterface $activateTenant,
-        private readonly SuspendTenantServiceInterface $suspendTenant,
-        private readonly DeactivateTenantServiceInterface $deactivateTenant,
-    ) {
-    }
+        private readonly ListTenantsService $listTenants,
+        private readonly GetTenantService $getTenant,
+        private readonly CreateTenantService $createTenant,
+        private readonly UpdateTenantService $updateTenant,
+        private readonly ActivateTenantService $activateTenant,
+        private readonly SuspendTenantService $suspendTenant,
+        private readonly DeactivateTenantService $deactivateTenant,
+    ) {}
 
     public function index(ListTenantRequest $request): JsonResponse
     {

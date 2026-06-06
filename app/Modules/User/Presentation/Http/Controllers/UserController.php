@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\User\Application\UseCases\UserService;
 use Modules\User\Domain\Constants\UserErrorCode;
 use Modules\User\Presentation\Http\Requests\AssignUserToOrganizationUnitRequest;
-use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
 use Modules\User\Presentation\Http\Requests\ListUserEntityRequest;
 use Modules\User\Presentation\Http\Requests\ResolveUserByIdentityRequest;
 use Modules\User\Presentation\Http\Requests\UpsertUserRequest;
@@ -15,9 +15,7 @@ use Modules\User\Presentation\Http\Resources\UserRecordResource;
 
 final class UserController extends AbstractUserCrudController
 {
-    public function __construct(private readonly UserServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly UserService $service) {}
 
     public function index(ListUserEntityRequest $request): JsonResponse
     {

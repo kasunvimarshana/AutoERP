@@ -6,7 +6,6 @@ namespace Modules\OrganizationUnit\Application\UseCases\OrganizationUnitSettingG
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitSettingGroups\OrganizationUnitSettingGroupServiceInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitSettingGroupRepositoryInterface;
 use Modules\OrganizationUnit\Domain\Constants\OrganizationUnitErrorCode;
@@ -14,15 +13,14 @@ use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInter
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Throwable;
 
-final class OrganizationUnitSettingGroupService implements OrganizationUnitSettingGroupServiceInterface
+final class OrganizationUnitSettingGroupService
 {
     public function __construct(
         private readonly OrganizationUnitSettingGroupRepositoryInterface $groups,
         private readonly OrganizationUnitRepositoryInterface $units,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function listByTenant(int|string $tenantId): Result
     {

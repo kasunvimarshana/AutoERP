@@ -7,18 +7,16 @@ namespace Modules\UOM\Application\UseCases\UnitOfMeasures;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Throwable;
 
-final class DeleteUnitOfMeasureService implements DeleteUnitOfMeasureServiceInterface
+final class DeleteUnitOfMeasureService
 {
     public function __construct(
         private readonly UnitOfMeasureRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id): Result
     {

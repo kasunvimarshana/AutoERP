@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\User\Application\Contracts\UseCases\UserTenantServiceInterface;
+use Modules\User\Application\UseCases\UserTenantService;
 use Modules\User\Presentation\Http\Requests\ListUserEntityRequest;
 use Modules\User\Presentation\Http\Requests\UpsertUserTenantRequest;
 use Modules\User\Presentation\Http\Resources\UserRecordResource;
 
 final class UserTenantController extends AbstractUserCrudController
 {
-    public function __construct(private readonly UserTenantServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly UserTenantService $service) {}
 
     public function index(ListUserEntityRequest $request): JsonResponse
     {

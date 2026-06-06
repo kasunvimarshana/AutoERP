@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Countries;
 
-use Modules\Configuration\Application\Contracts\UseCases\Countries\ListCountriesServiceInterface;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationDefaults;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -12,14 +11,12 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ListCountriesService implements ListCountriesServiceInterface
+final class ListCountriesService
 {
-    public function __construct(private readonly CountryRepositoryInterface $countries)
-    {
-    }
+    public function __construct(private readonly CountryRepositoryInterface $countries) {}
 
     /**
-     * @param array<string, mixed> $criteria
+     * @param  array<string, mixed>  $criteria
      */
     public function execute(array $criteria, int $perPage, int $page): Result
     {

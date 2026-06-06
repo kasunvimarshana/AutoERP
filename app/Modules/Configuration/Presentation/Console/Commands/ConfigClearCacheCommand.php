@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Configuration\Application\Contracts\UseCases\ClearConfigurationCacheServiceInterface;
+use Modules\Configuration\Application\UseCases\ClearConfigurationCacheService;
 
 final class ConfigClearCacheCommand extends Command
 {
@@ -13,7 +13,7 @@ final class ConfigClearCacheCommand extends Command
 
     protected $description = 'Clear configuration module cache';
 
-    public function __construct(private readonly ClearConfigurationCacheServiceInterface $service)
+    public function __construct(private readonly ClearConfigurationCacheService $service)
     {
         parent::__construct();
     }

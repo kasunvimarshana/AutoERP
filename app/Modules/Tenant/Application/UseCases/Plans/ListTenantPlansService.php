@@ -6,16 +6,13 @@ namespace Modules\Tenant\Application\UseCases\Plans;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Contracts\UseCases\Plans\ListTenantPlansServiceInterface;
 use Modules\Tenant\Application\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Throwable;
 
-final class ListTenantPlansService implements ListTenantPlansServiceInterface
+final class ListTenantPlansService
 {
-    public function __construct(private readonly TenantPlanRepositoryInterface $plans)
-    {
-    }
+    public function __construct(private readonly TenantPlanRepositoryInterface $plans) {}
 
     public function execute(array $filters): Result
     {

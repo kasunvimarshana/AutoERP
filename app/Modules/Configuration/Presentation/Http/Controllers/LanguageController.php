@@ -6,11 +6,11 @@ namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\Contracts\UseCases\Languages\CreateLanguageServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Languages\DeleteLanguageServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Languages\GetLanguageServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Languages\ListLanguagesServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Languages\UpdateLanguageServiceInterface;
+use Modules\Configuration\Application\UseCases\Languages\CreateLanguageService;
+use Modules\Configuration\Application\UseCases\Languages\DeleteLanguageService;
+use Modules\Configuration\Application\UseCases\Languages\GetLanguageService;
+use Modules\Configuration\Application\UseCases\Languages\ListLanguagesService;
+use Modules\Configuration\Application\UseCases\Languages\UpdateLanguageService;
 use Modules\Configuration\Presentation\Http\Requests\ListLanguageRequest;
 use Modules\Configuration\Presentation\Http\Requests\UpsertLanguageRequest;
 use Modules\Configuration\Presentation\Http\Resources\LanguageResource;
@@ -19,13 +19,12 @@ use Modules\Core\Application\DTO\PagedResult;
 final class LanguageController extends Controller
 {
     public function __construct(
-        private readonly ListLanguagesServiceInterface $listLanguages,
-        private readonly GetLanguageServiceInterface $getLanguage,
-        private readonly CreateLanguageServiceInterface $createLanguage,
-        private readonly UpdateLanguageServiceInterface $updateLanguage,
-        private readonly DeleteLanguageServiceInterface $deleteLanguage,
-    ) {
-    }
+        private readonly ListLanguagesService $listLanguages,
+        private readonly GetLanguageService $getLanguage,
+        private readonly CreateLanguageService $createLanguage,
+        private readonly UpdateLanguageService $updateLanguage,
+        private readonly DeleteLanguageService $deleteLanguage,
+    ) {}
 
     public function index(ListLanguageRequest $request): JsonResponse
     {

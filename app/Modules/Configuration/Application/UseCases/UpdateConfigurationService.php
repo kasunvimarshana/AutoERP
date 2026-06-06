@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases;
 
-use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\UpdateConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationMutationData;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -19,16 +17,15 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class UpdateConfigurationService implements UpdateConfigurationServiceInterface
+final class UpdateConfigurationService
 {
     public function __construct(
         private readonly ConfigurationRepositoryInterface $repository,
         private readonly ConfigurationDomainServiceInterface $domain,
-        private readonly SetConfigurationServiceInterface $setConfiguration,
+        private readonly SetConfigurationService $setConfiguration,
         private readonly CurrentTenantContextAccessorInterface $tenantContext,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(string $key, ConfigurationMutationData $data): Result
     {

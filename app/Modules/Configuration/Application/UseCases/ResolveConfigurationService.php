@@ -7,7 +7,6 @@ namespace Modules\Configuration\Application\UseCases;
 use Modules\Configuration\Application\Contracts\ConfigurationCacheInterface;
 use Modules\Configuration\Application\Contracts\ConfigurationCacheKeyFactoryInterface;
 use Modules\Configuration\Application\Contracts\ConfigurationRecordMapperInterface;
-use Modules\Configuration\Application\Contracts\UseCases\ResolveConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -22,7 +21,7 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class ResolveConfigurationService implements ResolveConfigurationServiceInterface
+final class ResolveConfigurationService
 {
     public function __construct(
         private readonly ConfigurationRepositoryInterface $repository,
@@ -32,8 +31,7 @@ final class ResolveConfigurationService implements ResolveConfigurationServiceIn
         private readonly ConfigurationCacheKeyFactoryInterface $cacheKeyFactory,
         private readonly CurrentTenantContextAccessorInterface $tenantContext,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(
         string $key,

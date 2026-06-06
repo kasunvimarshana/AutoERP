@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases;
 
-use Modules\Configuration\Application\Contracts\UseCases\IsFeatureEnabledServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\ResolveConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
@@ -13,13 +11,12 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class IsFeatureEnabledService implements IsFeatureEnabledServiceInterface
+final class IsFeatureEnabledService
 {
     public function __construct(
-        private readonly ResolveConfigurationServiceInterface $resolveConfiguration,
+        private readonly ResolveConfigurationService $resolveConfiguration,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(string $key, ?int $tenantId = null, bool $default = false): Result
     {

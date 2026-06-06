@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Application\UseCases\AuditLogs;
 
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\LogActivityServiceInterface;
 use Modules\Audit\Application\DTOs\AuditLogActivityData;
 use Modules\Audit\Application\Repositories\AuditLogRepositoryInterface;
 use Modules\Audit\Domain\Constants\AuditErrorCode;
@@ -16,7 +15,7 @@ use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class LogActivityService implements LogActivityServiceInterface
+final class LogActivityService
 {
     public function __construct(
         private readonly AuditLogRepositoryInterface $repository,
@@ -25,8 +24,7 @@ final class LogActivityService implements LogActivityServiceInterface
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-    ) {
-    }
+    ) {}
 
     public function execute(AuditLogActivityData $data): Result
     {

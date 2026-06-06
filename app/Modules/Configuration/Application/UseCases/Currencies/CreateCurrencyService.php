@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Currencies;
 
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\CreateCurrencyServiceInterface;
+use InvalidArgumentException;
 use Modules\Configuration\Application\Repositories\CurrencyRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use InvalidArgumentException;
 use Throwable;
 
-final class CreateCurrencyService implements CreateCurrencyServiceInterface
+final class CreateCurrencyService
 {
-    public function __construct(private readonly CurrencyRepositoryInterface $currencies)
-    {
-    }
+    public function __construct(private readonly CurrencyRepositoryInterface $currencies) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(array $payload): Result
     {
@@ -41,11 +38,11 @@ final class CreateCurrencyService implements CreateCurrencyServiceInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function requiredString(array $payload, string $field): string
     {
-        if (!array_key_exists($field, $payload)) {
+        if (! array_key_exists($field, $payload)) {
             throw new InvalidArgumentException(sprintf('Missing required field "%s".', $field));
         }
 

@@ -8,23 +8,20 @@ use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Events\TenantStatusChanged;
 use Modules\Tenant\Application\Contracts\TenantRecordMapperInterface;
-use Modules\Tenant\Application\Contracts\UseCases\ActivateTenantServiceInterface;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Modules\Tenant\Domain\Constants\TenantStatus;
 use Throwable;
 
-final class ActivateTenantService implements ActivateTenantServiceInterface
+final class ActivateTenantService
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantRecordMapperInterface $mapper,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id): Result
     {
@@ -42,8 +39,6 @@ final class ActivateTenantService implements ActivateTenantServiceInterface
                     'row_version' => ((int) $existing->get('row_version', 1)) + 1,
                 ]);
 
-                $this->dispatchEvent(new TenantStatusChanged($record->id(), TenantStatus::ACTIVE, true));
-
                 return Result::success($this->mapper->toValueData($record));
             });
         } catch (Throwable $exception) {
@@ -52,15 +47,6 @@ final class ActivateTenantService implements ActivateTenantServiceInterface
                 TenantErrorCode::INVALID_VALUE,
                 ['operation' => 'tenant.activate', 'tenant_id' => (string) $id],
             ));
-        }
-    }
-
-    private function dispatchEvent(object $event): void
-    {
-        try {
-            event($event);
-        } catch (Throwable) {
-            // Ignore dispatcher failures in non-framework test contexts.
         }
     }
 }

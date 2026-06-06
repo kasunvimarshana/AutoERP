@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Application\UseCases\AuditLogs;
 
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\GetAuditLogServiceInterface;
 use Modules\Audit\Application\Repositories\AuditLogRepositoryInterface;
 use Modules\Audit\Domain\Constants\AuditErrorCode;
 use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
@@ -14,15 +13,14 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class GetAuditLogService implements GetAuditLogServiceInterface
+final class GetAuditLogService
 {
     public function __construct(
         private readonly AuditLogRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id): Result
     {

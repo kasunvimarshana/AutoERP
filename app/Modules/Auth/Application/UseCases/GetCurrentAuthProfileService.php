@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Application\UseCases;
 
-use Modules\Auth\Application\Contracts\UseCases\GetCurrentAuthProfileServiceInterface;
 use Modules\Auth\Domain\Constants\AuthErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
@@ -13,15 +12,14 @@ use Modules\User\Application\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Application\Repositories\UserRepositoryInterface;
 use Modules\User\Application\Repositories\UserRoleRepositoryInterface;
 
-final class GetCurrentAuthProfileService implements GetCurrentAuthProfileServiceInterface
+final class GetCurrentAuthProfileService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
         private readonly RolePermissionRepositoryInterface $rolePermissions,
-    ) {
-    }
+    ) {}
 
     public function getProfile(
         int $userId,
@@ -131,7 +129,7 @@ final class GetCurrentAuthProfileService implements GetCurrentAuthProfileService
     }
 
     /**
-     * @param array<string,mixed> $payload
+     * @param  array<string,mixed>  $payload
      * @return array<string,mixed>
      */
     private function sanitizeTokenPayload(array $payload): array

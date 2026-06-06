@@ -7,18 +7,16 @@ namespace Modules\UOM\Application\UseCases\UomConversions;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\UOM\Application\Contracts\UseCases\UomConversions\DeleteUomConversionServiceInterface;
 use Modules\UOM\Application\Repositories\UomConversionRepositoryInterface;
 use Modules\UOM\Domain\Constants\UomErrorCode;
 use Throwable;
 
-final class DeleteUomConversionService implements DeleteUomConversionServiceInterface
+final class DeleteUomConversionService
 {
     public function __construct(
         private readonly UomConversionRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id): Result
     {

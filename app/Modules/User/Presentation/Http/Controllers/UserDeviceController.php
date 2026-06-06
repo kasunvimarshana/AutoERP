@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\User\Application\Contracts\UseCases\UserDeviceServiceInterface;
+use Modules\User\Application\UseCases\UserDeviceService;
 use Modules\User\Presentation\Http\Requests\ListUserEntityRequest;
 use Modules\User\Presentation\Http\Requests\UpsertUserDeviceRequest;
 use Modules\User\Presentation\Http\Resources\UserRecordResource;
 
 final class UserDeviceController extends AbstractUserCrudController
 {
-    public function __construct(private readonly UserDeviceServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly UserDeviceService $service) {}
 
     public function index(ListUserEntityRequest $request): JsonResponse
     {

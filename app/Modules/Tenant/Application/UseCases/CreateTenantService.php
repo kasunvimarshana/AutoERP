@@ -5,23 +5,21 @@ declare(strict_types=1);
 namespace Modules\Tenant\Application\UseCases;
 
 use DateTimeImmutable;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Tenant\Application\Events\TenantCreated;
 use Modules\Tenant\Application\Contracts\TenantRecordMapperInterface;
-use Modules\Tenant\Application\Contracts\UseCases\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantMutationData;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Constants\TenantErrorCode;
 use Modules\Tenant\Domain\Contracts\TenantDomainServiceInterface;
 use Throwable;
 
-final class CreateTenantService implements CreateTenantServiceInterface
+final class CreateTenantService
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
@@ -32,11 +30,10 @@ final class CreateTenantService implements CreateTenantServiceInterface
         private readonly FileStorageServiceInterface $files,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(array $payload): Result
     {
@@ -91,8 +88,6 @@ final class CreateTenantService implements CreateTenantServiceInterface
                     'row_version' => 1,
                 ]);
 
-                $this->dispatchEvent(new TenantCreated($record->id(), $code));
-
                 return Result::success($this->mapper->toValueData($record));
             });
         } catch (Throwable $exception) {
@@ -133,14 +128,5 @@ final class CreateTenantService implements CreateTenantServiceInterface
         }
 
         return (new DateTimeImmutable($candidate))->format('Y-m-d H:i:s');
-    }
-
-    private function dispatchEvent(object $event): void
-    {
-        try {
-            event($event);
-        } catch (Throwable) {
-            // Ignore dispatcher failures in non-framework test contexts.
-        }
     }
 }

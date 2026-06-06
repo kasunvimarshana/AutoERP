@@ -7,7 +7,6 @@ namespace Modules\Configuration\Application\UseCases;
 use Modules\Configuration\Application\Contracts\ConfigurationCacheInterface;
 use Modules\Configuration\Application\Contracts\ConfigurationCacheKeyFactoryInterface;
 use Modules\Configuration\Application\Contracts\ConfigurationRecordMapperInterface;
-use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationServiceInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationMutationData;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
@@ -19,7 +18,7 @@ use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class SetConfigurationService implements SetConfigurationServiceInterface
+final class SetConfigurationService
 {
     public function __construct(
         private readonly ConfigurationRepositoryInterface $repository,
@@ -30,8 +29,7 @@ final class SetConfigurationService implements SetConfigurationServiceInterface
         private readonly CurrentTenantContextAccessorInterface $tenantContext,
         private readonly TransactionManagerInterface $transactionManager,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-    ) {
-    }
+    ) {}
 
     public function execute(ConfigurationMutationData $data): Result
     {
@@ -84,14 +82,14 @@ final class SetConfigurationService implements SetConfigurationServiceInterface
 
         if ($scope === ConfigurationScope::ORGANIZATION_UNIT) {
             throw new \InvalidArgumentException(
-                ConfigurationErrorCode::INVALID_SCOPE . ': Organization unit scope is not supported by current schema.',
+                ConfigurationErrorCode::INVALID_SCOPE.': Organization unit scope is not supported by current schema.',
             );
         }
 
         $resolved = $tenantId ?? $this->tenantContext->currentTenantId();
         if ($resolved === null) {
             throw new \InvalidArgumentException(
-                ConfigurationErrorCode::TENANT_CONTEXT_REQUIRED . ': Tenant scope requires tenant context.',
+                ConfigurationErrorCode::TENANT_CONTEXT_REQUIRED.': Tenant scope requires tenant context.',
             );
         }
 

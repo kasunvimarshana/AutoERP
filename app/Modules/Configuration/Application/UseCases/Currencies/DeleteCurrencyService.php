@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Application\UseCases\Currencies;
 
-use Modules\Configuration\Application\Contracts\UseCases\Currencies\DeleteCurrencyServiceInterface;
 use Modules\Configuration\Application\Repositories\CurrencyRepositoryInterface;
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Throwable;
 
-final class DeleteCurrencyService implements DeleteCurrencyServiceInterface
+final class DeleteCurrencyService
 {
-    public function __construct(private readonly CurrencyRepositoryInterface $currencies)
-    {
-    }
+    public function __construct(private readonly CurrencyRepositoryInterface $currencies) {}
 
     public function execute(int|string $id): Result
     {

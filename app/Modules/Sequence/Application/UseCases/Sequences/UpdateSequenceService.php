@@ -6,19 +6,17 @@ namespace Modules\Sequence\Application\UseCases\Sequences;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\UpdateSequenceServiceInterface;
 use Modules\Sequence\Application\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Domain\Constants\SequenceErrorCode;
 use Modules\Sequence\Domain\Contracts\SequenceDomainServiceInterface;
 use Throwable;
 
-final class UpdateSequenceService implements UpdateSequenceServiceInterface
+final class UpdateSequenceService
 {
     public function __construct(
         private readonly SequenceRepositoryInterface $sequences,
         private readonly SequenceDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $id, array $payload): Result
     {
@@ -89,6 +87,7 @@ final class UpdateSequenceService implements UpdateSequenceServiceInterface
                     )
                     : $this->domain->normalizePeriodType((string) $existingPeriodType),
                 'period_value' => $periodValue,
+                'scope_key' => $this->domain->scopeKey($organizationUnitId, $periodValue),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->domain->normalizeMetadata($payload['metadata'])
                     : $this->domain->normalizeMetadata($existing->get('metadata', [])),

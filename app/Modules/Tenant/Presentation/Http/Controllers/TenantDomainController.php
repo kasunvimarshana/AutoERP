@@ -6,16 +6,14 @@ namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\Contracts\UseCases\Domains\TenantDomainServiceInterface;
+use Modules\Tenant\Application\UseCases\Domains\TenantDomainService;
 use Modules\Tenant\Presentation\Http\Requests\ListTenantDomainRequest;
 use Modules\Tenant\Presentation\Http\Requests\UpsertTenantDomainRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantDomainResource;
 
 final class TenantDomainController extends Controller
 {
-    public function __construct(private readonly TenantDomainServiceInterface $domains)
-    {
-    }
+    public function __construct(private readonly TenantDomainService $domains) {}
 
     public function index(ListTenantDomainRequest $request): JsonResponse
     {

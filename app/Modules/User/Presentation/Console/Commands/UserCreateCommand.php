@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Presentation\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
+use Modules\User\Application\UseCases\UserService;
 
 final class UserCreateCommand extends Command
 {
@@ -18,7 +18,7 @@ final class UserCreateCommand extends Command
 
     protected $description = 'Create a user through the User module service.';
 
-    public function __construct(private readonly UserServiceInterface $service)
+    public function __construct(private readonly UserService $service)
     {
         parent::__construct();
     }
@@ -42,7 +42,7 @@ final class UserCreateCommand extends Command
         $record = $result->valueOrFail();
         $id = method_exists($record, 'id') ? $record->id() : null;
 
-        $this->info(sprintf('User created successfully%s.', $id !== null ? ' (ID: ' . $id . ')' : ''));
+        $this->info(sprintf('User created successfully%s.', $id !== null ? ' (ID: '.$id.')' : ''));
 
         return self::SUCCESS;
     }

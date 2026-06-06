@@ -6,11 +6,11 @@ namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\CreateTimezoneServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\DeleteTimezoneServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\GetTimezoneServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\ListTimezonesServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Timezones\UpdateTimezoneServiceInterface;
+use Modules\Configuration\Application\UseCases\Timezones\CreateTimezoneService;
+use Modules\Configuration\Application\UseCases\Timezones\DeleteTimezoneService;
+use Modules\Configuration\Application\UseCases\Timezones\GetTimezoneService;
+use Modules\Configuration\Application\UseCases\Timezones\ListTimezonesService;
+use Modules\Configuration\Application\UseCases\Timezones\UpdateTimezoneService;
 use Modules\Configuration\Presentation\Http\Requests\ListTimezoneRequest;
 use Modules\Configuration\Presentation\Http\Requests\UpsertTimezoneRequest;
 use Modules\Configuration\Presentation\Http\Resources\TimezoneResource;
@@ -19,13 +19,12 @@ use Modules\Core\Application\DTO\PagedResult;
 final class TimezoneController extends Controller
 {
     public function __construct(
-        private readonly ListTimezonesServiceInterface $listTimezones,
-        private readonly GetTimezoneServiceInterface $getTimezone,
-        private readonly CreateTimezoneServiceInterface $createTimezone,
-        private readonly UpdateTimezoneServiceInterface $updateTimezone,
-        private readonly DeleteTimezoneServiceInterface $deleteTimezone,
-    ) {
-    }
+        private readonly ListTimezonesService $listTimezones,
+        private readonly GetTimezoneService $getTimezone,
+        private readonly CreateTimezoneService $createTimezone,
+        private readonly UpdateTimezoneService $updateTimezone,
+        private readonly DeleteTimezoneService $deleteTimezone,
+    ) {}
 
     public function index(ListTimezoneRequest $request): JsonResponse
     {

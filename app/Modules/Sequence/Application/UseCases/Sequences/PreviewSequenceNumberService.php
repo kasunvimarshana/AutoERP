@@ -6,19 +6,17 @@ namespace Modules\Sequence\Application\UseCases\Sequences;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Sequence\Application\Contracts\UseCases\Sequences\PreviewSequenceNumberServiceInterface;
 use Modules\Sequence\Application\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Domain\Constants\SequenceErrorCode;
 use Modules\Sequence\Domain\Contracts\SequenceDomainServiceInterface;
 use Throwable;
 
-final class PreviewSequenceNumberService implements PreviewSequenceNumberServiceInterface
+final class PreviewSequenceNumberService
 {
     public function __construct(
         private readonly SequenceRepositoryInterface $sequences,
         private readonly SequenceDomainServiceInterface $domain,
-    ) {
-    }
+    ) {}
 
     public function execute(array $payload): Result
     {

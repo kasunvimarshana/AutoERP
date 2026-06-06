@@ -24,9 +24,9 @@ use Modules\Core\Infrastructure\Services\SlugGenerator;
 use Modules\Core\Infrastructure\Support\ErrorNormalizer;
 use Modules\Core\Infrastructure\Support\ExceptionParser;
 use Modules\Core\Infrastructure\Support\LaravelTransactionManager;
+use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\RequestCurrentOrganizationUnitContextAccessor;
 use Modules\Core\Infrastructure\Support\RequestCurrentTenantContextAccessor;
-use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\RequestCurrentUserContextAccessor;
 use Modules\Core\Infrastructure\Support\SystemClock;
 
@@ -34,7 +34,7 @@ final class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../../Infrastructure/Config/core.php', 'core');
+        $this->mergeConfigFrom(__DIR__.'/../Config/core.php', 'core');
 
         $this->app->singleton(ClockInterface::class, SystemClock::class);
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
@@ -245,11 +245,11 @@ final class CoreServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Persistence/Eloquent/Migrations');
 
         $this->publishes([
-            __DIR__ . '/../../Infrastructure/Config/core.php' => config_path('core.php'),
+            __DIR__.'/../Config/core.php' => config_path('core.php'),
         ], 'core-config');
     }
 }

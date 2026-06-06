@@ -8,14 +8,12 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface;
+use Modules\Auth\Application\UseCases\ValidateTokenService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class TokenValidationMiddleware
 {
-    public function __construct(private readonly ValidateTokenServiceInterface $tokens)
-    {
-    }
+    public function __construct(private readonly ValidateTokenService $tokens) {}
 
     public function handle(Request $request, Closure $next): Response
     {

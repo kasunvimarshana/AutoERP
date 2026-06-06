@@ -6,9 +6,9 @@ namespace Modules\OrganizationUnit\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits as OrganizationUnitUseCases;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits\OrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits\ResolveOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits as OrganizationUnitUseCases;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits\OrganizationUnitService;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits\ResolveOrganizationUnitService;
 use Modules\OrganizationUnit\Presentation\Http\Requests\AssignUserToOrganizationUnitRequest;
 use Modules\OrganizationUnit\Presentation\Http\Requests\ListOrganizationUnitRequest;
 use Modules\OrganizationUnit\Presentation\Http\Requests\UpsertOrganizationUnitRequest;
@@ -17,11 +17,10 @@ use Modules\OrganizationUnit\Presentation\Http\Resources\OrganizationUnitResourc
 final class OrganizationUnitController extends Controller
 {
     public function __construct(
-        private readonly OrganizationUnitServiceInterface $units,
-        private readonly ResolveOrganizationUnitServiceInterface $resolveOrganizationUnit,
-        private readonly OrganizationUnitUseCases\AssignUserToOrganizationUnitServiceInterface $assignUserToUnit,
-    ) {
-    }
+        private readonly OrganizationUnitService $units,
+        private readonly ResolveOrganizationUnitService $resolveOrganizationUnit,
+        private readonly OrganizationUnitUseCases\AssignUserToOrganizationUnitService $assignUserToUnit,
+    ) {}
 
     public function resolve(): JsonResponse|OrganizationUnitResource
     {
@@ -114,7 +113,6 @@ final class OrganizationUnitController extends Controller
 
         return response()->json(['data' => $result->valueOrFail()], 201);
     }
-
 
     public function destroy(int|string $organizationUnit): JsonResponse
     {

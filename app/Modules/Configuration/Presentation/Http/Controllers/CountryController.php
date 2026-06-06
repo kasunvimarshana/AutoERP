@@ -6,11 +6,11 @@ namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\Contracts\UseCases\Countries\CreateCountryServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Countries\DeleteCountryServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Countries\GetCountryServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Countries\ListCountriesServiceInterface;
-use Modules\Configuration\Application\Contracts\UseCases\Countries\UpdateCountryServiceInterface;
+use Modules\Configuration\Application\UseCases\Countries\CreateCountryService;
+use Modules\Configuration\Application\UseCases\Countries\DeleteCountryService;
+use Modules\Configuration\Application\UseCases\Countries\GetCountryService;
+use Modules\Configuration\Application\UseCases\Countries\ListCountriesService;
+use Modules\Configuration\Application\UseCases\Countries\UpdateCountryService;
 use Modules\Configuration\Presentation\Http\Requests\ListCountryRequest;
 use Modules\Configuration\Presentation\Http\Requests\UpsertCountryRequest;
 use Modules\Configuration\Presentation\Http\Resources\CountryResource;
@@ -19,13 +19,12 @@ use Modules\Core\Application\DTO\PagedResult;
 final class CountryController extends Controller
 {
     public function __construct(
-        private readonly ListCountriesServiceInterface $listCountries,
-        private readonly GetCountryServiceInterface $getCountry,
-        private readonly CreateCountryServiceInterface $createCountry,
-        private readonly UpdateCountryServiceInterface $updateCountry,
-        private readonly DeleteCountryServiceInterface $deleteCountry,
-    ) {
-    }
+        private readonly ListCountriesService $listCountries,
+        private readonly GetCountryService $getCountry,
+        private readonly CreateCountryService $createCountry,
+        private readonly UpdateCountryService $updateCountry,
+        private readonly DeleteCountryService $deleteCountry,
+    ) {}
 
     public function index(ListCountryRequest $request): JsonResponse
     {
