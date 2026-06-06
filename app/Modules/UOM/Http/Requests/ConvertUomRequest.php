@@ -23,7 +23,6 @@ final class ConvertUomRequest extends FormRequest
             'quantity' => ['required', 'numeric'],
             'from_uom_id' => ['required', 'integer', 'min:1', 'exists:unit_of_measures,id'],
             'to_uom_id' => ['required', 'integer', 'min:1', 'exists:unit_of_measures,id', 'different:from_uom_id'],
-            'item_id' => ['nullable', 'integer', 'min:1', 'exists:items,id'],
         ];
     }
 }

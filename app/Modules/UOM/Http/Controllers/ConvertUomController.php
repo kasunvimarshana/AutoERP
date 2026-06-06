@@ -35,9 +35,8 @@ final class ConvertUomController extends Controller
         $quantity = (float) $validated['quantity'];
         $fromUomId = (int) $validated['from_uom_id'];
         $toUomId = (int) $validated['to_uom_id'];
-        $itemId = isset($validated['item_id']) ? (int) $validated['item_id'] : null;
 
-        $factorResult = $this->conversionService->getConversionFactor($fromUomId, $toUomId, $tenantId, $itemId);
+        $factorResult = $this->conversionService->getConversionFactor($fromUomId, $toUomId, $tenantId);
         if ($factorResult->isFailure()) {
             $error = $factorResult->errorOrFail();
             $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
@@ -45,7 +44,7 @@ final class ConvertUomController extends Controller
             return response()->json(['message' => $error->message, 'code' => $error->code], $status);
         }
 
-        $result = $this->conversionService->convert($quantity, $fromUomId, $toUomId, $tenantId, $itemId);
+        $result = $this->conversionService->convert($quantity, $fromUomId, $toUomId, $tenantId);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -59,7 +58,6 @@ final class ConvertUomController extends Controller
                 'from_uom_id' => $fromUomId,
                 'to_uom_id' => $toUomId,
                 'quantity' => $quantity,
-                'item_id' => $itemId,
             ],
             'calculated' => [
                 'converted_quantity' => $result->valueOrFail(),

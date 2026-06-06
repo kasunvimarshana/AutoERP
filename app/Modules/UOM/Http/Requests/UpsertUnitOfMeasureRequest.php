@@ -34,11 +34,6 @@ final class UpsertUnitOfMeasureRequest extends FormRequest
             'decimal_precision' => ['nullable', 'integer', 'min:0', 'max:8'],
             'allow_fractional_quantity' => ['nullable', 'boolean'],
             'is_base' => ['nullable', 'boolean'],
-            'usable_for_purchase' => ['nullable', 'boolean'],
-            'usable_for_sales' => ['nullable', 'boolean'],
-            'usable_for_inventory' => ['nullable', 'boolean'],
-            'usable_for_service' => ['nullable', 'boolean'],
-            'usable_for_rental' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'description' => ['nullable', 'string', 'max:1000'],
         ];

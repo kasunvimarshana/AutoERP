@@ -25,9 +25,8 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): Result {
-        $factorResult = $this->getConversionFactor($fromUomId, $toUomId, $tenantId, $itemId);
+        $factorResult = $this->getConversionFactor($fromUomId, $toUomId, $tenantId);
 
         if ($factorResult->isFailure()) {
             return $factorResult;
@@ -42,37 +41,27 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): bool {
-        return $this->getConversionFactor($fromUomId, $toUomId, $tenantId, $itemId)->isSuccess();
+        return $this->getConversionFactor($fromUomId, $toUomId, $tenantId)->isSuccess();
     }
 
     public function getConversionFactor(
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): Result {
         // Trivial: same unit
         if ($fromUomId == $toUomId) {
             return Result::success(1.0);
         }
 
-        // 1. Item-specific conversion (priority)
-        if ($itemId !== null) {
-            $result = $this->resolveDirectFactor($fromUomId, $toUomId, $tenantId, $itemId);
-            if ($result !== null) {
-                return Result::success($result);
-            }
-        }
-
-        // 2. Global (tenant-wide) conversion
-        $result = $this->resolveDirectFactor($fromUomId, $toUomId, $tenantId, null);
+        // 1. Tenant-wide direct conversion
+        $result = $this->resolveDirectFactor($fromUomId, $toUomId, $tenantId);
         if ($result !== null) {
             return Result::success($result);
         }
 
-        // 3. Mediate through the base unit of this type
+        // 2. Mediate through the base unit of this type
         return $this->resolveViaBaseUnit($fromUomId, $toUomId, $tenantId);
     }
 
@@ -132,17 +121,16 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId,
     ): ?float {
         // Forward
-        $record = $this->conversionRepository->findConversionBetween($fromUomId, $toUomId, $tenantId, $itemId);
+        $record = $this->conversionRepository->findConversionBetween($fromUomId, $toUomId, $tenantId);
 
         if ($record !== null && $record->get('is_active')) {
             return (float) $record->get('factor');
         }
 
         // Bidirectional reverse
-        $reverse = $this->conversionRepository->findConversionBetween($toUomId, $fromUomId, $tenantId, $itemId);
+        $reverse = $this->conversionRepository->findConversionBetween($toUomId, $fromUomId, $tenantId);
 
         if ($reverse !== null && $reverse->get('is_active') && $reverse->get('is_bidirectional')) {
             $factor = (float) $reverse->get('factor');
@@ -189,12 +177,12 @@ final class UomConversionService implements UomConversionServiceInterface
         // from -> base
         $fromToBase = ($fromUomId == $baseId)
             ? 1.0
-            : $this->resolveDirectFactor($fromUomId, $baseId, $tenantId, null);
+            : $this->resolveDirectFactor($fromUomId, $baseId, $tenantId);
 
         // base -> target
         $baseToTarget = ($toUomId == $baseId)
             ? 1.0
-            : $this->resolveDirectFactor($baseId, $toUomId, $tenantId, null);
+            : $this->resolveDirectFactor($baseId, $toUomId, $tenantId);
 
         if ($fromToBase === null || $baseToTarget === null) {
             return Result::failure(new Error(

@@ -36,7 +36,6 @@ final class CreateUomConversionService
 
             $fromUomId = (int) ($payload['from_uom_id'] ?? 0);
             $toUomId = (int) ($payload['to_uom_id'] ?? 0);
-            $itemId = isset($payload['item_id']) ? (int) $payload['item_id'] : null;
             $factor = (float) ($payload['factor'] ?? 0);
 
             if ($fromUomId === $toUomId) {
@@ -70,7 +69,7 @@ final class CreateUomConversionService
                 ));
             }
 
-            if ($this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId, $itemId) !== null) {
+            if ($this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId) !== null) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }
 

@@ -11,8 +11,7 @@ interface UomConversionServiceInterface
 {
     /**
      * Convert a quantity from one unit to another within a tenant scope.
-     * Resolves item-specific conversions first, then falls back to global
-     * tenant conversions, then attempts base-unit mediation.
+     * Resolves direct tenant conversions, then attempts base-unit mediation.
      *
      * @return Result<float>
      */
@@ -21,7 +20,6 @@ interface UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): Result;
 
     /**
@@ -31,7 +29,6 @@ interface UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): bool;
 
     /**
@@ -43,7 +40,6 @@ interface UomConversionServiceInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId = null,
     ): Result;
 
     /**

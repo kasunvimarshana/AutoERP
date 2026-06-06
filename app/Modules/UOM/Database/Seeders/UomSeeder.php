@@ -29,17 +29,17 @@ final class UomSeeder extends Seeder
     private function seedUnits(int $tenantId, ?int $organizationUnitId): void
     {
         $units = [
-            ['code' => 'PCS', 'name' => 'Each', 'symbol' => 'pcs', 'type' => 'UNIT', 'is_base' => true, 'precision' => 0, 'fractional' => false, 'inventory' => true, 'rental' => false],
-            ['code' => 'BOX', 'name' => 'Box', 'symbol' => 'box', 'type' => 'UNIT', 'is_base' => false, 'precision' => 0, 'fractional' => false, 'inventory' => true, 'rental' => false],
-            ['code' => 'PACK', 'name' => 'Pack', 'symbol' => 'pack', 'type' => 'UNIT', 'is_base' => false, 'precision' => 0, 'fractional' => false, 'inventory' => true, 'rental' => false],
-            ['code' => 'KG', 'name' => 'Kilogram', 'symbol' => 'kg', 'type' => 'MASS', 'is_base' => true, 'precision' => 3, 'fractional' => true, 'inventory' => true, 'rental' => false],
-            ['code' => 'G', 'name' => 'Gram', 'symbol' => 'g', 'type' => 'MASS', 'is_base' => false, 'precision' => 3, 'fractional' => true, 'inventory' => true, 'rental' => false],
-            ['code' => 'L', 'name' => 'Liter', 'symbol' => 'l', 'type' => 'VOLUME', 'is_base' => true, 'precision' => 3, 'fractional' => true, 'inventory' => true, 'rental' => false],
-            ['code' => 'ML', 'name' => 'Milliliter', 'symbol' => 'ml', 'type' => 'VOLUME', 'is_base' => false, 'precision' => 3, 'fractional' => true, 'inventory' => true, 'rental' => false],
-            ['code' => 'HOUR', 'name' => 'Hour', 'symbol' => 'hr', 'type' => 'TIME', 'is_base' => true, 'precision' => 2, 'fractional' => true, 'inventory' => false, 'rental' => true],
-            ['code' => 'DAY', 'name' => 'Day', 'symbol' => 'day', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true, 'inventory' => false, 'rental' => true],
-            ['code' => 'MONTH', 'name' => 'Month', 'symbol' => 'mo', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true, 'inventory' => false, 'rental' => true],
-            ['code' => 'KM', 'name' => 'Kilometer', 'symbol' => 'km', 'type' => 'DISTANCE', 'is_base' => true, 'precision' => 2, 'fractional' => true, 'inventory' => false, 'rental' => true],
+            ['code' => 'PCS', 'name' => 'Each', 'symbol' => 'pcs', 'type' => 'UNIT', 'is_base' => true, 'precision' => 0, 'fractional' => false],
+            ['code' => 'BOX', 'name' => 'Box', 'symbol' => 'box', 'type' => 'UNIT', 'is_base' => false, 'precision' => 0, 'fractional' => false],
+            ['code' => 'PACK', 'name' => 'Pack', 'symbol' => 'pack', 'type' => 'UNIT', 'is_base' => false, 'precision' => 0, 'fractional' => false],
+            ['code' => 'KG', 'name' => 'Kilogram', 'symbol' => 'kg', 'type' => 'MASS', 'is_base' => true, 'precision' => 3, 'fractional' => true],
+            ['code' => 'G', 'name' => 'Gram', 'symbol' => 'g', 'type' => 'MASS', 'is_base' => false, 'precision' => 3, 'fractional' => true],
+            ['code' => 'L', 'name' => 'Liter', 'symbol' => 'l', 'type' => 'VOLUME', 'is_base' => true, 'precision' => 3, 'fractional' => true],
+            ['code' => 'ML', 'name' => 'Milliliter', 'symbol' => 'ml', 'type' => 'VOLUME', 'is_base' => false, 'precision' => 3, 'fractional' => true],
+            ['code' => 'HOUR', 'name' => 'Hour', 'symbol' => 'hr', 'type' => 'TIME', 'is_base' => true, 'precision' => 2, 'fractional' => true],
+            ['code' => 'DAY', 'name' => 'Day', 'symbol' => 'day', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true],
+            ['code' => 'MONTH', 'name' => 'Month', 'symbol' => 'mo', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true],
+            ['code' => 'KM', 'name' => 'Kilometer', 'symbol' => 'km', 'type' => 'DISTANCE', 'is_base' => true, 'precision' => 2, 'fractional' => true],
         ];
 
         foreach ($units as $unit) {
@@ -61,11 +61,6 @@ final class UomSeeder extends Seeder
                     'row_version' => 1,
                     'symbol' => $unit['symbol'],
                     'type' => $unit['type'],
-                    'usable_for_inventory' => $unit['inventory'],
-                    'usable_for_purchase' => true,
-                    'usable_for_rental' => $unit['rental'],
-                    'usable_for_sales' => true,
-                    'usable_for_service' => true,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],
@@ -98,14 +93,11 @@ final class UomSeeder extends Seeder
             DB::table('uom_conversions')->updateOrInsert(
                 [
                     'tenant_id' => $tenantId,
-                    'item_id' => null,
                     'from_uom_id' => $from->id,
                     'to_uom_id' => $to->id,
                 ],
                 [
                     'category' => $from->type,
-                    'effective_from' => null,
-                    'effective_to' => null,
                     'factor' => $conversion['factor'],
                     'is_active' => true,
                     'is_bidirectional' => true,

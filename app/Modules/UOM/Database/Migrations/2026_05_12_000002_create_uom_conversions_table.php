@@ -21,7 +21,6 @@ return new class extends Migration
             $table->foreignId('to_uom_id')->constrained('unit_of_measures');
             $table->decimal('factor', 20, 8);
             $table->string('category')->nullable();
-            $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->boolean('is_bidirectional')->default(true);
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
@@ -30,10 +29,10 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(
-                ['tenant_id', 'item_id', 'from_uom_id', 'to_uom_id'],
-                'uom_conversions_item_from_to_uk'
+                ['tenant_id', 'from_uom_id', 'to_uom_id'],
+                'uom_conversions_from_to_uk'
             );
-            $table->index(['tenant_id', 'item_id', 'is_active'], 'uom_conversions_item_active_idx');
+            $table->index(['tenant_id', 'is_active'], 'uom_conversions_active_idx');
         });
     }
 

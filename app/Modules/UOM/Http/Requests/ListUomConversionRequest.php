@@ -27,7 +27,6 @@ final class ListUomConversionRequest extends FormRequest
             'to_uom_id' => ['nullable', 'integer', 'min:1', 'exists:unit_of_measures,id'],
             'search' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:255'],
-            'item_id' => ['nullable', 'integer', 'min:1', 'exists:items,id'],
             'is_bidirectional' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ];

@@ -31,20 +31,12 @@ final class EloquentUomConversionRepository extends EloquentRepository implement
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId,
     ): ?DataRecord {
-        $query = $this->query()
+        $model = $this->query()
             ->where('from_uom_id', $fromUomId)
             ->where('to_uom_id', $toUomId)
-            ->where('tenant_id', $tenantId);
-
-        if ($itemId === null) {
-            $query->whereNull('item_id');
-        } else {
-            $query->where('item_id', $itemId);
-        }
-
-        $model = $query->first();
+            ->where('tenant_id', $tenantId)
+            ->first();
 
         return $model instanceof Model ? $this->toRecord($model) : null;
     }

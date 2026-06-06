@@ -40,9 +40,6 @@ final class UpdateUomConversionService
             $payload['organization_unit_id'] ??= $current->get('organization_unit_id') ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
             $fromUomId = (int) ($payload['from_uom_id'] ?? $current->get('from_uom_id'));
             $toUomId = (int) ($payload['to_uom_id'] ?? $current->get('to_uom_id'));
-            $itemId = array_key_exists('item_id', $payload)
-                ? ($payload['item_id'] === null ? null : (int) $payload['item_id'])
-                : ($current->get('item_id') === null ? null : (int) $current->get('item_id'));
             $factor = (float) ($payload['factor'] ?? $current->get('factor'));
 
             if ($fromUomId === $toUomId) {
@@ -76,7 +73,7 @@ final class UpdateUomConversionService
                 ));
             }
 
-            $existing = $this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId, $itemId);
+            $existing = $this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId);
             if ($existing !== null && (int) $existing->get('id') !== (int) $id) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }

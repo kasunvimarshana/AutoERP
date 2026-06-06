@@ -25,11 +25,6 @@ final class UnitOfMeasureModel extends CoreModel
             'decimal_precision' => 'integer',
             'allow_fractional_quantity' => 'boolean',
             'is_base' => 'boolean',
-            'usable_for_purchase' => 'boolean',
-            'usable_for_sales' => 'boolean',
-            'usable_for_inventory' => 'boolean',
-            'usable_for_service' => 'boolean',
-            'usable_for_rental' => 'boolean',
             'is_active' => 'boolean',
         ]);
     }

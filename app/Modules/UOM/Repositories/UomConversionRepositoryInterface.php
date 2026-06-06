@@ -15,7 +15,6 @@ interface UomConversionRepositoryInterface extends RepositoryPortInterface
         int|string $fromUomId,
         int|string $toUomId,
         int $tenantId,
-        ?int $itemId,
     ): ?DataRecord;
 
     /** @return list<DataRecord> */
