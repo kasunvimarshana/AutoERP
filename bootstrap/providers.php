@@ -8,6 +8,7 @@ use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Extension\Providers\ExtensionServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
+use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
@@ -28,6 +29,7 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
+    ItemServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     ExtensionServiceProvider::class,
