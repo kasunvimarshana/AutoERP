@@ -30,24 +30,7 @@ final class CoreBootstrapSeeder extends Seeder
         'role',
         'permission',
         'audit',
-        'sequence',
-        'document',
-        'finance',
-        'inventory',
-        'payment',
-        'item',
-        'uom',
-        'pricing',
-        'warehouse',
-        'customer',
-        'supplier',
-        'hr',
-        'vehicle',
-        'purchase',
-        'sales',
-        'vehicle_service',
-        'vehicle_rental',
-        'voucher',
+        'sequence'
     ];
 
     /**
