@@ -22,6 +22,9 @@ final class ListPaymentRequest extends FormRequest
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'direction' => ['sometimes', Rule::in(['inbound', 'outbound'])],
             'status' => ['sometimes', 'string', 'max:50'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'party_type' => ['sometimes', Rule::in(['customer', 'supplier'])],
+            'party_id' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 }

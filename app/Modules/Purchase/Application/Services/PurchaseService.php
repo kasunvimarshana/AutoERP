@@ -635,6 +635,7 @@ final class PurchaseService
                 ->map(fn (object $row): array => (array) $row)
                 ->all(),
             'receivable-po-lines' => $this->receivablePoLineLookup($filters, $limit),
+            'uninvoiced-po-lines' => $this->uninvoicedPoLineLookup($filters, $limit),
             'received-grns' => DB::table('grn_headers')
                 ->leftJoin('suppliers', 'suppliers.id', '=', 'grn_headers.supplier_id')
                 ->select(['grn_headers.id', 'grn_headers.grn_number as code', 'suppliers.supplier_name as name', 'grn_headers.supplier_id', 'grn_headers.warehouse_id', 'grn_headers.status'])
@@ -648,6 +649,8 @@ final class PurchaseService
                 ->get()
                 ->map(fn (object $row): array => (array) $row)
                 ->all(),
+            'returnable-grn-lines' => $this->returnableGrnLineLookup($filters, $limit),
+            'uninvoiced-grn-lines' => $this->uninvoicedGrnLineLookup($filters, $limit),
             default => throw ValidationException::withMessages(['type' => ['Unsupported lookup type.']]),
         };
     }
@@ -1386,5 +1389,100 @@ final class PurchaseService
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function uninvoicedPoLineLookup(array $filters, int $limit): array
+    {
+        if (empty($filters['purchase_order_id'])) {
+            return [];
+        }
+
+        return $this->orderLines((int) $filters['purchase_order_id'])
+            ->filter(fn (object $line): bool => round((float) $line->ordered_qty - (float) $line->returned_qty - (float) $line->invoiced_qty, 4) > 0)
+            ->take($limit)
+            ->map(fn (object $line): array => $this->sourceLinePayload(
+                $line,
+                (float) $line->ordered_qty,
+                (float) $line->invoiced_qty,
+                round((float) $line->ordered_qty - (float) $line->returned_qty - (float) $line->invoiced_qty, 4)
+            ))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function returnableGrnLineLookup(array $filters, int $limit): array
+    {
+        if (empty($filters['grn_id'])) {
+            return [];
+        }
+
+        return $this->grnLines((int) $filters['grn_id'])
+            ->filter(fn (object $line): bool => round((float) $line->accepted_qty - $this->returnCommittedQuantity((int) $line->id), 4) > 0)
+            ->take($limit)
+            ->map(fn (object $line): array => [
+                ...$this->sourceLinePayload(
+                    $line,
+                    (float) $line->accepted_qty,
+                    $this->returnCommittedQuantity((int) $line->id),
+                    round((float) $line->accepted_qty - $this->returnCommittedQuantity((int) $line->id), 4)
+                ),
+                'received_qty' => $this->money($line->accepted_qty),
+                'returned_qty' => $this->money($this->returnCommittedQuantity((int) $line->id)),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function uninvoicedGrnLineLookup(array $filters, int $limit): array
+    {
+        if (empty($filters['grn_id'])) {
+            return [];
+        }
+
+        return $this->grnLines((int) $filters['grn_id'])
+            ->filter(fn (object $line): bool => round((float) $line->accepted_qty - (float) $line->returned_qty - (float) $line->invoiced_qty, 4) > 0)
+            ->take($limit)
+            ->map(fn (object $line): array => $this->sourceLinePayload(
+                $line,
+                (float) $line->accepted_qty,
+                (float) $line->invoiced_qty,
+                round((float) $line->accepted_qty - (float) $line->returned_qty - (float) $line->invoiced_qty, 4)
+            ))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sourceLinePayload(object $line, float $sourceQty, float $usedQty, float $remainingQty): array
+    {
+        return [
+            'id' => (int) $line->id,
+            'item_id' => (int) $line->item_id,
+            'item_code' => $line->item_code,
+            'name' => $line->item_name,
+            'uom_id' => (int) $line->uom_id,
+            'uom_code' => $line->uom_code,
+            'source_qty' => $this->money($sourceQty),
+            'used_qty' => $this->money($usedQty),
+            'remaining_qty' => $this->money($remainingQty),
+            'unit_price' => $this->money($line->unit_price),
+            'discount_amount' => $this->money($line->discount_amount ?? 0),
+            'tax_amount' => $this->money($line->tax_amount ?? 0),
+            'warehouse_id' => property_exists($line, 'warehouse_id') ? $line->warehouse_id : null,
+        ];
     }
 }

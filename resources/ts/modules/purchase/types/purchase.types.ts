@@ -17,6 +17,12 @@ export type PurchaseLineInput = {
     uomId: number;
     warehouseId?: number;
     locationId?: number;
+    itemCode?: string | null;
+    itemName?: string | null;
+    uomCode?: string | null;
+    sourceQty?: string;
+    usedQty?: string;
+    remainingQty?: string;
 };
 
 export type PurchaseHeaderTotalsInput = {
@@ -164,5 +170,5 @@ export type PurchaseLine = {
 
 export type InvoiceLink = { balance_total: string; grand_total: string; id: number; invoice_id: number; invoice_number: string; linked_amount: string; status: string };
 export type PurchasePage<T> = { items: T[]; meta: { currentPage: number; lastPage: number; perPage: number; total: number } };
-export type PurchaseLookup = { base_uom_id?: number; code?: string | null; cost_price?: string; id: number; name: string; outstanding_balance?: string; payment_terms_days?: number; purchase_uom_id?: number | null; symbol?: string | null; type?: string };
+export type PurchaseLookup = { base_uom_id?: number; code?: string | null; cost_price?: string; discount_amount?: string; grand_total?: string; id: number; item_code?: string | null; item_id?: number; name: string; outstanding_balance?: string; payment_terms_days?: number; purchase_uom_id?: number | null; remaining_qty?: string; source_qty?: string; supplier_id?: number; symbol?: string | null; tax_amount?: string; type?: string; unit_price?: string; uom_code?: string | null; uom_id?: number; used_qty?: string; warehouse_id?: number | null };
 export type PurchaseDashboard = { open_purchase_orders: number; pending_grns: number; posted_grns: number; purchase_order_total: string; supplier_outstanding: string; unpaid_purchase_invoices: { amount: string; count: number } };

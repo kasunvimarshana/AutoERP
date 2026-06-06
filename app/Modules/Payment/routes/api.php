@@ -14,6 +14,7 @@ Route::prefix('api/payment')
     ->middleware(['api', 'auth:'.$protectedGuard, $currentUserMiddleware, $currentTenantMiddleware, $currentOrganizationUnitMiddleware])
     ->name('payment.')
     ->group(function (): void {
+        Route::get('lookups/{type}', [PaymentController::class, 'lookup'])->name('lookups');
         Route::post('advances/{advance}/allocations', [PaymentController::class, 'allocateAdvance'])->name('advances.allocate');
         Route::post('payments/{payment}/allocations', [PaymentController::class, 'allocate'])->name('payments.allocate');
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show', 'destroy']);

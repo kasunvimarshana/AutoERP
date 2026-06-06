@@ -50,6 +50,73 @@ final class PaymentService
     }
 
     /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function lookup(string $type, array $filters = []): array
+    {
+        $tenantId = $this->support->tenantId();
+        $search = trim((string) ($filters['search'] ?? ''));
+        $limit = min((int) ($filters['limit'] ?? 50), 100);
+        $direction = match ($type) {
+            'payable-invoices' => 'payable',
+            'receivable-invoices' => 'receivable',
+            'outstanding-invoices' => ($filters['direction'] ?? null) === 'outbound' ? 'payable' : 'receivable',
+            default => throw ValidationException::withMessages(['type' => ['Unsupported lookup type.']]),
+        };
+
+        return DB::table('invoices')
+            ->select([
+                'id',
+                'invoice_number as code',
+                'invoice_number as name',
+                'document_type',
+                'ledger_direction',
+                'customer_id',
+                'supplier_id',
+                'invoice_date',
+                'due_date',
+                'status',
+                'grand_total',
+                'settled_total',
+                'balance_total',
+            ])
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->where('ledger_direction', $direction)
+            ->where('balance_total', '>', 0)
+            ->whereNotIn('status', ['draft', 'cancelled'])
+            ->when(isset($filters['party_type'], $filters['party_id']), function (Builder $query) use ($filters): Builder {
+                $partyColumn = $filters['party_type'] === 'supplier' ? 'supplier_id' : 'customer_id';
+
+                return $query->where($partyColumn, (int) $filters['party_id']);
+            })
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q
+                ->where('invoice_number', 'like', "%$search%")
+                ->orWhere('external_reference_number', 'like', "%$search%")))
+            ->orderBy('due_date')
+            ->orderBy('invoice_date')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $row): array => [
+                'id' => (int) $row->id,
+                'code' => $row->code,
+                'name' => $row->name,
+                'document_type' => $row->document_type,
+                'ledger_direction' => $row->ledger_direction,
+                'party_type' => $row->ledger_direction === 'payable' ? 'supplier' : 'customer',
+                'party_id' => (int) ($row->ledger_direction === 'payable' ? $row->supplier_id : $row->customer_id),
+                'invoice_date' => $row->invoice_date,
+                'due_date' => $row->due_date,
+                'status' => $row->status,
+                'grand_total' => $this->money($row->grand_total),
+                'settled_total' => $this->money($row->settled_total),
+                'balance_total' => $this->money($row->balance_total),
+            ])
+            ->all();
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function create(array $payload): object
@@ -197,5 +264,10 @@ final class PaymentService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function money(mixed $value): string
+    {
+        return number_format((float) $value, 4, '.', '');
     }
 }

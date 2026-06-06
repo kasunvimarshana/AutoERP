@@ -22,6 +22,11 @@ final class PaymentController extends Controller
         return PaymentResource::collection($this->payments->paginate($request->validated()));
     }
 
+    public function lookup(ListPaymentRequest $request, string $type): JsonResponse
+    {
+        return response()->json(['data' => $this->payments->lookup($type, $request->validated())]);
+    }
+
     public function show(int $payment): PaymentResource
     {
         return new PaymentResource($this->payments->find($payment));

@@ -1,6 +1,6 @@
 import type { ApiCollectionResponse, ApiResponse } from '../../../services/api/apiResponse';
 import { httpClient } from '../../../services/api/httpClient';
-import type { Payment, PaymentDirection, PaymentInput, PaymentPage } from '../types/payment.types';
+import type { OutstandingInvoiceLookup, Payment, PaymentDirection, PaymentInput, PaymentPage } from '../types/payment.types';
 
 type PaymentRecord = { allocated_amount: string; amount: string; direction: PaymentDirection; id: number; party_id: number; party_type: 'customer' | 'supplier'; payment_date: string; payment_method_id: number; payment_number: string; status: string; unallocated_amount: string };
 function mapPayment(record: PaymentRecord): Payment { return { allocatedAmount: record.allocated_amount, amount: record.amount, direction: record.direction, id: record.id, partyId: record.party_id, partyType: record.party_type, paymentDate: record.payment_date, paymentMethodId: record.payment_method_id, paymentNumber: record.payment_number, status: record.status, unallocatedAmount: record.unallocated_amount }; }
@@ -9,5 +9,6 @@ function payload(input: PaymentInput) { return { allocations: input.allocations?
 export const paymentApi = {
     async create(input: PaymentInput): Promise<Payment> { const response = await httpClient<ApiResponse<PaymentRecord>>('/api/payment/payments', { body: payload(input), method: 'POST' }); return mapPayment(response.data); },
     async get(id: number): Promise<Payment> { const response = await httpClient<ApiResponse<PaymentRecord>>(`/api/payment/payments/${id}`); return mapPayment(response.data); },
+    async lookup(type: string, query: { direction?: PaymentDirection; partyId?: number; partyType?: 'customer' | 'supplier'; search?: string } = {}): Promise<OutstandingInvoiceLookup[]> { const response = await httpClient<ApiResponse<OutstandingInvoiceLookup[]>>(`/api/payment/lookups/${type}`, { query: { direction: query.direction, party_id: query.partyId, party_type: query.partyType, search: query.search } }); return response.data; },
     async list(query: { direction?: PaymentDirection; page: number; perPage: number; search?: string; status?: string }): Promise<PaymentPage> { const response = await httpClient<ApiCollectionResponse<PaymentRecord>>('/api/payment/payments', { query: { direction: query.direction, page: query.page, per_page: query.perPage, search: query.search, status: query.status } }); return { payments: response.data.map(mapPayment), meta: { currentPage: response.meta?.current_page ?? query.page, lastPage: response.meta?.last_page ?? 1, perPage: response.meta?.per_page ?? query.perPage, total: response.meta?.total ?? response.data.length } }; },
 };

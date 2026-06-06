@@ -299,6 +299,19 @@ final class VehicleServiceService
         $search = trim((string) ($filters['search'] ?? ''));
         $limit = min((int) ($filters['limit'] ?? 50), 100);
 
+        if ($type === 'completed-jobs') {
+            return $this->completedJobLookup($search, $limit);
+        }
+        if ($type === 'job-billable-lines') {
+            return $this->jobBillableLineLookup((int) ($filters['job_card_id'] ?? 0), $limit);
+        }
+        if ($type === 'job-inventory-lines') {
+            return $this->jobInventoryLineLookup((int) ($filters['job_card_id'] ?? 0), $limit);
+        }
+        if ($type === 'outstanding-service-invoices') {
+            return $this->outstandingServiceInvoiceLookup($filters, $search, $limit);
+        }
+
         $query = match ($type) {
             'customers' => DB::table('customers')->select(['id', 'customer_code as code', 'customer_name as name'])->where('tenant_id', $tenantId)->where('status', 'active')->whereNull('deleted_at'),
             'vehicles' => DB::table('vehicles')->select(['id', 'vehicle_code as code', 'registration_number as name', 'make', 'model'])->where('tenant_id', $tenantId)->where('status', 'active')->whereNull('deleted_at'),
@@ -635,7 +648,7 @@ final class VehicleServiceService
             'tax_amount' => (float) $line->tax_amount,
         ])->concat($this->laborLines($jobId)->map(fn (object $line): array => [
             'line_type' => 'labor',
-            'item_id' => (int) $line->item_id,
+            'item_id' => $line->item_id === null ? null : (int) $line->item_id,
             'uom_id' => (int) $line->uom_id,
             'description' => $line->description ?? $line->item_name,
             'quantity' => (float) $line->quantity,
@@ -762,6 +775,180 @@ final class VehicleServiceService
             ->where('vehicle_service_non_inventory_items.job_card_id', $jobId)
             ->orderBy('vehicle_service_non_inventory_items.id')
             ->get();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function completedJobLookup(string $search, int $limit): array
+    {
+        return DB::table('vehicle_service_job_cards')
+            ->leftJoin('customers', 'customers.id', '=', 'vehicle_service_job_cards.linked_customer_id')
+            ->leftJoin('vehicles', 'vehicles.id', '=', 'vehicle_service_job_cards.vehicle_id')
+            ->select([
+                'vehicle_service_job_cards.id',
+                'vehicle_service_job_cards.job_card_number as code',
+                'customers.customer_name as customer_name',
+                'vehicles.registration_number',
+                'vehicle_service_job_cards.grand_total',
+                'vehicle_service_job_cards.status',
+                'vehicle_service_job_cards.invoice_status',
+            ])
+            ->where('vehicle_service_job_cards.tenant_id', $this->support->tenantId())
+            ->whereNull('vehicle_service_job_cards.deleted_at')
+            ->where('vehicle_service_job_cards.status', 'completed')
+            ->where('vehicle_service_job_cards.invoice_status', 'pending')
+            ->whereNotExists(function (Builder $query): void {
+                $query->selectRaw('1')
+                    ->from('vehicle_service_job_invoice_links')
+                    ->whereColumn('vehicle_service_job_invoice_links.job_card_id', 'vehicle_service_job_cards.id')
+                    ->where('vehicle_service_job_invoice_links.tenant_id', $this->support->tenantId())
+                    ->where('vehicle_service_job_invoice_links.status', 'active')
+                    ->whereNull('vehicle_service_job_invoice_links.deleted_at');
+            })
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $nested): Builder => $nested
+                ->where('vehicle_service_job_cards.job_card_number', 'like', "%$search%")
+                ->orWhere('customers.customer_name', 'like', "%$search%")
+                ->orWhere('vehicles.registration_number', 'like', "%$search%")))
+            ->orderByDesc('vehicle_service_job_cards.completed_datetime')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $row): array => [
+                'id' => (int) $row->id,
+                'code' => $row->code,
+                'name' => trim(($row->customer_name ?? '').' '.($row->registration_number ? ' - '.$row->registration_number : '')),
+                'customer_name' => $row->customer_name,
+                'registration_number' => $row->registration_number,
+                'grand_total' => $this->money($row->grand_total),
+                'status' => $row->status,
+                'invoice_status' => $row->invoice_status,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function jobBillableLineLookup(int $jobCardId, int $limit): array
+    {
+        if ($jobCardId <= 0 || ! $this->jobCanGenerateInvoice($jobCardId)) {
+            return [];
+        }
+
+        return $this->allBillableLines($jobCardId)
+            ->take($limit)
+            ->map(fn (array $line): array => [
+                'line_type' => $line['line_type'],
+                'item_id' => $line['item_id'],
+                'uom_id' => $line['uom_id'],
+                'description' => $line['description'],
+                'quantity' => $this->money($line['quantity']),
+                'unit_price' => $this->money($line['unit_price']),
+                'discount_amount' => $this->money($line['discount_amount']),
+                'tax_amount' => $this->money($line['tax_amount']),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function jobInventoryLineLookup(int $jobCardId, int $limit): array
+    {
+        if ($jobCardId <= 0) {
+            return [];
+        }
+
+        return $this->partLines($jobCardId)
+            ->filter(fn (object $line): bool => (bool) $line->requires_stock_movement && round((float) $line->quantity - (float) $line->consumed_qty, 4) > 0)
+            ->take($limit)
+            ->map(fn (object $line): array => [
+                'id' => (int) $line->id,
+                'line_type' => 'inventory_item',
+                'item_id' => (int) $line->item_id,
+                'item_code' => $line->item_code,
+                'name' => $line->item_name,
+                'uom_id' => (int) $line->uom_id,
+                'uom_code' => $line->uom_code,
+                'warehouse_id' => $line->warehouse_id,
+                'source_qty' => $this->money($line->quantity),
+                'used_qty' => $this->money($line->consumed_qty),
+                'remaining_qty' => $this->money(round((float) $line->quantity - (float) $line->consumed_qty, 4)),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function outstandingServiceInvoiceLookup(array $filters, string $search, int $limit): array
+    {
+        return DB::table('vehicle_service_job_invoice_links')
+            ->join('invoices', 'invoices.id', '=', 'vehicle_service_job_invoice_links.invoice_id')
+            ->leftJoin('vehicle_service_job_cards', 'vehicle_service_job_cards.id', '=', 'vehicle_service_job_invoice_links.job_card_id')
+            ->select([
+                'invoices.id',
+                'invoices.invoice_number as code',
+                'invoices.invoice_number as name',
+                'vehicle_service_job_invoice_links.job_card_id',
+                'vehicle_service_job_cards.job_card_number',
+                'invoices.customer_id',
+                'invoices.invoice_date',
+                'invoices.due_date',
+                'invoices.grand_total',
+                'invoices.settled_total',
+                'invoices.balance_total',
+                'invoices.status',
+            ])
+            ->where('vehicle_service_job_invoice_links.tenant_id', $this->support->tenantId())
+            ->where('vehicle_service_job_invoice_links.status', 'active')
+            ->whereNull('vehicle_service_job_invoice_links.deleted_at')
+            ->where('invoices.balance_total', '>', 0)
+            ->when(isset($filters['job_card_id']), fn (Builder $query): Builder => $query->where('vehicle_service_job_invoice_links.job_card_id', (int) $filters['job_card_id']))
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $nested): Builder => $nested
+                ->where('invoices.invoice_number', 'like', "%$search%")
+                ->orWhere('vehicle_service_job_cards.job_card_number', 'like', "%$search%")))
+            ->orderBy('invoices.due_date')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $row): array => [
+                'id' => (int) $row->id,
+                'code' => $row->code,
+                'name' => $row->name,
+                'job_card_id' => (int) $row->job_card_id,
+                'job_card_number' => $row->job_card_number,
+                'party_type' => 'customer',
+                'party_id' => (int) $row->customer_id,
+                'invoice_date' => $row->invoice_date,
+                'due_date' => $row->due_date,
+                'grand_total' => $this->money($row->grand_total),
+                'settled_total' => $this->money($row->settled_total),
+                'balance_total' => $this->money($row->balance_total),
+                'status' => $row->status,
+            ])
+            ->all();
+    }
+
+    private function jobCanGenerateInvoice(int $jobCardId): bool
+    {
+        return DB::table('vehicle_service_job_cards')
+            ->where('tenant_id', $this->support->tenantId())
+            ->where('id', $jobCardId)
+            ->where('status', 'completed')
+            ->where('invoice_status', 'pending')
+            ->whereNull('deleted_at')
+            ->whereNotExists(function (Builder $query): void {
+                $query->selectRaw('1')
+                    ->from('vehicle_service_job_invoice_links')
+                    ->whereColumn('vehicle_service_job_invoice_links.job_card_id', 'vehicle_service_job_cards.id')
+                    ->where('vehicle_service_job_invoice_links.tenant_id', $this->support->tenantId())
+                    ->where('vehicle_service_job_invoice_links.status', 'active')
+                    ->whereNull('vehicle_service_job_invoice_links.deleted_at');
+            })
+            ->exists();
     }
 
     private function money(mixed $value): string

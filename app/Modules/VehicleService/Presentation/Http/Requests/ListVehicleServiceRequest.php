@@ -23,6 +23,8 @@ final class ListVehicleServiceRequest extends FormRequest
             'status' => ['sometimes', 'nullable', Rule::in(['open', 'in_progress', 'completed', 'invoiced', 'paid', 'cancelled'])],
             'is_active' => ['sometimes', 'boolean'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'job_card_id' => ['sometimes', 'integer', 'min:1'],
+            'invoice_id' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 }
