@@ -35,6 +35,8 @@ final class ItemValidationService
         ItemType::Service->value,
         ItemType::Labour->value,
         ItemType::NonStock->value,
+        ItemType::Combo->value,
+        ItemType::Package->value,
     ];
 
     private const BUNDLE_LINE_TYPES = [
@@ -57,7 +59,7 @@ final class ItemValidationService
         $this->assertCategoryIsUsable($data->tenantId, $data->organizationUnitId, $data->itemCategoryId);
         $this->assertBrandIsUsable($data->tenantId, $data->organizationUnitId, $data->itemBrandId);
         $this->assertUomIsUsable($data->tenantId, $data->organizationUnitId, $data->baseUomId);
-        $this->assertTypeRules($data->itemType, $data->isStockable, $data->bundles);
+        $this->assertTypeRules($data->itemType, $data->isStockable);
     }
 
     public function validateUpdate(Item $item, UpdateItemData $data): void
@@ -82,13 +84,35 @@ final class ItemValidationService
 
         $itemType = $data->itemType ?? $item->item_type;
         $isStockable = $data->isStockable ?? (bool) $item->is_stockable;
-        $this->assertTypeRules($itemType instanceof ItemType ? $itemType : ItemType::from((string) $itemType), $isStockable);
+        $this->assertTypeRules(
+            $itemType instanceof ItemType ? $itemType : ItemType::from((string) $itemType),
+            $isStockable,
+        );
     }
 
-    public function validateUnit(Item $item, ItemUnitData $data): void
+    public function validateUnit(Item $item, ItemUnitData $data, ?int $ignoreUnitId = null): void
     {
         $this->assertPositiveDecimal($data->conversionFactor, 'Item unit conversion factor must be greater than zero.');
         $this->assertUomIsUsable((int) $item->tenant_id, $item->organization_unit_id, $data->uomId);
+
+        $duplicate = $item->units()
+            ->where('uom_id', $data->uomId)
+            ->where('unit_role', $data->unitRole->value);
+        if ($ignoreUnitId !== null) {
+            $duplicate->whereKeyNot($ignoreUnitId);
+        }
+        if ($duplicate->exists()) {
+            throw new InvalidArgumentException('This UOM is already assigned for the selected item unit role.');
+        }
+
+        if ($data->unitRole->value === 'base') {
+            if ($item->base_uom_id === null || (int) $item->base_uom_id !== $data->uomId) {
+                throw new InvalidArgumentException('Base item unit must match the item base UOM.');
+            }
+            if ($this->math->compare($data->conversionFactor, '1') !== 0) {
+                throw new InvalidArgumentException('Base item unit conversion factor must be 1.');
+            }
+        }
     }
 
     public function validateVariant(Item $item, ItemVariantData $data, ?int $ignoreVariantId = null): void
@@ -126,7 +150,7 @@ final class ItemValidationService
 
         $childType = $child->item_type instanceof ItemType ? $child->item_type->value : (string) $child->item_type;
         if (! in_array($childType, self::BUNDLE_CHILD_TYPES, true)) {
-            throw new InvalidArgumentException('Item bundle child must be stock, service, labour, or non-stock.');
+            throw new InvalidArgumentException('Item bundle child type is not supported.');
         }
 
         if ($data->childVariantId !== null) {
@@ -164,15 +188,12 @@ final class ItemValidationService
         }
     }
 
-    private function assertTypeRules(ItemType $itemType, bool $isStockable, array $bundles = []): void
+    private function assertTypeRules(ItemType $itemType, bool $isStockable): void
     {
         if (in_array($itemType, [ItemType::Service, ItemType::Labour], true) && $isStockable) {
             throw new InvalidArgumentException('Service and labour items cannot be stockable.');
         }
 
-        if (in_array($itemType, [ItemType::Combo, ItemType::Package], true) && $bundles === []) {
-            throw new InvalidArgumentException('Combo and package items require bundle child lines.');
-        }
     }
 
     private function assertCodeIsUnique(int $tenantId, string $code, ?int $ignoreItemId = null): void

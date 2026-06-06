@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Services;
 
 use Modules\Item\DTOs\UpdateItemData;
+use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Validators\ItemValidationService;
 
@@ -35,12 +36,30 @@ final class ItemUpdateService
             'is_active' => $data->isActive,
             'metadata' => $data->metadata,
         ] as $key => $value) {
-            if ($value !== null) {
+            if (in_array($key, $data->provided, true)) {
                 $attributes[$key] = $value;
             }
         }
 
+        $resolvedType = $attributes['item_type'] ?? $item->item_type;
+        $resolvedType = $resolvedType instanceof ItemType
+            ? $resolvedType
+            : ItemType::from((string) $resolvedType);
+        if (in_array($resolvedType, [ItemType::Combo, ItemType::Package], true)) {
+            $attributes['is_combo'] = true;
+        } elseif (array_key_exists('item_type', $attributes) && ! in_array('is_combo', $data->provided, true)) {
+            $attributes['is_combo'] = false;
+        }
+
         $item->fill($attributes);
+        $item->save();
+
+        return $item->refresh();
+    }
+
+    public function setActive(Item $item, bool $isActive): Item
+    {
+        $item->is_active = $isActive;
         $item->save();
 
         return $item->refresh();

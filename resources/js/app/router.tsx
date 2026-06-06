@@ -15,9 +15,10 @@ const UomConvertTool = lazy(() => import('@/modules/uom/UomConvertTool'));
 const SupplierListPage = lazy(() => import('@/modules/supplier/pages/SupplierListPage'));
 const SupplierFormPage = lazy(() => import('@/modules/supplier/pages/SupplierFormPage'));
 const SupplierDetailPage = lazy(() => import('@/modules/supplier/pages/SupplierDetailPage'));
-const ItemListPage = lazy(() => import('@/modules/item/pages/ItemListPage'));
-const ItemFormPage = lazy(() => import('@/modules/item/pages/ItemFormPage'));
-const ItemDetailPage = lazy(() => import('@/modules/item/pages/ItemDetailPage'));
+const ItemListPage = lazy(() => import('@/modules/item/ItemListPage'));
+const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
+const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
+const ItemDetailPage = lazy(() => import('@/modules/item/ItemDetailPage'));
 const InventoryPage = lazy(() => import('@/modules/inventory/pages/InventoryPage'));
 const PurchaseOrderListPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderListPage'));
 const PurchaseOrderFormPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderFormPage'));
@@ -52,8 +53,8 @@ export function AppRouter() {
                     <Route path="/suppliers/:id/edit" element={<SupplierFormPage />} />
                     <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
                     <Route path="/items" element={<ItemListPage />} />
-                    <Route path="/items/create" element={<ItemFormPage />} />
-                    <Route path="/items/:id/edit" element={<ItemFormPage />} />
+                    <Route path="/items/create" element={<ItemCreatePage />} />
+                    <Route path="/items/:id/edit" element={<ItemEditPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/purchase/orders" element={<PurchaseOrderListPage />} />

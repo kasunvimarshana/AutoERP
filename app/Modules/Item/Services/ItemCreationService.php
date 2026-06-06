@@ -6,10 +6,8 @@ namespace Modules\Item\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Item\DTOs\CreateItemData;
-use Modules\Item\DTOs\ItemCodeData;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
-use Modules\Item\Models\ItemCode;
 use Modules\Item\Validators\ItemValidationService;
 
 final class ItemCreationService
@@ -20,6 +18,7 @@ final class ItemCreationService
         private readonly ItemVariantService $variants,
         private readonly ItemBundleService $bundles,
         private readonly ItemPriceService $prices,
+        private readonly ItemCodeService $codes,
         private readonly ItemUsageRuleService $usageRules,
     ) {}
 
@@ -44,7 +43,8 @@ final class ItemCreationService
                 'costing_method' => $data->costingMethod,
                 'base_uom_id' => $data->baseUomId,
                 'is_stockable' => $data->isStockable,
-                'is_combo' => $data->isCombo ?? in_array($data->itemType, [ItemType::Combo, ItemType::Package], true),
+                'is_combo' => in_array($data->itemType, [ItemType::Combo, ItemType::Package], true)
+                    || $data->isCombo === true,
                 'is_active' => $data->isActive,
                 'metadata' => $data->metadata,
             ]);
@@ -66,7 +66,7 @@ final class ItemCreationService
             }
 
             foreach ($data->codes as $code) {
-                $this->createCode($item, $code);
+                $this->codes->create($item, $code);
             }
 
             foreach ($data->usageRules as $rule) {
@@ -74,30 +74,21 @@ final class ItemCreationService
             }
 
             return $item->refresh()->load([
-                'units',
+                'category',
+                'brand',
+                'baseUom',
+                'units.uom',
                 'variants',
-                'bundleLines',
-                'prices',
-                'codes',
+                'bundleLines.childItem.category',
+                'bundleLines.childItem.brand',
+                'bundleLines.childVariant',
+                'bundleLines.uom',
+                'prices.variant',
+                'prices.currency',
+                'prices.uom',
+                'codes.variant',
                 'usageRules',
             ]);
         });
-    }
-
-    private function createCode(Item $item, ItemCodeData $data): ItemCode
-    {
-        $this->validator->validateCode($item, $data);
-
-        return ItemCode::query()->create([
-            'tenant_id' => $item->tenant_id,
-            'organization_unit_id' => $item->organization_unit_id,
-            'item_id' => $item->getKey(),
-            'item_variant_id' => $data->itemVariantId,
-            'code_type' => $data->codeType,
-            'code' => $data->code,
-            'party_type' => $data->partyType,
-            'party_id' => $data->partyId,
-            'is_primary' => $data->isPrimary,
-        ]);
     }
 }

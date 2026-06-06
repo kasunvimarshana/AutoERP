@@ -12,6 +12,7 @@ final readonly class UpdateItemData
 {
     /**
      * @param  array<string, mixed>|null  $metadata
+     * @param  list<string>  $provided
      */
     public function __construct(
         public ?string $code = null,
@@ -30,5 +31,6 @@ final readonly class UpdateItemData
         public ?bool $isCombo = null,
         public ?bool $isActive = null,
         public ?array $metadata = null,
+        public array $provided = [],
     ) {}
 }

@@ -29,4 +29,33 @@ final class ItemVariantService
             'is_active' => $data->isActive,
         ]);
     }
+
+    public function update(Item $item, ItemVariant $variant, ItemVariantData $data): ItemVariant
+    {
+        $this->assertBelongsToItem($item, $variant);
+        $this->validator->validateVariant($item, $data, (int) $variant->getKey());
+        $variant->fill([
+            'code' => $data->code,
+            'sku' => $data->sku,
+            'barcode' => $data->barcode,
+            'name' => $data->name,
+            'attributes' => $data->attributes,
+            'is_active' => $data->isActive,
+        ])->save();
+
+        return $variant->refresh();
+    }
+
+    public function delete(Item $item, ItemVariant $variant): void
+    {
+        $this->assertBelongsToItem($item, $variant);
+        $variant->delete();
+    }
+
+    private function assertBelongsToItem(Item $item, ItemVariant $variant): void
+    {
+        if ((int) $variant->item_id !== (int) $item->getKey()) {
+            throw new \InvalidArgumentException('Item variant does not belong to the item.');
+        }
+    }
 }

@@ -55,6 +55,7 @@ final class UpdateItemRequest extends TenantScopedRequest
             isCombo: $this->has('is_combo') ? $this->boolean('is_combo') : null,
             isActive: $this->has('is_active') ? $this->boolean('is_active') : null,
             metadata: $this->has('metadata') ? $this->input('metadata') : null,
+            provided: array_keys($this->validated()),
         );
     }
 
