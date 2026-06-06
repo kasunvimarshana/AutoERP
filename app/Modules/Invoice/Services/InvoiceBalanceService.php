@@ -65,6 +65,21 @@ final class InvoiceBalanceService
         return $this->syncBalance($invoice, $balance);
     }
 
+    public function reversePayment(Invoice $invoice, string $amount): InvoiceBalance
+    {
+        $this->statuses->assertCanSettle($invoice);
+        $this->assertPositive($amount, 'Payment reversal amount');
+
+        $balance = $invoice->balance()->lockForUpdate()->firstOrFail();
+        if ($this->math->compare($amount, (string) $balance->paid_amount) > 0) {
+            throw new InvalidArgumentException('Payment reversal amount cannot exceed paid invoice amount.');
+        }
+
+        $balance->paid_amount = $this->math->sub((string) $balance->paid_amount, $amount);
+
+        return $this->syncBalance($invoice, $balance);
+    }
+
     public function allocateCredit(
         Invoice $invoice,
         string $creditSourceType,
@@ -145,6 +160,10 @@ final class InvoiceBalanceService
             $nextInvoiceStatus = InvoiceStatus::Paid;
         } elseif ($balanceStatus === InvoiceBalanceStatus::Partial) {
             $nextInvoiceStatus = InvoiceStatus::PartiallyPaid;
+        } elseif ($balanceStatus === InvoiceBalanceStatus::Unpaid
+            && in_array($invoiceStatus, [InvoiceStatus::Paid, InvoiceStatus::PartiallyPaid], true)
+        ) {
+            $nextInvoiceStatus = InvoiceStatus::Posted;
         }
 
         $invoice->forceFill([
