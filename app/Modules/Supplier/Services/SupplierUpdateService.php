@@ -23,6 +23,7 @@ final class SupplierUpdateService
         private readonly SupplierCategoryService $categories,
         private readonly SupplierDocumentService $documents,
         private readonly SupplierItemMappingService $itemMappings,
+        private readonly SupplierCreditProfileService $creditProfiles,
     ) {}
 
     public function update(Supplier $supplier, UpdateSupplierData $data): Supplier
@@ -52,7 +53,10 @@ final class SupplierUpdateService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
-                'credit_limit' => $data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null,
+                'credit_limit' => $data->creditProfile !== null
+                    ? $this->math->normalize($data->creditProfile->creditLimit)
+                    : ($data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null),
+                'opening_balance' => $data->openingBalance !== null ? $this->math->normalize($data->openingBalance) : null,
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
@@ -84,6 +88,9 @@ final class SupplierUpdateService
             if ($data->itemMappings !== null) {
                 $this->itemMappings->replace($supplier, $data->itemMappings);
             }
+            if ($data->creditProfile !== null) {
+                $this->creditProfiles->set($supplier, $data->creditProfile);
+            }
 
             return $supplier->refresh()->load([
                 'contacts',
@@ -92,7 +99,7 @@ final class SupplierUpdateService
                 'categories',
                 'documents',
                 'itemMappings',
-                'balance',
+                'creditProfile',
             ]);
         });
     }

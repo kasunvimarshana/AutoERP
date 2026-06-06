@@ -22,6 +22,9 @@ final class SupplierBankAccountService
         if ($data->isPrimary && $supplier->bankAccounts()->where('is_primary', true)->exists()) {
             throw new InvalidArgumentException('Supplier can have only one primary bank account.');
         }
+        if ($supplier->bankAccounts()->where('account_number', $data->accountNumber)->exists()) {
+            throw new InvalidArgumentException('Supplier bank account number already exists.');
+        }
         $this->validator->assertCurrencyActive($data->currencyId);
 
         return $supplier->bankAccounts()->create([

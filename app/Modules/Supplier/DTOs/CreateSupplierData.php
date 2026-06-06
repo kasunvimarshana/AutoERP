@@ -45,6 +45,7 @@ final readonly class CreateSupplierData
         public ?string $notes = null,
         public ?array $metadata = null,
         public ?int $createdBy = null,
+        public ?SupplierCreditProfileData $creditProfile = null,
         public array $contacts = [],
         public array $addresses = [],
         public array $bankAccounts = [],

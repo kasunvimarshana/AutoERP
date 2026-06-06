@@ -7,9 +7,9 @@ namespace Modules\Supplier\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
 
-final class SupplierBalance extends CoreModel
+final class SupplierCreditProfile extends CoreModel
 {
-    protected $table = 'supplier_balances';
+    protected $table = 'supplier_credit_profiles';
 
     protected $guarded = ['id'];
 
@@ -19,13 +19,12 @@ final class SupplierBalance extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
-            'opening_balance' => 'decimal:6',
-            'invoice_total' => 'decimal:6',
-            'payment_total' => 'decimal:6',
-            'credit_total' => 'decimal:6',
-            'debit_total' => 'decimal:6',
-            'outstanding_balance' => 'decimal:6',
-            'last_transaction_date' => 'date',
+            'credit_limit' => 'decimal:6',
+            'credit_period_days' => 'integer',
+            'warning_threshold_percent' => 'decimal:6',
+            'allow_over_credit' => 'boolean',
+            'allow_partial_payment' => 'boolean',
+            'is_active' => 'boolean',
         ]);
     }
 

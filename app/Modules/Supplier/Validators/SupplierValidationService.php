@@ -35,6 +35,9 @@ final class SupplierValidationService
         $this->assertOrganizationScope($data->tenantId, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
+        if ($data->creditProfile !== null) {
+            $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+        }
     }
 
     public function validateUpdate(Supplier $supplier, UpdateSupplierData $data): void
@@ -49,10 +52,16 @@ final class SupplierValidationService
         if ($data->creditLimit !== null) {
             $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');
         }
+        if ($data->openingBalance !== null) {
+            $this->assertNonNegative($data->openingBalance, 'Supplier opening balance cannot be negative.');
+        }
 
         $this->assertOrganizationScope((int) $supplier->tenant_id, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
+        if ($data->creditProfile !== null) {
+            $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+        }
     }
 
     public function assertSupplierScope(Supplier $supplier, int $tenantId, ?int $organizationUnitId): void

@@ -32,12 +32,11 @@ return new class extends Migration
             $table->string('svat_number')->nullable();
             $table->string('business_registration_number')->nullable();
             $table->decimal('credit_limit', 20, 6)->default('0.000000');
-            $table->decimal('outstanding_balance', 20, 6)->default('0.000000');
+            $table->decimal('opening_balance', 20, 6)->default('0.000000');
             $table->boolean('is_credit_allowed')->default(true);
             $table->boolean('is_advance_allowed')->default(true);
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
-            $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->timestamps();

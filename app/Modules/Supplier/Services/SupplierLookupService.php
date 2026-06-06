@@ -6,6 +6,7 @@ namespace Modules\Supplier\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Supplier\DTOs\SupplierResultData;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
 
@@ -45,6 +46,11 @@ final class SupplierLookupService
             ->get();
     }
 
+    public function preferredSuppliers(int $tenantId, int $itemId, ?int $organizationUnitId = null): Collection
+    {
+        return $this->preferredSuppliersForItem($tenantId, $itemId, $organizationUnitId);
+    }
+
     public function suppliersAllowedForCredit(int $tenantId, ?int $organizationUnitId = null): Collection
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
@@ -58,6 +64,38 @@ final class SupplierLookupService
         return $this->baseQuery($tenantId, $organizationUnitId)
             ->whereIn('status', [SupplierStatus::OnHold->value, SupplierStatus::Blacklisted->value])
             ->get();
+    }
+
+    public function suppliersOnHold(int $tenantId, ?int $organizationUnitId = null): Collection
+    {
+        return $this->baseQuery($tenantId, $organizationUnitId)
+            ->where('status', SupplierStatus::OnHold)
+            ->get();
+    }
+
+    public function blacklistedSuppliers(int $tenantId, ?int $organizationUnitId = null): Collection
+    {
+        return $this->baseQuery($tenantId, $organizationUnitId)
+            ->where('status', SupplierStatus::Blacklisted)
+            ->get();
+    }
+
+    public function result(Supplier $supplier): SupplierResultData
+    {
+        return new SupplierResultData(
+            supplierId: (int) $supplier->getKey(),
+            tenantId: (int) $supplier->tenant_id,
+            organizationUnitId: $supplier->organization_unit_id,
+            supplierNumber: (string) $supplier->supplier_number,
+            code: (string) $supplier->code,
+            name: (string) $supplier->name,
+            supplierType: $supplier->supplier_type,
+            status: $supplier->status,
+            creditLimit: (string) $supplier->credit_limit,
+            openingBalance: (string) $supplier->opening_balance,
+            isCreditAllowed: (bool) $supplier->is_credit_allowed,
+            isAdvanceAllowed: (bool) $supplier->is_advance_allowed,
+        );
     }
 
     private function baseQuery(int $tenantId, ?int $organizationUnitId): Builder

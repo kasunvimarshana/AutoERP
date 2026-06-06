@@ -18,6 +18,7 @@ use Modules\Supplier\DTOs\SupplierAddressData;
 use Modules\Supplier\DTOs\SupplierBankAccountData;
 use Modules\Supplier\DTOs\SupplierCategoryData;
 use Modules\Supplier\DTOs\SupplierContactData;
+use Modules\Supplier\DTOs\SupplierCreditProfileData;
 use Modules\Supplier\DTOs\SupplierDocumentData;
 use Modules\Supplier\DTOs\SupplierItemMappingData;
 use Modules\Supplier\DTOs\SupplierStatusChangeData;
@@ -29,11 +30,11 @@ use Modules\Supplier\Enums\SupplierType;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierCategory;
 use Modules\Supplier\Services\SupplierAddressService;
-use Modules\Supplier\Services\SupplierBalanceService;
 use Modules\Supplier\Services\SupplierBankAccountService;
 use Modules\Supplier\Services\SupplierCategoryService;
 use Modules\Supplier\Services\SupplierContactService;
 use Modules\Supplier\Services\SupplierCreationService;
+use Modules\Supplier\Services\SupplierCreditProfileService;
 use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Tests\TestCase;
@@ -42,7 +43,7 @@ final class SupplierEngineTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_supplier_creation_builds_reference_graph_and_balance_snapshot(): void
+    public function test_supplier_creation_builds_reference_graph_and_credit_profile(): void
     {
         [$tenantId, $organizationUnitId, $currencyId] = $this->scopeContext();
         $uomId = $this->createUom($tenantId, $organizationUnitId);
@@ -60,6 +61,12 @@ final class SupplierEngineTest extends TestCase
             defaultCurrencyId: $currencyId,
             creditLimit: '50000.000000',
             openingBalance: '2500.000000',
+            creditProfile: new SupplierCreditProfileData(
+                creditLimit: '50000.000000',
+                creditPeriodDays: 30,
+                warningThresholdPercent: '75.000000',
+                allowPartialPayment: true,
+            ),
             contacts: [
                 new SupplierContactData('Jane Buyer', email: 'jane@acme.test', isPrimary: true),
             ],
@@ -71,7 +78,7 @@ final class SupplierEngineTest extends TestCase
             ],
             categoryIds: [(int) $category->getKey()],
             documents: [
-                new SupplierDocumentData(SupplierDocumentType::BusinessRegistrationCertificate, 'BR-001', status: SupplierDocumentStatus::Active),
+                new SupplierDocumentData(SupplierDocumentType::BusinessRegistration, 'BR-001', status: SupplierDocumentStatus::Active),
             ],
             itemMappings: [
                 new SupplierItemMappingData(
@@ -87,6 +94,7 @@ final class SupplierEngineTest extends TestCase
 
         $this->assertSame(SupplierStatus::Active, $supplier->status);
         $this->assertSame('50000.000000', (string) $supplier->credit_limit);
+        $this->assertSame('2500.000000', (string) $supplier->opening_balance);
         $this->assertCount(1, $supplier->contacts);
         $this->assertCount(1, $supplier->addresses);
         $this->assertCount(1, $supplier->bankAccounts);
@@ -95,9 +103,14 @@ final class SupplierEngineTest extends TestCase
         $this->assertCount(1, $supplier->itemMappings);
         $this->assertCount(1, $supplier->statusHistories);
 
-        $balance = app(SupplierBalanceService::class)->result($supplier);
-        $this->assertSame('2500.000000', $balance->openingBalance);
-        $this->assertSame('2500.000000', $balance->outstandingBalance);
+        $profile = app(SupplierCreditProfileService::class)->get($supplier);
+        $this->assertNotNull($profile);
+        $this->assertSame('50000.000000', (string) $profile->credit_limit);
+        $this->assertSame(30, $profile->credit_period_days);
+        $this->assertSame('75.000000', (string) $profile->warning_threshold_percent);
+
+        $result = app(SupplierLookupService::class)->result($supplier);
+        $this->assertSame('2500.000000', $result->openingBalance);
     }
 
     public function test_duplicate_code_and_supplier_number_are_rejected_per_tenant(): void
@@ -154,6 +167,16 @@ final class SupplierEngineTest extends TestCase
             $this->assertSame('Supplier can have only one primary address per address type.', $exception->getMessage());
         }
 
+        try {
+            app(SupplierBankAccountService::class)->create(
+                $supplier,
+                new SupplierBankAccountData('Bank A', 'Primary Test', '100', currencyId: $currencyId),
+            );
+            $this->fail('Expected duplicate bank account validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Supplier bank account number already exists.', $exception->getMessage());
+        }
+
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Supplier can have only one primary bank account.');
         app(SupplierBankAccountService::class)->create(
@@ -204,10 +227,33 @@ final class SupplierEngineTest extends TestCase
         $this->assertCount(2, $supplier->statusHistories()->get());
         $this->assertFalse(app(SupplierLookupService::class)->activeSuppliers($tenantId)->contains($supplier));
         $this->assertTrue(app(SupplierLookupService::class)->restrictedSuppliers($tenantId)->contains($supplier));
+        $this->assertTrue(app(SupplierLookupService::class)->blacklistedSuppliers($tenantId)->contains($supplier));
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid supplier status transition.');
         app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::Active));
+    }
+
+    public function test_credit_profile_validation_and_on_hold_lookup(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'CREDIT', status: SupplierStatus::Active);
+
+        app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+            creditLimit: '10000.000000',
+            creditPeriodDays: 45,
+            warningThresholdPercent: '90.000000',
+            allowOverCredit: false,
+        ));
+        app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::OnHold));
+
+        $this->assertTrue(app(SupplierLookupService::class)->suppliersOnHold($tenantId)->contains($supplier));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Supplier credit warning threshold must be between 0 and 100.');
+        app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+            warningThresholdPercent: '101.000000',
+        ));
     }
 
     public function test_cross_tenant_and_organization_references_are_rejected(): void

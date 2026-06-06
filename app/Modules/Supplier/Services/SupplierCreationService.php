@@ -7,6 +7,7 @@ namespace Modules\Supplier\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Supplier\DTOs\CreateSupplierData;
+use Modules\Supplier\DTOs\SupplierCreditProfileData;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Validators\SupplierValidationService;
 
@@ -22,7 +23,7 @@ final class SupplierCreationService
         private readonly SupplierCategoryService $categories,
         private readonly SupplierDocumentService $documents,
         private readonly SupplierItemMappingService $itemMappings,
-        private readonly SupplierBalanceService $balances,
+        private readonly SupplierCreditProfileService $creditProfiles,
         private readonly SupplierStatusService $statuses,
     ) {}
 
@@ -51,13 +52,12 @@ final class SupplierCreationService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
-                'credit_limit' => $this->math->normalize($data->creditLimit),
-                'outstanding_balance' => $this->math->normalize($data->openingBalance),
+                'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
+                'opening_balance' => $this->math->normalize($data->openingBalance),
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
-                'created_by' => $data->createdBy,
                 'approved_by' => $data->status->value === 'active' ? $data->createdBy : null,
                 'approved_at' => $data->status->value === 'active' ? now() : null,
             ]);
@@ -78,7 +78,12 @@ final class SupplierCreationService
             foreach ($data->itemMappings as $mapping) {
                 $this->itemMappings->create($supplier, $mapping);
             }
-            $this->balances->createInitial($supplier, $data->openingBalance);
+            $this->creditProfiles->set(
+                $supplier,
+                $data->creditProfile ?? new SupplierCreditProfileData(
+                    creditLimit: $data->creditLimit,
+                ),
+            );
             $this->statuses->recordInitial($supplier, $data->createdBy);
 
             return $supplier->refresh()->load([
@@ -88,7 +93,7 @@ final class SupplierCreationService
                 'categories',
                 'documents',
                 'itemMappings',
-                'balance',
+                'creditProfile',
                 'statusHistories',
             ]);
         });

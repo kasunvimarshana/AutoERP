@@ -35,11 +35,10 @@ final class Supplier extends CoreModel
             'default_currency_id' => 'integer',
             'payment_term_id' => 'integer',
             'credit_limit' => 'decimal:6',
-            'outstanding_balance' => 'decimal:6',
+            'opening_balance' => 'decimal:6',
             'is_credit_allowed' => 'boolean',
             'is_advance_allowed' => 'boolean',
             'metadata' => 'array',
-            'created_by' => 'integer',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
         ]);
@@ -100,9 +99,9 @@ final class Supplier extends CoreModel
         return $this->hasMany(SupplierItemMapping::class, 'supplier_id');
     }
 
-    public function balance(): HasOne
+    public function creditProfile(): HasOne
     {
-        return $this->hasOne(SupplierBalance::class, 'supplier_id');
+        return $this->hasOne(SupplierCreditProfile::class, 'supplier_id');
     }
 
     public function statusHistories(): HasMany
