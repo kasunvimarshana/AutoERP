@@ -9,11 +9,10 @@ use Modules\Invoice\Enums\InvoiceBalanceStatus;
 final readonly class InvoiceBalanceResult
 {
     public function __construct(
+        public int $invoiceId,
         public string $invoiceTotal,
         public string $paidAmount,
-        public string $creditAllocatedAmount,
-        public string $debitAllocatedAmount,
-        public string $refundedAmount,
+        public string $creditAmount,
         public string $remainingAmount,
         public InvoiceBalanceStatus $status,
     ) {}

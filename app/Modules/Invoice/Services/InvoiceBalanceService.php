@@ -39,11 +39,10 @@ final class InvoiceBalanceService
     public function result(InvoiceBalance $balance): InvoiceBalanceResult
     {
         return new InvoiceBalanceResult(
+            invoiceId: (int) $balance->invoice_id,
             invoiceTotal: (string) $balance->invoice_total,
             paidAmount: (string) $balance->paid_amount,
-            creditAllocatedAmount: (string) $balance->credit_allocated_amount,
-            debitAllocatedAmount: (string) $balance->debit_allocated_amount,
-            refundedAmount: (string) $balance->refunded_amount,
+            creditAmount: (string) $balance->credit_allocated_amount,
             remainingAmount: (string) $balance->remaining_amount,
             status: $balance->status instanceof InvoiceBalanceStatus
                 ? $balance->status

@@ -7,8 +7,8 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\InvoiceBalanceService;
+use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
+use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Models\Payment;
@@ -23,7 +23,8 @@ final class PaymentAllocationService
         private readonly PaymentCalculationService $calculations,
         private readonly PaymentStatusService $statuses,
         private readonly PaymentUnappliedBalanceService $unappliedBalances,
-        private readonly InvoiceBalanceService $invoiceBalances,
+        private readonly InvoiceBalanceProviderInterface $invoiceBalances,
+        private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
     ) {}
 
     /**
@@ -50,28 +51,27 @@ final class PaymentAllocationService
 
     private function allocateOne(Payment $payment, PaymentAllocationData $allocation): PaymentAllocation
     {
-        $invoice = Invoice::query()->with('balance')->lockForUpdate()->findOrFail($allocation->invoiceId);
-        $this->validator->validateInvoiceAllocation($payment, $invoice, $allocation);
+        $invoiceBalance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
+        $this->validator->validateInvoiceAllocation($payment, $invoiceBalance, $allocation);
 
         $availableAmount = $this->availableAmount($payment);
         if ($this->math->compare($allocation->allocatedAmount, $availableAmount) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed available payment amount.');
         }
 
-        $invoiceBalance = $invoice->balance;
-        $invoiceBalanceBefore = $this->math->normalize((string) $invoiceBalance->remaining_amount);
+        $invoiceBalanceBefore = $this->math->normalize($invoiceBalance->remainingAmount);
         if (! $allocation->allowOverpayment && $this->math->compare($allocation->allocatedAmount, $invoiceBalanceBefore) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
         }
 
         $previouslyAllocated = $this->math->normalize((string) PaymentAllocation::query()
             ->where('payment_id', $payment->getKey())
-            ->where('invoice_id', $invoice->getKey())
+            ->where('invoice_id', $allocation->invoiceId)
             ->where('status', AllocationStatus::Active->value)
             ->sum('allocated_amount'));
 
-        $updatedInvoiceBalance = $this->invoiceBalances->applyPayment(
-            $invoice,
+        $settlement = $this->invoiceSettlements->applyPaymentAllocation(
+            $allocation->invoiceId,
             $allocation->allocatedAmount,
             $allocation->allowOverpayment,
         );
@@ -80,12 +80,12 @@ final class PaymentAllocationService
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
             'payment_id' => $payment->getKey(),
-            'invoice_id' => $invoice->getKey(),
-            'invoice_total' => $invoiceBalance->invoice_total,
+            'invoice_id' => $allocation->invoiceId,
+            'invoice_total' => $invoiceBalance->totalAmount,
             'invoice_balance_before' => $invoiceBalanceBefore,
             'previously_allocated_amount' => $previouslyAllocated,
             'allocated_amount' => $this->math->normalize($allocation->allocatedAmount),
-            'invoice_balance_after' => $updatedInvoiceBalance->remaining_amount,
+            'invoice_balance_after' => $settlement->balanceAfter,
             'allocation_date' => $allocation->allocationDate,
             'status' => AllocationStatus::Active->value,
         ]);

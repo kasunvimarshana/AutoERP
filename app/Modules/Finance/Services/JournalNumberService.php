@@ -21,7 +21,7 @@ final class JournalNumberService
         $result = $this->sequences->execute([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
-            'document_type' => 'finance_journal_'.$data->journalType->value,
+            'document_type' => 'finance_journal',
             'period_type' => 'yearly',
             'at_date' => $data->journalDate,
             'prefix' => 'JE-{PERIOD}-',

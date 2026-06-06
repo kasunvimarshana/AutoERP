@@ -7,8 +7,7 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\InvoiceBalanceService;
+use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentStatus;
@@ -20,7 +19,7 @@ final class PaymentReversalService
 {
     public function __construct(
         private readonly DecimalMath $math,
-        private readonly InvoiceBalanceService $invoiceBalances,
+        private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -41,8 +40,10 @@ final class PaymentReversalService
 
             $reversedAmount = '0.000000';
             foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->get() as $allocation) {
-                $invoice = Invoice::query()->with('balance')->lockForUpdate()->findOrFail($allocation->invoice_id);
-                $this->invoiceBalances->reversePayment($invoice, (string) $allocation->allocated_amount);
+                $this->invoiceSettlements->reversePaymentAllocation(
+                    (int) $allocation->invoice_id,
+                    (string) $allocation->allocated_amount,
+                );
 
                 $allocation->forceFill([
                     'status' => AllocationStatus::Reversed->value,

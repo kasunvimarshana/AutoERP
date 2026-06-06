@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Payment\Validators;
 
 use InvalidArgumentException;
+use Modules\Core\DTOs\Integration\BalanceResultData;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Invoice\Models\Invoice;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
@@ -66,22 +65,14 @@ final class PaymentValidationService
         }
     }
 
-    public function validateInvoiceAllocation(Payment $payment, Invoice $invoice, PaymentAllocationData $allocation): void
+    public function validateInvoiceAllocation(Payment $payment, BalanceResultData $invoiceBalance, PaymentAllocationData $allocation): void
     {
-        if ((int) $payment->tenant_id !== (int) $invoice->tenant_id) {
+        if ((int) $payment->tenant_id !== $invoiceBalance->tenantId) {
             throw new InvalidArgumentException('Payment invoice tenant must match payment tenant.');
         }
 
-        if ($payment->organization_unit_id !== $invoice->organization_unit_id) {
+        if ($payment->organization_unit_id !== $invoiceBalance->organizationUnitId) {
             throw new InvalidArgumentException('Payment invoice organization unit must match payment organization unit.');
-        }
-
-        $status = $invoice->status instanceof InvoiceStatus
-            ? $invoice->status
-            : InvoiceStatus::from((string) $invoice->status);
-
-        if (in_array($status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-            throw new InvalidArgumentException('Cancelled or void invoices cannot receive payment allocations.');
         }
 
         $this->assertPositive($allocation->allocatedAmount, 'Payment allocation amount');
