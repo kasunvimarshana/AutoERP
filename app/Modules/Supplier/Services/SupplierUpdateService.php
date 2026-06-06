@@ -56,13 +56,13 @@ final class SupplierUpdateService
                 'credit_limit' => $data->creditProfile !== null
                     ? $this->math->normalize($data->creditProfile->creditLimit)
                     : ($data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null),
-                'opening_balance' => $data->openingBalance !== null ? $this->math->normalize($data->openingBalance) : null,
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
             ] as $key => $value) {
-                if ($value !== null) {
+                $requestKey = $key;
+                if (in_array($requestKey, $data->provided, true)) {
                     $attributes[$key] = $value;
                 }
             }

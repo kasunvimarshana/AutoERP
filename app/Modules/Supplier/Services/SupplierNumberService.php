@@ -4,14 +4,28 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Services;
 
-use Modules\Supplier\Models\Supplier;
+use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
+use RuntimeException;
 
 final class SupplierNumberService
 {
+    public function __construct(private readonly GenerateSequenceNumberService $sequences) {}
+
     public function next(int $tenantId): string
     {
-        $next = Supplier::query()->withTrashed()->where('tenant_id', $tenantId)->count() + 1;
+        $result = $this->sequences->execute([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'document_type' => 'supplier',
+            'period_type' => 'infinite',
+            'prefix' => 'SUP-',
+            'padding' => 6,
+        ]);
 
-        return 'SUP-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        if ($result->isFailure()) {
+            throw new RuntimeException($result->errorOrFail()->message);
+        }
+
+        return (string) $result->valueOrFail()['generated_number'];
     }
 }

@@ -18,6 +18,7 @@ final readonly class UpdateSupplierData
      * @param  list<int>|null  $categoryIds
      * @param  list<SupplierDocumentData>|null  $documents
      * @param  list<SupplierItemMappingData>|null  $itemMappings
+     * @param  list<string>  $provided
      */
     public function __construct(
         public ?int $organizationUnitId = null,
@@ -37,7 +38,6 @@ final readonly class UpdateSupplierData
         public ?string $svatNumber = null,
         public ?string $businessRegistrationNumber = null,
         public ?string $creditLimit = null,
-        public ?string $openingBalance = null,
         public ?bool $isCreditAllowed = null,
         public ?bool $isAdvanceAllowed = null,
         public ?string $notes = null,
@@ -49,5 +49,6 @@ final readonly class UpdateSupplierData
         public ?array $categoryIds = null,
         public ?array $documents = null,
         public ?array $itemMappings = null,
+        public array $provided = [],
     ) {}
 }

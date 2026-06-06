@@ -4,118 +4,119 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Http\Controllers;
 
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Http\Requests\ChangeSupplierStatusRequest;
 use Modules\Supplier\Http\Requests\ListSupplierRequest;
 use Modules\Supplier\Http\Requests\StoreSupplierRequest;
+use Modules\Supplier\Http\Requests\StoreSupplierWithRelationsRequest;
 use Modules\Supplier\Http\Requests\UpdateSupplierRequest;
-use Modules\Supplier\Http\Resources\SupplierCategoryResource;
-use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
 use Modules\Supplier\Http\Resources\SupplierResource;
-use Modules\Supplier\Models\Supplier;
-use Modules\Supplier\Models\SupplierCategory;
-use Modules\Supplier\Models\SupplierItemMapping;
+use Modules\Supplier\Http\Resources\SupplierSummaryResource;
 use Modules\Supplier\Services\SupplierCreationService;
+use Modules\Supplier\Services\SupplierQueryService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Modules\Supplier\Services\SupplierUpdateService;
 
 final class SupplierController
 {
+    public function __construct(
+        private readonly SupplierQueryService $queries,
+        private readonly SupplierCreationService $creation,
+        private readonly SupplierUpdateService $updates,
+        private readonly SupplierStatusService $statuses,
+    ) {}
+
     public function index(ListSupplierRequest $request): AnonymousResourceCollection
     {
-        $query = $this->query($request)->with(['creditProfile', 'categories']);
-        $search = trim((string) $request->input('search', ''));
-        if ($search !== '') {
-            $query->where(function (Builder $scope) use ($search): void {
-                $scope->where('supplier_number', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        foreach (['status', 'supplier_type', 'is_credit_allowed'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
-        if ($request->filled('category_id')) {
-            $query->whereHas('categories', fn (Builder $scope): Builder => $scope->whereKey((int) $request->input('category_id')));
-        }
-        if ($request->filled('item_id')) {
-            $query->whereHas('itemMappings', fn (Builder $scope): Builder => $scope->where('item_id', (int) $request->input('item_id'))->where('is_active', true));
-        }
-
-        return SupplierResource::collection($query
-            ->orderBy((string) $request->input('sort', 'name'), (string) $request->input('direction', 'asc'))
-            ->paginate($request->perPage()));
+        return SupplierSummaryResource::collection($this->queries->paginate(
+            $request->validated(),
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->perPage(),
+        ));
     }
 
-    public function store(StoreSupplierRequest $request, SupplierCreationService $service): SupplierResource
+    public function store(StoreSupplierRequest $request): JsonResponse
     {
-        return new SupplierResource($service->create($request->toData()));
+        return $this->created($this->creation->create($request->toData()));
+    }
+
+    public function storeWithRelations(StoreSupplierWithRelationsRequest $request): JsonResponse
+    {
+        return $this->created($this->creation->create($request->toData()));
     }
 
     public function show(ListSupplierRequest $request, int $supplier): SupplierResource
     {
-        return new SupplierResource($this->query($request)->with([
-            'contacts', 'addresses', 'bankAccounts', 'categories', 'documents',
-            'itemMappings.item', 'itemMappings.variant', 'itemMappings.defaultPurchaseUom',
-            'creditProfile', 'statusHistories',
-        ])->findOrFail($supplier));
+        return new SupplierResource($this->queries->find(
+            $supplier,
+            $request->tenantId(),
+            $request->organizationUnitId(),
+        ));
     }
 
-    public function update(UpdateSupplierRequest $request, int $supplier, SupplierUpdateService $service): SupplierResource
+    public function update(UpdateSupplierRequest $request, int $supplier): SupplierResource
     {
-        $model = $this->query($request)->findOrFail($supplier);
-
-        return new SupplierResource($service->update($model, $request->toData()));
+        return new SupplierResource($this->updates->update(
+            $this->queries->supplier($supplier, $request->tenantId(), $request->organizationUnitId()),
+            $request->toData(),
+        )->load(['defaultCurrency']));
     }
 
-    public function changeStatus(ChangeSupplierStatusRequest $request, int $supplier, SupplierStatusService $service): SupplierResource
+    public function destroy(ListSupplierRequest $request, int $supplier): JsonResponse
     {
-        $model = $this->query($request)->findOrFail($supplier);
+        $this->queries->delete($this->queries->supplier(
+            $supplier,
+            $request->tenantId(),
+            $request->organizationUnitId(),
+        ));
 
-        return new SupplierResource($service->change($model, $request->toData()));
+        return response()->json(null, 204);
     }
 
-    public function lookup(ListSupplierRequest $request): AnonymousResourceCollection
+    public function activate(ListSupplierRequest $request, int $supplier): SupplierResource
     {
-        $request->merge(['per_page' => min($request->perPage(), 50)]);
-
-        return $this->index($request);
+        return $this->changeTo($request, $supplier, SupplierStatus::Active);
     }
 
-    public function categories(ListSupplierRequest $request): AnonymousResourceCollection
+    public function deactivate(ListSupplierRequest $request, int $supplier): SupplierResource
     {
-        $query = SupplierCategory::query()->where('tenant_id', $request->tenantId());
-        if ($request->organizationUnitId() !== null) {
-            $query->where(fn (Builder $scope): Builder => $scope->whereNull('organization_unit_id')
-                ->orWhere('organization_unit_id', $request->organizationUnitId()));
-        }
-
-        return SupplierCategoryResource::collection($query->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get());
+        return $this->changeTo($request, $supplier, SupplierStatus::Inactive);
     }
 
-    public function itemMappings(ListSupplierRequest $request): AnonymousResourceCollection
+    public function changeStatus(ChangeSupplierStatusRequest $request, int $supplier): SupplierResource
     {
-        $query = SupplierItemMapping::query()->where('tenant_id', $request->tenantId())->where('is_active', true);
-        if ($request->organizationUnitId() !== null) {
-            $query->where(fn (Builder $scope): Builder => $scope->whereNull('organization_unit_id')
-                ->orWhere('organization_unit_id', $request->organizationUnitId()));
-        }
-        if ($request->filled('item_id')) {
-            $query->where('item_id', (int) $request->input('item_id'));
-        }
+        $model = $this->queries->supplier($supplier, $request->tenantId(), $request->organizationUnitId());
 
-        return SupplierItemMappingResource::collection($query
-            ->with(['supplier', 'item', 'variant', 'defaultPurchaseUom'])
-            ->paginate($request->perPage()));
+        return new SupplierResource($this->statuses->change($model, $request->toData())->load('defaultCurrency'));
     }
 
-    private function query(ListSupplierRequest|UpdateSupplierRequest|ChangeSupplierStatusRequest $request): Builder
+    public function lookup(ListSupplierRequest $request, ?string $kind = null): AnonymousResourceCollection
     {
-        return Supplier::query()->forTenant($request->tenantId(), $request->organizationUnitId());
+        return SupplierSummaryResource::collection($this->queries->lookup(
+            $request->validated(),
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->perPage(),
+            $kind ?? 'all',
+        ));
+    }
+
+    private function changeTo(ListSupplierRequest $request, int $supplier, SupplierStatus $status): SupplierResource
+    {
+        $model = $this->queries->supplier($supplier, $request->tenantId(), $request->organizationUnitId());
+
+        return new SupplierResource($this->statuses->changeTo(
+            $model,
+            $status,
+            $request->currentUserId(),
+        )->load('defaultCurrency'));
+    }
+
+    private function created(\Modules\Supplier\Models\Supplier $supplier): JsonResponse
+    {
+        return (new SupplierResource($supplier))->response()->setStatusCode(201);
     }
 }

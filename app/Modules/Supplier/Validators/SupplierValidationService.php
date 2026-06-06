@@ -31,7 +31,6 @@ final class SupplierValidationService
             $this->assertNumberUnique($data->tenantId, $data->supplierNumber);
         }
         $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');
-        $this->assertNonNegative($data->openingBalance, 'Supplier opening balance cannot be negative.');
         $this->assertOrganizationScope($data->tenantId, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
@@ -51,9 +50,6 @@ final class SupplierValidationService
         }
         if ($data->creditLimit !== null) {
             $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');
-        }
-        if ($data->openingBalance !== null) {
-            $this->assertNonNegative($data->openingBalance, 'Supplier opening balance cannot be negative.');
         }
 
         $this->assertOrganizationScope((int) $supplier->tenant_id, $data->organizationUnitId);
@@ -113,6 +109,15 @@ final class SupplierValidationService
             if ((int) $variant->item_id !== $data->itemId) {
                 throw new InvalidArgumentException('Supplier item variant must belong to the mapped item.');
             }
+            $this->assertScope(
+                (int) $supplier->tenant_id,
+                $supplier->organization_unit_id,
+                (int) $variant->tenant_id,
+                $variant->organization_unit_id,
+            );
+            if (! (bool) $variant->is_active) {
+                throw new InvalidArgumentException('Inactive item variant cannot be mapped to a supplier.');
+            }
         }
 
         if ($data->defaultPurchaseUomId !== null) {
@@ -139,6 +144,11 @@ final class SupplierValidationService
         if (! (bool) $currency->is_active) {
             throw new InvalidArgumentException('Inactive currency cannot be used for supplier master data.');
         }
+    }
+
+    public function assertOrganizationUsable(int $tenantId, ?int $organizationUnitId): void
+    {
+        $this->assertOrganizationScope($tenantId, $organizationUnitId);
     }
 
     private function assertCodeUnique(int $tenantId, string $code, ?int $ignoreId = null): void

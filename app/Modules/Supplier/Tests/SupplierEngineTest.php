@@ -35,6 +35,7 @@ use Modules\Supplier\Services\SupplierCategoryService;
 use Modules\Supplier\Services\SupplierContactService;
 use Modules\Supplier\Services\SupplierCreationService;
 use Modules\Supplier\Services\SupplierCreditProfileService;
+use Modules\Supplier\Services\SupplierItemMappingService;
 use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Tests\TestCase;
@@ -60,7 +61,6 @@ final class SupplierEngineTest extends TestCase
             email: 'orders@acme.test',
             defaultCurrencyId: $currencyId,
             creditLimit: '50000.000000',
-            openingBalance: '2500.000000',
             creditProfile: new SupplierCreditProfileData(
                 creditLimit: '50000.000000',
                 creditPeriodDays: 30,
@@ -94,7 +94,6 @@ final class SupplierEngineTest extends TestCase
 
         $this->assertSame(SupplierStatus::Active, $supplier->status);
         $this->assertSame('50000.000000', (string) $supplier->credit_limit);
-        $this->assertSame('2500.000000', (string) $supplier->opening_balance);
         $this->assertCount(1, $supplier->contacts);
         $this->assertCount(1, $supplier->addresses);
         $this->assertCount(1, $supplier->bankAccounts);
@@ -110,7 +109,7 @@ final class SupplierEngineTest extends TestCase
         $this->assertSame('75.000000', (string) $profile->warning_threshold_percent);
 
         $result = app(SupplierLookupService::class)->result($supplier);
-        $this->assertSame('2500.000000', $result->openingBalance);
+        $this->assertSame('50000.000000', $result->creditLimit);
     }
 
     public function test_duplicate_code_and_supplier_number_are_rejected_per_tenant(): void
@@ -296,6 +295,31 @@ final class SupplierEngineTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Supplier reference belongs to a different organization unit.');
         app(SupplierCategoryService::class)->assign($supplier, [(int) $category->getKey()]);
+    }
+
+    public function test_cross_tenant_item_variant_reference_is_rejected(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$otherTenantId, $otherOrganizationUnitId] = $this->scopeContext('VARIANT-OTHER');
+        $item = $this->createItem($tenantId, $organizationUnitId, 'VARIANT-ITEM');
+        $supplier = $this->createSupplier($tenantId, 'VARIANT-SUP', organizationUnitId: $organizationUnitId);
+        $variantId = (int) DB::table('item_variants')->insertGetId([
+            'tenant_id' => $otherTenantId,
+            'organization_unit_id' => $otherOrganizationUnitId,
+            'item_id' => $item->getKey(),
+            'code' => 'CROSS-TENANT-VARIANT',
+            'name' => 'Cross tenant variant',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Supplier reference belongs to a different tenant.');
+        app(SupplierItemMappingService::class)->create(
+            $supplier,
+            new SupplierItemMappingData((int) $item->getKey(), itemVariantId: $variantId),
+        );
     }
 
     public function test_supplier_seeder_adds_only_reference_categories(): void

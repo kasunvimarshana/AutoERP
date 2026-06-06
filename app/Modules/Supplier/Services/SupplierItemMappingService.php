@@ -22,7 +22,7 @@ final class SupplierItemMappingService
     {
         $this->validator->validateItemMapping($supplier, $data);
 
-        if ($supplier->itemMappings()
+        if ($supplier->itemMappings()->withTrashed()
             ->where('item_id', $data->itemId)
             ->where('item_variant_id', $data->itemVariantId)
             ->exists()) {
@@ -48,6 +48,48 @@ final class SupplierItemMappingService
         ]);
     }
 
+    public function update(
+        Supplier $supplier,
+        SupplierItemMapping $mapping,
+        SupplierItemMappingData $data,
+    ): SupplierItemMapping {
+        $this->assertOwned($supplier, $mapping);
+        $this->validator->validateItemMapping($supplier, $data);
+
+        $duplicate = $supplier->itemMappings()->withTrashed()
+            ->whereKeyNot($mapping->getKey())
+            ->where('item_id', $data->itemId);
+        $data->itemVariantId === null
+            ? $duplicate->whereNull('item_variant_id')
+            : $duplicate->where('item_variant_id', $data->itemVariantId);
+        if ($duplicate->exists()) {
+            throw new InvalidArgumentException('Supplier item mapping already exists.');
+        }
+        if ($data->isPreferred) {
+            $this->clearPreferredForItem($supplier, $data);
+        }
+
+        $mapping->fill([
+            'item_id' => $data->itemId,
+            'item_variant_id' => $data->itemVariantId,
+            'supplier_item_code' => $data->supplierItemCode,
+            'supplier_item_name' => $data->supplierItemName,
+            'default_purchase_uom_id' => $data->defaultPurchaseUomId,
+            'minimum_order_quantity' => $this->math->normalize($data->minimumOrderQuantity),
+            'lead_time_days' => $data->leadTimeDays,
+            'is_preferred' => $data->isPreferred,
+            'is_active' => $data->isActive,
+        ])->save();
+
+        return $mapping->refresh()->load(['item.category', 'item.brand', 'variant', 'defaultPurchaseUom']);
+    }
+
+    public function delete(Supplier $supplier, SupplierItemMapping $mapping): void
+    {
+        $this->assertOwned($supplier, $mapping);
+        $mapping->delete();
+    }
+
     /**
      * @param  list<SupplierItemMappingData>  $mappings
      */
@@ -70,5 +112,12 @@ final class SupplierItemMappingService
             : $query->where('item_variant_id', $data->itemVariantId);
 
         $query->update(['is_preferred' => false]);
+    }
+
+    private function assertOwned(Supplier $supplier, SupplierItemMapping $mapping): void
+    {
+        if ((int) $mapping->supplier_id !== (int) $supplier->getKey()) {
+            throw new InvalidArgumentException('Supplier item mapping does not belong to the supplier.');
+        }
     }
 }

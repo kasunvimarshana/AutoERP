@@ -22,6 +22,7 @@ final class ListSupplierRequest extends TenantScopedRequest
             'category_id' => ['nullable', 'integer', 'min:1'],
             'item_id' => ['nullable', 'integer', 'min:1'],
             'is_credit_allowed' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['supplier_number', 'code', 'name', 'status', 'created_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'between:1,100'],

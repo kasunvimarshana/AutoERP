@@ -12,9 +12,10 @@ const UomDetailPage = lazy(() => import('@/modules/uom/UomDetailPage'));
 const UomConversionListPage = lazy(() => import('@/modules/uom/UomConversionListPage'));
 const UomConversionForm = lazy(() => import('@/modules/uom/UomConversionForm'));
 const UomConvertTool = lazy(() => import('@/modules/uom/UomConvertTool'));
-const SupplierListPage = lazy(() => import('@/modules/supplier/pages/SupplierListPage'));
-const SupplierFormPage = lazy(() => import('@/modules/supplier/pages/SupplierFormPage'));
-const SupplierDetailPage = lazy(() => import('@/modules/supplier/pages/SupplierDetailPage'));
+const SupplierListPage = lazy(() => import('@/modules/supplier/SupplierListPage'));
+const SupplierCreatePage = lazy(() => import('@/modules/supplier/SupplierCreatePage'));
+const SupplierEditPage = lazy(() => import('@/modules/supplier/SupplierEditPage'));
+const SupplierDetailPage = lazy(() => import('@/modules/supplier/SupplierDetailPage'));
 const ItemListPage = lazy(() => import('@/modules/item/ItemListPage'));
 const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
 const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
@@ -49,8 +50,8 @@ export function AppRouter() {
                     <Route path="/uom-conversions/:id/edit" element={<UomConversionForm />} />
                     <Route path="/uom-convert" element={<UomConvertTool />} />
                     <Route path="/suppliers" element={<SupplierListPage />} />
-                    <Route path="/suppliers/create" element={<SupplierFormPage />} />
-                    <Route path="/suppliers/:id/edit" element={<SupplierFormPage />} />
+                    <Route path="/suppliers/create" element={<SupplierCreatePage />} />
+                    <Route path="/suppliers/:id/edit" element={<SupplierEditPage />} />
                     <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
                     <Route path="/items" element={<ItemListPage />} />
                     <Route path="/items/create" element={<ItemCreatePage />} />

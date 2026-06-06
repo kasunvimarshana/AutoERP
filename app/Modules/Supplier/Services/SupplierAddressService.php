@@ -38,6 +38,41 @@ final class SupplierAddressService
         ]);
     }
 
+    public function update(Supplier $supplier, SupplierAddress $address, SupplierAddressData $data): SupplierAddress
+    {
+        $this->assertOwned($supplier, $address);
+        if (trim($data->addressLine1) === '') {
+            throw new InvalidArgumentException('Supplier address line 1 is required.');
+        }
+        if ($data->isPrimary && $supplier->addresses()
+            ->whereKeyNot($address->getKey())
+            ->where('address_type', $data->addressType->value)
+            ->where('is_primary', true)
+            ->exists()) {
+            throw new InvalidArgumentException('Supplier can have only one primary address per address type.');
+        }
+
+        $address->fill([
+            'address_type' => $data->addressType,
+            'address_line_1' => $data->addressLine1,
+            'address_line_2' => $data->addressLine2,
+            'city' => $data->city,
+            'state' => $data->state,
+            'postal_code' => $data->postalCode,
+            'country' => $data->country,
+            'is_primary' => $data->isPrimary,
+            'is_active' => $data->isActive,
+        ])->save();
+
+        return $address->refresh();
+    }
+
+    public function delete(Supplier $supplier, SupplierAddress $address): void
+    {
+        $this->assertOwned($supplier, $address);
+        $address->delete();
+    }
+
     /**
      * @param  list<SupplierAddressData>  $addresses
      */
@@ -46,6 +81,13 @@ final class SupplierAddressService
         $supplier->addresses()->delete();
         foreach ($addresses as $address) {
             $this->create($supplier, $address);
+        }
+    }
+
+    private function assertOwned(Supplier $supplier, SupplierAddress $address): void
+    {
+        if ((int) $address->supplier_id !== (int) $supplier->getKey()) {
+            throw new InvalidArgumentException('Supplier address does not belong to the supplier.');
         }
     }
 }

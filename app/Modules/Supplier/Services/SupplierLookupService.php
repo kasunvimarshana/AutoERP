@@ -92,7 +92,6 @@ final class SupplierLookupService
             supplierType: $supplier->supplier_type,
             status: $supplier->status,
             creditLimit: (string) $supplier->credit_limit,
-            openingBalance: (string) $supplier->opening_balance,
             isCreditAllowed: (bool) $supplier->is_credit_allowed,
             isAdvanceAllowed: (bool) $supplier->is_advance_allowed,
         );

@@ -4,7 +4,7 @@ import { Input } from '@/shared/components/Input';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
 
-export function SearchableResourceSelect<T extends NamedResource>({
+export function GenericLookupSelect<T extends NamedResource>({
     label,
     value,
     onChange,
@@ -28,8 +28,8 @@ export function SearchableResourceSelect<T extends NamedResource>({
     const [options, setOptions] = useState<T[]>([]);
     const [message, setMessage] = useState('');
     const debounced = useDebounce(query);
-    const abortRef = useRef<AbortController | null>(null);
-    const validationAbortRef = useRef<AbortController | null>(null);
+    const requestRef = useRef<AbortController | null>(null);
+    const validationRef = useRef<AbortController | null>(null);
     const cacheRef = useRef(new Map<string, T[]>());
     const validatedIdRef = useRef<number | null>(null);
 
@@ -57,9 +57,9 @@ export function SearchableResourceSelect<T extends NamedResource>({
             return;
         }
 
-        validationAbortRef.current?.abort();
+        validationRef.current?.abort();
         const controller = new AbortController();
-        validationAbortRef.current = controller;
+        validationRef.current = controller;
         const key = lookup.toLowerCase();
         const validate = (results: T[]) => {
             const match = results.find((entry) => Number(entry.id) === selectedId);
@@ -106,9 +106,9 @@ export function SearchableResourceSelect<T extends NamedResource>({
             return;
         }
 
-        abortRef.current?.abort();
+        requestRef.current?.abort();
         const controller = new AbortController();
-        abortRef.current = controller;
+        requestRef.current = controller;
         search(normalized, controller.signal)
             .then((results) => {
                 if (controller.signal.aborted) return;
@@ -126,8 +126,8 @@ export function SearchableResourceSelect<T extends NamedResource>({
     }, [debounced, excludeId, search, selectedLabel]);
 
     useEffect(() => () => {
-        abortRef.current?.abort();
-        validationAbortRef.current?.abort();
+        requestRef.current?.abort();
+        validationRef.current?.abort();
     }, []);
 
     return (

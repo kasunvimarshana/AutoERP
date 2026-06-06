@@ -39,7 +39,6 @@ final readonly class CreateSupplierData
         public ?string $svatNumber = null,
         public ?string $businessRegistrationNumber = null,
         public string $creditLimit = '0.000000',
-        public string $openingBalance = '0.000000',
         public bool $isCreditAllowed = true,
         public bool $isAdvanceAllowed = true,
         public ?string $notes = null,

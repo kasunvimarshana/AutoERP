@@ -30,6 +30,32 @@ final class SupplierDocumentService
         ]);
     }
 
+    public function update(Supplier $supplier, SupplierDocument $document, SupplierDocumentData $data): SupplierDocument
+    {
+        $this->assertOwned($supplier, $document);
+        if ($data->issuedDate !== null && $data->expiryDate !== null && $data->issuedDate > $data->expiryDate) {
+            throw new InvalidArgumentException('Supplier document issued date cannot be after expiry date.');
+        }
+
+        $document->fill([
+            'document_type' => $data->documentType,
+            'document_number' => $data->documentNumber,
+            'issued_date' => $data->issuedDate,
+            'expiry_date' => $data->expiryDate,
+            'file_path' => $data->filePath,
+            'status' => $data->status,
+            'notes' => $data->notes,
+        ])->save();
+
+        return $document->refresh();
+    }
+
+    public function delete(Supplier $supplier, SupplierDocument $document): void
+    {
+        $this->assertOwned($supplier, $document);
+        $document->delete();
+    }
+
     /**
      * @param  list<SupplierDocumentData>  $documents
      */
@@ -38,6 +64,13 @@ final class SupplierDocumentService
         $supplier->documents()->delete();
         foreach ($documents as $document) {
             $this->create($supplier, $document);
+        }
+    }
+
+    private function assertOwned(Supplier $supplier, SupplierDocument $document): void
+    {
+        if ((int) $document->supplier_id !== (int) $supplier->getKey()) {
+            throw new InvalidArgumentException('Supplier document does not belong to the supplier.');
         }
     }
 }

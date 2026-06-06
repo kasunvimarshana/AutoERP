@@ -61,6 +61,19 @@ final class SupplierStatusService
         });
     }
 
+    public function changeTo(
+        Supplier $supplier,
+        SupplierStatus $status,
+        ?int $changedBy = null,
+        ?string $reason = null,
+    ): Supplier {
+        return $this->change($supplier, new SupplierStatusChangeData(
+            newStatus: $status,
+            reason: $reason,
+            changedBy: $changedBy,
+        ));
+    }
+
     public function assertTransition(SupplierStatus $from, SupplierStatus $to): void
     {
         $allowed = [

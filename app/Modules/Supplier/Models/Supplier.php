@@ -35,7 +35,6 @@ final class Supplier extends CoreModel
             'default_currency_id' => 'integer',
             'payment_term_id' => 'integer',
             'credit_limit' => 'decimal:6',
-            'opening_balance' => 'decimal:6',
             'is_credit_allowed' => 'boolean',
             'is_advance_allowed' => 'boolean',
             'metadata' => 'array',

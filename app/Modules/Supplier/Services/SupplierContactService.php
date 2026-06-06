@@ -35,6 +35,37 @@ final class SupplierContactService
         ]);
     }
 
+    public function update(Supplier $supplier, SupplierContact $contact, SupplierContactData $data): SupplierContact
+    {
+        $this->assertOwned($supplier, $contact);
+        if (trim($data->contactName) === '') {
+            throw new InvalidArgumentException('Supplier contact name is required.');
+        }
+        if ($data->isPrimary && $supplier->contacts()->whereKeyNot($contact->getKey())->where('is_primary', true)->exists()) {
+            throw new InvalidArgumentException('Supplier can have only one primary contact.');
+        }
+
+        $contact->fill([
+            'contact_name' => $data->contactName,
+            'designation' => $data->designation,
+            'department' => $data->department,
+            'email' => $data->email,
+            'phone' => $data->phone,
+            'mobile' => $data->mobile,
+            'is_primary' => $data->isPrimary,
+            'is_active' => $data->isActive,
+            'notes' => $data->notes,
+        ])->save();
+
+        return $contact->refresh();
+    }
+
+    public function delete(Supplier $supplier, SupplierContact $contact): void
+    {
+        $this->assertOwned($supplier, $contact);
+        $contact->delete();
+    }
+
     /**
      * @param  list<SupplierContactData>  $contacts
      */
@@ -43,6 +74,13 @@ final class SupplierContactService
         $supplier->contacts()->delete();
         foreach ($contacts as $contact) {
             $this->create($supplier, $contact);
+        }
+    }
+
+    private function assertOwned(Supplier $supplier, SupplierContact $contact): void
+    {
+        if ((int) $contact->supplier_id !== (int) $supplier->getKey()) {
+            throw new InvalidArgumentException('Supplier contact does not belong to the supplier.');
         }
     }
 }

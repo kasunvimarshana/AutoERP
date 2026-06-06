@@ -27,8 +27,12 @@ final class UpdateSupplierRequest extends TenantScopedRequest
             'website' => ['nullable', 'url', 'max:255'],
             'default_currency_id' => ['nullable', 'integer', 'min:1'],
             'payment_term_id' => ['nullable', 'integer', 'min:1'],
+            'tax_registration_number' => ['nullable', 'string', 'max:100'],
+            'vat_number' => ['nullable', 'string', 'max:100'],
+            'svat_number' => ['nullable', 'string', 'max:100'],
+            'business_registration_number' => ['nullable', 'string', 'max:100'],
             'credit_limit' => ['nullable', 'decimal:0,6', 'min:0'],
-            'opening_balance' => ['nullable', 'decimal:0,6', 'min:0'],
+            'opening_balance' => ['prohibited'],
             'is_credit_allowed' => ['nullable', 'boolean'],
             'is_advance_allowed' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
@@ -56,11 +60,11 @@ final class UpdateSupplierRequest extends TenantScopedRequest
             svatNumber: $this->stringOrNull('svat_number'),
             businessRegistrationNumber: $this->stringOrNull('business_registration_number'),
             creditLimit: $this->filled('credit_limit') ? (string) $this->input('credit_limit') : null,
-            openingBalance: $this->filled('opening_balance') ? (string) $this->input('opening_balance') : null,
             isCreditAllowed: $this->has('is_credit_allowed') ? $this->boolean('is_credit_allowed') : null,
             isAdvanceAllowed: $this->has('is_advance_allowed') ? $this->boolean('is_advance_allowed') : null,
             notes: $this->stringOrNull('notes'),
             metadata: $this->has('metadata') ? $this->input('metadata') : null,
+            provided: array_keys($this->all()),
         );
     }
 

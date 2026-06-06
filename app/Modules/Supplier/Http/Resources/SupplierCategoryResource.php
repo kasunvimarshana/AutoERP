@@ -4,6 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Http\Resources;
 
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Supplier\Http\Resources\Concerns\FormatsSupplierResources;
 
-final class SupplierCategoryResource extends ModuleResource {}
+final class SupplierCategoryResource extends JsonResource
+{
+    use FormatsSupplierResources;
+
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => (int) $this->getKey(),
+            'code' => $this->code,
+            'name' => $this->name,
+            'description' => $this->description,
+            'parent' => $this->relationLoaded('parent') ? $this->namedResource($this->parent) : null,
+            'is_active' => (bool) $this->is_active,
+            'sort_order' => (int) $this->sort_order,
+        ];
+    }
+}

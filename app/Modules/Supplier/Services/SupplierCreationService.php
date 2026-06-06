@@ -53,7 +53,6 @@ final class SupplierCreationService
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
                 'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
-                'opening_balance' => $this->math->normalize($data->openingBalance),
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
@@ -87,12 +86,16 @@ final class SupplierCreationService
             $this->statuses->recordInitial($supplier, $data->createdBy);
 
             return $supplier->refresh()->load([
+                'defaultCurrency',
                 'contacts',
                 'addresses',
-                'bankAccounts',
-                'categories',
+                'bankAccounts.currency',
+                'categories.parent',
                 'documents',
-                'itemMappings',
+                'itemMappings.item.category',
+                'itemMappings.item.brand',
+                'itemMappings.variant',
+                'itemMappings.defaultPurchaseUom',
                 'creditProfile',
                 'statusHistories',
             ]);

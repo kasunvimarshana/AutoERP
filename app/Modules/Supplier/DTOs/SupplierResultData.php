@@ -19,7 +19,6 @@ final readonly class SupplierResultData
         public SupplierType $supplierType,
         public SupplierStatus $status,
         public string $creditLimit,
-        public string $openingBalance,
         public bool $isCreditAllowed,
         public bool $isAdvanceAllowed,
     ) {}

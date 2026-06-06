@@ -1,6 +1,6 @@
 import { listUoms } from '@/shared/api/referenceApi';
 import type { NamedResource } from '@/shared/types/common';
-import { SearchableResourceSelect } from './SearchableResourceSelect';
+import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 
 const formatUom = (uom: NamedResource) => `${uom.code ?? ''} - ${uom.name}${uom.symbol ? ` (${uom.symbol})` : ''}`;
 
@@ -10,5 +10,5 @@ export function ItemUomSelect({ label = 'UOM', value, onChange, error }: {
     onChange: (uom: NamedResource | null) => void;
     error?: string;
 }) {
-    return <SearchableResourceSelect label={label} value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} />;
+    return <GenericLookupSelect label={label} value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} />;
 }
