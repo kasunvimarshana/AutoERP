@@ -7,11 +7,11 @@ namespace Modules\Finance\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\DTOs\Integration\FinancePostingRequest;
-use Modules\Core\DTOs\Integration\PostingLineData;
-use Modules\Core\DTOs\Integration\PostingSourceData;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
+use Modules\Finance\DTOs\FinancePostingLine;
+use Modules\Finance\DTOs\FinancePostingRequest;
+use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
@@ -32,8 +32,8 @@ final class FinancePostingContractTest extends TestCase
             source: new PostingSourceData('invoice', 1001, $tenantId),
             postingDate: '2026-06-06',
             lines: [
-                new PostingLineData('1010', 'Cash', debit: '1000.000000', description: 'Cash debit'),
-                new PostingLineData('3000', 'Capital', credit: '1000.000000', description: 'Capital credit'),
+                new FinancePostingLine('1010', 'Cash', debit: '1000.000000', description: 'Cash debit'),
+                new FinancePostingLine('3000', 'Capital', credit: '1000.000000', description: 'Capital credit'),
             ],
             description: 'Contract posting test',
         );

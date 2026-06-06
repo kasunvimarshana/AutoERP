@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Repositories;
 
 use DateTimeInterface;
-use Modules\Core\Repositories\Contracts\RepositoryPortInterface;
+use Modules\Core\Contracts\RepositoryPortInterface;
 
 interface AuthLoginAttemptRepositoryInterface extends RepositoryPortInterface
 {

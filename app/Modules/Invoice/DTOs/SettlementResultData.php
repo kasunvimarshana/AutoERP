@@ -2,18 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\DTOs\Integration;
+namespace Modules\Invoice\DTOs;
 
-final readonly class BalanceResultData
+final readonly class SettlementResultData
 {
     public function __construct(
         public int $sourceId,
         public int $tenantId,
         public ?int $organizationUnitId,
-        public string $totalAmount,
-        public string $paidAmount,
-        public string $creditAmount,
-        public string $remainingAmount,
+        public string $settledAmount,
+        public string $balanceBefore,
+        public string $balanceAfter,
         public string $status,
         public string $sourceType = 'invoice',
     ) {}

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Sequence\Entities;
 
 use InvalidArgumentException;
-use Modules\Core\Entities\Entity;
+use Modules\Core\Support\Entity;
 use Modules\Sequence\Constants\SequencePeriodType;
 
 final class Sequence extends Entity

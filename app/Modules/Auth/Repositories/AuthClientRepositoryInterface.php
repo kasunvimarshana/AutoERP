@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Repositories;
 
+use Modules\Core\Contracts\RepositoryPortInterface;
 use Modules\Core\DTOs\DataRecord;
-use Modules\Core\Repositories\Contracts\RepositoryPortInterface;
 
 interface AuthClientRepositoryInterface extends RepositoryPortInterface
 {

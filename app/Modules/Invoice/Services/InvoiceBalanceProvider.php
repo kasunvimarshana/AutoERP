@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
-use Modules\Core\DTOs\Integration\BalanceResultData;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
+use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Invoice\DTOs\InvoiceBalanceResult;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Models\Invoice;

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Payment\Validators;
 
 use InvalidArgumentException;
-use Modules\Core\DTOs\Integration\BalanceResultData;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;

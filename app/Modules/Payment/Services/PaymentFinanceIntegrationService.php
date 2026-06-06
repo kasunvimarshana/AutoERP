@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
-use Modules\Core\DTOs\Integration\FinancePostingRequest;
-use Modules\Core\DTOs\Integration\PostingLineData;
-use Modules\Core\DTOs\Integration\PostingSourceData;
 use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\DTOs\FinancePostingLine;
+use Modules\Finance\DTOs\FinancePostingRequest;
+use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Payment\DTOs\PaymentPostingRequest;
 use Modules\Payment\Models\Payment;
 
@@ -16,7 +16,7 @@ final class PaymentFinanceIntegrationService
     public function __construct(private readonly FinancePostingInterface $financePostings) {}
 
     /**
-     * @param  list<PostingLineData>  $lines
+     * @param  list<FinancePostingLine>  $lines
      */
     public function preparePaymentPostingRequest(int $paymentId, array $lines): PaymentPostingRequest
     {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Contracts;
 
-use Modules\Core\DTOs\Integration\FinancePostingRequest;
-use Modules\Core\DTOs\Integration\PostingResultData;
+use Modules\Finance\DTOs\FinancePostingRequest;
+use Modules\Finance\DTOs\PostingResultData;
 
 interface FinancePostingInterface
 {

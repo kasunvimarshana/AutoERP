@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Contracts;
 
-use Modules\Core\DTOs\Integration\BalanceResultData;
+use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Invoice\DTOs\InvoiceBalanceResult;
 
 interface InvoiceBalanceProviderInterface

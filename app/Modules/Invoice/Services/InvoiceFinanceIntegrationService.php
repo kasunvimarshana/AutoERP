@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
-use Modules\Core\DTOs\Integration\FinancePostingRequest;
-use Modules\Core\DTOs\Integration\PostingLineData;
-use Modules\Core\DTOs\Integration\PostingSourceData;
 use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\DTOs\FinancePostingLine;
+use Modules\Finance\DTOs\FinancePostingRequest;
+use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Invoice\Models\Invoice;
 
 final class InvoiceFinanceIntegrationService
@@ -15,7 +15,7 @@ final class InvoiceFinanceIntegrationService
     public function __construct(private readonly FinancePostingInterface $financePostings) {}
 
     /**
-     * @param  list<PostingLineData>  $lines
+     * @param  list<FinancePostingLine>  $lines
      */
     public function preparePostingRequest(int $invoiceId, string $postingDate, array $lines): FinancePostingRequest
     {

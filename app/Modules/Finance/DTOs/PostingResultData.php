@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\DTOs\Integration;
+namespace Modules\Finance\DTOs;
 
 final readonly class PostingResultData
 {

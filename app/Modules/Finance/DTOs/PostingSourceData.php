@@ -9,5 +9,7 @@ final readonly class PostingSourceData
     public function __construct(
         public string $sourceType,
         public int $sourceId,
+        public ?int $tenantId = null,
+        public ?int $organizationUnitId = null,
     ) {}
 }

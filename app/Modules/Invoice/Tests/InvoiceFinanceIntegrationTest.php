@@ -7,8 +7,8 @@ namespace Modules\Invoice\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\DTOs\Integration\PostingLineData;
 use Modules\Finance\DTOs\CreateAccountData;
+use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccountType;
@@ -48,8 +48,8 @@ final class InvoiceFinanceIntegrationTest extends TestCase
             (int) $invoice->getKey(),
             '2026-06-06',
             [
-                new PostingLineData('1010', 'Cash', debit: '1000.000000'),
-                new PostingLineData('3000', 'Capital', credit: '1000.000000'),
+                new FinancePostingLine('1010', 'Cash', debit: '1000.000000'),
+                new FinancePostingLine('3000', 'Capital', credit: '1000.000000'),
             ],
         );
 

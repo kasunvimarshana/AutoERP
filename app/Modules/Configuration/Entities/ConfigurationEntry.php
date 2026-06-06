@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Entities;
 
-use Modules\Core\Entities\Entity;
+use Modules\Core\Support\Entity;
 
 final class ConfigurationEntry extends Entity
 {

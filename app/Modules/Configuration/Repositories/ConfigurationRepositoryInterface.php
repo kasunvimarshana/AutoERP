@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Repositories;
 
+use Modules\Core\Contracts\RepositoryPortInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
-use Modules\Core\Repositories\Contracts\RepositoryPortInterface;
 
 interface ConfigurationRepositoryInterface extends RepositoryPortInterface
 {

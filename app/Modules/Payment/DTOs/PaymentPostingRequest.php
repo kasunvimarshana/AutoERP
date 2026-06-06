@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Payment\DTOs;
 
-use Modules\Core\DTOs\Integration\PostingLineData;
+use Modules\Finance\DTOs\FinancePostingLine;
 
 final readonly class PaymentPostingRequest
 {
     /**
-     * @param  list<PostingLineData>  $lines
+     * @param  list<FinancePostingLine>  $lines
      */
     public function __construct(
         public int $paymentId,

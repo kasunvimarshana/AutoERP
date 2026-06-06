@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Entities;
 
 use InvalidArgumentException;
-use Modules\Core\Entities\Entity;
+use Modules\Core\Support\Entity;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\ValueObjects\TenantIsolationKey;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Entities;
+namespace Modules\Core\Support;
 
 use InvalidArgumentException;
 use Stringable;

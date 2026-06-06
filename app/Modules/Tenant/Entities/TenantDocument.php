@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Entities;
 
 use InvalidArgumentException;
-use Modules\Core\Entities\Entity;
+use Modules\Core\Support\Entity;
 
 final class TenantDocument extends Entity
 {

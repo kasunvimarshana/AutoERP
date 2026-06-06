@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Finance\Services;
 
 use InvalidArgumentException;
-use Modules\Core\DTOs\Integration\FinancePostingRequest;
-use Modules\Core\DTOs\Integration\PostingResultData;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateJournalEntryData;
+use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\JournalLineData;
+use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
@@ -53,6 +53,10 @@ final class FinancePostingService implements FinancePostingInterface
 
         if ($request->lines === []) {
             throw new InvalidArgumentException('Posting request requires at least one line.');
+        }
+
+        if ($request->source->tenantId === null) {
+            throw new InvalidArgumentException('Posting source tenant is required.');
         }
 
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {

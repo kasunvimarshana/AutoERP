@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\DTOs\Integration;
+namespace Modules\Finance\DTOs;
 
 final readonly class FinancePostingRequest
 {
     /**
-     * @param  list<PostingLineData|FinancePostingLine>  $lines
+     * @param  list<FinancePostingLine>  $lines
      */
     public function __construct(
         public PostingSourceData $source,

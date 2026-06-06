@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Contracts;
 
-use Modules\Core\DTOs\Integration\SettlementResultData;
+use Modules\Invoice\DTOs\SettlementResultData;
 
 interface InvoiceSettlementServiceInterface
 {
