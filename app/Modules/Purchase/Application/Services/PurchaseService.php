@@ -574,7 +574,7 @@ final class PurchaseService
 
         return match ($type) {
             'suppliers' => DB::table('suppliers')
-                ->select(['id', 'supplier_code as code', 'supplier_name as name', 'payment_terms_days'])
+                ->select(['id', 'supplier_code as code', 'supplier_name as name', 'payment_terms_days', 'credit_limit'])
                 ->where('tenant_id', $tenantId)
                 ->whereNull('deleted_at')
                 ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q->where('supplier_code', 'like', "%$search%")->orWhere('supplier_name', 'like', "%$search%")))

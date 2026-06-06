@@ -23,7 +23,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, onToggle }: Side
                 )}
             >
                 <div className={cn('flex h-16 items-center border-b border-slate-800 px-4', collapsed ? 'lg:justify-center' : 'justify-between')}>
-                    <NavLink className="flex min-w-0 items-center gap-3" onClick={onCloseMobile} to="/customers">
+                    <NavLink className="flex min-w-0 items-center gap-3" onClick={onCloseMobile} to="/dashboard">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-xs font-black tracking-wide text-white shadow-lg shadow-blue-950/40">AE</span>
                         <span className={cn('min-w-0', collapsed && 'lg:hidden')}>
                             <span className="block truncate text-sm font-bold text-white">AutoERP</span>
@@ -38,7 +38,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, onToggle }: Side
                 <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
                     {navigation.map((section) => (
                         <section key={section.label}>
-                            <p className={cn('mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600', collapsed && 'lg:text-center lg:text-[0px]')}>
+                            <p className={cn('mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em]', section.items.some((item) => pathname === item.to || pathname.startsWith(`${item.to}/`)) ? 'text-blue-300' : 'text-slate-600', collapsed && 'lg:text-center lg:text-[0px]')}>
                                 {collapsed ? <span className="hidden lg:inline">...</span> : null}
                                 <span className={collapsed ? 'lg:hidden' : ''}>{section.label}</span>
                             </p>
@@ -88,6 +88,7 @@ function Icon({ name }: { name: string }) {
         close: <path d="m6 6 12 12M18 6 6 18" />,
         collapse: <path d="m15 18-6-6 6-6" />,
         customers: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+        dashboard: <><path d="M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-3H4z" /></>,
         finance: <><path d="M3 21h18M5 21V10m4 11V10m6 11V10m4 11V10M3 10l9-7 9 7z" /></>,
         invoice: <><path d="M6 2h9l5 5v15H6z" /><path d="M14 2v6h6M9 13h6M9 17h6" /></>,
         items: <><path d="m21 8-9-5-9 5 9 5z" /><path d="m3 8 9 5 9-5M3 12l9 5 9-5M3 16l9 5 9-5" /></>,
@@ -95,8 +96,11 @@ function Icon({ name }: { name: string }) {
         purchase: <><path d="M3 3h2l2 12h11l2-8H6" /><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></>,
         service: <><path d="M14.7 6.3a4 4 0 0 0-5-5L7 4l3 3 2.7-2.7a4 4 0 0 0 2 2z" /><path d="m5 13-3 3 6 6 3-3M12 12l8.5 8.5" /></>,
         suppliers: <><path d="M3 21h18M5 21V5h10v16M15 9h4v12M8 9h4M8 13h4M8 17h4" /></>,
+        settings: <><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-2 .3l-.4.3-3.8-2.2-.1-.5a1.7 1.7 0 0 0-1.6-1.1H9l-1.9-3.4.3-.4a1.7 1.7 0 0 0 0-2l-.3-.4L9 7.5h.5a1.7 1.7 0 0 0 1.6-1.1l.1-.5 3.8-2.2.4.3a1.7 1.7 0 0 0 2 .3l.2-.1 2 3.4-.1.1a1.7 1.7 0 0 0-.3 1.9l.2.5v4.4z" /></>,
         uom: <><path d="M4 4v16h16M8 16l8-8M7 8h2M15 16h2" /></>,
+        users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /></>,
         vehicles: <><path d="m5 17-1 2v2h2l1-2h10l1 2h2v-2l-1-2-2-7H7z" /><path d="M5 17h14M7 10h10" /><circle cx="8" cy="16" r="1" /><circle cx="16" cy="16" r="1" /></>,
+        warehouse: <><path d="M3 21V8l9-5 9 5v13" /><path d="M7 21v-9h10v9M9 16h6" /></>,
     };
 
     return <svg aria-hidden="true" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">{paths[name]}</svg>;

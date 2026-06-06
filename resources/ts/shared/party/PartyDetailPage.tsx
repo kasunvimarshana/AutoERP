@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Spinner } from '../components/ui/Spinner';
-import { FormSection, MoneyDisplay, PageHeader, SecondaryLink, StatusBadge } from '../components/erp/ErpUi';
+import { CreditUtilization, FormSection, MoneyDisplay, PageHeader, SecondaryLink, StatusBadge } from '../components/erp/ErpUi';
 import type { PartyApi, PartyDetail } from './party.types';
 
 export function PartyDetailPage({ api, basePath, noun }: { api: PartyApi; basePath: string; noun: string }) {
@@ -35,7 +35,7 @@ export function PartyDetailPage({ api, basePath, noun }: { api: PartyApi; basePa
 
             <div className="grid gap-5 lg:grid-cols-3">
                 <div className="lg:col-span-2"><FormSection title="Contact and identity"><dl className="grid gap-4 sm:grid-cols-2"><Item label="Email" value={party.email} /><Item label="Phone" value={party.phone} /><Item label="Mobile" value={party.mobile} /><Item label="Status" value={<StatusBadge value={party.status} />} /><Item label="Tax number" value={party.taxNumber} /><Item label="VAT number" value={party.vatNumber} /></dl></FormSection></div>
-                <FormSection title="Credit and terms"><dl className="space-y-4"><Item label="Credit limit" value={<MoneyDisplay value={party.creditLimit} />} /><Item label="Current balance" value={party.currentCreditBalance ? <MoneyDisplay value={party.currentCreditBalance} /> : 'Not connected'} /><Item label="Available credit" value={party.availableCredit ? <MoneyDisplay value={party.availableCredit} /> : 'Not connected'} /><Item label="Payment terms" value={`${party.paymentTermsDays} days`} /></dl></FormSection>
+                <FormSection title="Credit and terms"><div className="space-y-4"><CreditUtilization availableCredit={party.availableCredit} creditLimit={party.creditLimit} currentBalance={party.currentCreditBalance ?? 0} /><dl className="space-y-4"><Item label="Payment terms" value={`${party.paymentTermsDays} days`} /><Item label="Credit source" value={party.currentCreditBalance ? 'Connected balance' : 'Limit configured; live exposure not connected'} /></dl></div></FormSection>
                 <div className="lg:col-span-2"><FormSection title="Primary address">{party.address ? <p className="leading-7 text-slate-600">{[party.address.addressLine1, party.address.addressLine2, party.address.city, party.address.stateProvince, party.address.postalCode, party.address.countryName].filter(Boolean).join(', ')}</p> : <p className="text-sm text-slate-500">No primary address recorded.</p>}</FormSection></div>
                 <FormSection title="Notes"><p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{party.notes || 'No notes.'}</p></FormSection>
             </div>

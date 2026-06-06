@@ -17,6 +17,19 @@ export function PageHeader({ actions, eyebrow, subtitle, title }: { actions?: Re
     );
 }
 
+export function Breadcrumb({ items }: { items: Array<{ label: string; to?: string }> }) {
+    return (
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-xs font-semibold text-slate-400">
+            {items.map((item, index) => (
+                <span className="flex items-center gap-1" key={`${item.label}-${index}`}>
+                    {index > 0 ? <span>/</span> : null}
+                    {item.to ? <Link className="hover:text-blue-600" to={item.to}>{item.label}</Link> : <span className="text-slate-600">{item.label}</span>}
+                </span>
+            ))}
+        </nav>
+    );
+}
+
 export function PrimaryLink({ children, to }: { children: ReactNode; to: string }) {
     return <Link className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300" to={to}>{children}</Link>;
 }
@@ -56,8 +69,11 @@ const statusStyles: Record<string, string> = {
     closed: 'bg-slate-100 text-slate-700 ring-slate-500/15',
     completed: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
     confirmed: 'bg-indigo-50 text-indigo-700 ring-indigo-600/15',
+    'credit exceeded': 'bg-red-50 text-red-700 ring-red-600/15',
     credited: 'bg-violet-50 text-violet-700 ring-violet-600/15',
     draft: 'bg-slate-100 text-slate-700 ring-slate-500/15',
+    healthy: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
+    'high risk': 'bg-orange-50 text-orange-700 ring-orange-600/15',
     inactive: 'bg-slate-100 text-slate-600 ring-slate-500/15',
     in_progress: 'bg-amber-50 text-amber-700 ring-amber-600/15',
     invoiced: 'bg-cyan-50 text-cyan-700 ring-cyan-600/15',
@@ -68,6 +84,7 @@ const statusStyles: Record<string, string> = {
     partially_received: 'bg-amber-50 text-amber-700 ring-amber-600/15',
     posted: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
     received: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
+    'watch closely': 'bg-amber-50 text-amber-700 ring-amber-600/15',
 };
 
 export function StatusBadge({ value }: { value?: string | null }) {
@@ -100,6 +117,40 @@ export function FormSection({ children, description, title }: { children: ReactN
 
 export function StatCard({ label, value }: { label: string; value: ReactNode }) {
     return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/40"><p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p><p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{value}</p></div>;
+}
+
+export function SummaryCard({ children, title }: { children: ReactNode; title: string }) {
+    return <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/40"><h2 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-400">{title}</h2><div className="mt-4 space-y-4">{children}</div></aside>;
+}
+
+export function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
+    return <div className="flex items-start justify-between gap-4 text-sm"><span className="text-slate-500">{label}</span><span className="text-right font-semibold text-slate-900">{value}</span></div>;
+}
+
+export function CreditUtilization({ availableCredit, creditLimit, currentBalance }: { availableCredit?: number | string | null; creditLimit?: number | string | null; currentBalance?: number | string | null }) {
+    const limit = Number(creditLimit || 0);
+    const balance = Number(currentBalance || 0);
+    const available = availableCredit === null || availableCredit === undefined ? limit - balance : Number(availableCredit);
+    const utilization = limit > 0 ? Math.max(0, Math.round((balance / limit) * 100)) : 0;
+    const state = utilization >= 100 ? 'Credit exceeded' : utilization >= 90 ? 'High risk' : utilization >= 80 ? 'Watch closely' : 'Healthy';
+    const bar = utilization >= 100 ? 'bg-red-500' : utilization >= 90 ? 'bg-orange-500' : utilization >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+
+    return (
+        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Credit exposure</p>
+                <StatusBadge value={state} />
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className={cn('h-full rounded-full transition-all', bar)} style={{ width: `${Math.min(100, utilization)}%` }} />
+            </div>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+                <div><p className="text-xs text-slate-400">Limit</p><MoneyDisplay className="font-bold" value={limit} /></div>
+                <div><p className="text-xs text-slate-400">Outstanding</p><MoneyDisplay className="font-bold" value={balance} /></div>
+                <div><p className="text-xs text-slate-400">Available</p><MoneyDisplay className="font-bold" value={available} /></div>
+            </div>
+        </div>
+    );
 }
 
 export function Pagination({ current, last, loading, onPage, total }: { current: number; last: number; loading?: boolean; onPage: (page: number) => void; total?: number }) {

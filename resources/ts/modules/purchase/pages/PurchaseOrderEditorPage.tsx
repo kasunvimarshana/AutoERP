@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
-import { FormSection, PageHeader, TotalsSummaryCard } from '../../../shared/components/erp/ErpUi';
+import { CreditUtilization, FormSection, MoneyDisplay, PageHeader, SummaryCard, SummaryRow, TotalsSummaryCard } from '../../../shared/components/erp/ErpUi';
 import { purchaseApi } from '../services/purchaseApi';
 import type { PurchaseHeaderTotalsInput, PurchaseLineInput, PurchaseLookup, PurchaseOrderInput } from '../types/purchase.types';
 
@@ -45,6 +45,8 @@ export function PurchaseOrderEditorPage({ mode }: { mode: 'create' | 'edit' }) {
     useEffect(() => { void Promise.all([purchaseApi.lookup('suppliers'), purchaseApi.lookup('items'), purchaseApi.lookup('uoms'), purchaseApi.lookup('warehouses')]).then(([s, i, u, w]) => { setSuppliers(s); setItems(i); setUoms(u); setWarehouses(w); }); }, []);
     useEffect(() => { if (mode === 'edit' && id) void purchaseApi.getOrder(Number(id)).then((order) => setValue({ creditNoteTotal: order.creditNoteTotal, debitNoteTotal: order.debitNoteTotal, expectedDate: order.expectedDate ?? undefined, headerDiscountAmount: order.headerDiscountAmount, headerDiscountType: order.headerDiscountType ?? '', headerDiscountValue: order.headerDiscountValue ?? undefined, headerTaxAmount: order.headerTaxAmount, lines: (order.lines ?? []).map((line) => ({ description: line.description ?? undefined, discountAmount: line.discount_amount, itemId: line.item_id, receivedQty: line.received_qty ?? line.ordered_qty ?? '1', taxAmount: line.tax_amount, unitPrice: line.unit_price, uomId: line.uom_id })), notes: order.notes ?? undefined, orderDate: order.orderDate, poNumber: order.poNumber, reference: order.reference ?? undefined, supplierId: order.supplierId, warehouseId: order.warehouseId })).catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load purchase order.')); }, [id, mode]);
     const total = useMemo(() => purchasePreview(value), [value]);
+    const selectedSupplier = suppliers.find((supplier) => supplier.id === value.supplierId);
+    const selectedWarehouse = warehouses.find((warehouse) => warehouse.id === value.warehouseId);
 
     function updateLine(index: number, next: Partial<PurchaseLineInput>) {
         setValue((current) => ({ ...current, lines: current.lines.map((line, lineIndex) => lineIndex === index ? { ...line, ...next } : line) }));
@@ -66,13 +68,32 @@ export function PurchaseOrderEditorPage({ mode }: { mode: 'create' | 'edit' }) {
 
     return <form className="space-y-5" onSubmit={(event) => void submit(event)}><Header title={mode === 'edit' ? 'Edit purchase order' : 'Create purchase order'} />
         {error ? <Alert message={error} /> : null}
-        <Section title="Basic Information"><div className="grid gap-4 md:grid-cols-3"><Field label="PO number"><Input value={value.poNumber ?? ''} onChange={(event) => setValue({ ...value, poNumber: event.target.value })} placeholder="Auto if empty" /></Field><Field label="Order date"><Input type="date" value={value.orderDate} onChange={(event) => setValue({ ...value, orderDate: event.target.value })} /></Field><Field label="Expected date"><Input type="date" value={value.expectedDate ?? ''} onChange={(event) => setValue({ ...value, expectedDate: event.target.value })} /></Field></div></Section>
-        <Section title="Supplier & Warehouse"><div className="grid gap-4 md:grid-cols-2"><Lookup label="Supplier" options={suppliers} value={value.supplierId} onChange={(supplierId) => setValue({ ...value, supplierId })} /><Lookup label="Warehouse" options={warehouses} value={value.warehouseId} onChange={(warehouseId) => setValue({ ...value, warehouseId })} /></div></Section>
-        <Section title="Item Lines"><Lines items={items} lines={value.lines} onAdd={() => setValue({ ...value, lines: [...value.lines, blankLine] })} onChange={updateLine} onItem={pickItem} onRemove={(index) => setValue({ ...value, lines: value.lines.filter((_, lineIndex) => lineIndex !== index) })} uoms={uoms} /></Section>
-        <Section title="Header Discount, Tax, Charges & Adjustments"><HeaderTotalsFields value={value} onChange={(next) => setValue({ ...value, ...next })} /></Section>
-        <Section title="Totals"><TotalsPreview totals={total} /></Section>
-        <Section title="Notes"><textarea className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm" value={value.notes ?? ''} onChange={(event) => setValue({ ...value, notes: event.target.value })} /></Section>
-        <div className="flex justify-end gap-3"><Button onClick={() => navigate('/purchase/orders')} variant="secondary">Cancel</Button><Button disabled={saving} type="submit" variant="blue">{saving ? 'Saving' : 'Save purchase order'}</Button></div>
+        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+            <div className="space-y-5">
+                <Section title="Basic Information"><div className="grid gap-4 md:grid-cols-3"><Field label="PO number"><Input value={value.poNumber ?? ''} onChange={(event) => setValue({ ...value, poNumber: event.target.value })} placeholder="Auto if empty" /></Field><Field label="Order date"><Input type="date" value={value.orderDate} onChange={(event) => setValue({ ...value, orderDate: event.target.value })} /></Field><Field label="Expected date"><Input type="date" value={value.expectedDate ?? ''} onChange={(event) => setValue({ ...value, expectedDate: event.target.value })} /></Field></div></Section>
+                <Section title="Supplier & Warehouse"><div className="grid gap-4 md:grid-cols-2"><Lookup label="Supplier" options={suppliers} value={value.supplierId} onChange={(supplierId) => setValue({ ...value, supplierId })} /><Lookup label="Warehouse" options={warehouses} value={value.warehouseId} onChange={(warehouseId) => setValue({ ...value, warehouseId })} /></div></Section>
+                <Section title="Item Lines"><Lines items={items} lines={value.lines} onAdd={() => setValue({ ...value, lines: [...value.lines, blankLine] })} onChange={updateLine} onItem={pickItem} onRemove={(index) => setValue({ ...value, lines: value.lines.filter((_, lineIndex) => lineIndex !== index) })} uoms={uoms} /></Section>
+                <Section title="Header Discount, Tax, Charges & Adjustments"><HeaderTotalsFields value={value} onChange={(next) => setValue({ ...value, ...next })} /></Section>
+                <Section title="Notes"><textarea className="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm" value={value.notes ?? ''} onChange={(event) => setValue({ ...value, notes: event.target.value })} /></Section>
+            </div>
+            <div className="space-y-5 xl:sticky xl:top-24 xl:self-start">
+                <SummaryCard title="Purchase Summary">
+                    <SummaryRow label="Supplier" value={selectedSupplier?.name ?? 'Not selected'} />
+                    <SummaryRow label="Warehouse" value={selectedWarehouse?.name ?? 'Not selected'} />
+                    <SummaryRow label="Lines" value={value.lines.length} />
+                    <SummaryRow label="Expected date" value={value.expectedDate || 'Not set'} />
+                    {selectedSupplier ? <CreditUtilization availableCredit={Number(selectedSupplier.credit_limit || 0) - Number(selectedSupplier.outstanding_balance || 0)} creditLimit={selectedSupplier.credit_limit ?? 0} currentBalance={selectedSupplier.outstanding_balance ?? 0} /> : null}
+                </SummaryCard>
+                <SummaryCard title="Totals">
+                    <SummaryRow label="Subtotal" value={<MoneyDisplay value={total.subtotal} />} />
+                    <SummaryRow label="Discounts" value={<MoneyDisplay value={total.lineDiscount + total.headerDiscount} />} />
+                    <SummaryRow label="Tax" value={<MoneyDisplay value={total.lineTax + total.headerTax} />} />
+                    <SummaryRow label="Adjustments" value={<MoneyDisplay value={total.additions - total.deductions} />} />
+                    <div className="border-t border-slate-100 pt-4"><SummaryRow label="Grand total" value={<MoneyDisplay className="text-lg font-black" value={total.grandTotal} />} /></div>
+                </SummaryCard>
+                <div className="flex justify-end gap-3"><Button onClick={() => navigate('/purchase/orders')} variant="secondary">Cancel</Button><Button disabled={saving} type="submit" variant="blue">{saving ? 'Saving' : 'Save purchase order'}</Button></div>
+            </div>
+        </div>
     </form>;
 }
 

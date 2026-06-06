@@ -1,5 +1,6 @@
 export type NavigationItem = {
-    icon: 'customers' | 'finance' | 'invoice' | 'items' | 'payments' | 'purchase' | 'service' | 'suppliers' | 'uom' | 'vehicles';
+    disabled?: boolean;
+    icon: 'customers' | 'dashboard' | 'finance' | 'invoice' | 'items' | 'payments' | 'purchase' | 'service' | 'settings' | 'suppliers' | 'uom' | 'users' | 'vehicles' | 'warehouse';
     label: string;
     to: string;
 };
@@ -11,13 +12,20 @@ export type NavigationSection = {
 
 export const navigation: NavigationSection[] = [
     {
+        label: 'Workspace',
+        items: [
+            { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
+        ],
+    },
+    {
         label: 'Masters',
         items: [
             { icon: 'customers', label: 'Customers', to: '/customers' },
             { icon: 'suppliers', label: 'Suppliers', to: '/suppliers' },
             { icon: 'vehicles', label: 'Vehicles', to: '/vehicles' },
             { icon: 'items', label: 'Items', to: '/items' },
-            { icon: 'uom', label: 'Units of measure', to: '/uoms' },
+            { icon: 'uom', label: 'UOM', to: '/uoms' },
+            { icon: 'warehouse', label: 'Warehouses', to: '/warehouses' },
         ],
     },
     {
@@ -36,6 +44,13 @@ export const navigation: NavigationSection[] = [
             { icon: 'invoice', label: 'Invoices', to: '/invoices' },
             { icon: 'payments', label: 'Payments', to: '/payments' },
             { icon: 'finance', label: 'Journal entries', to: '/finance/journals' },
+        ],
+    },
+    {
+        label: 'Administration',
+        items: [
+            { icon: 'users', label: 'Users', to: '/administration/users' },
+            { icon: 'settings', label: 'Settings', to: '/settings' },
         ],
     },
 ];

@@ -7,6 +7,7 @@ import { CustomerCreatePage } from '../modules/customer/pages/CustomerCreatePage
 import { CustomerDetailPage } from '../modules/customer/pages/CustomerDetailPage';
 import { CustomerEditPage } from '../modules/customer/pages/CustomerEditPage';
 import { CustomerListPage } from '../modules/customer/pages/CustomerListPage';
+import { DashboardPage } from '../modules/dashboard/pages/DashboardPage';
 import { JournalDetailPage } from '../modules/finance/pages/JournalDetailPage';
 import { JournalListPage } from '../modules/finance/pages/JournalListPage';
 import { InvoiceCreatePage } from '../modules/invoice/pages/InvoiceCreatePage';
@@ -45,6 +46,7 @@ import { UomCreatePage } from '../modules/uom/pages/UomCreatePage';
 import { UomDetailPage } from '../modules/uom/pages/UomDetailPage';
 import { UomEditPage } from '../modules/uom/pages/UomEditPage';
 import { UomListPage } from '../modules/uom/pages/UomListPage';
+import { PlaceholderPage } from '../shared/components/erp/PlaceholderPage';
 
 const router = createBrowserRouter([
     {
@@ -59,7 +61,8 @@ const router = createBrowserRouter([
             {
                 element: <AppLayout />,
                 children: [
-                    { element: <Navigate replace to="/customers" />, index: true },
+                    { element: <Navigate replace to="/dashboard" />, index: true },
+                    { element: <DashboardPage />, path: 'dashboard' },
                     { element: <CustomerListPage />, path: 'customers' },
                     { element: <CustomerCreatePage />, path: 'customers/new' },
                     { element: <CustomerDetailPage />, path: 'customers/:id' },
@@ -85,6 +88,7 @@ const router = createBrowserRouter([
                     { element: <ItemCreatePage />, path: 'items/new' },
                     { element: <ItemDetailPage />, path: 'items/:id' },
                     { element: <ItemEditPage />, path: 'items/:id/edit' },
+                    { element: <PlaceholderPage area="Master data" title="Warehouses" />, path: 'warehouses' },
                     { element: <InvoiceListPage />, path: 'invoices' },
                     { element: <InvoiceCreatePage />, path: 'invoices/new' },
                     { element: <InvoiceDetailPage />, path: 'invoices/:id' },
@@ -106,6 +110,8 @@ const router = createBrowserRouter([
                     { element: <PurchaseReturnEditorPage mode="edit" />, path: 'purchase/returns/:id/edit' },
                     { element: <JournalListPage />, path: 'finance/journals' },
                     { element: <JournalDetailPage />, path: 'finance/journals/:id' },
+                    { element: <PlaceholderPage area="Administration" title="Users" />, path: 'administration/users' },
+                    { element: <PlaceholderPage area="Administration" title="Settings" />, path: 'settings' },
                 ],
             },
         ],
