@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Core\Database\Seeders\CoreSeeder;
+use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
@@ -27,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ItemSeeder::class,
             WarehouseSeeder::class,
             SupplierSeeder::class,
+            CustomerSeeder::class,
         ]);
     }
 }

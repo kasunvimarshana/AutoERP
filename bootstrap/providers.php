@@ -5,6 +5,7 @@ use Modules\Audit\Providers\AuditServiceProvider;
 use Modules\Auth\Providers\AuthServiceProvider;
 use Modules\Configuration\Providers\ConfigurationServiceProvider;
 use Modules\Core\Providers\CoreServiceProvider;
+use Modules\Customer\Providers\CustomerServiceProvider;
 use Modules\Extension\Providers\ExtensionServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Inventory\Providers\InventoryServiceProvider;
@@ -36,6 +37,7 @@ return [
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
     SupplierServiceProvider::class,
+    CustomerServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     ExtensionServiceProvider::class,

@@ -16,6 +16,10 @@ const SupplierListPage = lazy(() => import('@/modules/supplier/SupplierListPage'
 const SupplierCreatePage = lazy(() => import('@/modules/supplier/SupplierCreatePage'));
 const SupplierEditPage = lazy(() => import('@/modules/supplier/SupplierEditPage'));
 const SupplierDetailPage = lazy(() => import('@/modules/supplier/SupplierDetailPage'));
+const CustomerListPage = lazy(() => import('@/modules/customer/CustomerListPage'));
+const CustomerCreatePage = lazy(() => import('@/modules/customer/CustomerCreatePage'));
+const CustomerEditPage = lazy(() => import('@/modules/customer/CustomerEditPage'));
+const CustomerDetailPage = lazy(() => import('@/modules/customer/CustomerDetailPage'));
 const ItemListPage = lazy(() => import('@/modules/item/ItemListPage'));
 const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
 const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
@@ -64,6 +68,10 @@ export function AppRouter() {
                     <Route path="/suppliers/create" element={<SupplierCreatePage />} />
                     <Route path="/suppliers/:id/edit" element={<SupplierEditPage />} />
                     <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+                    <Route path="/customers" element={<CustomerListPage />} />
+                    <Route path="/customers/create" element={<CustomerCreatePage />} />
+                    <Route path="/customers/:id/edit" element={<CustomerEditPage />} />
+                    <Route path="/customers/:id" element={<CustomerDetailPage />} />
                     <Route path="/items" element={<ItemListPage />} />
                     <Route path="/items/create" element={<ItemCreatePage />} />
                     <Route path="/items/:id/edit" element={<ItemEditPage />} />

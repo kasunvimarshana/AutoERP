@@ -1,5 +1,7 @@
 export const endpoints = {
     auth: '/api/v1/auth',
+    customers: '/api/v1/customers',
+    customerCategories: '/api/v1/customer-categories',
     suppliers: '/api/v1/suppliers',
     supplierCategories: '/api/v1/supplier-categories',
     items: '/api/v1/items',
