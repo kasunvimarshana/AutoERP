@@ -14,6 +14,7 @@ use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
+use Modules\Supplier\Providers\SupplierServiceProvider;
 use Modules\Tenant\Providers\TenantServiceProvider;
 use Modules\UOM\Providers\UomServiceProvider;
 use Modules\User\Providers\UserServiceProvider;
@@ -34,6 +35,7 @@ return [
     ItemServiceProvider::class,
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
+    SupplierServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     ExtensionServiceProvider::class,
