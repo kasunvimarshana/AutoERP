@@ -221,9 +221,24 @@ final class PurchaseController
 
     public function createDebitNote(StorePurchaseDebitNoteRequest $request, PurchaseDebitNoteService $service): JsonResponse
     {
-        return (new PurchaseDebitNoteResource($service->create($request->toData())))
+        return (new PurchaseDebitNoteResource($service->create($request->toData())->load(['supplier', 'purchaseReturn'])))
             ->response()
             ->setStatusCode(201);
+    }
+
+    public function debitNoteIndex(ListPurchaseOrderRequest $request): AnonymousResourceCollection
+    {
+        return PurchaseDebitNoteResource::collection($this->scope(PurchaseDebitNote::query(), $request)
+            ->with(['supplier', 'purchaseReturn'])
+            ->latest('debit_note_date')
+            ->paginate($request->perPage()));
+    }
+
+    public function showDebitNote(ListPurchaseOrderRequest $request, int $debitNote): PurchaseDebitNoteResource
+    {
+        return new PurchaseDebitNoteResource($this->scope(PurchaseDebitNote::query(), $request)
+            ->with(['supplier', 'purchaseReturn'])
+            ->findOrFail($debitNote));
     }
 
     public function createInventoryAdjustmentRequest(StorePurchaseInventoryAdjustmentRequest $request, StockAdjustmentService $service): JsonResponse
@@ -296,7 +311,7 @@ final class PurchaseController
             'source_line_type' => 'goods_receipt_note_line',
             'source_line_id' => (int) $line->getKey(),
             'item' => $line->relationLoaded('item') ? ['id' => (int) $line->item->getKey(), 'code' => $line->item->code, 'name' => $line->item->name] : null,
-            'uom' => $line->relationLoaded('uom') ? ['id' => (int) $line->uom->getKey(), 'code' => $line->uom->code, 'name' => $line->uom->name] : null,
+            'uom' => $line->relationLoaded('uom') ? ['id' => (int) $line->uom->getKey(), 'code' => $line->uom->code, 'name' => $line->uom->name, 'symbol' => $line->uom->symbol] : null,
             'returnable_quantity' => (string) $line->remaining_quantity,
             'unit_price' => (string) $line->unit_price,
         ])->all()]);

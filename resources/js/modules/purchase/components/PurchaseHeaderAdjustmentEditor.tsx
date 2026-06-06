@@ -7,6 +7,7 @@ export interface EditableHeaderAdjustment {
     adjustment_type: string;
     effect: 'increase' | 'decrease';
     calculation_type: 'fixed' | 'percentage';
+    calculation_base: 'subtotal' | 'subtotal_after_line_discount' | 'subtotal_after_line_adjustments';
     rate: string;
     amount: string;
     allocation_method: string;
@@ -19,6 +20,7 @@ export function emptyHeaderAdjustment(): EditableHeaderAdjustment {
         adjustment_type: 'freight',
         effect: 'increase',
         calculation_type: 'fixed',
+        calculation_base: 'subtotal',
         rate: '0.000000',
         amount: '0.000000',
         allocation_method: 'proportional',
@@ -37,6 +39,12 @@ const adjustmentTypes = [
     'rounding',
     'other',
 ].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+
+const calculationBases = [
+    { value: 'subtotal', label: 'subtotal' },
+    { value: 'subtotal_after_line_discount', label: 'after line discount' },
+    { value: 'subtotal_after_line_adjustments', label: 'after line adjustments' },
+];
 
 export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor }: {
     adjustments: EditableHeaderAdjustment[];
@@ -58,6 +66,7 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
                         <Select label="Calculation" value={adjustment.calculation_type} options={[{ value: 'fixed', label: 'fixed' }, { value: 'percentage', label: 'percentage' }]} error={errorFor(`adjustments.${index}.calculation_type`)} onChange={(event) => update(index, { ...adjustment, calculation_type: event.target.value as 'fixed' | 'percentage' })} />
                     </div>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <Select label="Base" value={adjustment.calculation_base} options={calculationBases} error={errorFor(`adjustments.${index}.calculation_base`)} onChange={(event) => update(index, { ...adjustment, calculation_base: event.target.value as EditableHeaderAdjustment['calculation_base'] })} />
                         <Input label="Rate" type="number" min="0" step="0.000001" value={adjustment.rate} error={errorFor(`adjustments.${index}.rate`)} onChange={(event) => update(index, { ...adjustment, rate: event.target.value })} />
                         <Input label="Amount" type="number" min="0" step="0.000001" value={adjustment.amount} error={errorFor(`adjustments.${index}.amount`)} onChange={(event) => update(index, { ...adjustment, amount: event.target.value })} />
                         <Select label="Allocation" value={adjustment.allocation_method} options={[{ value: 'proportional', label: 'proportional' }, { value: 'manual', label: 'manual' }, { value: 'first_invoice', label: 'first invoice' }, { value: 'last_invoice', label: 'last invoice' }]} error={errorFor(`adjustments.${index}.allocation_method`)} onChange={(event) => update(index, { ...adjustment, allocation_method: event.target.value })} />

@@ -18,6 +18,7 @@ final class PurchaseReturnResource extends ModuleResource
             'return_type' => $this->enumValue($this->return_type),
             'source_type' => $this->source_type,
             'source_id' => $this->source_id,
+            'source' => $this->sourceSummary(),
             'status' => $this->enumValue($this->status),
             'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
@@ -84,5 +85,19 @@ final class PurchaseReturnResource extends ModuleResource
         }
 
         return $data;
+    }
+
+    private function sourceSummary(): ?array
+    {
+        if ($this->source_type === null && $this->source_id === null) {
+            return null;
+        }
+
+        return [
+            'type' => $this->source_type,
+            'id' => $this->source_id === null ? null : (int) $this->source_id,
+            'number' => null,
+            'date' => null,
+        ];
     }
 }

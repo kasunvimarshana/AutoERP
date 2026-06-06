@@ -121,7 +121,7 @@ final class CoreModulesApiTest extends TestCase
             ]],
         ])->assertSuccessful()->json('data');
 
-        $this->postJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', [
+        $this->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
         ])->assertSuccessful()->assertJsonPath('data.status', 'posted');

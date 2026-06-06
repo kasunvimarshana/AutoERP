@@ -1,0 +1,191 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { Button } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Input } from '@/shared/components/Input';
+import { Panel } from '@/shared/components/Panel';
+import { Select } from '@/shared/components/Select';
+import { Textarea } from '@/shared/components/Textarea';
+import type { NamedResource } from '@/shared/types/common';
+import { createPurchaseInvoice, getGoodsReceipt, getInvoiceablePurchaseOrderLines, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
+import { CurrencyLookupSelect, GoodsReceiptLookupSelect, PurchaseOrderLookupSelect, SupplierLookupSelect } from '../components/PurchaseLookups';
+import { PurchaseInvoicePreview } from '../components/PurchaseInvoicePreview';
+
+type SourceType = 'goods_receipt_note' | 'purchase_order';
+
+interface InvoiceLine {
+    sourceType: SourceType;
+    sourceId: number;
+    sourceLabel: string;
+    lineId: number;
+    itemName: string;
+    sourceQty: string;
+    previouslyInvoiced: string;
+    remainingQty: string;
+    quantity: string;
+}
+
+function today(): string {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function decimal(value: string | undefined, fallback = '0.000000'): string {
+    return value && value.trim() !== '' ? value : fallback;
+}
+
+export default function PurchaseInvoiceCreatePage() {
+    const navigate = useNavigate();
+    const [sourceType, setSourceType] = useState<SourceType>('goods_receipt_note');
+    const [source, setSource] = useState<NamedResource | null>(null);
+    const [sources, setSources] = useState<Array<{ type: SourceType; id: number; label: string }>>([]);
+    const [lines, setLines] = useState<InvoiceLine[]>([]);
+    const [supplier, setSupplier] = useState<NamedResource | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const [invoiceDate, setInvoiceDate] = useState(today());
+    const [dueDate, setDueDate] = useState('');
+    const [invoiceNumber, setInvoiceNumber] = useState('');
+    const [exchangeRate, setExchangeRate] = useState('1.000000');
+    const [notes, setNotes] = useState('');
+    const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
+    const [error, setError] = useState<ApiError | null>(null);
+    const [busy, setBusy] = useState(false);
+    const errorFor = (field: string) => fieldError(error, field);
+
+    const addSource = async () => {
+        if (!source?.id) return;
+        if (sources.some((current) => current.type === sourceType && current.id === source.id)) return;
+        setBusy(true);
+        setError(null);
+        try {
+            if (sourceType === 'purchase_order') {
+                const rows = await getInvoiceablePurchaseOrderLines(source.id);
+                setLines((current) => [...current, ...rows.map((row: PurchaseOrderLine) => ({
+                    sourceType,
+                    sourceId: source.id,
+                    sourceLabel: source.name,
+                    lineId: row.id ?? 0,
+                    itemName: row.item?.name ?? '-',
+                    sourceQty: row.ordered_quantity,
+                    previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
+                    remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
+                    quantity: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
+                }))]);
+            } else {
+                const grn = await getGoodsReceipt(source.id);
+                if (!supplier && grn.supplier) setSupplier(grn.supplier);
+                setLines((current) => [...current, ...(grn.lines ?? []).filter((row) => row.remaining_quantity !== '0.000000').map((row: GoodsReceiptLine) => ({
+                    sourceType,
+                    sourceId: source.id,
+                    sourceLabel: source.name,
+                    lineId: row.id ?? 0,
+                    itemName: row.item?.name ?? '-',
+                    sourceQty: row.accepted_quantity,
+                    previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
+                    remainingQty: row.remaining_quantity ?? '0.000000',
+                    quantity: row.remaining_quantity ?? '0.000000',
+                }))]);
+            }
+            setSources((current) => [...current, { type: sourceType, id: source.id, label: source.name }]);
+            setSource(null);
+            setPreview(null);
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const payload = (): PurchaseInvoicePayload => ({
+        invoice_date: invoiceDate,
+        invoice_number: invoiceNumber || undefined,
+        supplier_type: 'supplier',
+        supplier_id: supplier?.id,
+        due_date: dueDate || undefined,
+        currency_id: currency?.id,
+        exchange_rate: decimal(exchangeRate, '1.000000'),
+        notes: notes || undefined,
+        sources: sources.map((item) => ({
+            source_type: item.type,
+            source_id: item.id,
+            line_quantities: Object.fromEntries(lines.filter((line) => line.sourceType === item.type && line.sourceId === item.id && line.quantity !== '').map((line) => [line.lineId, decimal(line.quantity)])),
+        })),
+    });
+
+    const runPreview = async () => {
+        setBusy(true);
+        setError(null);
+        try {
+            setPreview(await previewPurchaseInvoice(payload()));
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="space-y-5">
+            <ContentHeader title="Create supplier invoice" />
+            <ErrorAlert error={error} />
+            <Panel title="Invoice header">
+                <div className="grid gap-4 md:grid-cols-4">
+                    <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
+                    <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
+                    <Input label="Invoice date" type="date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => setInvoiceDate(event.target.value)} />
+                    <Input label="Due date" type="date" value={dueDate} error={errorFor('due_date')} onChange={(event) => setDueDate(event.target.value)} />
+                    <Input label="Invoice number" value={invoiceNumber} error={errorFor('invoice_number')} onChange={(event) => setInvoiceNumber(event.target.value)} />
+                    <Input label="Exchange rate" type="number" min="0.000001" step="0.000001" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => setExchangeRate(event.target.value)} />
+                </div>
+            </Panel>
+            <Panel title="Sources">
+                <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
+                    <Select label="Source type" value={sourceType} options={[{ value: 'goods_receipt_note', label: 'GRN' }, { value: 'purchase_order', label: 'PO' }]} onChange={(event) => { setSourceType(event.target.value as SourceType); setSource(null); }} />
+                    {sourceType === 'goods_receipt_note' ? <GoodsReceiptLookupSelect value={source} onChange={setSource} /> : <PurchaseOrderLookupSelect value={source} onChange={setSource} />}
+                    <Button type="button" variant="secondary" loading={busy} onClick={addSource}>Add source</Button>
+                </div>
+                {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}</span>)}</div>}
+            </Panel>
+            <Panel title="Invoiceable lines">
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <tr>{['Source', 'Item', 'Source qty', 'Previously invoiced', 'Remaining', 'Invoice qty'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {lines.map((line, index) => <tr key={`${line.sourceType}-${line.lineId}`}>
+                                <td className="px-4 py-3">{line.sourceLabel}</td>
+                                <td className="px-4 py-3">{line.itemName}</td>
+                                <td className="px-4 py-3 tabular-nums">{line.sourceQty}</td>
+                                <td className="px-4 py-3 tabular-nums">{line.previouslyInvoiced}</td>
+                                <td className="px-4 py-3 tabular-nums">{line.remainingQty}</td>
+                                <td className="min-w-44 px-4 py-3"><Input type="number" min="0" step="0.000001" value={line.quantity} error={errorFor(`sources.${index}.line_quantities.${line.lineId}`)} onChange={(event) => setLines(lines.map((current, currentIndex) => currentIndex === index ? { ...current, quantity: event.target.value } : current))} /></td>
+                            </tr>)}
+                        </tbody>
+                    </table>
+                    {lines.length === 0 && <div className="px-4 py-10 text-center text-sm text-slate-500">Add one or more GRN/PO sources.</div>}
+                </div>
+            </Panel>
+            <Panel title="Notes">
+                <Textarea label="Notes" value={notes} error={errorFor('notes')} onChange={(event) => setNotes(event.target.value)} />
+            </Panel>
+            <PurchaseInvoicePreview preview={preview} />
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" loading={busy} onClick={runPreview}>Preview</Button>
+                <Button type="button" loading={busy} onClick={async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                        const invoice = await createPurchaseInvoice(payload());
+                        navigate(`/invoices/${String(invoice.id ?? '')}`);
+                    } catch (requestError) {
+                        setError(toApiError(requestError));
+                    } finally {
+                        setBusy(false);
+                    }
+                }}>Create invoice</Button>
+            </div>
+        </div>
+    );
+}

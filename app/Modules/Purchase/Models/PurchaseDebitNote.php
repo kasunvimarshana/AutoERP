@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
+use Modules\Supplier\Models\Supplier;
 
 final class PurchaseDebitNote extends CoreModel
 {
@@ -37,5 +38,10 @@ final class PurchaseDebitNote extends CoreModel
     public function purchaseReturn(): BelongsTo
     {
         return $this->belongsTo(PurchaseReturn::class, 'purchase_return_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 }

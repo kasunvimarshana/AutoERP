@@ -20,12 +20,9 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::put('orders/{order}', [PurchaseController::class, 'update'])->whereNumber('order')->name('orders.update');
     Route::delete('orders/{order}', [PurchaseController::class, 'destroy'])->whereNumber('order')->name('orders.destroy');
     Route::patch('orders/{order}/submit', [PurchaseController::class, 'submit'])->whereNumber('order')->name('orders.submit');
-    Route::post('orders/{order}/approve', [PurchaseController::class, 'approve'])->whereNumber('order')->name('orders.approve');
-    Route::patch('orders/{order}/approve', [PurchaseController::class, 'approve'])->whereNumber('order')->name('orders.approve.patch');
-    Route::post('orders/{order}/cancel', [PurchaseController::class, 'cancel'])->whereNumber('order')->name('orders.cancel');
-    Route::patch('orders/{order}/cancel', [PurchaseController::class, 'cancel'])->whereNumber('order')->name('orders.cancel.patch');
-    Route::post('orders/{order}/close', [PurchaseController::class, 'close'])->whereNumber('order')->name('orders.close');
-    Route::patch('orders/{order}/close', [PurchaseController::class, 'close'])->whereNumber('order')->name('orders.close.patch');
+    Route::patch('orders/{order}/approve', [PurchaseController::class, 'approve'])->whereNumber('order')->name('orders.approve');
+    Route::patch('orders/{order}/cancel', [PurchaseController::class, 'cancel'])->whereNumber('order')->name('orders.cancel');
+    Route::patch('orders/{order}/close', [PurchaseController::class, 'close'])->whereNumber('order')->name('orders.close');
 
     Route::get('orders/{order}/receivable-lines', [PurchaseController::class, 'receivableLines'])->whereNumber('order')->name('orders.receivable-lines');
     Route::get('orders/{order}/invoiceable-lines', [PurchaseController::class, 'invoiceableLines'])->whereNumber('order')->name('orders.invoiceable-lines');
@@ -33,8 +30,7 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('goods-receipts', [PurchaseController::class, 'grnIndex'])->name('goods-receipts.index');
     Route::post('goods-receipts', [PurchaseController::class, 'createGrn'])->name('goods-receipts.store');
     Route::get('goods-receipts/{grn}', [PurchaseController::class, 'showGrn'])->whereNumber('grn')->name('goods-receipts.show');
-    Route::post('goods-receipts/{grn}/post', [PurchaseController::class, 'postGrn'])->whereNumber('grn')->name('goods-receipts.post');
-    Route::patch('goods-receipts/{grn}/post', [PurchaseController::class, 'postGrn'])->whereNumber('grn')->name('goods-receipts.post.patch');
+    Route::patch('goods-receipts/{grn}/post', [PurchaseController::class, 'postGrn'])->whereNumber('grn')->name('goods-receipts.post');
     Route::patch('goods-receipts/{grn}/reverse', [PurchaseController::class, 'reverseGrn'])->whereNumber('grn')->name('goods-receipts.reverse');
     Route::get('goods-receipts/{grn}/returnable-lines', [PurchaseController::class, 'returnableLines'])->whereNumber('grn')->name('goods-receipts.returnable-lines');
 
@@ -42,12 +38,13 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::post('returns', [PurchaseController::class, 'createReturn'])->name('returns.store');
     Route::get('returns/{return}', [PurchaseController::class, 'showReturn'])->whereNumber('return')->name('returns.show');
     Route::patch('returns/{return}/approve', [PurchaseController::class, 'approveReturn'])->whereNumber('return')->name('returns.approve');
-    Route::post('returns/{return}/post', [PurchaseController::class, 'postReturn'])->whereNumber('return')->name('returns.post');
-    Route::patch('returns/{return}/post', [PurchaseController::class, 'postReturn'])->whereNumber('return')->name('returns.post.patch');
+    Route::patch('returns/{return}/post', [PurchaseController::class, 'postReturn'])->whereNumber('return')->name('returns.post');
     Route::patch('returns/{return}/cancel', [PurchaseController::class, 'cancelReturn'])->whereNumber('return')->name('returns.cancel');
 
     Route::post('manual-supplier-returns', [PurchaseController::class, 'createManualSupplierReturn'])->name('manual-supplier-returns.store');
+    Route::get('debit-notes', [PurchaseController::class, 'debitNoteIndex'])->name('debit-notes.index');
     Route::post('debit-notes', [PurchaseController::class, 'createDebitNote'])->name('debit-notes.store');
+    Route::get('debit-notes/{debitNote}', [PurchaseController::class, 'showDebitNote'])->whereNumber('debitNote')->name('debit-notes.show');
     Route::post('inventory-adjustment-requests', [PurchaseController::class, 'createInventoryAdjustmentRequest'])->name('inventory-adjustment-requests.store');
 
     Route::post('invoices/preview', [PurchaseController::class, 'previewInvoice'])->name('invoices.preview');

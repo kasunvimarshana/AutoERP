@@ -24,6 +24,17 @@ const InventoryPage = lazy(() => import('@/modules/inventory/pages/InventoryPage
 const PurchaseOrderListPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderListPage'));
 const PurchaseOrderFormPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderFormPage'));
 const PurchaseOrderDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderDetailPage'));
+const GoodsReceiptListPage = lazy(() => import('@/modules/purchase/pages/GoodsReceiptListPage'));
+const GoodsReceiptCreatePage = lazy(() => import('@/modules/purchase/pages/GoodsReceiptCreatePage'));
+const GoodsReceiptDetailPage = lazy(() => import('@/modules/purchase/pages/GoodsReceiptDetailPage'));
+const PurchaseReturnListPage = lazy(() => import('@/modules/purchase/pages/PurchaseReturnListPage'));
+const PurchaseReturnCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseReturnCreatePage'));
+const PurchaseReturnDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseReturnDetailPage'));
+const ManualSupplierReturnCreatePage = lazy(() => import('@/modules/purchase/pages/ManualSupplierReturnCreatePage'));
+const PurchaseInvoiceCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseInvoiceCreatePage'));
+const PurchasePaymentPreparePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentPreparePage'));
+const PurchaseDebitNoteListPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteListPage'));
+const PurchaseDebitNoteDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteDetailPage'));
 const InvoiceListPage = lazy(() => import('@/modules/invoice/pages/InvoiceListPage'));
 const InvoiceDetailPage = lazy(() => import('@/modules/invoice/pages/InvoiceDetailPage'));
 const PaymentListPage = lazy(() => import('@/modules/payment/pages/PaymentListPage'));
@@ -62,6 +73,17 @@ export function AppRouter() {
                     <Route path="/purchase/orders/create" element={<PurchaseOrderFormPage />} />
                     <Route path="/purchase/orders/:id/edit" element={<PurchaseOrderFormPage />} />
                     <Route path="/purchase/orders/:id" element={<PurchaseOrderDetailPage />} />
+                    <Route path="/purchase/goods-receipts" element={<GoodsReceiptListPage />} />
+                    <Route path="/purchase/goods-receipts/create" element={<GoodsReceiptCreatePage />} />
+                    <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetailPage />} />
+                    <Route path="/purchase/returns" element={<PurchaseReturnListPage />} />
+                    <Route path="/purchase/returns/create" element={<PurchaseReturnCreatePage />} />
+                    <Route path="/purchase/returns/:id" element={<PurchaseReturnDetailPage />} />
+                    <Route path="/purchase/manual-supplier-returns/create" element={<ManualSupplierReturnCreatePage />} />
+                    <Route path="/purchase/invoices/create" element={<PurchaseInvoiceCreatePage />} />
+                    <Route path="/purchase/payments/prepare" element={<PurchasePaymentPreparePage />} />
+                    <Route path="/purchase/debit-notes" element={<PurchaseDebitNoteListPage />} />
+                    <Route path="/purchase/debit-notes/:id" element={<PurchaseDebitNoteDetailPage />} />
                     <Route path="/invoices" element={<InvoiceListPage />} />
                     <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                     <Route path="/payments" element={<PaymentListPage />} />
