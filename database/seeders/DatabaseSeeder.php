@@ -10,6 +10,7 @@ use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
+use Modules\Vehicle\Database\Seeders\VehicleSeeder;
 use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
 
 class DatabaseSeeder extends Seeder
@@ -29,6 +30,7 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             SupplierSeeder::class,
             CustomerSeeder::class,
+            VehicleSeeder::class,
         ]);
     }
 }
