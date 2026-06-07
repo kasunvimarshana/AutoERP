@@ -53,6 +53,7 @@ const FinanceJournalsPage = lazy(() => import('@/modules/finance/pages/FinanceJo
 const ReportListPage = lazy(() => import('@/modules/reporting/pages/ReportListPage'));
 const ReportPage = lazy(() => import('@/modules/reporting/pages/ReportPage'));
 const TechnicianWorkReportPage = lazy(() => import('@/modules/reporting/pages/TechnicianWorkReportPage'));
+const EmployeeCommissionReportPage = lazy(() => import('@/modules/reporting/pages/EmployeeCommissionReportPage'));
 const EmployeeListPage = lazy(() => import('@/modules/hr/EmployeeListPage'));
 const EmployeeCreatePage = lazy(() => import('@/modules/hr/EmployeeCreatePage'));
 const EmployeeEditPage = lazy(() => import('@/modules/hr/EmployeeEditPage'));
@@ -122,6 +123,7 @@ export function AppRouter() {
                     <Route path="/finance/journals" element={<FinanceJournalsPage />} />
                     <Route path="/reports" element={<ReportListPage />} />
                     <Route path="/reports/vehicle-service/technician-work" element={<TechnicianWorkReportPage />} />
+                    <Route path="/reports/vehicle-service/employee-commissions" element={<EmployeeCommissionReportPage />} />
                     <Route path="/reports/:key" element={<ReportPage />} />
                     <Route path="/hr/employees" element={<EmployeeListPage />} />
                     <Route path="/hr/employees/create" element={<EmployeeCreatePage />} />

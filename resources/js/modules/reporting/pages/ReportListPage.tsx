@@ -43,7 +43,7 @@ function groupReports(reports: ReportDefinition[]): Record<string, ReportDefinit
 }
 
 function reportPath(key: string): string {
-    return key === 'vehicle-service.technician-work'
-        ? '/reports/vehicle-service/technician-work'
-        : `/reports/${key}`;
+    if (key === 'vehicle-service.technician-work') return '/reports/vehicle-service/technician-work';
+    if (key === 'vehicle-service.employee-commissions') return '/reports/vehicle-service/employee-commissions';
+    return `/reports/${key}`;
 }

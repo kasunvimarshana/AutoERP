@@ -139,6 +139,98 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('data.0.line_description', 'Tenant A work');
     }
 
+    public function test_employee_commission_report_returns_dimensions_summaries_rankings_and_groups(): void
+    {
+        $context = $this->context('COM');
+        $other = $this->alternateResources($context, 'COM-ALT');
+        $job = $this->createJob($context, date: '2026-06-04');
+        $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Commission labour');
+        $top = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
+        $helper = $this->assignment($job, $line, $other['employee_id'], 'helper', '1.000000', '40.000000', VehicleServiceCommissionType::Fixed, '10.000000');
+        $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted, PaymentStatus::Allocated);
+
+        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context),
+            'group_by' => 'department',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (int) $top->getKey())
+            ->assertJsonPath('data.0.employee.code', 'EMP-COM')
+            ->assertJsonPath('data.0.department.name', 'Department COM')
+            ->assertJsonPath('data.0.designation.name', 'Designation COM')
+            ->assertJsonPath('data.0.job.name', (string) $job->job_number)
+            ->assertJsonPath('data.0.customer.name', 'Customer CUS-COM')
+            ->assertJsonPath('data.0.vehicle.name', 'REG-VEH-COM')
+            ->assertJsonPath('data.0.role_type', 'technician')
+            ->assertJsonPath('data.0.assigned_hours', '2.000000')
+            ->assertJsonPath('data.0.rate', '50.000000')
+            ->assertJsonPath('data.0.labour_amount', '100.000000')
+            ->assertJsonPath('data.0.commission_amount', '30.000000')
+            ->assertJsonPath('data.0.invoice_status', 'posted')
+            ->assertJsonPath('data.0.payment_status', 'allocated')
+            ->assertJsonPath('summary.total_jobs', 1)
+            ->assertJsonPath('summary.total_hours', '3.000000')
+            ->assertJsonPath('summary.total_labour_value', '140.000000')
+            ->assertJsonPath('summary.total_commission', '40.000000')
+            ->assertJsonPath('summary.average_commission_per_job', '40.000000')
+            ->assertJsonPath('summary.average_commission_per_hour', '13.333333')
+            ->assertJsonPath('rankings.top_earning_employee.employee.code', 'EMP-COM')
+            ->assertJsonPath('rankings.top_earning_employee.labour_value', '100.000000')
+            ->assertJsonPath('rankings.top_commission_employee.employee.code', 'EMP-COM')
+            ->assertJsonCount(2, 'groups');
+
+        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context),
+            'sort' => 'labour_amount',
+            'direction' => 'asc',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (int) $helper->getKey());
+    }
+
+    public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
+    {
+        $context = $this->context('COM-FILT');
+        $otherOrg = $this->alternateResources($context, 'ORG');
+        $matching = $this->assignmentForContext($context, 'Matching commission');
+        $this->assignmentForContext($otherOrg, 'Other organization commission');
+        $this->linkInvoiceAndPayment(
+            $context,
+            VehicleServiceJob::query()->findOrFail($matching->vehicle_service_job_id),
+            InvoiceStatus::Posted,
+            PaymentStatus::Allocated,
+        );
+
+        foreach ([
+            ['employee_id' => $context['employee_id']],
+            ['department_id' => $context['department_id']],
+            ['designation_id' => $context['designation_id']],
+            ['supervisor_id' => $context['supervisor_id']],
+            ['customer_id' => $context['customer_id']],
+            ['vehicle_id' => $context['vehicle_id']],
+            ['job_status' => 'draft'],
+            ['invoice_status' => 'posted'],
+            ['payment_status' => 'allocated'],
+            ['commission_type' => 'fixed'],
+            ['date_from' => '2026-06-01', 'date_to' => '2026-06-30'],
+            ['search' => 'Matching commission'],
+        ] as $filter) {
+            $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+                ...$this->scope($context),
+                ...$filter,
+            ]))
+                ->assertOk()
+                ->assertJsonPath('meta.total', 1)
+                ->assertJsonPath('data.0.id', (int) $matching->getKey());
+        }
+
+        $this->get('/api/v1/reports/vehicle-service/employee-commissions/export/csv?'.http_build_query($this->scope($context)))
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8')
+            ->assertSee('Employee code')
+            ->assertSee('EMP-COM-FILT');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -149,8 +241,10 @@ final class TechnicianWorkReportTest extends TestCase
         $uomId = $this->uom($tenantId, $organizationUnitId, 'PCS-'.$suffix);
         $customerId = $this->customer($tenantId, $organizationUnitId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($tenantId, $organizationUnitId, $customerId, 'VEH-'.$suffix);
-        $employeeId = $this->employee($tenantId, $organizationUnitId, 'EMP-'.$suffix);
-        $supervisorId = $this->employee($tenantId, $organizationUnitId, 'SUP-'.$suffix);
+        $departmentId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_departments', 'DEP-'.$suffix, 'Department '.$suffix);
+        $designationId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_designations', 'DES-'.$suffix, 'Designation '.$suffix);
+        $employeeId = $this->employee($tenantId, $organizationUnitId, 'EMP-'.$suffix, $departmentId, $designationId);
+        $supervisorId = $this->employee($tenantId, $organizationUnitId, 'SUP-'.$suffix, $departmentId, $designationId);
 
         return [
             'tenant_id' => $tenantId,
@@ -159,13 +253,15 @@ final class TechnicianWorkReportTest extends TestCase
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
             'supervisor_id' => $supervisorId,
+            'department_id' => $departmentId,
+            'designation_id' => $designationId,
             'uom_id' => $uomId,
             'labour' => $this->item($tenantId, $organizationUnitId, 'LAB-'.$suffix, $uomId),
         ];
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function alternateResources(array $context, string $suffix): array
@@ -176,8 +272,10 @@ final class TechnicianWorkReportTest extends TestCase
         $uomId = $this->uom($context['tenant_id'], $organizationUnitId, 'PCS-'.$suffix);
         $customerId = $this->customer($context['tenant_id'], $organizationUnitId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($context['tenant_id'], $organizationUnitId, $customerId, 'VEH-'.$suffix);
-        $employeeId = $this->employee($context['tenant_id'], $organizationUnitId, 'EMP-'.$suffix);
-        $supervisorId = $this->employee($context['tenant_id'], $organizationUnitId, 'SUP-'.$suffix);
+        $departmentId = $this->hrMaster($context['tenant_id'], $organizationUnitId, 'hr_departments', 'DEP-'.$suffix, 'Department '.$suffix);
+        $designationId = $this->hrMaster($context['tenant_id'], $organizationUnitId, 'hr_designations', 'DES-'.$suffix, 'Designation '.$suffix);
+        $employeeId = $this->employee($context['tenant_id'], $organizationUnitId, 'EMP-'.$suffix, $departmentId, $designationId);
+        $supervisorId = $this->employee($context['tenant_id'], $organizationUnitId, 'SUP-'.$suffix, $departmentId, $designationId);
 
         return [
             ...$context,
@@ -186,13 +284,15 @@ final class TechnicianWorkReportTest extends TestCase
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
             'supervisor_id' => $supervisorId,
+            'department_id' => $departmentId,
+            'designation_id' => $designationId,
             'uom_id' => $uomId,
             'labour' => $this->item($context['tenant_id'], $organizationUnitId, 'LAB-'.$suffix, $uomId),
         ];
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array<string, int>
      */
     private function scope(array $context): array
@@ -205,7 +305,7 @@ final class TechnicianWorkReportTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     private function assignmentForContext(array $context, string $description): VehicleServiceLineEmployee
     {
@@ -216,7 +316,7 @@ final class TechnicianWorkReportTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     private function createJob(
         array $context,
@@ -276,7 +376,7 @@ final class TechnicianWorkReportTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     private function linkInvoiceAndPayment(array $context, VehicleServiceJob $job, InvoiceStatus $invoiceStatus, PaymentStatus $paymentStatus): void
     {
@@ -434,7 +534,7 @@ final class TechnicianWorkReportTest extends TestCase
         ]);
     }
 
-    private function employee(int $tenantId, int $organizationUnitId, string $code): int
+    private function employee(int $tenantId, int $organizationUnitId, string $code, int $departmentId, int $designationId): int
     {
         return (int) DB::table('hr_employees')->insertGetId([
             'tenant_id' => $tenantId,
@@ -443,8 +543,23 @@ final class TechnicianWorkReportTest extends TestCase
             'code' => $code,
             'first_name' => 'Tech',
             'display_name' => 'Technician '.$code,
+            'department_id' => $departmentId,
+            'designation_id' => $designationId,
             'status' => 'active',
             'availability_status' => 'available',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function hrMaster(int $tenantId, int $organizationUnitId, string $table, string $code, string $name): int
+    {
+        return (int) DB::table($table)->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'code' => $code,
+            'name' => $name,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

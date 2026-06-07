@@ -6,7 +6,6 @@ namespace Modules\Reporting\Services;
 
 use InvalidArgumentException;
 use Modules\Customer\Models\Customer;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountBalance;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
@@ -157,6 +156,7 @@ final class ReportCatalog
             ], ['job.job_number', 'old_status', 'new_status'], ['job'], 'changed_at'),
             $this->labour('vehicle-service.labour-assignment', 'Labour Assignment'),
             $this->labour('vehicle-service.technician-work', 'Technician Work'),
+            $this->labour('vehicle-service.employee-commissions', 'Employee Commission'),
             $this->definition('vehicle-service.supervisor-commission', 'Supervisor Commission', 'Vehicle Service', VehicleServiceJob::class, [
                 $this->col('job_date', 'Date', format: 'date', sort: 'job_date'), $this->col('job_number', 'Job', sort: 'job_number'),
                 $this->col('supervisor', 'Supervisor', 'supervisor.display_name'), $this->money('supervisor_commission_value', 'Value'),
@@ -203,11 +203,11 @@ final class ReportCatalog
     }
 
     /**
-     * @param class-string $model
-     * @param array<int, ReportColumn> $columns
-     * @param array<int, string> $search
-     * @param array<int, string> $relations
-     * @param array<string, mixed> $constraints
+     * @param  class-string  $model
+     * @param  array<int, ReportColumn>  $columns
+     * @param  array<int, string>  $search
+     * @param  array<int, string>  $relations
+     * @param  array<string, mixed>  $constraints
      */
     private function definition(string $key, string $title, string $group, string $model, array $columns, array $search = [], array $relations = [], ?string $dateColumn = null, bool $includeGlobalOrganization = false, array $constraints = []): ReportDefinition
     {

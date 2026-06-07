@@ -3,9 +3,9 @@ import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { exportReport } from '../reportingApi';
-import type { ReportFormat, ReportParams, TechnicianWorkReportParams } from '../reportingTypes';
+import type { EmployeeCommissionReportParams, ReportFormat, ReportParams, TechnicianWorkReportParams } from '../reportingTypes';
 
-export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams }) {
+export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams }) {
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const run = async (format: ReportFormat) => {

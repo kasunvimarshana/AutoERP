@@ -2,6 +2,8 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiResource } from '@/shared/types/api';
 import type {
+    EmployeeCommissionReportParams,
+    EmployeeCommissionReportResult,
     ReportDefinition,
     ReportFormat,
     ReportParams,
@@ -25,7 +27,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
     return response.data;
 }
 
-export async function exportReport(key: string, format: ReportFormat, params: ReportParams | TechnicianWorkReportParams): Promise<void> {
+export async function exportReport(key: string, format: ReportFormat, params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
         params,
         responseType: 'blob',
@@ -50,5 +52,10 @@ export async function exportReport(key: string, format: ReportFormat, params: Re
 
 export async function runTechnicianWorkReport(params: TechnicianWorkReportParams, signal?: AbortSignal): Promise<TechnicianWorkReportResult> {
     const response = await apiClient.get<TechnicianWorkReportResult>(`${endpoints.reports}/vehicle-service/technician-work`, { params, signal });
+    return response.data;
+}
+
+export async function runEmployeeCommissionReport(params: EmployeeCommissionReportParams, signal?: AbortSignal): Promise<EmployeeCommissionReportResult> {
+    const response = await apiClient.get<EmployeeCommissionReportResult>(`${endpoints.reports}/vehicle-service/employee-commissions`, { params, signal });
     return response.data;
 }
