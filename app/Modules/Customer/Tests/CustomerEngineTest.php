@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Tests;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerAddressData;
 use Modules\Customer\DTOs\CustomerBankAccountData;
@@ -276,15 +276,14 @@ final class CustomerEngineTest extends TestCase
             ->assertJsonValidationErrors(['code', 'name', 'customer_type', 'credit_limit']);
     }
 
-    public function test_customer_seeder_adds_only_reference_categories(): void
+    public function test_database_seeder_adds_customer_master_data(): void
     {
-        [$tenantId] = $this->scopeContext();
-
-        $this->seed(CustomerSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+        $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
         $this->assertDatabaseHas('customer_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
-        $this->assertDatabaseHas('customer_categories', ['tenant_id' => $tenantId, 'code' => 'RETAIL']);
-        $this->assertSame(0, Customer::query()->count());
+        $this->assertDatabaseHas('customers', ['tenant_id' => $tenantId, 'customer_number' => 'CUS-000001']);
+        $this->assertSame(1, Customer::query()->where('tenant_id', $tenantId)->count());
     }
 
     private function createCustomer(

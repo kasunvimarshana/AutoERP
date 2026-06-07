@@ -33,6 +33,35 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
     }
 
+    public function findByTenantAndUsername(?int $tenantId, string $username, ?int $excludeId = null): ?DataRecord
+    {
+        $query = $this->query()->where('username', strtolower(trim($username)));
+
+        $this->applyTenantScope($query, $tenantId);
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        $model = $query->first();
+
+        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
+    }
+
+    public function findByTenantAndLoginIdentifier(int $tenantId, string $identifier): ?DataRecord
+    {
+        $normalized = strtolower(trim($identifier));
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where(function (Builder $query) use ($normalized): void {
+                $query->where('email', $normalized)
+                    ->orWhere('username', $normalized);
+            })
+            ->first();
+
+        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
+    }
+
     public function pageByFilters(?int $tenantId, ?string $search, int $perPage, int $page): PagedResult
     {
         $query = $this->query();
@@ -44,6 +73,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
             $query->where(function (Builder $builder) use ($term): void {
                 $builder->where('first_name', 'like', '%'.$term.'%')
                     ->orWhere('last_name', 'like', '%'.$term.'%')
+                    ->orWhere('username', 'like', '%'.$term.'%')
                     ->orWhere('email', 'like', '%'.$term.'%')
                     ->orWhere('phone', 'like', '%'.$term.'%');
             });

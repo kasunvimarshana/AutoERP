@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Item\Tests;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Item\Database\Seeders\ItemSeeder;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\DTOs\ItemBundleData;
 use Modules\Item\DTOs\ItemCodeData;
@@ -215,21 +215,24 @@ final class ItemEngineTest extends TestCase
         ));
     }
 
-    public function test_seeded_item_reference_data_is_minimal(): void
+    public function test_database_seeder_adds_item_master_data(): void
     {
-        $tenantId = $this->createTenant('SEED');
-        $this->createOrganizationUnit($tenantId, 'SEED-ORG');
-
-        $this->seed(ItemSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+        $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
         $this->assertDatabaseHas('item_categories', [
             'tenant_id' => $tenantId,
-            'code' => 'GENERAL',
+            'code' => 'PARTS',
         ]);
         $this->assertDatabaseHas('item_brands', [
             'tenant_id' => $tenantId,
             'code' => 'GENERIC',
         ]);
+        $this->assertDatabaseHas('items', [
+            'tenant_id' => $tenantId,
+            'code' => 'FULL-SERVICE-PACKAGE',
+        ]);
+        $this->assertSame(6, Item::query()->where('tenant_id', $tenantId)->count());
     }
 
     private function createBasicItem(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Tests;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,7 +13,6 @@ use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
-use Modules\Supplier\Database\Seeders\SupplierSeeder;
 use Modules\Supplier\DTOs\CreateSupplierData;
 use Modules\Supplier\DTOs\SupplierAddressData;
 use Modules\Supplier\DTOs\SupplierBankAccountData;
@@ -322,15 +322,14 @@ final class SupplierEngineTest extends TestCase
         );
     }
 
-    public function test_supplier_seeder_adds_only_reference_categories(): void
+    public function test_database_seeder_adds_supplier_master_data(): void
     {
-        [$tenantId] = $this->scopeContext();
-
-        $this->seed(SupplierSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+        $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
         $this->assertDatabaseHas('supplier_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
-        $this->assertDatabaseHas('supplier_categories', ['tenant_id' => $tenantId, 'code' => 'GOODS']);
-        $this->assertSame(0, Supplier::query()->count());
+        $this->assertDatabaseHas('suppliers', ['tenant_id' => $tenantId, 'supplier_number' => 'SUP-000001']);
+        $this->assertSame(1, Supplier::query()->where('tenant_id', $tenantId)->count());
     }
 
     private function createSupplier(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Vehicle\Tests;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,7 +14,6 @@ use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerCreationService;
-use Modules\Vehicle\Database\Seeders\VehicleSeeder;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\VehicleAttributeData;
 use Modules\Vehicle\DTOs\VehicleCategoryData;
@@ -245,16 +245,16 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonValidationErrors(['odometer_reading', 'status']);
     }
 
-    public function test_vehicle_seeder_adds_reference_master_data_only(): void
+    public function test_database_seeder_adds_vehicle_master_data(): void
     {
-        [$tenantId] = $this->scopeContext();
-
-        $this->seed(VehicleSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+        $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
         $this->assertDatabaseHas('vehicle_makes', ['tenant_id' => $tenantId, 'code' => 'TOYOTA']);
         $this->assertDatabaseHas('vehicle_types', ['tenant_id' => $tenantId, 'code' => 'CAR']);
-        $this->assertDatabaseHas('vehicle_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
-        $this->assertSame(0, Vehicle::query()->count());
+        $this->assertDatabaseHas('vehicle_categories', ['tenant_id' => $tenantId, 'code' => 'CUSTOMER']);
+        $this->assertDatabaseHas('vehicles', ['tenant_id' => $tenantId, 'vehicle_number' => 'VEH-000001']);
+        $this->assertSame(1, Vehicle::query()->where('tenant_id', $tenantId)->count());
     }
 
     private function vehicle(

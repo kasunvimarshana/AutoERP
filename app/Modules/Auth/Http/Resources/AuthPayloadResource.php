@@ -83,7 +83,7 @@ final class AuthPayloadResource extends JsonResource
 
     /**
      * @param  array<string,mixed>  $user
-     * @return array{id:int|string|null,name:string|null,email:string|null,roles:list<string>,permissions:list<string>}
+     * @return array{id:int|string|null,name:string|null,username:string|null,email:string|null,roles:list<string>,permissions:list<string>}
      */
     private function userSummary(array $user): array
     {
@@ -95,6 +95,7 @@ final class AuthPayloadResource extends JsonResource
         return [
             'id' => $user['id'] ?? null,
             'name' => $name !== '' ? $name : ($user['name'] ?? $user['email'] ?? null),
+            'username' => isset($user['username']) ? (string) $user['username'] : null,
             'email' => isset($user['email']) ? (string) $user['email'] : null,
             'roles' => $this->stringList($user['roles'] ?? []),
             'permissions' => $this->stringList($user['permissions'] ?? []),

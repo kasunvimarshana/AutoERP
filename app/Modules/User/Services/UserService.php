@@ -69,6 +69,7 @@ final class UserService extends AbstractUserCrudService
             return $this->transactions->runInTransaction(function () use ($payload): Result {
                 $tenantId = $this->resolveTenantId($this->toNullableInt($payload['tenant_id'] ?? null));
                 $email = $this->domain->normalizeEmail((string) ($payload['email'] ?? ''));
+                $username = $this->normalizeUsername($payload['username'] ?? null);
                 $firstName = $this->domain->normalizeRequiredString(
                     (string) ($payload['first_name'] ?? ''),
                     'First name',
@@ -76,6 +77,9 @@ final class UserService extends AbstractUserCrudService
 
                 if ($this->users->findByTenantAndEmail($tenantId, $email) !== null) {
                     return $this->failure(UserErrorCode::DUPLICATE_EMAIL, 'User email already exists in tenant scope.');
+                }
+                if ($username !== null && $this->users->findByTenantAndUsername($tenantId, $username) !== null) {
+                    return $this->failure(UserErrorCode::DUPLICATE_USERNAME, 'Username already exists in tenant scope.');
                 }
 
                 $organizationUnitId = $this->resolveOrganizationUnitId(
@@ -92,6 +96,7 @@ final class UserService extends AbstractUserCrudService
                     'metadata' => $metadata,
                     'first_name' => $firstName,
                     'last_name' => $this->domain->normalizeNullableString($payload['last_name'] ?? null),
+                    'username' => $username,
                     'email' => $email,
                     'email_verified_at' => $this->domain->normalizeNullableString(
                         $payload['email_verified_at'] ?? null,
@@ -136,12 +141,21 @@ final class UserService extends AbstractUserCrudService
                 $email = array_key_exists('email', $payload)
                     ? $this->domain->normalizeEmail((string) $payload['email'])
                     : (string) $existing->get('email');
+                $username = array_key_exists('username', $payload)
+                    ? $this->normalizeUsername($payload['username'])
+                    : $this->normalizeUsername($existing->get('username'));
                 $firstName = array_key_exists('first_name', $payload)
                     ? $this->domain->normalizeRequiredString((string) $payload['first_name'], 'First name')
                     : (string) $existing->get('first_name');
 
                 if ($this->users->findByTenantAndEmail($tenantId, $email, $targetId) !== null) {
                     return $this->failure(UserErrorCode::DUPLICATE_EMAIL, 'User email already exists in tenant scope.');
+                }
+                if (
+                    $username !== null
+                    && $this->users->findByTenantAndUsername($tenantId, $username, $targetId) !== null
+                ) {
+                    return $this->failure(UserErrorCode::DUPLICATE_USERNAME, 'Username already exists in tenant scope.');
                 }
 
                 $organizationUnitId = array_key_exists('organization_unit_id', $payload)
@@ -162,6 +176,7 @@ final class UserService extends AbstractUserCrudService
                     'last_name' => array_key_exists('last_name', $payload)
                         ? $this->domain->normalizeNullableString($payload['last_name'])
                         : $existing->get('last_name'),
+                    'username' => $username,
                     'email' => $email,
                     'email_verified_at' => array_key_exists('email_verified_at', $payload)
                         ? $this->domain->normalizeNullableString($payload['email_verified_at'])
@@ -398,6 +413,13 @@ final class UserService extends AbstractUserCrudService
         $tenantId = $this->resolveTenantId(null);
 
         return (int) $record->require('tenant_id') === $tenantId;
+    }
+
+    private function normalizeUsername(mixed $value): ?string
+    {
+        $username = strtolower(trim((string) $value));
+
+        return $username === '' ? null : $username;
     }
 
     private function resolveTenantId(?int $requestedTenantId): int

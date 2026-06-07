@@ -22,6 +22,8 @@ final class UserErrorCode
 
     public const DUPLICATE_EMAIL = 'USER_DUPLICATE_EMAIL';
 
+    public const DUPLICATE_USERNAME = 'USER_DUPLICATE_USERNAME';
+
     public const DUPLICATE_ROLE = 'USER_DUPLICATE_ROLE';
 
     public const DUPLICATE_PERMISSION = 'USER_DUPLICATE_PERMISSION';

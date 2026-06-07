@@ -7,65 +7,49 @@ namespace Modules\UOM\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
+use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\UOM\Models\UnitOfMeasureModel;
+use Modules\UOM\Models\UomConversionModel;
 
 final class UomSeeder extends Seeder
 {
+    use ResolvesSeedContext;
+
     public function run(): void
     {
         if (! Schema::hasTable('unit_of_measures')) {
             return;
         }
 
-        DB::transaction(function (): void {
-            $tenantId = $this->defaultTenantId();
-            $organizationUnitId = $this->defaultOrganizationUnitId($tenantId);
-
-            $this->seedUnits($tenantId, $organizationUnitId);
-            $this->seedConversions($tenantId, $organizationUnitId);
-        }, 3);
-    }
-
-    private function seedUnits(int $tenantId, ?int $organizationUnitId): void
-    {
-        $units = [
-            ['code' => 'PCS', 'name' => 'Pieces', 'symbol' => 'pcs', 'type' => 'unit', 'category' => 'quantity', 'is_base' => true, 'precision' => 0, 'fractional' => false],
-            ['code' => 'BOX', 'name' => 'Box', 'symbol' => 'box', 'type' => 'unit', 'category' => 'quantity', 'is_base' => false, 'precision' => 0, 'fractional' => false],
-            ['code' => 'PACK', 'name' => 'Pack', 'symbol' => 'pack', 'type' => 'unit', 'category' => 'quantity', 'is_base' => false, 'precision' => 0, 'fractional' => false],
-            ['code' => 'KG', 'name' => 'Kilogram', 'symbol' => 'kg', 'type' => 'weight', 'category' => 'weight', 'is_base' => true, 'precision' => 3, 'fractional' => true],
-            ['code' => 'G', 'name' => 'Gram', 'symbol' => 'g', 'type' => 'weight', 'category' => 'weight', 'is_base' => false, 'precision' => 3, 'fractional' => true],
-            ['code' => 'L', 'name' => 'Liter', 'symbol' => 'l', 'type' => 'volume', 'category' => 'volume', 'is_base' => true, 'precision' => 3, 'fractional' => true],
-            ['code' => 'ML', 'name' => 'Milliliter', 'symbol' => 'ml', 'type' => 'volume', 'category' => 'volume', 'is_base' => false, 'precision' => 3, 'fractional' => true],
-            ['code' => 'HOUR', 'name' => 'Hour', 'symbol' => 'hr', 'type' => 'time', 'category' => 'time', 'is_base' => true, 'precision' => 2, 'fractional' => true],
-            ['code' => 'DAY', 'name' => 'Day', 'symbol' => 'day', 'type' => 'time', 'category' => 'time', 'is_base' => false, 'precision' => 2, 'fractional' => true],
-            ['code' => 'MONTH', 'name' => 'Month', 'symbol' => 'mo', 'type' => 'time', 'category' => 'time', 'is_base' => false, 'precision' => 2, 'fractional' => true],
-            ['code' => 'M', 'name' => 'Meter', 'symbol' => 'm', 'type' => 'length', 'category' => 'length', 'is_base' => true, 'precision' => 2, 'fractional' => true],
-        ];
-
-        foreach ($units as $unit) {
-            DB::table('unit_of_measures')->updateOrInsert(
-                [
-                    'tenant_id' => $tenantId,
-                    'code' => $unit['code'],
-                ],
-                [
-                    'allow_fractional_quantity' => $unit['fractional'],
-                    'category' => $unit['category'],
-                    'decimal_precision' => $unit['precision'],
-                    'description' => 'Default UOM for real backend-connected module testing.',
-                    'is_active' => true,
-                    'is_base' => $unit['is_base'],
-                    'metadata' => $this->json(['seed_source' => 'uom_module']),
-                    'name' => $unit['name'],
-                    'organization_unit_id' => $organizationUnitId,
-                    'row_version' => 1,
-                    'symbol' => $unit['symbol'],
-                    'type' => $unit['type'],
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
+        $tenant = $this->defaultTenant();
+        $organizationUnit = $this->defaultOrganizationUnit($tenant);
+        if ($tenant === null) {
+            return;
         }
+
+        DB::transaction(function () use ($tenant, $organizationUnit): void {
+            foreach ($this->units() as $unit) {
+                UnitOfMeasureModel::query()->updateOrCreate(
+                    ['tenant_id' => $tenant->getKey(), 'code' => $unit['code']],
+                    [
+                        'organization_unit_id' => $organizationUnit?->getKey(),
+                        'name' => $unit['name'],
+                        'symbol' => $unit['symbol'],
+                        'type' => $unit['type'],
+                        'category' => $unit['category'],
+                        'decimal_precision' => $unit['precision'],
+                        'allow_fractional_quantity' => $unit['fractional'],
+                        'is_base' => $unit['is_base'],
+                        'is_active' => true,
+                        'description' => 'Default AutoERP unit of measure.',
+                        'row_version' => 1,
+                        'metadata' => ['seed_source' => 'uom_module'],
+                    ],
+                );
+            }
+
+            $this->seedConversions((int) $tenant->getKey(), $organizationUnit?->getKey());
+        }, 3);
     }
 
     private function seedConversions(int $tenantId, ?int $organizationUnitId): void
@@ -74,76 +58,50 @@ final class UomSeeder extends Seeder
             return;
         }
 
-        $conversions = [
-            ['from' => 'BOX', 'to' => 'PCS', 'conversion_factor' => '12'],
-            ['from' => 'PACK', 'to' => 'PCS', 'conversion_factor' => '6'],
-            ['from' => 'KG', 'to' => 'G', 'conversion_factor' => '1000'],
-            ['from' => 'L', 'to' => 'ML', 'conversion_factor' => '1000'],
-            ['from' => 'DAY', 'to' => 'HOUR', 'conversion_factor' => '24'],
-            ['from' => 'MONTH', 'to' => 'DAY', 'conversion_factor' => '30'],
-        ];
-
-        foreach ($conversions as $conversion) {
-            $from = $this->unit($tenantId, $conversion['from']);
-            $to = $this->unit($tenantId, $conversion['to']);
+        foreach ([
+            ['from' => 'KG', 'to' => 'G', 'factor' => '1000.000000'],
+            ['from' => 'LTR', 'to' => 'ML', 'factor' => '1000.000000'],
+            ['from' => 'M', 'to' => 'CM', 'factor' => '100.000000'],
+        ] as $conversion) {
+            $from = UnitOfMeasureModel::query()->where('tenant_id', $tenantId)->where('code', $conversion['from'])->first();
+            $to = UnitOfMeasureModel::query()->where('tenant_id', $tenantId)->where('code', $conversion['to'])->first();
             if ($from === null || $to === null) {
                 continue;
             }
 
-            DB::table('uom_conversions')->updateOrInsert(
+            UomConversionModel::query()->updateOrCreate(
                 [
                     'tenant_id' => $tenantId,
-                    'from_uom_id' => $from->id,
-                    'to_uom_id' => $to->id,
+                    'from_uom_id' => $from->getKey(),
+                    'to_uom_id' => $to->getKey(),
                 ],
                 [
-                    'conversion_factor' => $conversion['conversion_factor'],
+                    'organization_unit_id' => $organizationUnitId,
+                    'conversion_factor' => $conversion['factor'],
                     'is_active' => true,
                     'description' => 'Default generic conversion.',
-                    'organization_unit_id' => $organizationUnitId,
                     'row_version' => 1,
-                    'updated_at' => now(),
-                    'created_at' => now(),
                 ],
             );
         }
     }
 
-    private function defaultTenantId(): int
-    {
-        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
-        $id = DB::table('tenants')->where('code', $code)->value('id')
-            ?? DB::table('tenants')->orderBy('id')->value('id');
-
-        if ($id === null) {
-            throw new RuntimeException('Seed a tenant before running the UOM module seeder.');
-        }
-
-        return (int) $id;
-    }
-
-    private function defaultOrganizationUnitId(int $tenantId): ?int
-    {
-        return DB::table('organization_units')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('is_active')
-            ->orderBy('id')
-            ->value('id');
-    }
-
-    private function unit(int $tenantId, string $code): ?object
-    {
-        return DB::table('unit_of_measures')
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-    }
-
     /**
-     * @param  array<string,mixed>  $value
+     * @return list<array{code:string,name:string,symbol:string,type:string,category:string,precision:int,fractional:bool,is_base:bool}>
      */
-    private function json(array $value): string
+    private function units(): array
     {
-        return (string) json_encode($value, JSON_THROW_ON_ERROR);
+        return [
+            ['code' => 'PCS', 'name' => 'Pieces', 'symbol' => 'pcs', 'type' => 'unit', 'category' => 'quantity', 'precision' => 0, 'fractional' => false, 'is_base' => true],
+            ['code' => 'BOX', 'name' => 'Box', 'symbol' => 'box', 'type' => 'unit', 'category' => 'quantity', 'precision' => 0, 'fractional' => false, 'is_base' => false],
+            ['code' => 'KG', 'name' => 'Kilogram', 'symbol' => 'kg', 'type' => 'weight', 'category' => 'weight', 'precision' => 3, 'fractional' => true, 'is_base' => true],
+            ['code' => 'G', 'name' => 'Gram', 'symbol' => 'g', 'type' => 'weight', 'category' => 'weight', 'precision' => 3, 'fractional' => true, 'is_base' => false],
+            ['code' => 'LTR', 'name' => 'Liter', 'symbol' => 'L', 'type' => 'volume', 'category' => 'volume', 'precision' => 3, 'fractional' => true, 'is_base' => true],
+            ['code' => 'ML', 'name' => 'Milliliter', 'symbol' => 'mL', 'type' => 'volume', 'category' => 'volume', 'precision' => 3, 'fractional' => true, 'is_base' => false],
+            ['code' => 'M', 'name' => 'Meter', 'symbol' => 'm', 'type' => 'length', 'category' => 'length', 'precision' => 3, 'fractional' => true, 'is_base' => true],
+            ['code' => 'CM', 'name' => 'Centimeter', 'symbol' => 'cm', 'type' => 'length', 'category' => 'length', 'precision' => 3, 'fractional' => true, 'is_base' => false],
+            ['code' => 'HOUR', 'name' => 'Hour', 'symbol' => 'hr', 'type' => 'time', 'category' => 'time', 'precision' => 2, 'fractional' => true, 'is_base' => true],
+            ['code' => 'DAY', 'name' => 'Day', 'symbol' => 'day', 'type' => 'time', 'category' => 'time', 'precision' => 2, 'fractional' => true, 'is_base' => false],
+        ];
     }
 }

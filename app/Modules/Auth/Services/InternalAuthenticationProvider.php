@@ -44,12 +44,12 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
             return null;
         }
 
-        $email = strtolower(trim($data->loginIdentifier));
-        if ($email === '') {
+        $identifier = strtolower(trim($data->loginIdentifier));
+        if ($identifier === '') {
             return null;
         }
 
-        $user = $this->users->findByTenantAndEmail($data->tenantId, $email);
+        $user = $this->users->findByTenantAndLoginIdentifier($data->tenantId, $identifier);
         if ($user === null) {
             return null;
         }
@@ -66,7 +66,7 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
                 'organization_unit_id' => $data->organizationUnitId,
                 'provider_id' => (int) $provider->id(),
                 'user_id' => (int) $user->id(),
-                'provider_user_key' => $email,
+                'provider_user_key' => (string) $user->get('email', $identifier),
                 'status' => 'active',
                 'is_primary' => true,
                 'last_authenticated_at' => now(),

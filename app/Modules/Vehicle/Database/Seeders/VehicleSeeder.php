@@ -7,118 +7,165 @@ namespace Modules\Vehicle\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
+use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Customer\Models\Customer;
+use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Models\VehicleCategory;
+use Modules\Vehicle\Models\VehicleMake;
+use Modules\Vehicle\Models\VehicleModel;
+use Modules\Vehicle\Models\VehicleOwnership;
+use Modules\Vehicle\Models\VehicleType;
 
 final class VehicleSeeder extends Seeder
 {
+    use ResolvesSeedContext;
+
     public function run(): void
     {
-        if (! Schema::hasTable('vehicle_makes')) {
+        if (! Schema::hasTable('vehicles')) {
             return;
         }
 
-        $tenantId = $this->defaultTenantId();
-        $organizationUnitId = $this->defaultOrganizationUnitId($tenantId);
-
-        foreach ([
-            ['code' => 'TOYOTA', 'name' => 'Toyota'],
-            ['code' => 'NISSAN', 'name' => 'Nissan'],
-            ['code' => 'HONDA', 'name' => 'Honda'],
-        ] as $make) {
-            DB::table('vehicle_makes')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'code' => $make['code']],
-                [
-                    'organization_unit_id' => $organizationUnitId,
-                    'name' => $make['name'],
-                    'description' => 'Seed vehicle make.',
-                    'is_active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ],
-            );
+        $tenant = $this->defaultTenant();
+        $organizationUnit = $this->defaultOrganizationUnit($tenant);
+        if ($tenant === null) {
+            return;
         }
 
-        $toyotaId = DB::table('vehicle_makes')->where('tenant_id', $tenantId)->where('code', 'TOYOTA')->value('id');
-        if ($toyotaId !== null) {
-            foreach ([
-                ['code' => 'AQUA', 'name' => 'Aqua'],
-                ['code' => 'COROLLA', 'name' => 'Corolla'],
-            ] as $model) {
-                DB::table('vehicle_models')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'vehicle_make_id' => $toyotaId, 'code' => $model['code']],
+        DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $tenantId = (int) $tenant->getKey();
+            $organizationUnitId = $organizationUnit?->getKey();
+            $makes = $this->seedMakesAndModels($tenantId, $organizationUnitId);
+            $type = $this->seedType($tenantId, $organizationUnitId);
+            $category = $this->seedCategory($tenantId, $organizationUnitId);
+            $customer = Customer::query()
+                ->where('tenant_id', $tenantId)
+                ->where('customer_number', 'CUS-000001')
+                ->first();
+
+            $vehicle = Vehicle::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'vehicle_number' => 'VEH-000001'],
+                [
+                    'organization_unit_id' => $organizationUnitId,
+                    'code' => 'VEH-DEMO',
+                    'vehicle_make_id' => $makes['TOYOTA']['make']->getKey(),
+                    'vehicle_model_id' => $makes['TOYOTA']['model']->getKey(),
+                    'vehicle_type_id' => $type->getKey(),
+                    'vehicle_category_id' => $category->getKey(),
+                    'customer_id' => $customer?->getKey(),
+                    'current_owner_type' => $customer === null ? null : 'customer',
+                    'current_owner_id' => $customer?->getKey(),
+                    'registration_number' => 'AUTOERP-001',
+                    'manufacture_year' => 2020,
+                    'color' => 'Silver',
+                    'fuel_type' => 'petrol',
+                    'transmission_type' => 'automatic',
+                    'odometer_reading' => '0.000000',
+                    'odometer_unit' => 'km',
+                    'status' => 'active',
+                    'notes' => 'Default vehicle for local development and testing.',
+                    'metadata' => ['seed_source' => 'vehicle_module'],
+                ],
+            );
+
+            if ($customer !== null && Schema::hasTable('vehicle_ownerships')) {
+                VehicleOwnership::query()->updateOrCreate(
                     [
+                        'vehicle_id' => $vehicle->getKey(),
+                        'customer_id' => $customer->getKey(),
+                        'is_current' => true,
+                    ],
+                    [
+                        'tenant_id' => $tenantId,
                         'organization_unit_id' => $organizationUnitId,
-                        'name' => $model['name'],
-                        'year_from' => null,
-                        'year_to' => null,
-                        'description' => 'Seed vehicle model.',
-                        'is_active' => true,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'owner_type' => 'customer',
+                        'owner_id' => $customer->getKey(),
+                        'ownership_type' => 'customer_owned',
+                        'started_at' => '2026-01-01 00:00:00',
+                        'ended_at' => null,
+                        'notes' => 'Default customer ownership.',
                     ],
                 );
             }
-        }
+        }, 3);
+    }
 
-        foreach ([
-            ['code' => 'CAR', 'name' => 'Car'],
-            ['code' => 'VAN', 'name' => 'Van'],
-            ['code' => 'TRUCK', 'name' => 'Truck'],
-        ] as $index => $type) {
-            DB::table('vehicle_types')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'code' => $type['code']],
+    /**
+     * @return array<string,array{make:VehicleMake,model:VehicleModel}>
+     */
+    private function seedMakesAndModels(int $tenantId, ?int $organizationUnitId): array
+    {
+        $definitions = [
+            'TOYOTA' => ['Toyota', 'COROLLA', 'Corolla'],
+            'HONDA' => ['Honda', 'CIVIC', 'Civic'],
+        ];
+
+        $records = [];
+        foreach ($definitions as $makeCode => [$makeName, $modelCode, $modelName]) {
+            $make = VehicleMake::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'code' => $makeCode],
                 [
                     'organization_unit_id' => $organizationUnitId,
-                    'name' => $type['name'],
-                    'description' => 'Seed vehicle type.',
+                    'name' => $makeName,
+                    'description' => 'Default vehicle make.',
                     'is_active' => true,
-                    'sort_order' => $index + 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ],
             );
+            $model = VehicleModel::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'vehicle_make_id' => $make->getKey(), 'code' => $modelCode],
+                [
+                    'organization_unit_id' => $organizationUnitId,
+                    'name' => $modelName,
+                    'description' => 'Default vehicle model.',
+                    'is_active' => true,
+                ],
+            );
+            $records[$makeCode] = ['make' => $make, 'model' => $model];
         }
 
-        foreach ([
-            ['code' => 'GENERAL', 'name' => 'General Vehicles'],
-            ['code' => 'SERVICE', 'name' => 'Service Vehicles'],
-            ['code' => 'RENTAL', 'name' => 'Rental Vehicles'],
-        ] as $index => $category) {
-            DB::table('vehicle_categories')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'code' => $category['code']],
+        return $records;
+    }
+
+    private function seedType(int $tenantId, ?int $organizationUnitId): VehicleType
+    {
+        foreach (['CAR' => 'Car', 'VAN' => 'Van'] as $code => $name) {
+            $type = VehicleType::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'code' => $code],
+                [
+                    'organization_unit_id' => $organizationUnitId,
+                    'name' => $name,
+                    'description' => 'Default vehicle type.',
+                    'is_active' => true,
+                    'sort_order' => $code === 'CAR' ? 1 : 2,
+                ],
+            );
+            if ($code === 'CAR') {
+                $default = $type;
+            }
+        }
+
+        return $default;
+    }
+
+    private function seedCategory(int $tenantId, ?int $organizationUnitId): VehicleCategory
+    {
+        foreach (['CUSTOMER' => 'Customer Vehicles', 'FLEET' => 'Fleet Vehicles'] as $code => $name) {
+            $category = VehicleCategory::query()->updateOrCreate(
+                ['tenant_id' => $tenantId, 'code' => $code],
                 [
                     'organization_unit_id' => $organizationUnitId,
                     'parent_id' => null,
-                    'name' => $category['name'],
-                    'description' => 'Seed vehicle category.',
+                    'name' => $name,
+                    'description' => 'Default vehicle category.',
                     'is_active' => true,
-                    'sort_order' => $index + 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'sort_order' => $code === 'CUSTOMER' ? 1 : 2,
                 ],
             );
-        }
-    }
-
-    private function defaultTenantId(): int
-    {
-        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
-        $id = DB::table('tenants')->where('code', $code)->value('id')
-            ?? DB::table('tenants')->orderBy('id')->value('id');
-
-        if ($id === null) {
-            throw new RuntimeException('Seed a tenant before running the Vehicle module seeder.');
+            if ($code === 'CUSTOMER') {
+                $default = $category;
+            }
         }
 
-        return (int) $id;
-    }
-
-    private function defaultOrganizationUnitId(int $tenantId): ?int
-    {
-        return DB::table('organization_units')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('is_active')
-            ->orderBy('id')
-            ->value('id');
+        return $default;
     }
 }

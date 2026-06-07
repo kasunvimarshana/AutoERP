@@ -29,6 +29,7 @@ final class UpsertUserRequest extends FormRequest
             'identity_references.*' => ['required_with:identity_references', 'string', 'max:255'],
             'first_name' => array_merge($required, ['string', 'max:255']),
             'last_name' => ['nullable', 'string', 'max:255'],
+            'username' => ['nullable', 'string', 'max:100', 'regex:/^[a-zA-Z0-9._-]+$/'],
             'email' => array_merge($required, ['email:rfc,dns', 'max:255']),
             'email_verified_at' => ['nullable', 'date'],
             'password' => array_merge($required, ['string', 'min:1']),

@@ -7,68 +7,70 @@ namespace Modules\Warehouse\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
+use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\Warehouse\Models\WarehouseModel;
 
 final class WarehouseSeeder extends Seeder
 {
+    use ResolvesSeedContext;
+
     public function run(): void
     {
         if (! Schema::hasTable('warehouses')) {
             return;
         }
 
-        DB::transaction(function (): void {
-            $tenantId = $this->defaultTenantId();
-            $organizationUnitId = $this->defaultOrganizationUnitId($tenantId);
-
-            DB::table('warehouses')->updateOrInsert(
-                [
-                    'tenant_id' => $tenantId,
-                    'code' => 'MAIN',
-                ],
-                [
-                    'image_path' => null,
-                    'is_active' => true,
-                    'is_default' => true,
-                    'metadata' => $this->json(['seed_source' => 'warehouse_module']),
-                    'name' => 'Main Warehouse',
-                    'organization_unit_id' => $organizationUnitId,
-                    'row_version' => 1,
-                    'type' => 'standard',
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
-        }, 3);
-    }
-
-    private function defaultTenantId(): int
-    {
-        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
-        $id = DB::table('tenants')->where('code', $code)->value('id')
-            ?? DB::table('tenants')->orderBy('id')->value('id');
-
-        if ($id === null) {
-            throw new RuntimeException('Seed a tenant before running the Warehouse module seeder.');
+        $tenant = $this->defaultTenant();
+        $organizationUnit = $this->defaultOrganizationUnit($tenant);
+        if ($tenant === null) {
+            return;
         }
 
-        return (int) $id;
-    }
+        DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $warehouse = WarehouseModel::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'name' => 'Main Warehouse'],
+                [
+                    'organization_unit_id' => $organizationUnit?->getKey(),
+                    'code' => 'MAIN',
+                    'type' => 'standard',
+                    'is_active' => true,
+                    'is_default' => true,
+                    'row_version' => 1,
+                    'metadata' => ['seed_source' => 'warehouse_module'],
+                ],
+            );
 
-    private function defaultOrganizationUnitId(int $tenantId): ?int
-    {
-        return DB::table('organization_units')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('is_active')
-            ->orderBy('id')
-            ->value('id');
-    }
+            if (! Schema::hasTable('warehouse_locations')) {
+                return;
+            }
 
-    /**
-     * @param  array<string,mixed>  $value
-     */
-    private function json(array $value): string
-    {
-        return (string) json_encode($value, JSON_THROW_ON_ERROR);
+            foreach ([
+                ['code' => 'RECEIVING', 'name' => 'Receiving', 'type' => 'staging', 'pickable' => false, 'receivable' => true],
+                ['code' => 'DISPATCH', 'name' => 'Dispatch', 'type' => 'dispatch', 'pickable' => true, 'receivable' => false],
+                ['code' => 'RETURNS', 'name' => 'Returns', 'type' => 'staging', 'pickable' => false, 'receivable' => true],
+            ] as $location) {
+                WarehouseLocationModel::query()->updateOrCreate(
+                    [
+                        'tenant_id' => $tenant->getKey(),
+                        'warehouse_id' => $warehouse->getKey(),
+                        'name' => $location['name'],
+                    ],
+                    [
+                        'organization_unit_id' => $organizationUnit?->getKey(),
+                        'parent_id' => null,
+                        'code' => $location['code'],
+                        'path' => '/'.strtolower($location['code']),
+                        'depth' => 0,
+                        'type' => $location['type'],
+                        'is_active' => true,
+                        'is_pickable' => $location['pickable'],
+                        'is_receivable' => $location['receivable'],
+                        'row_version' => 1,
+                        'metadata' => ['seed_source' => 'warehouse_module'],
+                    ],
+                );
+            }
+        }, 3);
     }
 }

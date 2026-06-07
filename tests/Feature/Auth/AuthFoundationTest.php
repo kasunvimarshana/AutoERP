@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
-use Modules\Core\Database\Seeders\CoreSeeder;
 use Tests\TestCase;
 
 final class AuthFoundationTest extends TestCase
@@ -47,8 +46,7 @@ final class AuthFoundationTest extends TestCase
 
     public function test_seeded_local_admin_can_login_without_tenant_id_from_domain(): void
     {
-        $this->seed(CoreSeeder::class);
-        $this->seed(AuthSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $response = $this->withHeaders(['Host' => 'localhost:5173'])
             ->postJson('/api/v1/auth/login', [
@@ -59,8 +57,9 @@ final class AuthFoundationTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('token_type', 'Bearer')
             ->assertJsonPath('user.email', 'admin@example.com')
+            ->assertJsonPath('user.username', 'admin')
             ->assertJsonPath('tenant.code', 'AUTOERP')
-            ->assertJsonPath('organization_unit.code', 'MAIN')
+            ->assertJsonPath('organization_unit.code', 'HQ')
             ->assertJsonStructure([
                 'token',
                 'user' => ['id', 'name', 'email'],
@@ -71,7 +70,7 @@ final class AuthFoundationTest extends TestCase
 
     public function test_default_tenant_domains_are_seeded_for_local_development(): void
     {
-        $this->seed(CoreSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
@@ -86,7 +85,7 @@ final class AuthFoundationTest extends TestCase
 
     public function test_tenant_resolver_strips_port_and_resolves_localhost_domain(): void
     {
-        $this->seed(CoreSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $request = Request::create(
             '/api/v1/auth/login',
@@ -106,8 +105,7 @@ final class AuthFoundationTest extends TestCase
 
     public function test_invalid_password_without_tenant_id_fails_after_domain_resolution(): void
     {
-        $this->seed(CoreSeeder::class);
-        $this->seed(AuthSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $response = $this->withHeaders(['Host' => 'localhost'])
             ->postJson('/api/v1/auth/login', [
@@ -122,8 +120,7 @@ final class AuthFoundationTest extends TestCase
 
     public function test_unknown_domain_returns_tenant_resolution_error_before_login_lookup(): void
     {
-        $this->seed(CoreSeeder::class);
-        $this->seed(AuthSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $response = $this->call(
             'POST',
@@ -163,6 +160,20 @@ final class AuthFoundationTest extends TestCase
         $response->assertUnauthorized()
             ->assertJsonPath('success', false)
             ->assertJsonPath('error.code', 'AUTH_INVALID_CREDENTIALS');
+    }
+
+    public function test_seeded_local_admin_can_login_with_username(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $this->withHeaders(['Host' => 'localhost'])
+            ->postJson('/api/v1/auth/login', [
+                'login_identifier' => 'admin',
+                'password' => 'password',
+            ])
+            ->assertOk()
+            ->assertJsonPath('user.username', 'admin')
+            ->assertJsonPath('user.email', 'admin@example.com');
     }
 
     public function test_inactive_user_cannot_login(): void

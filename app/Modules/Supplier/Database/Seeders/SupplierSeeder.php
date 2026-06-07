@@ -7,59 +7,72 @@ namespace Modules\Supplier\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
+use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Supplier\Models\Supplier;
+use Modules\Supplier\Models\SupplierCategory;
+use Modules\Supplier\Models\SupplierCategoryAssignment;
 
 final class SupplierSeeder extends Seeder
 {
+    use ResolvesSeedContext;
+
     public function run(): void
     {
-        if (! Schema::hasTable('supplier_categories')) {
+        if (! Schema::hasTable('suppliers')) {
             return;
         }
 
-        $tenantId = $this->defaultTenantId();
-        $organizationUnitId = $this->defaultOrganizationUnitId($tenantId);
+        $tenant = $this->defaultTenant();
+        $organizationUnit = $this->defaultOrganizationUnit($tenant);
+        if ($tenant === null) {
+            return;
+        }
 
-        foreach ([
-            ['code' => 'GENERAL', 'name' => 'General Suppliers'],
-            ['code' => 'GOODS', 'name' => 'Goods Suppliers'],
-            ['code' => 'SERVICES', 'name' => 'Service Suppliers'],
-        ] as $index => $category) {
-            DB::table('supplier_categories')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'code' => $category['code']],
+        DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $category = SupplierCategory::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'code' => 'GENERAL'],
                 [
-                    'organization_unit_id' => $organizationUnitId,
+                    'organization_unit_id' => $organizationUnit?->getKey(),
                     'parent_id' => null,
-                    'name' => $category['name'],
-                    'description' => 'Generic supplier master category.',
+                    'name' => 'General Suppliers',
+                    'description' => 'Default supplier category.',
                     'is_active' => true,
-                    'sort_order' => $index + 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'sort_order' => 1,
                 ],
             );
-        }
-    }
 
-    private function defaultTenantId(): int
-    {
-        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
-        $id = DB::table('tenants')->where('code', $code)->value('id')
-            ?? DB::table('tenants')->orderBy('id')->value('id');
+            $supplier = Supplier::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'supplier_number' => 'SUP-000001'],
+                [
+                    'organization_unit_id' => $organizationUnit?->getKey(),
+                    'code' => 'SUP-GENERIC',
+                    'name' => 'Generic Parts Supplier',
+                    'legal_name' => 'Generic Parts Supplier',
+                    'display_name' => 'Generic Parts Supplier',
+                    'supplier_type' => 'company',
+                    'status' => 'active',
+                    'email' => 'supplier@example.com',
+                    'default_currency_id' => $this->defaultCurrency()?->getKey(),
+                    'credit_limit' => '0.000000',
+                    'is_credit_allowed' => true,
+                    'is_advance_allowed' => true,
+                    'notes' => 'Default supplier for local development and testing.',
+                    'metadata' => ['seed_source' => 'supplier_module'],
+                ],
+            );
 
-        if ($id === null) {
-            throw new RuntimeException('Seed a tenant before running the Supplier module seeder.');
-        }
-
-        return (int) $id;
-    }
-
-    private function defaultOrganizationUnitId(int $tenantId): ?int
-    {
-        return DB::table('organization_units')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('is_active')
-            ->orderBy('id')
-            ->value('id');
+            if (Schema::hasTable('supplier_category_assignments')) {
+                SupplierCategoryAssignment::query()->updateOrCreate(
+                    [
+                        'supplier_id' => $supplier->getKey(),
+                        'supplier_category_id' => $category->getKey(),
+                    ],
+                    [
+                        'tenant_id' => $tenant->getKey(),
+                        'organization_unit_id' => $organizationUnit?->getKey(),
+                    ],
+                );
+            }
+        }, 3);
     }
 }

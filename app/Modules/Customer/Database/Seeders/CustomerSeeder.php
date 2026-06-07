@@ -7,60 +7,74 @@ namespace Modules\Customer\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
+use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Customer\Models\Customer;
+use Modules\Customer\Models\CustomerCategory;
+use Modules\Customer\Models\CustomerCategoryAssignment;
 
 final class CustomerSeeder extends Seeder
 {
+    use ResolvesSeedContext;
+
     public function run(): void
     {
-        if (! Schema::hasTable('customer_categories')) {
+        if (! Schema::hasTable('customers')) {
             return;
         }
 
-        $tenantId = $this->defaultTenantId();
-        $organizationUnitId = $this->defaultOrganizationUnitId($tenantId);
+        $tenant = $this->defaultTenant();
+        $organizationUnit = $this->defaultOrganizationUnit($tenant);
+        if ($tenant === null) {
+            return;
+        }
 
-        foreach ([
-            ['code' => 'GENERAL', 'name' => 'General Customers'],
-            ['code' => 'RETAIL', 'name' => 'Retail Customers'],
-            ['code' => 'WHOLESALE', 'name' => 'Wholesale Customers'],
-            ['code' => 'CORPORATE', 'name' => 'Corporate Customers'],
-        ] as $index => $category) {
-            DB::table('customer_categories')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'code' => $category['code']],
+        DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $category = CustomerCategory::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'code' => 'GENERAL'],
                 [
-                    'organization_unit_id' => $organizationUnitId,
+                    'organization_unit_id' => $organizationUnit?->getKey(),
                     'parent_id' => null,
-                    'name' => $category['name'],
-                    'description' => 'Generic customer master category.',
+                    'name' => 'General Customers',
+                    'description' => 'Default customer category.',
                     'is_active' => true,
-                    'sort_order' => $index + 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'sort_order' => 1,
                 ],
             );
-        }
-    }
 
-    private function defaultTenantId(): int
-    {
-        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
-        $id = DB::table('tenants')->where('code', $code)->value('id')
-            ?? DB::table('tenants')->orderBy('id')->value('id');
+            $customer = Customer::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'customer_number' => 'CUS-000001'],
+                [
+                    'organization_unit_id' => $organizationUnit?->getKey(),
+                    'code' => 'CUS-WALKIN',
+                    'name' => 'Walk-in Customer',
+                    'display_name' => 'Walk-in Customer',
+                    'customer_type' => 'retail',
+                    'status' => 'active',
+                    'email' => 'customer@example.com',
+                    'default_currency_id' => $this->defaultCurrency()?->getKey(),
+                    'credit_limit' => '0.000000',
+                    'is_credit_allowed' => false,
+                    'is_advance_allowed' => true,
+                    'is_tax_exempt' => false,
+                    'marketing_consent' => false,
+                    'preferred_communication_channel' => 'email',
+                    'notes' => 'Default customer for local development and testing.',
+                    'metadata' => ['seed_source' => 'customer_module'],
+                ],
+            );
 
-        if ($id === null) {
-            throw new RuntimeException('Seed a tenant before running the Customer module seeder.');
-        }
-
-        return (int) $id;
-    }
-
-    private function defaultOrganizationUnitId(int $tenantId): ?int
-    {
-        return DB::table('organization_units')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('is_active')
-            ->orderBy('id')
-            ->value('id');
+            if (Schema::hasTable('customer_category_assignments')) {
+                CustomerCategoryAssignment::query()->updateOrCreate(
+                    [
+                        'customer_id' => $customer->getKey(),
+                        'customer_category_id' => $category->getKey(),
+                    ],
+                    [
+                        'tenant_id' => $tenant->getKey(),
+                        'organization_unit_id' => $organizationUnit?->getKey(),
+                    ],
+                );
+            }
+        }, 3);
     }
 }
