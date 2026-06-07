@@ -1,0 +1,12 @@
+<?php
+declare(strict_types=1);
+namespace Modules\Hr\Http\Requests;
+use Illuminate\Validation\Rule;
+use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Hr\DTOs\UpdateEmployeeData;
+use Modules\Hr\Enums\Gender;
+final class UpdateEmployeeRequest extends TenantScopedRequest
+{
+    public function rules(): array { return ['tenant_id' => ['required', 'integer', 'min:1'], 'organization_unit_id' => ['sometimes', 'nullable', 'integer', 'min:1'], 'code' => ['sometimes', 'nullable', 'string', 'max:80'], 'first_name' => ['sometimes', 'required', 'string', 'max:150'], 'middle_name' => ['sometimes', 'nullable', 'string', 'max:150'], 'last_name' => ['sometimes', 'nullable', 'string', 'max:150'], 'display_name' => ['sometimes', 'required', 'string', 'max:255'], 'email' => ['sometimes', 'nullable', 'email'], 'phone' => ['sometimes', 'nullable', 'string', 'max:50'], 'mobile' => ['sometimes', 'nullable', 'string', 'max:50'], 'department_id' => ['sometimes', 'nullable', 'integer', 'min:1'], 'designation_id' => ['sometimes', 'nullable', 'integer', 'min:1'], 'employment_type_id' => ['sometimes', 'nullable', 'integer', 'min:1'], 'reporting_manager_id' => ['sometimes', 'nullable', 'integer', 'min:1'], 'joined_date' => ['sometimes', 'nullable', 'date'], 'resigned_date' => ['sometimes', 'nullable', 'date'], 'date_of_birth' => ['sometimes', 'nullable', 'date'], 'gender' => ['sometimes', 'nullable', Rule::enum(Gender::class)], 'default_hourly_rate' => ['sometimes', 'decimal:0,6', 'gte:0'], 'default_daily_rate' => ['sometimes', 'decimal:0,6', 'gte:0'], 'default_service_rate' => ['sometimes', 'decimal:0,6', 'gte:0'], 'notes' => ['sometimes', 'nullable', 'string'], 'metadata' => ['sometimes', 'nullable', 'array']]; }
+    public function toData(): UpdateEmployeeData { $v = $this->validated(); $s = fn (string $k) => isset($v[$k]) && $v[$k] !== '' ? (string) $v[$k] : null; $i = fn (string $k) => isset($v[$k]) && $v[$k] !== '' ? (int) $v[$k] : null; return new UpdateEmployeeData(array_keys($v), $i('organization_unit_id'), $s('code'), $s('first_name'), $s('middle_name'), $s('last_name'), $s('display_name'), $s('email'), $s('phone'), $s('mobile'), $i('department_id'), $i('designation_id'), $i('employment_type_id'), $i('reporting_manager_id'), $s('joined_date'), $s('resigned_date'), $s('date_of_birth'), isset($v['gender']) && $v['gender'] !== '' ? Gender::from((string) $v['gender']) : null, $s('default_hourly_rate'), $s('default_daily_rate'), $s('default_service_rate'), $s('notes'), $v['metadata'] ?? null); }
+}

@@ -8,6 +8,7 @@ use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Core\Database\Seeders\CoreSeeder;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
+use Modules\Hr\Database\Seeders\HrSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
 use Modules\Vehicle\Database\Seeders\VehicleSeeder;
@@ -31,6 +32,7 @@ class DatabaseSeeder extends Seeder
             SupplierSeeder::class,
             CustomerSeeder::class,
             VehicleSeeder::class,
+            HrSeeder::class,
         ]);
     }
 }

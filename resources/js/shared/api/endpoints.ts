@@ -17,6 +17,13 @@ export const endpoints = {
     invoices: '/api/v1/invoices',
     payments: '/api/v1/payments',
     finance: '/api/v1/finance',
+    hrEmployees: '/api/v1/hr/employees',
+    hrDepartments: '/api/v1/hr/departments',
+    hrDesignations: '/api/v1/hr/designations',
+    hrEmploymentTypes: '/api/v1/hr/employment-types',
+    hrSkills: '/api/v1/hr/skills',
+    hrCertifications: '/api/v1/hr/certifications',
+    hrLicenses: '/api/v1/hr/licenses',
     uoms: '/api/v1/uoms',
     uomConversions: '/api/v1/uom-conversions',
 } as const;

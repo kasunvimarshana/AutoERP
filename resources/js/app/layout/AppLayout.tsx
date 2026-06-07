@@ -20,6 +20,7 @@ const navigation = [
     { to: '/invoices', label: 'Invoices' },
     { to: '/payments', label: 'Payments' },
     { to: '/finance/accounts', label: 'Finance' },
+    { to: '/hr/employees', label: 'Employees' },
 ];
 
 export function AppLayout() {

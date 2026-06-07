@@ -50,6 +50,10 @@ const PaymentDetailPage = lazy(() => import('@/modules/payment/pages/PaymentDeta
 const FinanceAccountsPage = lazy(() => import('@/modules/finance/pages/FinanceAccountsPage'));
 const FinanceAccountDetailPage = lazy(() => import('@/modules/finance/pages/FinanceAccountDetailPage'));
 const FinanceJournalsPage = lazy(() => import('@/modules/finance/pages/FinanceJournalsPage'));
+const EmployeeListPage = lazy(() => import('@/modules/hr/EmployeeListPage'));
+const EmployeeCreatePage = lazy(() => import('@/modules/hr/EmployeeCreatePage'));
+const EmployeeEditPage = lazy(() => import('@/modules/hr/EmployeeEditPage'));
+const EmployeeDetailPage = lazy(() => import('@/modules/hr/EmployeeDetailPage'));
 const NotFoundPage = lazy(() => import('@/modules/not-found/NotFoundPage'));
 
 export function AppRouter() {
@@ -107,6 +111,10 @@ export function AppRouter() {
                     <Route path="/finance/accounts" element={<FinanceAccountsPage />} />
                     <Route path="/finance/accounts/:id" element={<FinanceAccountDetailPage />} />
                     <Route path="/finance/journals" element={<FinanceJournalsPage />} />
+                    <Route path="/hr/employees" element={<EmployeeListPage />} />
+                    <Route path="/hr/employees/create" element={<EmployeeCreatePage />} />
+                    <Route path="/hr/employees/:id/edit" element={<EmployeeEditPage />} />
+                    <Route path="/hr/employees/:id" element={<EmployeeDetailPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Route>
             </Route>

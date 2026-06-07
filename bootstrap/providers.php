@@ -8,6 +8,7 @@ use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Customer\Providers\CustomerServiceProvider;
 use Modules\Extension\Providers\ExtensionServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
+use Modules\Hr\Providers\HrServiceProvider;
 use Modules\Inventory\Providers\InventoryServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
 use Modules\Item\Providers\ItemServiceProvider;
@@ -34,6 +35,7 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
+    HrServiceProvider::class,
     ItemServiceProvider::class,
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
