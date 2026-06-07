@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './Button';
 
 export function Drawer({ open, title, onClose, children }: {
@@ -20,8 +21,8 @@ export function Drawer({ open, title, onClose, children }: {
 
     if (!open) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    return createPortal(
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50" role="dialog" aria-modal="true" aria-labelledby={titleId} onSubmit={(event) => event.stopPropagation()}>
             <div className="flex h-full w-full flex-col bg-white shadow-xl sm:max-w-2xl">
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
@@ -29,7 +30,8 @@ export function Drawer({ open, title, onClose, children }: {
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 
