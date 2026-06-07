@@ -1,4 +1,8 @@
+import { useState } from 'react';
+import { Button } from '@/shared/components/Button';
+import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { Input } from '@/shared/components/Input';
+import { Modal } from '@/shared/components/Modal';
 import type { ReturnableLine } from '../purchaseApi';
 
 export interface EditableReturnLine {
@@ -7,31 +11,88 @@ export interface EditableReturnLine {
     reason: string;
 }
 
+type ReturnLineDialog = { index: number; line: EditableReturnLine };
+
 export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
     lines: EditableReturnLine[];
     onChange: (lines: EditableReturnLine[]) => void;
     errorFor: (field: string) => string | undefined;
 }) {
+    const [dialog, setDialog] = useState<ReturnLineDialog | null>(null);
+    const updateLine = (index: number, line: EditableReturnLine) => {
+        onChange(lines.map((current, currentIndex) => currentIndex === index ? line : current));
+        setDialog(null);
+    };
+    const columns: DataColumn<EditableReturnLine & { rowIndex: number }>[] = [
+        { key: 'item', header: 'Item', render: formatReturnItem },
+        { key: 'quantity', header: 'Qty', render: (line) => line.returned_quantity, className: 'tabular-nums' },
+        { key: 'uom', header: 'UOM', render: (line) => line.source.uom?.code ?? '-' },
+        { key: 'price', header: 'Unit price', render: (line) => line.source.unit_price, className: 'tabular-nums' },
+        { key: 'returnable', header: 'Returnable', render: (line) => line.source.returnable_quantity, className: 'tabular-nums' },
+        { key: 'reason', header: 'Reason', render: (line) => line.reason || '-' },
+        { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
+    ];
+    const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
+
     return (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                    <tr>{['Item', 'UOM', 'Returnable', 'Unit price', 'Return qty', 'Reason'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {lines.map((line, index) => (
-                        <tr key={line.source.id}>
-                            <td className="px-4 py-3">{line.source.item?.name ?? '-'}</td>
-                            <td className="px-4 py-3">{line.source.uom?.code ?? '-'}</td>
-                            <td className="px-4 py-3 tabular-nums">{line.source.returnable_quantity}</td>
-                            <td className="px-4 py-3 tabular-nums">{line.source.unit_price}</td>
-                            <td className="min-w-44 px-4 py-3"><Input type="number" min="0" step="0.000001" value={line.returned_quantity} error={errorFor(`lines.${index}.returned_quantity`)} onChange={(event) => onChange(lines.map((current, currentIndex) => currentIndex === index ? { ...current, returned_quantity: event.target.value } : current))} /></td>
-                            <td className="min-w-56 px-4 py-3"><Input value={line.reason} error={errorFor(`lines.${index}.reason`)} onChange={(event) => onChange(lines.map((current, currentIndex) => currentIndex === index ? { ...current, reason: event.target.value } : current))} /></td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {lines.length === 0 && <div className="px-4 py-10 text-center text-sm text-slate-500">Select a GRN with returnable lines.</div>}
-        </div>
+        <>
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." />
+            <Modal open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
+                {dialog && (
+                    <PurchaseReturnLineForm
+                        key={dialog.line.source.id}
+                        line={dialog.line}
+                        errorFor={(field) => errorFor(`lines.${dialog.index}.${field}`)}
+                        onCancel={() => setDialog(null)}
+                        onSave={(line) => updateLine(dialog.index, line)}
+                    />
+                )}
+            </Modal>
+        </>
     );
+}
+
+function PurchaseReturnLineForm({ line, errorFor, onSave, onCancel }: {
+    line: EditableReturnLine;
+    errorFor: (field: string) => string | undefined;
+    onSave: (line: EditableReturnLine) => void;
+    onCancel: () => void;
+}) {
+    const [draft, setDraft] = useState(line);
+    const set = <K extends keyof EditableReturnLine>(key: K, value: EditableReturnLine[K]) => setDraft((current) => ({ ...current, [key]: value }));
+
+    return (
+        <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
+            <section className="space-y-4">
+                <div>
+                    <h3 className="font-semibold text-slate-900">Basic Details</h3>
+                    <p className="text-sm text-slate-500">{formatReturnItem(draft)} / {draft.source.uom?.code ?? '-'}</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Input label="Return quantity" type="number" min="0" step="0.000001" value={draft.returned_quantity} error={errorFor('returned_quantity')} onChange={(event) => set('returned_quantity', event.target.value)} />
+                    <Input label="Reason" value={draft.reason} error={errorFor('reason')} onChange={(event) => set('reason', event.target.value)} />
+                </div>
+            </section>
+            <div className="rounded-lg border border-slate-200 p-4 text-sm">
+                <h3 className="font-semibold text-slate-900">Source Line</h3>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <Summary label="Returnable" value={draft.source.returnable_quantity} />
+                    <Summary label="Unit price" value={draft.source.unit_price} />
+                    <Summary label="UOM" value={draft.source.uom?.code ?? '-'} />
+                </div>
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
+                <Button type="submit">Save line</Button>
+            </div>
+        </form>
+    );
+}
+
+function formatReturnItem(line: EditableReturnLine): string {
+    return line.source.item?.name ?? '-';
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+    return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
 }

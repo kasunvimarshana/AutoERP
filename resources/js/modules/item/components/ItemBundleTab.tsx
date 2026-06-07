@@ -21,11 +21,9 @@ const list = (itemId: number, page: number, signal: AbortSignal) => listItemBund
 export default function ItemBundleTab({ itemId, canBundle }: { itemId: number; canBundle: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemBundle, update: updateItemBundle, remove: deleteItemBundle });
     const columns: DataColumn<ItemBundle>[] = [
-        { key: 'child', header: 'Child item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
+        { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
-        { key: 'type', header: 'Line type', render: (row) => row.line_type },
-        { key: 'required', header: 'Required', render: (row) => row.is_required ? 'Yes' : 'No' },
         { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
     return (
@@ -69,18 +67,24 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
         });
     }}>
         <ErrorAlert error={error} />
+        <h3 className="font-semibold text-slate-900">Basic Details</h3>
         <ItemLookupSelect label="Child item" value={child} onChange={setChild} excludeId={itemId} error={fieldError(error, 'child_item_id')} />
         <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
-            <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value)} options={bundleLineTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={fieldError(error, 'line_type')} />
-            <Input label="Sort order" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
         </div>
-        <label className="block text-sm"><input className="mr-2" type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Required line</label>
-        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting} disabled={!child}>Save</Button></div>
+        <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value)} options={bundleLineTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={fieldError(error, 'line_type')} />
+                <Input label="Sort order" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+            </div>
+            <label className="mt-4 block text-sm"><input className="mr-2" type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Required line</label>
+        </details>
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting} disabled={!child}>Save line</Button></div>
     </form>;
 }
 
 function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>;
+    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit line</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Remove line</button></div>;
 }

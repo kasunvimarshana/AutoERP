@@ -11,7 +11,7 @@ import { addDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal, s
 import type { PurchaseOrder, PurchaseOrderPayload } from '../purchaseApi';
 import { createPurchaseOrder, updatePurchaseOrder } from '../purchaseApi';
 import { PurchaseHeaderAdjustmentEditor, emptyHeaderAdjustment, type EditableHeaderAdjustment } from './PurchaseHeaderAdjustmentEditor';
-import { PurchaseOrderLineEditor, emptyPurchaseLine, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
+import { PurchaseOrderLineEditor, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderSummaryPanel';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
 
@@ -111,7 +111,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(resourceOrNull(order?.warehouse));
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(resourceOrNull(order?.warehouse_location));
     const [currency, setCurrency] = useState<NamedResource | null>(resourceOrNull(order?.currency));
-    const [lines, setLines] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(lineFromOrder) : [emptyPurchaseLine()]);
+    const [lines, setLines] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(lineFromOrder) : []);
     const [adjustments, setAdjustments] = useState<EditableHeaderAdjustment[]>(order?.adjustments?.length ? order.adjustments.map(adjustmentFromOrder) : []);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);

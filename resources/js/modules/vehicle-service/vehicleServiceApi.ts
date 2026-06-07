@@ -64,6 +64,9 @@ export const listEmployeeAssignableLines = (jobId: number, signal?: AbortSignal)
 export const createVehicleServiceEmployee = (jobId: number, lineId: number, payload: Record<string, unknown>) =>
     apiClient.post<ApiResource<VehicleServiceEmployeeAssignment>>(`${jobs}/${jobId}/lines/${lineId}/employees`, payload).then((response) => response.data.data);
 
+export const updateVehicleServiceEmployee = (jobId: number, lineId: number, assignmentId: number, payload: Record<string, unknown>) =>
+    apiClient.put<ApiResource<VehicleServiceEmployeeAssignment>>(`${jobs}/${jobId}/lines/${lineId}/employees/${assignmentId}`, payload).then((response) => response.data.data);
+
 export const deleteVehicleServiceEmployee = (jobId: number, lineId: number, assignmentId: number) =>
     apiClient.delete(`${jobs}/${jobId}/lines/${lineId}/employees/${assignmentId}`);
 
