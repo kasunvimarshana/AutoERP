@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -31,11 +32,12 @@ export default function ItemPriceTab({ itemId }: { itemId: number }) {
     return <>
         <ItemRelationHeader title="Reference prices" description="Maintain decimal-safe reference amounts without owning sales or purchase documents." onAdd={crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />
-        {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+        {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => `${row.price_type}: ${row.amount}`} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>UOM: {row.uom?.code ?? '-'}</span><span>{row.is_active ? 'Active' : 'Inactive'}</span></div>} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <Modal open={crud.open} title={crud.editing ? 'Edit price' : 'Add price'} onClose={crud.close}>
+        <FormDrawer open={crud.open} title={crud.editing ? 'Edit price' : 'Add price'} onClose={crud.close}>
             {crud.open && <PriceForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-        </Modal>
+        </FormDrawer>
+        {crud.confirmDialog}
     </>;
 }
 
@@ -61,7 +63,7 @@ function PriceForm({ row, error, submitting, onCancel, onSubmit }: {
         <ErrorAlert error={error} />
         <div className="grid gap-4 sm:grid-cols-2">
             <Select label="Price type" value={form.price_type} onChange={(event) => setForm({ ...form, price_type: event.target.value })} options={itemPriceTypes.map((value) => ({ value, label: value }))} error={fieldError(error, 'price_type')} />
-            <Input label="Amount" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} error={fieldError(error, 'amount')} required />
+            <DecimalInput label="Amount" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} error={fieldError(error, 'amount')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
             <Input label="Effective from" type="date" value={form.effective_from ?? ''} onChange={(event) => setForm({ ...form, effective_from: event.target.value || null })} />
             <Input label="Effective to" type="date" value={form.effective_to ?? ''} onChange={(event) => setForm({ ...form, effective_to: event.target.value || null })} error={fieldError(error, 'effective_to')} />

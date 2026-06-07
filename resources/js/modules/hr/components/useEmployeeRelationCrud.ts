@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
 import type { ApiCollection } from '@/shared/types/api';
 
@@ -14,13 +15,14 @@ export function useEmployeeRelationCrud<T extends { id: number }, P>(employeeId:
     const [open, setOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => api.list(employeeId, page, signal), [employeeId, page]);
     return {
-        ...result, page, setPage, editing, open, submitting, actionError,
+        ...result, page, setPage, editing, open, submitting, actionError, confirmDialog,
         startCreate: () => { setEditing(null); setActionError(null); setOpen(true); },
         startEdit: (row: T) => { setEditing(row); setActionError(null); setOpen(true); },
         close: () => { if (!submitting) setOpen(false); },
         submit: async (payload: P) => { setSubmitting(true); setActionError(null); try { if (editing) await api.update(employeeId, editing.id, payload); else await api.create(employeeId, payload); setOpen(false); result.reload(); } catch (error) { setActionError(toApiError(error)); } finally { setSubmitting(false); } },
-        destroy: async (row: T) => { if (!window.confirm('Delete this employee record?')) return; try { await api.remove(employeeId, row.id); result.reload(); } catch (error) { setActionError(toApiError(error)); } },
+        destroy: async (row: T) => { const confirmed = await confirm({ title: 'Delete employee record', message: 'This employee relation record will be permanently deleted.', confirmLabel: 'Delete' }); if (!confirmed) return; try { await api.remove(employeeId, row.id); result.reload(); } catch (error) { setActionError(toApiError(error)); } },
     };
 }

@@ -1,9 +1,10 @@
 const SCALE = 6;
 const FACTOR = 10n ** BigInt(SCALE);
+const decimalPattern = /^-?\d+(\.\d+)?$/;
 
 function scaled(value: string | number | null | undefined): bigint {
     const input = String(value ?? '0').trim();
-    if (!/^-?\d+(\.\d+)?$/.test(input)) return 0n;
+    if (!decimalPattern.test(input)) return 0n;
 
     const negative = input.startsWith('-');
     const [whole, fraction = ''] = (negative ? input.slice(1) : input).split('.');
@@ -41,4 +42,28 @@ export function sumDecimals(values: string[]): string {
 
 export function nonNegativeDecimal(value: string): string {
     return scaled(value) < 0n ? '0.000000' : decimal(scaled(value));
+}
+
+export function isDecimalString(value: string): boolean {
+    const input = value.trim();
+    return input === '' || decimalPattern.test(input);
+}
+
+export function normalizeDecimalInput(value: string): string {
+    return value.replace(/[^\d.-]/g, '');
+}
+
+export function compareDecimalStrings(left: string, right: string): -1 | 0 | 1 {
+    const difference = scaled(left) - scaled(right);
+    if (difference < 0n) return -1;
+    if (difference > 0n) return 1;
+    return 0;
+}
+
+export function isPositiveDecimal(value: string): boolean {
+    return isDecimalString(value) && value.trim() !== '' && compareDecimalStrings(value, '0') > 0;
+}
+
+export function isNonNegativeDecimal(value: string): boolean {
+    return isDecimalString(value) && (value.trim() === '' || compareDecimalStrings(value, '0') >= 0);
 }

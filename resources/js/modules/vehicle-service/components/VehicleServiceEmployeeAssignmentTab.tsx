@@ -2,12 +2,13 @@ import { useCallback, useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
-import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import { useApi } from '@/shared/hooks/useApi';
@@ -32,7 +33,9 @@ interface AssignmentFormValue {
 export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: number }) {
     const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialog | null>(null);
+    const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
     const [saving, setSaving] = useState(false);
+    const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const assignments = (result.data ?? []).flatMap((line) => (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
 
@@ -56,13 +59,16 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
         }
     };
     const removeAssignment = async (row: AssignmentRow) => {
-        if (!window.confirm('Remove this assignment?')) return;
+        setRemoving(true);
         setError(null);
         try {
             await deleteVehicleServiceEmployee(jobId, row.line.id, row.id);
+            setRemoveTarget(null);
             result.reload();
         } catch (requestError) {
             setError(toApiError(requestError));
+        } finally {
+            setRemoving(false);
         }
     };
 
@@ -74,9 +80,9 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
                 rows={assignments}
                 onAdd={() => setDialog({ mode: 'create', value: emptyAssignmentForm() })}
                 onEdit={(row) => setDialog({ mode: 'edit', assignmentId: row.id, value: assignmentToForm(row) })}
-                onRemove={(row) => void removeAssignment(row)}
+                onRemove={setRemoveTarget}
             />
-            <Modal open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit assignment' : 'Assign employee'} onClose={() => !saving && setDialog(null)}>
+            <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit assignment' : 'Assign employee'} onClose={() => !saving && setDialog(null)}>
                 {dialog && (
                     <EmployeeAssignmentForm
                         key={dialog.mode === 'edit' ? `edit-${dialog.assignmentId}` : 'create'}
@@ -88,7 +94,16 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
                         onSave={(value) => void saveAssignment(value)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
+            <ConfirmDialog
+                open={Boolean(removeTarget)}
+                title="Remove assignment"
+                message="This employee assignment will be removed from the service line."
+                confirmLabel="Remove assignment"
+                loading={removing}
+                onCancel={() => !removing && setRemoveTarget(null)}
+                onConfirm={() => removeTarget && void removeAssignment(removeTarget)}
+            />
         </div>
     );
 }
@@ -113,7 +128,7 @@ function EmployeeAssignmentTable({ rows, loading, onAdd, onEdit, onRemove }: {
     return (
         <div className="space-y-3">
             <div className="flex justify-end"><Button type="button" onClick={onAdd}>Assign employee</Button></div>
-            {loading ? <LoadingState /> : <DataTable rows={rows} columns={columns} rowKey={(row) => row.id} emptyMessage="No workforce assignments. Click Assign employee to start." />}
+            {loading ? <LoadingState /> : <DataTable rows={rows} columns={columns} rowKey={(row) => row.id} emptyMessage="No workforce assignments. Click Assign employee to start." mobileSummary={(row) => row.employee?.name ?? 'Unavailable employee'} mobileDetails={(row) => <AssignmentMobileDetails row={row} />} mobileActions={(row) => <AssignmentActions onEdit={() => onEdit(row)} onRemove={() => onRemove(row)} />} />}
         </div>
     );
 }
@@ -142,10 +157,10 @@ function EmployeeAssignmentForm({ value, lines, error, saving, onSave, onCancel 
                     <Select label="Service / labour line" value={draft.lineId} options={lines.map((line) => ({ value: line.id, label: `${line.line_number}. ${line.description}` }))} error={fieldError(error, 'line_id')} onChange={(event) => set('lineId', event.target.value)} />
                     <GenericLookupSelect label="Employee" value={draft.employee} onChange={(employee) => set('employee', employee)} search={search} formatLabel={(employee) => `${employee.code ?? ''} ${employee.name}`.trim()} />
                     <Select label="Role" value={draft.role} options={['technician', 'helper', 'inspector', 'custom'].map((role) => ({ value: role, label: role }))} error={fieldError(error, 'role_type')} onChange={(event) => set('role', event.target.value)} />
-                    <Input label="Assigned hours" type="number" min="0" step="0.000001" value={draft.hours} error={fieldError(error, 'assigned_hours')} onChange={(event) => set('hours', event.target.value)} />
-                    <Input label="Rate" type="number" min="0" step="0.000001" value={draft.rate} error={fieldError(error, 'rate')} onChange={(event) => set('rate', event.target.value)} />
+                    <DecimalInput label="Assigned hours" value={draft.hours} error={fieldError(error, 'assigned_hours')} onChange={(event) => set('hours', event.target.value)} />
+                    <DecimalInput label="Rate" value={draft.rate} error={fieldError(error, 'rate')} onChange={(event) => set('rate', event.target.value)} />
                     <Select label="Commission" value={draft.commissionType} options={['none', 'fixed', 'percentage'].map((type) => ({ value: type, label: type }))} error={fieldError(error, 'commission_type')} onChange={(event) => set('commissionType', event.target.value as CommissionType)} />
-                    <Input label="Commission value" type="number" min="0" step="0.000001" value={draft.commissionValue} error={fieldError(error, 'commission_value')} onChange={(event) => set('commissionValue', event.target.value)} />
+                    <DecimalInput label="Commission value" value={draft.commissionValue} error={fieldError(error, 'commission_value')} onChange={(event) => set('commissionValue', event.target.value)} />
                 </div>
             </section>
             <div className="flex justify-end gap-2">
@@ -198,4 +213,12 @@ function formatCommissionSummary(row: AssignmentRow): string {
 
 function AssignmentActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
     return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={onEdit}>Edit assignment</button><button type="button" className="font-semibold text-rose-600" onClick={onRemove}>Remove assignment</button></div>;
+}
+
+function AssignmentMobileDetails({ row }: { row: AssignmentRow }) {
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Line" value={`${row.line.line_number}. ${row.line.description}`} /><Summary label="Role" value={row.role_type} /><Summary label="Hours" value={row.assigned_hours} /><Summary label="Commission" value={formatCommissionSummary(row)} /></div>;
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+    return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block text-slate-900">{value}</strong></div>;
 }

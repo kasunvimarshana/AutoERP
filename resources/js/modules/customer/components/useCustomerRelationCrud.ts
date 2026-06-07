@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
 import type { ApiCollection } from '@/shared/types/api';
 
@@ -15,10 +16,11 @@ export function useCustomerRelationCrud<T extends { id: number }, P>({ customerI
     const [open, setOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => list(customerId, page, signal), [customerId, page]);
 
     return {
-        ...result, page, setPage, editing, open, submitting, actionError,
+        ...result, page, setPage, editing, open, submitting, actionError, confirmDialog,
         startCreate: () => { setEditing(null); setActionError(null); setOpen(true); },
         startEdit: (row: T) => { setEditing(row); setActionError(null); setOpen(true); },
         close: () => { if (!submitting) setOpen(false); },
@@ -35,7 +37,8 @@ export function useCustomerRelationCrud<T extends { id: number }, P>({ customerI
             }
         },
         destroy: async (row: T) => {
-            if (!window.confirm('Delete this customer relation record?')) return;
+            const confirmed = await confirm({ title: 'Delete customer relation', message: 'This customer relation record will be permanently deleted.', confirmLabel: 'Delete' });
+            if (!confirmed) return;
             setActionError(null);
             try { await remove(customerId, row.id); result.reload(); }
             catch (error) { setActionError(toApiError(error)); }

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { LookupSelect } from '@/shared/components/LookupSelect';
-import { Modal } from '@/shared/components/Modal';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import { addDecimal, multiplyDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
@@ -49,7 +51,9 @@ const lineTypeOptions = [
 export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
     const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
+    const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
     const [saving, setSaving] = useState(false);
+    const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     const saveLine = async (value: VehicleServiceLineFormValue) => {
@@ -72,13 +76,16 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
         }
     };
     const removeLine = async (line: VehicleServiceJobLine) => {
-        if (!window.confirm('Remove this line?')) return;
+        setRemoving(true);
         setError(null);
         try {
             await deleteVehicleServiceLine(jobId, line.id);
+            setRemoveTarget(null);
             result.reload();
         } catch (requestError) {
             setError(toApiError(requestError));
+        } finally {
+            setRemoving(false);
         }
     };
 
@@ -90,9 +97,9 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
                 loading={result.loading}
                 onAdd={() => setDialog({ mode: 'create', value: emptyLineForm() })}
                 onEdit={(line) => setDialog({ mode: 'edit', lineId: line.id, value: lineToForm(line) })}
-                onRemove={(line) => void removeLine(line)}
+                onRemove={setRemoveTarget}
             />
-            <Modal open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'} onClose={() => !saving && setDialog(null)}>
+            <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'} onClose={() => !saving && setDialog(null)}>
                 {dialog && (
                     <VehicleServiceLineForm
                         key={dialog.mode === 'edit' ? `edit-${dialog.lineId}` : 'create'}
@@ -104,7 +111,16 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
                         onSave={(value) => void saveLine(value)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
+            <ConfirmDialog
+                open={Boolean(removeTarget)}
+                title="Remove line"
+                message="This service line will be removed from the job."
+                confirmLabel="Remove line"
+                loading={removing}
+                onCancel={() => !removing && setRemoveTarget(null)}
+                onConfirm={() => removeTarget && void removeLine(removeTarget)}
+            />
         </div>
     );
 }
@@ -130,7 +146,7 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
     return (
         <div className="space-y-3">
             <div className="flex justify-end"><Button type="button" onClick={onAdd}>Add line</Button></div>
-            {loading ? <LoadingState /> : <DataTable rows={lines} columns={columns} rowKey={(line) => line.id} emptyMessage="No lines added yet. Click Add line to start." />}
+            {loading ? <LoadingState /> : <DataTable rows={lines} columns={columns} rowKey={(line) => line.id} emptyMessage="No lines added yet. Click Add line to start." mobileSummary={formatLineItem} mobileDetails={(line) => <LineMobileDetails line={line} />} mobileActions={(line) => <LineActions onEdit={() => onEdit(line)} onRemove={() => onRemove(line)} />} />}
         </div>
     );
 }
@@ -159,8 +175,8 @@ function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Select label="Line type" value={draft.source} options={lineTypeOptions} error={fieldError(error, 'line_source_type')} onChange={(event) => setDraft({ ...draft, source: event.target.value as VehicleServiceLineSourceType, item: null, customer_supplied: false })} />
                     {!external && <LookupSelect label="Item" value={draft.item} onChange={(item) => setDraft({ ...draft, item, description: item?.name ?? draft.description })} search={lookupApi.items} />}
-                    <Input label="Quantity" type="number" min="0.000001" step="0.000001" value={draft.quantity} error={fieldError(error, 'quantity')} onChange={(event) => set('quantity', event.target.value)} />
-                    <Input label="Unit price" type="number" min="0" step="0.000001" value={draft.unit_price} error={fieldError(error, 'unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
+                    <DecimalInput label="Quantity" value={draft.quantity} error={fieldError(error, 'quantity')} onChange={(event) => set('quantity', event.target.value)} />
+                    <DecimalInput label="Unit price" value={draft.unit_price} error={fieldError(error, 'unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
                     <Input label="Description" value={draft.description} error={fieldError(error, 'description')} onChange={(event) => set('description', event.target.value)} />
                 </div>
             </section>
@@ -169,13 +185,13 @@ function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }
                 <summary className="cursor-pointer font-semibold text-slate-800">Advanced pricing</summary>
                 <p className="mt-1 text-sm text-slate-500">Advanced pricing is optional.</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <Input label="Unit cost" type="number" min="0" step="0.000001" value={draft.unit_cost} error={fieldError(error, 'unit_cost')} onChange={(event) => set('unit_cost', event.target.value)} />
+                    <DecimalInput label="Unit cost" value={draft.unit_cost} error={fieldError(error, 'unit_cost')} onChange={(event) => set('unit_cost', event.target.value)} />
                     <Select label="Discount type" value={draft.discount_type} options={calculationOptions} error={fieldError(error, 'discount_calculation_type')} onChange={(event) => set('discount_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label="Discount value" type="number" min="0" step="0.000001" value={draft.discount_value} onChange={(event) => set('discount_value', event.target.value)} />
+                    <DecimalInput label="Discount value" value={draft.discount_value} onChange={(event) => set('discount_value', event.target.value)} />
                     <Select label="Tax type" value={draft.tax_type} options={calculationOptions} error={fieldError(error, 'tax_calculation_type')} onChange={(event) => set('tax_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label="Tax value" type="number" min="0" step="0.000001" value={draft.tax_value} onChange={(event) => set('tax_value', event.target.value)} />
+                    <DecimalInput label="Tax value" value={draft.tax_value} onChange={(event) => set('tax_value', event.target.value)} />
                     <Select label="Charge type" value={draft.charge_type} options={calculationOptions} error={fieldError(error, 'charge_calculation_type')} onChange={(event) => set('charge_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label="Charge value" type="number" min="0" step="0.000001" value={draft.charge_value} onChange={(event) => set('charge_value', event.target.value)} />
+                    <DecimalInput label="Charge value" value={draft.charge_value} onChange={(event) => set('charge_value', event.target.value)} />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-5 text-sm">
                     {external && <label><input type="checkbox" checked={draft.customer_supplied} onChange={(event) => setDraft({ ...draft, customer_supplied: event.target.checked, billable: event.target.checked ? false : draft.billable })} /> <span className="ml-2">Customer supplied</span></label>}
@@ -305,4 +321,8 @@ function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () =>
 
 function Preview({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
+}
+
+function LineMobileDetails({ line }: { line: VehicleServiceJobLine }) {
+    return <div className="grid grid-cols-2 gap-2"><Preview label="Qty" value={line.quantity} /><Preview label="UOM" value={line.uom?.code ?? '-'} /><Preview label="Price" value={line.unit_price} /><Preview label="Total" value={line.line_total} /></div>;
 }

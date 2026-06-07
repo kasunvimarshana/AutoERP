@@ -4,6 +4,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -44,7 +45,7 @@ export default function VehicleServiceInvoiceCreatePage() {
                     <div className="space-y-4">
                         <Input label="Invoice date" type="date" value={form.invoice_date} onChange={(event) => setForm({ ...form, invoice_date: event.target.value })} />
                         <Input label="Due date" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
-                        <Input label="Exchange rate" type="number" min="0.000001" step="0.000001" value={form.exchange_rate} onChange={(event) => setForm({ ...form, exchange_rate: event.target.value })} />
+                        <DecimalInput label="Exchange rate" value={form.exchange_rate} onChange={(event) => setForm({ ...form, exchange_rate: event.target.value })} />
                         <Textarea label="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                         <div className="flex gap-2">
                             <Button type="button" variant="secondary" loading={busy} onClick={async () => {

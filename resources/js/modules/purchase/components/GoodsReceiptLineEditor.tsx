@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
-import { Input } from '@/shared/components/Input';
-import { Modal } from '@/shared/components/Modal';
+import { DecimalInput } from '@/shared/components/DecimalInput';
+import { FormDrawer } from '@/shared/components/Drawer';
 import type { PurchaseOrderLine } from '../purchaseApi';
 
 export interface EditableGoodsReceiptLine {
@@ -38,8 +38,8 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
 
     return (
         <>
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." />
-            <Modal open={Boolean(dialog)} title="Edit receipt line" onClose={() => setDialog(null)}>
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            <FormDrawer open={Boolean(dialog)} title="Edit receipt line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <GoodsReceiptLineForm
                         key={dialog.line.source.id}
@@ -49,7 +49,7 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
                         onSave={(line) => updateLine(dialog.index, line)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
         </>
     );
 }
@@ -71,9 +71,9 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
                     <p className="text-sm text-slate-500">{formatGoodsReceiptItem(draft)} / {draft.source.uom?.code ?? '-'}</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Input label="Received quantity" type="number" min="0" step="0.000001" value={draft.received_quantity} error={errorFor('received_quantity')} onChange={(event) => set('received_quantity', event.target.value)} />
-                    <Input label="Accepted quantity" type="number" min="0" step="0.000001" value={draft.accepted_quantity} error={errorFor('accepted_quantity')} onChange={(event) => set('accepted_quantity', event.target.value)} />
-                    <Input label="Rejected quantity" type="number" min="0" step="0.000001" value={draft.rejected_quantity} error={errorFor('rejected_quantity')} onChange={(event) => set('rejected_quantity', event.target.value)} />
+                    <DecimalInput label="Received quantity" value={draft.received_quantity} error={errorFor('received_quantity')} onChange={(event) => set('received_quantity', event.target.value)} />
+                    <DecimalInput label="Accepted quantity" value={draft.accepted_quantity} error={errorFor('accepted_quantity')} onChange={(event) => set('accepted_quantity', event.target.value)} />
+                    <DecimalInput label="Rejected quantity" value={draft.rejected_quantity} error={errorFor('rejected_quantity')} onChange={(event) => set('rejected_quantity', event.target.value)} />
                 </div>
             </section>
             <div className="rounded-lg border border-slate-200 p-4 text-sm">
@@ -102,4 +102,8 @@ function remainingQuantity(line: EditableGoodsReceiptLine): string {
 
 function Summary({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
+}
+
+function GoodsReceiptMobileDetails({ line }: { line: EditableGoodsReceiptLine }) {
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Received" value={line.received_quantity} /><Summary label="Accepted" value={line.accepted_quantity} /><Summary label="Rejected" value={line.rejected_quantity} /><Summary label="Remaining" value={remainingQuantity(line)} /></div>;
 }

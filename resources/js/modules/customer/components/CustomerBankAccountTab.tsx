@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
@@ -25,7 +25,7 @@ export default function CustomerBankAccountTab({ customerId }: { customerId: num
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
         { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
-    return <><CustomerRelationHeader title="Bank accounts" description="Payment destination reference accounts owned by the customer master." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><Modal open={crud.open} title={crud.editing ? 'Edit bank account' : 'Add bank account'} onClose={crud.close}>{crud.open && <BankForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</Modal></>;
+    return <><CustomerRelationHeader title="Bank accounts" description="Payment destination reference accounts owned by the customer master." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><FormDrawer open={crud.open} title={crud.editing ? 'Edit bank account' : 'Add bank account'} onClose={crud.close}>{crud.open && <BankForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>{crud.confirmDialog}</>;
 }
 function BankForm({ row, error, submitting, onCancel, onSubmit }: { row: CustomerBankAccount | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: CustomerBankAccountPayload) => Promise<void> }) {
     const [currency, setCurrency] = useState<NamedResource | null>(row?.currency ?? null);

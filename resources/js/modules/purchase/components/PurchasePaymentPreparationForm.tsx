@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -80,7 +81,7 @@ export function PurchasePaymentPreparationForm() {
                     <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
                     <Input label="Payment date" type="date" value={paymentDate} error={errorFor('payment_date')} onChange={(event) => setPaymentDate(event.target.value)} />
                     <Input label="Reference" value={referenceNumber} error={errorFor('reference_number')} onChange={(event) => setReferenceNumber(event.target.value)} />
-                    <Input label="Payment amount" type="number" min="0.000001" step="0.000001" value={amount} error={errorFor('amount')} onChange={(event) => setAmount(event.target.value)} />
+                    <DecimalInput label="Payment amount" value={amount} error={errorFor('amount')} onChange={(event) => setAmount(event.target.value)} />
                     <div className="md:pt-7"><Button type="button" variant="secondary" loading={busy} disabled={!supplier} onClick={loadInvoices}>Load invoices</Button></div>
                 </div>
             </Panel>
@@ -96,7 +97,7 @@ export function PurchasePaymentPreparationForm() {
                                 <td className="px-4 py-3">{invoice.invoice_date ?? '-'}</td>
                                 <td className="px-4 py-3">{invoice.status ?? '-'}</td>
                                 <td className="px-4 py-3 tabular-nums">{balanceOf(invoice)}</td>
-                                <td className="min-w-44 px-4 py-3"><Input type="number" min="0" step="0.000001" value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${index}.allocated_amount`)} onChange={(event) => setAllocations({ ...allocations, [invoice.id]: event.target.value })} /></td>
+                                <td className="min-w-44 px-4 py-3"><DecimalInput value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${index}.allocated_amount`)} onChange={(event) => setAllocations({ ...allocations, [invoice.id]: event.target.value })} /></td>
                             </tr>)}
                         </tbody>
                     </table>

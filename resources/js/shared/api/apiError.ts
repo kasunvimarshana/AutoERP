@@ -50,3 +50,24 @@ export function toApiError(error: unknown): ApiError {
 export function fieldError(error: ApiError | null, field: string): string | undefined {
     return error?.fields[field]?.[0];
 }
+
+export function firstFieldError(error: ApiError | null, fields: string[]): string | undefined {
+    for (const field of fields) {
+        const message = fieldError(error, field);
+        if (message) return message;
+    }
+    return undefined;
+}
+
+export function hasFieldError(error: ApiError | null, field: string): boolean {
+    return Boolean(fieldError(error, field));
+}
+
+export function hasNestedFieldError(error: ApiError | null, prefix: string): boolean {
+    if (!error) return false;
+    return Object.keys(error.fields).some((field) => field === prefix || field.startsWith(`${prefix}.`));
+}
+
+export function nestedFieldError(error: ApiError | null, prefix: string, field: string): string | undefined {
+    return firstFieldError(error, [`${prefix}.${field}`, field]);
+}

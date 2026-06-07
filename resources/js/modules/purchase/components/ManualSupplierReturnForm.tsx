@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -82,8 +83,8 @@ export function ManualSupplierReturnForm() {
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
                     <ItemLookupSelect value={item} onChange={setItem} error={errorFor('lines.0.item_id')} />
                     <UomLookupSelect value={uom} onChange={setUom} error={errorFor('lines.0.uom_id')} />
-                    <Input label="Quantity" type="number" min="0.000001" step="0.000001" value={quantity} error={errorFor('lines.0.returned_quantity')} onChange={(event) => setQuantity(event.target.value)} />
-                    <Input label="Cost basis" type="number" min="0" step="0.000001" value={costBasis} error={errorFor('cost_basis') ?? errorFor('lines.0.cost_basis')} onChange={(event) => setCostBasis(event.target.value)} />
+                    <DecimalInput label="Quantity" value={quantity} error={errorFor('lines.0.returned_quantity')} onChange={(event) => setQuantity(event.target.value)} />
+                    <DecimalInput label="Cost basis" value={costBasis} error={errorFor('cost_basis') ?? errorFor('lines.0.cost_basis')} onChange={(event) => setCostBasis(event.target.value)} />
                     <label className="mt-7 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={affectsSupplierBalance} onChange={(event) => setAffectsSupplierBalance(event.target.checked)} /> Creates debit note impact</label>
                 </div>
                 <div className="mt-4">

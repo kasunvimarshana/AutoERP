@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
@@ -86,7 +87,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     <GenericLookupSelect label="Supervisor" value={supervisor} onChange={setSupervisor} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
                     <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => setForm({ ...form, job_date: event.target.value })} />
                     <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setForm({ ...form, expected_delivery_date: event.target.value })} />
-                    <Input label="Odometer" type="number" min="0" step="0.000001" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => setForm({ ...form, odometer_reading: event.target.value })} />
+                    <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => setForm({ ...form, odometer_reading: event.target.value })} />
                     <Input label="Fuel level" value={form.fuel_level} error={errorFor('fuel_level')} onChange={(event) => setForm({ ...form, fuel_level: event.target.value })} />
                     <Select label="Priority" value={form.priority} options={[
                         { value: 'low', label: 'Low' },
@@ -99,7 +100,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         { value: 'fixed', label: 'Fixed' },
                         { value: 'percentage', label: 'Percentage' },
                     ]} onChange={(event) => setForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
-                    <Input label="Commission value" type="number" min="0" step="0.000001" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => setForm({ ...form, supervisor_commission_value: event.target.value })} />
+                    <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => setForm({ ...form, supervisor_commission_value: event.target.value })} />
                 </div>
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <Textarea label="Customer complaint" value={form.customer_complaint} error={errorFor('customer_complaint')} onChange={(event) => setForm({ ...form, customer_complaint: event.target.value })} />

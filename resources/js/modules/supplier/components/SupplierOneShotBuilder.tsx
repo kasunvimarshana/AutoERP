@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
@@ -84,7 +85,7 @@ function MappingDraft({ value, onChange }: Props) {
 function CreditDraft({ value, onChange }: Props) {
     const profile = value.creditProfile;
     const set = <K extends keyof SupplierCreditProfile>(key: K, next: SupplierCreditProfile[K]) => onChange({ ...value, creditProfile: { ...profile, [key]: next } });
-    return <div className="grid gap-4 sm:grid-cols-2"><Input label="Credit limit" value={profile.credit_limit} onChange={(event) => set('credit_limit', event.target.value)} /><Input label="Credit period days" type="number" min="0" value={profile.credit_period_days ?? ''} onChange={(event) => set('credit_period_days', event.target.value ? Number(event.target.value) : null)} /><Input label="Warning threshold percent" value={profile.warning_threshold_percent} onChange={(event) => set('warning_threshold_percent', event.target.value)} /><label className="self-end pb-2 text-sm"><input className="mr-2" type="checkbox" checked={profile.allow_over_credit} onChange={(event) => set('allow_over_credit', event.target.checked)} />Allow over credit</label></div>;
+    return <div className="grid gap-4 sm:grid-cols-2"><DecimalInput label="Credit limit" value={profile.credit_limit} onChange={(event) => set('credit_limit', event.target.value)} /><Input label="Credit period days" type="number" min="0" value={profile.credit_period_days ?? ''} onChange={(event) => set('credit_period_days', event.target.value ? Number(event.target.value) : null)} /><DecimalInput label="Warning threshold percent" value={profile.warning_threshold_percent} onChange={(event) => set('warning_threshold_percent', event.target.value)} /><label className="self-end pb-2 text-sm"><input className="mr-2" type="checkbox" checked={profile.allow_over_credit} onChange={(event) => set('allow_over_credit', event.target.checked)} />Allow over credit</label></div>;
 }
 function Draft({ title, rows, remove, children }: { title: string; rows: string[]; remove: (index: number) => void; children: ReactNode }) { return <div><h3 className="mb-3 font-semibold">{title}</h3><div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">{children}</div><div className="mt-5 space-y-2">{rows.map((row, index) => <div key={`${row}-${index}`} className="flex justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"><span>{row}</span><button type="button" className="font-semibold text-rose-600" onClick={() => remove(index)}>Remove</button></div>)}</div></div>; }
 function Count({ label, value }: { label: string; value: number }) { return <div className="rounded-lg border border-slate-200 p-4"><span className="text-sm text-slate-500">{label}</span><strong className="mt-1 block text-2xl">{value}</strong></div>; }

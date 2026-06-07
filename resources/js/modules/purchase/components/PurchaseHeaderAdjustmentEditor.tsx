@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Input } from '@/shared/components/Input';
-import { Modal } from '@/shared/components/Modal';
 import { Select } from '@/shared/components/Select';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { isNonNegativeDecimal } from '@/shared/utils/decimal';
 
 export interface EditableHeaderAdjustment {
     name: string;
@@ -68,6 +71,7 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
     errorFor: (field: string) => string | undefined;
 }) {
     const [dialog, setDialog] = useState<AdjustmentDialog | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
     const addAdjustment = (adjustment: EditableHeaderAdjustment) => {
         onChange([...adjustments, adjustment]);
         setDialog(null);
@@ -76,8 +80,13 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
         onChange(adjustments.map((current, currentIndex) => currentIndex === index ? adjustment : current));
         setDialog(null);
     };
-    const removeAdjustment = (index: number) => {
-        if (!window.confirm('Remove this adjustment?')) return;
+    const removeAdjustment = async (index: number) => {
+        const confirmed = await confirm({
+            title: 'Remove adjustment',
+            message: 'This adjustment will be removed from the local order draft.',
+            confirmLabel: 'Remove adjustment',
+        });
+        if (!confirmed) return;
         onChange(adjustments.filter((_, currentIndex) => currentIndex !== index));
     };
 
@@ -87,9 +96,10 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
                 adjustments={adjustments}
                 onAdd={() => setDialog({ mode: 'create', adjustment: emptyHeaderAdjustment() })}
                 onEdit={(adjustment, index) => setDialog({ mode: 'edit', index, adjustment })}
-                onRemove={removeAdjustment}
+                onRemove={(index) => void removeAdjustment(index)}
+                hasError={(index) => adjustmentHasError(index, errorFor)}
             />
-            <Modal open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit adjustment' : 'Add adjustment'} onClose={() => setDialog(null)}>
+            <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit adjustment' : 'Add adjustment'} onClose={() => setDialog(null)}>
                 {dialog && (
                     <HeaderAdjustmentForm
                         key={dialog.mode === 'edit' ? `edit-${dialog.index}` : 'create'}
@@ -100,16 +110,18 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
                         onSave={(adjustment) => dialog.mode === 'edit' ? updateAdjustment(dialog.index, adjustment) : addAdjustment(adjustment)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
+            {confirmDialog}
         </div>
     );
 }
 
-function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove }: {
+function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError }: {
     adjustments: EditableHeaderAdjustment[];
     onAdd: () => void;
     onEdit: (adjustment: EditableHeaderAdjustment, index: number) => void;
     onRemove: (index: number) => void;
+    hasError: (index: number) => boolean;
 }) {
     const rows = adjustments.map((adjustment, index) => ({ ...adjustment, rowIndex: index }));
     const columns: DataColumn<EditableHeaderAdjustment & { rowIndex: number }>[] = [
@@ -124,7 +136,16 @@ function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove }: {
 
     return (
         <div className="space-y-3">
-            <DataTable rows={rows} columns={columns} rowKey={(row) => row.rowIndex} emptyMessage="No adjustments added yet. Click Add adjustment to start." />
+            <DataTable
+                rows={rows}
+                columns={columns}
+                rowKey={(row) => row.rowIndex}
+                emptyMessage="No adjustments added yet."
+                mobileSummary={(row) => row.name || row.adjustment_type.replaceAll('_', ' ')}
+                mobileDetails={(row) => <AdjustmentMobileDetails adjustment={row} />}
+                mobileActions={(row) => <AdjustmentActions onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} />}
+                rowBadge={(row) => hasError(row.rowIndex) ? <ErrorBadge /> : null}
+            />
             <Button type="button" variant="secondary" onClick={onAdd}>Add adjustment</Button>
         </div>
     );
@@ -165,8 +186,8 @@ function HeaderAdjustmentForm({ adjustment, mode, errorFor, onSave, onCancel }: 
                     <Select label="Calculation" value={draft.calculation_type} options={calculationOptions} error={errorFor('calculation_type')} onChange={(event) => set('calculation_type', event.target.value as 'fixed' | 'percentage')} />
                     {draft.calculation_type === 'percentage' && <Select label="Base" value={draft.calculation_base} options={calculationBases} error={errorFor('calculation_base')} onChange={(event) => set('calculation_base', event.target.value as EditableHeaderAdjustment['calculation_base'])} />}
                     {draft.calculation_type === 'percentage'
-                        ? <Input label="Rate (%)" type="number" min="0" max="100" step="0.000001" value={draft.rate} error={fieldError('rate') ?? errorFor('rate')} onChange={(event) => set('rate', event.target.value)} />
-                        : <Input label="Amount" type="number" min="0" step="0.000001" value={draft.amount} error={fieldError('amount') ?? errorFor('amount')} onChange={(event) => set('amount', event.target.value)} />}
+                        ? <DecimalInput label="Rate (%)" value={draft.rate} error={fieldError('rate') ?? errorFor('rate')} onChange={(event) => set('rate', event.target.value)} />
+                        : <DecimalInput label="Amount" value={draft.amount} error={fieldError('amount') ?? errorFor('amount')} onChange={(event) => set('amount', event.target.value)} />}
                     <Select label="Allocation" value={draft.allocation_method} options={allocationOptions} error={errorFor('allocation_method')} onChange={(event) => set('allocation_method', event.target.value)} />
                 </div>
             </section>
@@ -194,9 +215,14 @@ function HeaderAdjustmentForm({ adjustment, mode, errorFor, onSave, onCancel }: 
 function validateAdjustmentForm(adjustment: EditableHeaderAdjustment): AdjustmentFormErrors {
     const errors: AdjustmentFormErrors = {};
     if (!adjustment.name.trim()) errors.name = 'Enter an adjustment name.';
-    if (adjustment.calculation_type === 'percentage' && Number(adjustment.rate) < 0) errors.rate = 'Rate cannot be negative.';
-    if (adjustment.calculation_type === 'fixed' && Number(adjustment.amount) < 0) errors.amount = 'Amount cannot be negative.';
+    if (adjustment.calculation_type === 'percentage' && !isNonNegativeDecimal(adjustment.rate)) errors.rate = 'Rate cannot be negative.';
+    if (adjustment.calculation_type === 'fixed' && !isNonNegativeDecimal(adjustment.amount)) errors.amount = 'Amount cannot be negative.';
     return errors;
+}
+
+function adjustmentHasError(index: number, errorFor: (field: string) => string | undefined): boolean {
+    return ['name', 'adjustment_type', 'effect', 'calculation_type', 'calculation_base', 'rate', 'amount', 'allocation_method']
+        .some((field) => Boolean(errorFor(`adjustments.${index}.${field}`)));
 }
 
 function formatEffect(adjustment: EditableHeaderAdjustment): string {
@@ -218,4 +244,16 @@ function formatAdjustmentSummary(adjustment: EditableHeaderAdjustment): string {
 
 function AdjustmentActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
     return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={onEdit}>Edit adjustment</button><button type="button" className="font-semibold text-rose-600" onClick={onRemove}>Remove adjustment</button></div>;
+}
+
+function AdjustmentMobileDetails({ adjustment }: { adjustment: EditableHeaderAdjustment }) {
+    return <div className="grid grid-cols-2 gap-2"><Preview label="Effect" value={formatEffect(adjustment)} /><Preview label="Calculation" value={formatAdjustmentAmount(adjustment)} /><Preview label="Type" value={adjustment.adjustment_type.replaceAll('_', ' ')} /><Preview label="Allocation" value={adjustment.allocation_method.replaceAll('_', ' ')} /></div>;
+}
+
+function Preview({ label, value }: { label: string; value: string }) {
+    return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block text-slate-900">{value}</strong></div>;
+}
+
+function ErrorBadge() {
+    return <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">Error</span>;
 }

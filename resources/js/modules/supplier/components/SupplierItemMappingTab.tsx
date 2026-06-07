@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import type { NamedResource } from '@/shared/types/common';
 import { createSupplierItemMapping, deleteSupplierItemMapping, listSupplierItemMappings, updateSupplierItemMapping } from '../supplierApi';
@@ -26,7 +27,7 @@ export default function SupplierItemMappingTab({ supplierId }: { supplierId: num
         { key: 'uom', header: 'UOM', render: (row) => row.default_purchase_uom ? `${row.default_purchase_uom.code} - ${row.default_purchase_uom.name}` : '-' },
         { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
-    return <><SupplierRelationHeader title="Item mappings" description="Supplier-specific item codes, names, UOMs, and ordering references." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><Modal open={crud.open} title={crud.editing ? 'Edit item mapping' : 'Add item mapping'} onClose={crud.close}>{crud.open && <MappingForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</Modal></>;
+    return <><SupplierRelationHeader title="Item mappings" description="Supplier-specific item codes, names, UOMs, and ordering references." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => row.supplier_item_code ?? row.supplier_item_name ?? row.item?.name ?? '-'} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>Internal: {row.item?.name ?? '-'}</span><span>UOM: {row.default_purchase_uom?.code ?? '-'}</span></div>} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><FormDrawer open={crud.open} title={crud.editing ? 'Edit item mapping' : 'Add item mapping'} onClose={crud.close}>{crud.open && <MappingForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>{crud.confirmDialog}</>;
 }
 function MappingForm({ row, error, submitting, onCancel, onSubmit }: { row: SupplierItemMapping | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: SupplierItemMappingPayload) => Promise<void> }) {
     const [item, setItem] = useState<NamedResource | null>(row?.item ?? null);
@@ -44,7 +45,7 @@ function MappingForm({ row, error, submitting, onCancel, onSubmit }: { row: Supp
             <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <SupplierItemVariantSelect item={item} value={variant} onChange={(next) => { setVariant(next); set('item_variant_id', next ? Number(next.id) : null); }} error={fieldError(error, 'item_variant_id')} />
-                <Input label="Minimum order quantity" value={form.minimum_order_quantity} onChange={(event) => set('minimum_order_quantity', event.target.value)} error={fieldError(error, 'minimum_order_quantity')} />
+                <DecimalInput label="Minimum order quantity" value={form.minimum_order_quantity} onChange={(event) => set('minimum_order_quantity', event.target.value)} error={fieldError(error, 'minimum_order_quantity')} />
                 <Input label="Lead time days" type="number" min="0" value={form.lead_time_days ?? ''} onChange={(event) => set('lead_time_days', event.target.value ? Number(event.target.value) : null)} />
             </div>
             <div className="mt-4 flex gap-6 text-sm"><label><input className="mr-2" type="checkbox" checked={form.is_preferred} onChange={(event) => set('is_preferred', event.target.checked)} />Preferred</label><label><input className="mr-2" type="checkbox" checked={form.is_active} onChange={(event) => set('is_active', event.target.checked)} />Active</label></div>

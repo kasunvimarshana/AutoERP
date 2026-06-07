@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -25,7 +25,7 @@ export default function CustomerDocumentTab({ customerId }: { customerId: number
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
-    return <><CustomerRelationHeader title="Compliance documents" description="Customer registrations, certificates, contracts, and licenses." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><Modal open={crud.open} title={crud.editing ? 'Edit document' : 'Add document'} onClose={crud.close}>{crud.open && <DocumentForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</Modal></>;
+    return <><CustomerRelationHeader title="Compliance documents" description="Customer registrations, certificates, contracts, and licenses." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><FormDrawer open={crud.open} title={crud.editing ? 'Edit document' : 'Add document'} onClose={crud.close}>{crud.open && <DocumentForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>{crud.confirmDialog}</>;
 }
 function DocumentForm({ row, error, submitting, onCancel, onSubmit }: { row: CustomerDocument | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: CustomerDocumentPayload) => Promise<void> }) {
     const [form, setForm] = useState<CustomerDocumentPayload>(row ? { ...row } : { document_type: 'business_registration', status: 'pending' });

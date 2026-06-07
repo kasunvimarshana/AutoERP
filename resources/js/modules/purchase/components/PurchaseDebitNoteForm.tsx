@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -51,7 +52,7 @@ export function PurchaseDebitNoteForm() {
                 <div className="grid gap-4 md:grid-cols-3">
                     <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
                     <Input label="Date" type="date" value={debitNoteDate} error={errorFor('debit_note_date')} onChange={(event) => setDebitNoteDate(event.target.value)} />
-                    <Input label="Amount" type="number" min="0.000001" step="0.000001" value={amount} error={errorFor('amount')} onChange={(event) => setAmount(event.target.value)} />
+                    <DecimalInput label="Amount" value={amount} error={errorFor('amount')} onChange={(event) => setAmount(event.target.value)} />
                 </div>
                 <div className="mt-4">
                     <Textarea label="Reason" value={reason} error={errorFor('reason')} onChange={(event) => setReason(event.target.value)} />

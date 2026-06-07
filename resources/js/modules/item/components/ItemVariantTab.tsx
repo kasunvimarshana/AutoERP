@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { createItemVariant, deleteItemVariant, listItemVariants, updateItemVariant } from '../itemApi';
@@ -30,9 +30,10 @@ export default function ItemVariantTab({ itemId }: { itemId: number }) {
             <ErrorAlert error={crud.actionError ?? crud.error} />
             {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-            <Modal open={crud.open} title={crud.editing ? 'Edit variant' : 'Add variant'} onClose={crud.close}>
+            <FormDrawer open={crud.open} title={crud.editing ? 'Edit variant' : 'Add variant'} onClose={crud.close}>
                 {crud.open && <VariantForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-            </Modal>
+            </FormDrawer>
+            {crud.confirmDialog}
         </>
     );
 }

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { Input } from '@/shared/components/Input';
@@ -54,7 +55,7 @@ export default function VehicleServicePaymentPreparePage() {
                         if (link?.balance_due) setAmount(link.balance_due);
                     }} />
                     <Input label="Payment date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-                    <Input label="Amount" type="number" min="0.000001" step="0.000001" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                    <DecimalInput label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
                     <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
                     <Button type="submit" loading={busy}>Prepare Payment DTO</Button>
                 </form>

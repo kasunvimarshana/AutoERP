@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -183,7 +184,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                         <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
                         <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />
-                        <Input label="Exchange rate" type="number" min="0.000001" step="0.000001" value={header.exchange_rate} error={errorFor('exchange_rate')} onChange={(event) => setHeader({ ...header, exchange_rate: event.target.value })} />
+                        <DecimalInput label="Exchange rate" value={header.exchange_rate} error={errorFor('exchange_rate')} onChange={(event) => setHeader({ ...header, exchange_rate: event.target.value })} />
                     </div>
                     <div className="mt-4">
                         <Textarea label="Notes" value={header.notes} error={errorFor('notes')} onChange={(event) => setHeader({ ...header, notes: event.target.value })} />

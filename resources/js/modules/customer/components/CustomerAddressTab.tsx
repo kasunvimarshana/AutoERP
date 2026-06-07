@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { createCustomerAddress, deleteCustomerAddress, listCustomerAddresses, updateCustomerAddress } from '../customerApi';
@@ -26,7 +26,8 @@ export default function CustomerAddressTab({ customerId }: { customerId: number 
     ];
     return <><CustomerRelationHeader title="Addresses" description="Billing, shipping, registered, and service addresses." onAdd={crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <Modal open={crud.open} title={crud.editing ? 'Edit address' : 'Add address'} onClose={crud.close}>{crud.open && <AddressForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</Modal>
+        <FormDrawer open={crud.open} title={crud.editing ? 'Edit address' : 'Add address'} onClose={crud.close}>{crud.open && <AddressForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>
+        {crud.confirmDialog}
     </>;
 }
 function AddressForm({ row, error, submitting, onCancel, onSubmit }: { row: CustomerAddress | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: CustomerAddressPayload) => Promise<void> }) {

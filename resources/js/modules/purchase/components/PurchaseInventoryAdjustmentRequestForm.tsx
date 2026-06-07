@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -68,10 +69,10 @@ export function PurchaseInventoryAdjustmentRequestForm() {
                     <ItemLookupSelect value={item} onChange={setItem} error={errorFor('lines.0.item_id')} />
                     <Input label="Adjustment date" type="date" value={date} error={errorFor('adjustment_date')} onChange={(event) => setDate(event.target.value)} />
                     <Select label="Type" value={adjustmentType} options={['increase', 'decrease', 'recount', 'damage', 'expiry', 'opening_balance'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={errorFor('adjustment_type')} onChange={(event) => setAdjustmentType(event.target.value)} />
-                    <Input label="Unit cost" type="number" step="0.000001" min="0" value={unitCost} error={errorFor('lines.0.unit_cost')} onChange={(event) => setUnitCost(event.target.value)} />
-                    <Input label="System qty" type="number" step="0.000001" min="0" value={systemQuantity} error={errorFor('lines.0.system_quantity')} onChange={(event) => setSystemQuantity(event.target.value)} />
-                    <Input label="Counted qty" type="number" step="0.000001" min="0" value={countedQuantity} error={errorFor('lines.0.counted_quantity')} onChange={(event) => setCountedQuantity(event.target.value)} />
-                    <Input label="Adjustment qty" type="number" step="0.000001" value={adjustmentQuantity} error={errorFor('lines.0.adjustment_quantity')} onChange={(event) => setAdjustmentQuantity(event.target.value)} />
+                    <DecimalInput label="Unit cost" value={unitCost} error={errorFor('lines.0.unit_cost')} onChange={(event) => setUnitCost(event.target.value)} />
+                    <DecimalInput label="System qty" value={systemQuantity} error={errorFor('lines.0.system_quantity')} onChange={(event) => setSystemQuantity(event.target.value)} />
+                    <DecimalInput label="Counted qty" value={countedQuantity} error={errorFor('lines.0.counted_quantity')} onChange={(event) => setCountedQuantity(event.target.value)} />
+                    <DecimalInput label="Adjustment qty" value={adjustmentQuantity} error={errorFor('lines.0.adjustment_quantity')} onChange={(event) => setAdjustmentQuantity(event.target.value)} />
                 </div>
                 <div className="mt-4">
                     <Textarea label="Reason" value={reason} error={errorFor('reason')} onChange={(event) => setReason(event.target.value)} />

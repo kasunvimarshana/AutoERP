@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -136,7 +137,7 @@ export default function PurchaseInvoiceCreatePage() {
                     <Input label="Invoice date" type="date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => setInvoiceDate(event.target.value)} />
                     <Input label="Due date" type="date" value={dueDate} error={errorFor('due_date')} onChange={(event) => setDueDate(event.target.value)} />
                     <Input label="Invoice number" value={invoiceNumber} error={errorFor('invoice_number')} onChange={(event) => setInvoiceNumber(event.target.value)} />
-                    <Input label="Exchange rate" type="number" min="0.000001" step="0.000001" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => setExchangeRate(event.target.value)} />
+                    <DecimalInput label="Exchange rate" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => setExchangeRate(event.target.value)} />
                 </div>
             </Panel>
             <Panel title="Sources">
@@ -160,7 +161,7 @@ export default function PurchaseInvoiceCreatePage() {
                                 <td className="px-4 py-3 tabular-nums">{line.sourceQty}</td>
                                 <td className="px-4 py-3 tabular-nums">{line.previouslyInvoiced}</td>
                                 <td className="px-4 py-3 tabular-nums">{line.remainingQty}</td>
-                                <td className="min-w-44 px-4 py-3"><Input type="number" min="0" step="0.000001" value={line.quantity} error={errorFor(`sources.${index}.line_quantities.${line.lineId}`)} onChange={(event) => setLines(lines.map((current, currentIndex) => currentIndex === index ? { ...current, quantity: event.target.value } : current))} /></td>
+                                <td className="min-w-44 px-4 py-3"><DecimalInput value={line.quantity} error={errorFor(`sources.${index}.line_quantities.${line.lineId}`)} onChange={(event) => setLines(lines.map((current, currentIndex) => currentIndex === index ? { ...current, quantity: event.target.value } : current))} /></td>
                             </tr>)}
                         </tbody>
                     </table>

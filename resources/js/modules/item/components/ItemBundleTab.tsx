@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
@@ -31,11 +32,12 @@ export default function ItemBundleTab({ itemId, canBundle }: { itemId: number; c
             <ItemRelationHeader title="Bundle composition" description={canBundle ? 'Define readable child item composition.' : 'Only combo or package items can own bundle lines.'} onAdd={crud.startCreate} disabled={!canBundle} />
             {!canBundle && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Change the item type to combo or package before adding bundle lines.</p>}
             <ErrorAlert error={crud.actionError ?? crud.error} />
-            {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+            {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-'} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>Qty: {row.quantity}</span><span>UOM: {row.uom?.code ?? '-'}</span></div>} />}
             <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-            <Modal open={crud.open} title={crud.editing ? 'Edit bundle line' : 'Add bundle line'} onClose={crud.close}>
+            <FormDrawer open={crud.open} title={crud.editing ? 'Edit bundle line' : 'Add bundle line'} onClose={crud.close}>
                 {crud.open && <BundleForm key={crud.editing?.id ?? 'new'} row={crud.editing} itemId={itemId} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-            </Modal>
+            </FormDrawer>
+            {crud.confirmDialog}
         </>
     );
 }
@@ -70,7 +72,7 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
         <h3 className="font-semibold text-slate-900">Basic Details</h3>
         <ItemLookupSelect label="Child item" value={child} onChange={setChild} excludeId={itemId} error={fieldError(error, 'child_item_id')} />
         <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
+            <DecimalInput label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
         </div>
         <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">

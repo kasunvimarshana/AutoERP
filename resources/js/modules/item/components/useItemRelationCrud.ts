@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
 import type { ApiCollection } from '@/shared/types/api';
 
@@ -21,6 +22,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
     const [open, setOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => list(itemId, page, signal), [itemId, page]);
 
     return {
@@ -31,6 +33,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
         open,
         submitting,
         actionError,
+        confirmDialog,
         startCreate: () => {
             setEditing(null);
             setActionError(null);
@@ -59,7 +62,8 @@ export function useItemRelationCrud<T extends { id: number }, P>({
             }
         },
         destroy: async (row: T) => {
-            if (!window.confirm('Delete this relation record?')) return;
+            const confirmed = await confirm({ title: 'Delete relation record', message: 'This relation record will be permanently deleted.', confirmLabel: 'Delete' });
+            if (!confirmed) return;
             setActionError(null);
             try {
                 await remove(itemId, row.id);

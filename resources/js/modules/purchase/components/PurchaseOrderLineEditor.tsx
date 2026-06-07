@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Input } from '@/shared/components/Input';
-import { Modal } from '@/shared/components/Modal';
 import { Select } from '@/shared/components/Select';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import type { NamedResource } from '@/shared/types/common';
-import { addDecimal, multiplyDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
+import { addDecimal, isNonNegativeDecimal, isPositiveDecimal, multiplyDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import { ItemLookupSelect, UomLookupSelect } from './PurchaseLookups';
 
 export interface EditablePurchaseLine {
@@ -89,6 +91,7 @@ export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
     errorFor: (field: string) => string | undefined;
 }) {
     const [dialog, setDialog] = useState<LineDialog | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
 
     const addLine = (line: EditablePurchaseLine) => {
         onChange([...lines, line]);
@@ -98,8 +101,13 @@ export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
         onChange(lines.map((current, currentIndex) => currentIndex === index ? line : current));
         setDialog(null);
     };
-    const removeLine = (index: number) => {
-        if (!window.confirm('Remove this line?')) return;
+    const removeLine = async (index: number) => {
+        const confirmed = await confirm({
+            title: 'Remove line',
+            message: 'This line will be removed from the local order draft.',
+            confirmLabel: 'Remove line',
+        });
+        if (!confirmed) return;
         onChange(lines.filter((_, currentIndex) => currentIndex !== index));
     };
 
@@ -109,9 +117,10 @@ export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
                 lines={lines}
                 onAdd={() => setDialog({ mode: 'create', line: emptyPurchaseLine() })}
                 onEdit={(line, index) => setDialog({ mode: 'edit', index, line })}
-                onRemove={removeLine}
+                onRemove={(index) => void removeLine(index)}
+                hasError={(index) => lineHasError(index, errorFor)}
             />
-            <Modal open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'} onClose={() => setDialog(null)}>
+            <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'} onClose={() => setDialog(null)}>
                 {dialog && (
                     <PurchaseLineForm
                         key={dialog.mode === 'edit' ? `edit-${dialog.index}` : 'create'}
@@ -122,16 +131,18 @@ export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
                         onSave={(line) => dialog.mode === 'edit' ? updateLine(dialog.index, line) : addLine(line)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
+            {confirmDialog}
         </div>
     );
 }
 
-function PurchaseLineTable({ lines, onAdd, onEdit, onRemove }: {
+function PurchaseLineTable({ lines, onAdd, onEdit, onRemove, hasError }: {
     lines: EditablePurchaseLine[];
     onAdd: () => void;
     onEdit: (line: EditablePurchaseLine, index: number) => void;
     onRemove: (index: number) => void;
+    hasError: (index: number) => boolean;
 }) {
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
     const columns: DataColumn<EditablePurchaseLine & { rowIndex: number }>[] = [
@@ -147,7 +158,16 @@ function PurchaseLineTable({ lines, onAdd, onEdit, onRemove }: {
 
     return (
         <div className="space-y-3">
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.rowIndex} emptyMessage="No lines added yet. Click Add line to start." />
+            <DataTable
+                rows={rows}
+                columns={columns}
+                rowKey={(line) => line.rowIndex}
+                emptyMessage="No lines added yet. Click Add line to start."
+                mobileSummary={formatItemLabel}
+                mobileDetails={(line) => <LineMobileDetails line={line} />}
+                mobileActions={(line) => <LineActions onEdit={() => onEdit(line, line.rowIndex)} onRemove={() => onRemove(line.rowIndex)} />}
+                rowBadge={(line) => hasError(line.rowIndex) ? <ErrorBadge /> : null}
+            />
             <Button type="button" variant="secondary" onClick={onAdd}>Add line</Button>
         </div>
     );
@@ -184,9 +204,9 @@ function PurchaseLineForm({ line, mode, errorFor, onSave, onCancel }: {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <ItemLookupSelect value={draft.item} onChange={(item) => set('item', item)} error={fieldError('item') ?? errorFor('item_id')} />
-                    <Input label="Quantity" type="number" min="0.000001" step="0.000001" value={draft.ordered_quantity} error={fieldError('ordered_quantity')} onChange={(event) => set('ordered_quantity', event.target.value)} />
+                    <DecimalInput label="Quantity" value={draft.ordered_quantity} error={fieldError('ordered_quantity')} onChange={(event) => set('ordered_quantity', event.target.value)} />
                     <UomLookupSelect value={draft.uom} onChange={(uom) => set('uom', uom)} error={fieldError('uom') ?? errorFor('uom_id')} />
-                    <Input label="Unit price" type="number" min="0" step="0.000001" value={draft.unit_price} error={fieldError('unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
+                    <DecimalInput label="Unit price" value={draft.unit_price} error={fieldError('unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
                     <Input className="sm:col-span-2" label="Description" value={draft.description} onChange={(event) => set('description', event.target.value)} />
                 </div>
             </section>
@@ -196,11 +216,11 @@ function PurchaseLineForm({ line, mode, errorFor, onSave, onCancel }: {
                 <p className="mt-1 text-sm text-slate-500">Advanced pricing is optional.</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <Select label="Discount type" value={draft.discount_calculation_type} options={calculationOptions} error={errorFor('discount_calculation_type')} onChange={(event) => set('discount_calculation_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label={draft.discount_calculation_type === 'percentage' ? 'Discount value (%)' : 'Discount value'} type="number" min="0" step="0.000001" value={draft.discount_calculation_type === 'percentage' ? draft.discount_rate : draft.discount_amount} error={errorFor(draft.discount_calculation_type === 'percentage' ? 'discount_rate' : 'discount_amount')} onChange={(event) => set(draft.discount_calculation_type === 'percentage' ? 'discount_rate' : 'discount_amount', event.target.value)} />
+                    <DecimalInput label={draft.discount_calculation_type === 'percentage' ? 'Discount value (%)' : 'Discount value'} value={draft.discount_calculation_type === 'percentage' ? draft.discount_rate : draft.discount_amount} error={errorFor(draft.discount_calculation_type === 'percentage' ? 'discount_rate' : 'discount_amount')} onChange={(event) => set(draft.discount_calculation_type === 'percentage' ? 'discount_rate' : 'discount_amount', event.target.value)} />
                     <Select label="Tax type" value={draft.tax_calculation_type} options={calculationOptions} error={errorFor('tax_calculation_type')} onChange={(event) => set('tax_calculation_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label={draft.tax_calculation_type === 'percentage' ? 'Tax value (%)' : 'Tax value'} type="number" min="0" step="0.000001" value={draft.tax_calculation_type === 'percentage' ? draft.tax_rate : draft.tax_amount} error={errorFor(draft.tax_calculation_type === 'percentage' ? 'tax_rate' : 'tax_amount')} onChange={(event) => set(draft.tax_calculation_type === 'percentage' ? 'tax_rate' : 'tax_amount', event.target.value)} />
+                    <DecimalInput label={draft.tax_calculation_type === 'percentage' ? 'Tax value (%)' : 'Tax value'} value={draft.tax_calculation_type === 'percentage' ? draft.tax_rate : draft.tax_amount} error={errorFor(draft.tax_calculation_type === 'percentage' ? 'tax_rate' : 'tax_amount')} onChange={(event) => set(draft.tax_calculation_type === 'percentage' ? 'tax_rate' : 'tax_amount', event.target.value)} />
                     <Select label="Charge type" value={draft.charge_calculation_type} options={calculationOptions} error={errorFor('charge_calculation_type')} onChange={(event) => set('charge_calculation_type', event.target.value as 'fixed' | 'percentage')} />
-                    <Input label={draft.charge_calculation_type === 'percentage' ? 'Charge value (%)' : 'Charge value'} type="number" min="0" step="0.000001" value={draft.charge_calculation_type === 'percentage' ? draft.charge_rate : draft.charge_amount} error={errorFor(draft.charge_calculation_type === 'percentage' ? 'charge_rate' : 'charge_amount')} onChange={(event) => set(draft.charge_calculation_type === 'percentage' ? 'charge_rate' : 'charge_amount', event.target.value)} />
+                    <DecimalInput label={draft.charge_calculation_type === 'percentage' ? 'Charge value (%)' : 'Charge value'} value={draft.charge_calculation_type === 'percentage' ? draft.charge_rate : draft.charge_amount} error={errorFor(draft.charge_calculation_type === 'percentage' ? 'charge_rate' : 'charge_amount')} onChange={(event) => set(draft.charge_calculation_type === 'percentage' ? 'charge_rate' : 'charge_amount', event.target.value)} />
                 </div>
             </details>
 
@@ -227,9 +247,14 @@ function validateLineForm(line: EditablePurchaseLine): LineFormErrors {
     const errors: LineFormErrors = {};
     if (!line.item) errors.item = 'Select an item.';
     if (!line.uom) errors.uom = 'Select a UOM.';
-    if (Number(line.ordered_quantity) <= 0) errors.ordered_quantity = 'Quantity must be greater than zero.';
-    if (Number(line.unit_price) < 0) errors.unit_price = 'Unit price cannot be negative.';
+    if (!isPositiveDecimal(line.ordered_quantity)) errors.ordered_quantity = 'Quantity must be greater than zero.';
+    if (!isNonNegativeDecimal(line.unit_price)) errors.unit_price = 'Unit price cannot be negative.';
     return errors;
+}
+
+function lineHasError(index: number, errorFor: (field: string) => string | undefined): boolean {
+    return ['item_id', 'uom_id', 'ordered_quantity', 'unit_price', 'discount_rate', 'discount_amount', 'tax_rate', 'tax_amount', 'charge_rate', 'charge_amount']
+        .some((field) => Boolean(errorFor(`lines.${index}.${field}`)));
 }
 
 function formatItemLabel(line: EditablePurchaseLine): string {
@@ -251,4 +276,12 @@ function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () =>
 
 function PreviewValue({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
+}
+
+function LineMobileDetails({ line }: { line: EditablePurchaseLine }) {
+    return <div className="grid grid-cols-2 gap-2"><PreviewValue label="Qty" value={line.ordered_quantity} /><PreviewValue label="UOM" value={line.uom?.code ?? '-'} /><PreviewValue label="Price" value={line.unit_price} /><PreviewValue label="Total" value={previewLineTotal(line)} /></div>;
+}
+
+function ErrorBadge() {
+    return <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">Error</span>;
 }

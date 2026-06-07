@@ -3,14 +3,14 @@ import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import type { ApiError } from '@/shared/api/apiError';
 import type { ApiCollection } from '@/shared/types/api';
 import { humanize, readableRelation } from '@/shared/utils/object';
 
 export function EmployeeRelationTab<T extends { id: number }>({ title, fields, result, open, editing, submitting, actionError, onCreate, onEdit, onDelete, onClose, onSubmit, children }: {
-    title: string; fields: string[]; result: { data: ApiCollection<T> | null; loading: boolean; error: ApiError | null; page: number; setPage: (page: number) => void };
+    title: string; fields: string[]; result: { data: ApiCollection<T> | null; loading: boolean; error: ApiError | null; page: number; setPage: (page: number) => void; confirmDialog?: ReactNode };
     open: boolean; editing: T | null; submitting: boolean; actionError: ApiError | null; onCreate: () => void; onEdit: (row: T) => void; onDelete: (row: T) => void; onClose: () => void; onSubmit: () => void; children: ReactNode;
 }) {
     const columns: DataColumn<T>[] = [
@@ -29,7 +29,8 @@ export function EmployeeRelationTab<T extends { id: number }>({ title, fields, r
             <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage={`No ${title.toLowerCase()} records yet. Click Add ${title} to start.`} />
             <Pagination meta={result.data?.meta} onPageChange={result.setPage} />
         </>}
-        <Modal open={open} title={`${editing ? 'Edit' : 'Add'} ${title}`} onClose={onClose}><div className="space-y-4"><ErrorAlert error={actionError} />{children}<div className="flex justify-end"><Button loading={submitting} onClick={onSubmit}>Save {title.toLowerCase()}</Button></div></div></Modal>
+        <FormDrawer open={open} title={`${editing ? 'Edit' : 'Add'} ${title}`} onClose={onClose}><div className="space-y-4"><ErrorAlert error={actionError} />{children}<div className="flex justify-end"><Button loading={submitting} onClick={onSubmit}>Save {title.toLowerCase()}</Button></div></div></FormDrawer>
+        {result.confirmDialog}
     </div>;
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -114,7 +115,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         <Input label="Color" {...input('color')} />
                         <Select label="Fuel" options={fuelOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('fuel_type')} />
                         <Select label="Transmission" options={transmissionOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('transmission_type')} />
-                        <Input label="Odometer" {...input('odometer_reading')} />
+                        <DecimalInput label="Odometer" value={String(payload.odometer_reading ?? '')} onChange={(event) => setPayload({ ...payload, odometer_reading: event.target.value })} error={fieldError(error, 'odometer_reading')} />
                         <Input label="Odometer Unit" {...input('odometer_unit')} />
                         <Input label="Fuel Level" {...input('fuel_level')} />
                         <div className="md:col-span-3"><Textarea label="Notes" {...input('notes')} /></div>

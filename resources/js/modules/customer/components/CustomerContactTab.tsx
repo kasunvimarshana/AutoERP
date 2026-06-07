@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Modal } from '@/shared/components/Modal';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { createCustomerContact, deleteCustomerContact, listCustomerContacts, updateCustomerContact } from '../customerApi';
@@ -29,9 +29,10 @@ export default function CustomerContactTab({ customerId }: { customerId: number 
         <ErrorAlert error={crud.actionError ?? crud.error} />
         {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <Modal open={crud.open} title={crud.editing ? 'Edit contact' : 'Add contact'} onClose={crud.close}>
+        <FormDrawer open={crud.open} title={crud.editing ? 'Edit contact' : 'Add contact'} onClose={crud.close}>
             {crud.open && <ContactForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-        </Modal>
+        </FormDrawer>
+        {crud.confirmDialog}
     </>;
 }
 

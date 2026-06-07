@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { DecimalInput } from '@/shared/components/DecimalInput';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { Input } from '@/shared/components/Input';
-import { Modal } from '@/shared/components/Modal';
 import type { ReturnableLine } from '../purchaseApi';
 
 export interface EditableReturnLine {
@@ -36,8 +37,8 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
 
     return (
         <>
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." />
-            <Modal open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            <FormDrawer open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <PurchaseReturnLineForm
                         key={dialog.line.source.id}
@@ -47,7 +48,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
                         onSave={(line) => updateLine(dialog.index, line)}
                     />
                 )}
-            </Modal>
+            </FormDrawer>
         </>
     );
 }
@@ -69,7 +70,7 @@ function PurchaseReturnLineForm({ line, errorFor, onSave, onCancel }: {
                     <p className="text-sm text-slate-500">{formatReturnItem(draft)} / {draft.source.uom?.code ?? '-'}</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Input label="Return quantity" type="number" min="0" step="0.000001" value={draft.returned_quantity} error={errorFor('returned_quantity')} onChange={(event) => set('returned_quantity', event.target.value)} />
+                    <DecimalInput label="Return quantity" value={draft.returned_quantity} error={errorFor('returned_quantity')} onChange={(event) => set('returned_quantity', event.target.value)} />
                     <Input label="Reason" value={draft.reason} error={errorFor('reason')} onChange={(event) => set('reason', event.target.value)} />
                 </div>
             </section>
@@ -95,4 +96,8 @@ function formatReturnItem(line: EditableReturnLine): string {
 
 function Summary({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
+}
+
+function ReturnLineMobileDetails({ line }: { line: EditableReturnLine }) {
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Return qty" value={line.returned_quantity} /><Summary label="Returnable" value={line.source.returnable_quantity} /><Summary label="UOM" value={line.source.uom?.code ?? '-'} /><Summary label="Unit price" value={line.source.unit_price} /></div>;
 }
