@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Payment\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Http\Requests\AllocatePaymentRequest;
 use Modules\Payment\Http\Requests\ListPaymentRequest;
@@ -53,13 +55,20 @@ final class PaymentController
         return new PaymentResource($service->create($request->toData()));
     }
 
-    public function show(ListPaymentRequest $request, int $payment): PaymentResource
+    public function show(
+        ListPaymentRequest $request,
+        int $payment,
+        InvoiceBalanceProviderInterface $invoices,
+    ): PaymentResource
     {
-        return new PaymentResource($this->scope(Payment::query(), $request)
+        $row = $this->scope(Payment::query(), $request)
             ->with([
-                'currency', 'lines.paymentMethod', 'allocations.invoice',
+                'currency', 'lines.paymentMethod', 'allocations',
                 'unappliedBalance', 'refunds', 'reversals',
-            ])->findOrFail($payment));
+            ])->findOrFail($payment);
+        $this->attachInvoiceReferences($row->allocations, $invoices);
+
+        return new PaymentResource($row);
     }
 
     public function approve(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
@@ -93,9 +102,16 @@ final class PaymentController
         return new PaymentResource($service->allocate($this->find($request, $payment), $request->toData()));
     }
 
-    public function allocations(PaymentActionRequest $request, int $payment): JsonResponse
+    public function allocations(
+        PaymentActionRequest $request,
+        int $payment,
+        InvoiceBalanceProviderInterface $invoices,
+    ): JsonResponse
     {
-        return response()->json(['data' => $this->find($request, $payment)->allocations()->with('invoice')->get()]);
+        $allocations = $this->find($request, $payment)->allocations()->get();
+        $this->attachInvoiceReferences($allocations, $invoices);
+
+        return response()->json(['data' => $allocations]);
     }
 
     public function unappliedBalance(PaymentActionRequest $request, int $payment): JsonResponse
@@ -122,5 +138,21 @@ final class PaymentController
         return $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $request->organizationUnitId());
+    }
+
+    /**
+     * @param  Collection<int, \Modules\Payment\Models\PaymentAllocation>  $allocations
+     */
+    private function attachInvoiceReferences(
+        Collection $allocations,
+        InvoiceBalanceProviderInterface $invoices,
+    ): void {
+        $references = $invoices->getInvoiceReferences(
+            $allocations->pluck('invoice_id')->map(fn (mixed $id): int => (int) $id)->all(),
+        );
+
+        foreach ($allocations as $allocation) {
+            $allocation->setAttribute('invoice', $references[(int) $allocation->invoice_id] ?? null);
+        }
     }
 }

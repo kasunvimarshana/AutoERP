@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toApiError } from '@/shared/api/apiError';
 import { Input } from '@/shared/components/Input';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -27,7 +27,9 @@ export function GenericLookupSelect<T extends NamedResource>({
     const [query, setQuery] = useState(selectedLabel);
     const [options, setOptions] = useState<T[]>([]);
     const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
     const debounced = useDebounce(query);
+    const listboxId = useId();
     const requestRef = useRef<AbortController | null>(null);
     const validationRef = useRef<AbortController | null>(null);
     const cacheRef = useRef(new Map<string, T[]>());
@@ -95,7 +97,9 @@ export function GenericLookupSelect<T extends NamedResource>({
     useEffect(() => {
         const normalized = debounced.trim();
         if (normalized.length < 2 || normalized === selectedLabel) {
+            requestRef.current?.abort();
             setOptions([]);
+            setLoading(false);
             return;
         }
 
@@ -103,12 +107,14 @@ export function GenericLookupSelect<T extends NamedResource>({
         const cached = cacheRef.current.get(key);
         if (cached) {
             setOptions(filter(cached, excludeId));
+            setLoading(false);
             return;
         }
 
         requestRef.current?.abort();
         const controller = new AbortController();
         requestRef.current = controller;
+        setLoading(true);
         search(normalized, controller.signal)
             .then((results) => {
                 if (controller.signal.aborted) return;
@@ -120,6 +126,9 @@ export function GenericLookupSelect<T extends NamedResource>({
                 if (controller.signal.aborted) return;
                 setOptions([]);
                 setMessage(toApiError(requestError).message);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
             });
 
         return () => controller.abort();
@@ -137,19 +146,30 @@ export function GenericLookupSelect<T extends NamedResource>({
                 value={query}
                 placeholder={placeholder}
                 error={error}
+                role="combobox"
+                autoComplete="off"
+                aria-expanded={options.length > 0}
+                aria-controls={listboxId}
+                aria-autocomplete="list"
+                onKeyDown={(event) => {
+                    if (event.key === 'Escape') setOptions([]);
+                }}
                 onChange={(event) => {
                     setQuery(event.target.value);
                     setMessage('');
                     if (value) onChange(null);
                 }}
             />
+            {loading && <p className="mt-1 text-xs text-slate-500" role="status">Searching...</p>}
             {message && <p className="mt-1 text-xs text-rose-600">{message}</p>}
             {options.length > 0 && (
-                <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                <div id={listboxId} role="listbox" className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
                     {options.map((option) => (
                         <button
                             key={option.id}
                             type="button"
+                            role="option"
+                            aria-selected={Number(option.id) === Number(value?.id)}
                             className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-sky-50"
                             onClick={() => {
                                 validatedIdRef.current = Number(option.id);

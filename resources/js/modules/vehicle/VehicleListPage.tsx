@@ -18,8 +18,9 @@ import { VehicleCategorySelect } from './components/VehicleCategorySelect';
 import { VehicleMakeSelect } from './components/VehicleMakeSelect';
 import { VehicleModelSelect } from './components/VehicleModelSelect';
 import { VehicleTypeSelect } from './components/VehicleTypeSelect';
-import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
-import type { CustomerSummary } from '@/modules/customer/customerTypes';
+import { LookupSelect } from '@/shared/components/LookupSelect';
+import { lookupApi } from '@/shared/api/lookupApi';
+import type { NamedResource } from '@/shared/types/common';
 import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './vehicleTypes';
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
@@ -33,7 +34,7 @@ export default function VehicleListPage() {
     const [model, setModel] = useState<VehicleModel | null>(null);
     const [type, setType] = useState<VehicleType | null>(null);
     const [category, setCategory] = useState<VehicleCategory | null>(null);
-    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
+    const [customer, setCustomer] = useState<NamedResource | null>(null);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
@@ -61,7 +62,9 @@ export default function VehicleListPage() {
             .catch((requestError) => {
                 if (!controller.signal.aborted) setError(toApiError(requestError));
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
         return () => controller.abort();
     }, [category, customer, debouncedSearch, make, model, page, status, type]);
 
@@ -81,7 +84,7 @@ export default function VehicleListPage() {
                 <VehicleModelSelect makeId={make?.id} value={model} onChange={(value) => { setModel(value); setPage(1); }} />
                 <VehicleTypeSelect value={type} onChange={(value) => { setType(value); setPage(1); }} />
                 <VehicleCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} />
-                <CustomerLookupSelect value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} />
+                <LookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} search={lookupApi.customers} />
             </div>
             <ErrorAlert error={error} />
             {loading ? <LoadingState label="Loading vehicles..." /> : (

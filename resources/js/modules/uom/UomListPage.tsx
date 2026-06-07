@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -22,6 +23,7 @@ export default function UomListPage() {
     const [active, setActive] = useState('');
     const [page, setPage] = useState(1);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
     const result = useApi((signal) => listUoms({
         search: debouncedSearch || undefined,
@@ -47,7 +49,15 @@ export default function UomListPage() {
                 <div className="flex justify-end gap-3">
                     <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uoms/${row.id}/edit`}>Edit</Link>
                     {row.is_active && (
-                        <button className="text-sm font-semibold text-rose-600 hover:text-rose-700" onClick={async () => { await deactivateUom(row.id); setRefreshKey((value) => value + 1); }}>
+                        <button type="button" className="text-sm font-semibold text-rose-600 hover:text-rose-700" onClick={async () => {
+                            setActionError(null);
+                            try {
+                                await deactivateUom(row.id);
+                                setRefreshKey((value) => value + 1);
+                            } catch (requestError) {
+                                setActionError(toApiError(requestError));
+                            }
+                        }}>
                             Deactivate
                         </button>
                     )}
@@ -65,7 +75,7 @@ export default function UomListPage() {
                 <Select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }} options={uomCategories.map((value) => ({ value, label: value }))} placeholder="All categories" />
                 <Select value={active} onChange={(event) => { setActive(event.target.value); setPage(1); }} options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} placeholder="Any status" />
             </div>
-            <ErrorAlert error={result.error} />
+            <ErrorAlert error={actionError ?? result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </>

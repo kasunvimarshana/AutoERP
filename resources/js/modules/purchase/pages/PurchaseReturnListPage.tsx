@@ -6,9 +6,11 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, listPurchaseReturns, postPurchaseReturn, type PurchaseReturn } from '../purchaseApi';
@@ -17,8 +19,9 @@ export default function PurchaseReturnListPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
+    const debouncedSearch = useDebounce(search);
     const [actionError, setActionError] = useState<ApiError | null>(null);
-    const result = useApi((signal) => listPurchaseReturns({ page, search, status, per_page: 15 }, signal), [page, search, status]);
+    const result = useApi((signal) => listPurchaseReturns({ page, search: debouncedSearch || undefined, status: status || undefined, per_page: 15 }, signal), [page, debouncedSearch, status]);
     const run = async (row: PurchaseReturn, action: 'approve' | 'post' | 'cancel') => {
         setActionError(null);
         try {
@@ -31,7 +34,7 @@ export default function PurchaseReturnListPage() {
         }
     };
     const columns: DataColumn<PurchaseReturn>[] = [
-        { key: 'number', header: 'Return', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/returns/${row.id}`}>{row.return_number ?? `Return #${row.id}`}</Link> },
+        { key: 'number', header: 'Return', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/returns/${row.id}`}>{row.return_number ?? 'Purchase return'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.return_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'type', header: 'Type', render: (row) => row.return_type?.replaceAll('_', ' ') ?? '-' },
@@ -47,7 +50,7 @@ export default function PurchaseReturnListPage() {
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Input label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
-            <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />
+            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </div>
     );

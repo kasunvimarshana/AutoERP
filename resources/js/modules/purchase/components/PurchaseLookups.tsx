@@ -51,7 +51,7 @@ async function searchInvoices(search: string, signal?: AbortSignal): Promise<Nam
     const response = await listInvoices({ search, invoice_type: 'purchase', direction: 'inbound', per_page: 20 }, signal);
     return response.data.map((invoice) => ({
         id: invoice.id,
-        code: invoice.invoice_number ?? `INV-${invoice.id}`,
-        name: `${invoice.invoice_number ?? `Invoice #${invoice.id}`}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
+        code: invoice.invoice_number,
+        name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
     }));
 }

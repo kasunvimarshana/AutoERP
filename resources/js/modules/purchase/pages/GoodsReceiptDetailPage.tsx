@@ -48,7 +48,7 @@ export default function GoodsReceiptDetailPage() {
     return (
         <div className="space-y-5">
             <ContentHeader
-                title={grn.grn_number ?? `GRN #${grn.id}`}
+                title={grn.grn_number ?? 'Goods receipt'}
                 description={formatDate(grn.received_date)}
                 actions={<>{grn.status === 'draft' && <Button onClick={() => run('post')}>Post</Button>}{grn.status === 'posted' && <Button variant="secondary" onClick={() => run('reverse')}>Reverse</Button>}<Link to="/purchase/invoices/create"><Button variant="secondary">Create invoice</Button></Link></>}
             />

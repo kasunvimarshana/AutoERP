@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/shared/api/apiClient';
-import { endpoints } from '@/shared/api/endpoints';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
@@ -10,11 +9,7 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
-import type { ApiCollection } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
-import { searchCustomers } from '@/modules/customer/customerApi';
-import { searchEmployees } from '@/modules/hr/hrApi';
-import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
 
@@ -42,23 +37,14 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const errorFor = (key: string) => fieldError(error, key);
 
     const searchCustomer = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
-        return searchCustomers(query, signal);
+        return lookupApi.customers(query, signal);
     }, []);
     const searchVehicle = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
         if (!customer) return [];
-        const response = await apiClient.get<ApiCollection<VehicleSummary>>(`${endpoints.vehicles}/lookup/service-available`, {
-            params: { search: query, customer_id: customer.id, per_page: 20 },
-            signal,
-        });
-        return response.data.data.map((entry) => ({
-            id: entry.id,
-            code: entry.vehicle_number,
-            name: entry.registration_number ?? entry.vehicle_number,
-        }));
+        return lookupApi.serviceVehicles(customer.id, query, signal);
     }, [customer]);
     const searchSupervisor = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
-        const employees = await searchEmployees(query, signal, 'available');
-        return employees.map((entry) => ({ id: entry.id, code: entry.employee_number, name: entry.display_name }));
+        return lookupApi.availableEmployees(query, signal);
     }, []);
 
     const payload = (): VehicleServiceJobPayload => ({

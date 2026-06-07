@@ -47,7 +47,7 @@ export default function SupplierListPage() {
         { key: 'category', header: 'Categories', render: (row) => row.categories?.map((entry) => entry.name).join(', ') || '-' },
         { key: 'contact', header: 'Contact', render: (row) => row.email ?? row.phone ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/suppliers/${row.id}/edit`}>Edit</Link><button className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button><button className="font-semibold text-sky-700" onClick={() => { setStatusSupplier(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button></div> },
+        { key: 'actions', header: '', className: 'text-right', render: (row) => <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/suppliers/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button><button type="button" className="font-semibold text-sky-700" onClick={() => { setStatusSupplier(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button></div> },
     ];
     async function toggle(row: SupplierSummary) {
         setActionError(null);

@@ -4,6 +4,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
+import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -59,7 +60,13 @@ export default function VehicleServiceInvoiceCreatePage() {
                                 } catch (requestError) { setError(toApiError(requestError)); } finally { setBusy(false); }
                             }}>Create invoice</Button>
                         </div>
-                        {preview && <pre className="overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(preview, null, 2)}</pre>}
+                        {preview && <DetailGrid items={[
+                            { label: 'Subtotal', value: String(preview.subtotal ?? '0.000000') },
+                            { label: 'Discount', value: String(preview.discountTotal ?? '0.000000') },
+                            { label: 'Tax', value: String(preview.taxTotal ?? '0.000000') },
+                            { label: 'Charges', value: String(preview.chargeTotal ?? '0.000000') },
+                            { label: 'Grand total', value: String(preview.grandTotal ?? '0.000000') },
+                        ]} />}
                     </div>
                 </Panel>
             </div>

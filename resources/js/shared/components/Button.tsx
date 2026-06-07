@@ -15,11 +15,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     children: ReactNode;
 }
 
-export function Button({ variant = 'primary', loading, className = '', children, disabled, ...props }: ButtonProps) {
+export function Button({ variant = 'primary', loading, className = '', children, disabled, type = 'button', ...props }: ButtonProps) {
     return (
         <button
+            type={type}
             className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
             disabled={disabled || loading}
+            aria-busy={loading || undefined}
             {...props}
         >
             {loading ? 'Working...' : children}

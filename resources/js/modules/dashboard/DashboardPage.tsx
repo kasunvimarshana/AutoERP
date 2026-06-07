@@ -4,6 +4,8 @@ import { Panel } from '@/shared/components/Panel';
 
 const modules = [
     ['/suppliers', 'Suppliers', 'Supplier profiles and relation-aware onboarding'],
+    ['/customers', 'Customers', 'Customer profiles, credit policy, and relationship data'],
+    ['/vehicles', 'Vehicles', 'Vehicle records, ownership, documents, and service context'],
     ['/uoms', 'UOM', 'Generic units, categories, and conversion factors'],
     ['/uom-convert', 'UOM Convert', 'Backend-powered quantity conversion'],
     ['/items', 'Items', 'Catalog, units, variants, pricing, and codes'],
@@ -12,6 +14,8 @@ const modules = [
     ['/invoices', 'Invoices', 'Invoice balances, sources, and adjustments'],
     ['/payments', 'Payments', 'Allocations and unapplied balances'],
     ['/finance/accounts', 'Finance', 'Chart of accounts and ledger activity'],
+    ['/hr/employees', 'Employees', 'Workforce, skills, rates, and availability'],
+    ['/vehicle-service/jobs', 'Vehicle Service', 'Service jobs, inspections, lines, invoicing, and payments'],
 ];
 
 export default function DashboardPage() {

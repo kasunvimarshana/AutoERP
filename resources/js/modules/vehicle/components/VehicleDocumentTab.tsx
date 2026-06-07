@@ -26,9 +26,15 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
         const controller = new AbortController();
         setLoading(true);
         listVehicleDocuments(vehicleId, { per_page: 50 }, controller.signal)
-            .then((response: ApiCollection<VehicleDocument>) => setRows(response.data))
-            .catch((requestError) => setError(toApiError(requestError)))
-            .finally(() => setLoading(false));
+            .then((response: ApiCollection<VehicleDocument>) => {
+                if (!controller.signal.aborted) setRows(response.data);
+            })
+            .catch((requestError) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
         return controller;
     };
 

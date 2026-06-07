@@ -98,6 +98,7 @@ export interface VehicleServicePaymentLink {
     payment_id: number;
     payment_number?: string | null;
     invoice_id?: number | null;
+    invoice_number?: string | null;
     allocated_amount: string;
     status: string;
 }

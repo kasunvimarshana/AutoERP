@@ -4,6 +4,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { DetailGrid } from '@/shared/components/DetailGrid';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
@@ -47,7 +48,7 @@ export default function VehicleServicePaymentPreparePage() {
                         setBusy(false);
                     }
                 }}>
-                    <Select label="Invoice" value={invoiceId} options={(job.data.invoice_links ?? []).map((link) => ({ value: link.invoice_id, label: `${link.invoice_number ?? `Invoice #${link.invoice_id}`} / balance ${link.balance_due ?? link.invoice_total}` }))} onChange={(event) => {
+                    <Select label="Invoice" value={invoiceId} options={(job.data.invoice_links ?? []).map((link) => ({ value: link.invoice_id, label: `${link.invoice_number ?? 'Invoice'} / balance ${link.balance_due ?? link.invoice_total}` }))} onChange={(event) => {
                         setInvoiceId(event.target.value);
                         const link = job.data?.invoice_links?.find((entry) => entry.invoice_id === Number(event.target.value));
                         if (link?.balance_due) setAmount(link.balance_due);
@@ -57,7 +58,17 @@ export default function VehicleServicePaymentPreparePage() {
                     <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
                     <Button type="submit" loading={busy}>Prepare Payment DTO</Button>
                 </form>
-                {prepared && <pre className="mt-5 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(prepared, null, 2)}</pre>}
+                {prepared && <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="mb-4 text-sm font-semibold text-emerald-900">Payment data prepared successfully</p>
+                    <DetailGrid items={[
+                        { label: 'Type', value: String(prepared.paymentType ?? '-') },
+                        { label: 'Direction', value: String(prepared.direction ?? '-') },
+                        { label: 'Payment date', value: String(prepared.paymentDate ?? date) },
+                        { label: 'Reference', value: String(prepared.referenceNumber ?? (reference || '-')) },
+                        { label: 'Amount', value: String((prepared.lines as Array<Record<string, unknown>> | undefined)?.[0]?.amount ?? amount) },
+                        { label: 'Invoice', value: job.data.invoice_links?.find((link) => link.invoice_id === Number(invoiceId))?.invoice_number ?? '-' },
+                    ]} />
+                </div>}
             </Panel>
         </>
     );

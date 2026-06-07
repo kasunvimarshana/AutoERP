@@ -20,7 +20,7 @@ export default function InvoiceListPage() {
     const debounced = useDebounce(search);
     const result = useApi((signal) => listInvoices({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
     const columns: DataColumn<Invoice>[] = [
-        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.id}`}>{row.invoice_number ?? `Invoice #${row.id}`}</Link> },
+        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },

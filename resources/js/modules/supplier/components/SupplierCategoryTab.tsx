@@ -22,7 +22,7 @@ export default function SupplierCategoryTab({ supplierId }: { supplierId: number
     const columns: DataColumn<SupplierCategory>[] = [
         { key: 'category', header: 'Category', render: (row) => <>{row.code} - {row.name}</> },
         { key: 'parent', header: 'Parent', render: (row) => row.parent ? `${row.parent.code} - ${row.parent.name}` : '-' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <button className="font-semibold text-rose-600" onClick={() => void remove(row)}>Remove</button> },
+        { key: 'actions', header: '', className: 'text-right', render: (row) => <button type="button" className="font-semibold text-rose-600" onClick={() => void remove(row)}>Remove</button> },
     ];
     async function remove(row: SupplierCategory) {
         if (!window.confirm('Remove this supplier category?')) return;

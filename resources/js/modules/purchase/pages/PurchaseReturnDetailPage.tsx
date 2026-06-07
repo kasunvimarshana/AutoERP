@@ -50,7 +50,7 @@ export default function PurchaseReturnDetailPage() {
     return (
         <div className="space-y-5">
             <ContentHeader
-                title={row.return_number ?? `Return #${row.id}`}
+                title={row.return_number ?? 'Purchase return'}
                 description={formatDate(row.return_date)}
                 actions={<>{row.status === 'draft' && <Button onClick={() => run('approve')}>Approve</Button>}{(row.status === 'draft' || row.status === 'approved') && <Button variant="secondary" onClick={() => run('post')}>Post</Button>}{row.status !== 'posted' && row.status !== 'cancelled' && <Button variant="ghost" onClick={() => run('cancel')}>Cancel</Button>}</>}
             />
@@ -75,8 +75,8 @@ export default function PurchaseReturnDetailPage() {
                         { key: 'remaining', header: 'Remaining', render: (allocation) => formatMoney(String(allocation.remaining_amount ?? '0.000000')) },
                     ]} rowKey={(allocation) => String(allocation.id ?? allocation.adjustment_type)} />}
                     {tab === 'linked' && <DetailGrid items={[
-                        { label: 'Source', value: row.source?.id ? `${row.source.type} #${row.source.id}` : '-' },
-                        { label: 'Debit note', value: row.debit_note_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/debit-notes/${row.debit_note_id}`}>Debit note #{row.debit_note_id}</Link> : '-' },
+                        { label: 'Source', value: row.source?.number ?? (row.source?.type ? row.source.type.replaceAll('_', ' ') : '-') },
+                        { label: 'Debit note', value: row.debit_note_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/debit-notes/${row.debit_note_id}`}>{row.debit_note?.debit_note_number ?? 'Debit note'}</Link> : '-' },
                     ]} />}
                 </div>
             </Panel>

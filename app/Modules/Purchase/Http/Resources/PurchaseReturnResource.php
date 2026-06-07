@@ -32,6 +32,7 @@ final class PurchaseReturnResource extends ModuleResource
             'adjustment_return_total' => (string) $this->adjustment_return_total,
             'grand_total' => (string) $this->grand_total,
             'debit_note_id' => $this->debit_note_id,
+            'debit_note' => $this->whenLoaded('debitNote', fn () => $this->summary($this->debitNote, ['debit_note_number', 'status'])),
             'lines' => $this->whenLoaded('lines', fn () => $this->lines->map(fn ($line): array => [
                 'id' => (int) $line->getKey(),
                 'source_line_type' => $line->source_line_type,
@@ -89,6 +90,15 @@ final class PurchaseReturnResource extends ModuleResource
 
     private function sourceSummary(): ?array
     {
+        if ($this->source_type === 'goods_receipt_note' && $this->relationLoaded('sourceGoodsReceipt') && $this->sourceGoodsReceipt !== null) {
+            return [
+                'type' => $this->source_type,
+                'id' => (int) $this->sourceGoodsReceipt->getKey(),
+                'number' => $this->sourceGoodsReceipt->grn_number,
+                'date' => $this->sourceGoodsReceipt->received_date?->toDateString(),
+            ];
+        }
+
         if ($this->source_type === null && $this->source_id === null) {
             return null;
         }

@@ -29,7 +29,7 @@ export default function InvoiceDetailPage() {
     const value = invoice.data;
     return (
         <>
-            <ContentHeader title={value.invoice_number ?? `Invoice #${value.id}`} description={formatDate(value.invoice_date)} />
+            <ContentHeader title={value.invoice_number ?? 'Invoice'} description={formatDate(value.invoice_date)} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">

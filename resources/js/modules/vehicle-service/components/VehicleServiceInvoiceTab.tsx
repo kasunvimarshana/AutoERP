@@ -27,7 +27,7 @@ export default function VehicleServiceInvoiceTab({ job }: { job: VehicleServiceJ
                     rows={job.invoice_links ?? []}
                     rowKey={(link) => link.id}
                     columns={[
-                        { key: 'invoice', header: 'Invoice', render: (link) => <Link className="text-sky-700 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number ?? `Invoice #${link.invoice_id}`}</Link> },
+                        { key: 'invoice', header: 'Invoice', render: (link) => <Link className="text-sky-700 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number ?? 'Invoice'}</Link> },
                         { key: 'total', header: 'Total', render: (link) => link.invoice_total },
                         { key: 'balance', header: 'Balance', render: (link) => link.balance_due ?? '-' },
                         { key: 'status', header: 'Status', render: (link) => link.status },

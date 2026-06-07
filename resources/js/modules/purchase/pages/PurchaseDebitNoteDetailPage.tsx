@@ -18,7 +18,7 @@ export default function PurchaseDebitNoteDetailPage() {
     const note = result.data;
     return (
         <div className="space-y-5">
-            <ContentHeader title={note.debit_note_number ?? `Debit note #${note.id}`} description={formatDate(note.debit_note_date)} />
+            <ContentHeader title={note.debit_note_number ?? 'Debit note'} description={formatDate(note.debit_note_date)} />
             <Panel>
                 <DetailGrid items={[
                     { label: 'Status', value: <StatusBadge status={note.status} /> },
@@ -26,8 +26,8 @@ export default function PurchaseDebitNoteDetailPage() {
                     { label: 'Amount', value: formatMoney(note.amount) },
                     { label: 'Allocated', value: formatMoney(note.allocated_amount) },
                     { label: 'Remaining', value: formatMoney(note.remaining_amount) },
-                    { label: 'Source', value: note.source?.number ?? (note.source?.type ? `${note.source.type} #${note.source.id ?? '-'}` : '-') },
-                    { label: 'Purchase return', value: note.purchase_return_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/${note.purchase_return_id}`}>Return #{note.purchase_return_id}</Link> : '-' },
+                    { label: 'Source', value: note.source?.number ?? note.source?.type?.replaceAll('_', ' ') ?? '-' },
+                    { label: 'Purchase return', value: note.purchase_return_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/${note.purchase_return_id}`}>{note.purchase_return?.return_number ?? note.source?.number ?? 'Purchase return'}</Link> : '-' },
                     { label: 'Reason', value: note.reason ?? '-' },
                 ]} />
             </Panel>

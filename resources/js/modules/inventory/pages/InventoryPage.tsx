@@ -6,6 +6,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Input } from '@/shared/components/Input';
 import { Button } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
+import { DetailGrid } from '@/shared/components/DetailGrid';
 import { Pagination } from '@/shared/components/Pagination';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -67,7 +68,12 @@ export default function InventoryPage() {
                             <LookupSelect label="Warehouse" value={availabilityWarehouse} onChange={setAvailabilityWarehouse} search={searchWarehouses} placeholder="Search warehouses..." />
                             <ErrorAlert error={availabilityError} />
                             <Button type="submit" loading={checking}>Check availability</Button>
-                            {availability && <pre className="overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(availability, null, 2)}</pre>}
+                            {availability && <DetailGrid items={[
+                                { label: 'On hand', value: String(availability.quantityOnHand ?? '0.000000') },
+                                { label: 'Reserved', value: String(availability.quantityReserved ?? '0.000000') },
+                                { label: 'Allocated', value: String(availability.quantityAllocated ?? '0.000000') },
+                                { label: 'Available', value: String(availability.quantityAvailable ?? '0.000000') },
+                            ]} />}
                         </form>
                     </Panel>
                     <CapabilityNotice>The backend supports creating and posting adjustments/transfers, but does not expose adjustment or transfer list/detail endpoints yet.</CapabilityNotice>

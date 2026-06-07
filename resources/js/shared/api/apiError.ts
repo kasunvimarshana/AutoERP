@@ -32,8 +32,10 @@ export function toApiError(error: unknown): ApiError {
         ? 'Your session is not authorized.'
         : status === 403
             ? 'You do not have permission to perform this action.'
-            : status === 500
+            : status !== null && status >= 500
                 ? 'The server reported an unexpected error.'
+                : status === null
+                    ? 'The server could not be reached. Check your connection and try again.'
                 : 'The request could not be completed.';
 
     return new ApiError(

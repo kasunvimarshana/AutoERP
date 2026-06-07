@@ -14,8 +14,8 @@ export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJ
                 rowKey={(link) => link.id}
                 emptyMessage="No linked payments. Payment creation and allocation remain owned by Payment."
                 columns={[
-                    { key: 'payment', header: 'Payment', render: (link) => <Link className="text-sky-700 hover:underline" to={`/payments/${link.payment_id}`}>{link.payment_number ?? `Payment #${link.payment_id}`}</Link> },
-                    { key: 'invoice', header: 'Invoice', render: (link) => link.invoice_id ?? '-' },
+                    { key: 'payment', header: 'Payment', render: (link) => <Link className="text-sky-700 hover:underline" to={`/payments/${link.payment_id}`}>{link.payment_number ?? 'Payment'}</Link> },
+                    { key: 'invoice', header: 'Invoice', render: (link) => link.invoice_id ? <Link className="text-sky-700 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number ?? 'Invoice'}</Link> : '-' },
                     { key: 'amount', header: 'Allocated amount', render: (link) => link.allocated_amount },
                     { key: 'status', header: 'Status', render: (link) => link.status },
                 ]}

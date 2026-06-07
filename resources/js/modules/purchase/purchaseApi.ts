@@ -261,6 +261,7 @@ export interface PurchaseReturn {
     adjustment_return_total?: string;
     grand_total?: string;
     debit_note_id?: number | null;
+    debit_note?: { id: number; debit_note_number?: string; status?: string } | null;
     lines?: PurchaseReturnLine[];
     adjustment_allocations?: Array<Record<string, unknown>>;
 }
@@ -299,6 +300,7 @@ export interface PurchaseDebitNote {
     supplier?: NamedResource | null;
     supplier_id?: number | null;
     purchase_return_id?: number | null;
+    purchase_return?: { id: number; return_number?: string; status?: string } | null;
     source_type?: string | null;
     source_id?: number | null;
     source?: SourceSummary | null;
@@ -531,8 +533,8 @@ export async function searchPurchaseOrders(search: string, signal?: AbortSignal)
     const response = await listPurchaseOrders({ search, per_page: 20 }, signal);
     return response.data.map((order) => ({
         id: order.id,
-        code: order.purchase_order_number ?? `PO-${order.id}`,
-        name: `${order.purchase_order_number ?? `PO #${order.id}`}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
+        code: order.purchase_order_number,
+        name: `${order.purchase_order_number ?? 'Purchase order'}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
     }));
 }
 
@@ -540,7 +542,7 @@ export async function searchGoodsReceipts(search: string, signal?: AbortSignal):
     const response = await listGoodsReceipts({ search, per_page: 20 }, signal);
     return response.data.map((grn) => ({
         id: grn.id,
-        code: grn.grn_number ?? `GRN-${grn.id}`,
-        name: `${grn.grn_number ?? `GRN #${grn.id}`}${grn.supplier?.name ? ` - ${grn.supplier.name}` : ''}`,
+        code: grn.grn_number,
+        name: `${grn.grn_number ?? 'Goods receipt'}${grn.supplier?.name ? ` - ${grn.supplier.name}` : ''}`,
     }));
 }

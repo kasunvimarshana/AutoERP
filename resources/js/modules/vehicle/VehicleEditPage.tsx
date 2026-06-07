@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { getVehicle, updateVehicle } from './vehicleApi';
 import { VehicleForm } from './components/VehicleForm';
@@ -19,9 +20,15 @@ export default function VehicleEditPage() {
     useEffect(() => {
         const controller = new AbortController();
         getVehicle(vehicleId, controller.signal)
-            .then(setVehicle)
-            .catch((requestError) => setError(toApiError(requestError)))
-            .finally(() => setLoading(false));
+            .then((value) => {
+                if (!controller.signal.aborted) setVehicle(value);
+            })
+            .catch((requestError) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
         return () => controller.abort();
     }, [vehicleId]);
 
@@ -39,10 +46,11 @@ export default function VehicleEditPage() {
     };
 
     if (loading) return <LoadingState label="Loading vehicle..." />;
+    if (!vehicle) return <ErrorAlert error={error} />;
 
     return (
         <div>
-            <ContentHeader title="Edit Vehicle" description={vehicle?.vehicle_number} />
+            <ContentHeader title="Edit Vehicle" description={vehicle.vehicle_number} />
             <VehicleForm initial={vehicle} error={error} submitting={submitting} onSubmit={submit} />
         </div>
     );

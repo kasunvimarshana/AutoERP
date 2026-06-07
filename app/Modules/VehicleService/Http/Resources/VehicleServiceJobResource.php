@@ -55,6 +55,7 @@ final class VehicleServiceJobResource extends ModuleResource
                 'payment_id' => (int) $link->payment_id,
                 'payment_number' => $link->payment?->payment_number,
                 'invoice_id' => $link->invoice_id,
+                'invoice_number' => $link->invoice?->invoice_number,
                 'allocated_amount' => (string) $link->allocated_amount,
                 'status' => $link->status,
             ])->values()->all(), []),

@@ -92,7 +92,7 @@ export function PurchasePaymentPreparationForm() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {invoices.map((invoice, index) => <tr key={invoice.id}>
-                                <td className="px-4 py-3">{invoice.invoice_number ?? `Invoice #${invoice.id}`}</td>
+                                <td className="px-4 py-3">{invoice.invoice_number ?? 'Invoice'}</td>
                                 <td className="px-4 py-3">{invoice.invoice_date ?? '-'}</td>
                                 <td className="px-4 py-3">{invoice.status ?? '-'}</td>
                                 <td className="px-4 py-3 tabular-nums">{balanceOf(invoice)}</td>

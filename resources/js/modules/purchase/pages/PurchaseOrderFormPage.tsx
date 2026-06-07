@@ -26,7 +26,7 @@ export default function PurchaseOrderFormPage() {
     if (result.data.status !== 'draft') {
         return (
             <>
-                <ContentHeader title={result.data.purchase_order_number ?? `Purchase order #${result.data.id}`} />
+                <ContentHeader title={result.data.purchase_order_number ?? 'Purchase order'} />
                 <CapabilityNotice>Only draft purchase orders can be edited.</CapabilityNotice>
             </>
         );
@@ -34,7 +34,7 @@ export default function PurchaseOrderFormPage() {
 
     return (
         <>
-            <ContentHeader title={`Edit ${result.data.purchase_order_number ?? `purchase order #${result.data.id}`}`} />
+            <ContentHeader title={`Edit ${result.data.purchase_order_number ?? 'purchase order'}`} />
             <PurchaseOrderForm order={result.data} />
         </>
     );

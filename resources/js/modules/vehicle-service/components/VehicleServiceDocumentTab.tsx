@@ -52,7 +52,15 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                         { key: 'type', header: 'Type', render: (document) => document.document_type.replaceAll('_', ' ') },
                         { key: 'description', header: 'Description', render: (document) => document.description ?? '-' },
                         { key: 'path', header: 'File', render: (document) => document.file_path ?? '-' },
-                        { key: 'actions', header: '', render: (document) => <Button type="button" variant="danger" onClick={async () => { await deleteVehicleServiceDocument(jobId, document.id); result.reload(); }}>Delete</Button> },
+                        { key: 'actions', header: '', render: (document) => <Button type="button" variant="danger" onClick={async () => {
+                            setError(null);
+                            try {
+                                await deleteVehicleServiceDocument(jobId, document.id);
+                                result.reload();
+                            } catch (requestError) {
+                                setError(toApiError(requestError));
+                            }
+                        }}>Delete</Button> },
                     ]}
                 />
             )}

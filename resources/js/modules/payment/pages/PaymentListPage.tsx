@@ -20,7 +20,7 @@ export default function PaymentListPage() {
     const debounced = useDebounce(search);
     const result = useApi((signal) => listPayments({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
     const columns: DataColumn<Payment>[] = [
-        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? `Payment #${row.id}`}</Link> },
+        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? 'Payment'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.payment_type ?? '-'} / ${row.direction ?? '-'}` },

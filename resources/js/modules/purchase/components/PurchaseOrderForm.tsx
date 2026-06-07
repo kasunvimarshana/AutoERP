@@ -7,10 +7,11 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
+import { addDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { PurchaseOrder, PurchaseOrderPayload } from '../purchaseApi';
 import { createPurchaseOrder, updatePurchaseOrder } from '../purchaseApi';
 import { PurchaseHeaderAdjustmentEditor, emptyHeaderAdjustment, type EditableHeaderAdjustment } from './PurchaseHeaderAdjustmentEditor';
-import { PurchaseOrderLineEditor, emptyPurchaseLine, previewLineTotal, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
+import { PurchaseOrderLineEditor, emptyPurchaseLine, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderSummaryPanel';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
 
@@ -27,11 +28,6 @@ function today(): string {
 
 function normalizeDecimal(value: string | undefined, fallback = '0.000000'): string {
     return value && value.trim() !== '' ? value : fallback;
-}
-
-function decimal(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function resourceOrNull(resource: NamedResource | null | undefined): NamedResource | null {
@@ -72,23 +68,34 @@ function adjustmentFromOrder(adjustment: NonNullable<PurchaseOrder['adjustments'
 }
 
 function calculatePreview(lines: EditablePurchaseLine[], adjustments: EditableHeaderAdjustment[]): PurchaseTotals {
-    const lineTotals = lines.map((line) => decimal(previewLineTotal(line)));
-    const subtotal = lines.reduce((total, line) => total + (decimal(line.ordered_quantity) * decimal(line.unit_price)), 0);
-    const discount = lines.reduce((total, line) => total + decimal(line.discount_amount), 0);
-    const tax = lines.reduce((total, line) => total + decimal(line.tax_amount), 0);
-    const charge = lines.reduce((total, line) => total + decimal(line.charge_amount), 0);
-    const increases = adjustments.filter((adjustment) => adjustment.effect === 'increase').reduce((total, adjustment) => total + decimal(adjustment.amount), 0);
-    const decreases = adjustments.filter((adjustment) => adjustment.effect === 'decrease').reduce((total, adjustment) => total + decimal(adjustment.amount), 0);
-    const grand = lineTotals.reduce((total, value) => total + value, 0) + increases - decreases;
+    const lineAmounts = lines.map(previewLineAmounts);
+    const subtotal = sumDecimals(lineAmounts.map((line) => line.subtotal));
+    const discount = sumDecimals(lineAmounts.map((line) => line.discount));
+    const tax = sumDecimals(lineAmounts.map((line) => line.tax));
+    const charge = sumDecimals(lineAmounts.map((line) => line.charge));
+    const subtotalAfterLineDiscount = sumDecimals(lineAmounts.map((line) => subtractDecimal(line.subtotal, line.discount)));
+    const subtotalAfterLineAdjustments = sumDecimals(lineAmounts.map((line) => line.total));
+    const adjustmentAmounts = adjustments.map((adjustment) => {
+        if (adjustment.calculation_type === 'fixed') return adjustment.amount;
+        const base = adjustment.calculation_base === 'subtotal'
+            ? subtotal
+            : adjustment.calculation_base === 'subtotal_after_line_discount'
+                ? subtotalAfterLineDiscount
+                : subtotalAfterLineAdjustments;
+        return percentageOfDecimal(base, adjustment.rate);
+    });
+    const increases = sumDecimals(adjustments.flatMap((adjustment, index) => adjustment.effect === 'increase' ? [adjustmentAmounts[index]] : []));
+    const decreases = sumDecimals(adjustments.flatMap((adjustment, index) => adjustment.effect === 'decrease' ? [adjustmentAmounts[index]] : []));
+    const grand = subtractDecimal(addDecimal(subtotalAfterLineAdjustments, increases), decreases);
 
     return {
-        subtotal: subtotal.toFixed(6),
-        discount_total: discount.toFixed(6),
-        tax_total: tax.toFixed(6),
-        charge_total: charge.toFixed(6),
-        header_increase_total: increases.toFixed(6),
-        header_decrease_total: decreases.toFixed(6),
-        grand_total: Math.max(grand, 0).toFixed(6),
+        subtotal,
+        discount_total: discount,
+        tax_total: tax,
+        charge_total: charge,
+        header_increase_total: increases,
+        header_decrease_total: decreases,
+        grand_total: nonNegativeDecimal(grand),
     };
 }
 

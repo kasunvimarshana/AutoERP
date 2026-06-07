@@ -6,9 +6,11 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { listGoodsReceipts, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceipt } from '../purchaseApi';
@@ -17,8 +19,9 @@ export default function GoodsReceiptListPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
+    const debouncedSearch = useDebounce(search);
     const [actionError, setActionError] = useState<ApiError | null>(null);
-    const result = useApi((signal) => listGoodsReceipts({ page, search, status, per_page: 15 }, signal), [page, search, status]);
+    const result = useApi((signal) => listGoodsReceipts({ page, search: debouncedSearch || undefined, status: status || undefined, per_page: 15 }, signal), [page, debouncedSearch, status]);
 
     const run = async (row: GoodsReceipt, action: 'post' | 'reverse') => {
         setActionError(null);
@@ -32,7 +35,7 @@ export default function GoodsReceiptListPage() {
     };
 
     const columns: DataColumn<GoodsReceipt>[] = [
-        { key: 'number', header: 'GRN', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/goods-receipts/${row.id}`}>{row.grn_number ?? `GRN #${row.id}`}</Link> },
+        { key: 'number', header: 'GRN', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/goods-receipts/${row.id}`}>{row.grn_number ?? 'Goods receipt'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.received_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'po', header: 'PO', render: (row) => row.purchase_order?.purchase_order_number ?? row.purchase_order?.name ?? '-' },
@@ -49,7 +52,7 @@ export default function GoodsReceiptListPage() {
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Input label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
-            <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />
+            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </div>
     );

@@ -71,4 +71,14 @@ final class PurchaseReturn extends CoreModel
     {
         return $this->hasMany(PurchaseReturnAdjustmentAllocation::class, 'purchase_return_id');
     }
+
+    public function debitNote(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseDebitNote::class, 'debit_note_id');
+    }
+
+    public function sourceGoodsReceipt(): BelongsTo
+    {
+        return $this->belongsTo(GoodsReceiptNote::class, 'source_id');
+    }
 }

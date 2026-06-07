@@ -16,6 +16,21 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
         private readonly InvoiceStatusService $statuses,
     ) {}
 
+    public function getInvoiceReferences(array $invoiceIds): array
+    {
+        return Invoice::query()
+            ->whereIn('id', array_values(array_unique($invoiceIds)))
+            ->get(['id', 'invoice_number'])
+            ->mapWithKeys(fn (Invoice $invoice): array => [
+                (int) $invoice->getKey() => [
+                    'id' => (int) $invoice->getKey(),
+                    'invoice_number' => $invoice->invoice_number,
+                    'name' => $invoice->invoice_number ?? 'Invoice',
+                ],
+            ])
+            ->all();
+    }
+
     public function getInvoiceBalance(int $invoiceId): InvoiceBalanceResult
     {
         $invoice = Invoice::query()->with('balance')->findOrFail($invoiceId);

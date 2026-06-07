@@ -125,7 +125,7 @@ final class VehicleServiceJobService
         return [
             'customer', 'vehicle', 'supervisor', 'inspection.inspector',
             'lines.item', 'lines.variant', 'lines.uom', 'lines.children.item',
-            'invoiceLinks.invoice.balance', 'paymentLinks.payment',
+            'invoiceLinks.invoice.balance', 'paymentLinks.payment', 'paymentLinks.invoice',
         ];
     }
 }

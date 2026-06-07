@@ -2,6 +2,7 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
+import { addDecimal, multiplyDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import { ItemLookupSelect, UomLookupSelect } from './PurchaseLookups';
 
 export interface EditablePurchaseLine {
@@ -21,20 +22,38 @@ export interface EditablePurchaseLine {
     charge_amount: string;
 }
 
-function decimal(value: string): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+export interface PurchaseLinePreview {
+    subtotal: string;
+    discount: string;
+    tax: string;
+    charge: string;
+    total: string;
+}
+
+export function previewLineAmounts(line: EditablePurchaseLine): PurchaseLinePreview {
+    const subtotal = multiplyDecimal(line.ordered_quantity, line.unit_price);
+    const discount = line.discount_calculation_type === 'percentage'
+        ? percentageOfDecimal(subtotal, line.discount_rate)
+        : line.discount_amount;
+    const taxBase = nonNegativeDecimal(subtractDecimal(subtotal, discount));
+    const tax = line.tax_calculation_type === 'percentage'
+        ? percentageOfDecimal(taxBase, line.tax_rate)
+        : line.tax_amount;
+    const charge = line.charge_calculation_type === 'percentage'
+        ? percentageOfDecimal(subtotal, line.charge_rate)
+        : line.charge_amount;
+
+    return {
+        subtotal,
+        discount,
+        tax,
+        charge,
+        total: nonNegativeDecimal(addDecimal(addDecimal(subtractDecimal(subtotal, discount), tax), charge)),
+    };
 }
 
 export function previewLineTotal(line: EditablePurchaseLine): string {
-    const subtotal = decimal(line.ordered_quantity) * decimal(line.unit_price);
-    const discount = line.discount_calculation_type === 'percentage' ? subtotal * decimal(line.discount_rate) / 100 : decimal(line.discount_amount);
-    const taxBase = Math.max(subtotal - discount, 0);
-    const tax = line.tax_calculation_type === 'percentage' ? taxBase * decimal(line.tax_rate) / 100 : decimal(line.tax_amount);
-    const charge = line.charge_calculation_type === 'percentage' ? subtotal * decimal(line.charge_rate) / 100 : decimal(line.charge_amount);
-    const total = subtotal - discount + tax + charge;
-
-    return Math.max(total, 0).toFixed(6);
+    return previewLineAmounts(line).total;
 }
 
 export function emptyPurchaseLine(): EditablePurchaseLine {

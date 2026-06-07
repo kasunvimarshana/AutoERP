@@ -66,7 +66,7 @@ export default function PurchaseOrderListPage() {
     };
 
     const columns: DataColumn<PurchaseOrder>[] = [
-        { key: 'number', header: 'Order', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? `PO #${row.id}`}</Link> },
+        { key: 'number', header: 'Order', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? 'Purchase order'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.purchase_order_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => readableRelation(row.supplier) },
         { key: 'warehouse', header: 'Warehouse', render: (row) => readableRelation(row.warehouse) },

@@ -1,48 +1,39 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
+import { useApi } from '@/shared/hooks/useApi';
+import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { getVehicle } from './vehicleApi';
-import { VehicleAttributeTab } from './components/VehicleAttributeTab';
-import { VehicleDocumentTab } from './components/VehicleDocumentTab';
-import { VehicleOwnershipTab } from './components/VehicleOwnershipTab';
-import { VehicleStatusHistoryTab } from './components/VehicleStatusHistoryTab';
 import { VehicleSummaryCard } from './components/VehicleSummaryCard';
-import type { Vehicle } from './vehicleTypes';
+
+const VehicleAttributeTab = lazy(() => import('./components/VehicleAttributeTab').then((module) => ({ default: module.VehicleAttributeTab })));
+const VehicleDocumentTab = lazy(() => import('./components/VehicleDocumentTab').then((module) => ({ default: module.VehicleDocumentTab })));
+const VehicleOwnershipTab = lazy(() => import('./components/VehicleOwnershipTab').then((module) => ({ default: module.VehicleOwnershipTab })));
+const VehicleStatusHistoryTab = lazy(() => import('./components/VehicleStatusHistoryTab').then((module) => ({ default: module.VehicleStatusHistoryTab })));
 
 type DetailTab = 'summary' | 'ownership' | 'documents' | 'attributes' | 'history';
 
 export default function VehicleDetailPage() {
     const { id } = useParams();
     const vehicleId = Number(id);
-    const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-    const [tab, setTab] = useState<DetailTab>('summary');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<ApiError | null>(null);
+    const result = useApi((signal) => getVehicle(vehicleId, signal), [vehicleId], Number.isFinite(vehicleId));
+    const tab = useOnDemandTab<DetailTab>('summary');
 
-    useEffect(() => {
-        const controller = new AbortController();
-        getVehicle(vehicleId, controller.signal)
-            .then(setVehicle)
-            .catch((requestError) => setError(toApiError(requestError)))
-            .finally(() => setLoading(false));
-        return () => controller.abort();
-    }, [vehicleId]);
-
-    if (loading) return <LoadingState label="Loading vehicle..." />;
-    if (!vehicle) return <ErrorAlert error={error} />;
+    if (result.loading) return <LoadingState label="Loading vehicle..." />;
+    if (!result.data) return <ErrorAlert error={result.error} />;
+    const vehicle = result.data;
 
     return (
         <div>
             <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<Link to={`/vehicles/${vehicle.id}/edit`}><Button>Edit</Button></Link>} />
-            <ErrorAlert error={error} />
+            <ErrorAlert error={result.error} />
             <Panel>
-                <Tabs<DetailTab> active={tab} onChange={setTab} tabs={[
+                <Tabs<DetailTab> active={tab.activeTab} onChange={tab.openTab} tabs={[
                     { id: 'summary', label: 'Summary' },
                     { id: 'ownership', label: 'Ownership' },
                     { id: 'documents', label: 'Documents' },
@@ -50,11 +41,13 @@ export default function VehicleDetailPage() {
                     { id: 'history', label: 'Status History' },
                 ]} />
                 <div className="mt-5">
-                    {tab === 'summary' && <VehicleSummaryCard vehicle={vehicle} />}
-                    {tab === 'ownership' && <VehicleOwnershipTab vehicleId={vehicle.id} />}
-                    {tab === 'documents' && <VehicleDocumentTab vehicleId={vehicle.id} />}
-                    {tab === 'attributes' && <VehicleAttributeTab vehicleId={vehicle.id} />}
-                    {tab === 'history' && <VehicleStatusHistoryTab vehicleId={vehicle.id} />}
+                    {tab.activeTab === 'summary' && <VehicleSummaryCard vehicle={vehicle} />}
+                    <Suspense fallback={<LoadingState label="Loading tab..." />}>
+                        {tab.openedTabs.has('ownership') && <div hidden={tab.activeTab !== 'ownership'}><VehicleOwnershipTab vehicleId={vehicle.id} /></div>}
+                        {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><VehicleDocumentTab vehicleId={vehicle.id} /></div>}
+                        {tab.openedTabs.has('attributes') && <div hidden={tab.activeTab !== 'attributes'}><VehicleAttributeTab vehicleId={vehicle.id} /></div>}
+                        {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><VehicleStatusHistoryTab vehicleId={vehicle.id} /></div>}
+                    </Suspense>
                 </div>
             </Panel>
         </div>

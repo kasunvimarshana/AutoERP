@@ -45,7 +45,7 @@ export default function ItemListPage() {
         { key: 'brand', header: 'Brand', render: (row) => readableRelation(row.brand) },
         { key: 'uom', header: 'Base UOM', render: (row) => readableRelation(row.base_uom) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/items/${row.id}/edit`}>Edit</Link><button className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.is_active ? 'Deactivate' : 'Activate'}</button></div> },
+        { key: 'actions', header: '', className: 'text-right', render: (row) => <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/items/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.is_active ? 'Deactivate' : 'Activate'}</button></div> },
     ];
 
     async function toggle(item: ItemSummary) {

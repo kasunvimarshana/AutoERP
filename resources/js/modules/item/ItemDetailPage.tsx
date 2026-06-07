@@ -38,12 +38,12 @@ export default function ItemDetailPage() {
             <div className="p-5">
                 {tab.activeTab === 'summary' && <ItemSummaryCard item={item.data} />}
                 <Suspense fallback={<LoadingState />}>
-                    {tab.activeTab === 'units' && <ItemUnitTab itemId={itemId} />}
-                    {tab.activeTab === 'variants' && <ItemVariantTab itemId={itemId} />}
-                    {tab.activeTab === 'bundles' && <ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(item.data.item_type)} />}
-                    {tab.activeTab === 'prices' && <ItemPriceTab itemId={itemId} />}
-                    {tab.activeTab === 'codes' && <ItemCodeTab itemId={itemId} />}
-                    {tab.activeTab === 'usage_rules' && <ItemUsageRuleTab itemId={itemId} />}
+                    {tab.openedTabs.has('units') && <div hidden={tab.activeTab !== 'units'}><ItemUnitTab itemId={itemId} /></div>}
+                    {tab.openedTabs.has('variants') && <div hidden={tab.activeTab !== 'variants'}><ItemVariantTab itemId={itemId} /></div>}
+                    {tab.openedTabs.has('bundles') && <div hidden={tab.activeTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(item.data.item_type)} /></div>}
+                    {tab.openedTabs.has('prices') && <div hidden={tab.activeTab !== 'prices'}><ItemPriceTab itemId={itemId} /></div>}
+                    {tab.openedTabs.has('codes') && <div hidden={tab.activeTab !== 'codes'}><ItemCodeTab itemId={itemId} /></div>}
+                    {tab.openedTabs.has('usage_rules') && <div hidden={tab.activeTab !== 'usage_rules'}><ItemUsageRuleTab itemId={itemId} /></div>}
                 </Suspense>
             </div>
         </Panel>

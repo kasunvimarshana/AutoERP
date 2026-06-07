@@ -70,7 +70,7 @@ export default function PurchaseOrderDetailPage() {
     return (
         <>
             <ContentHeader
-                title={order.purchase_order_number ?? `Purchase order #${order.id}`}
+                title={order.purchase_order_number ?? 'Purchase order'}
                 description={formatDate(order.purchase_order_date)}
                 actions={<PurchaseOrderActions order={order} busy={busy} onApprove={() => run('approve')} onCancel={() => run('cancel')} onClose={() => run('close')} onDelete={() => run('delete')} />}
             />

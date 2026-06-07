@@ -158,13 +158,13 @@ final class PurchaseController
 
     public function createReturn(StorePurchaseReturnRequest $request, PurchaseReturnService $service): PurchaseReturnResource
     {
-        return new PurchaseReturnResource($service->create($request->toData()));
+        return new PurchaseReturnResource($service->create($request->toData())->load($this->returnRelations()));
     }
 
     public function returnIndex(ListPurchaseOrderRequest $request): AnonymousResourceCollection
     {
         return PurchaseReturnResource::collection($this->scope(PurchaseReturn::query(), $request)
-            ->with(['supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustmentAllocations'])
+            ->with($this->returnRelations())
             ->latest('return_date')
             ->paginate($request->perPage()));
     }
@@ -172,13 +172,14 @@ final class PurchaseController
     public function showReturn(ListPurchaseOrderRequest $request, int $return): PurchaseReturnResource
     {
         return new PurchaseReturnResource($this->scope(PurchaseReturn::query(), $request)
-            ->with(['supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustmentAllocations'])
+            ->with($this->returnRelations())
             ->findOrFail($return));
     }
 
     public function approveReturn(PurchaseActionRequest $request, int $return, PurchaseReturnService $service): PurchaseReturnResource
     {
-        return new PurchaseReturnResource($service->approve($this->scope(PurchaseReturn::query(), $request)->findOrFail($return), $request->currentUserId()));
+        return new PurchaseReturnResource($service->approve($this->scope(PurchaseReturn::query(), $request)->findOrFail($return), $request->currentUserId())
+            ->load($this->returnRelations()));
     }
 
     public function postReturn(PurchaseActionRequest $request, int $return, PurchaseReturnService $service): JsonResponse
@@ -190,7 +191,8 @@ final class PurchaseController
 
     public function cancelReturn(PurchaseActionRequest $request, int $return, PurchaseReturnService $service): PurchaseReturnResource
     {
-        return new PurchaseReturnResource($service->cancel($this->scope(PurchaseReturn::query(), $request)->findOrFail($return)));
+        return new PurchaseReturnResource($service->cancel($this->scope(PurchaseReturn::query(), $request)->findOrFail($return))
+            ->load($this->returnRelations()));
     }
 
     public function createManualSupplierReturn(StorePurchaseReturnRequest $request, PurchaseReturnService $service): PurchaseReturnResource
@@ -216,7 +218,7 @@ final class PurchaseController
             auditMetadata: $data->auditMetadata,
             createdBy: $data->createdBy,
             lines: $data->lines,
-        )));
+        ))->load($this->returnRelations()));
     }
 
     public function createDebitNote(StorePurchaseDebitNoteRequest $request, PurchaseDebitNoteService $service): JsonResponse
@@ -315,6 +317,21 @@ final class PurchaseController
             'returnable_quantity' => (string) $line->remaining_quantity,
             'unit_price' => (string) $line->unit_price,
         ])->all()]);
+    }
+
+    private function returnRelations(): array
+    {
+        return [
+            'supplier',
+            'warehouse',
+            'warehouseLocation',
+            'sourceGoodsReceipt',
+            'debitNote',
+            'lines.item',
+            'lines.variant',
+            'lines.uom',
+            'adjustmentAllocations',
+        ];
     }
 
     public function supplierItemMappings(ListPurchaseOrderRequest $request, int $supplier): AnonymousResourceCollection

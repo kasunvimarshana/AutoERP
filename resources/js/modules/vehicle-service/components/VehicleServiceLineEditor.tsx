@@ -5,16 +5,17 @@ import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
-import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
-import type { ItemSummary } from '@/modules/item/itemTypes';
+import { lookupApi } from '@/shared/api/lookupApi';
+import type { NamedResource } from '@/shared/types/common';
 import { useApi } from '@/shared/hooks/useApi';
 import { createVehicleServiceLine, deleteVehicleServiceLine, listVehicleServiceLines } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine, VehicleServiceLinePayload, VehicleServiceLineSourceType } from '../vehicleServiceTypes';
 
 const empty = () => ({
     source: 'inventory_item' as VehicleServiceLineSourceType,
-    item: null as ItemSummary | null,
+    item: null as NamedResource | null,
     description: '',
     quantity: '1.000000',
     unit_cost: '0.000000',
@@ -44,7 +45,15 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
         { key: 'price', header: 'Unit price', render: (line) => line.unit_price },
         { key: 'total', header: 'Total', render: (line) => line.line_total },
         { key: 'flags', header: 'Flags', render: (line) => [line.is_billable && 'Billable', line.is_customer_supplied && 'Customer supplied', line.is_inventory_tracked && 'Inventory', line.is_employee_assignable && 'Workforce'].filter(Boolean).join(', ') || '-' },
-        { key: 'actions', header: '', render: (line) => <Button type="button" variant="danger" onClick={async () => { await deleteVehicleServiceLine(jobId, line.id); result.reload(); }}>Delete</Button> },
+        { key: 'actions', header: '', render: (line) => <Button type="button" variant="danger" onClick={async () => {
+            setError(null);
+            try {
+                await deleteVehicleServiceLine(jobId, line.id);
+                result.reload();
+            } catch (requestError) {
+                setError(toApiError(requestError));
+            }
+        }}>Delete</Button> },
     ];
 
     return (
@@ -98,7 +107,7 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
                         { value: 'labour_item', label: 'Labour item' },
                         { value: 'combo_parent', label: 'Combo / package' },
                     ]} onChange={(event) => setForm({ ...form, source: event.target.value as VehicleServiceLineSourceType, item: null, customer_supplied: false })} />
-                    {!external && <ItemLookupSelect value={form.item} onChange={set => setForm({ ...form, item: set, description: set?.name ?? form.description })} />}
+                    {!external && <LookupSelect label="Item" value={form.item} onChange={set => setForm({ ...form, item: set, description: set?.name ?? form.description })} search={lookupApi.items} />}
                     <Input label="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
                     <Input label="Quantity" type="number" min="0.000001" step="0.000001" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
                     <Input label="Unit cost" type="number" min="0" step="0.000001" value={form.unit_cost} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />

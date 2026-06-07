@@ -21,6 +21,7 @@ final class PurchaseDebitNoteResource extends ModuleResource
             'supplier_id' => $this->supplier_id,
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'purchase_return_id' => $this->purchase_return_id,
+            'purchase_return' => $this->whenLoaded('purchaseReturn', fn () => $this->summary($this->purchaseReturn, ['return_number', 'return_date', 'status'])),
             'source_type' => $this->source_type,
             'source_id' => $this->source_id,
             'source' => $this->sourceSummary(),

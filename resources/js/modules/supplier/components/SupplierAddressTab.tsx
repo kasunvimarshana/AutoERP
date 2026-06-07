@@ -44,4 +44,4 @@ function AddressForm({ row, error, submitting, onCancel, onSubmit }: { row: Supp
         <Footer submitting={submitting} onCancel={onCancel} /></form>;
 }
 function Footer({ submitting, onCancel }: { submitting: boolean; onCancel: () => void }) { return <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting}>Save</Button></div>; }
-function Actions({ edit, remove }: { edit: () => void; remove: () => void }) { return <div className="flex justify-end gap-3"><button className="font-semibold text-sky-700" onClick={edit}>Edit</button><button className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>; }
+function Actions({ edit, remove }: { edit: () => void; remove: () => void }) { return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>; }

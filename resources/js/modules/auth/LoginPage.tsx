@@ -13,8 +13,6 @@ export default function LoginPage() {
     const location = useLocation();
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
-    const [tenantId, setTenantId] = useState('');
-    const [organizationUnitId, setOrganizationUnitId] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -41,7 +39,7 @@ export default function LoginPage() {
                     <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">AutoERP</p>
                     <h1 className="mt-2 text-2xl font-bold text-slate-950">Sign in</h1>
                     <p className="mt-2 text-sm text-slate-500">
-                        Use your backend API account and tenant context.
+                        Use your AutoERP account.
                     </p>
                 </div>
 
@@ -56,8 +54,6 @@ export default function LoginPage() {
                             await auth.login({
                                 login_identifier: loginIdentifier,
                                 password,
-                                tenant_id: tenantId ? Number(tenantId) : null,
-                                organization_unit_id: organizationUnitId ? Number(organizationUnitId) : null,
                             });
                             navigate(from, { replace: true });
                         } catch (nextError) {
@@ -89,27 +85,6 @@ export default function LoginPage() {
                         error={fieldError(error, 'password')}
                         required
                     />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Input
-                            label="Tenant ID"
-                            name="tenant_id"
-                            type="number"
-                            min="1"
-                            value={tenantId}
-                            onChange={(event) => setTenantId(event.target.value)}
-                            error={fieldError(error, 'tenant_id')}
-                            required
-                        />
-                        <Input
-                            label="Org unit ID"
-                            name="organization_unit_id"
-                            type="number"
-                            min="1"
-                            value={organizationUnitId}
-                            onChange={(event) => setOrganizationUnitId(event.target.value)}
-                            error={fieldError(error, 'organization_unit_id')}
-                        />
-                    </div>
                     <Button type="submit" className="w-full" loading={submitting || auth.isLoading}>
                         Sign in
                     </Button>

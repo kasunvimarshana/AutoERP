@@ -4,12 +4,12 @@ import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
+import { lookupApi } from '@/shared/api/lookupApi';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import { useApi } from '@/shared/hooks/useApi';
-import { searchEmployees } from '@/modules/hr/hrApi';
 import { createVehicleServiceEmployee, deleteVehicleServiceEmployee, listEmployeeAssignableLines } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceEmployeeAssignment, VehicleServiceJobLine } from '../vehicleServiceTypes';
 
@@ -25,18 +25,25 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const search = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
-        const rows = await searchEmployees(query, signal, 'available');
-        return rows.map((row) => ({ id: row.id, code: row.employee_number, name: row.display_name }));
+        return lookupApi.availableEmployees(query, signal);
     }, []);
     const assignments = (result.data ?? []).flatMap((line) => (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
     type Row = VehicleServiceEmployeeAssignment & { line: VehicleServiceJobLine };
     const columns: DataColumn<Row>[] = [
         { key: 'line', header: 'Line', render: (row) => `${row.line.line_number}. ${row.line.description}` },
-        { key: 'employee', header: 'Employee', render: (row) => row.employee?.name ?? row.employee_id },
+        { key: 'employee', header: 'Employee', render: (row) => row.employee?.name ?? 'Unavailable employee' },
         { key: 'role', header: 'Role', render: (row) => row.role_type },
         { key: 'hours', header: 'Hours', render: (row) => row.assigned_hours },
         { key: 'commission', header: 'Commission', render: (row) => `${row.commission_type}: ${row.commission_amount}` },
-        { key: 'actions', header: '', render: (row) => <Button type="button" variant="danger" onClick={async () => { await deleteVehicleServiceEmployee(jobId, row.line.id, row.id); result.reload(); }}>Remove</Button> },
+        { key: 'actions', header: '', render: (row) => <Button type="button" variant="danger" onClick={async () => {
+            setError(null);
+            try {
+                await deleteVehicleServiceEmployee(jobId, row.line.id, row.id);
+                result.reload();
+            } catch (requestError) {
+                setError(toApiError(requestError));
+            }
+        }}>Remove</Button> },
     ];
 
     return (

@@ -28,7 +28,7 @@ export default function PaymentDetailPage() {
     const value = payment.data;
     return (
         <>
-            <ContentHeader title={value.payment_number ?? `Payment #${value.id}`} description={formatDate(value.payment_date)} />
+            <ContentHeader title={value.payment_number ?? 'Payment'} description={formatDate(value.payment_date)} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">

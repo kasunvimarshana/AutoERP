@@ -5,9 +5,10 @@ import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
-import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
-import type { CustomerSummary } from '@/modules/customer/customerTypes';
+import { lookupApi } from '@/shared/api/lookupApi';
+import type { NamedResource } from '@/shared/types/common';
 import { createVehicleOwnership, deleteVehicleOwnership, listVehicleOwnerships, updateVehicleOwnership } from '../vehicleApi';
 import type { VehicleOwnership, VehicleOwnershipPayload } from '../vehicleTypes';
 
@@ -17,7 +18,7 @@ const emptyPayload: VehicleOwnershipPayload = { ownership_type: 'owned', started
 export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
     const [rows, setRows] = useState<VehicleOwnership[]>([]);
     const [form, setForm] = useState<VehicleOwnershipPayload>(emptyPayload);
-    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
+    const [customer, setCustomer] = useState<NamedResource | null>(null);
     const [editing, setEditing] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -27,9 +28,15 @@ export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
         const controller = new AbortController();
         setLoading(true);
         listVehicleOwnerships(vehicleId, { per_page: 50 }, controller.signal)
-            .then((response) => setRows(response.data))
-            .catch((requestError) => setError(toApiError(requestError)))
-            .finally(() => setLoading(false));
+            .then((response) => {
+                if (!controller.signal.aborted) setRows(response.data);
+            })
+            .catch((requestError) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
         return controller;
     };
 
@@ -63,7 +70,7 @@ export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
             <ErrorAlert error={error} />
             <div className="grid gap-3 md:grid-cols-4">
                 <Select label="Ownership" value={form.ownership_type} options={ownershipTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, ownership_type: event.target.value as VehicleOwnershipPayload['ownership_type'] })} error={fieldError(error, 'ownership_type')} />
-                <CustomerLookupSelect value={customer} onChange={setCustomer} error={fieldError(error, 'customer_id')} />
+                <LookupSelect label="Customer" value={customer} onChange={setCustomer} search={lookupApi.customers} error={fieldError(error, 'customer_id')} />
                 <Input label="Started" type="date" value={form.started_at} onChange={(event) => setForm({ ...form, started_at: event.target.value })} error={fieldError(error, 'started_at')} />
                 <Input label="Ended" type="date" value={form.ended_at ?? ''} onChange={(event) => setForm({ ...form, ended_at: event.target.value })} error={fieldError(error, 'ended_at')} />
             </div>
@@ -83,7 +90,7 @@ export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
                     { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? '-' },
                     { key: 'started', header: 'Started', render: (row) => row.started_at?.slice(0, 10) ?? '-' },
                     { key: 'current', header: 'Current', render: (row) => row.is_current ? 'Yes' : 'No' },
-                    { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => { setEditing(row.id); setCustomer(row.customer as CustomerSummary | null); setForm({ customer_id: row.customer?.id ?? null, ownership_type: row.ownership_type, started_at: row.started_at?.slice(0, 10) ?? '', ended_at: row.ended_at?.slice(0, 10) ?? '', is_current: row.is_current, notes: row.notes ?? '' }); }}>Edit</Button><Button variant="danger" disabled={row.is_current} onClick={() => deleteVehicleOwnership(vehicleId, row.id).then(() => load()).catch((requestError) => setError(toApiError(requestError)))}>Delete</Button></div> },
+                    { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => { setEditing(row.id); setCustomer(row.customer ?? null); setForm({ customer_id: row.customer?.id ?? null, ownership_type: row.ownership_type, started_at: row.started_at?.slice(0, 10) ?? '', ended_at: row.ended_at?.slice(0, 10) ?? '', is_current: row.is_current, notes: row.notes ?? '' }); }}>Edit</Button><Button variant="danger" disabled={row.is_current} onClick={() => deleteVehicleOwnership(vehicleId, row.id).then(() => load()).catch((requestError) => setError(toApiError(requestError)))}>Delete</Button></div> },
                 ]}
             />
         </div>

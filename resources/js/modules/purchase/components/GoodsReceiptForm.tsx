@@ -22,8 +22,8 @@ function decimal(value: string | undefined, fallback = '0.000000'): string {
 function orderLabel(order: PurchaseOrder): NamedResource {
     return {
         id: order.id,
-        code: order.purchase_order_number ?? `PO-${order.id}`,
-        name: `${order.purchase_order_number ?? `PO #${order.id}`}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
+        code: order.purchase_order_number,
+        name: `${order.purchase_order_number ?? 'Purchase order'}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
     };
 }
 

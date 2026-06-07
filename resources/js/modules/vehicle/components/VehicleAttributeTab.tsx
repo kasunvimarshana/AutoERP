@@ -24,9 +24,15 @@ export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
         const controller = new AbortController();
         setLoading(true);
         listVehicleAttributes(vehicleId, { per_page: 50 }, controller.signal)
-            .then((response) => setRows(response.data))
-            .catch((requestError) => setError(toApiError(requestError)))
-            .finally(() => setLoading(false));
+            .then((response) => {
+                if (!controller.signal.aborted) setRows(response.data);
+            })
+            .catch((requestError) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
         return controller;
     };
 

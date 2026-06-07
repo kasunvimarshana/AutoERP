@@ -8,7 +8,7 @@ export function PurchaseLinkedDocumentsTab({ source, links = [] }: {
 }) {
     return (
         <DetailGrid items={[
-            { label: 'Source', value: source?.number ?? (source?.type ? `${source.type} #${source.id ?? '-'}` : '-') },
+            { label: 'Source', value: source?.number ?? source?.type?.replaceAll('_', ' ') ?? '-' },
             ...links.map((link) => ({ label: link.label, value: <Link className="text-sky-700 hover:underline" to={link.to}>{link.text}</Link> })),
         ]} />
     );

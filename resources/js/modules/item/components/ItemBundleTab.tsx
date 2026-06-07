@@ -82,5 +82,5 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
 }
 
 function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
-    return <div className="flex justify-end gap-3"><button className="font-semibold text-sky-700" onClick={edit}>Edit</button><button className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>;
+    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>;
 }
