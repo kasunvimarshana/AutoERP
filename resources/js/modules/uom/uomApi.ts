@@ -13,7 +13,7 @@ import type {
 
 export async function listUoms(params: ListParams, signal?: AbortSignal): Promise<UomListResponse<UnitOfMeasure>> {
     const response = await apiClient.get<ApiCollection<UnitOfMeasure>>(endpoints.uoms, { params, signal });
-    return withMeta(response.data);
+    return response.data;
 }
 
 export async function getUom(id: number, signal?: AbortSignal): Promise<UnitOfMeasure> {
@@ -51,7 +51,7 @@ export async function searchUoms(search: string, signal?: AbortSignal): Promise<
 
 export async function listUomConversions(params: ListParams, signal?: AbortSignal): Promise<UomListResponse<UomConversion>> {
     const response = await apiClient.get<ApiCollection<UomConversion>>(endpoints.uomConversions, { params, signal });
-    return withMeta(response.data);
+    return response.data;
 }
 
 export async function getUomConversion(id: number, signal?: AbortSignal): Promise<UomConversion> {
@@ -72,26 +72,4 @@ export async function updateUomConversion(id: number, payload: Partial<UomConver
 export async function convertUom(payload: { from_uom_id: number; to_uom_id: number; quantity: string }): Promise<UomConvertResult> {
     const response = await apiClient.post<UomConvertResult>(`${endpoints.uomConversions}/convert`, payload);
     return response.data;
-}
-
-function withMeta<T>(response: ApiCollection<T>): UomListResponse<T> {
-    const meta = response.meta as (typeof response.meta & { page?: number; page_count?: number }) | undefined;
-    if (!meta) return { data: response.data };
-
-    const currentPage = meta.current_page ?? meta.page ?? 1;
-    const perPage = meta.per_page ?? response.data.length;
-    const total = meta.total ?? response.data.length;
-    const lastPage = meta.last_page ?? meta.page_count ?? Math.max(1, Math.ceil(total / Math.max(1, perPage)));
-
-    return {
-        data: response.data,
-        meta: {
-            current_page: currentPage,
-            from: total === 0 ? null : (currentPage - 1) * perPage + 1,
-            last_page: lastPage,
-            per_page: perPage,
-            to: total === 0 ? null : Math.min(currentPage * perPage, total),
-            total,
-        },
-    };
 }

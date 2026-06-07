@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\QueryRequest;
 
-final class ListUomConversionRequest extends FormRequest
+final class ListUomConversionRequest extends QueryRequest
 {
     public function authorize(): bool
     {

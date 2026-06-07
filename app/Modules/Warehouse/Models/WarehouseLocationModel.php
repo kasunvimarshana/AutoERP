@@ -18,7 +18,17 @@ final class WarehouseLocationModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-
+            'tenant_id' => 'integer',
+            'row_version' => 'integer',
+            'organization_unit_id' => 'integer',
+            'metadata' => 'array',
+            'warehouse_id' => 'integer',
+            'parent_id' => 'integer',
+            'depth' => 'integer',
+            'is_active' => 'boolean',
+            'is_pickable' => 'boolean',
+            'is_receivable' => 'boolean',
+            'capacity' => 'decimal:4',
         ]);
     }
 }

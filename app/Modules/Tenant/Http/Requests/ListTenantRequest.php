@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\QueryRequest;
 use Modules\Tenant\Constants\TenantStatus;
 
-final class ListTenantRequest extends FormRequest
+final class ListTenantRequest extends QueryRequest
 {
     public function authorize(): bool
     {

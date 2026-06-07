@@ -139,8 +139,8 @@ export interface PurchaseOrderPayload {
     }>;
 }
 
-export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed' | 'partially_invoiced' | 'invoiced' | 'partially_returned' | 'returned';
-export type PurchaseReturnStatus = 'draft' | 'approved' | 'posted' | 'cancelled';
+export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed' | 'partially_invoiced' | 'invoiced' | 'partially_returned' | 'returned' | 'cancelled';
+export type PurchaseReturnStatus = 'draft' | 'approved' | 'posted' | 'cancelled' | 'reversed';
 
 export interface SourceSummary {
     type?: string | null;

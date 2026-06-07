@@ -23,13 +23,7 @@ abstract class AbstractUserCrudController extends Controller
         if ($value instanceof PagedResult) {
             return response()->json([
                 'data' => UserRecordResource::collection($value->items)->resolve(),
-                'meta' => [
-                    'total' => $value->total,
-                    'page' => $value->page,
-                    'per_page' => $value->perPage,
-                    'page_count' => $value->pageCount(),
-                    'has_more' => $value->hasMore(),
-                ],
+                'meta' => $value->paginationMeta(),
             ]);
         }
 

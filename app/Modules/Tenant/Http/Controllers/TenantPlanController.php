@@ -40,13 +40,7 @@ final class TenantPlanController extends Controller
 
         return response()->json([
             'data' => TenantPlanResource::collection($page->items)->resolve(),
-            'meta' => [
-                'total' => $page->total,
-                'page' => $page->page,
-                'per_page' => $page->perPage,
-                'page_count' => $page->pageCount(),
-                'has_more' => $page->hasMore(),
-            ],
+            'meta' => $page->paginationMeta(),
         ]);
     }
 

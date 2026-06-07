@@ -46,19 +46,13 @@ final class WarehouseController extends Controller
 
         return response()->json([
             'data' => WarehouseResource::collection($pageResult->items)->resolve(),
-            'meta' => [
-                'total' => $pageResult->total,
-                'page' => $pageResult->page,
-                'per_page' => $pageResult->perPage,
-                'page_count' => $pageResult->pageCount(),
-                'has_more' => $pageResult->hasMore(),
-            ],
+            'meta' => $pageResult->paginationMeta(),
         ]);
     }
 
-    public function show(int|string $id): JsonResponse|WarehouseResource
+    public function show(ListWarehouseRequest $request, int|string $id): JsonResponse|WarehouseResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->getService->execute($id, $request->tenantId(), $request->organizationUnitId());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -80,7 +74,12 @@ final class WarehouseController extends Controller
 
     public function update(UpsertWarehouseRequest $request, int|string $id): JsonResponse|WarehouseResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->updateService->execute(
+            $id,
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->validated(),
+        );
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -92,9 +91,9 @@ final class WarehouseController extends Controller
         return new WarehouseResource($result->valueOrFail());
     }
 
-    public function destroy(int|string $id): JsonResponse
+    public function destroy(ListWarehouseRequest $request, int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
+        $result = $this->deleteService->execute($id, $request->tenantId(), $request->organizationUnitId());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);

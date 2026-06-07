@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { clearStoredAuthSession, getStoredApiContext } from './authSessionStorage';
 import { toApiError } from './apiError';
+import { serializeQueryParams } from './queryParams';
 
 export const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/',
@@ -9,6 +10,9 @@ export const apiClient = axios.create({
         'Content-Type': 'application/json',
     },
     timeout: 30_000,
+    paramsSerializer: {
+        serialize: serializeQueryParams,
+    },
 });
 
 apiClient.interceptors.request.use((config) => {

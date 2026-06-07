@@ -48,13 +48,7 @@ final class UomConversionController extends Controller
 
         return response()->json([
             'data' => UomConversionResource::collection($pageResult->items)->resolve(),
-            'meta' => [
-                'total' => $pageResult->total,
-                'page' => $pageResult->page,
-                'per_page' => $pageResult->perPage,
-                'page_count' => $pageResult->pageCount(),
-                'has_more' => $pageResult->hasMore(),
-            ],
+            'meta' => $pageResult->paginationMeta(),
         ]);
     }
 

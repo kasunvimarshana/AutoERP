@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
@@ -10,7 +11,9 @@ import { PurchaseReturnForm } from '../components/PurchaseReturnForm';
 type Tab = 'referenced' | 'manual' | 'debit' | 'adjustment';
 
 export default function PurchaseReturnCreatePage() {
-    const [tab, setTab] = useState<Tab>('referenced');
+    const [searchParams] = useSearchParams();
+    const requestedTab = searchParams.get('tab');
+    const [tab, setTab] = useState<Tab>(isTab(requestedTab) ? requestedTab : 'referenced');
     return (
         <div className="space-y-5">
             <ContentHeader title="Purchase return decision" />
@@ -34,4 +37,8 @@ export default function PurchaseReturnCreatePage() {
             </Panel>
         </div>
     );
+}
+
+function isTab(value: string | null): value is Tab {
+    return value === 'referenced' || value === 'manual' || value === 'debit' || value === 'adjustment';
 }

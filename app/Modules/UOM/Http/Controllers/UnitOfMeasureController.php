@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomCategory;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Constants\UomType;
@@ -15,8 +16,8 @@ use Modules\UOM\Contracts\Services\UomUsageSummaryServiceInterface;
 use Modules\UOM\Http\Requests\ListUnitOfMeasureRequest;
 use Modules\UOM\Http\Requests\StoreUomRequest;
 use Modules\UOM\Http\Requests\UpdateUomRequest;
-use Modules\UOM\Http\Resources\UomLookupResource;
 use Modules\UOM\Http\Resources\UnitOfMeasureResource;
+use Modules\UOM\Http\Resources\UomLookupResource;
 use Modules\UOM\Services\UnitOfMeasures\CreateUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\DeleteUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\GetUnitOfMeasureService;
@@ -113,13 +114,7 @@ final class UnitOfMeasureController extends Controller
 
         return response()->json([
             'data' => UnitOfMeasureResource::collection($pageResult->items)->resolve(),
-            'meta' => [
-                'total' => $pageResult->total,
-                'page' => $pageResult->page,
-                'per_page' => $pageResult->perPage,
-                'page_count' => $pageResult->pageCount(),
-                'has_more' => $pageResult->hasMore(),
-            ],
+            'meta' => $pageResult->paginationMeta(),
         ]);
     }
 
@@ -214,7 +209,7 @@ final class UnitOfMeasureController extends Controller
         return new UnitOfMeasureResource($result->valueOrFail());
     }
 
-    private function respondLookup(\Modules\Core\Results\Result $result): JsonResponse
+    private function respondLookup(Result $result): JsonResponse
     {
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -227,13 +222,7 @@ final class UnitOfMeasureController extends Controller
 
         return response()->json([
             'data' => UomLookupResource::collection($pageResult->items)->resolve(),
-            'meta' => [
-                'total' => $pageResult->total,
-                'page' => $pageResult->page,
-                'per_page' => $pageResult->perPage,
-                'page_count' => $pageResult->pageCount(),
-                'has_more' => $pageResult->hasMore(),
-            ],
+            'meta' => $pageResult->paginationMeta(),
         ]);
     }
 

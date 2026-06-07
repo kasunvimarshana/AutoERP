@@ -47,4 +47,28 @@ final readonly class PagedResult
     {
         return $this->page < $this->pageCount();
     }
+
+    /**
+     * @return array{
+     *     current_page: int,
+     *     from: int|null,
+     *     last_page: int,
+     *     per_page: int,
+     *     to: int|null,
+     *     total: int
+     * }
+     */
+    public function paginationMeta(): array
+    {
+        $from = $this->total === 0 ? null : (($this->page - 1) * $this->perPage) + 1;
+
+        return [
+            'current_page' => $this->page,
+            'from' => $from,
+            'last_page' => max(1, $this->pageCount()),
+            'per_page' => $this->perPage,
+            'to' => $from === null ? null : min($this->page * $this->perPage, $this->total),
+            'total' => $this->total,
+        ];
+    }
 }

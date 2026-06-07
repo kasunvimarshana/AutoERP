@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { listUoms, searchCurrencies, searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
@@ -32,10 +33,15 @@ export function WarehouseLookupSelect(props: LookupProps) {
 }
 
 export function WarehouseLocationLookupSelect({ warehouseId, ...props }: WarehouseLocationLookupProps) {
+    const search = useCallback(
+        (query: string, signal: AbortSignal) => searchWarehouseLocations(query, signal, warehouseId),
+        [warehouseId],
+    );
+
     return (
         <LookupSelect
             label="Location"
-            search={(search, signal) => searchWarehouseLocations(search, signal, warehouseId)}
+            search={search}
             placeholder="Search locations..."
             {...props}
         />

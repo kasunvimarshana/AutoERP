@@ -14,10 +14,14 @@ final class UpdateWarehouseService
 {
     public function __construct(private readonly WarehouseRepositoryInterface $repository) {}
 
-    public function execute(int|string $id, array $payload): Result
+    public function execute(int|string $id, int $tenantId, ?int $organizationUnitId, array $payload): Result
     {
         try {
-            if ($this->repository->findById($id) === null) {
+            if (! $this->repository->exists([
+                'id' => $id,
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+            ])) {
                 return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
             }
 

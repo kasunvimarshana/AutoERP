@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 
-abstract class TenantScopedRequest extends FormRequest
+abstract class TenantScopedRequest extends QueryRequest
 {
     public function authorize(): bool
     {
@@ -57,6 +56,8 @@ abstract class TenantScopedRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        parent::prepareForValidation();
+
         $tenant = $this->attributes->get(
             (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
         );

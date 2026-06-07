@@ -65,6 +65,28 @@ final class UomApiTest extends TestCase
             ->assertJsonPath('data.0.code', 'PCS');
     }
 
+    public function test_uom_boolean_filters_accept_string_values(): void
+    {
+        $context = $this->createAuthContext();
+        $this->withAuth($context)->postJson('/api/v1/uoms', $this->uomPayload())->assertCreated();
+        $this->withAuth($context)->postJson('/api/v1/uoms', $this->uomPayload([
+            'code' => 'BOX',
+            'name' => 'Box',
+            'symbol' => 'box',
+            'is_active' => false,
+        ]))->assertCreated();
+
+        $this->withAuth($context)->getJson('/api/v1/uoms?is_active=true')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.code', 'PCS');
+
+        $this->withAuth($context)->getJson('/api/v1/uoms?is_active=false')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.code', 'BOX');
+    }
+
     public function test_conversion_create_returns_readable_relations(): void
     {
         $context = $this->createAuthContext();

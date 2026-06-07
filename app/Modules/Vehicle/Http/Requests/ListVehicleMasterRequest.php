@@ -17,6 +17,7 @@ final class ListVehicleMasterRequest extends TenantScopedRequest
             'search' => ['nullable', 'string', 'max:150'],
             'vehicle_make_id' => ['nullable', 'integer', 'min:1'],
             'is_active' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
             'sort' => ['nullable', Rule::in(['code', 'name', 'sort_order', 'created_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],

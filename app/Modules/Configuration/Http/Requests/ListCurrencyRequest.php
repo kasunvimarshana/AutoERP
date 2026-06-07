@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Modules\Configuration\Constants\ConfigurationDefaults;
+use Modules\Core\Http\Requests\QueryRequest;
 
-final class ListCurrencyRequest extends FormRequest
+final class ListCurrencyRequest extends QueryRequest
 {
     public function authorize(): bool
     {

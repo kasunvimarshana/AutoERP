@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\QueryRequest;
 
-final class ListTenantPlanRequest extends FormRequest
+final class ListTenantPlanRequest extends QueryRequest
 {
     public function authorize(): bool
     {

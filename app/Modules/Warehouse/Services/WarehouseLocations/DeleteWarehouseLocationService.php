@@ -14,10 +14,14 @@ final class DeleteWarehouseLocationService
 {
     public function __construct(private readonly WarehouseLocationRepositoryInterface $repository) {}
 
-    public function execute(int|string $id): Result
+    public function execute(int|string $id, int $tenantId, ?int $organizationUnitId): Result
     {
         try {
-            if ($this->repository->findById($id) === null) {
+            if (! $this->repository->exists([
+                'id' => $id,
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+            ])) {
                 return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'WarehouseLocation not found.'));
             }
 

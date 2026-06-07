@@ -14,10 +14,14 @@ final class GetWarehouseLocationService
 {
     public function __construct(private readonly WarehouseLocationRepositoryInterface $repository) {}
 
-    public function execute(int|string $id): Result
+    public function execute(int|string $id, int $tenantId, ?int $organizationUnitId): Result
     {
         try {
-            $record = $this->repository->findById($id);
+            $record = $this->repository->list([
+                'id' => $id,
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+            ])[0] ?? null;
 
             if ($record === null) {
                 return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'WarehouseLocation not found.'));
