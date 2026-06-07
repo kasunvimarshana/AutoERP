@@ -16,6 +16,8 @@ use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -23,6 +25,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
@@ -35,6 +38,7 @@ use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServicePaymentLink;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceInspectionService;
 use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
@@ -314,6 +318,193 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('125.500000', $resource['lines'][0]['line_total']);
     }
 
+    public function test_vehicle_service_boolean_inputs_are_normalized_before_validation(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $job = $this->createJob($context);
+
+        foreach ([
+            true => [true, 'true', 1, '1'],
+            false => [false, 'false', 0, '0'],
+        ] as $expected => $values) {
+            foreach ($values as $index => $value) {
+                $this->postJson("/api/v1/vehicle-service/jobs/{$job->getKey()}/lines", [
+                    'tenant_id' => $context['tenant_id'],
+                    'line_source_type' => 'service_item',
+                    'item_id' => $context['service']->getKey(),
+                    'description' => "Boolean line {$expected}-{$index}",
+                    'quantity' => '1.000000',
+                    'unit_price' => '10.000000',
+                    'is_billable' => $value,
+                    'is_inventory_tracked' => $value,
+                    'is_employee_assignable' => $value,
+                    'expand_combo' => $value,
+                ])->assertCreated()
+                    ->assertJsonPath('data.is_billable', (bool) $expected)
+                    ->assertJsonPath('data.is_inventory_tracked', false)
+                    ->assertJsonPath('data.is_employee_assignable', true);
+            }
+        }
+    }
+
+    public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $inventory = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '10.000000');
+        $customerSupplied = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '10.000000', customerSupplied: true);
+        $external = $this->line($job, VehicleServiceLineSourceType::ExternalItem, null, '1.000000', '10.000000');
+        $labour = $this->line($job, VehicleServiceLineSourceType::LabourItem, $context['labour'], '1.000000', '10.000000');
+        $service = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '10.000000');
+
+        $this->assertTrue((bool) $inventory->is_inventory_tracked);
+        $this->assertFalse((bool) $customerSupplied->is_inventory_tracked);
+        $this->assertFalse((bool) $customerSupplied->is_billable);
+        $this->assertFalse((bool) $external->is_inventory_tracked);
+        $this->assertFalse((bool) $labour->is_inventory_tracked);
+        $this->assertFalse((bool) $service->is_inventory_tracked);
+
+        $eligible = app(VehicleServiceInventoryIntegrationService::class)->issueLines($job);
+        $this->assertSame([(int) $inventory->getKey()], $eligible->pluck('id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function test_invalid_combo_child_relationships_are_rejected(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+
+        try {
+            $this->line($job, VehicleServiceLineSourceType::ComboChild, $context['stock'], '1.000000', '0.000000');
+            $this->fail('Expected a combo child without a parent to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Combo child lines require a combo parent line.', $exception->getMessage());
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only combo child lines may reference a parent line.');
+        app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
+            lineSourceType: VehicleServiceLineSourceType::ServiceItem,
+            description: 'Invalid parent reference',
+            quantity: '1.000000',
+            unitPrice: '10.000000',
+            parentLineId: 999,
+            itemId: (int) $context['service']->getKey(),
+        ));
+    }
+
+    public function test_partial_invoice_tracks_remaining_quantity_and_reaches_invoiced_status(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '4.000000', '50.000000');
+        $statuses = app(VehicleServiceStatusService::class);
+        $statuses->change($job, VehicleServiceJobStatus::InProgress);
+        $statuses->change($job->refresh(), VehicleServiceJobStatus::Completed);
+        $invoices = app(VehicleServiceInvoiceIntegrationService::class);
+
+        $first = $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '1.500000']);
+        $this->assertSame('75.000000', (string) $first->grand_total);
+        $this->assertSame(VehicleServiceJobStatus::Completed, $job->refresh()->status);
+        $readiness = $invoices->billableLines($job->refresh())->firstWhere('id', $line->getKey());
+        $this->assertSame('1.500000', (string) $readiness?->invoiced_quantity);
+        $this->assertSame('2.500000', (string) $readiness?->remaining_billable_quantity);
+        $this->assertSame('partially_invoiced', $readiness?->invoice_state);
+
+        $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '2.500000']);
+        $this->assertSame(VehicleServiceJobStatus::Invoiced, $job->refresh()->status);
+    }
+
+    public function test_cancelled_invoice_source_quantity_can_be_invoiced_again(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '80.000000');
+        $statuses = app(VehicleServiceStatusService::class);
+        $statuses->change($job, VehicleServiceJobStatus::InProgress);
+        $statuses->change($job->refresh(), VehicleServiceJobStatus::Completed);
+        $invoices = app(VehicleServiceInvoiceIntegrationService::class);
+        $first = $invoices->create($job->refresh(), '2026-06-07');
+        $first->forceFill(['status' => InvoiceStatus::Cancelled->value])->save();
+
+        $replacement = $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '1.000000']);
+        $this->assertNotSame($first->getKey(), $replacement->getKey());
+        $this->assertSame('80.000000', (string) $replacement->grand_total);
+    }
+
+    public function test_payment_creation_allocates_invoice_and_updates_job_status(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '250.000000');
+        $statuses = app(VehicleServiceStatusService::class);
+        $statuses->change($job, VehicleServiceJobStatus::InProgress);
+        $statuses->change($job->refresh(), VehicleServiceJobStatus::Completed);
+        $invoice = app(VehicleServiceInvoiceIntegrationService::class)->create($job->refresh(), '2026-06-07');
+        $payments = app(VehicleServicePaymentIntegrationService::class);
+
+        try {
+            $payments->prepare($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '251.000000');
+            $this->fail('Expected payment amount above the invoice balance to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Payment amount cannot exceed invoice remaining balance.', $exception->getMessage());
+        }
+
+        $first = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '100.000000');
+        $this->assertSame(PaymentStatus::Allocated, $first->status);
+        $this->assertSame('150.000000', (string) Invoice::query()->findOrFail($invoice->getKey())->balance_due);
+        $this->assertSame(VehicleServiceJobStatus::PartiallyPaid, $job->refresh()->status);
+        $resource = (new VehicleServiceJobResource($job->refresh()->load(app(VehicleServiceJobService::class)->relations())))->resolve();
+        $this->assertSame('150.000000', $resource['invoice_links'][0]['balance_due']);
+
+        $second = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '150.000000');
+        $this->assertSame(PaymentStatus::Allocated, $second->status);
+        $this->assertSame(VehicleServiceJobStatus::Paid, $job->refresh()->status);
+        $this->assertSame(2, VehicleServicePaymentLink::query()->where('vehicle_service_job_id', $job->getKey())->count());
+    }
+
+    public function test_inventory_issue_rejects_line_ids_from_another_job(): void
+    {
+        $context = $this->context();
+        $this->receiveStock($context, '5.000000');
+        $job = $this->createJob($context);
+        $otherJob = $this->createJob($context);
+        $otherLine = $this->line($otherJob, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '10.000000');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('One or more selected inventory lines are invalid or already issued.');
+        app(VehicleServiceInventoryIntegrationService::class)->issue(
+            $job,
+            $context['warehouse_id'],
+            lineIds: [(int) $otherLine->getKey()],
+        );
+    }
+
+    public function test_tracked_inventory_lines_are_blocked_before_issue(): void
+    {
+        $context = $this->context();
+        $tracked = $this->item(
+            $context['tenant_id'],
+            'BATCH-'.$context['tenant_id'],
+            ItemType::Stock,
+            true,
+            $context['uom_id'],
+            TrackingType::Batch,
+        );
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $tracked, '1.000000', '10.000000');
+
+        $readiness = app(VehicleServiceInventoryIntegrationService::class)
+            ->issueLines($job, $context['warehouse_id'])
+            ->firstWhere('id', $line->getKey());
+
+        $this->assertFalse((bool) $readiness?->issue_eligible);
+        $this->assertSame(
+            'Batch, lot, and serial tracked items require tracking references in the Inventory workflow.',
+            $readiness?->inventory_warning,
+        );
+    }
+
     /** @return array<string, mixed> */
     private function context(string $suffix = ''): array
     {
@@ -391,14 +582,20 @@ final class VehicleServiceEngineTest extends TestCase
         ));
     }
 
-    private function item(int $tenantId, string $code, ItemType $type, bool $stockable, int $uomId): Item
-    {
+    private function item(
+        int $tenantId,
+        string $code,
+        ItemType $type,
+        bool $stockable,
+        int $uomId,
+        TrackingType $trackingType = TrackingType::None,
+    ): Item {
         return app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,
             code: $code,
             name: str_replace('-', ' ', $code),
             itemType: $type,
-            trackingType: TrackingType::None,
+            trackingType: $trackingType,
             costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
             baseUomId: $uomId,
             isStockable: $stockable,

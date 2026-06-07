@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Storage;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Http\Requests\CreateVehicleServiceInvoiceRequest;
 use Modules\VehicleService\Http\Requests\IssueVehicleServiceInventoryRequest;
@@ -43,7 +44,7 @@ final class VehicleServiceController
     public function index(ListVehicleServiceJobRequest $request, VehicleServiceJobService $service): AnonymousResourceCollection
     {
         $query = $this->scope(VehicleServiceJob::query(), $request)
-            ->with(['customer', 'vehicle', 'supervisor']);
+            ->with(['customer', 'vehicle.make', 'vehicle.model', 'vehicle.customer', 'supervisor']);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(function (Builder $scope) use ($search): void {
@@ -251,11 +252,27 @@ final class VehicleServiceController
             (int) $request->input('invoice_id'),
             (string) $request->input('payment_date'),
             (string) $request->input('amount'),
+            $request->filled('payment_method_id') ? (int) $request->input('payment_method_id') : null,
             $request->filled('currency_id') ? (int) $request->input('currency_id') : null,
             (string) $request->input('exchange_rate', '1.000000'),
             $request->filled('reference_number') ? (string) $request->input('reference_number') : null,
             $request->currentUserId(),
         )]);
+    }
+
+    public function createPayment(PrepareVehicleServicePaymentRequest $request, int $job, VehicleServicePaymentIntegrationService $service): JsonResponse
+    {
+        return (new PaymentResource($service->create(
+            $this->job($request, $job),
+            (int) $request->input('invoice_id'),
+            (string) $request->input('payment_date'),
+            (string) $request->input('amount'),
+            $request->filled('payment_method_id') ? (int) $request->input('payment_method_id') : null,
+            $request->filled('currency_id') ? (int) $request->input('currency_id') : null,
+            (string) $request->input('exchange_rate', '1.000000'),
+            $request->filled('reference_number') ? (string) $request->input('reference_number') : null,
+            $request->currentUserId(),
+        )))->response()->setStatusCode(201);
     }
 
     public function documents(ListVehicleServiceJobRequest $request, int $job): AnonymousResourceCollection
@@ -305,18 +322,18 @@ final class VehicleServiceController
         ])->all()]);
     }
 
-    public function billableLines(ListVehicleServiceJobRequest $request, int $job): AnonymousResourceCollection
+    public function billableLines(ListVehicleServiceJobRequest $request, int $job, VehicleServiceInvoiceIntegrationService $service): AnonymousResourceCollection
     {
-        return VehicleServiceJobLineResource::collection($this->job($request, $job)->lines()
-            ->where('is_billable', true)->with(['item', 'variant', 'uom'])->get());
+        return VehicleServiceJobLineResource::collection($service->billableLines($this->job($request, $job)));
     }
 
-    public function inventoryIssueLines(ListVehicleServiceJobRequest $request, int $job, VehicleServiceLineService $service): AnonymousResourceCollection
+    public function inventoryIssueLines(ListVehicleServiceJobRequest $request, int $job, VehicleServiceInventoryIntegrationService $service): AnonymousResourceCollection
     {
-        $lines = $this->job($request, $job)->lines()->with(['item', 'variant', 'uom'])->whereNull('inventory_movement_id')->get()
-            ->filter(fn (VehicleServiceJobLine $line): bool => $service->isInventoryIssueLine($line))->values();
-
-        return VehicleServiceJobLineResource::collection($lines);
+        return VehicleServiceJobLineResource::collection($service->issueLines(
+            $this->job($request, $job),
+            $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null,
+            $request->filled('warehouse_location_id') ? (int) $request->input('warehouse_location_id') : null,
+        ));
     }
 
     public function employeeAssignableLines(ListVehicleServiceJobRequest $request, int $job): AnonymousResourceCollection

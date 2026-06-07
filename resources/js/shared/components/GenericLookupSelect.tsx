@@ -75,25 +75,25 @@ export function GenericLookupSelect<T extends NamedResource>({
         requestRef.current = controller;
         setLoading(true);
         setSearched(false);
-        search(normalized, controller.signal)
-            .then((results) => {
+        void (async () => {
+            try {
+                const results = await search(normalized, controller.signal);
                 if (controller.signal.aborted) return;
                 cacheRef.current.set(key, results);
                 setOptions(filter(results, excludeId));
                 setActiveIndex(-1);
                 setSearched(true);
                 setMessage('');
-            })
-            .catch((requestError: unknown) => {
+            } catch (requestError: unknown) {
                 if (controller.signal.aborted) return;
                 setOptions([]);
                 setActiveIndex(-1);
                 setSearched(true);
                 setMessage(toApiError(requestError).message);
-            })
-            .finally(() => {
+            } finally {
                 if (!controller.signal.aborted) setLoading(false);
-            });
+            }
+        })();
 
         return () => controller.abort();
     }, [debounced, excludeId, search, selectedLabel]);

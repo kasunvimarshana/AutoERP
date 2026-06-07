@@ -15,6 +15,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
     const [description, setDescription] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
 
     return (
@@ -52,13 +53,16 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                         { key: 'type', header: 'Type', render: (document) => document.document_type.replaceAll('_', ' ') },
                         { key: 'description', header: 'Description', render: (document) => document.description ?? '-' },
                         { key: 'path', header: 'File', render: (document) => document.file_path ?? '-' },
-                        { key: 'actions', header: '', render: (document) => <Button type="button" variant="danger" onClick={async () => {
+                        { key: 'actions', header: '', render: (document) => <Button type="button" variant="danger" loading={deletingId === document.id} onClick={async () => {
                             setError(null);
+                            setDeletingId(document.id);
                             try {
                                 await deleteVehicleServiceDocument(jobId, document.id);
                                 result.reload();
                             } catch (requestError) {
                                 setError(toApiError(requestError));
+                            } finally {
+                                setDeletingId(null);
                             }
                         }}>Delete</Button> },
                     ]}

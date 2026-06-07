@@ -20,6 +20,15 @@ export type VehicleServiceLineSourceType =
 
 export type CommissionType = 'none' | 'fixed' | 'percentage';
 
+export interface VehicleServiceVehicle extends NamedResource {
+    registration_number?: string | null;
+    make?: NamedResource | null;
+    model?: NamedResource | null;
+    customer?: NamedResource | null;
+    odometer_reading?: string | null;
+    odometer_unit?: string | null;
+}
+
 export interface VehicleServiceInspection {
     id: number;
     customer_complaint?: string | null;
@@ -79,6 +88,13 @@ export interface VehicleServiceJobLine {
     is_billable: boolean;
     is_employee_assignable: boolean;
     inventory_movement_id?: number | null;
+    stock_on_hand?: string;
+    stock_available?: string;
+    issue_eligible?: boolean;
+    inventory_warning?: string | null;
+    invoiced_quantity?: string;
+    remaining_billable_quantity?: string;
+    invoice_state?: 'uninvoiced' | 'partially_invoiced' | 'invoiced';
     status: string;
     children?: VehicleServiceJobLine[];
     employee_assignments?: VehicleServiceEmployeeAssignment[];
@@ -90,6 +106,7 @@ export interface VehicleServiceInvoiceLink {
     invoice_number?: string | null;
     invoice_total: string;
     balance_due?: string | null;
+    invoice_status?: string | null;
     status: string;
 }
 
@@ -111,7 +128,7 @@ export interface VehicleServiceJob {
     customer_id: number;
     customer?: NamedResource | null;
     vehicle_id: number;
-    vehicle?: NamedResource | null;
+    vehicle?: VehicleServiceVehicle | null;
     supervisor_employee_id?: number | null;
     supervisor?: NamedResource | null;
     supervisor_commission_type: CommissionType;
@@ -153,6 +170,7 @@ export interface VehicleServiceJobPayload {
 export interface VehicleServiceLinePayload {
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;
+    uom_id?: number;
     description: string;
     quantity: string;
     unit_cost?: string;
@@ -169,6 +187,33 @@ export interface VehicleServiceLinePayload {
     is_customer_supplied?: boolean;
     is_billable?: boolean;
     expand_combo?: boolean;
+}
+
+export interface VehicleServiceInvoicePreview {
+    subtotal: string;
+    discountTotal: string;
+    taxTotal: string;
+    chargeTotal: string;
+    grandTotal: string;
+}
+
+export interface VehicleServicePaymentPayload {
+    invoice_id: number;
+    payment_date: string;
+    amount: string;
+    payment_method_id?: number;
+    currency_id?: number;
+    exchange_rate?: string;
+    reference_number?: string;
+}
+
+export interface PreparedVehicleServicePayment {
+    paymentType: string;
+    direction: string;
+    paymentDate: string;
+    referenceNumber?: string | null;
+    lines: Array<{ amount: string }>;
+    allocations: Array<{ invoiceId: number; allocatedAmount: string }>;
 }
 
 export interface VehicleServiceStatusHistory {

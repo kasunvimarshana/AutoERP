@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\InvoiceSourceLine;
 
 final class InvoiceSourceAllocationService
@@ -91,6 +92,10 @@ final class InvoiceSourceAllocationService
             ->where('tenant_id', $data->tenantId)
             ->where('source_line_type', $sourceLine->sourceLineType)
             ->where('source_line_id', $sourceLine->sourceLineId)
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]))
             ->sum('invoiced_quantity');
 
         return $this->math->compare($databaseQuantity, $sourceLine->previouslyInvoicedQuantity) > 0

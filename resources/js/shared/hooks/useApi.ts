@@ -27,17 +27,22 @@ export function useApi<T>(
 
         const controller = new AbortController();
         setState((current) => ({ ...current, loading: true, error: null }));
-        requestRef.current(controller.signal)
-            .then((data) => {
+        void (async () => {
+            try {
+                const data = await requestRef.current(controller.signal);
                 if (!controller.signal.aborted) {
-                    setState({ data, error: null, loading: false });
+                    setState((current) => ({ ...current, data, error: null }));
                 }
-            })
-            .catch((error: unknown) => {
+            } catch (error: unknown) {
                 if (!controller.signal.aborted) {
-                    setState((current) => ({ ...current, error: toApiError(error), loading: false }));
+                    setState((current) => ({ ...current, error: toApiError(error) }));
                 }
-            });
+            } finally {
+                if (!controller.signal.aborted) {
+                    setState((current) => ({ ...current, loading: false }));
+                }
+            }
+        })();
 
         return () => controller.abort();
         // Dependencies are deliberately supplied by each caller.

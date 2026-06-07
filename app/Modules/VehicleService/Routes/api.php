@@ -43,6 +43,7 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     Route::post('jobs/{job}/invoices/preview', [VehicleServiceController::class, 'previewInvoice'])->whereNumber('job')->name('invoices.preview');
     Route::post('jobs/{job}/invoices', [VehicleServiceController::class, 'createInvoice'])->whereNumber('job')->name('invoices.store');
     Route::post('jobs/{job}/payments/prepare', [VehicleServiceController::class, 'preparePayment'])->whereNumber('job')->name('payments.prepare');
+    Route::post('jobs/{job}/payments', [VehicleServiceController::class, 'createPayment'])->whereNumber('job')->name('payments.store');
 
     Route::get('jobs/{job}/documents', [VehicleServiceController::class, 'documents'])->whereNumber('job')->name('documents.index');
     Route::post('jobs/{job}/documents', [VehicleServiceController::class, 'storeDocument'])->whereNumber('job')->name('documents.store');

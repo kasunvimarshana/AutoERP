@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { lookupApi } from '@/shared/api/lookupApi';
+import { lookupApi, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -20,7 +20,7 @@ const decimal = (value: string, fallback = '0.000000') => value.trim() || fallba
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<NamedResource | null>(job?.customer ?? null);
-    const [vehicle, setVehicle] = useState<NamedResource | null>(job?.vehicle ?? null);
+    const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(job?.vehicle ?? null);
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
@@ -40,7 +40,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const searchCustomer = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
         return lookupApi.customers(query, signal);
     }, []);
-    const searchVehicle = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
+    const searchVehicle = useCallback(async (query: string, signal: AbortSignal): Promise<VehicleLookupResource[]> => {
         if (!customer) return [];
         return lookupApi.serviceVehicles(customer.id, query, signal);
     }, [customer]);
@@ -83,7 +83,12 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             <Panel title="Service job">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
-                    <GenericLookupSelect label="Vehicle" value={vehicle} onChange={setVehicle} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} />
+                    <GenericLookupSelect label="Vehicle" value={vehicle} onChange={(value) => {
+                        setVehicle(value);
+                        if (value?.odometer_reading && !form.odometer_reading) {
+                            setForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
+                        }
+                    }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} />
                     <GenericLookupSelect label="Supervisor" value={supervisor} onChange={setSupervisor} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
                     <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => setForm({ ...form, job_date: event.target.value })} />
                     <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setForm({ ...form, expected_delivery_date: event.target.value })} />
@@ -102,6 +107,15 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     ]} onChange={(event) => setForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
                     <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => setForm({ ...form, supervisor_commission_value: event.target.value })} />
                 </div>
+                {vehicle && (
+                    <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
+                        <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
+                        <VehicleContext label="Make" value={vehicle.make?.name ?? '-'} />
+                        <VehicleContext label="Model" value={vehicle.model?.name ?? '-'} />
+                        <VehicleContext label="Owner" value={vehicle.customer?.name ?? customer?.name ?? '-'} />
+                        <VehicleContext label="Odometer" value={`${vehicle.odometer_reading ?? '-'} ${vehicle.odometer_unit ?? ''}`.trim()} />
+                    </div>
+                )}
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <Textarea label="Customer complaint" value={form.customer_complaint} error={errorFor('customer_complaint')} onChange={(event) => setForm({ ...form, customer_complaint: event.target.value })} />
                     <Textarea label="Notes" value={form.notes} error={errorFor('notes')} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
@@ -113,4 +127,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             </div>
         </form>
     );
+}
+
+function VehicleContext({ label, value }: { label: string; value: string }) {
+    return <div><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span><strong className="mt-1 block text-slate-900">{value}</strong></div>;
 }

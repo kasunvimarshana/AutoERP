@@ -4,22 +4,73 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
+use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
+use Modules\Item\Enums\TrackingType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
 
 final class VehicleServiceInventoryIntegrationService
 {
     public function __construct(
+        private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceLineService $lines,
+        private readonly StockAvailabilityService $availability,
         private readonly StockMovementService $movements,
     ) {}
+
+    /** @return Collection<int, VehicleServiceJobLine> */
+    public function issueLines(
+        VehicleServiceJob $job,
+        ?int $warehouseId = null,
+        ?int $warehouseLocationId = null,
+    ): Collection {
+        return $job->lines()
+            ->with(['item', 'variant', 'uom'])
+            ->whereNull('inventory_movement_id')
+            ->get()
+            ->filter(fn ($line): bool => $this->lines->isInventoryIssueLine($line))
+            ->each(function ($line) use ($job, $warehouseId, $warehouseLocationId): void {
+                $line->setAttribute('issue_eligible', true);
+                $line->setAttribute('inventory_warning', $warehouseId === null ? 'Select a warehouse to check stock availability.' : null);
+
+                if ($line->item?->tracking_type !== TrackingType::None) {
+                    $line->setAttribute('issue_eligible', false);
+                    $line->setAttribute('inventory_warning', 'Batch, lot, and serial tracked items require tracking references in the Inventory workflow.');
+
+                    return;
+                }
+                if ($warehouseId === null) {
+                    return;
+                }
+
+                $stock = $this->availability->availability(new StockBalanceData(
+                    tenantId: (int) $job->tenant_id,
+                    itemId: (int) $line->item_id,
+                    warehouseId: $warehouseId,
+                    organizationUnitId: $job->organization_unit_id,
+                    itemVariantId: $line->item_variant_id,
+                    warehouseLocationId: $warehouseLocationId,
+                ));
+                $eligible = $this->math->compare($stock->quantityAvailable, (string) $line->quantity) >= 0;
+                $line->setAttribute('stock_on_hand', $stock->quantityOnHand);
+                $line->setAttribute('stock_available', $stock->quantityAvailable);
+                $line->setAttribute('issue_eligible', $eligible);
+                $line->setAttribute('inventory_warning', $eligible ? null : 'Available stock is below the required quantity.');
+            })
+            ->values();
+    }
 
     /**
      * @param  list<int>  $lineIds
@@ -35,13 +86,19 @@ final class VehicleServiceInventoryIntegrationService
         $this->validator->assertMutable($job);
 
         return DB::transaction(function () use ($job, $warehouseId, $warehouseLocationId, $lineIds, $postedBy): array {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $query = $job->lines()->with('item')->whereNull('inventory_movement_id');
             if ($lineIds !== []) {
+                $lineIds = array_values(array_unique($lineIds));
                 $query->whereIn('id', $lineIds);
             }
 
             $issued = [];
-            foreach ($query->get() as $line) {
+            $selectedLines = $query->get();
+            if ($lineIds !== [] && $selectedLines->count() !== count($lineIds)) {
+                throw new InvalidArgumentException('One or more selected inventory lines are invalid or already issued.');
+            }
+            foreach ($selectedLines as $line) {
                 if (! $this->lines->isInventoryIssueLine($line)) {
                     if (in_array((int) $line->getKey(), $lineIds, true)) {
                         $this->validator->assertInventoryIssueLine($line);

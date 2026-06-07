@@ -1,13 +1,25 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
+import { DetailGrid } from '@/shared/components/DetailGrid';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
 
 export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJob }) {
+    const outstanding = (job.invoice_links ?? []).filter((link) => compareDecimalStrings(link.balance_due ?? '0', '0') > 0 && link.status === 'active');
     return (
         <div className="space-y-5">
             <div className="flex justify-end">
-                <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button>Prepare payment</Button></Link>
+                {outstanding.length > 0
+                    ? <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button>Receive payment</Button></Link>
+                    : <Button type="button" disabled>Receive payment</Button>}
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <DetailGrid items={[
+                    { label: 'Linked invoices', value: String((job.invoice_links ?? []).length) },
+                    { label: 'Outstanding invoices', value: String(outstanding.length) },
+                    { label: 'Outstanding balance', value: outstanding.map((link) => `${link.invoice_number ?? `#${link.invoice_id}`}: ${link.balance_due}`).join(', ') || '0.000000' },
+                ]} />
             </div>
             <DataTable
                 rows={job.payment_links ?? []}

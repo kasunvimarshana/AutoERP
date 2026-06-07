@@ -14,11 +14,17 @@ final class VehicleServiceInspectionService
 {
     public function __construct(
         private readonly DecimalMath $math,
+        private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceStatusService $statuses,
     ) {}
 
     public function save(VehicleServiceJob $job, VehicleServiceInspectionData $data): VehicleServiceInspection
     {
+        $this->validator->assertMutable($job);
+        if ($data->odometerReading !== null) {
+            $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
+        }
+
         $inspection = VehicleServiceInspection::query()->updateOrCreate(
             ['vehicle_service_job_id' => $job->getKey()],
             [

@@ -47,8 +47,11 @@ final class VehicleServiceJobResource extends ModuleResource
                 'invoice_id' => (int) $link->invoice_id,
                 'invoice_number' => $link->invoice?->invoice_number,
                 'invoice_total' => (string) $link->invoice_total,
-                'balance_due' => $link->invoice?->balance === null ? null : (string) $link->invoice->balance->balance_due,
-                'status' => $link->status,
+                'balance_due' => $link->invoice?->balance === null ? null : (string) $link->invoice->balance->remaining_amount,
+                'invoice_status' => $this->enum($link->invoice?->status),
+                'status' => in_array($this->enum($link->invoice?->status), ['cancelled', 'void'], true)
+                    ? 'inactive'
+                    : $link->status,
             ])->values()->all(), []),
             'payment_links' => $this->whenLoaded('paymentLinks', fn () => $this->paymentLinks->map(fn ($link) => [
                 'id' => (int) $link->getKey(),
@@ -84,6 +87,12 @@ final class VehicleServiceJobResource extends ModuleResource
             'id' => (int) $this->vehicle->getKey(),
             'code' => $this->vehicle->vehicle_number,
             'name' => $this->vehicle->registration_number ?? $this->vehicle->code ?? $this->vehicle->vehicle_number,
+            'registration_number' => $this->vehicle->registration_number,
+            'make' => $this->vehicle->relationLoaded('make') ? $this->namedRelation($this->vehicle->make) : null,
+            'model' => $this->vehicle->relationLoaded('model') ? $this->namedRelation($this->vehicle->model) : null,
+            'customer' => $this->vehicle->relationLoaded('customer') ? $this->customerRelation($this->vehicle->customer) : null,
+            'odometer_reading' => (string) $this->vehicle->odometer_reading,
+            'odometer_unit' => $this->vehicle->odometer_unit,
         ];
     }
 
@@ -93,6 +102,24 @@ final class VehicleServiceJobResource extends ModuleResource
             'id' => (int) $employee->getKey(),
             'code' => $employee->employee_number,
             'name' => $employee->display_name,
+        ];
+    }
+
+    private function namedRelation(mixed $model): ?array
+    {
+        return $model === null ? null : [
+            'id' => (int) $model->getKey(),
+            'code' => $model->code,
+            'name' => $model->name,
+        ];
+    }
+
+    private function customerRelation(mixed $customer): ?array
+    {
+        return $customer === null ? null : [
+            'id' => (int) $customer->getKey(),
+            'code' => $customer->code,
+            'name' => $customer->display_name ?? $customer->name,
         ];
     }
 }

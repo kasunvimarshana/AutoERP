@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
+import { listUoms } from '@/shared/api/referenceApi';
 import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -20,6 +21,7 @@ import type { VehicleServiceJobLine, VehicleServiceLinePayload, VehicleServiceLi
 interface VehicleServiceLineFormValue {
     source: VehicleServiceLineSourceType;
     item: NamedResource | null;
+    uom: NamedResource | null;
     description: string;
     quantity: string;
     unit_cost: string;
@@ -45,7 +47,6 @@ const lineTypeOptions = [
     { value: 'service_item', label: 'Service item' },
     { value: 'labour_item', label: 'Labour item' },
     { value: 'combo_parent', label: 'Combo / package' },
-    { value: 'combo_child', label: 'Combo child' },
 ];
 
 export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
@@ -137,8 +138,6 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
         { key: 'quantity', header: 'Qty', render: (line) => line.quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.uom?.code ?? '-' },
         { key: 'price', header: 'Unit price', render: (line) => line.unit_price, className: 'tabular-nums' },
-        { key: 'discount', header: 'Discount', render: formatDiscountSummary },
-        { key: 'tax', header: 'Tax', render: formatTaxSummary },
         { key: 'total', header: 'Total', render: (line) => line.line_total, className: 'tabular-nums font-semibold' },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <LineActions onEdit={() => onEdit(line)} onRemove={() => onRemove(line)} /> },
     ];
@@ -161,6 +160,15 @@ function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }
 }) {
     const [draft, setDraft] = useState(value);
     const external = draft.source === 'external_item';
+    const itemSearch = draft.source === 'inventory_item'
+        ? lookupApi.stockableItems
+        : draft.source === 'service_item'
+            ? lookupApi.serviceItems
+            : draft.source === 'labour_item'
+                ? lookupApi.labourItems
+                : draft.source === 'combo_parent'
+                    ? lookupApi.comboItems
+                    : lookupApi.items;
     const set = <K extends keyof VehicleServiceLineFormValue>(key: K, next: VehicleServiceLineFormValue[K]) => setDraft((current) => ({ ...current, [key]: next }));
     const preview = calculateLinePreview(draft);
 
@@ -169,22 +177,27 @@ function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }
             <ErrorAlert error={error} />
             <section className="space-y-4">
                 <div>
-                    <h3 className="font-semibold text-slate-900">Basic Details</h3>
-                    <p className="text-sm text-slate-500">Choose the line type, item or description, quantity, and price.</p>
+                    <h3 className="font-semibold text-slate-900">Line details</h3>
+                    <p className="text-sm text-slate-500">Enter the workshop line in reading order. Pricing rules and flags are optional.</p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Select label="Line type" value={draft.source} options={lineTypeOptions} error={fieldError(error, 'line_source_type')} onChange={(event) => setDraft({ ...draft, source: event.target.value as VehicleServiceLineSourceType, item: null, customer_supplied: false })} />
-                    {!external && <LookupSelect label="Item" value={draft.item} onChange={(item) => setDraft({ ...draft, item, description: item?.name ?? draft.description })} search={lookupApi.items} />}
-                    <DecimalInput label="Quantity" value={draft.quantity} error={fieldError(error, 'quantity')} onChange={(event) => set('quantity', event.target.value)} />
-                    <DecimalInput label="Unit price" value={draft.unit_price} error={fieldError(error, 'unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {!external && <LookupSelect label="Item" value={draft.item} onChange={(item) => setDraft({ ...draft, item, description: item?.name ?? draft.description })} search={itemSearch} />}
                     <Input label="Description" value={draft.description} error={fieldError(error, 'description')} onChange={(event) => set('description', event.target.value)} />
+                    <DecimalInput label="Quantity" value={draft.quantity} error={fieldError(error, 'quantity')} onChange={(event) => set('quantity', event.target.value)} />
+                    <LookupSelect label="UOM" value={draft.uom} onChange={(uom) => set('uom', uom)} search={listUoms} error={fieldError(error, 'uom_id')} />
+                    <DecimalInput label="Unit price" value={draft.unit_price} error={fieldError(error, 'unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</span>
+                        <strong className="mt-1 block text-lg tabular-nums text-slate-900">{preview.total}</strong>
+                    </div>
                 </div>
             </section>
 
             <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <summary className="cursor-pointer font-semibold text-slate-800">Advanced pricing</summary>
-                <p className="mt-1 text-sm text-slate-500">Advanced pricing is optional.</p>
+                <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
+                <p className="mt-1 text-sm text-slate-500">Discount, tax, charge, cost, line type, and flags.</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Select label="Line type" value={draft.source} options={lineTypeOptions} error={fieldError(error, 'line_source_type')} onChange={(event) => setDraft({ ...draft, source: event.target.value as VehicleServiceLineSourceType, item: null, customer_supplied: false })} />
                     <DecimalInput label="Unit cost" value={draft.unit_cost} error={fieldError(error, 'unit_cost')} onChange={(event) => set('unit_cost', event.target.value)} />
                     <Select label="Discount type" value={draft.discount_type} options={calculationOptions} error={fieldError(error, 'discount_calculation_type')} onChange={(event) => set('discount_type', event.target.value as 'fixed' | 'percentage')} />
                     <DecimalInput label="Discount value" value={draft.discount_value} onChange={(event) => set('discount_value', event.target.value)} />
@@ -200,7 +213,7 @@ function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }
             </details>
 
             <div className="rounded-lg border border-slate-200 p-4 text-sm">
-                <h3 className="font-semibold text-slate-900">Line Preview</h3>
+                <h3 className="font-semibold text-slate-900">Pricing summary</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-5">
                     <Preview label="Subtotal" value={preview.subtotal} />
                     <Preview label="Discount" value={preview.discount} />
@@ -222,6 +235,7 @@ function emptyLineForm(): VehicleServiceLineFormValue {
     return {
         source: 'inventory_item',
         item: null,
+        uom: null,
         description: '',
         quantity: '1.000000',
         unit_cost: '0.000000',
@@ -241,6 +255,7 @@ function lineToForm(line: VehicleServiceJobLine): VehicleServiceLineFormValue {
     return {
         source: line.line_source_type,
         item: line.item ?? null,
+        uom: line.uom ?? null,
         description: line.description,
         quantity: line.quantity,
         unit_cost: line.unit_cost,
@@ -265,6 +280,7 @@ function lineFormToPayload(form: VehicleServiceLineFormValue): VehicleServiceLin
     return {
         line_source_type: form.source,
         item_id: external ? undefined : form.item?.id,
+        uom_id: form.uom?.id,
         description: form.description || form.item?.name || '',
         quantity: form.quantity,
         unit_cost: form.unit_cost,
@@ -305,14 +321,6 @@ function calculateLinePreview(line: VehicleServiceLineFormValue) {
 
 function formatLineItem(line: VehicleServiceJobLine): string {
     return line.item ? [line.item.code, line.item.name].filter(Boolean).join(' - ') : line.description || line.line_source_type.replaceAll('_', ' ');
-}
-
-function formatDiscountSummary(line: VehicleServiceJobLine): string {
-    return line.discount_calculation_type === 'percentage' ? `${line.discount_rate}%` : line.discount_amount;
-}
-
-function formatTaxSummary(line: VehicleServiceJobLine): string {
-    return line.tax_calculation_type === 'percentage' ? `${line.tax_rate}%` : line.tax_amount;
 }
 
 function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {

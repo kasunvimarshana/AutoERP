@@ -45,6 +45,19 @@ final class VehicleServiceLineService
         if ($line->inventory_movement_id !== null) {
             throw new InvalidArgumentException('Issued inventory lines cannot be edited.');
         }
+        if ($line->line_source_type === VehicleServiceLineSourceType::ComboChild) {
+            throw new InvalidArgumentException('Combo child lines are managed through their combo parent.');
+        }
+        if ($line->children()->whereNotNull('inventory_movement_id')->exists()) {
+            throw new InvalidArgumentException('Combo parents with issued inventory children cannot be edited.');
+        }
+        if ($line->children()->exists() && (
+            $data->lineSourceType !== VehicleServiceLineSourceType::ComboParent
+            || $data->itemId !== (int) $line->item_id
+            || $this->math->compare($data->quantity, (string) $line->quantity) !== 0
+        )) {
+            throw new InvalidArgumentException('Expanded combo item and quantity cannot be changed. Remove and add the combo again.');
+        }
 
         return DB::transaction(function () use ($job, $line, $data): VehicleServiceJobLine {
             $item = $this->validator->validateLine($job, $data);
@@ -67,6 +80,9 @@ final class VehicleServiceLineService
         $this->validator->assertMutable($job);
         if ($line->inventory_movement_id !== null || $line->children()->whereNotNull('inventory_movement_id')->exists()) {
             throw new InvalidArgumentException('Issued inventory lines cannot be deleted.');
+        }
+        if ($line->line_source_type === VehicleServiceLineSourceType::ComboChild) {
+            throw new InvalidArgumentException('Combo child lines are managed through their combo parent.');
         }
 
         DB::transaction(function () use ($job, $line): void {
@@ -147,6 +163,9 @@ final class VehicleServiceLineService
         }
 
         $defaults = $this->flags($data->lineSourceType, $item);
+        $customerSupplied = $data->isCustomerSupplied;
+        $external = $data->lineSourceType === VehicleServiceLineSourceType::ExternalItem;
+        $comboChild = $data->lineSourceType === VehicleServiceLineSourceType::ComboChild;
 
         return [
             'parent_line_id' => $data->parentLineId,
@@ -168,21 +187,24 @@ final class VehicleServiceLineService
             'charge_rate' => $this->math->normalize($data->chargeRate),
             'charge_amount' => $charge,
             'line_total' => $lineTotal,
-            'is_inventory_tracked' => $data->isInventoryTracked ?? $defaults['inventory'],
-            'is_customer_supplied' => $data->isCustomerSupplied,
-            'is_external' => $data->isExternal ?? $defaults['external'],
-            'is_billable' => $data->isBillable ?? ! $data->isCustomerSupplied,
-            'is_employee_assignable' => $data->isEmployeeAssignable ?? $defaults['employee'],
+            'is_inventory_tracked' => $defaults['inventory'] && ! $customerSupplied && ! $external,
+            'is_customer_supplied' => $customerSupplied,
+            'is_external' => $external,
+            'is_billable' => ! $customerSupplied && ! $comboChild && ($data->isBillable ?? true),
+            'is_employee_assignable' => $defaults['employee'],
         ];
     }
 
     private function expandCombo(VehicleServiceJob $job, VehicleServiceJobLine $parent): void
     {
         $parent->load('item.bundleLines.childItem');
+        if ($parent->item === null || $parent->item->bundleLines->isEmpty()) {
+            throw new InvalidArgumentException('Combo parent item must contain at least one valid bundle line.');
+        }
         foreach ($parent->item?->bundleLines ?? [] as $bundleLine) {
             $child = $bundleLine->childItem;
             if ($child === null) {
-                continue;
+                throw new InvalidArgumentException('Combo bundle contains an unavailable child item.');
             }
             $quantity = $this->math->mul((string) $parent->quantity, (string) $bundleLine->quantity);
             $this->persist($job, new VehicleServiceLineData(

@@ -14,6 +14,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, startVehicleServiceJob } from '../vehicleServiceApi';
@@ -80,7 +81,10 @@ export default function VehicleServiceJobDetailPage() {
                 </div>
                 <DetailGrid items={[
                     { label: 'Customer', value: readableRelation(job.customer) },
-                    { label: 'Vehicle', value: readableRelation(job.vehicle) },
+                    { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
+                    { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
+                    { label: 'Vehicle owner', value: readableRelation(job.vehicle?.customer ?? job.customer) },
+                    { label: 'Odometer', value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim() },
                     { label: 'Supervisor', value: readableRelation(job.supervisor) },
                     { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },
                     { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
@@ -100,8 +104,8 @@ export default function VehicleServiceJobDetailPage() {
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
-                        <Link to={`/vehicle-service/jobs/${job.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>
-                        <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button type="button" variant="secondary" className="w-full">Prepare payment</Button></Link>
+                        {['completed', 'invoiced'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>}
+                        {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button type="button" variant="secondary" className="w-full">Receive payment</Button></Link>}
                     </>
                 }
             >

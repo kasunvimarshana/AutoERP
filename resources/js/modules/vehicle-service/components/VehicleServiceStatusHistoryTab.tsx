@@ -1,4 +1,5 @@
 import { DataTable } from '@/shared/components/DataTable';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
@@ -10,7 +11,9 @@ export default function VehicleServiceStatusHistoryTab({ jobId }: { jobId: numbe
     if (result.loading) return <LoadingState />;
 
     return (
-        <DataTable
+        <div className="space-y-4">
+            <ErrorAlert error={result.error} />
+            <DataTable
             rows={result.data ?? []}
             rowKey={(row) => row.id}
             columns={[
@@ -19,6 +22,7 @@ export default function VehicleServiceStatusHistoryTab({ jobId }: { jobId: numbe
                 { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '-' },
                 { key: 'changed', header: 'Changed at', render: (row) => formatDate(row.changed_at) },
             ]}
-        />
+            />
+        </div>
     );
 }

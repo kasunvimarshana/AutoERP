@@ -11,6 +11,8 @@ use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
+use Modules\Item\Models\ItemVariant;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
@@ -68,11 +70,17 @@ final class VehicleServiceValidationService
 
     public function validateLine(VehicleServiceJob $job, VehicleServiceLineData $data): ?Item
     {
-        if ($data->parentLineId !== null) {
-            $parent = $job->lines()->findOrFail($data->parentLineId);
-            if ($parent->line_source_type !== VehicleServiceLineSourceType::ComboParent) {
-                throw new InvalidArgumentException('Combo child parent must be a combo parent line from the same service job.');
-            }
+        if ($data->lineSourceType === VehicleServiceLineSourceType::ComboChild && $data->parentLineId === null) {
+            throw new InvalidArgumentException('Combo child lines require a combo parent line.');
+        }
+        if ($data->lineSourceType !== VehicleServiceLineSourceType::ComboChild && $data->parentLineId !== null) {
+            throw new InvalidArgumentException('Only combo child lines may reference a parent line.');
+        }
+        if ($data->isCustomerSupplied && ! in_array($data->lineSourceType, [
+            VehicleServiceLineSourceType::InventoryItem,
+            VehicleServiceLineSourceType::ExternalItem,
+        ], true)) {
+            throw new InvalidArgumentException('Customer supplied lines must be inventory or external item lines.');
         }
 
         $this->positive($data->quantity, 'Line quantity must be greater than zero.');
@@ -96,8 +104,12 @@ final class VehicleServiceValidationService
 
         if ($data->lineSourceType === VehicleServiceLineSourceType::ExternalItem) {
             if ($data->itemId !== null) {
-                return $this->item((int) $job->tenant_id, $job->organization_unit_id, $data->itemId);
+                $item = $this->item((int) $job->tenant_id, $job->organization_unit_id, $data->itemId);
+                $this->validateLineReferences($job, $data, $item);
+
+                return $item;
             }
+            $this->validateLineReferences($job, $data, null);
 
             return null;
         }
@@ -107,12 +119,13 @@ final class VehicleServiceValidationService
         }
 
         $item = $this->item((int) $job->tenant_id, $job->organization_unit_id, $data->itemId);
+        $this->validateLineReferences($job, $data, $item);
         match ($data->lineSourceType) {
             VehicleServiceLineSourceType::InventoryItem => $this->assertInventoryItem($item),
             VehicleServiceLineSourceType::ServiceItem => $this->assertItemType($item, ItemType::Service),
             VehicleServiceLineSourceType::LabourItem => $this->assertItemType($item, ItemType::Labour),
             VehicleServiceLineSourceType::ComboParent => $this->assertCombo($item),
-            VehicleServiceLineSourceType::ComboChild => null,
+            VehicleServiceLineSourceType::ComboChild => $this->assertComboChild($job, $data->parentLineId, $item),
             VehicleServiceLineSourceType::ExternalItem => null,
         };
 
@@ -185,6 +198,42 @@ final class VehicleServiceValidationService
     {
         if (! $item->is_combo && ! in_array($item->item_type, [ItemType::Combo, ItemType::Package], true)) {
             throw new InvalidArgumentException('Combo parent lines require a combo or package item.');
+        }
+    }
+
+    private function assertComboChild(VehicleServiceJob $job, ?int $parentLineId, Item $item): void
+    {
+        $parent = $job->lines()->with('item')->findOrFail($parentLineId);
+        if ($parent->line_source_type !== VehicleServiceLineSourceType::ComboParent || $parent->item === null) {
+            throw new InvalidArgumentException('Combo child parent must be a combo parent line from the same service job.');
+        }
+        if (in_array($item->item_type, [ItemType::Combo, ItemType::Package, ItemType::Asset], true)) {
+            throw new InvalidArgumentException('Combo child lines must use stock, consumable, non-stock, service, or labour items.');
+        }
+        if (! $parent->item->bundleLines()->where('child_item_id', $item->getKey())->exists()) {
+            throw new InvalidArgumentException('Combo child item must belong to the selected combo parent.');
+        }
+    }
+
+    private function validateLineReferences(VehicleServiceJob $job, VehicleServiceLineData $data, ?Item $item): void
+    {
+        if ($data->itemVariantId !== null) {
+            if ($item === null) {
+                throw new InvalidArgumentException('Item variant requires an item.');
+            }
+            $variant = $this->scoped(ItemVariant::query(), (int) $job->tenant_id, $job->organization_unit_id)
+                ->findOrFail($data->itemVariantId);
+            if ((int) $variant->item_id !== (int) $item->getKey() || ! $variant->is_active) {
+                throw new InvalidArgumentException('Line item variant must be active and belong to the selected item.');
+            }
+        }
+
+        if ($data->uomId !== null) {
+            $uom = $this->scoped(UnitOfMeasureModel::query(), (int) $job->tenant_id, $job->organization_unit_id)
+                ->findOrFail($data->uomId);
+            if (! $uom->is_active) {
+                throw new InvalidArgumentException('Line unit of measure must be active.');
+            }
         }
     }
 

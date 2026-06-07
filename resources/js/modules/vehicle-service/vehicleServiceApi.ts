@@ -5,10 +5,13 @@ import type {
     VehicleServiceDocument,
     VehicleServiceEmployeeAssignment,
     VehicleServiceInspection,
+    VehicleServiceInvoicePreview,
     VehicleServiceJob,
     VehicleServiceJobLine,
     VehicleServiceJobPayload,
     VehicleServiceLinePayload,
+    VehicleServicePaymentPayload,
+    PreparedVehicleServicePayment,
     VehicleServiceStatusHistory,
 } from './vehicleServiceTypes';
 
@@ -70,8 +73,8 @@ export const updateVehicleServiceEmployee = (jobId: number, lineId: number, assi
 export const deleteVehicleServiceEmployee = (jobId: number, lineId: number, assignmentId: number) =>
     apiClient.delete(`${jobs}/${jobId}/lines/${lineId}/employees/${assignmentId}`);
 
-export const listInventoryIssueLines = (jobId: number, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<VehicleServiceJobLine>>(`${jobs}/${jobId}/inventory-issue-lines`, { signal }).then((response) => response.data.data);
+export const listInventoryIssueLines = (jobId: number, params: { warehouse_id?: number; warehouse_location_id?: number } = {}, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleServiceJobLine>>(`${jobs}/${jobId}/inventory-issue-lines`, { params, signal }).then((response) => response.data.data);
 
 export const issueVehicleServiceInventory = (jobId: number, payload: { warehouse_id: number; warehouse_location_id?: number; line_ids?: number[] }) =>
     apiClient.post<ApiResource<Array<Record<string, unknown>>>>(`${jobs}/${jobId}/issue-inventory`, payload).then((response) => response.data.data);
@@ -80,13 +83,16 @@ export const listBillableLines = (jobId: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleServiceJobLine>>(`${jobs}/${jobId}/billable-lines`, { signal }).then((response) => response.data.data);
 
 export const previewVehicleServiceInvoice = (jobId: number, payload: Record<string, unknown>) =>
-    apiClient.post<ApiResource<Record<string, unknown>>>(`${jobs}/${jobId}/invoices/preview`, payload).then((response) => response.data.data);
+    apiClient.post<ApiResource<VehicleServiceInvoicePreview>>(`${jobs}/${jobId}/invoices/preview`, payload).then((response) => response.data.data);
 
 export const createVehicleServiceInvoice = (jobId: number, payload: Record<string, unknown>) =>
     apiClient.post<ApiResource<Record<string, unknown>>>(`${jobs}/${jobId}/invoices`, payload).then((response) => response.data.data);
 
-export const prepareVehicleServicePayment = (jobId: number, payload: Record<string, unknown>) =>
-    apiClient.post<ApiResource<Record<string, unknown>>>(`${jobs}/${jobId}/payments/prepare`, payload).then((response) => response.data.data);
+export const prepareVehicleServicePayment = (jobId: number, payload: VehicleServicePaymentPayload) =>
+    apiClient.post<ApiResource<PreparedVehicleServicePayment>>(`${jobs}/${jobId}/payments/prepare`, payload).then((response) => response.data.data);
+
+export const createVehicleServicePayment = (jobId: number, payload: VehicleServicePaymentPayload) =>
+    apiClient.post<ApiResource<{ id: number; payment_number?: string }>>(`${jobs}/${jobId}/payments`, payload).then((response) => response.data.data);
 
 export const listVehicleServiceDocuments = (jobId: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleServiceDocument>>(`${jobs}/${jobId}/documents`, { signal }).then((response) => response.data.data);

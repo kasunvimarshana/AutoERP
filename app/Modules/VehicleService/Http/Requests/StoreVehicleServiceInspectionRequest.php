@@ -6,9 +6,12 @@ namespace Modules\VehicleService\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
+use Modules\VehicleService\Http\Requests\Concerns\NormalizesBooleanInput;
 
 final class StoreVehicleServiceInspectionRequest extends TenantScopedRequest
 {
+    use NormalizesBooleanInput;
+
     public function rules(): array
     {
         return [

@@ -62,6 +62,9 @@ final class VehicleServiceJobService
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
+            if ($data->odometerReading !== null) {
+                $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
+            }
 
             $job->fill($this->attributes($data, false, (string) $job->grand_total))->save();
 
@@ -123,8 +126,7 @@ final class VehicleServiceJobService
     public function relations(): array
     {
         return [
-            'customer', 'vehicle', 'supervisor', 'inspection.inspector',
-            'lines.item', 'lines.variant', 'lines.uom', 'lines.children.item',
+            'customer', 'vehicle.make', 'vehicle.model', 'vehicle.customer', 'supervisor', 'inspection.inspector',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment', 'paymentLinks.invoice',
         ];
     }

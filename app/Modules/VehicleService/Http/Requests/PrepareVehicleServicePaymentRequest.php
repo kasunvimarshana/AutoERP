@@ -16,6 +16,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
             'invoice_id' => ['required', 'integer', 'min:1'],
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'decimal:0,6', 'gt:0'],
+            'payment_method_id' => ['nullable', 'integer', 'min:1'],
             'currency_id' => ['nullable', 'integer', 'min:1'],
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'reference_number' => ['nullable', 'string', 'max:150'],

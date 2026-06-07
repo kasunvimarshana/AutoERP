@@ -8,9 +8,12 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Http\Requests\Concerns\NormalizesBooleanInput;
 
 final class StoreVehicleServiceLineRequest extends TenantScopedRequest
 {
+    use NormalizesBooleanInput;
+
     public function rules(): array
     {
         return [

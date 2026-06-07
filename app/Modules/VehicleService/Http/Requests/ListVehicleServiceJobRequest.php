@@ -21,6 +21,8 @@ final class ListVehicleServiceJobRequest extends TenantScopedRequest
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'warehouse_id' => ['nullable', 'integer', 'min:1'],
+            'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];

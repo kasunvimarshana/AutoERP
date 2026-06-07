@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
@@ -14,14 +15,17 @@ use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
 
 final class VehicleServiceInvoiceIntegrationService
 {
@@ -29,7 +33,30 @@ final class VehicleServiceInvoiceIntegrationService
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
         private readonly VehicleServiceStatusService $statuses,
+        private readonly VehicleServicePaymentIntegrationService $payments,
     ) {}
+
+    /** @return Collection<int, VehicleServiceJobLine> */
+    public function billableLines(VehicleServiceJob $job): Collection
+    {
+        return $job->lines()
+            ->where('is_billable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->with(['item', 'variant', 'uom'])
+            ->get()
+            ->each(function ($line) use ($job): void {
+                $invoiced = $this->invoicedQuantity((int) $job->tenant_id, (int) $line->getKey());
+                $remaining = $this->math->sub((string) $line->quantity, $invoiced);
+                if ($this->math->isNegative($remaining)) {
+                    $remaining = '0.000000';
+                }
+                $line->setAttribute('invoiced_quantity', $invoiced);
+                $line->setAttribute('remaining_billable_quantity', $remaining);
+                $line->setAttribute('invoice_state', $this->math->isZero($remaining)
+                    ? 'invoiced'
+                    : ($this->math->isZero($invoiced) ? 'uninvoiced' : 'partially_invoiced'));
+            });
+    }
 
     /** @param array<int, string> $lineQuantities */
     public function preview(VehicleServiceJob $job, string $invoiceDate, array $lineQuantities = []): InvoiceCalculationResult
@@ -50,9 +77,9 @@ final class VehicleServiceInvoiceIntegrationService
         ?string $notes = null,
         ?int $createdBy = null,
     ): Invoice {
-        $this->assertInvoiceable($job);
-
         return DB::transaction(function () use ($job, $invoiceDate, $lineQuantities, $dueDate, $currencyId, $exchangeRate, $notes, $createdBy): Invoice {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertInvoiceable($job);
             $data = $this->invoiceData($job, $invoiceDate, $lineQuantities, $dueDate, $currencyId, $exchangeRate, $notes, $createdBy);
             $invoice = $this->invoices->create($data);
             VehicleServiceInvoiceLink::query()->create([
@@ -74,6 +101,7 @@ final class VehicleServiceInvoiceIntegrationService
             }
             if ($job->status === VehicleServiceJobStatus::Completed) {
                 $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy);
+                $this->payments->syncJobStatus($job->refresh(), $createdBy);
             }
 
             return $invoice;
@@ -91,15 +119,30 @@ final class VehicleServiceInvoiceIntegrationService
         ?string $notes = null,
         ?int $createdBy = null,
     ): CreateInvoiceData {
-        $job->load('lines.item');
+        $lines = $job->lines()
+            ->where('is_billable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->with('item')
+            ->get();
         $invoiceLines = [];
         $sourceLines = [];
         $selectedTotal = '0.000000';
         $lineNumber = 1;
+        $selectionProvided = $lineQuantities !== [];
+        $validLineIds = $lines->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        if (array_diff(array_keys($lineQuantities), $validLineIds) !== []) {
+            throw new InvalidArgumentException('Invoice selection contains a line that is not billable for this service job.');
+        }
 
-        foreach ($job->lines->where('is_billable', true) as $line) {
+        foreach ($lines as $line) {
+            if ($selectionProvided && ! array_key_exists((int) $line->getKey(), $lineQuantities)) {
+                continue;
+            }
             $previouslyInvoiced = $this->invoicedQuantity((int) $job->tenant_id, (int) $line->getKey());
             $remaining = $this->math->sub((string) $line->quantity, $previouslyInvoiced);
+            if ($this->math->compare($remaining, '0.000000') <= 0) {
+                continue;
+            }
             $quantity = $this->math->normalize($lineQuantities[(int) $line->getKey()] ?? $remaining);
             if ($this->math->isZero($quantity)) {
                 continue;
@@ -183,7 +226,10 @@ final class VehicleServiceInvoiceIntegrationService
 
     private function hasRemainingBillableLines(VehicleServiceJob $job): bool
     {
-        foreach ($job->lines()->where('is_billable', true)->get() as $line) {
+        foreach ($job->lines()
+            ->where('is_billable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->get() as $line) {
             if ($this->math->compare(
                 $this->invoicedQuantity((int) $job->tenant_id, (int) $line->getKey()),
                 (string) $line->quantity,
@@ -201,6 +247,10 @@ final class VehicleServiceInvoiceIntegrationService
             ->where('tenant_id', $tenantId)
             ->where('source_line_type', 'vehicle_service_job_line')
             ->where('source_line_id', $lineId)
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]))
             ->sum('invoiced_quantity'));
     }
 
