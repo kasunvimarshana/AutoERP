@@ -3,13 +3,19 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { DetailGrid } from '@/shared/components/DetailGrid';
+import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
+import { formatDate } from '@/shared/utils/formatDate';
+import { readableRelation } from '@/shared/utils/object';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
+import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, startVehicleServiceJob } from '../vehicleServiceApi';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
@@ -55,45 +61,77 @@ export default function VehicleServiceJobDetailPage() {
         }
     };
 
+    const headerActions = (
+        <div className="flex flex-wrap gap-2">
+            {['draft', 'inspected', 'in_progress'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+            {job.status === 'draft' && <Button type="button" loading={busy} onClick={() => action('inspect')}>Mark inspected</Button>}
+            {['draft', 'inspected'].includes(job.status) && <Button type="button" loading={busy} onClick={() => action('start')}>Start work</Button>}
+            {job.status === 'in_progress' && <Button type="button" loading={busy} onClick={() => action('complete')}>Complete</Button>}
+            {!['paid', 'cancelled'].includes(job.status) && <Button type="button" variant="danger" loading={busy} onClick={() => action('cancel')}>Cancel</Button>}
+            {job.status === 'draft' && <Button type="button" variant="danger" loading={busy} onClick={() => action('delete')}>Delete</Button>}
+        </div>
+    );
+    const sideSummary = (
+        <Panel className="rounded-lg">
+            <div className="space-y-4">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Workshop status</p>
+                    <div className="mt-2"><VehicleServiceStatusBadge status={job.status} /></div>
+                </div>
+                <DetailGrid items={[
+                    { label: 'Customer', value: readableRelation(job.customer) },
+                    { label: 'Vehicle', value: readableRelation(job.vehicle) },
+                    { label: 'Supervisor', value: readableRelation(job.supervisor) },
+                    { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },
+                    { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
+                ]} />
+            </div>
+        </Panel>
+    );
+
     return (
         <>
-            <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} actions={
-                <div className="flex flex-wrap gap-2">
-                    {['draft', 'inspected', 'in_progress'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
-                    {job.status === 'draft' && <Button type="button" loading={busy} onClick={() => action('inspect')}>Mark inspected</Button>}
-                    {['draft', 'inspected'].includes(job.status) && <Button type="button" loading={busy} onClick={() => action('start')}>Start work</Button>}
-                    {job.status === 'in_progress' && <Button type="button" loading={busy} onClick={() => action('complete')}>Complete</Button>}
-                    {!['paid', 'cancelled'].includes(job.status) && <Button type="button" variant="danger" loading={busy} onClick={() => action('cancel')}>Cancel</Button>}
-                    {job.status === 'draft' && <Button type="button" variant="danger" loading={busy} onClick={() => action('delete')}>Delete</Button>}
-                </div>
-            } />
+            <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} actions={headerActions} />
             <ErrorAlert error={actionError ?? result.error} />
-            <Panel className="p-0">
-                <Tabs tabs={[
-                    { id: 'summary', label: 'Summary' },
-                    { id: 'inspection', label: 'Inspection' },
-                    { id: 'lines', label: 'Lines' },
-                    { id: 'workforce', label: 'Workforce' },
-                    { id: 'inventory', label: 'Inventory Issue' },
-                    { id: 'invoice', label: 'Invoice' },
-                    { id: 'payments', label: 'Payments' },
-                    { id: 'documents', label: 'Documents' },
-                    { id: 'history', label: 'Status History' },
-                ]} active={tabs.activeTab} onChange={tabs.openTab} />
-                <div className="p-5">
-                    <Suspense fallback={<LoadingState />}>
-                        {tabs.activeTab === 'summary' && <VehicleServiceSummaryPanel job={job} />}
-                        {tabs.openedTabs.has('inspection') && tabs.activeTab === 'inspection' && <InspectionTab jobId={job.id} />}
-                        {tabs.openedTabs.has('lines') && tabs.activeTab === 'lines' && <LinesTab jobId={job.id} />}
-                        {tabs.openedTabs.has('workforce') && tabs.activeTab === 'workforce' && <WorkforceTab jobId={job.id} />}
-                        {tabs.openedTabs.has('inventory') && tabs.activeTab === 'inventory' && <InventoryTab jobId={job.id} />}
-                        {tabs.openedTabs.has('invoice') && tabs.activeTab === 'invoice' && <InvoiceTab job={job} />}
-                        {tabs.openedTabs.has('payments') && tabs.activeTab === 'payments' && <PaymentTab job={job} />}
-                        {tabs.openedTabs.has('documents') && tabs.activeTab === 'documents' && <DocumentTab jobId={job.id} />}
-                        {tabs.openedTabs.has('history') && tabs.activeTab === 'history' && <StatusHistoryTab jobId={job.id} />}
-                    </Suspense>
-                </div>
-            </Panel>
+            <EntityDetailLayout
+                summary={sideSummary}
+                actions={
+                    <>
+                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
+                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
+                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
+                        <Link to={`/vehicle-service/jobs/${job.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>
+                        <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button type="button" variant="secondary" className="w-full">Prepare payment</Button></Link>
+                    </>
+                }
+            >
+                <Panel className="p-0">
+                    <Tabs tabs={[
+                        { id: 'summary', label: 'Overview' },
+                        { id: 'inspection', label: 'Inspection' },
+                        { id: 'lines', label: 'Job lines' },
+                        { id: 'workforce', label: 'Workforce' },
+                        { id: 'inventory', label: 'Inventory' },
+                        { id: 'invoice', label: 'Invoice' },
+                        { id: 'payments', label: 'Payments' },
+                        { id: 'documents', label: 'Documents' },
+                        { id: 'history', label: 'Timeline' },
+                    ]} active={tabs.activeTab} onChange={tabs.openTab} />
+                    <div className="p-5">
+                        <Suspense fallback={<LoadingState />}>
+                            {tabs.activeTab === 'summary' && <VehicleServiceSummaryPanel job={job} />}
+                            {tabs.openedTabs.has('inspection') && tabs.activeTab === 'inspection' && <InspectionTab jobId={job.id} />}
+                            {tabs.openedTabs.has('lines') && tabs.activeTab === 'lines' && <LinesTab jobId={job.id} />}
+                            {tabs.openedTabs.has('workforce') && tabs.activeTab === 'workforce' && <WorkforceTab jobId={job.id} />}
+                            {tabs.openedTabs.has('inventory') && tabs.activeTab === 'inventory' && <InventoryTab jobId={job.id} />}
+                            {tabs.openedTabs.has('invoice') && tabs.activeTab === 'invoice' && <InvoiceTab job={job} />}
+                            {tabs.openedTabs.has('payments') && tabs.activeTab === 'payments' && <PaymentTab job={job} />}
+                            {tabs.openedTabs.has('documents') && tabs.activeTab === 'documents' && <DocumentTab jobId={job.id} />}
+                            {tabs.openedTabs.has('history') && tabs.activeTab === 'history' && <StatusHistoryTab jobId={job.id} />}
+                        </Suspense>
+                    </div>
+                </Panel>
+            </EntityDetailLayout>
         </>
     );
 }

@@ -53,7 +53,7 @@ export default function UomConvertTool() {
                     <div className="flex justify-end"><Button type="submit" loading={loading}>Convert</Button></div>
                 </form>
                 {result && (
-                    <div className="mt-6 rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm">
+                    <div className="mt-6 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm">
                         <p className="text-slate-600">Converted quantity</p>
                         <p className="mt-1 text-2xl font-bold text-slate-950">
                             {result.converted_quantity} {result.to_uom.code}

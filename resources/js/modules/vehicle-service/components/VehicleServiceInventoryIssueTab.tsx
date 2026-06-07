@@ -29,7 +29,7 @@ export default function VehicleServiceInventoryIssueTab({ jobId }: { jobId: numb
     return (
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
-            <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto]">
                 <GenericLookupSelect label="Issue warehouse" value={warehouse} onChange={setWarehouse} search={search} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} />
                 <div className="flex items-end">
                     <Button type="button" loading={issuing} disabled={!warehouse || selected.length === 0} onClick={async () => {

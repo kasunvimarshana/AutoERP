@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
@@ -32,24 +33,32 @@ export default function VehicleDetailPage() {
         <div>
             <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<Link to={`/vehicles/${vehicle.id}/edit`}><Button>Edit</Button></Link>} />
             <ErrorAlert error={result.error} />
-            <Panel>
-                <Tabs<DetailTab> active={tab.activeTab} onChange={tab.openTab} tabs={[
-                    { id: 'summary', label: 'Summary' },
-                    { id: 'ownership', label: 'Ownership' },
-                    { id: 'documents', label: 'Documents' },
-                    { id: 'attributes', label: 'Attributes' },
-                    { id: 'history', label: 'Status History' },
-                ]} />
-                <div className="mt-5">
-                    {tab.activeTab === 'summary' && <VehicleSummaryCard vehicle={vehicle} />}
-                    <Suspense fallback={<LoadingState label="Loading tab..." />}>
-                        {tab.openedTabs.has('ownership') && <div hidden={tab.activeTab !== 'ownership'}><VehicleOwnershipTab vehicleId={vehicle.id} /></div>}
-                        {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><VehicleDocumentTab vehicleId={vehicle.id} /></div>}
-                        {tab.openedTabs.has('attributes') && <div hidden={tab.activeTab !== 'attributes'}><VehicleAttributeTab vehicleId={vehicle.id} /></div>}
-                        {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><VehicleStatusHistoryTab vehicleId={vehicle.id} /></div>}
-                    </Suspense>
-                </div>
-            </Panel>
+            <EntityDetailLayout actions={
+                <>
+                    <Link to="/vehicle-service/jobs/create"><Button type="button" variant="secondary" className="w-full">Create service job</Button></Link>
+                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('history')}>View status history</Button>
+                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('documents')}>Review documents</Button>
+                </>
+            }>
+                <Panel className="p-0">
+                    <Tabs<DetailTab> active={tab.activeTab} onChange={tab.openTab} tabs={[
+                        { id: 'summary', label: 'Summary' },
+                        { id: 'ownership', label: 'Ownership' },
+                        { id: 'documents', label: 'Documents' },
+                        { id: 'attributes', label: 'Attributes' },
+                        { id: 'history', label: 'Status History' },
+                    ]} />
+                    <div className="p-5">
+                        {tab.activeTab === 'summary' && <VehicleSummaryCard vehicle={vehicle} />}
+                        <Suspense fallback={<LoadingState label="Loading tab..." />}>
+                            {tab.openedTabs.has('ownership') && <div hidden={tab.activeTab !== 'ownership'}><VehicleOwnershipTab vehicleId={vehicle.id} /></div>}
+                            {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><VehicleDocumentTab vehicleId={vehicle.id} /></div>}
+                            {tab.openedTabs.has('attributes') && <div hidden={tab.activeTab !== 'attributes'}><VehicleAttributeTab vehicleId={vehicle.id} /></div>}
+                            {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><VehicleStatusHistoryTab vehicleId={vehicle.id} /></div>}
+                        </Suspense>
+                    </div>
+                </Panel>
+            </EntityDetailLayout>
         </div>
     );
 }

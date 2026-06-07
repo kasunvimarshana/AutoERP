@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
@@ -35,20 +36,28 @@ export default function CustomerDetailPage() {
             description="Customer master data and relation-aware CRUD."
             actions={<Link to={`/customers/${customerId}/edit`}><Button variant="secondary">Edit customer</Button></Link>}
         />
-        <Panel className="p-0">
-            <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
-            <div className="p-5">
-                {tab.activeTab === 'summary' && <CustomerSummaryCard customer={customer.data} />}
-                <Suspense fallback={<LoadingState />}>
-                    {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><CustomerContactTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><CustomerAddressTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('bank_accounts') && <div hidden={tab.activeTab !== 'bank_accounts'}><CustomerBankAccountTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('categories') && <div hidden={tab.activeTab !== 'categories'}><CustomerCategoryTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><CustomerDocumentTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('credit_profile') && <div hidden={tab.activeTab !== 'credit_profile'}><CustomerCreditProfileTab customerId={customerId} /></div>}
-                    {tab.openedTabs.has('status_history') && <div hidden={tab.activeTab !== 'status_history'}><CustomerStatusHistoryTab customerId={customerId} /></div>}
-                </Suspense>
-            </div>
-        </Panel>
+        <EntityDetailLayout actions={
+            <>
+                <Link to="/vehicle-service/jobs/create"><Button type="button" variant="secondary" className="w-full">Create service job</Button></Link>
+                <Link to="/invoices"><Button type="button" variant="secondary" className="w-full">View invoices</Button></Link>
+                <Link to="/payments"><Button type="button" variant="secondary" className="w-full">View payments</Button></Link>
+            </>
+        }>
+            <Panel className="p-0">
+                <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
+                <div className="p-5">
+                    {tab.activeTab === 'summary' && <CustomerSummaryCard customer={customer.data} />}
+                    <Suspense fallback={<LoadingState />}>
+                        {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><CustomerContactTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><CustomerAddressTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('bank_accounts') && <div hidden={tab.activeTab !== 'bank_accounts'}><CustomerBankAccountTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('categories') && <div hidden={tab.activeTab !== 'categories'}><CustomerCategoryTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><CustomerDocumentTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('credit_profile') && <div hidden={tab.activeTab !== 'credit_profile'}><CustomerCreditProfileTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('status_history') && <div hidden={tab.activeTab !== 'status_history'}><CustomerStatusHistoryTab customerId={customerId} /></div>}
+                    </Suspense>
+                </div>
+            </Panel>
+        </EntityDetailLayout>
     </>;
 }

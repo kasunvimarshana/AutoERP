@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, getPurchaseOrder } from '../purchaseApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Button } from '@/shared/components/Button';
+import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -58,13 +61,29 @@ export default function PurchaseOrderDetailPage() {
             { label: 'Line charges', value: <MoneyDisplay value={order.charge_total} currency={order.currency?.code ?? undefined} /> },
             { label: 'Header adjustment net', value: <MoneyDisplay value={order.adjustment_total} currency={order.currency?.code ?? undefined} /> },
             { label: 'Grand total', value: <MoneyDisplay value={order.grand_total} currency={order.currency?.code ?? undefined} /> },
-            { label: 'Received quantity', value: order.received_quantity ?? '0.000000' },
-            { label: 'Invoiced quantity', value: order.invoiced_quantity ?? '0.000000' },
-            { label: 'Returned quantity', value: order.returned_quantity ?? '0.000000' },
+            { label: 'Received quantity', value: <QuantityDisplay value={order.received_quantity} precision={6} /> },
+            { label: 'Invoiced quantity', value: <QuantityDisplay value={order.invoiced_quantity} precision={6} /> },
+            { label: 'Returned quantity', value: <QuantityDisplay value={order.returned_quantity} precision={6} /> },
             { label: 'Approved at', value: formatDate(order.approved_at) },
             { label: 'Closed at', value: formatDate(order.closed_at) },
             { label: 'Notes', value: order.notes ?? '-' },
         ]} />
+    );
+    const sideSummary = (
+        <Panel className="rounded-lg">
+            <div className="space-y-4">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                    <div className="mt-2"><PurchaseOrderStatusBadge status={order.status} /></div>
+                </div>
+                <DetailGrid items={[
+                    { label: 'Supplier', value: readableRelation(order.supplier) },
+                    { label: 'Warehouse', value: readableRelation(order.warehouse) },
+                    { label: 'Expected', value: formatDate(order.expected_delivery_date) },
+                    { label: 'Grand total', value: <MoneyDisplay value={order.grand_total} currency={order.currency?.code ?? undefined} /> },
+                ]} />
+            </div>
+        </Panel>
     );
 
     return (
@@ -75,9 +94,21 @@ export default function PurchaseOrderDetailPage() {
                 actions={<PurchaseOrderActions order={order} busy={busy} onApprove={() => run('approve')} onCancel={() => run('cancel')} onClose={() => run('close')} onDelete={() => run('delete')} />}
             />
             <ErrorAlert error={actionError ?? result.error} />
-            <Panel className="p-0">
-                <PurchaseOrderTabs order={order} summary={summary} />
-            </Panel>
+            <EntityDetailLayout
+                summary={sideSummary}
+                actions={
+                    <>
+                        <Link to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Receive goods</Button></Link>
+                        <Link to={`/purchase/invoices/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Create supplier invoice</Button></Link>
+                        <Link to={`/purchase/payments/prepare?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Prepare payment</Button></Link>
+                        <Link to={`/purchase/returns/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Create return</Button></Link>
+                    </>
+                }
+            >
+                <Panel className="p-0">
+                    <PurchaseOrderTabs order={order} summary={summary} />
+                </Panel>
+            </EntityDetailLayout>
         </>
     );
 }

@@ -20,7 +20,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
     return (
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
-            <form className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3" onSubmit={async (event) => {
+            <form className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-3" onSubmit={async (event) => {
                 event.preventDefault();
                 setSaving(true);
                 setError(null);

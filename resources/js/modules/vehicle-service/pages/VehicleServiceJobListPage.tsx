@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -21,8 +21,9 @@ const statuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced', 
     .map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 export default function VehicleServiceJobListPage() {
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
+    const [status, setStatus] = useState(searchParams.get('status') ?? '');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [page, setPage] = useState(1);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, listPurchaseOrders, type PurchaseOrder } from '../purchaseApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -31,8 +31,9 @@ const statuses = [
 ].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 export default function PurchaseOrderListPage() {
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
+    const [status, setStatus] = useState(searchParams.get('status') ?? '');
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');

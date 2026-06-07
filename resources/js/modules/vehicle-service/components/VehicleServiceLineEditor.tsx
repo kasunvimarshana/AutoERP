@@ -59,7 +59,7 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
     return (
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
-            <form className="rounded-xl border border-slate-200 bg-slate-50 p-4" onSubmit={async (event) => {
+            <form className="rounded-lg border border-slate-200 bg-slate-50 p-4" onSubmit={async (event) => {
                 event.preventDefault();
                 setSaving(true);
                 setError(null);

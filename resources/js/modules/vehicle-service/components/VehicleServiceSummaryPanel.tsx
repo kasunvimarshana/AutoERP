@@ -1,6 +1,5 @@
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
-import { Panel } from '@/shared/components/Panel';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
@@ -8,7 +7,7 @@ import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
 export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) {
     return (
-        <Panel>
+        <div>
             <DetailGrid items={[
                 { label: 'Status', value: <VehicleServiceStatusBadge status={job.status} /> },
                 { label: 'Customer', value: readableRelation(job.customer) },
@@ -28,6 +27,6 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Completed at', value: formatDate(job.completed_at) },
                 { label: 'Notes', value: job.notes ?? '-' },
             ]} />
-        </Panel>
+        </div>
     );
 }

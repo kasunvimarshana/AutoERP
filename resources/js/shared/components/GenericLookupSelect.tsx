@@ -28,8 +28,11 @@ export function GenericLookupSelect<T extends NamedResource>({
     const [options, setOptions] = useState<T[]>([]);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const [searched, setSearched] = useState(false);
     const debounced = useDebounce(query);
     const listboxId = useId();
+    const activeOptionId = activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined;
     const requestRef = useRef<AbortController | null>(null);
     const validationRef = useRef<AbortController | null>(null);
     const cacheRef = useRef(new Map<string, T[]>());
@@ -100,6 +103,8 @@ export function GenericLookupSelect<T extends NamedResource>({
             requestRef.current?.abort();
             setOptions([]);
             setLoading(false);
+            setActiveIndex(-1);
+            setSearched(false);
             return;
         }
 
@@ -108,23 +113,30 @@ export function GenericLookupSelect<T extends NamedResource>({
         if (cached) {
             setOptions(filter(cached, excludeId));
             setLoading(false);
+            setActiveIndex(-1);
+            setSearched(true);
             return;
         }
 
-        requestRef.current?.abort();
+                requestRef.current?.abort();
         const controller = new AbortController();
         requestRef.current = controller;
         setLoading(true);
+        setSearched(false);
         search(normalized, controller.signal)
             .then((results) => {
                 if (controller.signal.aborted) return;
                 cacheRef.current.set(key, results);
                 setOptions(filter(results, excludeId));
+                setActiveIndex(-1);
+                setSearched(true);
                 setMessage('');
             })
             .catch((requestError: unknown) => {
                 if (controller.signal.aborted) return;
                 setOptions([]);
+                setActiveIndex(-1);
+                setSearched(true);
                 setMessage(toApiError(requestError).message);
             })
             .finally(() => {
@@ -150,33 +162,51 @@ export function GenericLookupSelect<T extends NamedResource>({
                 autoComplete="off"
                 aria-expanded={options.length > 0}
                 aria-controls={listboxId}
+                aria-activedescendant={activeOptionId}
                 aria-autocomplete="list"
                 onKeyDown={(event) => {
-                    if (event.key === 'Escape') setOptions([]);
+                    if (event.key === 'Escape') {
+                        setOptions([]);
+                        setActiveIndex(-1);
+                    }
+                    if (event.key === 'ArrowDown' && options.length > 0) {
+                        event.preventDefault();
+                        setActiveIndex((index) => Math.min(index + 1, options.length - 1));
+                    }
+                    if (event.key === 'ArrowUp' && options.length > 0) {
+                        event.preventDefault();
+                        setActiveIndex((index) => Math.max(index - 1, 0));
+                    }
+                    if (event.key === 'Enter' && activeIndex >= 0 && options[activeIndex]) {
+                        event.preventDefault();
+                        selectOption(options[activeIndex]);
+                    }
                 }}
                 onChange={(event) => {
                     setQuery(event.target.value);
                     setMessage('');
+                    setSearched(false);
+                    setActiveIndex(-1);
                     if (value) onChange(null);
                 }}
             />
             {loading && <p className="mt-1 text-xs text-slate-500" role="status">Searching...</p>}
             {message && <p className="mt-1 text-xs text-rose-600">{message}</p>}
+            {!loading && searched && debounced.trim().length >= 2 && options.length === 0 && !message && (
+                <p className="mt-1 text-xs text-slate-500" role="status">No matching {label.toLowerCase()} found.</p>
+            )}
             {options.length > 0 && (
                 <div id={listboxId} role="listbox" className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                    {options.map((option) => (
+                    {options.map((option, index) => (
                         <button
                             key={option.id}
+                            id={`${listboxId}-option-${index}`}
                             type="button"
                             role="option"
                             aria-selected={Number(option.id) === Number(value?.id)}
-                            className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-sky-50"
-                            onClick={() => {
-                                validatedIdRef.current = Number(option.id);
-                                onChange(option);
-                                setQuery(formatLabel(option));
-                                setOptions([]);
-                            }}
+                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${activeIndex === index ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            onClick={() => selectOption(option)}
                         >
                             {formatLabel(option)}
                         </button>
@@ -185,6 +215,14 @@ export function GenericLookupSelect<T extends NamedResource>({
             )}
         </div>
     );
+
+    function selectOption(option: T) {
+        validatedIdRef.current = Number(option.id);
+        onChange(option);
+        setQuery(formatLabel(option));
+        setOptions([]);
+        setActiveIndex(-1);
+    }
 }
 
 function filter<T extends NamedResource>(options: T[], excludeId?: number | null): T[] {

@@ -41,17 +41,17 @@ export default function ItemCreatePage() {
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
     const [baseUom, setBaseUom] = useState<NamedResource | null>(null);
-    const [oneShot, setOneShot] = useState(false);
+    const [oneShot, setOneShot] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>('basic');
     const [draft, setDraft] = useState<OneShotDraft>(emptyOneShotDraft);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     return <>
-        <ContentHeader title="New item" description="Create a basic item or save an initial relation tree in one transaction." />
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <ContentHeader title="New item" description="Capture catalog setup, units, variants, pricing, codes, and usage rules from one screen." />
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
             <input id="one-shot" type="checkbox" checked={oneShot} onChange={(event) => { setOneShot(event.target.checked); setActiveTab('basic'); }} />
-            <label htmlFor="one-shot" className="text-sm font-medium">One-shot relation-aware create</label>
+            <label htmlFor="one-shot" className="text-sm font-medium">Save related details together</label>
         </div>
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -60,7 +60,7 @@ export default function ItemCreatePage() {
             {oneShot && activeTab !== 'basic' && <Panel><ItemOneShotBuilder section={activeTab} value={draft} onChange={setDraft} /></Panel>}
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                <Button type="submit" loading={submitting}>{oneShot ? 'Create item tree' : 'Create item'}</Button>
+                <Button type="submit" loading={submitting}>{oneShot ? 'Save everything' : 'Create item'}</Button>
             </div>
         </form>
     </>;
