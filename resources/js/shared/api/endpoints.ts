@@ -3,6 +3,7 @@ export const endpoints = {
     customers: '/api/v1/customers',
     customerCategories: '/api/v1/customer-categories',
     vehicles: '/api/v1/vehicles',
+    vehicleService: '/api/v1/vehicle-service',
     vehicleMakes: '/api/v1/vehicle-makes',
     vehicleModels: '/api/v1/vehicle-models',
     vehicleTypes: '/api/v1/vehicle-types',

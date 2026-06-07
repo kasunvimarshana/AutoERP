@@ -21,6 +21,7 @@ const navigation = [
     { to: '/payments', label: 'Payments' },
     { to: '/finance/accounts', label: 'Finance' },
     { to: '/hr/employees', label: 'Employees' },
+    { to: '/vehicle-service/jobs', label: 'Vehicle Service' },
 ];
 
 export function AppLayout() {

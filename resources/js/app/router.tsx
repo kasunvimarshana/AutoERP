@@ -54,6 +54,12 @@ const EmployeeListPage = lazy(() => import('@/modules/hr/EmployeeListPage'));
 const EmployeeCreatePage = lazy(() => import('@/modules/hr/EmployeeCreatePage'));
 const EmployeeEditPage = lazy(() => import('@/modules/hr/EmployeeEditPage'));
 const EmployeeDetailPage = lazy(() => import('@/modules/hr/EmployeeDetailPage'));
+const VehicleServiceJobListPage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceJobListPage'));
+const VehicleServiceJobCreatePage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceJobCreatePage'));
+const VehicleServiceJobEditPage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceJobEditPage'));
+const VehicleServiceJobDetailPage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceJobDetailPage'));
+const VehicleServiceInvoiceCreatePage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceInvoiceCreatePage'));
+const VehicleServicePaymentPreparePage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServicePaymentPreparePage'));
 const NotFoundPage = lazy(() => import('@/modules/not-found/NotFoundPage'));
 
 export function AppRouter() {
@@ -115,6 +121,12 @@ export function AppRouter() {
                     <Route path="/hr/employees/create" element={<EmployeeCreatePage />} />
                     <Route path="/hr/employees/:id/edit" element={<EmployeeEditPage />} />
                     <Route path="/hr/employees/:id" element={<EmployeeDetailPage />} />
+                    <Route path="/vehicle-service/jobs" element={<VehicleServiceJobListPage />} />
+                    <Route path="/vehicle-service/jobs/create" element={<VehicleServiceJobCreatePage />} />
+                    <Route path="/vehicle-service/jobs/:id/edit" element={<VehicleServiceJobEditPage />} />
+                    <Route path="/vehicle-service/jobs/:id/invoice" element={<VehicleServiceInvoiceCreatePage />} />
+                    <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
+                    <Route path="/vehicle-service/jobs/:id" element={<VehicleServiceJobDetailPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Route>
             </Route>
