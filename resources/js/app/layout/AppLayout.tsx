@@ -49,6 +49,7 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/payments', label: 'Payments' },
             { to: '/finance/accounts', label: 'Chart of accounts' },
             { to: '/finance/journals', label: 'Journals' },
+            { to: '/reports', label: 'Reports' },
         ],
     },
 ];

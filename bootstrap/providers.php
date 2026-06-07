@@ -15,6 +15,7 @@ use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
+use Modules\Reporting\Providers\ReportingServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
 use Modules\Supplier\Providers\SupplierServiceProvider;
 use Modules\Tenant\Providers\TenantServiceProvider;
@@ -36,6 +37,7 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
+    ReportingServiceProvider::class,
     HrServiceProvider::class,
     ItemServiceProvider::class,
     InventoryServiceProvider::class,

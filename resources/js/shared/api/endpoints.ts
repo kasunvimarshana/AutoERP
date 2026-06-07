@@ -18,6 +18,7 @@ export const endpoints = {
     invoices: '/api/v1/invoices',
     payments: '/api/v1/payments',
     finance: '/api/v1/finance',
+    reports: '/api/v1/reports',
     currencies: '/api/v1/currencies',
     warehouses: '/api/v1/warehouses',
     warehouseLocations: '/api/v1/warehouse-locations',
