@@ -26,7 +26,7 @@ async function mappedLookup(
 }
 
 export const lookupApi = {
-    items: (search: string, signal?: AbortSignal) => lookup(`${endpoints.items}/lookup/active`, search, signal),
+    items: (search: string, signal?: AbortSignal) => lookup(`${endpoints.items}/lookup`, search, signal),
     stockableItems: (search: string, signal?: AbortSignal) => lookup(`${endpoints.items}/lookup/stockable`, search, signal),
     suppliers: (search: string, signal?: AbortSignal) => lookup(`${endpoints.suppliers}/lookup`, search, signal),
     customers: (search: string, signal?: AbortSignal) => lookup(`${endpoints.customers}/lookup/active`, search, signal),

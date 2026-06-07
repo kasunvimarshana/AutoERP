@@ -23,8 +23,6 @@ final class ListWarehouseLocationsService
                 ? min($perPage, (int) config('warehouse.pagination.max_per_page', WarehouseDefaults::MAX_PER_PAGE))
                 : (int) config('warehouse.pagination.default_per_page', WarehouseDefaults::DEFAULT_PER_PAGE);
 
-            unset($criteria['search']);
-
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
             return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, $exception->getMessage()));

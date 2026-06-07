@@ -11,6 +11,10 @@ interface LookupProps {
     error?: string;
 }
 
+interface WarehouseLocationLookupProps extends LookupProps {
+    warehouseId?: number | null;
+}
+
 export function SupplierLookupSelect(props: LookupProps) {
     return <LookupSelect label="Supplier" search={lookupApi.suppliers} placeholder="Search suppliers..." {...props} />;
 }
@@ -27,8 +31,15 @@ export function WarehouseLookupSelect(props: LookupProps) {
     return <LookupSelect label="Warehouse" search={searchWarehouses} placeholder="Search warehouses..." {...props} />;
 }
 
-export function WarehouseLocationLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Location" search={searchWarehouseLocations} placeholder="Search locations..." {...props} />;
+export function WarehouseLocationLookupSelect({ warehouseId, ...props }: WarehouseLocationLookupProps) {
+    return (
+        <LookupSelect
+            label="Location"
+            search={(search, signal) => searchWarehouseLocations(search, signal, warehouseId)}
+            placeholder="Search locations..."
+            {...props}
+        />
+    );
 }
 
 export function CurrencyLookupSelect(props: LookupProps) {

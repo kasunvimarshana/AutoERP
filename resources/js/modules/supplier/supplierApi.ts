@@ -64,7 +64,7 @@ export async function searchSupplierCategories(search: string, signal?: AbortSig
 }
 
 export async function searchActiveItems(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.items}/lookup/active`, {
+    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.items}/lookup`, {
         params: { search, per_page: 20 },
         signal,
     });
@@ -80,8 +80,8 @@ export async function listItemVariantsForLookup(itemId: number, signal?: AbortSi
 }
 
 export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/configuration/currencies', {
-        params: { code: search, is_active: true, per_page: 20 },
+    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
+        params: { search, is_active: true, per_page: 20 },
         signal,
     });
     return response.data.data;

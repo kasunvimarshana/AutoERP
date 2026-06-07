@@ -62,8 +62,8 @@ export async function searchCustomerCategories(search: string, signal?: AbortSig
 }
 
 export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/configuration/currencies', {
-        params: { code: search, is_active: true, per_page: 20 },
+    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
+        params: { search, is_active: true, per_page: 20 },
         signal,
     });
     return response.data.data;

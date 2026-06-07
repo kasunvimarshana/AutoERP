@@ -14,7 +14,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'current.organization-unit',
 );
 
-Route::prefix('api/warehouse')
+Route::prefix('api/v1')
     ->middleware([
         'api',
         'auth:'.$protectedGuard,
@@ -22,7 +22,7 @@ Route::prefix('api/warehouse')
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
     ])
-    ->name('warehouse.')
+    ->name('api.v1.')
     ->group(function (): void {
         Route::apiResource('warehouses', WarehouseController::class);
         Route::apiResource('warehouse-locations', WarehouseLocationController::class);

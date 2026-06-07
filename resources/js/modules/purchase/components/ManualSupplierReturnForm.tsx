@@ -78,7 +78,7 @@ export function ManualSupplierReturnForm() {
                 <div className="grid gap-4 md:grid-cols-3">
                     <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
                     <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
-                    <WarehouseLocationLookupSelect value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                    <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
                     <ItemLookupSelect value={item} onChange={setItem} error={errorFor('lines.0.item_id')} />
                     <UomLookupSelect value={uom} onChange={setUom} error={errorFor('lines.0.uom_id')} />

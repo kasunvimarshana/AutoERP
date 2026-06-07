@@ -21,6 +21,8 @@ final class ListWarehouseRequest extends FormRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'search' => ['nullable', 'string', 'max:150'],
+            'is_active' => ['nullable', 'boolean'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('warehouse.pagination.max_per_page', 200)],
         ];

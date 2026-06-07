@@ -12,24 +12,24 @@ export async function listUoms(search = '', signal?: AbortSignal): Promise<Named
 }
 
 export async function searchWarehouses(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/warehouse/warehouses', {
-        params: { search, per_page: 20 },
+    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.warehouses, {
+        params: { search, is_active: true, per_page: 20 },
         signal,
     });
     return response.data.data;
 }
 
-export async function searchWarehouseLocations(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/warehouse/warehouse-locations', {
-        params: { search, per_page: 20 },
+export async function searchWarehouseLocations(search: string, signal?: AbortSignal, warehouseId?: number | null): Promise<NamedResource[]> {
+    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.warehouseLocations, {
+        params: { search, warehouse_id: warehouseId ?? undefined, is_active: true, per_page: 20 },
         signal,
     });
     return response.data.data;
 }
 
 export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>('/api/configuration/currencies', {
-        params: { code: search, per_page: 20 },
+    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
+        params: { search, is_active: true, per_page: 20 },
         signal,
     });
     return response.data.data;

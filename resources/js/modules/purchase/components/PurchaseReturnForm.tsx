@@ -96,7 +96,7 @@ export function PurchaseReturnForm() {
                 <div className="grid gap-4 md:grid-cols-4">
                     <GoodsReceiptLookupSelect value={source} onChange={setSource} error={errorFor('source_id')} />
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
-                    <WarehouseLocationLookupSelect value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                    <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Supplier</span><br />{supplier?.name ?? '-'}</div>
                 </div>
             </Panel>

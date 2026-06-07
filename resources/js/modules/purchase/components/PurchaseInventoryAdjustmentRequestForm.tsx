@@ -64,7 +64,7 @@ export function PurchaseInventoryAdjustmentRequestForm() {
             <Panel title="Inventory adjustment only">
                 <div className="grid gap-4 md:grid-cols-3">
                     <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
-                    <WarehouseLocationLookupSelect value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                    <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                     <ItemLookupSelect value={item} onChange={setItem} error={errorFor('lines.0.item_id')} />
                     <Input label="Adjustment date" type="date" value={date} error={errorFor('adjustment_date')} onChange={(event) => setDate(event.target.value)} />
                     <Select label="Type" value={adjustmentType} options={['increase', 'decrease', 'recount', 'damage', 'expiry', 'opening_balance'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={errorFor('adjustment_type')} onChange={(event) => setAdjustmentType(event.target.value)} />

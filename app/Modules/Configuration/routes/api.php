@@ -17,7 +17,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'current.organization-unit',
 );
 
-Route::prefix('api/configuration')
+Route::prefix('api/v1')
     ->middleware([
         'api',
         'auth:'.$protectedGuard,
@@ -25,28 +25,28 @@ Route::prefix('api/configuration')
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
     ])
-    ->name('configuration.')
+    ->name('api.v1.')
     ->group(function (): void {
         $keyPattern = '[A-Za-z0-9._-]+';
 
-        Route::get('entries', [ConfigurationController::class, 'index'])->name('entries.index');
-        Route::post('entries', [ConfigurationController::class, 'store'])->name('entries.store');
-        Route::get('entries/{key}', [ConfigurationController::class, 'show'])
+        Route::get('configuration/entries', [ConfigurationController::class, 'index'])->name('configuration.entries.index');
+        Route::post('configuration/entries', [ConfigurationController::class, 'store'])->name('configuration.entries.store');
+        Route::get('configuration/entries/{key}', [ConfigurationController::class, 'show'])
             ->where('key', $keyPattern)
-            ->name('entries.show');
-        Route::get('entries/{key}/resolve', [ConfigurationController::class, 'resolve'])
+            ->name('configuration.entries.show');
+        Route::get('configuration/entries/{key}/resolve', [ConfigurationController::class, 'resolve'])
             ->where('key', $keyPattern)
-            ->name('entries.resolve');
-        Route::get('features/{key}/enabled', [ConfigurationController::class, 'featureEnabled'])
+            ->name('configuration.entries.resolve');
+        Route::get('configuration/features/{key}/enabled', [ConfigurationController::class, 'featureEnabled'])
             ->where('key', $keyPattern)
-            ->name('features.enabled');
-        Route::put('entries/{key}', [ConfigurationController::class, 'update'])
+            ->name('configuration.features.enabled');
+        Route::put('configuration/entries/{key}', [ConfigurationController::class, 'update'])
             ->where('key', $keyPattern)
-            ->name('entries.update');
-        Route::delete('entries/{key}', [ConfigurationController::class, 'destroy'])
+            ->name('configuration.entries.update');
+        Route::delete('configuration/entries/{key}', [ConfigurationController::class, 'destroy'])
             ->where('key', $keyPattern)
-            ->name('entries.destroy');
-        Route::post('cache/clear', [ConfigurationController::class, 'clearCache'])->name('cache.clear');
+            ->name('configuration.entries.destroy');
+        Route::post('configuration/cache/clear', [ConfigurationController::class, 'clearCache'])->name('configuration.cache.clear');
 
         Route::get('countries', [CountryController::class, 'index'])->name('countries.index');
         Route::post('countries', [CountryController::class, 'store'])->name('countries.store');

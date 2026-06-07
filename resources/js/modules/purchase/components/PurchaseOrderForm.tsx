@@ -179,7 +179,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
                         <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
-                        <WarehouseLocationLookupSelect value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                        <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                         <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
                         <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />

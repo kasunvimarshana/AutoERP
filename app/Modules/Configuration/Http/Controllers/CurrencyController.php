@@ -37,6 +37,9 @@ final class CurrencyController extends Controller
         if (isset($validated['name'])) {
             $criteria['name'] = (string) $validated['name'];
         }
+        if (isset($validated['search'])) {
+            $criteria['search'] = (string) $validated['search'];
+        }
         if (array_key_exists('is_active', $validated)) {
             $criteria['is_active'] = (bool) $validated['is_active'];
         }

@@ -118,7 +118,7 @@ export function GoodsReceiptForm() {
                 <div className="grid gap-4 md:grid-cols-3">
                     <PurchaseOrderLookupSelect value={purchaseOrder} onChange={setPurchaseOrder} error={errorFor('purchase_order_id')} />
                     <Input label="Received date" type="date" value={receivedDate} error={errorFor('received_date')} onChange={(event) => setReceivedDate(event.target.value)} />
-                    <WarehouseLocationLookupSelect value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                    <WarehouseLocationLookupSelect warehouseId={sourceOrder?.warehouse?.id ?? sourceOrder?.warehouse_id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                 </div>
                 {sourceOrder && (
                     <div className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700 md:grid-cols-3">
