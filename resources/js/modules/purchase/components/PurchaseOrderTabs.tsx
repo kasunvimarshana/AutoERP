@@ -1,11 +1,10 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Tabs } from '@/shared/components/Tabs';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import type { PurchaseOrder } from '../purchaseApi';
 
-type Tab = 'summary' | 'lines' | 'adjustments' | 'grns' | 'invoices' | 'returns' | 'payments' | 'audit';
+type Tab = 'summary' | 'lines' | 'adjustments';
 
 const LazyLines = lazy(async () => ({ default: ({ order }: { order: PurchaseOrder }) => (
     <div className="overflow-x-auto">
@@ -65,11 +64,6 @@ export function PurchaseOrderTabs({ order, summary }: { order: PurchaseOrder; su
         ['summary', 'Summary'],
         ['lines', 'Lines'],
         ['adjustments', 'Adjustments'],
-        ['grns', 'GRNs'],
-        ['invoices', 'Invoices'],
-        ['returns', 'Returns'],
-        ['payments', 'Payments'],
-        ['audit', 'Audit'],
     ].map(([id, label]) => ({ id: id as Tab, label }));
 
     return (
@@ -80,8 +74,6 @@ export function PurchaseOrderTabs({ order, summary }: { order: PurchaseOrder; su
                     {state.activeTab === 'summary' && summary}
                     {state.activeTab === 'lines' && <LazyLines order={order} />}
                     {state.activeTab === 'adjustments' && <LazyAdjustments order={order} />}
-                    {['grns', 'invoices', 'returns', 'payments'].includes(state.activeTab) && <CapabilityNotice>Available in next phase.</CapabilityNotice>}
-                    {state.activeTab === 'audit' && <CapabilityNotice>Audit details are not exposed for purchase orders yet.</CapabilityNotice>}
                 </Suspense>
             </div>
         </>

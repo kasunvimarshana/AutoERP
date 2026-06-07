@@ -23,5 +23,9 @@ final class EmployeeSummaryResource extends JsonResource
             'employment_type' => $this->whenLoaded('employmentType', fn () => $this->employmentType ? new HrEmploymentTypeResource($this->employmentType) : null),
         ];
     }
-    private function value(mixed $value): mixed { return $value instanceof BackedEnum ? $value->value : $value; }
+
+    private function value(mixed $value): mixed
+    {
+        return $value instanceof BackedEnum ? $value->value : $value;
+    }
 }
