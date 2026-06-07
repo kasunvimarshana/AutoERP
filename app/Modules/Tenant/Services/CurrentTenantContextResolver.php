@@ -41,6 +41,11 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return $hostTenant;
         }
 
+        $configuredFallback = $this->resolveConfiguredFallbackTenant($applicationId);
+        if ($configuredFallback !== null) {
+            return $configuredFallback;
+        }
+
         $authenticatedTenantId = $this->resolveAuthenticatedTenantId($request);
         if ($authenticatedTenantId === null) {
             return null;
@@ -224,6 +229,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return null;
         }
 
+        if (! $this->isActiveDomain($domain)) {
+            return null;
+        }
+
         $tenantId = $this->toNullableInt($domain->get('tenant_id'));
         if ($tenantId === null) {
             return null;
@@ -235,6 +244,40 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
 
         return $this->toContext($tenant, $applicationId, 'request_host', $host);
+    }
+
+    private function resolveConfiguredFallbackTenant(?string $applicationId): ?CurrentTenantContext
+    {
+        if (! $this->configuredFallbackEnabled()) {
+            return null;
+        }
+
+        $fallbackDomain = $this->stringSignal(config('tenant.resolution.local_fallback_domain'));
+        if ($fallbackDomain !== null) {
+            $normalizedDomain = $this->normalizeDomain($fallbackDomain);
+            if ($normalizedDomain !== null) {
+                $domain = $this->tenantDomains->findByDomain($normalizedDomain);
+                if ($domain !== null && $this->isActiveDomain($domain)) {
+                    $tenantId = $this->toNullableInt($domain->get('tenant_id'));
+                    $tenant = $tenantId !== null ? $this->tenants->findById($tenantId) : null;
+                    if ($tenant !== null) {
+                        return $this->toContext($tenant, $applicationId, 'configured_fallback', $normalizedDomain);
+                    }
+                }
+            }
+        }
+
+        $fallbackCode = $this->stringSignal(config('tenant.resolution.local_fallback_tenant_code'));
+        if ($fallbackCode === null) {
+            return null;
+        }
+
+        $tenant = $this->tenants->findByCode($fallbackCode);
+        if ($tenant === null) {
+            return null;
+        }
+
+        return $this->toContext($tenant, $applicationId, 'configured_fallback');
     }
 
     private function contextFromTenantIdSignal(
@@ -303,6 +346,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         $domain = $this->tenantDomains->findByDomain($normalizedDomain);
         if ($domain === null) {
             throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
+        }
+
+        if (! $this->isActiveDomain($domain)) {
+            throw new CurrentTenantContextResolutionException('Requested tenant domain is not active.');
         }
 
         $tenantId = $this->toNullableInt($domain->get('tenant_id'));
@@ -430,6 +477,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             throw new CurrentTenantContextResolutionException('Resolved tenant record is incomplete.');
         }
 
+        if (! $this->isActiveTenant($tenant)) {
+            throw new CurrentTenantContextResolutionException('Resolved tenant is not active.');
+        }
+
         $resolvedDomain = $domain;
         if ($resolvedDomain === null) {
             $primaryDomain = $this->tenantDomains->findPrimaryByTenant($tenantId);
@@ -509,6 +560,17 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return false;
     }
 
+    private function isActiveDomain(DataRecord $domain): bool
+    {
+        return strtolower(trim((string) $domain->get('status', ''))) === 'active';
+    }
+
+    private function isActiveTenant(DataRecord $tenant): bool
+    {
+        return $this->toBool($tenant->get('is_active'))
+            && strtolower(trim((string) $tenant->get('status', ''))) === 'active';
+    }
+
     /**
      * @param  list<string>  $fallback
      * @return list<string>
@@ -548,6 +610,23 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return (bool) config('tenant.resolution.enforce_authenticated_tenant_match', true);
         } catch (Throwable) {
             return true;
+        }
+    }
+
+    private function configuredFallbackEnabled(): bool
+    {
+        try {
+            if (! (bool) config('tenant.resolution.local_fallback_enabled', false)) {
+                return false;
+            }
+
+            if (! function_exists('app')) {
+                return false;
+            }
+
+            return app()->environment(['local', 'testing']);
+        } catch (Throwable) {
+            return false;
         }
     }
 }

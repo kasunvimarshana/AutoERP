@@ -49,6 +49,13 @@ final class AuthWorkflowService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($data): Result {
+                if ($data->tenantId === null) {
+                    return $this->failure(
+                        AuthErrorCode::TENANT_RESOLUTION_FAILED,
+                        'Tenant could not be resolved for this domain.',
+                    );
+                }
+
                 if ($this->isLockedOut($data)) {
                     return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
                 }
@@ -71,7 +78,7 @@ final class AuthWorkflowService
                 if (! $this->isActiveUser($user)) {
                     $this->recordAttempt($data, false, AuthErrorCode::USER_INACTIVE, null, null, (int) $user['id']);
 
-                    return $this->failure(AuthErrorCode::USER_INACTIVE, 'User account is not active.');
+                    return $this->failure(AuthErrorCode::USER_INACTIVE, 'User account is inactive.');
                 }
 
                 $session = $this->registry->sessionProvider()->create([
@@ -112,7 +119,7 @@ final class AuthWorkflowService
                     'provider' => $providerRecord,
                     'identity' => $identity,
                     'user' => $user,
-                    'tenant' => $this->tenantSummary($data->tenantId ?? $this->toNullableInt($user['tenant_id'] ?? null)),
+                    'tenant' => $this->tenantSummary($data->tenantId),
                     'organization_unit' => $this->organizationUnitSummary(
                         $data->organizationUnitId ?? $this->toNullableInt($user['organization_unit_id'] ?? null),
                     ),
@@ -461,6 +468,7 @@ final class AuthWorkflowService
 
         return [
             'id' => (int) $tenant->id(),
+            'code' => $this->nullableString($tenant->get('code')),
             'name' => $this->nullableString($tenant->get('name')),
         ];
     }
@@ -478,6 +486,7 @@ final class AuthWorkflowService
 
         return [
             'id' => (int) $organizationUnit->id(),
+            'code' => $this->nullableString($organizationUnit->get('code')),
             'name' => $this->nullableString($organizationUnit->get('name')),
         ];
     }

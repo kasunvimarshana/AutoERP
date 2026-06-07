@@ -50,8 +50,13 @@ use Modules\Auth\Services\ValidateTokenService;
 use Modules\Auth\Services\VerifyChallengeService;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\DTOs\DataRecord;
+use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 
 final class AuthController extends Controller
 {
@@ -74,11 +79,18 @@ final class AuthController extends Controller
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+        private readonly CurrentTenantContextResolverInterface $tenantResolver,
+        private readonly OrganizationUnitRepositoryInterface $organizationUnits,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->loginService->login(LoginData::fromArray($request->validated()));
+        $payload = $this->resolveLoginContext($request);
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->loginService->login(LoginData::fromArray($payload));
 
         return $this->respond($result);
     }
@@ -297,6 +309,8 @@ final class AuthController extends Controller
     private function statusForErrorCode(string $code): int
     {
         return match ($code) {
+            AuthErrorCode::TENANT_RESOLUTION_FAILED,
+            AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED => 400,
             AuthErrorCode::INVALID_CREDENTIALS,
             AuthErrorCode::PROVIDER_NOT_FOUND,
             AuthErrorCode::TOKEN_INVALID,
@@ -321,5 +335,109 @@ final class AuthController extends Controller
             409 => 'conflict',
             default => $status >= 500 ? 'infrastructure' : 'domain',
         };
+    }
+
+    /**
+     * @return array<string,mixed>|Result
+     */
+    private function resolveLoginContext(LoginRequest $request): array|Result
+    {
+        $payload = $request->validated();
+
+        try {
+            $tenantContext = $this->tenantResolver->resolve($request);
+        } catch (CurrentTenantContextResolutionException) {
+            return $this->tenantResolutionFailure();
+        }
+
+        if ($tenantContext === null) {
+            return $this->tenantResolutionFailure();
+        }
+
+        $tenantId = $tenantContext->tenantId();
+        $payload['tenant_id'] = $tenantId;
+
+        $organizationUnitId = $this->resolveLoginOrganizationUnitId(
+            $payload['organization_unit_id'] ?? null,
+            $tenantId,
+        );
+
+        if ($organizationUnitId instanceof Result) {
+            return $organizationUnitId;
+        }
+
+        if ($organizationUnitId !== null) {
+            $payload['organization_unit_id'] = $organizationUnitId;
+        }
+
+        return $payload;
+    }
+
+    private function resolveLoginOrganizationUnitId(mixed $requestedOrganizationUnitId, int $tenantId): int|Result|null
+    {
+        $organizationUnitId = $this->toNullableInt($requestedOrganizationUnitId);
+        if ($organizationUnitId !== null) {
+            $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+            if (! $organizationUnit instanceof DataRecord
+                || $this->toNullableInt($organizationUnit->get('tenant_id')) !== $tenantId
+            ) {
+                return Result::failure(new Error(
+                    AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                    'Organization unit could not be resolved for this tenant.',
+                ));
+            }
+
+            return $organizationUnitId;
+        }
+
+        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
+            if ($this->truthy($organizationUnit->get('is_default'))) {
+                return (int) $organizationUnit->id();
+            }
+        }
+
+        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
+            if ($this->truthy($organizationUnit->get('is_active'))) {
+                return (int) $organizationUnit->id();
+            }
+        }
+
+        return null;
+    }
+
+    private function tenantResolutionFailure(): Result
+    {
+        return Result::failure(new Error(
+            AuthErrorCode::TENANT_RESOLUTION_FAILED,
+            'Tenant could not be resolved for this domain.',
+        ));
+    }
+
+    private function toNullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        $normalized = (int) $value;
+
+        return $normalized > 0 ? $normalized : null;
+    }
+
+    private function truthy(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (is_string($value)) {
+            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
+        }
+
+        return false;
     }
 }

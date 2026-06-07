@@ -125,6 +125,7 @@ final class CoreSeeder extends Seeder
     private function seedTenantAndOrganization(?int $currencyId): array
     {
         $tenantId = $this->seedDefaultTenant($currencyId);
+        $this->seedDefaultTenantDomains($tenantId);
         $organizationTypeId = $this->seedDefaultOrganizationUnitType($tenantId);
         $organizationUnitId = $this->seedDefaultOrganizationUnit($tenantId, $organizationTypeId);
 
@@ -174,6 +175,31 @@ final class CoreSeeder extends Seeder
         ]);
 
         return $this->requiredIdBy('tenants', ['code' => $tenantCode]);
+    }
+
+    private function seedDefaultTenantDomains(int $tenantId): void
+    {
+        if (! Schema::hasTable('tenant_domains')) {
+            return;
+        }
+
+        $domains = $this->defaultTenantDomains();
+        foreach ($domains as $index => $domain) {
+            DB::table('tenant_domains')->updateOrInsert(
+                ['domain' => $domain],
+                [
+                    'tenant_id' => $tenantId,
+                    'is_primary' => $index === 0,
+                    'is_verified' => true,
+                    'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
+                    'row_version' => 1,
+                    'status' => 'active',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                    'verified_at' => now(),
+                ],
+            );
+        }
     }
 
     private function seedDefaultOrganizationUnitType(int $tenantId): ?int
@@ -533,6 +559,28 @@ final class CoreSeeder extends Seeder
     private function defaultTenantCode(): string
     {
         return strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function defaultTenantDomains(): array
+    {
+        $configured = trim((string) env('AUTH_LOCAL_TENANT_DOMAINS', ''));
+        $domains = $configured !== ''
+            ? explode(',', $configured)
+            : ['localhost', '127.0.0.1', 'autoerp.local', 'autoerp.test'];
+
+        $normalized = [];
+        foreach ($domains as $domain) {
+            $domain = strtolower(trim((string) $domain));
+            $domain = preg_replace('/:\d+$/', '', $domain);
+            if (is_string($domain) && $domain !== '') {
+                $normalized[] = $domain;
+            }
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function defaultTenantName(): string

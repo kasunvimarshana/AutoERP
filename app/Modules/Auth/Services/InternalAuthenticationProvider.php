@@ -35,6 +35,10 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
      */
     public function authenticate(LoginData $data): ?array
     {
+        if ($data->tenantId === null) {
+            return null;
+        }
+
         $provider = $this->providers->findActiveByKey($data->tenantId, $this->key());
         if ($provider === null) {
             return null;

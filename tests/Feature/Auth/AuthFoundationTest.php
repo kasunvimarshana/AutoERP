@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Auth\Database\Seeders\AuthSeeder;
+use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Core\Database\Seeders\CoreSeeder;
 use Tests\TestCase;
 
 final class AuthFoundationTest extends TestCase
@@ -39,6 +43,110 @@ final class AuthFoundationTest extends TestCase
                 'organization_unit' => ['id', 'name'],
                 'session_id',
             ]);
+    }
+
+    public function test_seeded_local_admin_can_login_without_tenant_id_from_domain(): void
+    {
+        $this->seed(CoreSeeder::class);
+        $this->seed(AuthSeeder::class);
+
+        $response = $this->withHeaders(['Host' => 'localhost:5173'])
+            ->postJson('/api/v1/auth/login', [
+                'login_identifier' => 'admin@example.com',
+                'password' => 'password',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('token_type', 'Bearer')
+            ->assertJsonPath('user.email', 'admin@example.com')
+            ->assertJsonPath('tenant.code', 'AUTOERP')
+            ->assertJsonPath('organization_unit.code', 'MAIN')
+            ->assertJsonStructure([
+                'token',
+                'user' => ['id', 'name', 'email'],
+                'tenant' => ['id', 'code', 'name'],
+                'organization_unit' => ['id', 'code', 'name'],
+            ]);
+    }
+
+    public function test_default_tenant_domains_are_seeded_for_local_development(): void
+    {
+        $this->seed(CoreSeeder::class);
+
+        $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
+
+        foreach (['localhost', '127.0.0.1', 'autoerp.local', 'autoerp.test'] as $domain) {
+            $this->assertDatabaseHas('tenant_domains', [
+                'tenant_id' => $tenantId,
+                'domain' => $domain,
+                'status' => 'active',
+            ]);
+        }
+    }
+
+    public function test_tenant_resolver_strips_port_and_resolves_localhost_domain(): void
+    {
+        $this->seed(CoreSeeder::class);
+
+        $request = Request::create(
+            '/api/v1/auth/login',
+            'POST',
+            [],
+            [],
+            [],
+            ['HTTP_HOST' => 'localhost:5173'],
+        );
+
+        $context = app(CurrentTenantContextResolverInterface::class)->resolve($request);
+
+        $this->assertNotNull($context);
+        $this->assertSame('AUTOERP', $context->tenantCode());
+        $this->assertSame('localhost', $context->domain());
+    }
+
+    public function test_invalid_password_without_tenant_id_fails_after_domain_resolution(): void
+    {
+        $this->seed(CoreSeeder::class);
+        $this->seed(AuthSeeder::class);
+
+        $response = $this->withHeaders(['Host' => 'localhost'])
+            ->postJson('/api/v1/auth/login', [
+                'login_identifier' => 'admin@example.com',
+                'password' => 'wrong-password',
+            ]);
+
+        $response->assertUnauthorized()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Credentials are invalid.');
+    }
+
+    public function test_unknown_domain_returns_tenant_resolution_error_before_login_lookup(): void
+    {
+        $this->seed(CoreSeeder::class);
+        $this->seed(AuthSeeder::class);
+
+        $response = $this->call(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_HOST' => 'unknown.example',
+                'SERVER_NAME' => 'unknown.example',
+            ],
+            (string) json_encode([
+                'tenant_domain' => 'unknown.example',
+                'login_identifier' => 'admin@example.com',
+                'password' => 'password',
+            ], JSON_THROW_ON_ERROR),
+        );
+
+        $response->assertBadRequest()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Tenant could not be resolved for this domain.');
     }
 
     public function test_invalid_credentials_return_unauthorized_error(): void
