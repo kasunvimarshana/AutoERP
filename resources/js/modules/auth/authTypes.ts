@@ -2,6 +2,8 @@ export interface AuthUser {
     id: number | string;
     name: string | null;
     email: string | null;
+    roles?: string[];
+    permissions?: string[];
 }
 
 export interface AuthTenant {
@@ -22,12 +24,16 @@ export interface AuthSession {
     user: AuthUser;
     tenant: AuthTenant | null;
     organization_unit: AuthOrganizationUnit | null;
+    roles?: string[];
+    permissions?: string[];
 }
 
 export interface CurrentUserResponse {
     user: AuthUser;
     tenant: AuthTenant | null;
     organization_unit: AuthOrganizationUnit | null;
+    roles?: string[];
+    permissions?: string[];
 }
 
 export interface LoginPayload {

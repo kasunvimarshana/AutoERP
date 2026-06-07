@@ -43,9 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         stored.organizationUnitId ? { id: stored.organizationUnitId, name: null } : null,
     );
     const [isLoading, setIsLoading] = useState<boolean>(Boolean(stored.accessToken));
-    const initialLoadStarted = useRef(false);
+    const authLoadId = useRef(0);
 
     const clearAuthState = useCallback(() => {
+        authLoadId.current += 1;
         clearStoredAuthSession();
         setToken(null);
         setSessionId(null);
@@ -80,13 +81,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [sessionId, token]);
 
     const loadCurrentUser = useCallback(async (signal?: AbortSignal) => {
-        if (!getStoredApiContext().accessToken) {
-            clearAuthState();
-            return;
-        }
+        const loadId = authLoadId.current + 1;
+        authLoadId.current = loadId;
 
         setIsLoading(true);
         try {
+            if (!getStoredApiContext().accessToken) {
+                clearAuthState();
+                return;
+            }
+
             const current = await authApi.me(signal);
             if (signal?.aborted) return;
             applySession({
@@ -96,13 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
         } catch (error) {
             if (signal?.aborted) return;
-            if (error instanceof ApiError && error.status === 401) {
+            if (error instanceof ApiError) {
                 clearAuthState();
                 return;
             }
+            clearAuthState();
             throw error;
         } finally {
-            if (!signal?.aborted) {
+            if (authLoadId.current === loadId) {
                 setIsLoading(false);
             }
         }
@@ -148,14 +153,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [clearAuthState]);
 
     useEffect(() => {
-        if (!token || initialLoadStarted.current) return;
+        if (!token || user) return;
 
-        initialLoadStarted.current = true;
         const controller = new AbortController();
         void loadCurrentUser(controller.signal).catch(() => undefined);
 
         return () => controller.abort();
-    }, [loadCurrentUser, token]);
+    }, [loadCurrentUser, token, user]);
 
     const value = useMemo<AuthContextValue>(() => ({
         user,

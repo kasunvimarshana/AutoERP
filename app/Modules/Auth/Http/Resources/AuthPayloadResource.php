@@ -51,22 +51,30 @@ final class AuthPayloadResource extends JsonResource
     private function serializeAuthPayload(array $payload): array
     {
         if (isset($payload['tokens']) && is_array($payload['tokens'])) {
+            $userPayload = is_array($payload['user'] ?? null) ? $payload['user'] : [];
+
             return [
                 'token' => $payload['tokens']['access_token'] ?? null,
                 'refresh_token' => $payload['tokens']['refresh_token'] ?? null,
                 'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
-                'user' => $this->userSummary($payload['user'] ?? []),
+                'user' => $this->userSummary($userPayload),
                 'tenant' => $this->relationSummary($payload['tenant'] ?? null),
                 'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
+                'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
+                'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
                 'session_id' => $payload['session']['id'] ?? null,
             ];
         }
 
         if (isset($payload['user']) && is_array($payload['user'])) {
+            $userPayload = $payload['user'];
+
             return [
-                'user' => $this->userSummary($payload['user']),
+                'user' => $this->userSummary($userPayload),
                 'tenant' => $this->relationSummary($payload['tenant'] ?? null),
                 'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
+                'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
+                'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
             ];
         }
 
@@ -75,7 +83,7 @@ final class AuthPayloadResource extends JsonResource
 
     /**
      * @param  array<string,mixed>  $user
-     * @return array{id:int|string|null,name:string|null,email:string|null}
+     * @return array{id:int|string|null,name:string|null,email:string|null,roles:list<string>,permissions:list<string>}
      */
     private function userSummary(array $user): array
     {
@@ -88,6 +96,8 @@ final class AuthPayloadResource extends JsonResource
             'id' => $user['id'] ?? null,
             'name' => $name !== '' ? $name : ($user['name'] ?? $user['email'] ?? null),
             'email' => isset($user['email']) ? (string) $user['email'] : null,
+            'roles' => $this->stringList($user['roles'] ?? []),
+            'permissions' => $this->stringList($user['permissions'] ?? []),
         ];
     }
 
@@ -105,6 +115,30 @@ final class AuthPayloadResource extends JsonResource
             'code' => isset($relation['code']) ? (string) $relation['code'] : null,
             'name' => isset($relation['name']) ? (string) $relation['name'] : null,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($value as $item) {
+            if (! is_scalar($item)) {
+                continue;
+            }
+
+            $normalized = trim((string) $item);
+            if ($normalized !== '') {
+                $items[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($items));
     }
 
     private function sanitize(mixed $value): mixed

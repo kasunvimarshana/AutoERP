@@ -11,6 +11,14 @@ const REFRESH_TOKEN_KEY = 'autoerp.refresh_token';
 const SESSION_KEY = 'autoerp.session_id';
 const TENANT_KEY = 'autoerp.tenant_id';
 const ORG_KEY = 'autoerp.organization_unit_id';
+const LEGACY_AUTH_KEYS = [
+    'autoerp.user',
+    'autoerp.current_user',
+    'autoerp.permissions',
+    'autoerp.roles',
+    'autoerp.tenant',
+    'autoerp.organization_unit',
+];
 
 function storedNumber(key: string): number | null {
     const value = window.localStorage.getItem(key);
@@ -41,6 +49,7 @@ export function clearStoredAuthSession(): void {
     window.localStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem(TENANT_KEY);
     window.localStorage.removeItem(ORG_KEY);
+    LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
 }
 
 function setString(key: string, value: string | null): void {
