@@ -24,12 +24,22 @@ export function ExportActions({ reportKey, params }: { reportKey: string; params
         <div className="space-y-2">
             <ErrorAlert error={error} />
             <div className="flex flex-wrap gap-2">
-                {(['csv', 'xlsx', 'pdf', 'print'] as ReportFormat[]).map((format) => (
+                {(['html', 'print', 'pdf', 'xlsx', 'csv'] as ReportFormat[]).map((format) => (
                     <Button key={format} type="button" variant="secondary" loading={busy === format} onClick={() => void run(format)}>
-                        {format.toUpperCase()}
+                        {label(format)}
                     </Button>
                 ))}
             </div>
         </div>
     );
+}
+
+function label(format: ReportFormat): string {
+    return {
+        html: 'Preview',
+        print: 'Print',
+        pdf: 'PDF',
+        xlsx: 'Excel',
+        csv: 'CSV',
+    }[format];
 }

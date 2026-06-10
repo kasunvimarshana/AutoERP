@@ -1,7 +1,7 @@
 import type { ApiCollection } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 
-export type ReportFormat = 'csv' | 'xlsx' | 'pdf' | 'print';
+export type ReportFormat = 'html' | 'csv' | 'xlsx' | 'pdf' | 'print';
 
 export interface ReportColumn {
     key: string;

@@ -11,13 +11,13 @@ use Illuminate\Database\Eloquent\Model;
 final readonly class ReportDefinition
 {
     /**
-     * @param class-string<Model> $model
-     * @param array<int, ReportColumn> $columns
-     * @param array<int, string> $search
-     * @param array<int, string> $relations
-     * @param array<int, ReportFilter> $filters
-     * @param array<string, mixed> $constraints
-     * @param Closure(Builder): Builder|null $scope
+     * @param  class-string<Model>  $model
+     * @param  array<int, ReportColumn>  $columns
+     * @param  array<int, string>  $search
+     * @param  array<int, string>  $relations
+     * @param  array<int, ReportFilter>  $filters
+     * @param  array<string, mixed>  $constraints
+     * @param  Closure(Builder): Builder|null  $scope
      */
     public function __construct(
         public string $key,
@@ -35,6 +35,7 @@ final readonly class ReportDefinition
         public array $constraints = [],
         public ?Closure $scope = null,
         public string $description = '',
+        public ?string $orientation = null,
     ) {}
 
     public function column(string $key): ?ReportColumn
@@ -74,6 +75,8 @@ final readonly class ReportDefinition
             'supports_date_range' => $this->dateColumn !== null,
             'default_sort' => $this->defaultSort,
             'default_direction' => $this->defaultDirection,
+            'orientation' => $this->orientation ?? (count($this->columns) > 7 ? 'landscape' : 'portrait'),
+            'formats' => ['html', 'print', 'pdf', 'xlsx', 'csv'],
         ];
     }
 }

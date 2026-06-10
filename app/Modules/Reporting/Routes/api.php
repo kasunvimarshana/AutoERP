@@ -19,17 +19,17 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
     Route::get('/', [ReportController::class, 'index'])->name('index');
     Route::get('vehicle-service/technician-work', [TechnicianWorkReportController::class, 'index'])->name('vehicle-service.technician-work');
     Route::get('vehicle-service/technician-work/export/{format}', [TechnicianWorkReportController::class, 'export'])
-        ->whereIn('format', ['csv', 'xlsx', 'pdf', 'print'])
+        ->whereIn('format', ['html', 'csv', 'xlsx', 'pdf', 'print'])
         ->name('vehicle-service.technician-work.export');
     Route::get('vehicle-service/employee-commissions', [EmployeeCommissionReportController::class, 'index'])
         ->name('vehicle-service.employee-commissions');
     Route::get('vehicle-service/employee-commissions/export/{format}', [EmployeeCommissionReportController::class, 'export'])
-        ->whereIn('format', ['csv', 'xlsx', 'pdf', 'print'])
+        ->whereIn('format', ['html', 'csv', 'xlsx', 'pdf', 'print'])
         ->name('vehicle-service.employee-commissions.export');
     Route::get('{report}', [ReportController::class, 'show'])->where('report', '[A-Za-z0-9._-]+')->name('show');
     Route::get('{report}/run', [ReportController::class, 'run'])->where('report', '[A-Za-z0-9._-]+')->name('run');
     Route::get('{report}/export/{format}', [ReportController::class, 'export'])
         ->where('report', '[A-Za-z0-9._-]+')
-        ->whereIn('format', ['csv', 'xlsx', 'pdf', 'print'])
+        ->whereIn('format', ['html', 'csv', 'xlsx', 'pdf', 'print'])
         ->name('export');
 });

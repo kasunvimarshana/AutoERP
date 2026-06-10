@@ -24,16 +24,18 @@ final class EmployeeCommissionReportController
 
     public function export(EmployeeCommissionReportRequest $request, string $format): Response
     {
-        $rows = $this->reports->exportRows($this->input($request))->all();
+        $input = $this->input($request);
+        $rows = $this->reports->exportRows($input)->all();
         $definition = $this->reports->definition();
 
-        return match ($format) {
-            'csv' => $this->export->csv($definition, $rows),
-            'xlsx' => $this->export->xlsx($definition, $rows),
-            'pdf' => $this->export->pdf($definition, $rows),
-            'print' => $this->export->print($definition, $rows),
-            default => response('Unsupported export format.', 422),
-        };
+        return $this->export->export(
+            $format,
+            $definition,
+            $rows,
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $input,
+        );
     }
 
     /**

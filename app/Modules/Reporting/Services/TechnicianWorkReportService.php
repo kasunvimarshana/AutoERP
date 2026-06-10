@@ -24,7 +24,7 @@ final class TechnicianWorkReportService
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
-     * @param array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      * @return array<string, mixed>
      */
     public function run(array $params): array
@@ -63,7 +63,7 @@ final class TechnicianWorkReportService
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      * @return Collection<int, array<string, mixed>>
      */
     public function exportRows(array $params): Collection
@@ -96,15 +96,15 @@ final class TechnicianWorkReportService
                 new ReportColumn('line_source_type', 'Line source type', 'line_source_type', 'line_source_type'),
                 new ReportColumn('employee_name', 'Technician'),
                 new ReportColumn('role_type', 'Role type', 'role_type', 'role_type'),
-                new ReportColumn('assigned_hours', 'Assigned hours', 'assigned_hours', 'assigned_hours', 'decimal'),
+                new ReportColumn('assigned_hours', 'Assigned hours', 'assigned_hours', 'assigned_hours', 'decimal', true),
                 new ReportColumn('rate', 'Rate', 'rate', 'rate', 'currency'),
-                new ReportColumn('labour_amount', 'Labour amount', 'labour_amount', null, 'currency'),
-                new ReportColumn('line_total', 'Line total', 'line_total', 'line_total', 'currency'),
+                new ReportColumn('labour_amount', 'Labour amount', 'labour_amount', null, 'currency', true),
+                new ReportColumn('line_total', 'Line total', 'line_total', 'line_total', 'currency', true),
                 new ReportColumn('commission_type', 'Commission type', 'commission_type', 'commission_type'),
                 new ReportColumn('commission_value', 'Commission value', 'commission_value', 'commission_value', 'decimal'),
-                new ReportColumn('commission_amount', 'Commission amount', 'commission_amount', 'commission_amount', 'currency'),
+                new ReportColumn('commission_amount', 'Commission amount', 'commission_amount', 'commission_amount', 'currency', true),
                 new ReportColumn('supervisor_name', 'Supervisor'),
-                new ReportColumn('supervisor_commission_amount', 'Supervisor commission', 'supervisor_commission_amount', 'supervisor_commission_amount', 'currency'),
+                new ReportColumn('supervisor_commission_amount', 'Supervisor commission', 'supervisor_commission_amount', 'supervisor_commission_amount', 'currency', true),
                 new ReportColumn('invoice_status', 'Invoice status'),
                 new ReportColumn('payment_status', 'Payment status'),
             ],
@@ -115,7 +115,7 @@ final class TechnicianWorkReportService
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      * @return Builder<VehicleServiceLineEmployee>
      */
     private function filteredQuery(array $params): Builder
@@ -232,8 +232,8 @@ final class TechnicianWorkReportService
     }
 
     /**
-     * @param Builder<VehicleServiceLineEmployee> $query
-     * @param array<string, mixed> $params
+     * @param  Builder<VehicleServiceLineEmployee>  $query
+     * @param  array<string, mixed>  $params
      */
     private function applySorting(Builder $query, array $params): void
     {

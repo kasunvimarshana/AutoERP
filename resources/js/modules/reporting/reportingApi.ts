@@ -35,7 +35,7 @@ export async function exportReport(key: string, format: ReportFormat, params: Re
     const blob = response.data;
     const url = URL.createObjectURL(blob);
 
-    if (format === 'print') {
+    if (format === 'print' || format === 'html') {
         window.open(url, '_blank', 'noopener,noreferrer');
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         return;
@@ -43,11 +43,17 @@ export async function exportReport(key: string, format: ReportFormat, params: Re
 
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${key.replaceAll('/', '-').replaceAll('.', '-')}.${format}`;
+    link.download = responseFilename(response.headers['content-disposition'])
+        ?? `${key.replaceAll('/', '-').replaceAll('.', '-')}.${format}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+}
+
+function responseFilename(contentDisposition?: string): string | null {
+    const match = contentDisposition?.match(/filename="?([^";]+)"?/i);
+    return match?.[1] ?? null;
 }
 
 export async function runTechnicianWorkReport(params: TechnicianWorkReportParams, signal?: AbortSignal): Promise<TechnicianWorkReportResult> {

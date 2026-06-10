@@ -44,6 +44,10 @@ final class ReportCatalog
     /** @var array<string, ReportDefinition>|null */
     private ?array $reports = null;
 
+    public function __construct(
+        private readonly VehicleServiceProfitabilityCalculator $profitability,
+    ) {}
+
     /**
      * @return array<string, ReportDefinition>
      */
@@ -90,9 +94,9 @@ final class ReportCatalog
                 $this->col('is_stockable', 'Stockable', format: 'boolean', sort: 'is_stockable'),
                 $this->col('is_active', 'Active', format: 'boolean', sort: 'is_active'),
             ], ['code', 'name', 'category.name', 'brand.name'], ['category', 'brand', 'baseUom']),
-            $this->party('masters.supplier', 'Supplier', Supplier::class),
-            $this->party('masters.customer', 'Customer', Customer::class),
-            $this->masters('masters.vehicle', 'Vehicle', Vehicle::class, [
+            $this->party('masters.supplier', 'Supplier Report', Supplier::class),
+            $this->party('masters.customer', 'Customer Report', Customer::class),
+            $this->masters('masters.vehicle', 'Vehicle Report', Vehicle::class, [
                 $this->col('vehicle_number', 'Vehicle No.', sort: 'vehicle_number'),
                 $this->col('code', 'Code', sort: 'code'),
                 $this->col('registration_number', 'Registration', sort: 'registration_number'),
@@ -101,7 +105,7 @@ final class ReportCatalog
                 $this->col('customer', 'Customer', 'customer.name'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['vehicle_number', 'code', 'registration_number', 'make.name', 'model.name', 'customer.name'], ['make', 'model', 'customer']),
-            $this->masters('masters.employee', 'Employee', HrEmployee::class, [
+            $this->masters('masters.employee', 'Employee Report', HrEmployee::class, [
                 $this->col('employee_number', 'Employee No.', sort: 'employee_number'),
                 $this->col('display_name', 'Name', sort: 'display_name'),
                 $this->col('department', 'Department', 'department.name'),
@@ -146,24 +150,25 @@ final class ReportCatalog
             $this->definition('purchase.supplier-item-mapping', 'Supplier Item Mapping', 'Purchase', SupplierItemMapping::class, [
                 $this->col('supplier', 'Supplier', 'supplier.name'), $this->itemCol(), $this->col('supplier_item_code', 'Supplier Code', sort: 'supplier_item_code'),
                 $this->col('supplier_item_name', 'Supplier Name', sort: 'supplier_item_name'), $this->col('uom', 'Purchase UOM', 'defaultPurchaseUom.code'),
-                $this->qty('minimum_order_quantity', 'MOQ'), $this->col('lead_time_days', 'Lead Time', sort: 'lead_time_days'), $this->col('is_preferred', 'Preferred', format: 'boolean', sort: 'is_preferred'),
+                $this->qty('minimum_order_quantity', 'MOQ', false), $this->col('lead_time_days', 'Lead Time', sort: 'lead_time_days'), $this->col('is_preferred', 'Preferred', format: 'boolean', sort: 'is_preferred'),
             ], ['supplier.name', 'item.code', 'item.name', 'supplier_item_code', 'supplier_item_name'], ['supplier', 'item', 'defaultPurchaseUom'], includeGlobalOrganization: true),
 
-            $this->serviceJob('vehicle-service.jobs', 'Service Jobs'),
+            $this->serviceJob('vehicle-service.jobs', 'Vehicle Service Jobs'),
+            $this->profitabilityReport(),
             $this->definition('vehicle-service.job-status', 'Job Status', 'Vehicle Service', VehicleServiceStatusHistory::class, [
                 $this->col('changed_at', 'Changed At', format: 'datetime', sort: 'changed_at'), $this->col('job', 'Job', 'job.job_number'),
                 $this->col('old_status', 'From', format: 'enum', sort: 'old_status'), $this->col('new_status', 'To', format: 'enum', sort: 'new_status'),
             ], ['job.job_number', 'old_status', 'new_status'], ['job'], 'changed_at'),
             $this->labour('vehicle-service.labour-assignment', 'Labour Assignment'),
             $this->labour('vehicle-service.technician-work', 'Technician Work'),
-            $this->labour('vehicle-service.employee-commissions', 'Employee Commission'),
+            $this->labour('vehicle-service.employee-commissions', 'Employee Commission Report'),
             $this->definition('vehicle-service.supervisor-commission', 'Supervisor Commission', 'Vehicle Service', VehicleServiceJob::class, [
                 $this->col('job_date', 'Date', format: 'date', sort: 'job_date'), $this->col('job_number', 'Job', sort: 'job_number'),
-                $this->col('supervisor', 'Supervisor', 'supervisor.display_name'), $this->money('supervisor_commission_value', 'Value'),
+                $this->col('supervisor', 'Supervisor', 'supervisor.display_name'), $this->money('supervisor_commission_value', 'Value', false),
                 $this->money('supervisor_commission_amount', 'Commission'), $this->money('grand_total', 'Job Total'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['job_number', 'supervisor.display_name'], ['supervisor'], 'job_date'),
             $this->definition('vehicle-service.parts-usage', 'Parts Usage', 'Vehicle Service', VehicleServiceJobLine::class, [
-                $this->col('job', 'Job', 'job.job_number'), $this->itemCol(), $this->qty('quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost'), $this->money('line_total', 'Line Total'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                $this->col('job', 'Job', 'job.job_number'), $this->itemCol(), $this->qty('quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false), $this->money('line_total', 'Line Total'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['job.job_number', 'item.code', 'item.name'], ['job', 'item'], constraints: ['is_inventory_tracked' => true]),
 
             $this->invoice('invoice.register', 'Invoice Register', Invoice::class, 'invoice_date', 'invoice_number', 'grand_total'),
@@ -236,7 +241,7 @@ final class ReportCatalog
     {
         return $this->masters($key, $title, $model, [
             $this->col('code', 'Code', sort: 'code'), $this->col('name', 'Name', sort: 'name'), $this->col('display_name', 'Display Name', sort: 'display_name'),
-            $this->col('email', 'Email', sort: 'email'), $this->col('phone', 'Phone', sort: 'phone'), $this->col('status', 'Status', format: 'enum', sort: 'status'), $this->money('credit_limit', 'Credit Limit'),
+            $this->col('email', 'Email', sort: 'email'), $this->col('phone', 'Phone', sort: 'phone'), $this->col('status', 'Status', format: 'enum', sort: 'status'), $this->money('credit_limit', 'Credit Limit', false),
         ], ['code', 'name', 'display_name', 'email', 'phone']);
     }
 
@@ -269,11 +274,46 @@ final class ReportCatalog
         ], ['job_number', 'customer.name', 'vehicle.vehicle_number', 'supervisor.display_name'], ['customer', 'vehicle', 'supervisor'], 'job_date');
     }
 
+    private function profitabilityReport(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'vehicle-service.profitability',
+            title: 'Vehicle Service Profitability Report',
+            group: 'Vehicle Service',
+            model: VehicleServiceJob::class,
+            columns: [
+                $this->col('job_date', 'Date', format: 'date', sort: 'job_date'),
+                $this->col('job_number', 'Job', sort: 'job_number'),
+                $this->col('customer', 'Customer', 'customer.name'),
+                $this->col('vehicle', 'Vehicle', 'vehicle.vehicle_number'),
+                $this->calculatedMoney('revenue', 'Revenue'),
+                $this->calculatedMoney('direct_cost', 'Direct Cost'),
+                $this->calculatedMoney('commission', 'Commission'),
+                $this->calculatedMoney('gross_profit', 'Gross Profit'),
+                new ReportColumn(
+                    key: 'margin',
+                    label: 'Margin %',
+                    format: 'decimal',
+                    value: fn (VehicleServiceJob $job): string => $this->profitability->value($job, 'margin'),
+                ),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['job_number', 'customer.name', 'vehicle.vehicle_number'],
+            relations: ['customer', 'vehicle', 'lines', 'employeeAssignments'],
+            filters: [$this->filter('status', 'Status', 'status')],
+            dateColumn: 'job_date',
+            defaultSort: 'job_date',
+            defaultDirection: 'desc',
+            description: 'Revenue, direct line cost, stored commission, gross profit, and margin by service job.',
+            orientation: 'landscape',
+        );
+    }
+
     private function labour(string $key, string $title): ReportDefinition
     {
         return $this->definition($key, $title, 'Vehicle Service', VehicleServiceLineEmployee::class, [
             $this->col('assigned_at', 'Assigned', format: 'datetime', sort: 'assigned_at'), $this->col('job', 'Job', 'job.job_number'), $this->col('employee', 'Employee', 'employee.display_name'),
-            $this->qty('assigned_hours', 'Hours'), $this->money('rate', 'Rate'), $this->money('commission_amount', 'Commission'), $this->col('completed_at', 'Completed', format: 'datetime', sort: 'completed_at'),
+            $this->qty('assigned_hours', 'Hours'), $this->money('rate', 'Rate', false), $this->money('commission_amount', 'Commission'), $this->col('completed_at', 'Completed', format: 'datetime', sort: 'completed_at'),
         ], ['job.job_number', 'employee.display_name'], ['job', 'employee'], 'assigned_at');
     }
 
@@ -298,14 +338,25 @@ final class ReportCatalog
         return new ReportColumn($key, $label, $path, $sort, $format);
     }
 
-    private function qty(string $key, string $label): ReportColumn
+    private function qty(string $key, string $label, bool $summarize = true): ReportColumn
     {
-        return $this->col($key, $label, format: 'decimal', sort: $key);
+        return new ReportColumn($key, $label, null, $key, 'decimal', $summarize);
     }
 
-    private function money(string $key, string $label): ReportColumn
+    private function money(string $key, string $label, bool $summarize = true): ReportColumn
     {
-        return $this->col($key, $label, format: 'money', sort: $key);
+        return new ReportColumn($key, $label, null, $key, 'money', $summarize);
+    }
+
+    private function calculatedMoney(string $key, string $label): ReportColumn
+    {
+        return new ReportColumn(
+            key: $key,
+            label: $label,
+            format: 'money',
+            summarize: true,
+            value: fn (VehicleServiceJob $job): string => $this->profitability->value($job, $key),
+        );
     }
 
     private function itemCol(): ReportColumn

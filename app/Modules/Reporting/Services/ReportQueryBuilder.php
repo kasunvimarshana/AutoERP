@@ -16,7 +16,7 @@ use Modules\Reporting\DTOs\ReportFilter;
 final class ReportQueryBuilder
 {
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return Builder<Model>
      */
     public function query(ReportDefinition $definition, int $tenantId, ?int $organizationUnitId, array $input): Builder
@@ -61,7 +61,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return LengthAwarePaginator<Model>
      */
     public function paginate(ReportDefinition $definition, int $tenantId, ?int $organizationUnitId, array $input, int $perPage): LengthAwarePaginator
@@ -70,7 +70,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param iterable<Model|array<string, mixed>> $rows
+     * @param  iterable<Model|array<string, mixed>>  $rows
      * @return array<int, array<string, mixed>>
      */
     public function rows(ReportDefinition $definition, iterable $rows): array
@@ -85,7 +85,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param Model|array<string, mixed> $row
+     * @param  Model|array<string, mixed>  $row
      * @return array<string, mixed>
      */
     public function row(ReportDefinition $definition, Model|array $row): array
@@ -100,7 +100,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param array<int, string> $fields
+     * @param  array<int, string>  $fields
      */
     private function applySearch(Builder $query, string $search, array $fields): void
     {
@@ -117,7 +117,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      */
     private function applyDateRange(Builder $query, ReportDefinition $definition, array $input): void
     {
@@ -135,7 +135,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      */
     private function applyFilters(Builder $query, ReportDefinition $definition, array $values): void
     {
@@ -168,7 +168,7 @@ final class ReportQueryBuilder
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      */
     private function applySort(Builder $query, ReportDefinition $definition, array $input): void
     {
@@ -206,6 +206,10 @@ final class ReportQueryBuilder
 
     private function value(Model|array $row, ReportColumn $column): mixed
     {
+        if ($column->value !== null) {
+            return ($column->value)($row);
+        }
+
         $path = $column->path ?? $column->key;
         $value = data_get($row, $path);
 

@@ -34,12 +34,13 @@ final class TechnicianWorkReportController
         $definition = $this->reports->definition();
         $rows = $this->reports->exportRows($input)->all();
 
-        return match ($format) {
-            'csv' => $this->export->csv($definition, $rows),
-            'xlsx' => $this->export->xlsx($definition, $rows),
-            'pdf' => $this->export->pdf($definition, $rows),
-            'print' => $this->export->print($definition, $rows),
-            default => response('Unsupported export format.', 422),
-        };
+        return $this->export->export(
+            $format,
+            $definition,
+            $rows,
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $input,
+        );
     }
 }
