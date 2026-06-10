@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getPayment, getPaymentAllocations, getPaymentUnappliedBalance } from '../paymentApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -13,6 +13,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
+import { Button } from '@/shared/components/Button';
 
 type Tab = 'summary' | 'allocations' | 'unapplied';
 const tabs = [{ id: 'summary' as Tab, label: 'Summary' }, { id: 'allocations' as Tab, label: 'Allocations' }, { id: 'unapplied' as Tab, label: 'Unapplied Balance' }];
@@ -26,9 +27,14 @@ export default function PaymentDetailPage() {
     if (payment.loading) return <LoadingState />;
     if (!payment.data) return <ErrorAlert error={payment.error} />;
     const value = payment.data;
+    const isCheque = value.lines?.some((line) => line.payment_method?.method_type === 'cheque') ?? false;
     return (
         <>
-            <ContentHeader title={value.payment_number ?? 'Payment'} description={formatDate(value.payment_date)} />
+            <ContentHeader
+                title={value.payment_number ?? 'Payment'}
+                description={formatDate(value.payment_date)}
+                actions={isCheque ? <Link to={`/payments/${id}/cheque-print`}><Button>Print cheque</Button></Link> : undefined}
+            />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
@@ -40,6 +46,11 @@ export default function PaymentDetailPage() {
                         { label: 'Total', value: <MoneyDisplay value={value.total_amount} /> },
                         { label: 'Allocated', value: <MoneyDisplay value={value.allocated_amount} /> },
                         { label: 'Unapplied', value: <MoneyDisplay value={value.unapplied_amount} /> },
+                        ...(isCheque ? [
+                            { label: 'Payee', value: value.payee_name ?? '-' },
+                            { label: 'Cheque number', value: value.cheque_number ?? '-' },
+                            { label: 'Cheque date', value: formatDate(value.cheque_date) },
+                        ] : []),
                     ]} />}
                     {tabState.activeTab === 'allocations' && (allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'status']} />)}
                     {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['original_amount', 'applied_amount', 'refunded_amount', 'available_amount', 'status']} />)}

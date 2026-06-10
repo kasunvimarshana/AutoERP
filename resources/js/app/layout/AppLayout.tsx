@@ -7,6 +7,7 @@ type NavigationItem = {
     to: string;
     label: string;
     match?: string[];
+    exclude?: string[];
 };
 
 const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
@@ -46,7 +47,8 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/purchase/invoices/create', label: 'Supplier invoice' },
             { to: '/purchase/payments/prepare', label: 'Prepare supplier payment' },
             { to: '/invoices', label: 'Invoices' },
-            { to: '/payments', label: 'Payments' },
+            { to: '/payments', label: 'Payments', exclude: ['/payments/cheque-templates'] },
+            { to: '/payments/cheque-templates', label: 'Cheque templates' },
             { to: '/finance/accounts', label: 'Chart of accounts' },
             { to: '/finance/journals', label: 'Journals' },
             { to: '/reports', label: 'Reports' },
@@ -64,7 +66,7 @@ export function AppLayout() {
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900">
             {sidebarOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation" />}
-            <aside className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-white transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-white transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="flex h-16 items-center border-b border-slate-800 px-5">
                     <Link to="/dashboard" onClick={() => setSidebarOpen(false)} className="min-w-0">
                         <span className="block text-lg font-bold tracking-tight">AutoERP</span>
@@ -80,12 +82,13 @@ export function AppLayout() {
                                     const active = item.match
                                         ? item.match.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`))
                                         : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+                                    const visibleActive = active && !item.exclude?.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
                                     return (
                                         <NavLink
                                             key={item.to}
                                             to={item.to}
                                             onClick={() => setSidebarOpen(false)}
-                                            className={`block rounded-md px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-400 ${active ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                                            className={`block rounded-md px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-sky-400 ${visibleActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
                                         >
                                             {item.label}
                                         </NavLink>
@@ -96,8 +99,8 @@ export function AppLayout() {
                     ))}
                 </nav>
             </aside>
-            <div className="lg:pl-72">
-                <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+            <div className="app-content lg:pl-72">
+                <header className="app-header sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
                     <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold lg:hidden" onClick={() => setSidebarOpen(true)}>Menu</button>
                     <div className="min-w-0 text-sm text-slate-500">
                         <div className="truncate">
@@ -126,7 +129,7 @@ export function AppLayout() {
                         Logout
                     </Button>
                 </header>
-                <main className="p-4 sm:p-6 lg:p-8">
+                <main className="app-main p-4 sm:p-6 lg:p-8">
                     <Outlet />
                 </main>
             </div>

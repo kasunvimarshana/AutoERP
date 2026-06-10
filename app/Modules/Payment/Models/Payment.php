@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentStatus;
@@ -31,10 +32,12 @@ final class Payment extends CoreModel
             'organization_unit_id' => 'integer',
             'party_id' => 'integer',
             'currency_id' => 'integer',
+            'bank_account_id' => 'integer',
             'payment_type' => PaymentType::class,
             'direction' => PaymentDirection::class,
             'status' => PaymentStatus::class,
             'payment_date' => 'date',
+            'cheque_date' => 'date',
             'exchange_rate' => 'decimal:6',
             'total_amount' => 'decimal:6',
             'allocated_amount' => 'decimal:6',
@@ -64,6 +67,11 @@ final class Payment extends CoreModel
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinanceAccount::class, 'bank_account_id');
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(PaymentLine::class, 'payment_id');
@@ -87,5 +95,10 @@ final class Payment extends CoreModel
     public function refunds(): HasMany
     {
         return $this->hasMany(PaymentRefund::class, 'payment_id');
+    }
+
+    public function chequePrintLogs(): HasMany
+    {
+        return $this->hasMany(ChequePrintLog::class, 'payment_id');
     }
 }

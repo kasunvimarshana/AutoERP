@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Payment\Http\Controllers\ChequePrintController;
+use Modules\Payment\Http\Controllers\ChequeTemplateController;
 use Modules\Payment\Http\Controllers\PaymentController;
 
 $middleware = [
@@ -14,6 +16,11 @@ $middleware = [
 ];
 
 Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments.')->group(function (): void {
+    Route::get('cheque-templates', [ChequeTemplateController::class, 'index'])->name('cheque-templates.index');
+    Route::post('cheque-templates', [ChequeTemplateController::class, 'store'])->name('cheque-templates.store');
+    Route::get('cheque-templates/{id}', [ChequeTemplateController::class, 'show'])->whereNumber('id')->name('cheque-templates.show');
+    Route::put('cheque-templates/{id}', [ChequeTemplateController::class, 'update'])->whereNumber('id')->name('cheque-templates.update');
+    Route::delete('cheque-templates/{id}', [ChequeTemplateController::class, 'destroy'])->whereNumber('id')->name('cheque-templates.destroy');
     Route::get('/', [PaymentController::class, 'index'])->name('index');
     Route::post('/', [PaymentController::class, 'store'])->name('store');
     Route::get('{payment}', [PaymentController::class, 'show'])->whereNumber('payment')->name('show');
@@ -25,4 +32,6 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::get('{payment}/allocations', [PaymentController::class, 'allocations'])->whereNumber('payment')->name('allocations.index');
     Route::get('{payment}/unapplied-balance', [PaymentController::class, 'unappliedBalance'])->whereNumber('payment')->name('unapplied-balance');
     Route::post('{payment}/refunds', [PaymentController::class, 'refund'])->whereNumber('payment')->name('refunds.store');
+    Route::get('{payment}/cheque-print/preview', [ChequePrintController::class, 'preview'])->whereNumber('payment')->name('cheque-print.preview');
+    Route::post('{payment}/cheque-print/mark-printed', [ChequePrintController::class, 'markPrinted'])->whereNumber('payment')->name('cheque-print.mark-printed');
 });

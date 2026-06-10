@@ -13,6 +13,17 @@ export interface Payment extends Record<string, unknown> {
     total_amount?: string;
     allocated_amount?: string;
     unapplied_amount?: string;
+    cheque_number?: string | null;
+    cheque_date?: string | null;
+    payee_name?: string | null;
+    amount_in_words?: string | null;
+    lines?: Array<{
+        payment_method?: {
+            id: number;
+            name?: string;
+            method_type?: string;
+        } | null;
+    }>;
 }
 
 export async function listPayments(params: ListParams, signal?: AbortSignal) {

@@ -28,8 +28,20 @@ final class StorePaymentRequest extends TenantScopedRequest
             'currency_id' => ['nullable', 'integer', 'min:1'],
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'reference_number' => ['nullable', 'string', 'max:150'],
+            'cheque_number' => ['nullable', 'string', 'max:100'],
+            'cheque_date' => ['nullable', 'date'],
+            'bank_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('finance_accounts', 'id')
+                    ->where('tenant_id', $this->tenantId())
+                    ->where('is_bank_account', true),
+            ],
+            'payee_name' => ['nullable', 'string', 'max:255'],
+            'amount_in_words' => ['nullable', 'string', 'max:2000'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
+            'lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.cleared_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'allocations' => ['nullable', 'array'],
@@ -53,6 +65,11 @@ final class StorePaymentRequest extends TenantScopedRequest
             currencyId: $this->intOrNull('currency_id'),
             exchangeRate: (string) $this->input('exchange_rate', '1.000000'),
             referenceNumber: $this->stringOrNull('reference_number'),
+            chequeNumber: $this->stringOrNull('cheque_number'),
+            chequeDate: $this->stringOrNull('cheque_date'),
+            bankAccountId: $this->intOrNull('bank_account_id'),
+            payeeName: $this->stringOrNull('payee_name'),
+            amountInWords: $this->stringOrNull('amount_in_words'),
             notes: $this->stringOrNull('notes'),
             createdBy: $this->currentUserId(),
             lines: array_map(static fn (array $row): PaymentLineData => new PaymentLineData(

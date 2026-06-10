@@ -47,6 +47,9 @@ const InvoiceListPage = lazy(() => import('@/modules/invoice/pages/InvoiceListPa
 const InvoiceDetailPage = lazy(() => import('@/modules/invoice/pages/InvoiceDetailPage'));
 const PaymentListPage = lazy(() => import('@/modules/payment/pages/PaymentListPage'));
 const PaymentDetailPage = lazy(() => import('@/modules/payment/pages/PaymentDetailPage'));
+const ChequeTemplateListPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateListPage'));
+const ChequeTemplateFormPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateFormPage'));
+const ChequePrintPreviewPage = lazy(() => import('@/modules/payment/cheque-print/ChequePrintPreviewPage'));
 const FinanceAccountsPage = lazy(() => import('@/modules/finance/pages/FinanceAccountsPage'));
 const FinanceAccountDetailPage = lazy(() => import('@/modules/finance/pages/FinanceAccountDetailPage'));
 const FinanceJournalsPage = lazy(() => import('@/modules/finance/pages/FinanceJournalsPage'));
@@ -117,6 +120,10 @@ export function AppRouter() {
                     <Route path="/invoices" element={<InvoiceListPage />} />
                     <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                     <Route path="/payments" element={<PaymentListPage />} />
+                    <Route path="/payments/cheque-templates" element={<ChequeTemplateListPage />} />
+                    <Route path="/payments/cheque-templates/create" element={<ChequeTemplateFormPage />} />
+                    <Route path="/payments/cheque-templates/:id/edit" element={<ChequeTemplateFormPage />} />
+                    <Route path="/payments/:id/cheque-print" element={<ChequePrintPreviewPage />} />
                     <Route path="/payments/:id" element={<PaymentDetailPage />} />
                     <Route path="/finance/accounts" element={<FinanceAccountsPage />} />
                     <Route path="/finance/accounts/:id" element={<FinanceAccountDetailPage />} />

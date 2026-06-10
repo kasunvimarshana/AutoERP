@@ -20,3 +20,66 @@ button,
 a {
     -webkit-tap-highlight-color: transparent;
 }
+
+.cheque-page {
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: white;
+    color: black;
+}
+
+.cheque-field {
+    position: absolute;
+}
+
+@media screen {
+    .cheque-page {
+        border: 1px solid #94a3b8;
+        box-shadow: 0 10px 25px rgb(15 23 42 / 0.12);
+    }
+}
+
+@media print {
+    .no-print,
+    .app-sidebar,
+    .app-header {
+        display: none !important;
+    }
+
+    @page {
+        size: 210mm 99mm;
+        margin: 0;
+    }
+
+    html,
+    body,
+    #app,
+    .app-content,
+    .app-main,
+    .cheque-print-workspace,
+    .cheque-print-stage {
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: white !important;
+        box-shadow: none !important;
+    }
+
+    body {
+        margin: 0;
+        background: white;
+    }
+
+    .app-content {
+        padding-left: 0 !important;
+    }
+
+    .cheque-page {
+        border: 0;
+        box-shadow: none;
+    }
+}
