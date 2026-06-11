@@ -22,6 +22,7 @@ final class StoreReservationRequest extends TenantScopedRequest
             'item_variant_id' => ['nullable', 'integer', 'min:1'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'batch_id' => ['nullable', 'integer', 'min:1'],
+            'uom_id' => ['nullable', 'integer', 'min:1'],
             'source_type' => ['nullable', 'string', 'max:150'],
             'source_id' => ['nullable', 'integer', 'min:1'],
             'source_line_type' => ['nullable', 'string', 'max:150'],
@@ -50,6 +51,8 @@ final class StoreReservationRequest extends TenantScopedRequest
             sourceLineId: $this->intOrNull('source_line_id'),
             expiresAt: $this->stringOrNull('expires_at'),
             notes: $this->stringOrNull('notes'),
+            uomId: $this->intOrNull('uom_id'),
+            createdBy: $this->currentUserId(),
         );
     }
 

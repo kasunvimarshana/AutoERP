@@ -50,14 +50,14 @@ final class InventoryFacade
         return $this->allocations->allocate($data);
     }
 
-    public function issueAllocation(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function issueAllocation(InventoryAllocation $allocation, ?string $quantity = null, ?int $issuedBy = null): InventoryAllocation
     {
-        return $this->allocations->issue($allocation, $quantity);
+        return $this->allocations->issue($allocation, $quantity, $issuedBy);
     }
 
-    public function release(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function release(InventoryAllocation $allocation, ?string $quantity = null, ?int $releasedBy = null): InventoryAllocation
     {
-        return $this->allocations->release($allocation, $quantity);
+        return $this->allocations->release($allocation, $quantity, $releasedBy);
     }
 
     public function reserve(ReservationData $data): InventoryReservation
@@ -65,9 +65,9 @@ final class InventoryFacade
         return $this->reservations->reserve($data);
     }
 
-    public function unreserve(InventoryReservation $reservation, ?string $quantity = null): InventoryReservation
+    public function unreserve(InventoryReservation $reservation, ?string $quantity = null, ?int $releasedBy = null): InventoryReservation
     {
-        return $this->reservations->release($reservation, $quantity);
+        return $this->reservations->release($reservation, $quantity, $releasedBy);
     }
 
     public function transfer(StockTransferData $data): InventoryTransfer
@@ -78,6 +78,16 @@ final class InventoryFacade
     public function postTransfer(InventoryTransfer $transfer, ?int $postedBy = null): InventoryTransfer
     {
         return $this->transfers->post($transfer, $postedBy);
+    }
+
+    public function receiveTransfer(InventoryTransfer $transfer, ?int $receivedBy = null): InventoryTransfer
+    {
+        return $this->transfers->receive($transfer, $receivedBy);
+    }
+
+    public function cancelTransfer(InventoryTransfer $transfer, ?int $cancelledBy = null): InventoryTransfer
+    {
+        return $this->transfers->cancel($transfer, $cancelledBy);
     }
 
     public function adjust(StockAdjustmentData $data): InventoryAdjustment

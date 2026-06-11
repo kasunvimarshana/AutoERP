@@ -24,6 +24,7 @@ final class StoreAllocationRequest extends TenantScopedRequest
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'batch_id' => ['nullable', 'integer', 'min:1'],
             'serial_number_id' => ['nullable', 'integer', 'min:1'],
+            'uom_id' => ['nullable', 'integer', 'min:1'],
             'source_type' => ['nullable', 'string', 'max:150'],
             'source_id' => ['nullable', 'integer', 'min:1'],
             'source_line_type' => ['nullable', 'string', 'max:150'],
@@ -55,6 +56,8 @@ final class StoreAllocationRequest extends TenantScopedRequest
             sourceLineType: $string('source_line_type'),
             sourceLineId: $int('source_line_id'),
             notes: $string('notes'),
+            uomId: $int('uom_id'),
+            createdBy: $this->currentUserId(),
         );
     }
 }

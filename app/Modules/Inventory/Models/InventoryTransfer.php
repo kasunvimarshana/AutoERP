@@ -33,6 +33,10 @@ final class InventoryTransfer extends CoreModel
             'status' => TransferStatus::class,
             'approved_at' => 'datetime',
             'posted_at' => 'datetime',
+            'dispatched_at' => 'datetime',
+            'received_at' => 'datetime',
+            'reversed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ]);
     }
 

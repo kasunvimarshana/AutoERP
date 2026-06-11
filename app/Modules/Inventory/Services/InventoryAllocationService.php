@@ -17,6 +17,7 @@ use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\ReservationStatus;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Models\InventoryAllocation;
@@ -37,13 +38,40 @@ final class InventoryAllocationService
         private readonly StockBalanceService $balances,
         private readonly StockMovementService $movements,
         private readonly InventoryMethodResolver $methods,
+        private readonly InventoryUomService $uoms,
+        private readonly InventoryStockStateService $states,
     ) {}
 
     public function allocate(AllocationData $data): InventoryAllocation
     {
         $quantity = $this->math->normalize($data->quantityAllocated);
         $this->validator->assertPositiveQuantity($quantity);
-        $item = $this->validateReferences($data, $quantity);
+        $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
+        if ($data->uomId !== null) {
+            $quantity = $this->uoms->quantity($data->tenantId, $data->organizationUnitId, $item, $data->uomId, $quantity);
+            $item = $item->refresh();
+            $data = new AllocationData(
+                tenantId: $data->tenantId,
+                allocationDate: $data->allocationDate,
+                itemId: $data->itemId,
+                warehouseId: $data->warehouseId,
+                quantityAllocated: $quantity,
+                organizationUnitId: $data->organizationUnitId,
+                allocationNumber: $data->allocationNumber,
+                reservationId: $data->reservationId,
+                itemVariantId: $data->itemVariantId,
+                warehouseLocationId: $data->warehouseLocationId,
+                batchId: $data->batchId,
+                serialNumberId: $data->serialNumberId,
+                sourceType: $data->sourceType,
+                sourceId: $data->sourceId,
+                sourceLineType: $data->sourceLineType,
+                sourceLineId: $data->sourceLineId,
+                notes: $data->notes,
+                createdBy: $data->createdBy,
+            );
+        }
+        $this->validateReferences($data, $quantity, $item);
 
         return DB::transaction(function () use ($data, $quantity, $item): InventoryAllocation {
             $reservation = $this->lockReservation($data, $quantity);
@@ -88,6 +116,7 @@ final class InventoryAllocationService
                 'source_line_id' => $effectiveData->sourceLineId,
                 'status' => AllocationStatus::Active,
                 'notes' => $effectiveData->notes,
+                'created_by' => $effectiveData->createdBy,
             ]);
 
             foreach ($plan->lines as $line) {
@@ -111,6 +140,18 @@ final class InventoryAllocationService
                     $serial->status = SerialStatus::Reserved;
                     $serial->save();
                 }
+                $this->states->record(
+                    $balance,
+                    $reservation instanceof InventoryReservation ? InventoryStockState::Reserved : InventoryStockState::Available,
+                    InventoryStockState::Allocated,
+                    $line->quantity,
+                    $effectiveData->sourceType ?? 'inventory_allocation',
+                    $effectiveData->sourceId ?? (int) $allocation->getKey(),
+                    $effectiveData->sourceLineType,
+                    $effectiveData->sourceLineId,
+                    'Inventory allocation '.$allocation->allocation_number,
+                    $effectiveData->createdBy,
+                );
             }
 
             if ($reservation instanceof InventoryReservation) {
@@ -126,9 +167,9 @@ final class InventoryAllocationService
         });
     }
 
-    public function issue(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function issue(InventoryAllocation $allocation, ?string $quantity = null, ?int $issuedBy = null): InventoryAllocation
     {
-        return DB::transaction(function () use ($allocation, $quantity): InventoryAllocation {
+        return DB::transaction(function () use ($allocation, $quantity, $issuedBy): InventoryAllocation {
             $allocation = InventoryAllocation::query()
                 ->with('lines.stockBalance')
                 ->lockForUpdate()
@@ -165,11 +206,14 @@ final class InventoryAllocationService
                     warehouseLocationId: $balance->warehouse_location_id,
                     batchId: $line->batch_id,
                     serialNumberId: $line->serial_number_id,
-                    sourceType: $allocation->source_type,
-                    sourceId: $allocation->source_id,
-                    sourceLineType: $allocation->source_line_type,
-                    sourceLineId: $allocation->source_line_id,
+                    sourceType: $allocation->source_type ?? 'inventory_allocation',
+                    sourceId: $allocation->source_id ?? (int) $allocation->getKey(),
+                    sourceLineType: $allocation->source_line_type ?? 'inventory_allocation_line',
+                    sourceLineId: $allocation->source_line_id ?? (int) $line->getKey(),
                     description: 'Issue from inventory allocation '.$allocation->allocation_number,
+                    createdBy: $issuedBy,
+                    fromState: InventoryStockState::Allocated,
+                    toState: InventoryStockState::Issued,
                 ));
 
                 InventoryAllocationIssue::query()->create([
@@ -197,6 +241,8 @@ final class InventoryAllocationService
             $allocation->quantity_remaining = $this->math->sub((string) $allocation->quantity_remaining, $issueQuantity);
             if ($this->math->isZero((string) $allocation->quantity_remaining)) {
                 $allocation->status = AllocationStatus::Issued;
+                $allocation->issued_by = $issuedBy;
+                $allocation->issued_at = now();
             }
             $allocation->save();
 
@@ -204,9 +250,9 @@ final class InventoryAllocationService
         });
     }
 
-    public function release(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function release(InventoryAllocation $allocation, ?string $quantity = null, ?int $releasedBy = null): InventoryAllocation
     {
-        return DB::transaction(function () use ($allocation, $quantity): InventoryAllocation {
+        return DB::transaction(function () use ($allocation, $quantity, $releasedBy): InventoryAllocation {
             $allocation = InventoryAllocation::query()->with('lines')->lockForUpdate()->findOrFail($allocation->getKey());
             if ($allocation->status !== AllocationStatus::Active) {
                 throw new InvalidArgumentException('Only active inventory allocations can be released.');
@@ -237,12 +283,26 @@ final class InventoryAllocationService
                         $serial->save();
                     }
                 }
+                $this->states->record(
+                    $balance,
+                    InventoryStockState::Allocated,
+                    InventoryStockState::Available,
+                    $planLine->quantity,
+                    $allocation->source_type ?? 'inventory_allocation',
+                    $allocation->source_id ?? (int) $allocation->getKey(),
+                    $allocation->source_line_type,
+                    $allocation->source_line_id,
+                    'Inventory allocation release '.$allocation->allocation_number,
+                    $releasedBy,
+                );
             }
 
             $allocation->quantity_released = $this->math->add((string) $allocation->quantity_released, $releaseQuantity);
             $allocation->quantity_remaining = $this->math->sub((string) $allocation->quantity_remaining, $releaseQuantity);
             if ($this->math->isZero((string) $allocation->quantity_remaining)) {
                 $allocation->status = AllocationStatus::Released;
+                $allocation->released_by = $releasedBy;
+                $allocation->released_at = now();
             }
             $allocation->save();
 
@@ -262,15 +322,39 @@ final class InventoryAllocationService
     public function preview(AllocationData $data): AllocationPlanData
     {
         $quantity = $this->math->normalize($data->quantityAllocated);
-        $item = $this->validateReferences($data, $quantity);
+        $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
+        if ($data->uomId !== null) {
+            $quantity = $this->uoms->quantity($data->tenantId, $data->organizationUnitId, $item, $data->uomId, $quantity);
+            $item = $item->refresh();
+            $data = new AllocationData(
+                tenantId: $data->tenantId,
+                allocationDate: $data->allocationDate,
+                itemId: $data->itemId,
+                warehouseId: $data->warehouseId,
+                quantityAllocated: $quantity,
+                organizationUnitId: $data->organizationUnitId,
+                allocationNumber: $data->allocationNumber,
+                reservationId: $data->reservationId,
+                itemVariantId: $data->itemVariantId,
+                warehouseLocationId: $data->warehouseLocationId,
+                batchId: $data->batchId,
+                serialNumberId: $data->serialNumberId,
+                sourceType: $data->sourceType,
+                sourceId: $data->sourceId,
+                sourceLineType: $data->sourceLineType,
+                sourceLineId: $data->sourceLineId,
+                notes: $data->notes,
+                createdBy: $data->createdBy,
+            );
+        }
+        $this->validateReferences($data, $quantity, $item);
         $method = $this->methods->allocation($item, $data->warehouseId, $data->organizationUnitId);
 
         return $this->strategy($method)->preview($data);
     }
 
-    private function validateReferences(AllocationData $data, string $quantity): Item
+    private function validateReferences(AllocationData $data, string $quantity, Item $item): void
     {
-        $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
         $item->loadMissing('category');
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
@@ -283,7 +367,7 @@ final class InventoryAllocationService
             $this->validator->serial($item, $data->serialNumberId, $quantity);
         }
 
-        return $item;
+        return;
     }
 
     private function lockReservation(AllocationData $data, string $quantity): ?InventoryReservation
@@ -341,6 +425,7 @@ final class InventoryAllocationService
             sourceLineType: $data->sourceLineType,
             sourceLineId: $data->sourceLineId,
             notes: $data->notes,
+            createdBy: $data->createdBy,
         );
     }
 

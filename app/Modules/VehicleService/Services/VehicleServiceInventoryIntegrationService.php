@@ -14,7 +14,7 @@ use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\InventoryFacade;
-use Modules\Inventory\Services\StockAvailabilityService;
+use Modules\Inventory\Services\InventoryAvailabilityService;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Services\ItemBaseUomConversionService;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -27,7 +27,7 @@ final class VehicleServiceInventoryIntegrationService
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceLineService $lines,
-        private readonly StockAvailabilityService $availability,
+        private readonly InventoryAvailabilityService $availability,
         private readonly InventoryFacade $inventory,
         private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}

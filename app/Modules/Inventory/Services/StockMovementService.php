@@ -13,6 +13,7 @@ use Modules\Inventory\DTOs\StockPostingResult;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Models\InventoryAllocation;
@@ -32,15 +33,24 @@ final class StockMovementService
         private readonly InventoryNumberService $numbers,
         private readonly StockBalanceService $balances,
         private readonly InventoryValuationService $valuation,
+        private readonly InventoryUomService $uoms,
+        private readonly InventoryStockStateService $states,
     ) {}
 
     public function create(StockMovementData $data): InventoryMovement
     {
         $quantity = $this->math->normalize($data->quantity);
+        $unitCost = $this->math->normalize($data->unitCost);
         $this->validator->assertPositiveQuantity($quantity);
-        $this->validator->assertNonNegative($data->unitCost, 'Inventory unit cost cannot be negative.');
+        $this->validator->assertNonNegative($unitCost, 'Inventory unit cost cannot be negative.');
 
         $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
+        if ($data->uomId !== null) {
+            $basis = $this->uoms->basis($data->tenantId, $data->organizationUnitId, $item, $data->uomId, $quantity, $unitCost);
+            $quantity = $basis['quantity'];
+            $unitCost = $basis['unit_cost'];
+            $item = $item->refresh();
+        }
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
@@ -63,12 +73,14 @@ final class StockMovementService
             'batch_id' => $data->batchId,
             'serial_number_id' => $data->serialNumberId,
             'quantity' => $quantity,
-            'unit_cost' => $this->math->normalize($data->unitCost),
-            'total_cost' => $this->math->mul($quantity, $data->unitCost),
+            'unit_cost' => $unitCost,
+            'total_cost' => $this->math->mul($quantity, $unitCost),
             'source_type' => $data->sourceType,
             'source_id' => $data->sourceId,
             'source_line_type' => $data->sourceLineType,
             'source_line_id' => $data->sourceLineId,
+            'from_state' => $data->fromState ?? $this->defaultFromState($data->direction),
+            'to_state' => $data->toState ?? $this->defaultToState($data->direction),
             'status' => InventoryStatus::Draft,
             'description' => $data->description,
             'created_by' => $data->createdBy,
@@ -123,6 +135,18 @@ final class StockMovementService
             $movement->posted_by = $postedBy;
             $movement->posted_at = now();
             $movement->save();
+            $this->states->record(
+                $movement,
+                $movement->from_state,
+                $movement->to_state,
+                $quantity,
+                $movement->source_type,
+                $movement->source_id,
+                $movement->source_line_type,
+                $movement->source_line_id,
+                $movement->description,
+                $postedBy ?? $movement->created_by,
+            );
 
             return $movement->refresh();
         });
@@ -161,8 +185,10 @@ final class StockMovementService
                 unitCost: $reversalUnitCost,
                 sourceType: 'inventory_movement',
                 sourceId: (int) $movement->getKey(),
-                description: 'Reversal of '.$movement->movement_number,
-            ));
+            description: 'Reversal of '.$movement->movement_number,
+            fromState: $movement->to_state,
+            toState: InventoryStockState::Reversed,
+        ));
             $reversal->reversal_of_id = $movement->getKey();
             $reversal->save();
             $reversal = $this->post($reversal, $reversedBy);
@@ -291,5 +317,17 @@ final class StockMovementService
                 : AllocationStatus::Released;
         }
         $allocation->save();
+    }
+
+    private function defaultFromState(InventoryDirection $direction): ?InventoryStockState
+    {
+        return $direction === InventoryDirection::Out ? InventoryStockState::Available : null;
+    }
+
+    private function defaultToState(InventoryDirection $direction): InventoryStockState
+    {
+        return $direction === InventoryDirection::Out
+            ? InventoryStockState::Issued
+            : InventoryStockState::Available;
     }
 }

@@ -6,6 +6,7 @@ namespace Modules\Inventory\DTOs;
 
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStockState;
 
 final readonly class StockMovementData
 {
@@ -30,5 +31,8 @@ final readonly class StockMovementData
         public ?int $sourceLineId = null,
         public ?string $description = null,
         public ?int $createdBy = null,
+        public ?int $uomId = null,
+        public ?InventoryStockState $fromState = null,
+        public ?InventoryStockState $toState = null,
     ) {}
 }

@@ -32,6 +32,12 @@ final class StockBalanceService
                 'quantity_reserved' => '0.000000',
                 'quantity_allocated' => '0.000000',
                 'quantity_available' => '0.000000',
+                'quantity_returned' => '0.000000',
+                'quantity_in_transit' => '0.000000',
+                'quantity_damaged' => '0.000000',
+                'quantity_quarantine' => '0.000000',
+                'quantity_expired' => '0.000000',
+                'quantity_scrapped' => '0.000000',
                 'average_cost' => '0.000000',
                 'total_value' => '0.000000',
             ],
@@ -90,8 +96,9 @@ final class StockBalanceService
 
     public function decreaseByValue(InventoryStockBalance $balance, string $quantity, string $movementValue): InventoryStockBalance
     {
-        if ($this->math->compare((string) $balance->quantity_on_hand, $quantity) < 0
-            || $this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
+        if (! $this->allowsNegativeStock()
+            && ($this->math->compare((string) $balance->quantity_on_hand, $quantity) < 0
+                || $this->math->compare((string) $balance->quantity_available, $quantity) < 0)) {
             throw new InvalidArgumentException('Inventory issue quantity cannot exceed available stock.');
         }
 
@@ -112,7 +119,7 @@ final class StockBalanceService
 
     public function reserve(InventoryStockBalance $balance, string $quantity): InventoryStockBalance
     {
-        if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
+        if (! $this->allowsNegativeStock() && $this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
             throw new InvalidArgumentException('Inventory reservation quantity cannot exceed available stock.');
         }
 
@@ -138,7 +145,7 @@ final class StockBalanceService
 
     public function allocate(InventoryStockBalance $balance, string $quantity): InventoryStockBalance
     {
-        if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
+        if (! $this->allowsNegativeStock() && $this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
             throw new InvalidArgumentException('Inventory allocation cannot exceed available stock.');
         }
 
@@ -162,15 +169,45 @@ final class StockBalanceService
         return $balance->refresh();
     }
 
+    public function increaseInTransit(InventoryStockBalance $balance, string $quantity): InventoryStockBalance
+    {
+        $balance->quantity_in_transit = $this->math->add((string) ($balance->quantity_in_transit ?? '0.000000'), $quantity);
+        $balance->save();
+
+        return $balance->refresh();
+    }
+
+    public function releaseInTransit(InventoryStockBalance $balance, string $quantity): InventoryStockBalance
+    {
+        if ($this->math->compare((string) ($balance->quantity_in_transit ?? '0.000000'), $quantity) < 0) {
+            throw new InvalidArgumentException('Inventory in-transit quantity cannot become negative.');
+        }
+
+        $balance->quantity_in_transit = $this->math->sub((string) ($balance->quantity_in_transit ?? '0.000000'), $quantity);
+        $balance->save();
+
+        return $balance->refresh();
+    }
+
     public function recalculateAvailable(InventoryStockBalance $balance): void
     {
-        $balance->quantity_available = $this->math->sub(
-            $this->math->sub((string) $balance->quantity_on_hand, (string) $balance->quantity_reserved),
+        $unavailable = $this->math->sum([
+            (string) $balance->quantity_reserved,
             (string) $balance->quantity_allocated,
-        );
-        if ($this->math->isNegative((string) $balance->quantity_available)) {
+            (string) ($balance->quantity_returned ?? '0.000000'),
+            (string) ($balance->quantity_damaged ?? '0.000000'),
+            (string) ($balance->quantity_quarantine ?? '0.000000'),
+            (string) ($balance->quantity_expired ?? '0.000000'),
+        ]);
+        $balance->quantity_available = $this->math->sub((string) $balance->quantity_on_hand, $unavailable);
+        if (! $this->allowsNegativeStock() && $this->math->isNegative((string) $balance->quantity_available)) {
             throw new InvalidArgumentException('Inventory available quantity cannot become negative.');
         }
+    }
+
+    private function allowsNegativeStock(): bool
+    {
+        return (bool) config('inventory.allow_negative_stock', false);
     }
 
     private function balanceQuery(StockBalanceData $data)

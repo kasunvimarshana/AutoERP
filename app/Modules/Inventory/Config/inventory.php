@@ -13,6 +13,8 @@ use Modules\Inventory\Strategies\Valuation\StandardCostValuationMethod;
 use Modules\Inventory\Strategies\Valuation\WeightedAverageValuationMethod;
 
 return [
+    'allow_negative_stock' => (bool) env('INVENTORY_ALLOW_NEGATIVE_STOCK', false),
+
     'valuation' => [
         'default' => 'fifo',
         'strategies' => [

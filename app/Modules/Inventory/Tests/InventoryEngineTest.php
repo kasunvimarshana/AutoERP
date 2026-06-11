@@ -9,10 +9,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Inventory\DTOs\AllocationData;
+use Modules\Inventory\DTOs\CostAdjustmentData;
+use Modules\Inventory\DTOs\CostAdjustmentLineData;
 use Modules\Inventory\DTOs\ReservationData;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
 use Modules\Inventory\DTOs\StockBalanceData;
+use Modules\Inventory\DTOs\StockCountData;
+use Modules\Inventory\DTOs\StockCountLineData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\DTOs\StockTransferData;
 use Modules\Inventory\DTOs\StockTransferLineData;
@@ -20,10 +24,13 @@ use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Inventory\Enums\AdjustmentType;
 use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\AllocationStatus;
+use Modules\Inventory\Enums\CostAdjustmentStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\ReservationStatus;
 use Modules\Inventory\Enums\SerialStatus;
+use Modules\Inventory\Enums\StockCountStatus;
 use Modules\Inventory\Enums\TransferStatus;
 use Modules\Inventory\Models\InventoryAllocationIssue;
 use Modules\Inventory\Models\InventoryMovement;
@@ -31,7 +38,9 @@ use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Models\InventoryValuationConsumption;
 use Modules\Inventory\Models\InventoryValuationLayer;
 use Modules\Inventory\Services\BatchTrackingService;
+use Modules\Inventory\Services\InventoryCostAdjustmentService;
 use Modules\Inventory\Services\InventoryMethodResolver;
+use Modules\Inventory\Services\InventoryStockCountService;
 use Modules\Inventory\Services\SerialTrackingService;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAllocationService;
@@ -146,6 +155,24 @@ final class InventoryEngineTest extends TestCase
         $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
         $this->assertSame('6.000000', $availability->quantityOnHand);
         $this->assertSame('4.000000', $availability->quantityAvailable);
+        $this->assertDatabaseHas('inventory_stock_state_changes', [
+            'item_id' => $item->getKey(),
+            'from_state' => InventoryStockState::Available->value,
+            'to_state' => InventoryStockState::Reserved->value,
+            'source_type' => 'inventory_reservation',
+        ]);
+        $this->assertDatabaseHas('inventory_stock_state_changes', [
+            'item_id' => $item->getKey(),
+            'from_state' => InventoryStockState::Reserved->value,
+            'to_state' => InventoryStockState::Allocated->value,
+            'source_type' => 'inventory_allocation',
+        ]);
+        $this->assertDatabaseHas('inventory_stock_state_changes', [
+            'item_id' => $item->getKey(),
+            'from_state' => InventoryStockState::Allocated->value,
+            'to_state' => InventoryStockState::Issued->value,
+            'source_type' => 'inventory_allocation',
+        ]);
     }
 
     public function test_release_reservation_restores_availability(): void
@@ -215,7 +242,7 @@ final class InventoryEngineTest extends TestCase
         $this->assertSame(AdjustmentStatus::Reversed, $adjustment->refresh()->status);
     }
 
-    public function test_transfer_moves_stock_between_warehouses(): void
+    public function test_transfer_dispatch_receive_and_reverse_tracks_in_transit_stock(): void
     {
         [$tenantId, $fromWarehouseId, $item] = $this->stockContext();
         $toWarehouseId = $this->createWarehouse($tenantId, 'WH-TO');
@@ -233,14 +260,97 @@ final class InventoryEngineTest extends TestCase
 
         app(StockTransferService::class)->post($transfer);
 
-        $this->assertSame(TransferStatus::Posted, $transfer->refresh()->status);
+        $this->assertSame(TransferStatus::Dispatched, $transfer->refresh()->status);
         $this->assertSame('7.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $fromWarehouseId))->quantityOnHand);
-        $this->assertSame('3.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId))->quantityOnHand);
+        $toAvailability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId));
+        $this->assertSame('0.000000', $toAvailability->quantityOnHand);
+        $this->assertSame('3.000000', $toAvailability->quantityInTransit);
+        $this->assertSame('3.000000', (string) InventoryStockBalance::query()
+            ->where('item_id', $item->getKey())
+            ->where('warehouse_id', $toWarehouseId)
+            ->value('quantity_in_transit'));
+        $this->assertDatabaseHas('inventory_stock_state_changes', [
+            'item_id' => $item->getKey(),
+            'from_state' => InventoryStockState::Available->value,
+            'to_state' => InventoryStockState::InTransit->value,
+            'source_type' => 'inventory_transfer',
+        ]);
+
+        app(StockTransferService::class)->receive($transfer);
+
+        $this->assertSame(TransferStatus::Received, $transfer->refresh()->status);
+        $toAvailability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId));
+        $this->assertSame('3.000000', $toAvailability->quantityOnHand);
+        $this->assertSame('0.000000', $toAvailability->quantityInTransit);
+        $this->assertSame('0.000000', (string) InventoryStockBalance::query()
+            ->where('item_id', $item->getKey())
+            ->where('warehouse_id', $toWarehouseId)
+            ->value('quantity_in_transit'));
+        $this->assertDatabaseHas('inventory_stock_state_changes', [
+            'item_id' => $item->getKey(),
+            'from_state' => InventoryStockState::InTransit->value,
+            'to_state' => InventoryStockState::Available->value,
+            'source_type' => 'inventory_transfer',
+        ]);
 
         app(StockTransferService::class)->reverse($transfer);
         $this->assertSame(TransferStatus::Reversed, $transfer->refresh()->status);
         $this->assertSame('10.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $fromWarehouseId))->quantityOnHand);
         $this->assertSame('0.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId))->quantityOnHand);
+    }
+
+    public function test_cost_adjustment_updates_open_valuation_layer_without_receiving_again(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $this->receipt($tenantId, $warehouseId, $item, '10.000000', '5.000000');
+        $layer = InventoryValuationLayer::query()->where('item_id', $item->getKey())->firstOrFail();
+
+        $adjustment = app(InventoryCostAdjustmentService::class)->create(new CostAdjustmentData(
+            tenantId: $tenantId,
+            adjustmentDate: '2026-06-06',
+            lines: [
+                new CostAdjustmentLineData((int) $layer->getKey(), '20.000000', 'Freight'),
+            ],
+        ));
+
+        app(InventoryCostAdjustmentService::class)->post($adjustment);
+
+        $this->assertSame(CostAdjustmentStatus::Posted, $adjustment->refresh()->status);
+        $layer->refresh();
+        $this->assertSame('70.000000', (string) $layer->remaining_value);
+        $this->assertSame('7.000000', (string) $layer->unit_cost);
+        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $this->assertSame('70.000000', (string) $balance->total_value);
+        $this->assertSame('7.000000', (string) $balance->average_cost);
+    }
+
+    public function test_stock_count_detects_variance_and_posts_recount_adjustment(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $this->receipt($tenantId, $warehouseId, $item, '10.000000', '5.000000');
+
+        $count = app(InventoryStockCountService::class)->create(new StockCountData(
+            tenantId: $tenantId,
+            countDate: '2026-06-06',
+            warehouseId: $warehouseId,
+            lines: [
+                new StockCountLineData((int) $item->getKey(), '8.000000'),
+            ],
+        ));
+
+        $this->assertSame('10.000000', (string) $count->lines[0]->system_quantity);
+        $this->assertSame('-2.000000', (string) $count->lines[0]->variance_quantity);
+
+        app(InventoryStockCountService::class)->approve($count);
+        $this->assertSame(StockCountStatus::Approved, $count->refresh()->status);
+
+        app(InventoryStockCountService::class)->post($count);
+
+        $this->assertSame(StockCountStatus::Posted, $count->refresh()->status);
+        $this->assertNotNull($count->inventory_adjustment_id);
+        $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
+        $this->assertSame('8.000000', $availability->quantityOnHand);
+        $this->assertSame('8.000000', $availability->quantityAvailable);
     }
 
     public function test_fifo_layers_are_consumed_and_weighted_average_recalculates(): void

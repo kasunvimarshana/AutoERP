@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\ReservationData;
 use Modules\Inventory\DTOs\StockBalanceData;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\ReservationStatus;
 use Modules\Inventory\Models\InventoryReservation;
 use Modules\Inventory\Validators\InventoryValidationService;
@@ -20,6 +21,8 @@ final class StockReservationService
         private readonly InventoryValidationService $validator,
         private readonly InventoryNumberService $numbers,
         private readonly StockBalanceService $balances,
+        private readonly InventoryUomService $uoms,
+        private readonly InventoryStockStateService $states,
     ) {}
 
     public function reserve(ReservationData $data): InventoryReservation
@@ -27,6 +30,10 @@ final class StockReservationService
         $quantity = $this->math->normalize($data->quantityReserved);
         $this->validator->assertPositiveQuantity($quantity);
         $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
+        if ($data->uomId !== null) {
+            $quantity = $this->uoms->quantity($data->tenantId, $data->organizationUnitId, $item, $data->uomId, $quantity);
+            $item = $item->refresh();
+        }
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
@@ -37,7 +44,7 @@ final class StockReservationService
             $balance = $this->balances->getOrCreateForUpdate($this->balanceData($data));
             $this->balances->reserve($balance, $quantity);
 
-            return InventoryReservation::query()->create([
+            $reservation = InventoryReservation::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'reservation_number' => $data->reservationNumber ?? $this->numbers->next($data->tenantId, 'RES', 'inventory_reservations', 'reservation_number'),
@@ -57,13 +64,28 @@ final class StockReservationService
                 'status' => ReservationStatus::Active,
                 'expires_at' => $data->expiresAt,
                 'notes' => $data->notes,
+                'created_by' => $data->createdBy,
             ]);
+            $this->states->record(
+                $balance,
+                InventoryStockState::Available,
+                InventoryStockState::Reserved,
+                $quantity,
+                $data->sourceType ?? 'inventory_reservation',
+                $data->sourceId ?? (int) $reservation->getKey(),
+                $data->sourceLineType,
+                $data->sourceLineId,
+                'Inventory reservation '.$reservation->reservation_number,
+                $data->createdBy,
+            );
+
+            return $reservation;
         });
     }
 
-    public function release(InventoryReservation $reservation, ?string $quantity = null): InventoryReservation
+    public function release(InventoryReservation $reservation, ?string $quantity = null, ?int $releasedBy = null): InventoryReservation
     {
-        return DB::transaction(function () use ($reservation, $quantity): InventoryReservation {
+        return DB::transaction(function () use ($reservation, $quantity, $releasedBy): InventoryReservation {
             $reservation = InventoryReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
             if (! in_array($reservation->status, [ReservationStatus::Active, ReservationStatus::PartiallyAllocated], true)) {
                 throw new InvalidArgumentException('Only active inventory reservations can be released.');
@@ -82,8 +104,22 @@ final class StockReservationService
             $reservation->quantity_remaining = $this->math->sub((string) $reservation->quantity_remaining, $releaseQty);
             if ($this->math->isZero((string) $reservation->quantity_remaining)) {
                 $reservation->status = ReservationStatus::Released;
+                $reservation->released_by = $releasedBy;
+                $reservation->released_at = now();
             }
             $reservation->save();
+            $this->states->record(
+                $balance,
+                InventoryStockState::Reserved,
+                InventoryStockState::Available,
+                $releaseQty,
+                $reservation->source_type ?? 'inventory_reservation',
+                $reservation->source_id ?? (int) $reservation->getKey(),
+                $reservation->source_line_type,
+                $reservation->source_line_id,
+                'Inventory reservation release '.$reservation->reservation_number,
+                $releasedBy,
+            );
 
             return $reservation->refresh();
         });

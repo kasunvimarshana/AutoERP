@@ -26,6 +26,10 @@ final class SerialTrackingService
         $item = $this->validator->item($tenantId, $organizationUnitId, $itemId);
         $this->validator->variant($item, $itemVariantId);
         $this->validator->batch($item, $batchId);
+        if ($warehouseId !== null) {
+            $warehouse = $this->validator->warehouse($tenantId, $organizationUnitId, $warehouseId);
+            $this->validator->location($warehouse, $warehouseLocationId);
+        }
 
         if (trim($serialNumber) === '') {
             throw new InvalidArgumentException('Inventory serial number is required.');

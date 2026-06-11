@@ -9,9 +9,9 @@ use Modules\Core\Models\CoreModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 
-final class InventoryTransferLine extends CoreModel
+final class InventoryStockCountLine extends CoreModel
 {
-    protected $table = 'inventory_transfer_lines';
+    protected $table = 'inventory_stock_count_lines';
 
     protected $guarded = ['id'];
 
@@ -20,25 +20,22 @@ final class InventoryTransferLine extends CoreModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'inventory_transfer_id' => 'integer',
+            'inventory_stock_count_id' => 'integer',
             'item_id' => 'integer',
             'item_variant_id' => 'integer',
             'batch_id' => 'integer',
             'serial_number_id' => 'integer',
-            'quantity' => 'decimal:6',
-            'dispatched_quantity' => 'decimal:6',
-            'received_quantity' => 'decimal:6',
-            'cancelled_quantity' => 'decimal:6',
+            'system_quantity' => 'decimal:6',
+            'counted_quantity' => 'decimal:6',
+            'variance_quantity' => 'decimal:6',
             'unit_cost' => 'decimal:6',
-            'total_cost' => 'decimal:6',
-            'outbound_movement_id' => 'integer',
-            'inbound_movement_id' => 'integer',
+            'inventory_adjustment_line_id' => 'integer',
         ]);
     }
 
-    public function transfer(): BelongsTo
+    public function stockCount(): BelongsTo
     {
-        return $this->belongsTo(InventoryTransfer::class, 'inventory_transfer_id');
+        return $this->belongsTo(InventoryStockCount::class, 'inventory_stock_count_id');
     }
 
     public function item(): BelongsTo
@@ -61,13 +58,8 @@ final class InventoryTransferLine extends CoreModel
         return $this->belongsTo(InventorySerialNumber::class, 'serial_number_id');
     }
 
-    public function outboundMovement(): BelongsTo
+    public function adjustmentLine(): BelongsTo
     {
-        return $this->belongsTo(InventoryMovement::class, 'outbound_movement_id');
-    }
-
-    public function inboundMovement(): BelongsTo
-    {
-        return $this->belongsTo(InventoryMovement::class, 'inbound_movement_id');
+        return $this->belongsTo(InventoryAdjustmentLine::class, 'inventory_adjustment_line_id');
     }
 }

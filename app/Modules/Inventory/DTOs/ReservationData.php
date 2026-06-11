@@ -23,5 +23,7 @@ final readonly class ReservationData
         public ?int $sourceLineId = null,
         public ?string $expiresAt = null,
         public ?string $notes = null,
+        public ?int $uomId = null,
+        public ?int $createdBy = null,
     ) {}
 }

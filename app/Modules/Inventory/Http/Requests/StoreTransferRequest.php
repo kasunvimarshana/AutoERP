@@ -25,6 +25,10 @@ final class StoreTransferRequest extends TenantScopedRequest
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', 'min:1'],
+            'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.batch_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.serial_number_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
         ];
@@ -51,6 +55,7 @@ final class StoreTransferRequest extends TenantScopedRequest
                 itemVariantId: isset($row['item_variant_id']) ? (int) $row['item_variant_id'] : null,
                 batchId: isset($row['batch_id']) ? (int) $row['batch_id'] : null,
                 serialNumberId: isset($row['serial_number_id']) ? (int) $row['serial_number_id'] : null,
+                uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
             ), $this->input('lines')),
         );
     }

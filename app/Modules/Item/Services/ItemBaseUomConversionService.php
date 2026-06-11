@@ -70,7 +70,18 @@ final class ItemBaseUomConversionService
 
                 $balances = $this->scope(InventoryStockBalance::query(), $lockedItem)->lockForUpdate()->get();
                 foreach ($balances as $balance) {
-                    foreach (['quantity_on_hand', 'quantity_reserved', 'quantity_allocated', 'quantity_available'] as $column) {
+                    foreach ([
+                        'quantity_on_hand',
+                        'quantity_reserved',
+                        'quantity_allocated',
+                        'quantity_available',
+                        'quantity_returned',
+                        'quantity_in_transit',
+                        'quantity_damaged',
+                        'quantity_quarantine',
+                        'quantity_expired',
+                        'quantity_scrapped',
+                    ] as $column) {
                         $balance->{$column} = $this->math->mul((string) $balance->{$column}, $factor);
                     }
                     $balance->average_cost = $this->math->div((string) $balance->average_cost, $factor);

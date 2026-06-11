@@ -17,14 +17,14 @@ final class StockAllocationService
         return $this->allocations->allocate($data);
     }
 
-    public function issue(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function issue(InventoryAllocation $allocation, ?string $quantity = null, ?int $issuedBy = null): InventoryAllocation
     {
-        return $this->allocations->issue($allocation, $quantity);
+        return $this->allocations->issue($allocation, $quantity, $issuedBy);
     }
 
-    public function release(InventoryAllocation $allocation, ?string $quantity = null): InventoryAllocation
+    public function release(InventoryAllocation $allocation, ?string $quantity = null, ?int $releasedBy = null): InventoryAllocation
     {
-        return $this->allocations->release($allocation, $quantity);
+        return $this->allocations->release($allocation, $quantity, $releasedBy);
     }
 
     public function reallocate(InventoryAllocation $allocation, AllocationData $data): InventoryAllocation

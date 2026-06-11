@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -48,6 +49,8 @@ final class InventoryMovement extends CoreModel
             'source_id' => 'integer',
             'source_line_id' => 'integer',
             'status' => InventoryStatus::class,
+            'from_state' => InventoryStockState::class,
+            'to_state' => InventoryStockState::class,
             'posted_at' => 'datetime',
             'reversed_at' => 'datetime',
             'reversal_of_id' => 'integer',

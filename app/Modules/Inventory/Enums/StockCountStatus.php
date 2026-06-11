@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Enums;
 
-enum TransferStatus: string
+enum StockCountStatus: string
 {
-    case Pending = 'pending';
     case Draft = 'draft';
     case Approved = 'approved';
-    case Dispatched = 'dispatched';
-    case InTransit = 'in_transit';
-    case Received = 'received';
     case Posted = 'posted';
-    case Reversed = 'reversed';
     case Cancelled = 'cancelled';
 }

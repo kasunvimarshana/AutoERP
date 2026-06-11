@@ -138,7 +138,7 @@ final class ItemBaseUomUsageAuditService
                 ->join('inventory_transfers as parents', 'parents.id', '=', 'lines.inventory_transfer_id'),
             $item,
             'lines',
-        )->whereIn('parents.status', ['draft', 'approved', 'in_transit'])->count();
+                )->whereIn('parents.status', ['pending', 'draft', 'approved', 'dispatched', 'in_transit'])->count();
         $this->addBlocker($blockers, 'open_transfers', 'Open inventory transfers must be completed or cancelled before conversion.', $unsafeTransfers);
 
         $unsafePurchaseOrders = $this->scopedJoin(

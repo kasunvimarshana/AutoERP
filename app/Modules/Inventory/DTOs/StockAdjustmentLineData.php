@@ -16,5 +16,6 @@ final readonly class StockAdjustmentLineData
         public ?int $batchId = null,
         public ?int $serialNumberId = null,
         public ?string $reason = null,
+        public ?int $uomId = null,
     ) {}
 }

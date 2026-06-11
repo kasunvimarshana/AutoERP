@@ -24,5 +24,7 @@ final readonly class AllocationData
         public ?string $sourceLineType = null,
         public ?int $sourceLineId = null,
         public ?string $notes = null,
+        public ?int $uomId = null,
+        public ?int $createdBy = null,
     ) {}
 }

@@ -26,6 +26,7 @@ final class StockAdjustmentService
         private readonly InventoryValidationService $validator,
         private readonly InventoryNumberService $numbers,
         private readonly StockMovementService $movements,
+        private readonly InventoryUomService $uoms,
     ) {}
 
     public function create(StockAdjustmentData $data): InventoryAdjustment
@@ -158,12 +159,22 @@ final class StockAdjustmentService
         $this->validator->assertNonNegative($data->countedQuantity, 'Inventory adjustment counted quantity cannot be negative.');
         $this->validator->assertNonNegative($data->unitCost, 'Inventory adjustment unit cost cannot be negative.');
         $item = $this->validator->item((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $data->itemId);
+        $systemQuantity = $this->math->normalize($data->systemQuantity);
+        $countedQuantity = $this->math->normalize($data->countedQuantity);
+        $quantity = $this->math->normalize($data->adjustmentQuantity);
+        $unitCost = $this->math->normalize($data->unitCost);
+        if ($data->uomId !== null) {
+            $systemQuantity = $this->uoms->quantity((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $systemQuantity);
+            $countedQuantity = $this->uoms->quantity((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $countedQuantity);
+            $basis = $this->uoms->basis((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $quantity, $unitCost);
+            $quantity = $basis['quantity'];
+            $unitCost = $basis['unit_cost'];
+            $item = $item->refresh();
+        }
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $this->validator->batch($item, $data->batchId);
-        $this->validator->serial($item, $data->serialNumberId, ltrim($data->adjustmentQuantity, '-'));
-
-        $quantity = $this->math->normalize($data->adjustmentQuantity);
+        $this->validator->serial($item, $data->serialNumberId, ltrim($quantity, '-'));
 
         return InventoryAdjustmentLine::query()->create([
             'tenant_id' => $adjustment->tenant_id,
@@ -173,11 +184,11 @@ final class StockAdjustmentService
             'item_variant_id' => $data->itemVariantId,
             'batch_id' => $data->batchId,
             'serial_number_id' => $data->serialNumberId,
-            'system_quantity' => $this->math->normalize($data->systemQuantity),
-            'counted_quantity' => $this->math->normalize($data->countedQuantity),
+            'system_quantity' => $systemQuantity,
+            'counted_quantity' => $countedQuantity,
             'adjustment_quantity' => $quantity,
-            'unit_cost' => $this->math->normalize($data->unitCost),
-            'total_cost' => $this->math->mul(ltrim($quantity, '-'), $data->unitCost),
+            'unit_cost' => $unitCost,
+            'total_cost' => $this->math->mul(ltrim($quantity, '-'), $unitCost),
             'reason' => $data->reason,
         ]);
     }

@@ -131,8 +131,21 @@ final class ReportCatalog
                 $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('location', 'Location', 'warehouseLocation.name'),
                 $this->col('uom', 'UOM', 'item.baseUom.code'),
                 $this->col('batch', 'Batch', 'batch.batch_number'), $this->qty('quantity_on_hand', 'On Hand'), $this->qty('quantity_reserved', 'Reserved'),
-                $this->qty('quantity_allocated', 'Allocated'), $this->qty('quantity_available', 'Available'), $this->money('total_value', 'Value'),
+                $this->qty('quantity_allocated', 'Allocated'), $this->qty('quantity_available', 'Available'), $this->qty('quantity_in_transit', 'In Transit'),
+                $this->qty('quantity_damaged', 'Damaged'), $this->qty('quantity_quarantine', 'Quarantine'), $this->qty('quantity_expired', 'Expired'), $this->money('total_value', 'Value'),
             ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'item.baseUom', 'warehouse', 'warehouseLocation', 'batch']),
+            $this->inventory('inventory.low-stock', 'Low Stock Report', InventoryStockBalance::class, [
+                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('location', 'Location', 'warehouseLocation.name'),
+                $this->qty('quantity_available', 'Available'), $this->col('uom', 'UOM', 'item.baseUom.code'),
+                new ReportColumn(
+                    key: 'low_stock_threshold',
+                    label: 'Low Stock Threshold',
+                    format: 'decimal',
+                    value: static fn (InventoryStockBalance $balance): string => is_array($balance->item?->metadata)
+                        ? (string) (data_get($balance->item->metadata, 'inventory.low_stock_threshold', $balance->item->metadata['low_stock_threshold'] ?? '0.000000'))
+                        : '0.000000',
+                ),
+            ], ['item.code', 'item.name', 'warehouse.name'], ['item', 'item.baseUom', 'warehouse', 'warehouseLocation']),
             $this->inventory('inventory.stock-movement', 'Stock Movement', InventoryMovement::class, [
                 $this->col('movement_date', 'Date', format: 'date', sort: 'movement_date'), $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'),
                 $this->col('movement_type', 'Type', format: 'enum', sort: 'movement_type'), $this->col('direction', 'Direction', format: 'enum', sort: 'direction'),
@@ -141,6 +154,18 @@ final class ReportCatalog
             $this->inventory('inventory.batch-lot', 'Batch/Lot', InventoryBatch::class, [
                 $this->col('batch_number', 'Batch', sort: 'batch_number'), $this->itemCol(), $this->col('manufacture_date', 'Manufactured', format: 'date', sort: 'manufacture_date'),
                 $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['batch_number', 'lot_number', 'item.code', 'item.name'], ['item'], 'expiry_date'),
+            $this->inventory('inventory.batch-expiry', 'Batch Expiry Report', InventoryBatch::class, [
+                $this->col('batch_number', 'Batch', sort: 'batch_number'), $this->col('lot_number', 'Lot', sort: 'lot_number'), $this->itemCol(),
+                $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'),
+                new ReportColumn(
+                    key: 'days_to_expiry',
+                    label: 'Days To Expiry',
+                    value: static fn (InventoryBatch $batch): ?int => $batch->expiry_date === null
+                        ? null
+                        : (int) now()->startOfDay()->diffInDays($batch->expiry_date->startOfDay(), false),
+                ),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['batch_number', 'lot_number', 'item.code', 'item.name'], ['item'], 'expiry_date'),
             $this->inventory('inventory.serial', 'Serial', InventorySerialNumber::class, [
                 $this->col('serial_number', 'Serial', sort: 'serial_number'), $this->itemCol(), $this->col('batch', 'Batch', 'batch.batch_number'),
@@ -155,6 +180,22 @@ final class ReportCatalog
                 $this->money('unit_cost', 'Unit Cost', false), $this->money('remaining_value', 'Remaining Value'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch']),
+            $this->inventory('inventory.valuation', 'Inventory Valuation Report', InventoryValuationLayer::class, [
+                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
+                $this->col('valuation_method', 'Method', format: 'enum', sort: 'valuation_method'),
+                $this->qty('remaining_quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false),
+                $this->money('remaining_value', 'Value'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch']),
+            $this->inventory('inventory.aging', 'Inventory Aging Report', InventoryValuationLayer::class, [
+                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
+                $this->col('created_at', 'Receipt Date', format: 'date', sort: 'created_at'),
+                new ReportColumn(
+                    key: 'age_days',
+                    label: 'Age Days',
+                    value: static fn (InventoryValuationLayer $layer): int => (int) $layer->created_at?->startOfDay()->diffInDays(now()->startOfDay()),
+                ),
+                $this->qty('remaining_quantity', 'Remaining Qty'), $this->money('remaining_value', 'Remaining Value'),
+            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch'], 'created_at'),
             $this->inventory('inventory.valuation-consumption', 'Valuation Consumption', InventoryValuationConsumption::class, [
                 $this->col('movement', 'Issue Movement', 'issueMovement.movement_number'),
                 $this->col('item', 'Item', 'valuationLayer.item.name'),

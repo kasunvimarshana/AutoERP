@@ -47,6 +47,8 @@ final class InventoryAllocation extends CoreModel
             'source_id' => 'integer',
             'source_line_id' => 'integer',
             'status' => AllocationStatus::class,
+            'issued_at' => 'datetime',
+            'released_at' => 'datetime',
         ]);
     }
 

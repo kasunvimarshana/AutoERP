@@ -18,6 +18,7 @@ final class InventoryLookupRequest extends TenantScopedRequest
             'warehouse_id' => ['nullable', 'integer', 'min:1'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'batch_id' => ['nullable', 'integer', 'min:1'],
+            'serial_number_id' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', 'string', 'max:50'],
             'search' => ['nullable', 'string', 'max:150'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
