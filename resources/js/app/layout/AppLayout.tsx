@@ -17,6 +17,7 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/dashboard', label: 'Task center', match: ['/dashboard'] },
             { to: '/vehicle-service/jobs', label: 'Vehicle service workspace', match: ['/vehicle-service'] },
             { to: '/purchase/orders', label: 'Purchase workflow', match: ['/purchase'] },
+            { to: '/sales/orders', label: 'Sales workflow', match: ['/sales'] },
         ],
     },
     {
@@ -39,6 +40,10 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/purchase/goods-receipts', label: 'Goods receipts' },
             { to: '/purchase/returns', label: 'Purchase returns' },
             { to: '/purchase/debit-notes', label: 'Debit notes' },
+            { to: '/sales/quotations', label: 'Sales quotations' },
+            { to: '/sales/deliveries', label: 'Sales deliveries' },
+            { to: '/sales/returns', label: 'Sales returns' },
+            { to: '/sales/credit-notes', label: 'Credit notes' },
         ],
     },
     {
@@ -46,6 +51,8 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
         items: [
             { to: '/purchase/invoices/create', label: 'Supplier invoice' },
             { to: '/purchase/payments/prepare', label: 'Prepare supplier payment' },
+            { to: '/sales/invoices/create', label: 'Customer invoice' },
+            { to: '/sales/payments/prepare', label: 'Prepare customer receipt' },
             { to: '/invoices', label: 'Invoices' },
             { to: '/payments', label: 'Payments', exclude: ['/payments/cheque-templates'] },
             { to: '/payments/cheque-templates', label: 'Cheque templates' },

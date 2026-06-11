@@ -1,0 +1,546 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Sales\Tests;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\DTOs\StockAdjustmentData;
+use Modules\Inventory\DTOs\StockAdjustmentLineData;
+use Modules\Inventory\Enums\AdjustmentType;
+use Modules\Inventory\Models\InventoryAllocation;
+use Modules\Inventory\Models\InventoryMovement;
+use Modules\Inventory\Services\StockAdjustmentService;
+use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\Models\Payment;
+use Modules\Sales\DTOs\CreateSalesDeliveryData;
+use Modules\Sales\DTOs\CreateSalesInvoiceData;
+use Modules\Sales\DTOs\CreateSalesOrderData;
+use Modules\Sales\DTOs\CreateSalesQuotationData;
+use Modules\Sales\DTOs\CreateSalesReturnData;
+use Modules\Sales\DTOs\SalesDeliveryLineData;
+use Modules\Sales\DTOs\SalesHeaderAdjustmentData;
+use Modules\Sales\DTOs\SalesInvoiceSourceData;
+use Modules\Sales\DTOs\SalesLineData;
+use Modules\Sales\DTOs\SalesReturnLineData;
+use Modules\Sales\Enums\SalesAdjustmentCalculationBase;
+use Modules\Sales\Enums\SalesAdjustmentCalculationType;
+use Modules\Sales\Enums\SalesAdjustmentEffect;
+use Modules\Sales\Enums\SalesAdjustmentType;
+use Modules\Sales\Enums\SalesOrderStatus;
+use Modules\Sales\Enums\SalesQuotationStatus;
+use Modules\Sales\Enums\SalesReturnType;
+use Modules\Sales\Models\SalesCreditNote;
+use Modules\Sales\Models\SalesDelivery;
+use Modules\Sales\Models\SalesInvoiceLink;
+use Modules\Sales\Models\SalesOrder;
+use Modules\Sales\Models\SalesReturn;
+use Modules\Sales\Models\SalesStatusHistory;
+use Modules\Sales\Services\SalesDeliveryService;
+use Modules\Sales\Services\SalesInvoiceIntegrationService;
+use Modules\Sales\Services\SalesOrderService;
+use Modules\Sales\Services\SalesPaymentPreparationService;
+use Modules\Sales\Services\SalesQuotationService;
+use Modules\Sales\Services\SalesReturnService;
+use Tests\TestCase;
+
+final class SalesEngineTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_quotation_decimal_totals_and_conversion_to_order(): void
+    {
+        $context = $this->context();
+        $quotation = app(SalesQuotationService::class)->create(new CreateSalesQuotationData(
+            tenantId: $context['tenant_id'],
+            quotationDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            lines: [new SalesLineData(
+                itemId: $context['item_id'],
+                quantity: '3.333333',
+                unitPrice: '2.100000',
+                uomId: $context['uom_id'],
+                discountCalculationType: SalesAdjustmentCalculationType::Fixed,
+                discountAmount: '0.000001',
+                taxCalculationType: SalesAdjustmentCalculationType::Fixed,
+                taxAmount: '0.000002',
+                chargeCalculationType: SalesAdjustmentCalculationType::Fixed,
+                chargeAmount: '0.000003',
+            )],
+            adjustments: [
+                new SalesHeaderAdjustmentData(
+                    'Service',
+                    SalesAdjustmentType::ServiceCharge,
+                    SalesAdjustmentEffect::Increase,
+                    '0.000000',
+                    SalesAdjustmentCalculationType::Percentage,
+                    SalesAdjustmentCalculationBase::SubtotalAfterLineDiscount,
+                    '5.000000',
+                ),
+            ],
+        ));
+
+        $this->assertSame('7.000003', (string) $quotation->lines->first()->line_total);
+        $this->assertSame('0.349999', (string) $quotation->header_increase_total);
+        $this->assertSame('7.350002', (string) $quotation->grand_total);
+
+        app(SalesQuotationService::class)->accept($quotation);
+        $order = app(SalesQuotationService::class)->convertToOrder($quotation->refresh(), '2026-06-11', $context['warehouse_id']);
+
+        $this->assertSame(SalesQuotationStatus::Converted, $quotation->refresh()->status);
+        $this->assertSame($quotation->getKey(), $order->quotation_id);
+        $this->assertSame('7.350002', (string) $order->grand_total);
+        $this->assertSame($quotation->lines->first()->getKey(), $order->lines->first()->quotation_line_id);
+        $this->assertGreaterThanOrEqual(2, SalesStatusHistory::query()->count());
+    }
+
+    public function test_delivery_allocates_and_issues_stock_but_skips_service_items(): void
+    {
+        $context = $this->context();
+        $serviceItemId = $this->createItem($context['tenant_id'], 'SVC-'.Str::upper(Str::random(4)), $context['uom_id'], 'service', false);
+        $this->seedStock($context, '20.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '5.000000', '10.000000', uomId: $context['uom_id']),
+            new SalesLineData($serviceItemId, '1.000000', '25.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+
+        $delivery = app(SalesDeliveryService::class)->create(new CreateSalesDeliveryData(
+            tenantId: $context['tenant_id'],
+            deliveryDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            warehouseId: $context['warehouse_id'],
+            salesOrderId: (int) $order->getKey(),
+            lines: [
+                new SalesDeliveryLineData($context['item_id'], '5.000000', '10.000000', salesOrderLineId: (int) $order->lines[0]->getKey(), uomId: $context['uom_id']),
+                new SalesDeliveryLineData($serviceItemId, '1.000000', '25.000000', salesOrderLineId: (int) $order->lines[1]->getKey(), uomId: $context['uom_id']),
+            ],
+        ));
+        $posted = app(SalesDeliveryService::class)->post($delivery);
+
+        $this->assertSame('posted', $posted->status->value);
+        $this->assertSame(1, InventoryAllocation::query()->where('source_type', 'sales_delivery')->count());
+        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'sales_delivery')->count());
+        $this->assertSame(SalesOrderStatus::Delivered, $order->refresh()->status);
+        $this->assertSame('75.000000', (string) $order->refresh()->delivered_total);
+    }
+
+    public function test_many_deliveries_create_partial_and_followup_customer_invoices(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '30.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData(
+                $context['item_id'],
+                '10.000000',
+                '10.000000',
+                uomId: $context['uom_id'],
+                discountAmount: '10.000000',
+                taxAmount: '18.000000',
+            ),
+        ], [
+            new SalesHeaderAdjustmentData('Freight', SalesAdjustmentType::Freight, SalesAdjustmentEffect::Increase, '5.000000'),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $first = $this->deliver($context, $order, '4.000000');
+        $second = $this->deliver($context, $order, '6.000000');
+
+        $firstLineId = (int) $first->lines->first()->getKey();
+        $secondLineId = (int) $second->lines->first()->getKey();
+        $invoice = app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(new CreateSalesInvoiceData(
+            tenantId: $context['tenant_id'],
+            invoiceDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            sources: [
+                new SalesInvoiceSourceData('sales_delivery', (int) $first->getKey()),
+                new SalesInvoiceSourceData('sales_delivery', (int) $second->getKey(), [$secondLineId => '2.000000']),
+            ],
+        ));
+
+        $this->assertCount(2, SalesInvoiceLink::query()->where('invoice_id', $invoice->getKey())->get());
+        $this->assertSame('67.799999', (string) $invoice->grand_total);
+        $this->assertSame('2.000000', (string) $second->lines->first()->refresh()->invoiced_quantity);
+        $this->assertSame('4.000000', (string) $second->lines->first()->refresh()->remaining_quantity);
+
+        $followup = app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(new CreateSalesInvoiceData(
+            tenantId: $context['tenant_id'],
+            invoiceDate: '2026-06-12',
+            customerId: $context['customer_id'],
+            sources: [new SalesInvoiceSourceData('sales_delivery', (int) $second->getKey())],
+        ));
+
+        $this->assertSame('45.200001', (string) $followup->grand_total);
+        $this->assertSame(
+            '113.000000',
+            app(DecimalMath::class)->add(
+                (string) $invoice->grand_total,
+                (string) $followup->grand_total,
+            ),
+        );
+        $this->assertSame('invoiced', $second->refresh()->status->value);
+        $this->assertSame('4.000000', (string) $first->lines->first()->refresh()->invoiced_quantity);
+        $this->assertSame($firstLineId, $invoice->lines->first()->source_line_id);
+    }
+
+    public function test_return_scenarios_apply_only_the_owned_inventory_and_credit_effects(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '50.000000');
+        $order = $this->createOrder($context, [new SalesLineData($context['item_id'], '10.000000', '10.000000', uomId: $context['uom_id'])]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '10.000000');
+        $sourceLineId = (int) $delivery->lines->first()->getKey();
+
+        $referenced = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ReferencedCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesReturnLineData('2.000000', 'sales_delivery_line', $sourceLineId)],
+        ));
+        $referencedResult = app(SalesReturnService::class)->post($referenced);
+        $this->assertNotNull($referencedResult->creditNoteId);
+        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'sales_return')->count());
+
+        $creditOnly = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::CreditNoteOnly,
+            reason: 'Price allowance',
+            lines: [new SalesReturnLineData('1.000000', itemId: $context['item_id'], uomId: $context['uom_id'], unitPrice: '5.000000')],
+        ));
+        app(SalesReturnService::class)->post($creditOnly);
+        $this->assertSame(2, SalesCreditNote::query()->count());
+        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'sales_return')->count());
+
+        $inventoryOnly = $this->createManualReturn($context, SalesReturnType::InventoryAdjustmentOnly);
+        app(SalesReturnService::class)->approve($inventoryOnly);
+        app(SalesReturnService::class)->post($inventoryOnly);
+        $this->assertSame(2, SalesCreditNote::query()->count());
+        $this->assertSame(2, InventoryMovement::query()->where('source_type', 'sales_return')->count());
+
+        $replacement = $this->createOrder($context, [new SalesLineData($context['item_id'], '1.000000', '0.000000', uomId: $context['uom_id'])]);
+        app(SalesOrderService::class)->approve($replacement);
+        $warranty = $this->createManualReturn($context, SalesReturnType::WarrantyReplacement, $replacement->getKey());
+        app(SalesReturnService::class)->approve($warranty);
+        $warrantyResult = app(SalesReturnService::class)->post($warranty);
+        $this->assertSame(2, SalesCreditNote::query()->count());
+        $this->assertCount(2, $warrantyResult->inventoryMovementIds);
+        $this->assertSame(SalesOrderStatus::Delivered, $replacement->refresh()->status);
+
+        $exchangeItemId = $this->createItem($context['tenant_id'], 'EXCHANGE-'.Str::upper(Str::random(4)), $context['uom_id']);
+        $this->seedStock($context, '5.000000', $exchangeItemId);
+        $exchangeOrder = $this->createOrder($context, [new SalesLineData($exchangeItemId, '1.000000', '12.000000', uomId: $context['uom_id'])]);
+        app(SalesOrderService::class)->approve($exchangeOrder);
+        $exchange = $this->createManualReturn($context, SalesReturnType::ExchangeReturn, $exchangeOrder->getKey());
+        app(SalesReturnService::class)->approve($exchange);
+        $exchangeResult = app(SalesReturnService::class)->post($exchange);
+        $this->assertSame(3, SalesCreditNote::query()->count());
+        $this->assertCount(2, $exchangeResult->inventoryMovementIds);
+        $this->assertSame(SalesOrderStatus::Delivered, $exchangeOrder->refresh()->status);
+
+        $damaged = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ManualCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            warehouseLocationId: $context['location_id'],
+            reason: 'Damaged imported return',
+            approvalRequired: true,
+            costBasis: '4.000000',
+            lines: [new SalesReturnLineData('1.000000', itemId: $context['item_id'], uomId: $context['uom_id'], costBasis: '4.000000', conditionStatus: 'quarantine')],
+        ));
+        app(SalesReturnService::class)->approve($damaged);
+        app(SalesReturnService::class)->post($damaged);
+        $this->assertSame('quarantine', $damaged->lines->first()->condition_status);
+
+        $opening = $this->createManualReturn($context, SalesReturnType::OpeningImportedReturn);
+        app(SalesReturnService::class)->approve($opening);
+        app(SalesReturnService::class)->post($opening);
+        $this->assertSame(7, SalesReturn::query()->count());
+    }
+
+    public function test_payment_preparation_and_tenant_isolation(): void
+    {
+        $context = $this->context();
+        $payment = app(SalesPaymentPreparationService::class)->prepareCustomerReceipt(
+            $context['tenant_id'],
+            '2026-06-11',
+            '25.000000',
+            customerId: $context['customer_id'],
+        );
+        $this->assertSame(PaymentType::CustomerReceipt, $payment->paymentType);
+        $this->assertSame(PaymentDirection::Inbound, $payment->direction);
+        $this->assertSame(0, Payment::query()->count());
+
+        $other = $this->context('OTHER');
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Sales reference belongs to a different tenant.');
+        app(SalesOrderService::class)->create(new CreateSalesOrderData(
+            tenantId: $context['tenant_id'],
+            salesOrderDate: '2026-06-11',
+            customerId: $other['customer_id'],
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesLineData($context['item_id'], '1.000000', '1.000000', uomId: $context['uom_id'])],
+        ));
+    }
+
+    public function test_over_quantities_and_missing_uom_conversion_are_rejected(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+
+        try {
+            $this->deliver($context, $order, '3.000000');
+            $this->fail('Expected over-delivery validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Delivered quantity cannot exceed sales order remaining deliverable quantity.', $exception->getMessage());
+        }
+
+        $delivery = $this->deliver($context, $order, '2.000000');
+        $deliveryLine = $delivery->lines->first();
+
+        try {
+            app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(new CreateSalesInvoiceData(
+                tenantId: $context['tenant_id'],
+                invoiceDate: '2026-06-11',
+                customerId: $context['customer_id'],
+                sources: [new SalesInvoiceSourceData(
+                    'sales_delivery',
+                    (int) $delivery->getKey(),
+                    [(int) $deliveryLine->getKey() => '3.000000'],
+                )],
+            ));
+            $this->fail('Expected over-invoicing validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Sales invoice quantity cannot exceed delivery remaining quantity.', $exception->getMessage());
+        }
+
+        try {
+            app(SalesReturnService::class)->create(new CreateSalesReturnData(
+                tenantId: $context['tenant_id'],
+                returnDate: '2026-06-11',
+                customerId: $context['customer_id'],
+                returnType: SalesReturnType::ReferencedCustomerReturn,
+                warehouseId: $context['warehouse_id'],
+                lines: [new SalesReturnLineData('3.000000', 'sales_delivery_line', (int) $deliveryLine->getKey())],
+            ));
+            $this->fail('Expected over-return validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Returned quantity cannot exceed source remaining quantity.', $exception->getMessage());
+        }
+
+        $unsupportedUomId = $this->createUom($context['tenant_id'], 'BOX-'.Str::upper(Str::random(4)), false);
+        try {
+            $this->createOrder($context, [
+                new SalesLineData($context['item_id'], '1.000000', '10.000000', uomId: $unsupportedUomId),
+            ]);
+            $this->fail('Expected missing UOM conversion validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Sales UOM conversion is required but no conversion exists.', $exception->getMessage());
+        }
+    }
+
+    private function createOrder(array $context, array $lines, array $adjustments = []): SalesOrder
+    {
+        return app(SalesOrderService::class)->create(new CreateSalesOrderData(
+            tenantId: $context['tenant_id'],
+            salesOrderDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            warehouseId: $context['warehouse_id'],
+            lines: $lines,
+            adjustments: $adjustments,
+        ));
+    }
+
+    private function deliver(array $context, SalesOrder $order, string $quantity): SalesDelivery
+    {
+        $line = $order->refresh()->load('lines')->lines->first();
+        $delivery = app(SalesDeliveryService::class)->create(new CreateSalesDeliveryData(
+            tenantId: $context['tenant_id'],
+            deliveryDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            warehouseId: $context['warehouse_id'],
+            salesOrderId: (int) $order->getKey(),
+            lines: [new SalesDeliveryLineData(
+                itemId: (int) $line->item_id,
+                deliveredQuantity: $quantity,
+                unitPrice: (string) $line->unit_price,
+                salesOrderLineId: (int) $line->getKey(),
+                uomId: $context['uom_id'],
+            )],
+        ));
+
+        return app(SalesDeliveryService::class)->post($delivery)->refresh()->load(['lines', 'adjustments']);
+    }
+
+    private function createManualReturn(array $context, SalesReturnType $type, ?int $replacementOrderId = null): SalesReturn
+    {
+        return app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: $type,
+            warehouseId: $context['warehouse_id'],
+            reason: 'Legacy customer return',
+            replacementSalesOrderId: $replacementOrderId,
+            approvalRequired: true,
+            costBasis: '4.000000',
+            lines: [new SalesReturnLineData(
+                returnedQuantity: '1.000000',
+                itemId: $context['item_id'],
+                uomId: $context['uom_id'],
+                costBasis: '4.000000',
+            )],
+        ));
+    }
+
+    private function seedStock(array $context, string $quantity, ?int $itemId = null): void
+    {
+        $adjustment = app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+            tenantId: $context['tenant_id'],
+            adjustmentDate: '2026-06-11',
+            adjustmentType: AdjustmentType::OpeningBalance,
+            warehouseId: $context['warehouse_id'],
+            reason: 'Sales test opening stock',
+            lines: [new StockAdjustmentLineData(
+                $itemId ?? $context['item_id'],
+                '0.000000',
+                $quantity,
+                $quantity,
+                '4.000000',
+            )],
+        ));
+        app(StockAdjustmentService::class)->post($adjustment);
+    }
+
+    private function context(string $suffix = ''): array
+    {
+        $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
+        $tenantId = $this->createTenant($suffix);
+        $uomId = $this->createUom($tenantId, 'PCS-'.$suffix);
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-'.$suffix);
+
+        return [
+            'tenant_id' => $tenantId,
+            'uom_id' => $uomId,
+            'warehouse_id' => $warehouseId,
+            'location_id' => $this->createWarehouseLocation($tenantId, $warehouseId, 'QUAR-'.$suffix),
+            'customer_id' => $this->createCustomer($tenantId, 'CUS-'.$suffix),
+            'item_id' => $this->createItem($tenantId, 'ITEM-'.$suffix, $uomId),
+        ];
+    }
+
+    private function createTenant(string $suffix): int
+    {
+        return (int) DB::table('tenants')->insertGetId([
+            'uuid' => (string) Str::uuid(),
+            'code' => 'TEN-SAL-'.$suffix,
+            'name' => 'Sales Tenant '.$suffix,
+            'slug' => 'sales-tenant-'.Str::lower($suffix),
+            'status' => 'active',
+            'is_active' => true,
+            'is_isolated' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createUom(int $tenantId, string $code, bool $isBase = true): int
+    {
+        return (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'code' => $code,
+            'name' => 'Unit '.$code,
+            'symbol' => 'pcs',
+            'type' => 'unit',
+            'category' => 'quantity',
+            'decimal_precision' => 6,
+            'allow_fractional_quantity' => true,
+            'is_base' => $isBase,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createWarehouse(int $tenantId, string $code): int
+    {
+        return (int) DB::table('warehouses')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => 'Warehouse '.$code,
+            'code' => $code,
+            'type' => 'standard',
+            'is_active' => true,
+            'is_default' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createWarehouseLocation(int $tenantId, int $warehouseId, string $code): int
+    {
+        return (int) DB::table('warehouse_locations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouseId,
+            'row_version' => 1,
+            'name' => $code,
+            'code' => $code,
+            'type' => 'bin',
+            'is_active' => true,
+            'is_pickable' => false,
+            'is_receivable' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createCustomer(int $tenantId, string $code): int
+    {
+        return (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => $code,
+            'code' => $code,
+            'name' => 'Customer '.$code,
+            'display_name' => 'Customer '.$code,
+            'customer_type' => 'business',
+            'status' => 'active',
+            'is_credit_allowed' => true,
+            'is_advance_allowed' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createItem(int $tenantId, string $code, int $uomId, string $type = 'stock', bool $stockable = true): int
+    {
+        return (int) DB::table('items')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => 'Sales '.$code,
+            'item_type' => $type,
+            'tracking_type' => 'none',
+            'costing_method' => 'fifo',
+            'base_uom_id' => $uomId,
+            'is_stockable' => $stockable,
+            'is_combo' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+}
