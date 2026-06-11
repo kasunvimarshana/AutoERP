@@ -20,6 +20,10 @@ import type {
     ItemVariant,
     ItemVariantPayload,
     ItemWithRelationsPayload,
+    BaseUomChangePayload,
+    BaseUomConversionPreview,
+    BaseUomRevision,
+    BaseUomUsageAudit,
 } from './itemTypes';
 
 export async function listItems(params: ListParams, signal?: AbortSignal) {
@@ -130,3 +134,26 @@ export const createItemUsageRule = (itemId: number, payload: ItemUsageRulePayloa
 export const updateItemUsageRule = (itemId: number, id: number, payload: ItemUsageRulePayload) =>
     apiClient.put<ApiResource<ItemUsageRule>>(`${relationPath(itemId, 'usage-rules')}/${id}`, payload).then((response) => response.data.data);
 export const deleteItemUsageRule = (itemId: number, id: number) => apiClient.delete(`${relationPath(itemId, 'usage-rules')}/${id}`);
+
+export async function getBaseUomUsageAudit(itemId: number, signal?: AbortSignal): Promise<BaseUomUsageAudit> {
+    const response = await apiClient.get<ApiResource<BaseUomUsageAudit>>(`${endpoints.items}/${itemId}/base-uom/usage-audit`, { signal });
+    return response.data.data;
+}
+
+export async function previewBaseUomChange(itemId: number, payload: BaseUomChangePayload): Promise<BaseUomConversionPreview> {
+    const response = await apiClient.post<ApiResource<BaseUomConversionPreview>>(`${endpoints.items}/${itemId}/base-uom/preview-change`, payload);
+    return response.data.data;
+}
+
+export async function applyBaseUomChange(itemId: number, payload: BaseUomChangePayload): Promise<BaseUomRevision> {
+    const response = await apiClient.post<ApiResource<BaseUomRevision>>(`${endpoints.items}/${itemId}/base-uom/apply-change`, payload);
+    return response.data.data;
+}
+
+export async function listBaseUomRevisions(itemId: number, signal?: AbortSignal): Promise<BaseUomRevision[]> {
+    const response = await apiClient.get<ApiCollection<BaseUomRevision>>(`${endpoints.items}/${itemId}/base-uom/revisions`, {
+        params: { per_page: 100 },
+        signal,
+    });
+    return response.data.data;
+}

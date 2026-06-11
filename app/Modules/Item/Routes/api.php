@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Item\Http\Controllers\ItemBaseUomController;
 use Modules\Item\Http\Controllers\ItemBrandController;
 use Modules\Item\Http\Controllers\ItemCategoryController;
 use Modules\Item\Http\Controllers\ItemController;
@@ -24,6 +25,10 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
 
     Route::patch('items/{item}/activate', [ItemController::class, 'activate'])->whereNumber('item')->name('items.activate');
     Route::patch('items/{item}/deactivate', [ItemController::class, 'deactivate'])->whereNumber('item')->name('items.deactivate');
+    Route::get('items/{item}/base-uom/usage-audit', [ItemBaseUomController::class, 'usageAudit'])->whereNumber('item')->name('items.base-uom.usage-audit');
+    Route::post('items/{item}/base-uom/preview-change', [ItemBaseUomController::class, 'preview'])->whereNumber('item')->name('items.base-uom.preview');
+    Route::post('items/{item}/base-uom/apply-change', [ItemBaseUomController::class, 'apply'])->whereNumber('item')->name('items.base-uom.apply');
+    Route::get('items/{item}/base-uom/revisions', [ItemBaseUomController::class, 'revisions'])->whereNumber('item')->name('items.base-uom.revisions');
 
     Route::get('items/{item}/units', [ItemRelationController::class, 'units'])->whereNumber('item')->name('items.units.index');
     Route::post('items/{item}/units', [ItemRelationController::class, 'storeUnit'])->whereNumber('item')->name('items.units.store');

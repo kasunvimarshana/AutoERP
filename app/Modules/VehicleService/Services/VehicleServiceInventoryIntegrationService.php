@@ -16,6 +16,7 @@ use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Item\Enums\TrackingType;
+use Modules\Item\Services\ItemBaseUomConversionService;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
@@ -28,6 +29,7 @@ final class VehicleServiceInventoryIntegrationService
         private readonly VehicleServiceLineService $lines,
         private readonly StockAvailabilityService $availability,
         private readonly StockMovementService $movements,
+        private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
     /** @return Collection<int, VehicleServiceJobLine> */
@@ -63,7 +65,13 @@ final class VehicleServiceInventoryIntegrationService
                     itemVariantId: $line->item_variant_id,
                     warehouseLocationId: $warehouseLocationId,
                 ));
-                $eligible = $this->math->compare($stock->quantityAvailable, (string) $line->quantity) >= 0;
+                $required = $this->baseUomConversions->convertOperationalBasis(
+                    $line->item,
+                    (int) ($line->uom_id ?: $line->item->base_uom_id),
+                    (string) $line->quantity,
+                    (string) $line->unit_cost,
+                )['quantity'];
+                $eligible = $this->math->compare($stock->quantityAvailable, $required) >= 0;
                 $line->setAttribute('stock_on_hand', $stock->quantityOnHand);
                 $line->setAttribute('stock_available', $stock->quantityAvailable);
                 $line->setAttribute('issue_eligible', $eligible);
@@ -107,6 +115,12 @@ final class VehicleServiceInventoryIntegrationService
                     continue;
                 }
                 $this->validator->assertInventoryIssueLine($line);
+                $basis = $this->baseUomConversions->convertOperationalBasis(
+                    $line->item,
+                    (int) ($line->uom_id ?: $line->item->base_uom_id),
+                    (string) $line->quantity,
+                    (string) $line->unit_cost,
+                );
                 $movement = $this->movements->record(new StockMovementData(
                     tenantId: (int) $job->tenant_id,
                     movementDate: now()->toDateString(),
@@ -114,11 +128,11 @@ final class VehicleServiceInventoryIntegrationService
                     direction: InventoryDirection::Out,
                     itemId: (int) $line->item_id,
                     warehouseId: $warehouseId,
-                    quantity: (string) $line->quantity,
+                    quantity: $basis['quantity'],
                     organizationUnitId: $job->organization_unit_id,
                     itemVariantId: $line->item_variant_id,
                     warehouseLocationId: $warehouseLocationId,
-                    unitCost: (string) $line->unit_cost,
+                    unitCost: $basis['unit_cost'],
                     sourceType: 'vehicle_service_job',
                     sourceId: (int) $job->getKey(),
                     sourceLineType: 'vehicle_service_job_line',

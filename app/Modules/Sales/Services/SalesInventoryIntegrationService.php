@@ -14,6 +14,7 @@ use Modules\Inventory\Services\StockAllocationService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
+use Modules\Item\Services\ItemBaseUomConversionService;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesDeliveryLine;
 use Modules\Sales\Models\SalesReturn;
@@ -24,6 +25,7 @@ final class SalesInventoryIntegrationService
     public function __construct(
         private readonly StockAllocationService $allocations,
         private readonly StockMovementService $movements,
+        private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
     public function allocateForDelivery(SalesDelivery $delivery, SalesDeliveryLine $line): ?InventoryAllocation
@@ -32,12 +34,20 @@ final class SalesInventoryIntegrationService
             return null;
         }
 
+        $item = Item::query()->findOrFail($line->item_id);
+        $quantity = $this->baseUomConversions->convertOperationalBasis(
+            $item,
+            (int) ($line->uom_id ?: $item->base_uom_id),
+            (string) $line->delivered_quantity,
+            (string) $line->unit_price,
+        )['quantity'];
+
         return $this->allocations->allocate(new AllocationData(
             tenantId: (int) $delivery->tenant_id,
             allocationDate: $delivery->delivery_date->toDateString(),
             itemId: (int) $line->item_id,
             warehouseId: (int) $delivery->warehouse_id,
-            quantityAllocated: (string) $line->delivered_quantity,
+            quantityAllocated: $quantity,
             organizationUnitId: $delivery->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $delivery->warehouse_location_id,
@@ -87,6 +97,14 @@ final class SalesInventoryIntegrationService
             $unitCost = (string) ($deliveryLine?->inventoryMovement?->unit_cost ?? '0.000000');
         }
 
+        $item = Item::query()->findOrFail($line->item_id);
+        $basis = $this->baseUomConversions->convertOperationalBasis(
+            $item,
+            (int) ($line->uom_id ?: $item->base_uom_id),
+            (string) $line->returned_quantity,
+            $unitCost,
+        );
+
         return $this->movements->record(new StockMovementData(
             tenantId: (int) $return->tenant_id,
             movementDate: $return->return_date->toDateString(),
@@ -94,11 +112,11 @@ final class SalesInventoryIntegrationService
             direction: InventoryDirection::In,
             itemId: (int) $line->item_id,
             warehouseId: (int) $return->warehouse_id,
-            quantity: (string) $line->returned_quantity,
+            quantity: $basis['quantity'],
             organizationUnitId: $return->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $return->warehouse_location_id,
-            unitCost: $unitCost,
+            unitCost: $basis['unit_cost'],
             sourceType: 'sales_return',
             sourceId: (int) $return->getKey(),
             sourceLineType: 'sales_return_line',

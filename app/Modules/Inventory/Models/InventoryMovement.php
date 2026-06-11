@@ -15,6 +15,7 @@ use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
+use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InventoryMovement extends CoreModel
 {
@@ -33,6 +34,7 @@ final class InventoryMovement extends CoreModel
             'movement_type' => InventoryMovementType::class,
             'direction' => InventoryDirection::class,
             'item_id' => 'integer',
+            'base_uom_id' => 'integer',
             'item_variant_id' => 'integer',
             'warehouse_id' => 'integer',
             'warehouse_location_id' => 'integer',
@@ -55,6 +57,11 @@ final class InventoryMovement extends CoreModel
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class, 'item_id');
+    }
+
+    public function baseUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
     }
 
     public function variant(): BelongsTo

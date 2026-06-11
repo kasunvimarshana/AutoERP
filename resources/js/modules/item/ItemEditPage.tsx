@@ -6,8 +6,8 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import type { NamedResource } from '@/shared/types/common';
-import { getItem, updateItem } from './itemApi';
-import type { ItemPayload } from './itemTypes';
+import { getBaseUomUsageAudit, getItem, updateItem } from './itemApi';
+import type { BaseUomUsageAudit, ItemPayload } from './itemTypes';
 import { ItemForm } from './components/ItemForm';
 
 export default function ItemEditPage() {
@@ -17,14 +17,15 @@ export default function ItemEditPage() {
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
     const [baseUom, setBaseUom] = useState<NamedResource | null>(null);
+    const [baseUomAudit, setBaseUomAudit] = useState<BaseUomUsageAudit | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     useEffect(() => {
         const controller = new AbortController();
-        getItem(itemId, controller.signal)
-            .then((item) => {
+        Promise.all([getItem(itemId, controller.signal), getBaseUomUsageAudit(itemId, controller.signal)])
+            .then(([item, audit]) => {
                 if (controller.signal.aborted) return;
                 setForm({
                     code: item.code,
@@ -45,6 +46,7 @@ export default function ItemEditPage() {
                 setCategory(item.category ?? null);
                 setBrand(item.brand ?? null);
                 setBaseUom(item.base_uom ?? null);
+                setBaseUomAudit(audit);
             })
             .catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
             .finally(() => !controller.signal.aborted && setLoading(false));
@@ -57,7 +59,19 @@ export default function ItemEditPage() {
         <ContentHeader title="Edit item" description="Relations remain on-demand in the item detail workspace." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <ItemForm value={form} onChange={setForm} category={category} onCategoryChange={setCategory} brand={brand} onBrandChange={setBrand} baseUom={baseUom} onBaseUomChange={setBaseUom} error={error} />
+            <ItemForm
+                value={form}
+                onChange={setForm}
+                category={category}
+                onCategoryChange={setCategory}
+                brand={brand}
+                onBrandChange={setBrand}
+                baseUom={baseUom}
+                onBaseUomChange={setBaseUom}
+                error={error}
+                baseUomLocked={baseUomAudit?.has_usage === true}
+                baseUomChangeHref={`/items/${itemId}?tab=base_uom`}
+            />
             <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save item</Button></div>
         </form>
     </>;

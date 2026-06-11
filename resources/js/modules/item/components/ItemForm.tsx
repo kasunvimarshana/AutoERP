@@ -5,6 +5,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
+import { Link } from 'react-router-dom';
 import { costingMethods, itemTypes, trackingTypes, type ItemPayload } from '../itemTypes';
 import { ItemBrandSelect } from './ItemBrandSelect';
 import { ItemCategorySelect } from './ItemCategorySelect';
@@ -20,6 +21,8 @@ export function ItemForm({
     baseUom,
     onBaseUomChange,
     error,
+    baseUomLocked = false,
+    baseUomChangeHref,
 }: {
     value: ItemPayload;
     onChange: (value: ItemPayload) => void;
@@ -30,6 +33,8 @@ export function ItemForm({
     baseUom: NamedResource | null;
     onBaseUomChange: (value: NamedResource | null) => void;
     error: ApiError | null;
+    baseUomLocked?: boolean;
+    baseUomChangeHref?: string;
 }) {
     const set = <K extends keyof ItemPayload>(key: K, next: ItemPayload[K]) => onChange({ ...value, [key]: next });
     const options = (entries: readonly string[]) => entries.map((entry) => ({ value: entry, label: entry.replaceAll('_', ' ') }));
@@ -54,7 +59,18 @@ export function ItemForm({
                 <Input label="Barcode" value={value.barcode ?? ''} onChange={(event) => set('barcode', event.target.value || null)} error={fieldError(error, 'barcode') ?? fieldError(error, 'item.barcode')} />
                 <ItemCategorySelect value={category} onChange={(next) => { onCategoryChange(next); set('item_category_id', next ? Number(next.id) : null); }} error={fieldError(error, 'item_category_id') ?? fieldError(error, 'item.item_category_id')} />
                 <ItemBrandSelect value={brand} onChange={(next) => { onBrandChange(next); set('item_brand_id', next ? Number(next.id) : null); }} error={fieldError(error, 'item_brand_id') ?? fieldError(error, 'item.item_brand_id')} />
-                <ItemUomSelect label="Base UOM" value={baseUom} onChange={(next) => { onBaseUomChange(next); set('base_uom_id', next ? Number(next.id) : null); }} error={fieldError(error, 'base_uom_id') ?? fieldError(error, 'item.base_uom_id')} />
+                {baseUomLocked ? (
+                    <div>
+                        <span className="mb-1 block text-sm font-medium text-slate-700">Base UOM</span>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <span className="font-semibold">{baseUom ? `${baseUom.code ?? ''} - ${baseUom.name}` : 'Not set'}</span>
+                            <p className="mt-1 text-xs text-slate-500">Locked because this item has operational or document usage.</p>
+                            {baseUomChangeHref && <Link className="mt-2 inline-block font-semibold text-sky-700 hover:underline" to={baseUomChangeHref}>Change via conversion wizard</Link>}
+                        </div>
+                    </div>
+                ) : (
+                    <ItemUomSelect label="Base UOM" value={baseUom} onChange={(next) => { onBaseUomChange(next); set('base_uom_id', next ? Number(next.id) : null); }} error={fieldError(error, 'base_uom_id') ?? fieldError(error, 'item.base_uom_id')} />
+                )}
             </div>
             <div className="mt-4">
                 <Textarea label="Description" value={value.description ?? ''} onChange={(event) => set('description', event.target.value || null)} />

@@ -24,5 +24,6 @@ final readonly class ValuationLayerData
         public ?int $sourceId = null,
         public ?string $sourceLineType = null,
         public ?int $sourceLineId = null,
+        public ?int $baseUomId = null,
     ) {}
 }

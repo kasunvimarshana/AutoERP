@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { lazy, Suspense, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -17,17 +17,21 @@ const ItemBundleTab = lazy(() => import('./components/ItemBundleTab'));
 const ItemPriceTab = lazy(() => import('./components/ItemPriceTab'));
 const ItemCodeTab = lazy(() => import('./components/ItemCodeTab'));
 const ItemUsageRuleTab = lazy(() => import('./components/ItemUsageRuleTab'));
+const BaseUomChangeWizard = lazy(() => import('./components/BaseUomChangeWizard'));
+const BaseUomRevisionHistoryTab = lazy(() => import('./components/BaseUomRevisionHistoryTab'));
 
-type Tab = 'summary' | 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
+type Tab = 'summary' | 'base_uom' | 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
 const tabs = [
-    ['summary', 'Summary'], ['units', 'Units'], ['variants', 'Variants'], ['bundles', 'Bundles'],
+    ['summary', 'Summary'], ['base_uom', 'Base UOM'], ['units', 'Units'], ['variants', 'Variants'], ['bundles', 'Bundles'],
     ['prices', 'Prices'], ['codes', 'Codes'], ['usage_rules', 'Usage Rules'],
 ].map(([id, label]) => ({ id: id as Tab, label }));
 
 export default function ItemDetailPage() {
     const itemId = Number(useParams().id);
+    const [searchParams] = useSearchParams();
     const item = useApi((signal) => getItem(itemId, signal), [itemId], Number.isFinite(itemId));
-    const tab = useOnDemandTab<Tab>('summary');
+    const tab = useOnDemandTab<Tab>(searchParams.get('tab') === 'base_uom' ? 'base_uom' : 'summary');
+    const [revisionVersion, setRevisionVersion] = useState(0);
     if (item.loading) return <LoadingState />;
     if (!item.data) return <ErrorAlert error={item.error} />;
 
@@ -38,6 +42,10 @@ export default function ItemDetailPage() {
             <div className="p-5">
                 {tab.activeTab === 'summary' && <ItemSummaryCard item={item.data} />}
                 <Suspense fallback={<LoadingState />}>
+                    {tab.openedTabs.has('base_uom') && <div hidden={tab.activeTab !== 'base_uom'} className="space-y-5">
+                        <BaseUomChangeWizard itemId={itemId} onApplied={() => { item.reload(); setRevisionVersion((value) => value + 1); }} />
+                        <BaseUomRevisionHistoryTab itemId={itemId} refreshKey={revisionVersion} />
+                    </div>}
                     {tab.openedTabs.has('units') && <div hidden={tab.activeTab !== 'units'}><ItemUnitTab itemId={itemId} /></div>}
                     {tab.openedTabs.has('variants') && <div hidden={tab.activeTab !== 'variants'}><ItemVariantTab itemId={itemId} /></div>}
                     {tab.openedTabs.has('bundles') && <div hidden={tab.activeTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(item.data.item_type)} /></div>}

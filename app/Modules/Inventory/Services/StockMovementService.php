@@ -15,6 +15,8 @@ use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Inventory\Models\InventoryMovement;
+use Modules\Item\Enums\ItemBaseUomRevisionStatus;
+use Modules\Item\Models\ItemBaseUomRevision;
 use Modules\Inventory\Validators\InventoryValidationService;
 
 final class StockMovementService
@@ -49,6 +51,7 @@ final class StockMovementService
             'movement_type' => $data->movementType,
             'direction' => $data->direction,
             'item_id' => $data->itemId,
+            'base_uom_id' => $item->base_uom_id,
             'item_variant_id' => $data->itemVariantId,
             'warehouse_id' => $data->warehouseId,
             'warehouse_location_id' => $data->warehouseLocationId,
@@ -102,6 +105,7 @@ final class StockMovementService
                     sourceId: $movement->source_id,
                     sourceLineType: $movement->source_line_type,
                     sourceLineId: $movement->source_line_id,
+                    baseUomId: $movement->base_uom_id,
                 ));
             } elseif ($movement->direction === InventoryDirection::Out) {
                 if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
@@ -139,6 +143,7 @@ final class StockMovementService
         $direction = $movement->direction === InventoryDirection::In ? InventoryDirection::Out : InventoryDirection::In;
         $type = $direction === InventoryDirection::In ? InventoryMovementType::AdjustmentIn : InventoryMovementType::AdjustmentOut;
 
+        [$reversalQuantity, $reversalUnitCost] = $this->reversalBasis($movement);
         $reversal = $this->record(new StockMovementData(
             tenantId: (int) $movement->tenant_id,
             movementDate: now()->toDateString(),
@@ -146,13 +151,13 @@ final class StockMovementService
             direction: $direction,
             itemId: (int) $movement->item_id,
             warehouseId: (int) $movement->warehouse_id,
-            quantity: (string) $movement->quantity,
+            quantity: $reversalQuantity,
             organizationUnitId: $movement->organization_unit_id,
             itemVariantId: $movement->item_variant_id,
             warehouseLocationId: $movement->warehouse_location_id,
             batchId: $movement->batch_id,
             serialNumberId: $movement->serial_number_id,
-            unitCost: (string) $movement->unit_cost,
+            unitCost: $reversalUnitCost,
             sourceType: 'inventory_movement',
             sourceId: (int) $movement->getKey(),
             description: 'Reversal of '.$movement->movement_number,
@@ -166,6 +171,45 @@ final class StockMovementService
         $reversal->save();
 
         return $reversal->refresh();
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function reversalBasis(InventoryMovement $movement): array
+    {
+        $item = $movement->item()->firstOrFail();
+        $fromUomId = (int) ($movement->base_uom_id ?: $item->base_uom_id);
+        $toUomId = (int) $item->base_uom_id;
+        if ($fromUomId === $toUomId) {
+            return [(string) $movement->quantity, (string) $movement->unit_cost];
+        }
+
+        $factor = '1.000000';
+        $currentUomId = $fromUomId;
+        $revisions = ItemBaseUomRevision::query()
+            ->where('tenant_id', $movement->tenant_id)
+            ->where('item_id', $movement->item_id)
+            ->where('status', ItemBaseUomRevisionStatus::Applied->value)
+            ->where('applied_at', '>=', $movement->created_at)
+            ->orderBy('applied_at')
+            ->orderBy('id')
+            ->get();
+        foreach ($revisions as $revision) {
+            if ((int) $revision->old_base_uom_id !== $currentUomId) {
+                continue;
+            }
+            $factor = $this->math->mul($factor, (string) $revision->conversion_factor);
+            $currentUomId = (int) $revision->new_base_uom_id;
+            if ($currentUomId === $toUomId) {
+                return [
+                    $this->math->mul((string) $movement->quantity, $factor),
+                    $this->math->div((string) $movement->unit_cost, $factor),
+                ];
+            }
+        }
+
+        throw new InvalidArgumentException('Historical inventory movement UOM cannot be converted to the current item base UOM.');
     }
 
     public function result(InventoryMovement $movement): StockPostingResult

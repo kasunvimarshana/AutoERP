@@ -72,6 +72,11 @@ final class Item extends CoreModel
         return $this->hasMany(ItemUnit::class, 'item_id');
     }
 
+    public function baseUomRevisions(): HasMany
+    {
+        return $this->hasMany(ItemBaseUomRevision::class, 'item_id');
+    }
+
     public function variants(): HasMany
     {
         return $this->hasMany(ItemVariant::class, 'item_id');

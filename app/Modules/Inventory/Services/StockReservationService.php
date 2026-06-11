@@ -33,7 +33,7 @@ final class StockReservationService
         $this->validator->location($warehouse, $data->warehouseLocationId);
         $this->validator->batch($item, $data->batchId);
 
-        return DB::transaction(function () use ($data, $quantity): InventoryReservation {
+        return DB::transaction(function () use ($data, $quantity, $item): InventoryReservation {
             $balance = $this->balances->getOrCreate($this->balanceData($data));
             if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
                 throw new InvalidArgumentException('Inventory reservation quantity cannot exceed available stock.');
@@ -47,6 +47,7 @@ final class StockReservationService
                 'reservation_number' => $data->reservationNumber ?? $this->numbers->next($data->tenantId, 'RES', 'inventory_reservations', 'reservation_number'),
                 'reservation_date' => $data->reservationDate,
                 'item_id' => $data->itemId,
+                'base_uom_id' => $item->base_uom_id,
                 'item_variant_id' => $data->itemVariantId,
                 'warehouse_id' => $data->warehouseId,
                 'warehouse_location_id' => $data->warehouseLocationId,

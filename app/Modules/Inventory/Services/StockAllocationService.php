@@ -40,7 +40,7 @@ final class StockAllocationService
         $this->validator->batch($item, $data->batchId);
         $this->validator->serial($item, $data->serialNumberId, $quantity);
 
-        return DB::transaction(function () use ($data, $quantity): InventoryAllocation {
+        return DB::transaction(function () use ($data, $quantity, $item): InventoryAllocation {
             $reservation = $data->reservationId === null ? null : InventoryReservation::query()->findOrFail($data->reservationId);
             if ($reservation !== null && $this->math->compare((string) $reservation->quantity_remaining, $quantity) < 0) {
                 throw new InvalidArgumentException('Inventory allocation cannot exceed reservation remaining quantity.');
@@ -70,6 +70,7 @@ final class StockAllocationService
                 'allocation_date' => $data->allocationDate,
                 'reservation_id' => $data->reservationId,
                 'item_id' => $data->itemId,
+                'base_uom_id' => $item->base_uom_id,
                 'item_variant_id' => $data->itemVariantId,
                 'warehouse_id' => $data->warehouseId,
                 'warehouse_location_id' => $data->warehouseLocationId,

@@ -175,3 +175,68 @@ export interface ItemWithRelationsPayload {
     codes: ItemCodePayload[];
     usage_rules: ItemUsageRulePayload[];
 }
+
+export interface BaseUomAffectedModule {
+    module: string;
+    count: number;
+    references: Record<string, number>;
+}
+
+export interface BaseUomBlocker {
+    code: string;
+    message: string;
+    count: number;
+}
+
+export interface BaseUomUsageAudit {
+    item: ItemSummary;
+    has_usage: boolean;
+    can_direct_edit: boolean;
+    usage_count: number;
+    affected_modules: BaseUomAffectedModule[];
+    blockers: BaseUomBlocker[];
+    warnings: string[];
+}
+
+export interface BaseUomPreviewRow {
+    area: string;
+    reference: string;
+    metric: string;
+    before: string;
+    after: string;
+}
+
+export interface BaseUomConversionPreview {
+    item: ItemSummary;
+    old_base_uom: NamedResource | null;
+    new_base_uom: NamedResource | null;
+    conversion_factor: string | null;
+    factor_source: string | null;
+    effective_at: string;
+    is_valid: boolean;
+    affected_modules: BaseUomAffectedModule[];
+    preview_rows: BaseUomPreviewRow[];
+    blockers: BaseUomBlocker[];
+    warnings: string[];
+}
+
+export interface BaseUomRevision {
+    id: number;
+    item?: NamedResource;
+    old_base_uom: NamedResource | null;
+    new_base_uom: NamedResource | null;
+    conversion_factor: string;
+    effective_at: string;
+    reason?: string | null;
+    status: string;
+    validation_summary?: Record<string, unknown> | null;
+    applied_at?: string | null;
+    created_at: string;
+}
+
+export interface BaseUomChangePayload {
+    new_base_uom_id: number;
+    conversion_factor?: string | null;
+    effective_at?: string | null;
+    reason?: string | null;
+}

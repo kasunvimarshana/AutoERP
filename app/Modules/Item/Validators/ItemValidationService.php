@@ -47,7 +47,10 @@ final class ItemValidationService
         'charge',
     ];
 
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly \Modules\Item\Services\ItemBaseUomUsageAuditService $baseUomUsageAudit,
+    ) {}
 
     public function validateCreate(CreateItemData $data): void
     {
@@ -66,6 +69,12 @@ final class ItemValidationService
     {
         $tenantId = (int) $item->tenant_id;
         $organizationUnitId = $data->organizationUnitId ?? $item->organization_unit_id;
+
+        if (in_array('base_uom_id', $data->provided, true)
+            && (int) ($data->baseUomId ?? 0) !== (int) ($item->base_uom_id ?? 0)
+            && $this->baseUomUsageAudit->audit($item)['has_usage']) {
+            throw new InvalidArgumentException('Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.');
+        }
 
         if ($data->code !== null) {
             $this->assertText($data->code, 'Item code is required.');

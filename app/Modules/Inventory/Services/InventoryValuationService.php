@@ -24,6 +24,7 @@ final class InventoryValuationService
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'item_id' => $data->itemId,
+            'base_uom_id' => $data->baseUomId,
             'item_variant_id' => $data->itemVariantId,
             'warehouse_id' => $data->warehouseId,
             'warehouse_location_id' => $data->warehouseLocationId,

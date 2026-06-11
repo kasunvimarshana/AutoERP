@@ -124,14 +124,15 @@ final class ReportCatalog
 
             $this->inventory('inventory.stock-balance', 'Stock Balance', InventoryStockBalance::class, [
                 $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('location', 'Location', 'warehouseLocation.name'),
+                $this->col('uom', 'UOM', 'item.baseUom.code'),
                 $this->col('batch', 'Batch', 'batch.batch_number'), $this->qty('quantity_on_hand', 'On Hand'), $this->qty('quantity_reserved', 'Reserved'),
                 $this->qty('quantity_allocated', 'Allocated'), $this->qty('quantity_available', 'Available'), $this->money('total_value', 'Value'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'warehouseLocation', 'batch']),
+            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'item.baseUom', 'warehouse', 'warehouseLocation', 'batch']),
             $this->inventory('inventory.stock-movement', 'Stock Movement', InventoryMovement::class, [
                 $this->col('movement_date', 'Date', format: 'date', sort: 'movement_date'), $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'),
                 $this->col('movement_type', 'Type', format: 'enum', sort: 'movement_type'), $this->col('direction', 'Direction', format: 'enum', sort: 'direction'),
-                $this->qty('quantity', 'Quantity'), $this->money('total_cost', 'Cost'), $this->col('source_type', 'Source', sort: 'source_type'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'source_type', 'reference_number'], ['item', 'warehouse'], 'movement_date'),
+                $this->qty('quantity', 'Quantity'), $this->col('uom', 'UOM', 'baseUom.code'), $this->money('total_cost', 'Cost'), $this->col('source_type', 'Source', sort: 'source_type'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['item.code', 'item.name', 'warehouse.name', 'source_type', 'reference_number'], ['item', 'baseUom', 'warehouse'], 'movement_date'),
             $this->inventory('inventory.batch-lot', 'Batch/Lot', InventoryBatch::class, [
                 $this->col('batch_number', 'Batch', sort: 'batch_number'), $this->itemCol(), $this->col('manufacture_date', 'Manufactured', format: 'date', sort: 'manufacture_date'),
                 $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
@@ -254,8 +255,8 @@ final class ReportCatalog
     {
         return $this->inventory($key, $title, $model, [
             $this->col($dateColumn, 'Date', format: 'date', sort: $dateColumn), $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'),
-            $this->col('batch', 'Batch', 'batch.batch_number'), $this->qty($quantityColumn, 'Quantity'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-        ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch'], $dateColumn);
+            $this->col('batch', 'Batch', 'batch.batch_number'), $this->qty($quantityColumn, 'Quantity'), $this->col('uom', 'UOM', 'baseUom.code'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+        ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'baseUom', 'warehouse', 'batch'], $dateColumn);
     }
 
     private function purchase(string $key, string $title, string $model, string $dateColumn, string $numberColumn, string $amountColumn): ReportDefinition
