@@ -43,6 +43,45 @@ final class ChartOfAccountsService
         ]);
     }
 
+    public function updateAccount(FinanceAccount $account, CreateAccountData $data): FinanceAccount
+    {
+        $this->validator->validateAccountCreation($data, (int) $account->getKey());
+
+        if ((int) $account->tenant_id !== $data->tenantId
+            || $account->organization_unit_id !== $data->organizationUnitId) {
+            throw new \InvalidArgumentException('Finance account scope cannot be changed.');
+        }
+
+        if ($account->ledgerEntries()->exists()
+            && ($account->normal_balance !== $data->normalBalance
+                || $this->math->compare((string) $account->opening_balance, $data->openingBalance) !== 0)) {
+            throw new \InvalidArgumentException('Posted accounts cannot change normal balance or opening balance.');
+        }
+
+        $account->forceFill([
+            'account_type_id' => $data->accountTypeId,
+            'account_category_id' => $data->accountCategoryId,
+            'parent_id' => $data->parentId,
+            'code' => trim($data->code),
+            'name' => trim($data->name),
+            'description' => $data->description,
+            'normal_balance' => $data->normalBalance->value,
+            'is_control_account' => $data->isControlAccount,
+            'is_posting_account' => $data->isPostingAccount,
+            'is_cash_account' => $data->isCashAccount,
+            'is_bank_account' => $data->isBankAccount,
+            'is_tax_account' => $data->isTaxAccount,
+            'is_active' => $data->isActive,
+            'opening_balance' => $this->math->normalize($data->openingBalance),
+            'current_balance' => $account->ledgerEntries()->exists()
+                ? (string) $account->current_balance
+                : $this->math->normalize($data->openingBalance),
+            'metadata' => $data->metadata,
+        ])->save();
+
+        return $account->refresh();
+    }
+
     public function assertPostable(FinanceAccount $account): void
     {
         if (! (bool) $account->is_active) {

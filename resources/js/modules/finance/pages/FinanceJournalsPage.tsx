@@ -1,32 +1,56 @@
 import { useState } from 'react';
-import { listLedgerEntries } from '../financeApi';
-import { useApi } from '@/shared/hooks/useApi';
+import { Link } from 'react-router-dom';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
-import { DataTable } from '@/shared/components/DataTable';
-import { Pagination } from '@/shared/components/Pagination';
-import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { Pagination } from '@/shared/components/Pagination';
+import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { listJournals, type JournalEntry } from '../financeApi';
 
 export default function FinanceJournalsPage() {
+    const [search, setSearch] = useState('');
+    const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
-    const result = useApi((signal) => listLedgerEntries({ page, per_page: 25 }, signal), [page]);
-    return (
-        <>
-            <ContentHeader title="Journal activity" description="Ledger-backed finance activity." />
-            <div className="mb-4"><CapabilityNotice>The Finance API can create, post, and reverse journals, but does not expose journal list/detail GET endpoints. This page uses the available ledger feed and does not fabricate journal records.</CapabilityNotice></div>
-            <ErrorAlert error={result.error} />
-            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} rowKey={(row) => row.id} columns={[
-                { key: 'date', header: 'Date', render: (row) => formatDate(row.entry_date) },
-                { key: 'account', header: 'Account', render: (row) => readableRelation(row.account) },
-                { key: 'journal', header: 'Journal', render: (row) => readableRelation(row.journal_entry) },
-                { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
-                { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-            ]} />}
-            <Pagination meta={result.data?.meta} onPageChange={setPage} />
-        </>
-    );
+    const debounced = useDebounce(search);
+    const result = useApi((signal) => listJournals({
+        search: debounced || undefined,
+        status: status || undefined,
+        page,
+        per_page: 25,
+    }, signal), [debounced, status, page]);
+    const columns: DataColumn<JournalEntry>[] = [
+        { key: 'journal', header: 'Journal', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/finance/journals/${row.id}`}>{row.journal_number}</Link> },
+        { key: 'date', header: 'Date', render: (row) => formatDate(row.journal_date) },
+        { key: 'type', header: 'Type', render: (row) => row.journal_type.replaceAll('_', ' ') },
+        { key: 'source', header: 'Source', render: (row) => row.source_number ?? row.source_type ?? '-' },
+        { key: 'debit', header: 'Debit', render: (row) => <span className="tabular-nums">{row.total_debit}</span> },
+        { key: 'credit', header: 'Credit', render: (row) => <span className="tabular-nums">{row.total_credit}</span> },
+        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+    ];
+
+    return <>
+        <ContentHeader
+            title="Journal entries"
+            description="Draft, posted, cancelled, and reversed accounting journals."
+            actions={<Link className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700" to="/finance/journals/create">New journal</Link>}
+        />
+        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(16rem,1fr)_14rem]">
+            <Input type="search" placeholder="Search journal or source number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+            <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} options={[
+                { value: 'draft', label: 'Draft' },
+                { value: 'posted', label: 'Posted' },
+                { value: 'reversed', label: 'Reversed' },
+                { value: 'cancelled', label: 'Cancelled' },
+            ]} placeholder="All statuses" />
+        </div>
+        <ErrorAlert error={result.error} />
+        {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+        <Pagination meta={result.data?.meta} onPageChange={setPage} />
+    </>;
 }

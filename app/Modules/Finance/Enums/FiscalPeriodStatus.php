@@ -9,4 +9,5 @@ enum FiscalPeriodStatus: string
     case Open = 'open';
     case Closed = 'closed';
     case Locked = 'locked';
+    case YearClosed = 'year_closed';
 }

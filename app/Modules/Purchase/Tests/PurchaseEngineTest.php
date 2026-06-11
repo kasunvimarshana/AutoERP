@@ -8,12 +8,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Finance\DTOs\JournalLineData;
+use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
-use Modules\Inventory\Enums\AdjustmentType as InventoryAdjustmentType;
 use Modules\Inventory\DTOs\StockBalanceData;
+use Modules\Inventory\Enums\AdjustmentType as InventoryAdjustmentType;
 use Modules\Inventory\Models\InventoryMovement;
+use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -21,23 +22,23 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
-use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Models\Payment;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
-use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseDebitNoteData;
+use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\DTOs\PurchaseReturnLineData;
+use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
-use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
@@ -48,13 +49,12 @@ use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
+use Modules\Purchase\Services\PurchaseDebitNoteService;
 use Modules\Purchase\Services\PurchaseFinancePreparationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
-use Modules\Purchase\Services\PurchaseDebitNoteService;
 use Modules\Purchase\Services\PurchaseReturnService;
-use Modules\Inventory\Services\StockAdjustmentService;
 use Tests\TestCase;
 
 final class PurchaseEngineTest extends TestCase
@@ -350,12 +350,13 @@ final class PurchaseEngineTest extends TestCase
             journalDate: '2026-06-06',
             sourceType: 'purchase_order',
             sourceId: 1,
-            lines: [new JournalLineData(accountId: 1, lineNumber: 1, debit: '100.000000')],
+            lines: [new FinancePostingLine(accountCode: '5100', accountName: 'Purchase Expense', debit: '100.000000')],
         );
 
         $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
         $this->assertSame(PaymentDirection::Outbound, $payment->direction);
-        $this->assertSame('purchase_order', $journal->source?->sourceType);
+        $this->assertSame('purchase_order', $journal->source->sourceType);
+        $this->assertSame('purchase', $journal->source->sourceModule);
     }
 
     private function createAdjustedOrder(int $tenantId, int $warehouseId, Item $item): PurchaseOrder

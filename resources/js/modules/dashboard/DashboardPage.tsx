@@ -32,6 +32,8 @@ const workflowWidgets = [
             ['Payment allocations', '/payments'],
             ['Chart of accounts', '/finance/accounts'],
             ['Journal review', '/finance/journals'],
+            ['General ledger', '/finance/ledger'],
+            ['Trial balance', '/finance/trial-balance'],
         ],
     },
 ];

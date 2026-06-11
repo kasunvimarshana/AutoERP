@@ -61,8 +61,16 @@ const ChequeTemplateListPage = lazy(() => import('@/modules/payment/cheque-print
 const ChequeTemplateFormPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateFormPage'));
 const ChequePrintPreviewPage = lazy(() => import('@/modules/payment/cheque-print/ChequePrintPreviewPage'));
 const FinanceAccountsPage = lazy(() => import('@/modules/finance/pages/FinanceAccountsPage'));
+const FinanceAccountCreatePage = lazy(() => import('@/modules/finance/pages/FinanceAccountCreatePage'));
+const FinanceAccountEditPage = lazy(() => import('@/modules/finance/pages/FinanceAccountEditPage'));
 const FinanceAccountDetailPage = lazy(() => import('@/modules/finance/pages/FinanceAccountDetailPage'));
 const FinanceJournalsPage = lazy(() => import('@/modules/finance/pages/FinanceJournalsPage'));
+const FinanceJournalCreatePage = lazy(() => import('@/modules/finance/pages/FinanceJournalCreatePage'));
+const FinanceJournalEditPage = lazy(() => import('@/modules/finance/pages/FinanceJournalEditPage'));
+const FinanceJournalDetailPage = lazy(() => import('@/modules/finance/pages/FinanceJournalDetailPage'));
+const LedgerReportPage = lazy(() => import('@/modules/finance/pages/LedgerReportPage'));
+const TrialBalanceReportPage = lazy(() => import('@/modules/finance/pages/TrialBalanceReportPage'));
+const AccountBalanceReportPage = lazy(() => import('@/modules/finance/pages/AccountBalanceReportPage'));
 const ReportListPage = lazy(() => import('@/modules/reporting/pages/ReportListPage'));
 const ReportPage = lazy(() => import('@/modules/reporting/pages/ReportPage'));
 const TechnicianWorkReportPage = lazy(() => import('@/modules/reporting/pages/TechnicianWorkReportPage'));
@@ -151,8 +159,16 @@ export function AppRouter() {
                     <Route path="/payments/:id/cheque-print" element={<ChequePrintPreviewPage />} />
                     <Route path="/payments/:id" element={<PaymentDetailPage />} />
                     <Route path="/finance/accounts" element={<FinanceAccountsPage />} />
+                    <Route path="/finance/accounts/create" element={<FinanceAccountCreatePage />} />
+                    <Route path="/finance/accounts/:id/edit" element={<FinanceAccountEditPage />} />
                     <Route path="/finance/accounts/:id" element={<FinanceAccountDetailPage />} />
                     <Route path="/finance/journals" element={<FinanceJournalsPage />} />
+                    <Route path="/finance/journals/create" element={<FinanceJournalCreatePage />} />
+                    <Route path="/finance/journals/:id/edit" element={<FinanceJournalEditPage />} />
+                    <Route path="/finance/journals/:id" element={<FinanceJournalDetailPage />} />
+                    <Route path="/finance/ledger" element={<LedgerReportPage />} />
+                    <Route path="/finance/trial-balance" element={<TrialBalanceReportPage />} />
+                    <Route path="/finance/account-balances" element={<AccountBalanceReportPage />} />
                     <Route path="/reports" element={<ReportListPage />} />
                     <Route path="/reports/vehicle-service/technician-work" element={<TechnicianWorkReportPage />} />
                     <Route path="/reports/vehicle-service/employee-commissions" element={<EmployeeCommissionReportPage />} />

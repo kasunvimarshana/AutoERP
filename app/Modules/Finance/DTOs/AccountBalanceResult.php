@@ -18,5 +18,7 @@ final readonly class AccountBalanceResult
         public string $closingDebit,
         public string $closingCredit,
         public string $balance,
+        public ?string $accountCode = null,
+        public ?string $accountName = null,
     ) {}
 }

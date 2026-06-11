@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Database\Seeders;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -11,6 +12,10 @@ use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceFiscalPeriod;
+use Modules\Finance\Models\FinanceFiscalYear;
+use Modules\Finance\Models\FinancePostingProfile;
+use Modules\Finance\Models\FinancePostingProfileRule;
 
 final class FinanceSeeder extends Seeder
 {
@@ -37,6 +42,8 @@ final class FinanceSeeder extends Seeder
                 $types,
                 $categories,
             );
+            $this->seedFiscalCalendar((int) $tenant->getKey(), $organizationUnit?->getKey());
+            $this->seedPostingProfiles((int) $tenant->getKey(), $organizationUnit?->getKey());
         }, 3);
     }
 
@@ -180,6 +187,131 @@ final class FinanceSeeder extends Seeder
                     'metadata' => ['seed_source' => 'finance_module'],
                 ],
             );
+        }
+    }
+
+    private function seedFiscalCalendar(int $tenantId, ?int $organizationUnitId): void
+    {
+        if (! Schema::hasTable('finance_fiscal_years')) {
+            return;
+        }
+
+        $yearNumber = (int) now()->year;
+        $start = CarbonImmutable::create($yearNumber, 1, 1);
+        $end = $start->endOfYear();
+        $year = FinanceFiscalYear::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'start_date' => $start,
+                'end_date' => $end,
+            ],
+            [
+                'name' => 'FY '.$yearNumber,
+                'status' => 'open',
+            ],
+        );
+
+        for ($month = 1; $month <= 12; $month++) {
+            $periodStart = CarbonImmutable::create($yearNumber, $month, 1);
+            FinanceFiscalPeriod::query()->updateOrCreate(
+                [
+                    'fiscal_year_id' => $year->getKey(),
+                    'period_number' => $month,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'name' => $periodStart->format('F Y'),
+                    'start_date' => $periodStart->toDateString(),
+                    'end_date' => $periodStart->endOfMonth()->toDateString(),
+                    'status' => 'open',
+                ],
+            );
+        }
+    }
+
+    private function seedPostingProfiles(int $tenantId, ?int $organizationUnitId): void
+    {
+        if (! Schema::hasTable('finance_posting_profiles')) {
+            return;
+        }
+
+        $definitions = [
+            'sales_invoice' => [
+                'name' => 'Sales Invoice',
+                'rules' => ['receivable' => '1100', 'revenue' => '4100', 'tax_payable' => '2200'],
+            ],
+            'purchase_invoice' => [
+                'name' => 'Purchase Invoice',
+                'rules' => ['expense' => '5100', 'payable' => '2100', 'tax_receivable' => '1300'],
+            ],
+            'payment_received' => [
+                'name' => 'Payment Received',
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'receivable' => '1100'],
+            ],
+            'payment_made' => [
+                'name' => 'Payment Made',
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'payable' => '2100'],
+            ],
+            'inventory_receipt' => [
+                'name' => 'Inventory Receipt',
+                'rules' => ['inventory' => '1200', 'payable' => '2100'],
+            ],
+            'inventory_issue' => [
+                'name' => 'Inventory Issue',
+                'rules' => ['cost_of_goods_sold' => '5200', 'inventory' => '1200'],
+            ],
+            'vehicle_service_invoice' => [
+                'name' => 'Vehicle Service Invoice',
+                'rules' => ['receivable' => '1100', 'service_revenue' => '4200', 'tax_payable' => '2200'],
+            ],
+            'sales_return' => [
+                'name' => 'Sales Return',
+                'rules' => ['sales_revenue' => '4100', 'receivable' => '1100'],
+            ],
+            'purchase_return' => [
+                'name' => 'Purchase Return',
+                'rules' => ['payable' => '2100', 'purchase_expense' => '5100'],
+            ],
+        ];
+
+        $accounts = FinanceAccount::query()
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('code');
+
+        foreach ($definitions as $code => $definition) {
+            $profile = FinancePostingProfile::query()->updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'code' => $code,
+                ],
+                [
+                    'name' => $definition['name'],
+                    'description' => 'Default AutoERP posting profile.',
+                    'is_active' => true,
+                ],
+            );
+
+            foreach ($definition['rules'] as $lineKey => $accountCode) {
+                $account = $accounts->get($accountCode);
+                if (! $account instanceof FinanceAccount) {
+                    continue;
+                }
+
+                FinancePostingProfileRule::query()->updateOrCreate(
+                    [
+                        'posting_profile_id' => $profile->getKey(),
+                        'line_key' => $lineKey,
+                    ],
+                    [
+                        'account_id' => $account->getKey(),
+                        'description' => $definition['name'].' '.$lineKey,
+                    ],
+                );
+            }
         }
     }
 }

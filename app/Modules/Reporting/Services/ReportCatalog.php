@@ -6,6 +6,7 @@ namespace Modules\Reporting\Services;
 
 use InvalidArgumentException;
 use Modules\Customer\Models\Customer;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountBalance;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
@@ -220,17 +221,22 @@ final class ReportCatalog
                 $this->money('opening_credit', 'Opening Cr'), $this->money('period_debit', 'Period Dr'), $this->money('period_credit', 'Period Cr'),
                 $this->money('closing_debit', 'Closing Dr'), $this->money('closing_credit', 'Closing Cr'),
             ], ['account.code', 'account.name'], ['account', 'fiscalPeriod']),
+            $this->chartOfAccounts(),
             $this->definition('finance.journals', 'Journal Entries', 'Finance', FinanceJournalEntry::class, [
                 $this->col('journal_date', 'Date', format: 'date', sort: 'journal_date'), $this->col('journal_number', 'Journal', sort: 'journal_number'),
-                $this->col('journal_type', 'Type', format: 'enum', sort: 'journal_type'), $this->money('total_debit', 'Debit'), $this->money('total_credit', 'Credit'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                $this->col('journal_type', 'Type', format: 'enum', sort: 'journal_type'), $this->col('source_module', 'Source Module', sort: 'source_module'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('total_debit', 'Debit'), $this->money('total_credit', 'Credit'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['journal_number', 'description'], [], 'journal_date'),
             $this->definition('finance.ledger', 'Ledger', 'Finance', FinanceLedgerEntry::class, [
                 $this->col('entry_date', 'Date', format: 'date', sort: 'entry_date'), $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'),
-                $this->col('journal', 'Journal', 'journalEntry.journal_number'), $this->money('debit', 'Debit'), $this->money('credit', 'Credit'), $this->money('balance_after', 'Balance'),
+                $this->col('journal', 'Journal', 'journalEntry.journal_number'), $this->col('source_module', 'Source Module', sort: 'source_module'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('debit', 'Debit'), $this->money('credit', 'Credit'), $this->money('balance_after', 'Balance'),
             ], ['account.code', 'account.name', 'journalEntry.journal_number'], ['account', 'journalEntry'], 'entry_date'),
             $this->definition('finance.trial-balance', 'Trial Balance', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('closing_debit', 'Debit'), $this->money('closing_credit', 'Credit'),
             ], ['account.code', 'account.name'], ['account']),
+            $this->aging('finance.ar-aging', 'Accounts Receivable Aging', 'outbound'),
+            $this->aging('finance.ap-aging', 'Accounts Payable Aging', 'inbound'),
         ];
 
         return collect($reports)->keyBy->key->all();
@@ -360,6 +366,89 @@ final class ReportCatalog
             $this->col($dateColumn, 'Date', format: 'date', sort: $dateColumn), $this->col($numberColumn, 'Number', sort: $numberColumn), $this->col('party_name', 'Party', sort: 'party_name'),
             $this->money($amountColumn, 'Amount'), $this->money('allocated_amount', 'Allocated'), $this->money('unapplied_amount', 'Unapplied'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
         ], [$numberColumn, 'party_name'], [], $dateColumn);
+    }
+
+    private function aging(string $key, string $title, string $direction): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Finance',
+            model: InvoiceBalance::class,
+            columns: [
+                $this->col('invoice_number', 'Invoice', 'invoice.invoice_number'),
+                $this->col('invoice_date', 'Invoice Date', 'invoice.invoice_date', 'date'),
+                $this->col('due_date', 'Due Date', 'invoice.due_date', 'date'),
+                new ReportColumn(
+                    key: 'days_overdue',
+                    label: 'Days Overdue',
+                    value: static function (InvoiceBalance $balance): int {
+                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
+                        if ($dueDate === null || $dueDate->isFuture()) {
+                            return 0;
+                        }
+
+                        return (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
+                    },
+                ),
+                new ReportColumn(
+                    key: 'aging_bucket',
+                    label: 'Aging Bucket',
+                    value: static function (InvoiceBalance $balance): string {
+                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
+                        if ($dueDate === null || $dueDate->isFuture()) {
+                            return 'Current';
+                        }
+
+                        $days = (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
+
+                        return match (true) {
+                            $days <= 30 => '1-30',
+                            $days <= 60 => '31-60',
+                            $days <= 90 => '61-90',
+                            default => '90+',
+                        };
+                    },
+                ),
+                $this->money('invoice_total', 'Invoice Total'),
+                $this->money('remaining_amount', 'Outstanding'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['invoice.invoice_number'],
+            relations: ['invoice'],
+            defaultSort: 'id',
+            defaultDirection: 'asc',
+            scope: static fn ($query) => $query
+                ->where('remaining_amount', '>', '0')
+                ->whereHas('invoice', fn ($invoice) => $invoice
+                    ->where('direction', $direction)
+                    ->whereNotIn('status', ['cancelled', 'void'])),
+            description: 'Outstanding invoice balances grouped by age from the Invoice source of truth.',
+        );
+    }
+
+    private function chartOfAccounts(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'finance.chart-of-accounts',
+            title: 'Chart of Accounts',
+            group: 'Finance',
+            model: FinanceAccount::class,
+            columns: [
+                $this->col('code', 'Account', sort: 'code'),
+                $this->col('name', 'Account Name', sort: 'name'),
+                $this->col('account_type', 'Type', 'accountType.name'),
+                $this->col('category', 'Category', 'accountCategory.name'),
+                $this->col('parent', 'Parent', 'parent.code'),
+                $this->col('normal_balance', 'Normal Balance', format: 'enum', sort: 'normal_balance'),
+                $this->col('is_posting_account', 'Postable', format: 'boolean', sort: 'is_posting_account'),
+                $this->col('is_active', 'Active', format: 'boolean', sort: 'is_active'),
+            ],
+            search: ['code', 'name', 'accountType.name', 'accountCategory.name'],
+            relations: ['accountType', 'accountCategory', 'parent'],
+            defaultSort: 'code',
+            defaultDirection: 'asc',
+        );
     }
 
     private function col(string $key, string $label, ?string $path = null, string $format = 'text', ?string $sort = null): ReportColumn

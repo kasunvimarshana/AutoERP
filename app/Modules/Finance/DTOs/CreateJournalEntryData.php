@@ -27,5 +27,8 @@ final readonly class CreateJournalEntryData
         public string $exchangeRate = '1.000000',
         public ?int $createdBy = null,
         public array $lines = [],
+        public ?int $postingProfileId = null,
+        public ?int $reversalOfId = null,
+        public ?string $reversalReason = null,
     ) {}
 }

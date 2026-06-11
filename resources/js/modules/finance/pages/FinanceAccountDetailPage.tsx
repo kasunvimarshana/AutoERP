@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getAccount, getAccountBalance, listLedgerEntries } from '../financeApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -11,6 +11,8 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { readableRelation } from '@/shared/utils/object';
+import { Button } from '@/shared/components/Button';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 
 type Tab = 'summary' | 'balance' | 'ledger' | 'children';
 const tabs = [{ id: 'summary' as Tab, label: 'Summary' }, { id: 'balance' as Tab, label: 'Balance' }, { id: 'ledger' as Tab, label: 'Ledger' }, { id: 'children' as Tab, label: 'Child Accounts' }];
@@ -19,14 +21,14 @@ export default function FinanceAccountDetailPage() {
     const id = Number(useParams().id);
     const tabState = useOnDemandTab<Tab>('summary');
     const account = useApi((signal) => getAccount(id, signal), [id]);
-    const balance = useApi((signal) => getAccountBalance(id, signal), [id], tabState.openedTabs.has('balance'));
+    const balance = useApi((signal) => getAccountBalance(id, {}, signal), [id], tabState.openedTabs.has('balance'));
     const ledger = useApi((signal) => listLedgerEntries({ account_id: id, per_page: 25 }, signal), [id], tabState.openedTabs.has('ledger'));
     if (account.loading) return <LoadingState />;
     if (!account.data) return <ErrorAlert error={account.error} />;
     const value = account.data;
     return (
         <>
-            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" />
+            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" actions={<Link to={`/finance/accounts/${id}/edit`}><Button type="button" variant="secondary">Edit account</Button></Link>} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
@@ -36,10 +38,12 @@ export default function FinanceAccountDetailPage() {
                         { label: 'Category', value: readableRelation(value.account_category) },
                         { label: 'Parent', value: readableRelation(value.parent) },
                         { label: 'Normal balance', value: value.normal_balance },
+                        { label: 'Postable', value: value.is_posting_account ? 'Yes' : 'No' },
+                        { label: 'Current balance', value: <MoneyDisplay value={value.current_balance} /> },
                     ]} />}
                     {tabState.activeTab === 'children' && <RecordTable rows={value.children ?? []} fields={['code', 'name', 'normal_balance', 'is_active']} />}
-                    {tabState.activeTab === 'balance' && (balance.loading ? <LoadingState /> : balance.error ? <ErrorAlert error={balance.error} /> : <RecordTable rows={balance.data ? [balance.data] : []} fields={['openingBalance', 'debitTotal', 'creditTotal', 'closingBalance']} />)}
-                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'description', 'debit', 'credit', 'running_balance']} />)}
+                    {tabState.activeTab === 'balance' && (balance.loading ? <LoadingState /> : balance.error ? <ErrorAlert error={balance.error} /> : <RecordTable rows={balance.data ? [balance.data] : []} fields={['opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit', 'balance']} />)}
+                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'debit', 'credit', 'balance_after', 'source_number']} />)}
                 </div>
             </Panel>
         </>

@@ -21,15 +21,27 @@ final class JournalReversalService
         private readonly JournalPostingService $posting,
     ) {}
 
-    public function reverse(FinanceJournalEntry $journal, string $reversalDate, ?int $reversedBy = null): FinanceJournalEntry
-    {
-        return DB::transaction(function () use ($journal, $reversalDate, $reversedBy): FinanceJournalEntry {
+    public function reverse(
+        FinanceJournalEntry $journal,
+        string $reversalDate,
+        ?int $reversedBy = null,
+        ?string $reason = null,
+    ): FinanceJournalEntry {
+        return DB::transaction(function () use ($journal, $reversalDate, $reversedBy, $reason): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()
                 ->with(['lines', 'reversals'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
 
             $this->validator->assertReversible($journal);
+            if ($reversalDate < $journal->journal_date->toDateString()) {
+                throw new \InvalidArgumentException('Reversal date cannot be before the original journal date.');
+            }
+
+            $reason = trim((string) $reason);
+            if ($reason === '') {
+                $reason = 'Accounting reversal';
+            }
 
             $lines = [];
             foreach ($journal->lines as $line) {
@@ -50,19 +62,24 @@ final class JournalReversalService
                 journalDate: $reversalDate,
                 journalType: JournalType::Reversal,
                 organizationUnitId: $journal->organization_unit_id,
-                fiscalYearId: $journal->fiscal_year_id,
-                fiscalPeriodId: $journal->fiscal_period_id,
-                source: new PostingSourceData('finance_journal_entry', (int) $journal->getKey()),
-                description: 'Reversal of '.$journal->journal_number,
+                source: new PostingSourceData(
+                    sourceType: (string) ($journal->source_type ?: 'finance_journal_entry'),
+                    sourceId: (int) ($journal->source_id ?: $journal->getKey()),
+                    tenantId: (int) $journal->tenant_id,
+                    organizationUnitId: $journal->organization_unit_id,
+                    sourceModule: (string) ($journal->source_module ?: 'finance'),
+                    sourceNumber: $journal->source_number,
+                    sourceDate: $journal->source_date?->toDateString(),
+                ),
+                description: 'Reversal of '.$journal->journal_number.': '.$reason,
                 currencyId: $journal->currency_id,
                 exchangeRate: (string) $journal->exchange_rate,
                 createdBy: $reversedBy,
                 lines: $lines,
+                postingProfileId: $journal->posting_profile_id,
+                reversalOfId: (int) $journal->getKey(),
+                reversalReason: $reason,
             ));
-
-            $reversal->forceFill([
-                'reversal_of_id' => $journal->getKey(),
-            ])->save();
 
             $this->posting->post($reversal, $reversedBy);
 
@@ -70,6 +87,7 @@ final class JournalReversalService
                 'status' => JournalStatus::Reversed->value,
                 'reversed_by' => $reversedBy,
                 'reversed_at' => now(),
+                'reversal_reason' => $reason,
             ])->save();
 
             return $reversal->refresh()->load(['lines', 'ledgerEntries']);

@@ -12,6 +12,8 @@ use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceFiscalPeriod;
+use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -56,6 +58,8 @@ final class InvoiceFinanceIntegrationTest extends TestCase
         $this->assertSame('invoice', $request->source->sourceType);
         $this->assertSame((int) $invoice->getKey(), $request->source->sourceId);
         $this->assertSame($tenantId, $request->source->tenantId);
+        $this->assertSame('invoice', $request->source->sourceModule);
+        $this->assertSame('INV-FIN-PREP', $request->source->sourceNumber);
         $this->assertCount(2, $request->lines);
 
         app(InvoiceFinanceIntegrationService::class)->validatePostingRequest($request);
@@ -85,6 +89,23 @@ final class InvoiceFinanceIntegrationTest extends TestCase
             name: 'Capital',
             normalBalance: NormalBalance::Credit,
         ));
+
+        $year = FinanceFiscalYear::query()->create([
+            'tenant_id' => $tenantId,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+        ]);
+        FinanceFiscalPeriod::query()->create([
+            'tenant_id' => $tenantId,
+            'fiscal_year_id' => $year->getKey(),
+            'name' => 'June 2026',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
+        ]);
 
         return [$tenantId];
     }

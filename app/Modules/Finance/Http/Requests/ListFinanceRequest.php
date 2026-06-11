@@ -20,6 +20,11 @@ final class ListFinanceRequest extends TenantScopedRequest
             'fiscal_period_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'string', 'max:30'],
+            'journal_type' => ['nullable', 'string', 'max:30'],
+            'source_module' => ['nullable', 'string', 'max:100'],
+            'source_type' => ['nullable', 'string', 'max:150'],
+            'source_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];

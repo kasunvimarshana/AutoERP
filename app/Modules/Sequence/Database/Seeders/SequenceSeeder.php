@@ -70,6 +70,7 @@ final class SequenceSeeder extends Seeder
             ['document_type' => 'purchase_return', 'prefix' => 'PRN'],
             ['document_type' => 'invoice', 'prefix' => 'INV'],
             ['document_type' => 'payment', 'prefix' => 'PAY'],
+            ['document_type' => 'finance_journal', 'prefix' => 'JE'],
             ['document_type' => 'vehicle_service_job', 'prefix' => 'VSJ'],
         ];
     }

@@ -6,7 +6,8 @@ namespace Modules\Finance\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\TrialBalanceResult;
-use Modules\Finance\Models\FinanceAccountBalance;
+use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceFiscalPeriod;
 
 final class TrialBalanceService
 {
@@ -15,28 +16,39 @@ final class TrialBalanceService
         private readonly AccountBalanceService $balances,
     ) {}
 
-    public function calculate(int $tenantId, ?int $organizationUnitId = null, ?int $fiscalPeriodId = null): TrialBalanceResult
-    {
-        $query = FinanceAccountBalance::query()
-            ->with('account')
+    public function calculate(
+        int $tenantId,
+        ?int $organizationUnitId = null,
+        ?int $fiscalPeriodId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+    ): TrialBalanceResult {
+        if ($fiscalPeriodId !== null) {
+            $period = FinanceFiscalPeriod::query()
+                ->where('tenant_id', $tenantId)
+                ->findOrFail($fiscalPeriodId);
+            $dateFrom = $period->start_date->toDateString();
+            $dateTo = $period->end_date->toDateString();
+        }
+
+        $query = FinanceAccount::query()
             ->where('tenant_id', $tenantId);
 
         $organizationUnitId === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $organizationUnitId);
 
-        $fiscalPeriodId === null
-            ? $query->whereNull('fiscal_period_id')
-            : $query->where('fiscal_period_id', $fiscalPeriodId);
-
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
-        $accountBalances = [];
+        $accountBalances = $this->balances->forAccounts(
+            $query->orderBy('code')->get(),
+            $dateFrom,
+            $dateTo,
+        );
 
-        foreach ($query->get() as $balance) {
-            $totalDebit = $this->math->add($totalDebit, (string) $balance->closing_debit);
-            $totalCredit = $this->math->add($totalCredit, (string) $balance->closing_credit);
-            $accountBalances[] = $this->balances->result($balance);
+        foreach ($accountBalances as $balance) {
+            $totalDebit = $this->math->add($totalDebit, $balance->closingDebit);
+            $totalCredit = $this->math->add($totalCredit, $balance->closingCredit);
         }
 
         return new TrialBalanceResult(

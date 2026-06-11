@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateJournalEntryData;
-use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\JournalLineData;
+use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceJournalEntry;
+use Modules\Finance\Models\FinancePostingProfile;
 
 final class FinancePostingService implements FinancePostingInterface
 {
@@ -24,28 +25,40 @@ final class FinancePostingService implements FinancePostingInterface
         private readonly JournalEntryCreationService $journals,
         private readonly JournalPostingService $posting,
         private readonly JournalReversalService $reversals,
+        private readonly PostingProfileService $profiles,
+        private readonly FiscalPeriodService $periods,
     ) {}
 
-    public function createDraftJournal(FinancePostingRequest $request): PostingResultData
+    public function createDraftJournal(PostingContext $request): PostingResultData
     {
         $this->validatePosting($request);
+        $profile = $this->profiles->resolveProfile($request);
 
         $journal = $this->journals->create(new CreateJournalEntryData(
             tenantId: $request->source->tenantId,
             journalDate: $request->postingDate,
             journalType: $this->journalTypeForSource($request->source->sourceType),
             organizationUnitId: $request->source->organizationUnitId,
-            source: new PostingSourceData($request->source->sourceType, $request->source->sourceId),
+            source: new PostingSourceData(
+                sourceType: $request->source->sourceType,
+                sourceId: $request->source->sourceId,
+                tenantId: $request->source->tenantId,
+                organizationUnitId: $request->source->organizationUnitId,
+                sourceModule: $request->source->sourceModule ?: $request->source->sourceType,
+                sourceNumber: $request->source->sourceNumber,
+                sourceDate: $request->source->sourceDate ?: $request->postingDate,
+            ),
             description: $request->description,
             currencyId: $request->currencyId,
             exchangeRate: $request->exchangeRate,
-            lines: $this->journalLines($request),
+            lines: $this->journalLines($request, $profile),
+            postingProfileId: $profile?->getKey(),
         ));
 
         return $this->resultFromJournal($journal);
     }
 
-    public function validatePosting(FinancePostingRequest $request): void
+    public function validatePosting(PostingContext $request): void
     {
         if (trim($request->postingDate) === '') {
             throw new InvalidArgumentException('Posting date is required.');
@@ -59,6 +72,19 @@ final class FinancePostingService implements FinancePostingInterface
             throw new InvalidArgumentException('Posting source tenant is required.');
         }
 
+        if (trim($request->source->sourceType) === '' || $request->source->sourceId < 1) {
+            throw new InvalidArgumentException('Posting source type and ID are required.');
+        }
+
+        $this->periods->resolve(
+            $request->source->tenantId,
+            $request->source->organizationUnitId,
+            $request->postingDate,
+            requireOpen: true,
+        );
+
+        $profile = $this->profiles->resolveProfile($request);
+
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {
             throw new InvalidArgumentException('Posting exchange rate must be greater than zero.');
         }
@@ -71,7 +97,7 @@ final class FinancePostingService implements FinancePostingInterface
                 throw new InvalidArgumentException('Posting line debit and credit cannot be negative.');
             }
 
-            $account = $this->resolveAccount($request, $line->accountCode);
+            $account = $this->profiles->resolveAccount($request, $line, $profile);
             if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
                 throw new InvalidArgumentException('Posting account must be active and postable.');
             }
@@ -83,6 +109,15 @@ final class FinancePostingService implements FinancePostingInterface
         if ($this->math->compare($totalDebit, $totalCredit) !== 0) {
             throw new InvalidArgumentException('Posting request must be balanced.');
         }
+    }
+
+    public function post(PostingContext $request, ?int $postedBy = null): PostingResultData
+    {
+        return DB::transaction(function () use ($request, $postedBy): PostingResultData {
+            $draft = $this->createDraftJournal($request);
+
+            return $this->postJournal($draft->journalId, $postedBy);
+        });
     }
 
     public function postJournal(int $journalId, ?int $postedBy = null): PostingResultData
@@ -99,12 +134,17 @@ final class FinancePostingService implements FinancePostingInterface
         );
     }
 
-    public function reverseJournal(int $journalId, string $reversalDate, ?int $reversedBy = null): PostingResultData
-    {
+    public function reverseJournal(
+        int $journalId,
+        string $reversalDate,
+        ?int $reversedBy = null,
+        ?string $reason = null,
+    ): PostingResultData {
         $reversal = $this->reversals->reverse(
             FinanceJournalEntry::query()->findOrFail($journalId),
             $reversalDate,
             $reversedBy,
+            $reason,
         );
 
         return $this->resultFromJournal($reversal);
@@ -113,41 +153,34 @@ final class FinancePostingService implements FinancePostingInterface
     /**
      * @return list<JournalLineData>
      */
-    private function journalLines(FinancePostingRequest $request): array
-    {
+    private function journalLines(
+        PostingContext $request,
+        ?FinancePostingProfile $profile,
+    ): array {
         $lines = [];
         foreach ($request->lines as $index => $line) {
-            $account = $this->resolveAccount($request, $line->accountCode);
+            $account = $this->profiles->resolveAccount($request, $line, $profile);
+            $dimension = $this->profiles->resolveDimension($request, $line->dimensionCode);
             $lines[] = new JournalLineData(
                 accountId: (int) $account->getKey(),
                 lineNumber: $index + 1,
                 debit: $line->debit,
                 credit: $line->credit,
                 description: $line->description,
+                dimensionId: $dimension?->getKey(),
+                sourceLineType: $line->sourceLineType,
+                sourceLineId: $line->sourceLineId,
             );
         }
 
         return $lines;
     }
 
-    private function resolveAccount(FinancePostingRequest $request, string $accountCode): FinanceAccount
-    {
-        $query = FinanceAccount::query()
-            ->where('tenant_id', $request->source->tenantId)
-            ->where('code', $accountCode);
-
-        $request->source->organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $request->source->organizationUnitId);
-
-        return $query->firstOrFail();
-    }
-
     private function journalTypeForSource(string $sourceType): JournalType
     {
         return match ($sourceType) {
-            'invoice' => JournalType::Invoice,
-            'payment' => JournalType::Payment,
+            'invoice', 'sales_invoice', 'purchase_invoice', 'vehicle_service_invoice' => JournalType::Invoice,
+            'payment', 'payment_received', 'payment_made' => JournalType::Payment,
             default => JournalType::General,
         };
     }

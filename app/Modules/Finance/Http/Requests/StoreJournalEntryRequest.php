@@ -23,8 +23,12 @@ final class StoreJournalEntryRequest extends TenantScopedRequest
             'journal_number' => ['nullable', 'string', 'max:100'],
             'fiscal_year_id' => ['nullable', 'integer', 'min:1'],
             'fiscal_period_id' => ['nullable', 'integer', 'min:1'],
+            'posting_profile_id' => ['nullable', 'integer', 'min:1', 'exists:finance_posting_profiles,id'],
+            'source_module' => ['nullable', 'string', 'max:100', 'required_with:source_type'],
             'source_type' => ['nullable', 'string', 'max:150', 'required_with:source_id'],
             'source_id' => ['nullable', 'integer', 'min:1', 'required_with:source_type'],
+            'source_number' => ['nullable', 'string', 'max:150'],
+            'source_date' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'currency_id' => ['nullable', 'integer', 'min:1'],
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
@@ -33,13 +37,25 @@ final class StoreJournalEntryRequest extends TenantScopedRequest
             'lines.*.line_number' => ['required', 'integer', 'min:1'],
             'lines.*.debit' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.credit' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.description' => ['nullable', 'string'],
+            'lines.*.dimension_id' => ['nullable', 'integer', 'min:1', 'exists:finance_dimensions,id'],
+            'lines.*.source_line_type' => ['nullable', 'string', 'max:150'],
+            'lines.*.source_line_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
     public function toData(): CreateJournalEntryData
     {
         $source = $this->filled('source_type') && $this->filled('source_id')
-            ? new PostingSourceData((string) $this->input('source_type'), (int) $this->input('source_id'))
+            ? new PostingSourceData(
+                sourceType: (string) $this->input('source_type'),
+                sourceId: (int) $this->input('source_id'),
+                tenantId: $this->tenantId(),
+                organizationUnitId: $this->organizationUnitId(),
+                sourceModule: (string) $this->input('source_module', $this->input('source_type')),
+                sourceNumber: $this->filled('source_number') ? (string) $this->input('source_number') : null,
+                sourceDate: $this->filled('source_date') ? (string) $this->input('source_date') : null,
+            )
             : null;
 
         return new CreateJournalEntryData(
@@ -65,6 +81,7 @@ final class StoreJournalEntryRequest extends TenantScopedRequest
                 sourceLineType: $row['source_line_type'] ?? null,
                 sourceLineId: isset($row['source_line_id']) ? (int) $row['source_line_id'] : null,
             ), $this->input('lines')),
+            postingProfileId: $this->filled('posting_profile_id') ? (int) $this->input('posting_profile_id') : null,
         );
     }
 }

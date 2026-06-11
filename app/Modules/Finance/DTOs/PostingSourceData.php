@@ -11,5 +11,8 @@ final readonly class PostingSourceData
         public int $sourceId,
         public ?int $tenantId = null,
         public ?int $organizationUnitId = null,
+        public ?string $sourceModule = null,
+        public ?string $sourceNumber = null,
+        public ?string $sourceDate = null,
     ) {}
 }

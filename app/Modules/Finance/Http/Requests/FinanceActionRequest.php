@@ -14,6 +14,7 @@ final class FinanceActionRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'reversal_date' => ['nullable', 'date'],
+            'reversal_reason' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

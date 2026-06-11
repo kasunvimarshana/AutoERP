@@ -4,13 +4,4 @@ declare(strict_types=1);
 
 namespace Modules\Finance\DTOs;
 
-final readonly class FinancePostingLine
-{
-    public function __construct(
-        public string $accountCode,
-        public string $accountName,
-        public string $debit = '0.000000',
-        public string $credit = '0.000000',
-        public ?string $description = null,
-    ) {}
-}
+final readonly class FinancePostingLine extends PostingLine {}

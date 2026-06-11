@@ -202,6 +202,7 @@ final class CoreModulesApiTest extends TestCase
 
         $cash = $this->createAccountViaApi($tenantId, $organizationUnitId, $debitType, '1000', 'Cash', 'debit');
         $capital = $this->createAccountViaApi($tenantId, $organizationUnitId, $creditType, '3000', 'Capital', 'credit');
+        $this->fiscalPeriod($tenantId, $organizationUnitId);
 
         $journal = $this->postJson('/api/v1/finance/journals', [
             'tenant_id' => $tenantId,
@@ -357,6 +358,32 @@ final class CoreModulesApiTest extends TestCase
             'normal_balance' => $normalBalance,
             'statement_type' => 'balance_sheet',
             'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function fiscalPeriod(int $tenantId, int $organizationUnitId): void
+    {
+        $yearId = (int) DB::table('finance_fiscal_years')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_fiscal_periods')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'fiscal_year_id' => $yearId,
+            'name' => 'June 2026',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

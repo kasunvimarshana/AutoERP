@@ -7,6 +7,7 @@ namespace Modules\Finance\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Finance\Enums\JournalStatus;
@@ -29,7 +30,9 @@ final class FinanceJournalEntry extends CoreModel
             'organization_unit_id' => 'integer',
             'fiscal_year_id' => 'integer',
             'fiscal_period_id' => 'integer',
+            'posting_profile_id' => 'integer',
             'source_id' => 'integer',
+            'source_date' => 'date',
             'journal_type' => JournalType::class,
             'status' => JournalStatus::class,
             'journal_date' => 'date',
@@ -71,6 +74,11 @@ final class FinanceJournalEntry extends CoreModel
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
+    public function postingProfile(): BelongsTo
+    {
+        return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id');
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(FinanceJournalLine::class, 'journal_entry_id');
@@ -89,5 +97,36 @@ final class FinanceJournalEntry extends CoreModel
     public function reversals(): HasMany
     {
         return $this->hasMany(self::class, 'reversal_of_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::updating(function (self $journal): void {
+            $originalStatus = $journal->getOriginal('status');
+            $status = $originalStatus instanceof JournalStatus
+                ? $originalStatus
+                : JournalStatus::from((string) $originalStatus);
+
+            if ($status === JournalStatus::Posted) {
+                $allowed = ['status', 'reversed_by', 'reversed_at', 'reversal_reason', 'updated_at'];
+                if (array_diff(array_keys($journal->getDirty()), $allowed) !== []) {
+                    throw new LogicException('Posted journals are immutable and must be corrected by reversal.');
+                }
+            }
+
+            if ($status === JournalStatus::Reversed) {
+                throw new LogicException('Reversed journals are immutable.');
+            }
+        });
+
+        self::deleting(function (self $journal): void {
+            $status = $journal->status instanceof JournalStatus
+                ? $journal->status
+                : JournalStatus::from((string) $journal->status);
+
+            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
+                throw new LogicException('Posted journals cannot be deleted.');
+            }
+        });
     }
 }

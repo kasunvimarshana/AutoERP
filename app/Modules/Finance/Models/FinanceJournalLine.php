@@ -6,7 +6,9 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use LogicException;
 use Modules\Core\Models\CoreModel;
+use Modules\Finance\Enums\JournalStatus;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -59,5 +61,26 @@ final class FinanceJournalLine extends CoreModel
     public function ledgerEntry(): HasOne
     {
         return $this->hasOne(FinanceLedgerEntry::class, 'journal_line_id');
+    }
+
+    protected static function booted(): void
+    {
+        $assertDraft = static function (self $line): void {
+            $journal = $line->journalEntry()->first();
+            if (! $journal instanceof FinanceJournalEntry) {
+                return;
+            }
+
+            $status = $journal->status instanceof JournalStatus
+                ? $journal->status
+                : JournalStatus::from((string) $journal->status);
+
+            if ($status !== JournalStatus::Draft) {
+                throw new LogicException('Posted journal lines are immutable.');
+            }
+        };
+
+        self::updating($assertDraft);
+        self::deleting($assertDraft);
     }
 }

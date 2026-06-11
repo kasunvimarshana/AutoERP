@@ -12,14 +12,18 @@ use Modules\Finance\DTOs\JournalLineData;
 use Modules\Finance\Enums\FiscalPeriodStatus;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceAccountCategory;
+use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceJournalEntry;
+use Modules\Finance\Models\FinancePostingProfile;
 
 final class FinanceValidationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function validateAccountCreation(CreateAccountData $data): void
+    public function validateAccountCreation(CreateAccountData $data, ?int $ignoreAccountId = null): void
     {
         if ($data->tenantId < 1) {
             throw new InvalidArgumentException('Finance account tenant is required.');
@@ -31,9 +35,34 @@ final class FinanceValidationService
 
         $this->assertNonNegative($data->openingBalance, 'Opening balance');
 
+        $duplicate = FinanceAccount::query()
+            ->where('tenant_id', $data->tenantId)
+            ->where('code', trim($data->code))
+            ->when($ignoreAccountId !== null, fn ($query) => $query->whereKeyNot($ignoreAccountId))
+            ->exists();
+        if ($duplicate) {
+            throw new InvalidArgumentException('Finance account code already exists for this tenant.');
+        }
+
+        $accountType = FinanceAccountType::query()->findOrFail($data->accountTypeId);
+        if ($accountType->tenant_id !== null && (int) $accountType->tenant_id !== $data->tenantId) {
+            throw new InvalidArgumentException('Finance account type belongs to a different tenant.');
+        }
+
+        if ($data->accountCategoryId !== null) {
+            $category = FinanceAccountCategory::query()->findOrFail($data->accountCategoryId);
+            if (($category->tenant_id !== null && (int) $category->tenant_id !== $data->tenantId)
+                || (int) $category->account_type_id !== $data->accountTypeId) {
+                throw new InvalidArgumentException('Finance account category is invalid for the selected type and tenant.');
+            }
+        }
+
         if ($data->parentId !== null) {
             $parent = FinanceAccount::query()->findOrFail($data->parentId);
             $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $parent->tenant_id, $parent->organization_unit_id);
+            if ($ignoreAccountId !== null && (int) $parent->getKey() === $ignoreAccountId) {
+                throw new InvalidArgumentException('Finance account cannot be its own parent.');
+            }
         }
     }
 
@@ -63,6 +92,39 @@ final class FinanceValidationService
             $this->validateJournalLine($line);
             $account = FinanceAccount::query()->findOrFail($line->accountId);
             $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $account->tenant_id, $account->organization_unit_id);
+
+            if ($line->dimensionId !== null) {
+                $dimension = FinanceDimension::query()->findOrFail($line->dimensionId);
+                $this->assertSameScope(
+                    $data->tenantId,
+                    $data->organizationUnitId,
+                    (int) $dimension->tenant_id,
+                    $dimension->organization_unit_id,
+                );
+                if (! (bool) $dimension->is_active) {
+                    throw new InvalidArgumentException('Journal dimension must be active.');
+                }
+            }
+        }
+
+        if ($data->source !== null) {
+            if ($data->source->tenantId !== null && $data->source->tenantId !== $data->tenantId) {
+                throw new InvalidArgumentException('Journal source tenant scope mismatch.');
+            }
+            if ($data->source->organizationUnitId !== null
+                && $data->source->organizationUnitId !== $data->organizationUnitId) {
+                throw new InvalidArgumentException('Journal source organization unit scope mismatch.');
+            }
+        }
+
+        if ($data->postingProfileId !== null) {
+            $profile = FinancePostingProfile::query()->findOrFail($data->postingProfileId);
+            $this->assertSameScope(
+                $data->tenantId,
+                $data->organizationUnitId,
+                (int) $profile->tenant_id,
+                $profile->organization_unit_id,
+            );
         }
 
         [$totalDebit, $totalCredit] = $this->journalTotals($data->lines);

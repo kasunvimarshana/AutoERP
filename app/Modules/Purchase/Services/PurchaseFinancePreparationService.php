@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
-use Modules\Finance\DTOs\CreateJournalEntryData;
-use Modules\Finance\DTOs\JournalLineData;
+use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\DTOs\FinancePostingLine;
+use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Enums\JournalType;
 
 final class PurchaseFinancePreparationService
 {
+    public function __construct(private readonly FinancePostingInterface $financePostings) {}
+
     /**
-     * Prepare finance journal DTOs only. Account mapping remains a later integration concern.
-     *
-     * @param  list<JournalLineData>  $lines
+     * @param  list<FinancePostingLine>  $lines
      */
     public function prepareJournal(
         int $tenantId,
@@ -26,17 +26,31 @@ final class PurchaseFinancePreparationService
         ?int $currencyId = null,
         string $exchangeRate = '1.000000',
         ?string $description = null,
-    ): CreateJournalEntryData {
-        return new CreateJournalEntryData(
-            tenantId: $tenantId,
-            journalDate: $journalDate,
-            journalType: JournalType::General,
-            organizationUnitId: $organizationUnitId,
-            source: new PostingSourceData($sourceType, $sourceId, $tenantId, $organizationUnitId),
+        ?string $sourceNumber = null,
+        ?string $sourceDate = null,
+        ?string $postingProfileCode = null,
+    ): FinancePostingRequest {
+        return new FinancePostingRequest(
+            source: new PostingSourceData(
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                sourceModule: 'purchase',
+                sourceNumber: $sourceNumber,
+                sourceDate: $sourceDate ?? $journalDate,
+            ),
+            postingDate: $journalDate,
             description: $description,
             currencyId: $currencyId,
             exchangeRate: $exchangeRate,
             lines: $lines,
+            postingProfileCode: $postingProfileCode,
         );
+    }
+
+    public function validatePostingRequest(FinancePostingRequest $request): void
+    {
+        $this->financePostings->validatePosting($request);
     }
 }

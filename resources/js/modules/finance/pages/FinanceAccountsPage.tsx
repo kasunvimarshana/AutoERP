@@ -26,7 +26,7 @@ export default function FinanceAccountsPage() {
     ];
     return (
         <>
-            <ContentHeader title="Chart of accounts" description="Finance accounts with readable type and category resources." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/finance/journals">Journal activity</Link>} />
+            <ContentHeader title="Chart of accounts" description="Finance accounts with readable type and category resources." actions={<div className="flex gap-3 text-sm font-semibold"><Link className="text-sky-700 hover:underline" to="/finance/account-balances">Account balances</Link><Link className="rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700" to="/finance/accounts/create">New account</Link></div>} />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search account code or name" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
