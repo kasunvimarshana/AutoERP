@@ -9,10 +9,12 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceLine;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Invoice\Validators\InvoiceValidationService;
+use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceCreationService
 {
@@ -26,6 +28,7 @@ final class InvoiceCreationService
         private readonly InvoiceSourceService $sources,
         private readonly InvoiceAdjustmentService $adjustments,
         private readonly InvoiceBalanceService $balances,
+        private readonly TaxDocumentIntegrationService $taxDocuments,
     ) {}
 
     public function create(CreateInvoiceData $data): Invoice
@@ -75,6 +78,10 @@ final class InvoiceCreationService
             );
             $this->adjustments->createAdjustments($invoice, $preparedAdjustments);
             $this->balances->createBalance($invoice, $calculation->grandTotal);
+            $this->taxDocuments->snapshotInvoice($invoice->refresh()->load('lines'));
+            if ($data->status === InvoiceStatus::Posted) {
+                $this->taxDocuments->postInvoice($invoice->refresh());
+            }
 
             return $invoice->load([
                 'lines',

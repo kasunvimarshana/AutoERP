@@ -7,9 +7,12 @@ namespace Modules\Invoice\Services;
 use InvalidArgumentException;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
+use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceStatusService
 {
+    public function __construct(private readonly TaxDocumentIntegrationService $taxDocuments) {}
+
     /**
      * @return array<string, list<string>>
      */
@@ -69,10 +72,15 @@ final class InvoiceStatusService
             $updates['approved_at'] = now();
         }
         if ($to === InvoiceStatus::Posted) {
+            $this->taxDocuments->snapshotInvoice($invoice);
             $updates['posted_at'] = now();
         }
 
         $invoice->forceFill($updates)->save();
+
+        if ($to === InvoiceStatus::Posted) {
+            $this->taxDocuments->postInvoice($invoice->refresh());
+        }
 
         return $invoice->refresh();
     }

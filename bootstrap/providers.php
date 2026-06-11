@@ -19,6 +19,7 @@ use Modules\Reporting\Providers\ReportingServiceProvider;
 use Modules\Sales\Providers\SalesServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
 use Modules\Supplier\Providers\SupplierServiceProvider;
+use Modules\Tax\Providers\TaxServiceProvider;
 use Modules\Tenant\Providers\TenantServiceProvider;
 use Modules\UOM\Providers\UomServiceProvider;
 use Modules\User\Providers\UserServiceProvider;
@@ -45,6 +46,7 @@ return [
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
     SupplierServiceProvider::class,
+    TaxServiceProvider::class,
     CustomerServiceProvider::class,
     VehicleServiceProvider::class,
     VehicleServiceServiceProvider::class,

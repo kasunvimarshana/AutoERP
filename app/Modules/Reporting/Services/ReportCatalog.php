@@ -35,6 +35,7 @@ use Modules\Reporting\DTOs\ReportDefinition;
 use Modules\Reporting\DTOs\ReportFilter;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierItemMapping;
+use Modules\Tax\Models\TaxTransaction;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -237,6 +238,13 @@ final class ReportCatalog
             ], ['account.code', 'account.name'], ['account']),
             $this->aging('finance.ar-aging', 'Accounts Receivable Aging', 'outbound'),
             $this->aging('finance.ap-aging', 'Accounts Payable Aging', 'inbound'),
+
+            $this->taxTransactions('tax.transactions', 'Tax Transactions'),
+            $this->taxTransactions('tax.summary', 'Tax Summary'),
+            $this->taxTransactions('tax.liability', 'Tax Liability', ['payable' => true]),
+            $this->taxTransactions('tax.receivable', 'Tax Receivable', ['receivable' => true]),
+            $this->taxTransactions('tax.vat', 'VAT Report', ['tax_type' => 'VAT']),
+            $this->taxTransactions('tax.wht', 'WHT Report', ['is_withholding' => true]),
         ];
 
         return collect($reports)->keyBy->key->all();
@@ -270,6 +278,42 @@ final class ReportCatalog
     private function masters(string $key, string $title, string $model, array $columns, array $search, array $relations = [], ?string $dateColumn = null): ReportDefinition
     {
         return $this->definition($key, $title, 'Masters', $model, $columns, $search, $relations, $dateColumn, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $constraints
+     */
+    private function taxTransactions(string $key, string $title, array $constraints = []): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Tax',
+            model: TaxTransaction::class,
+            columns: [
+                $this->col('transaction_date', 'Date', format: 'date', sort: 'transaction_date'),
+                $this->col('tax_code', 'Tax Code', sort: 'tax_code'),
+                $this->col('tax_name', 'Tax Name', sort: 'tax_name'),
+                $this->col('tax_type', 'Tax Type', sort: 'tax_type'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'),
+                $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
+                $this->money('taxable_amount', 'Taxable'),
+                $this->money('tax_amount', 'Tax'),
+                $this->money('withholding_amount', 'Withholding'),
+                $this->col('is_withholding', 'WHT', format: 'boolean', sort: 'is_withholding'),
+            ],
+            search: ['tax_code', 'tax_name', 'tax_type', 'source_number'],
+            filters: [
+                $this->filter('tax_type', 'Tax Type', 'tax_type'),
+                $this->filter('tax_code', 'Tax Code', 'tax_code'),
+                $this->filter('party_type', 'Party Type', 'party_type'),
+            ],
+            dateColumn: 'transaction_date',
+            defaultSort: 'transaction_date',
+            constraints: $constraints,
+            description: 'Tax Engine transaction report export.',
+            orientation: 'landscape',
+        );
     }
 
     private function party(string $key, string $title, string $model): ReportDefinition

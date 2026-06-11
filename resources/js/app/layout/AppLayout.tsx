@@ -61,6 +61,8 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/finance/ledger', label: 'General ledger' },
             { to: '/finance/trial-balance', label: 'Trial balance' },
             { to: '/finance/account-balances', label: 'Account balances' },
+            { to: '/tax/taxes', label: 'Tax engine', match: ['/tax'], exclude: ['/tax/reports'] },
+            { to: '/tax/reports', label: 'Tax reports' },
             { to: '/reports', label: 'Reports' },
         ],
     },

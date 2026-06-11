@@ -62,6 +62,9 @@ final class ItemValidationService
         $this->assertCategoryIsUsable($data->tenantId, $data->organizationUnitId, $data->itemCategoryId);
         $this->assertBrandIsUsable($data->tenantId, $data->organizationUnitId, $data->itemBrandId);
         $this->assertUomIsUsable($data->tenantId, $data->organizationUnitId, $data->baseUomId);
+        $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->defaultTaxGroupId);
+        $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->purchaseTaxGroupId);
+        $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->salesTaxGroupId);
         $this->assertTypeRules($data->itemType, $data->isStockable);
     }
 
@@ -90,6 +93,9 @@ final class ItemValidationService
         $this->assertCategoryIsUsable($tenantId, $organizationUnitId, $data->itemCategoryId);
         $this->assertBrandIsUsable($tenantId, $organizationUnitId, $data->itemBrandId);
         $this->assertUomIsUsable($tenantId, $organizationUnitId, $data->baseUomId);
+        $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->defaultTaxGroupId);
+        $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->purchaseTaxGroupId);
+        $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->salesTaxGroupId);
 
         $itemType = $data->itemType ?? $item->item_type;
         $isStockable = $data->isStockable ?? (bool) $item->is_stockable;
@@ -317,6 +323,19 @@ final class ItemValidationService
         $this->assertScopedRecord($tenantId, $organizationUnitId, (int) $uom->tenant_id, $uom->organization_unit_id);
         if (! (bool) $uom->is_active) {
             throw new InvalidArgumentException('Inactive UOM cannot be used for item master data.');
+        }
+    }
+
+    private function assertTaxGroupIsUsable(int $tenantId, ?int $organizationUnitId, ?int $taxGroupId): void
+    {
+        if ($taxGroupId === null) {
+            return;
+        }
+
+        $group = \Modules\Tax\Models\TaxGroup::query()->findOrFail($taxGroupId);
+        $this->assertScopedRecord($tenantId, $organizationUnitId, (int) $group->tenant_id, $group->organization_unit_id);
+        if (! (bool) $group->active) {
+            throw new InvalidArgumentException('Inactive tax group cannot be used for item master data.');
         }
     }
 

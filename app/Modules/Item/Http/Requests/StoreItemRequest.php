@@ -32,8 +32,12 @@ final class StoreItemRequest extends TenantScopedRequest
             'barcode' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
+            'default_tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
+            'purchase_tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
+            'sales_tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
             'is_stockable' => ['nullable', 'boolean'],
             'is_combo' => ['nullable', 'boolean'],
+            'is_tax_exempt' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'metadata' => ['nullable', 'array'],
         ];

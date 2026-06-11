@@ -71,6 +71,14 @@ const FinanceJournalDetailPage = lazy(() => import('@/modules/finance/pages/Fina
 const LedgerReportPage = lazy(() => import('@/modules/finance/pages/LedgerReportPage'));
 const TrialBalanceReportPage = lazy(() => import('@/modules/finance/pages/TrialBalanceReportPage'));
 const AccountBalanceReportPage = lazy(() => import('@/modules/finance/pages/AccountBalanceReportPage'));
+const TaxListPage = lazy(() => import('@/modules/tax/pages/TaxListPage'));
+const TaxCreatePage = lazy(() => import('@/modules/tax/pages/TaxCreatePage'));
+const TaxEditPage = lazy(() => import('@/modules/tax/pages/TaxEditPage'));
+const TaxGroupPage = lazy(() => import('@/modules/tax/pages/TaxGroupPage'));
+const CustomerTaxProfilePage = lazy(() => import('@/modules/tax/pages/CustomerTaxProfilePage'));
+const SupplierTaxProfilePage = lazy(() => import('@/modules/tax/pages/SupplierTaxProfilePage'));
+const TaxPostingProfilePage = lazy(() => import('@/modules/tax/pages/TaxPostingProfilePage'));
+const TaxReportPages = lazy(() => import('@/modules/tax/pages/TaxReportPages'));
 const ReportListPage = lazy(() => import('@/modules/reporting/pages/ReportListPage'));
 const ReportPage = lazy(() => import('@/modules/reporting/pages/ReportPage'));
 const TechnicianWorkReportPage = lazy(() => import('@/modules/reporting/pages/TechnicianWorkReportPage'));
@@ -169,6 +177,14 @@ export function AppRouter() {
                     <Route path="/finance/ledger" element={<LedgerReportPage />} />
                     <Route path="/finance/trial-balance" element={<TrialBalanceReportPage />} />
                     <Route path="/finance/account-balances" element={<AccountBalanceReportPage />} />
+                    <Route path="/tax/taxes" element={<TaxListPage />} />
+                    <Route path="/tax/taxes/create" element={<TaxCreatePage />} />
+                    <Route path="/tax/taxes/:id/edit" element={<TaxEditPage />} />
+                    <Route path="/tax/groups" element={<TaxGroupPage />} />
+                    <Route path="/tax/customer-profiles" element={<CustomerTaxProfilePage />} />
+                    <Route path="/tax/supplier-profiles" element={<SupplierTaxProfilePage />} />
+                    <Route path="/tax/posting-profiles" element={<TaxPostingProfilePage />} />
+                    <Route path="/tax/reports" element={<TaxReportPages />} />
                     <Route path="/reports" element={<ReportListPage />} />
                     <Route path="/reports/vehicle-service/technician-work" element={<TechnicianWorkReportPage />} />
                     <Route path="/reports/vehicle-service/employee-commissions" element={<EmployeeCommissionReportPage />} />

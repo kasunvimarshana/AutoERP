@@ -36,8 +36,12 @@ trait MapsItemData
             trackingType: TrackingType::from((string) ($item['tracking_type'] ?? TrackingType::None->value)),
             costingMethod: CostingMethod::from((string) ($item['costing_method'] ?? CostingMethod::None->value)),
             baseUomId: $this->nullableInt($item, 'base_uom_id'),
+            defaultTaxGroupId: $this->nullableInt($item, 'default_tax_group_id'),
+            purchaseTaxGroupId: $this->nullableInt($item, 'purchase_tax_group_id'),
+            salesTaxGroupId: $this->nullableInt($item, 'sales_tax_group_id'),
             isStockable: (bool) ($item['is_stockable'] ?? false),
             isCombo: array_key_exists('is_combo', $item) ? (bool) $item['is_combo'] : null,
+            isTaxExempt: (bool) ($item['is_tax_exempt'] ?? false),
             isActive: (bool) ($item['is_active'] ?? true),
             metadata: $item['metadata'] ?? null,
             units: array_map(static fn (array $row): ItemUnitData => new ItemUnitData(

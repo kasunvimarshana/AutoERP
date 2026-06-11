@@ -45,8 +45,12 @@ final class ItemUpdateService
                 'tracking_type' => $data->trackingType,
                 'costing_method' => $data->costingMethod,
                 'base_uom_id' => $data->baseUomId,
+                'default_tax_group_id' => $data->defaultTaxGroupId,
+                'purchase_tax_group_id' => $data->purchaseTaxGroupId,
+                'sales_tax_group_id' => $data->salesTaxGroupId,
                 'is_stockable' => $data->isStockable,
                 'is_combo' => $data->isCombo,
+                'is_tax_exempt' => $data->isTaxExempt,
                 'is_active' => $data->isActive,
                 'metadata' => $data->metadata,
             ] as $key => $value) {
