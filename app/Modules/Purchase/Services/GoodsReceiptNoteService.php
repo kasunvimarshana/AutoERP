@@ -16,6 +16,7 @@ use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
+use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class GoodsReceiptNoteService
 {
@@ -28,6 +29,7 @@ final class GoodsReceiptNoteService
         private readonly PurchaseInventoryIntegrationService $inventory,
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
+        private readonly TaxDocumentIntegrationService $taxDocuments,
     ) {}
 
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
@@ -172,6 +174,7 @@ final class GoodsReceiptNoteService
             $grn->posted_by = $postedBy;
             $grn->posted_at = now();
             $grn->save();
+            $this->taxDocuments->postGoodsReceiptNote($grn->refresh()->load('lines'));
 
             return $grn->refresh()->load(['lines', 'adjustments']);
         });

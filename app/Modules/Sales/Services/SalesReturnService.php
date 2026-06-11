@@ -27,6 +27,7 @@ use Modules\Sales\Models\SalesReturn;
 use Modules\Sales\Models\SalesReturnAdjustmentAllocation;
 use Modules\Sales\Models\SalesReturnLine;
 use Modules\Sales\Validators\SalesValidationService;
+use Modules\Tax\Services\TaxReturnAllocationService;
 
 final class SalesReturnService
 {
@@ -39,6 +40,7 @@ final class SalesReturnService
         private readonly SalesStatusService $statuses,
         private readonly SalesOrderService $orders,
         private readonly SalesDeliveryService $deliveries,
+        private readonly TaxReturnAllocationService $taxReturns,
     ) {}
 
     public function create(CreateSalesReturnData $data): SalesReturn
@@ -188,6 +190,7 @@ final class SalesReturnService
             $return->posted_by = $userId;
             $return->posted_at = now();
             $return->save();
+            $this->taxReturns->reverseSalesReturn($return->refresh()->load('lines'), $creditNote === null ? null : (int) $creditNote->getKey());
 
             return new SalesPostingResult(
                 (int) $return->getKey(),

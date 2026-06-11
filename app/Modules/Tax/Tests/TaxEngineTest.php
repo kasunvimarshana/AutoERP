@@ -10,6 +10,11 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Invoice\Models\Invoice;
+use Modules\Payment\Models\Payment;
+use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Sales\Models\SalesDelivery;
+use Modules\Sales\Models\SalesReturn;
 use Modules\Tax\DTOs\ApplicableTaxData;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationData;
@@ -25,6 +30,7 @@ use Modules\Tax\Services\TaxDeterminationService;
 use Modules\Tax\Services\TaxMasterDataService;
 use Modules\Tax\Services\TaxPostingContextService;
 use Modules\Tax\Services\TaxReportService;
+use Modules\Tax\Services\TaxReturnAllocationService;
 use Modules\Tax\Services\TaxSnapshotService;
 use Tests\TestCase;
 
@@ -375,6 +381,141 @@ final class TaxEngineTest extends TestCase
         $this->assertSame('customer', TaxTransaction::query()->where('tax_document_snapshot_id', $snapshots[0]->getKey())->value('party_type'));
     }
 
+    public function test_posted_purchase_snapshot_is_immutable_after_rate_change(): void
+    {
+        $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId, 'SUP-SNAP');
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-SNAP');
+        $tax = $this->createTax($tenantId, 'PUR-SNAP', 'VAT', 'exclusive', '10.000000');
+        $group = $this->createGroup($tenantId, 'PUR-SNAP-GROUP', $tax);
+        $itemId = $this->createItem($tenantId, 'PUR-SNAP-ITEM', defaultTaxGroupId: (int) $group->getKey());
+        $grn = $this->createGoodsReceiptNote($tenantId, $supplierId, $warehouseId, $itemId, '10.000000', '100.000000');
+
+        app(TaxDocumentIntegrationService::class)->postGoodsReceiptNote($grn);
+        $snapshot = TaxDocumentSnapshot::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->firstOrFail();
+        $this->assertSame('10.000000', (string) $snapshot->rate);
+        $this->assertSame('100.000000', (string) $snapshot->tax_amount);
+
+        DB::table('tax_rates')->where('tax_id', $tax->getKey())->update(['rate' => '20.000000']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Posted tax snapshots cannot be recalculated');
+        app(TaxDocumentIntegrationService::class)->snapshotGoodsReceiptNote($grn->refresh());
+    }
+
+    public function test_partial_purchase_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
+    {
+        $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId, 'SUP-RET');
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-RET');
+        $tax = $this->createTax($tenantId, 'PIN-10', 'VAT', 'exclusive', '10.000000');
+        $group = $this->createGroup($tenantId, 'PIN-GROUP', $tax);
+        $itemId = $this->createItem($tenantId, 'PIN-ITEM', defaultTaxGroupId: (int) $group->getKey());
+        $grn = $this->createGoodsReceiptNote($tenantId, $supplierId, $warehouseId, $itemId, '10.000000', '100.000000');
+
+        app(TaxDocumentIntegrationService::class)->postGoodsReceiptNote($grn);
+        $return = $this->createPurchaseReturn($tenantId, $supplierId, $warehouseId, $grn->lines()->firstOrFail()->getKey(), $itemId, '2.000000', '10.000000', '100.000000');
+        $created = app(TaxReturnAllocationService::class)->reversePurchaseReturn($return);
+
+        $this->assertCount(1, $created);
+        $this->assertSame('-20.000000', (string) $created[0]->tax_amount);
+        $summary = app(TaxReportService::class)->summary($tenantId, null, ['tax_code' => 'PIN-10']);
+        $this->assertSame('80.000000', $summary['totals']['tax_amount']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tax reversal already exists');
+        app(TaxReturnAllocationService::class)->reversePurchaseReturn($return->refresh());
+    }
+
+    public function test_partial_sales_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
+    {
+        $tenantId = $this->createTenant();
+        $customerId = $this->createCustomer($tenantId, 'CUST-RET');
+        $warehouseId = $this->createWarehouse($tenantId, 'SWH-RET');
+        $tax = $this->createTax($tenantId, 'SOUT-10', 'VAT', 'exclusive', '10.000000');
+        $group = $this->createGroup($tenantId, 'SOUT-GROUP', $tax);
+        $itemId = $this->createItem($tenantId, 'SOUT-ITEM', defaultTaxGroupId: (int) $group->getKey());
+        $delivery = $this->createSalesDelivery($tenantId, $customerId, $warehouseId, $itemId, '10.000000', '100.000000');
+
+        app(TaxDocumentIntegrationService::class)->postSalesDelivery($delivery);
+        $return = $this->createSalesReturn($tenantId, $customerId, $warehouseId, $delivery->lines()->firstOrFail()->getKey(), $itemId, '4.000000', '10.000000', '100.000000');
+        $created = app(TaxReturnAllocationService::class)->reverseSalesReturn($return);
+
+        $this->assertCount(1, $created);
+        $this->assertSame('-40.000000', (string) $created[0]->tax_amount);
+        $summary = app(TaxReportService::class)->summary($tenantId, null, ['tax_code' => 'SOUT-10']);
+        $this->assertSame('60.000000', $summary['totals']['tax_amount']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tax reversal already exists');
+        app(TaxReturnAllocationService::class)->reverseSalesReturn($return->refresh());
+    }
+
+    public function test_wht_invoice_context_generates_finance_context_and_missing_profile_fails(): void
+    {
+        $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId, 'SUP-WHT');
+        $tax = $this->createTax($tenantId, 'WHT-5', 'WHT', 'percentage', '5.000000', isWithholding: true);
+        $group = $this->createGroup($tenantId, 'WHT-GROUP', $tax);
+        $itemId = $this->createItem($tenantId, 'WHT-ITEM', defaultTaxGroupId: (int) $group->getKey());
+        $invoice = $this->createInvoice($tenantId, 'purchase', 'inbound', 'supplier', $supplierId, $itemId, '100000.000000');
+
+        $integration = app(TaxDocumentIntegrationService::class);
+        $integration->snapshotInvoice($invoice);
+        $this->assertSame('5000.000000', (string) TaxDocumentSnapshot::query()->where('source_type', 'invoice')->where('is_withholding', true)->value('tax_amount'));
+
+        try {
+            $integration->withholdingPostingContextForInvoice($invoice->refresh(), '2026-06-11', '2100', 'Supplier Control');
+            $this->fail('Expected missing WHT posting profile to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('Tax account mapping is missing', $exception->getMessage());
+        }
+
+        $counterpartyAccount = $this->createFinanceAccount($tenantId, '2100', 'Supplier Control', 'credit');
+        $taxAccount = $this->createFinanceAccount($tenantId, '2300', 'WHT Control', 'credit', isTax: true);
+        app(TaxMasterDataService::class)->savePostingProfile([
+            'tenant_id' => $tenantId,
+            'tax_id' => $tax->getKey(),
+            'direction' => 'withholding',
+            'account_id' => $taxAccount,
+            'active' => true,
+        ]);
+
+        $context = $integration->withholdingPostingContextForInvoice($invoice->refresh(), '2026-06-11', '2100', 'Supplier Control');
+        $this->assertCount(2, $context->financeContext->lines);
+        $this->assertSame('5000.000000', $context->taxLines[0]->taxAmount);
+        $this->assertSame('2300', $context->financeContext->lines[1]->accountCode);
+        $this->assertNotSame($counterpartyAccount, $taxAccount);
+    }
+
+    public function test_wht_payment_context_uses_allocated_invoice_snapshot_proportion(): void
+    {
+        $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId, 'SUP-PAY-WHT');
+        $tax = $this->createTax($tenantId, 'PAY-WHT-5', 'WHT', 'percentage', '5.000000', isWithholding: true);
+        $group = $this->createGroup($tenantId, 'PAY-WHT-GROUP', $tax);
+        $itemId = $this->createItem($tenantId, 'PAY-WHT-ITEM', defaultTaxGroupId: (int) $group->getKey());
+        $invoice = $this->createInvoice($tenantId, 'purchase', 'inbound', 'supplier', $supplierId, $itemId, '100000.000000');
+        $payment = $this->createPayment($tenantId, $invoice, '40000.000000');
+
+        $integration = app(TaxDocumentIntegrationService::class);
+        $integration->snapshotInvoice($invoice);
+        $taxAccount = $this->createFinanceAccount($tenantId, '2350', 'Payment WHT Control', 'credit', isTax: true);
+        app(TaxMasterDataService::class)->savePostingProfile([
+            'tenant_id' => $tenantId,
+            'tax_id' => $tax->getKey(),
+            'direction' => 'withholding',
+            'account_id' => $taxAccount,
+            'active' => true,
+        ]);
+
+        $context = $integration->withholdingPostingContextForPayment($payment->refresh(), '2026-06-11', '2100', 'Supplier Control');
+
+        $this->assertSame('payment', $context->source->sourceType);
+        $this->assertSame('2000.000000', $context->taxLines[0]->taxAmount);
+        $this->assertSame('2350', $context->financeContext->lines[1]->accountCode);
+    }
+
     private function createTax(
         int $tenantId,
         string $code,
@@ -382,9 +523,10 @@ final class TaxEngineTest extends TestCase
         string $method,
         string $rate,
         ?int $organizationUnitId = null,
+        bool $isWithholding = false,
     ): Tax {
         $service = app(TaxMasterDataService::class);
-        $tax = $service->saveTax($this->taxPayload($tenantId, $code, $code, $type, $method, payable: true, organizationUnitId: $organizationUnitId));
+        $tax = $service->saveTax($this->taxPayload($tenantId, $code, $code, $type, $method, payable: true, organizationUnitId: $organizationUnitId, isWithholding: $isWithholding));
         $service->saveRate($tax, [
             'rate' => $rate,
             'effective_from' => '2026-01-01',
@@ -420,6 +562,7 @@ final class TaxEngineTest extends TestCase
         string $method,
         bool $payable = false,
         ?int $organizationUnitId = null,
+        bool $isWithholding = false,
     ): array {
         return [
             'tenant_id' => $tenantId,
@@ -428,6 +571,7 @@ final class TaxEngineTest extends TestCase
             'name' => $name,
             'tax_type' => $type,
             'calculation_method' => $method,
+            'is_withholding' => $isWithholding,
             'recoverable' => false,
             'payable' => $payable,
             'receivable' => false,
@@ -480,6 +624,32 @@ final class TaxEngineTest extends TestCase
         ]);
     }
 
+    private function createSupplier(int $tenantId, string $code): int
+    {
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_number' => $code,
+            'code' => $code,
+            'name' => $code,
+            'supplier_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createWarehouse(int $tenantId, string $code): int
+    {
+        return (int) DB::table('warehouses')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => $code,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function createItem(int $tenantId, string $code, ?int $defaultTaxGroupId = null): int
     {
         return (int) DB::table('items')->insertGetId([
@@ -497,6 +667,258 @@ final class TaxEngineTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function createGoodsReceiptNote(
+        int $tenantId,
+        int $supplierId,
+        int $warehouseId,
+        int $itemId,
+        string $quantity,
+        string $unitPrice,
+    ): GoodsReceiptNote {
+        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($quantity, $unitPrice);
+        $grnId = (int) DB::table('goods_receipt_notes')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_type' => 'supplier',
+            'supplier_id' => $supplierId,
+            'warehouse_id' => $warehouseId,
+            'grn_number' => 'GRN-TAX-'.Str::upper(Str::random(6)),
+            'received_date' => '2026-06-11',
+            'status' => 'posted',
+            'subtotal' => $lineTotal,
+            'grand_total' => $lineTotal,
+            'posted_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('goods_receipt_note_lines')->insert([
+            'tenant_id' => $tenantId,
+            'goods_receipt_note_id' => $grnId,
+            'item_id' => $itemId,
+            'received_quantity' => $quantity,
+            'accepted_quantity' => $quantity,
+            'remaining_quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'line_total' => $lineTotal,
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return GoodsReceiptNote::query()->with('lines')->findOrFail($grnId);
+    }
+
+    private function createSalesDelivery(
+        int $tenantId,
+        int $customerId,
+        int $warehouseId,
+        int $itemId,
+        string $quantity,
+        string $unitPrice,
+    ): SalesDelivery {
+        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($quantity, $unitPrice);
+        $deliveryId = (int) DB::table('sales_deliveries')->insertGetId([
+            'tenant_id' => $tenantId,
+            'delivery_number' => 'SD-TAX-'.Str::upper(Str::random(6)),
+            'delivery_date' => '2026-06-11',
+            'customer_id' => $customerId,
+            'warehouse_id' => $warehouseId,
+            'status' => 'posted',
+            'posted_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('sales_delivery_lines')->insert([
+            'tenant_id' => $tenantId,
+            'sales_delivery_id' => $deliveryId,
+            'item_id' => $itemId,
+            'delivered_quantity' => $quantity,
+            'remaining_quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'line_total' => $lineTotal,
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return SalesDelivery::query()->with('lines')->findOrFail($deliveryId);
+    }
+
+    private function createPurchaseReturn(
+        int $tenantId,
+        int $supplierId,
+        int $warehouseId,
+        int $sourceLineId,
+        int $itemId,
+        string $returnedQuantity,
+        string $sourceQuantity,
+        string $unitPrice,
+    ): PurchaseReturn {
+        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($returnedQuantity, $unitPrice);
+        $returnId = (int) DB::table('purchase_returns')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_type' => 'supplier',
+            'supplier_id' => $supplierId,
+            'warehouse_id' => $warehouseId,
+            'return_number' => 'PRET-TAX-'.Str::upper(Str::random(6)),
+            'return_type' => 'referenced',
+            'return_date' => '2026-06-11',
+            'status' => 'posted',
+            'subtotal' => $lineTotal,
+            'grand_total' => $lineTotal,
+            'posted_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('purchase_return_lines')->insert([
+            'tenant_id' => $tenantId,
+            'purchase_return_id' => $returnId,
+            'item_id' => $itemId,
+            'source_line_type' => 'goods_receipt_note_line',
+            'source_line_id' => $sourceLineId,
+            'returned_quantity' => $returnedQuantity,
+            'source_quantity' => $sourceQuantity,
+            'previously_returned_quantity' => '0.000000',
+            'remaining_quantity' => app(\Modules\Core\Services\DecimalMath::class)->sub($sourceQuantity, $returnedQuantity),
+            'unit_price' => $unitPrice,
+            'cost_basis' => $unitPrice,
+            'line_total' => $lineTotal,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return PurchaseReturn::query()->with('lines')->findOrFail($returnId);
+    }
+
+    private function createSalesReturn(
+        int $tenantId,
+        int $customerId,
+        int $warehouseId,
+        int $sourceLineId,
+        int $itemId,
+        string $returnedQuantity,
+        string $sourceQuantity,
+        string $unitPrice,
+    ): SalesReturn {
+        $math = app(\Modules\Core\Services\DecimalMath::class);
+        $lineTotal = $math->mul($returnedQuantity, $unitPrice);
+        $returnId = (int) DB::table('sales_returns')->insertGetId([
+            'tenant_id' => $tenantId,
+            'return_number' => 'SRET-TAX-'.Str::upper(Str::random(6)),
+            'return_date' => '2026-06-11',
+            'customer_id' => $customerId,
+            'warehouse_id' => $warehouseId,
+            'return_type' => 'referenced_customer_return',
+            'status' => 'posted',
+            'subtotal' => $lineTotal,
+            'grand_total' => $lineTotal,
+            'affects_inventory' => true,
+            'affects_customer_balance' => true,
+            'approval_required' => false,
+            'posted_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('sales_return_lines')->insert([
+            'tenant_id' => $tenantId,
+            'sales_return_id' => $returnId,
+            'item_id' => $itemId,
+            'source_line_type' => 'sales_delivery_line',
+            'source_line_id' => $sourceLineId,
+            'returned_quantity' => $returnedQuantity,
+            'source_quantity' => $sourceQuantity,
+            'previously_returned_quantity' => '0.000000',
+            'remaining_quantity' => $math->sub($sourceQuantity, $returnedQuantity),
+            'unit_price' => $unitPrice,
+            'line_total' => $lineTotal,
+            'condition_status' => 'sellable',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return SalesReturn::query()->with('lines')->findOrFail($returnId);
+    }
+
+    private function createInvoice(
+        int $tenantId,
+        string $invoiceType,
+        string $direction,
+        string $partyType,
+        int $partyId,
+        int $itemId,
+        string $unitPrice,
+    ): Invoice {
+        $invoiceId = (int) DB::table('invoices')->insertGetId([
+            'tenant_id' => $tenantId,
+            'invoice_number' => 'INV-WHT-'.Str::upper(Str::random(6)),
+            'invoice_type' => $invoiceType,
+            'direction' => $direction,
+            'party_type' => $partyType,
+            'party_id' => $partyId,
+            'invoice_date' => '2026-06-11',
+            'status' => 'approved',
+            'subtotal' => $unitPrice,
+            'grand_total' => $unitPrice,
+            'balance_due' => $unitPrice,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('invoice_lines')->insert([
+            'tenant_id' => $tenantId,
+            'invoice_id' => $invoiceId,
+            'line_number' => 1,
+            'item_id' => $itemId,
+            'description' => 'Tax invoice line',
+            'line_type' => 'item',
+            'quantity' => '1.000000',
+            'unit_price' => $unitPrice,
+            'line_total' => $unitPrice,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return Invoice::query()->with('lines')->findOrFail($invoiceId);
+    }
+
+    private function createPayment(int $tenantId, Invoice $invoice, string $allocatedAmount): Payment
+    {
+        $paymentId = (int) DB::table('payments')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $invoice->organization_unit_id,
+            'payment_number' => 'PAY-WHT-'.Str::upper(Str::random(6)),
+            'payment_type' => 'supplier_payment',
+            'direction' => 'outbound',
+            'party_type' => $invoice->party_type,
+            'party_id' => $invoice->party_id,
+            'payment_date' => '2026-06-11',
+            'exchange_rate' => '1.000000',
+            'status' => 'posted',
+            'total_amount' => $allocatedAmount,
+            'allocated_amount' => $allocatedAmount,
+            'unapplied_amount' => '0.000000',
+            'refunded_amount' => '0.000000',
+            'posted_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('payment_allocations')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $invoice->organization_unit_id,
+            'payment_id' => $paymentId,
+            'invoice_id' => $invoice->getKey(),
+            'invoice_total' => (string) $invoice->grand_total,
+            'invoice_balance_before' => (string) $invoice->grand_total,
+            'previously_allocated_amount' => '0.000000',
+            'allocated_amount' => $allocatedAmount,
+            'invoice_balance_after' => app(\Modules\Core\Services\DecimalMath::class)->sub((string) $invoice->grand_total, $allocatedAmount),
+            'allocation_date' => '2026-06-11',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return Payment::query()->with('allocations')->findOrFail($paymentId);
     }
 
     private function createFinanceAccount(int $tenantId, string $code, string $name, string $normalBalance, bool $isTax = false): int

@@ -79,6 +79,63 @@ final class TaxSnapshotService
     }
 
     /**
+     * @param  array<string, mixed>  $source
+     * @param  array<string, mixed>  $line
+     * @param  array<string, mixed>  $metadata
+     */
+    public function createReversalSnapshot(
+        TaxDocumentSnapshot $original,
+        array $source,
+        array $line,
+        string $ratio,
+        array $metadata = [],
+    ): TaxDocumentSnapshot {
+        $tenantId = (int) $source['tenant_id'];
+        $organizationUnitId = isset($source['organization_unit_id']) && $source['organization_unit_id'] !== ''
+            ? (int) $source['organization_unit_id']
+            : null;
+
+        $taxableAmount = $this->math->sub('0.000000', $this->math->mul((string) $original->taxable_amount, $ratio));
+        $taxAmount = $this->math->sub('0.000000', $this->math->mul((string) $original->tax_amount, $ratio));
+        $totalAmount = $this->math->sub('0.000000', $this->math->mul((string) $original->total_amount, $ratio));
+
+        return TaxDocumentSnapshot::query()->create([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'source_module' => $source['source_module'] ?? $original->source_module,
+            'source_type' => $source['source_type'],
+            'source_id' => $source['source_id'],
+            'source_number' => $source['source_number'] ?? null,
+            'source_date' => $source['source_date'] ?? null,
+            'line_type' => $line['line_type'] ?? 'return_line',
+            'line_id' => $line['line_id'] ?? null,
+            'tax_id' => $original->tax_id,
+            'tax_code' => $original->tax_code,
+            'tax_name' => $original->tax_name,
+            'tax_type' => $original->tax_type,
+            'calculation_method' => $original->calculation_method,
+            'rate' => $this->math->normalize((string) $original->rate),
+            'sequence' => $original->sequence,
+            'taxable_amount' => $taxableAmount,
+            'tax_amount' => $taxAmount,
+            'total_amount' => $totalAmount,
+            'is_withholding' => (bool) $original->is_withholding,
+            'recoverable' => (bool) $original->recoverable,
+            'payable' => (bool) $original->payable,
+            'receivable' => (bool) $original->receivable,
+            'posted' => false,
+            'metadata' => array_merge([
+                'line_number' => $line['line_number'] ?? null,
+                'original_snapshot_id' => (int) $original->getKey(),
+                'original_source_type' => $original->source_type,
+                'original_source_id' => (int) $original->source_id,
+                'original_line_id' => $original->line_id,
+                'reversal_ratio' => $this->math->normalize($ratio, 12),
+            ], $metadata),
+        ]);
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function recordTransaction(TaxDocumentSnapshot $snapshot, array $attributes = []): TaxTransaction

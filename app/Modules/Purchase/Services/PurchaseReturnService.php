@@ -17,6 +17,7 @@ use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
+use Modules\Tax\Services\TaxReturnAllocationService;
 
 final class PurchaseReturnService
 {
@@ -28,6 +29,7 @@ final class PurchaseReturnService
         private readonly PurchaseDebitNoteService $debitNotes,
         private readonly PurchaseNumberService $numbers,
         private readonly PurchaseOrderService $orders,
+        private readonly TaxReturnAllocationService $taxReturns,
     ) {}
 
     public function create(CreatePurchaseReturnData $data): PurchaseReturn
@@ -214,6 +216,7 @@ final class PurchaseReturnService
             $return->posted_at = now();
             $return->debit_note_id = $debitNote?->getKey();
             $return->save();
+            $this->taxReturns->reversePurchaseReturn($return->refresh()->load('lines'), $debitNote === null ? null : (int) $debitNote->getKey());
 
             return new PurchasePostingResult((int) $return->getKey(), (string) $return->return_number, $return->status->value, $movementIds, debitNoteId: $debitNote === null ? null : (int) $debitNote->getKey());
         });

@@ -15,6 +15,7 @@ use Modules\Sales\Models\SalesHeaderAdjustment;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
 use Modules\Sales\Validators\SalesValidationService;
+use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class SalesDeliveryService
 {
@@ -26,6 +27,7 @@ final class SalesDeliveryService
         private readonly SalesOrderService $orders,
         private readonly SalesNumberService $numbers,
         private readonly SalesStatusService $statuses,
+        private readonly TaxDocumentIntegrationService $taxDocuments,
     ) {}
 
     public function create(CreateSalesDeliveryData $data): SalesDelivery
@@ -156,6 +158,7 @@ final class SalesDeliveryService
             $delivery->posted_by = $userId;
             $delivery->posted_at = now();
             $delivery->save();
+            $this->taxDocuments->postSalesDelivery($delivery->refresh()->load(['lines.salesOrderLine']));
 
             return $this->load($delivery);
         });
