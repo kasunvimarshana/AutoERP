@@ -111,12 +111,16 @@ final class InventoryValidationService
         }
 
         $batch = InventoryBatch::query()->findOrFail($batchId);
-        if ((int) $batch->item_id !== (int) $item->getKey()) {
+        if ((int) $batch->tenant_id !== (int) $item->tenant_id
+            || (int) $batch->item_id !== (int) $item->getKey()) {
             throw new InvalidArgumentException('Inventory batch must belong to the item.');
         }
 
         if ($batch->status !== BatchStatus::Active) {
             throw new InvalidArgumentException('Only active inventory batches can be used.');
+        }
+        if ($batch->expiry_date !== null && $batch->expiry_date->isBefore(now()->startOfDay())) {
+            throw new InvalidArgumentException('Expired inventory batches cannot be used.');
         }
 
         return $batch;
@@ -140,7 +144,8 @@ final class InventoryValidationService
         }
 
         $serial = InventorySerialNumber::query()->findOrFail($serialId);
-        if ((int) $serial->item_id !== (int) $item->getKey()) {
+        if ((int) $serial->tenant_id !== (int) $item->tenant_id
+            || (int) $serial->item_id !== (int) $item->getKey()) {
             throw new InvalidArgumentException('Inventory serial number must belong to the item.');
         }
 

@@ -6,7 +6,7 @@ namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Modules\Inventory\Http\Resources\InventoryAdjustmentResource;
-use Modules\Inventory\Services\StockAdjustmentService;
+use Modules\Inventory\Services\InventoryFacade;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Purchase\Http\Requests\PreparePurchasePaymentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInventoryAdjustmentRequest;
@@ -16,9 +16,9 @@ use Modules\Purchase\Services\PurchasePaymentIntegrationService;
 
 final class PurchaseIntegrationController
 {
-    public function createInventoryAdjustmentRequest(StorePurchaseInventoryAdjustmentRequest $request, StockAdjustmentService $service): JsonResponse
+    public function createInventoryAdjustmentRequest(StorePurchaseInventoryAdjustmentRequest $request, InventoryFacade $inventory): JsonResponse
     {
-        return (new InventoryAdjustmentResource($service->create($request->toData())))
+        return (new InventoryAdjustmentResource($inventory->adjust($request->toData())))
             ->response()
             ->setStatusCode(201);
     }

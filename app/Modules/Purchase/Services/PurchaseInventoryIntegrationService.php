@@ -8,7 +8,7 @@ use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
-use Modules\Inventory\Services\StockMovementService;
+use Modules\Inventory\Services\InventoryFacade;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemBaseUomConversionService;
@@ -20,7 +20,7 @@ use Modules\Purchase\Models\PurchaseReturnLine;
 final class PurchaseInventoryIntegrationService
 {
     public function __construct(
-        private readonly StockMovementService $movements,
+        private readonly InventoryFacade $inventory,
         private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
@@ -32,7 +32,7 @@ final class PurchaseInventoryIntegrationService
 
         $basis = $this->basis((int) $line->item_id, $line->uom_id ?? $line->base_uom_id, (string) $line->accepted_quantity, (string) $line->unit_price);
 
-        return $this->movements->record(new StockMovementData(
+        return $this->inventory->receive(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
             movementDate: $grn->received_date->toDateString(),
             movementType: InventoryMovementType::Receipt,
@@ -60,7 +60,7 @@ final class PurchaseInventoryIntegrationService
 
         $basis = $this->basis((int) $line->item_id, $line->uom_id, (string) $line->returned_quantity, (string) $line->unit_price);
 
-        return $this->movements->record(new StockMovementData(
+        return $this->inventory->issue(new StockMovementData(
             tenantId: (int) $return->tenant_id,
             movementDate: $return->return_date->toDateString(),
             movementType: InventoryMovementType::ReturnOut,
@@ -86,9 +86,14 @@ final class PurchaseInventoryIntegrationService
             return null;
         }
 
+        $line->loadMissing('inventoryMovement');
+        if ($line->inventoryMovement instanceof InventoryMovement) {
+            return $this->inventory->reverse($line->inventoryMovement, $postedBy);
+        }
+
         $basis = $this->basis((int) $line->item_id, $line->uom_id ?? $line->base_uom_id, (string) $line->accepted_quantity, (string) $line->unit_price);
 
-        return $this->movements->record(new StockMovementData(
+        return $this->inventory->issue(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
             movementDate: now()->toDateString(),
             movementType: InventoryMovementType::ReturnOut,

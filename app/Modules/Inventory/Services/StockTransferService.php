@@ -12,7 +12,9 @@ use Modules\Inventory\DTOs\StockTransferData;
 use Modules\Inventory\DTOs\StockTransferLineData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Inventory\Enums\TransferStatus;
+use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryTransfer;
 use Modules\Inventory\Models\InventoryTransferLine;
 use Modules\Inventory\Validators\InventoryValidationService;
@@ -67,13 +69,17 @@ final class StockTransferService
 
     public function post(InventoryTransfer $transfer, ?int $postedBy = null): InventoryTransfer
     {
-        if (! in_array($transfer->status, [TransferStatus::Draft, TransferStatus::Approved], true)) {
-            throw new InvalidArgumentException('Only draft or approved inventory transfers can be posted.');
-        }
-
         return DB::transaction(function () use ($transfer, $postedBy): InventoryTransfer {
+            $transfer = InventoryTransfer::query()
+                ->with('lines')
+                ->lockForUpdate()
+                ->findOrFail($transfer->getKey());
+            if (! in_array($transfer->status, [TransferStatus::Draft, TransferStatus::Approved], true)) {
+                throw new InvalidArgumentException('Only draft or approved inventory transfers can be posted.');
+            }
+
             foreach ($transfer->lines as $line) {
-                $this->movements->record(new StockMovementData(
+                $outbound = $this->movements->record(new StockMovementData(
                     tenantId: (int) $transfer->tenant_id,
                     movementDate: $transfer->transfer_date->toDateString(),
                     movementType: InventoryMovementType::TransferOut,
@@ -106,7 +112,7 @@ final class StockTransferService
                     warehouseLocationId: $transfer->to_warehouse_location_id,
                     batchId: $line->batch_id,
                     serialNumberId: $line->serial_number_id,
-                    unitCost: (string) $line->unit_cost,
+                    unitCost: (string) $outbound->unit_cost,
                     sourceType: 'inventory_transfer',
                     sourceId: (int) $transfer->getKey(),
                     sourceLineType: 'inventory_transfer_line',
@@ -117,6 +123,33 @@ final class StockTransferService
             $transfer->status = TransferStatus::Posted;
             $transfer->posted_by = $postedBy;
             $transfer->posted_at = now();
+            $transfer->save();
+
+            return $transfer->refresh();
+        });
+    }
+
+    public function reverse(InventoryTransfer $transfer, ?int $reversedBy = null): InventoryTransfer
+    {
+        return DB::transaction(function () use ($transfer, $reversedBy): InventoryTransfer {
+            $transfer = InventoryTransfer::query()->lockForUpdate()->findOrFail($transfer->getKey());
+            if ($transfer->status !== TransferStatus::Posted) {
+                throw new InvalidArgumentException('Only posted inventory transfers can be reversed.');
+            }
+
+            $movements = InventoryMovement::query()
+                ->where('source_type', 'inventory_transfer')
+                ->where('source_id', $transfer->getKey())
+                ->where('status', InventoryStatus::Posted->value)
+                ->orderByRaw('CASE WHEN movement_type = ? THEN 0 ELSE 1 END', [InventoryMovementType::TransferIn->value])
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+            foreach ($movements as $movement) {
+                $this->movements->reverse($movement, $reversedBy);
+            }
+
+            $transfer->status = TransferStatus::Reversed;
             $transfer->save();
 
             return $transfer->refresh();

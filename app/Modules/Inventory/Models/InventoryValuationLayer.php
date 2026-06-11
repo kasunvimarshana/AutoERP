@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\ValuationLayerStatus;
 use Modules\Inventory\Enums\ValuationMethod;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
-use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InventoryValuationLayer extends CoreModel
 {
@@ -77,5 +78,10 @@ final class InventoryValuationLayer extends CoreModel
     public function movement(): BelongsTo
     {
         return $this->belongsTo(InventoryMovement::class, 'movement_id');
+    }
+
+    public function consumptions(): HasMany
+    {
+        return $this->hasMany(InventoryValuationConsumption::class, 'valuation_layer_id');
     }
 }

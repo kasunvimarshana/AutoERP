@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
+use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
-use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InventoryAllocation extends CoreModel
 {
@@ -28,6 +30,7 @@ final class InventoryAllocation extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'allocation_date' => 'date',
+            'allocation_method' => AllocationMethod::class,
             'reservation_id' => 'integer',
             'item_id' => 'integer',
             'base_uom_id' => 'integer',
@@ -38,6 +41,7 @@ final class InventoryAllocation extends CoreModel
             'serial_number_id' => 'integer',
             'quantity_allocated' => 'decimal:6',
             'quantity_issued' => 'decimal:6',
+            'quantity_reversed' => 'decimal:6',
             'quantity_released' => 'decimal:6',
             'quantity_remaining' => 'decimal:6',
             'source_id' => 'integer',
@@ -84,5 +88,15 @@ final class InventoryAllocation extends CoreModel
     public function serialNumber(): BelongsTo
     {
         return $this->belongsTo(InventorySerialNumber::class, 'serial_number_id');
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(InventoryAllocationLine::class, 'allocation_id');
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(InventoryAllocationIssue::class, 'allocation_id');
     }
 }

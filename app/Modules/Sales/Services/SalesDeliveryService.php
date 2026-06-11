@@ -134,11 +134,11 @@ final class SalesDeliveryService
 
     public function post(SalesDelivery $delivery, ?int $userId = null): SalesDelivery
     {
-        if ($delivery->status !== SalesDeliveryStatus::Draft) {
-            throw new InvalidArgumentException('Only draft sales deliveries can be posted.');
-        }
-
         return DB::transaction(function () use ($delivery, $userId): SalesDelivery {
+            $delivery = SalesDelivery::query()->lockForUpdate()->findOrFail($delivery->getKey());
+            if ($delivery->status !== SalesDeliveryStatus::Draft) {
+                throw new InvalidArgumentException('Only draft sales deliveries can be posted.');
+            }
             $delivery->load('lines.salesOrderLine');
             foreach ($delivery->lines as $line) {
                 $allocation = $this->inventory->allocateForDelivery($delivery, $line);
@@ -163,11 +163,11 @@ final class SalesDeliveryService
 
     public function reverse(SalesDelivery $delivery, ?int $userId = null): SalesDelivery
     {
-        if ($delivery->status !== SalesDeliveryStatus::Posted) {
-            throw new InvalidArgumentException('Only posted sales deliveries can be reversed.');
-        }
-
         return DB::transaction(function () use ($delivery, $userId): SalesDelivery {
+            $delivery = SalesDelivery::query()->lockForUpdate()->findOrFail($delivery->getKey());
+            if ($delivery->status !== SalesDeliveryStatus::Posted) {
+                throw new InvalidArgumentException('Only posted sales deliveries can be reversed.');
+            }
             $delivery->load(['lines.inventoryMovement', 'lines.salesOrderLine']);
             foreach ($delivery->lines as $line) {
                 if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0

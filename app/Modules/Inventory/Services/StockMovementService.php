@@ -10,14 +10,19 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\DTOs\StockPostingResult;
-use Modules\Inventory\DTOs\ValuationLayerData;
+use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Enums\InventoryStatus;
+use Modules\Inventory\Enums\SerialStatus;
+use Modules\Inventory\Models\InventoryAllocation;
+use Modules\Inventory\Models\InventoryAllocationIssue;
+use Modules\Inventory\Models\InventoryAllocationLine;
 use Modules\Inventory\Models\InventoryMovement;
+use Modules\Inventory\Models\InventorySerialNumber;
+use Modules\Inventory\Validators\InventoryValidationService;
 use Modules\Item\Enums\ItemBaseUomRevisionStatus;
 use Modules\Item\Models\ItemBaseUomRevision;
-use Modules\Inventory\Validators\InventoryValidationService;
 
 final class StockMovementService
 {
@@ -72,56 +77,45 @@ final class StockMovementService
 
     public function record(StockMovementData $data, ?int $postedBy = null): InventoryMovement
     {
-        return $this->post($this->create($data), $postedBy);
+        return DB::transaction(fn (): InventoryMovement => $this->post($this->create($data), $postedBy));
     }
 
     public function post(InventoryMovement $movement, ?int $postedBy = null): InventoryMovement
     {
-        if ($movement->status !== InventoryStatus::Draft) {
-            throw new InvalidArgumentException('Only draft inventory movements can be posted.');
-        }
-
         return DB::transaction(function () use ($movement, $postedBy): InventoryMovement {
-            $balance = $this->balances->getOrCreate($this->balanceData($movement));
-            $quantity = (string) $movement->quantity;
-            $unitCost = (string) $movement->unit_cost;
-            $totalCost = (string) $movement->total_cost;
-
-            if ($movement->direction === InventoryDirection::In) {
-                $this->balances->increase($balance, $quantity, $unitCost);
-                $this->valuation->createInboundLayer(new ValuationLayerData(
-                    tenantId: (int) $movement->tenant_id,
-                    itemId: (int) $movement->item_id,
-                    warehouseId: (int) $movement->warehouse_id,
-                    valuationMethod: $this->valuation->methodFromItem($movement->item?->costing_method?->value ?? null),
-                    originalQuantity: $quantity,
-                    unitCost: $unitCost,
-                    organizationUnitId: $movement->organization_unit_id,
-                    itemVariantId: $movement->item_variant_id,
-                    warehouseLocationId: $movement->warehouse_location_id,
-                    batchId: $movement->batch_id,
-                    movementId: (int) $movement->getKey(),
-                    sourceType: $movement->source_type,
-                    sourceId: $movement->source_id,
-                    sourceLineType: $movement->source_line_type,
-                    sourceLineId: $movement->source_line_id,
-                    baseUomId: $movement->base_uom_id,
-                ));
-            } elseif ($movement->direction === InventoryDirection::Out) {
-                if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
-                    throw new InvalidArgumentException('Inventory issue quantity cannot exceed available stock.');
-                }
-
-                if ($this->math->isZero($unitCost)) {
-                    $unitCost = (string) $balance->average_cost;
-                }
-
-                $movement->unit_cost = $unitCost;
-                $totalCost = $this->valuation->consumeOutbound($movement, $quantity);
-                $movement->total_cost = $totalCost;
-                $this->balances->decrease($balance, $quantity, $this->math->div($totalCost, $quantity));
+            $movement = InventoryMovement::query()
+                ->with('item.category')
+                ->lockForUpdate()
+                ->findOrFail($movement->getKey());
+            if ($movement->status !== InventoryStatus::Draft) {
+                throw new InvalidArgumentException('Only draft inventory movements can be posted.');
             }
 
+            $balance = $this->balances->getOrCreateForUpdate($this->balanceData($movement));
+            $quantity = (string) $movement->quantity;
+            if ($movement->direction === InventoryDirection::Out
+                && $this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
+                throw new InvalidArgumentException('Inventory issue quantity cannot exceed available stock.');
+            }
+
+            $valuation = $movement->reversal_of_id === null
+                ? ($movement->direction === InventoryDirection::In
+                    ? $this->valuation->receive($movement)
+                    : $this->valuation->issue($movement, $quantity))
+                : $this->valuation->reverse(
+                    InventoryMovement::query()->lockForUpdate()->findOrFail($movement->reversal_of_id),
+                    $movement,
+                );
+
+            $movement->unit_cost = $valuation->unitCost;
+            $movement->total_cost = $valuation->totalCost;
+            if ($movement->direction === InventoryDirection::In) {
+                $this->balances->increaseByValue($balance, $quantity, $valuation->totalCost);
+            } elseif ($movement->direction === InventoryDirection::Out) {
+                $this->balances->decreaseByValue($balance, $quantity, $valuation->totalCost);
+            }
+
+            $this->updateSerial($movement);
             $balance->refresh();
             $movement->balance_quantity_after = $balance->quantity_on_hand;
             $movement->balance_value_after = $balance->total_value;
@@ -136,41 +130,51 @@ final class StockMovementService
 
     public function reverse(InventoryMovement $movement, ?int $reversedBy = null): InventoryMovement
     {
-        if ($movement->status !== InventoryStatus::Posted) {
-            throw new InvalidArgumentException('Only posted inventory movements can be reversed.');
-        }
+        return DB::transaction(function () use ($movement, $reversedBy): InventoryMovement {
+            $movement = InventoryMovement::query()->lockForUpdate()->findOrFail($movement->getKey());
+            if ($movement->status !== InventoryStatus::Posted) {
+                throw new InvalidArgumentException('Only posted inventory movements can be reversed.');
+            }
+            if ($movement->reversals()->whereIn('status', [
+                InventoryStatus::Draft->value,
+                InventoryStatus::Posted->value,
+            ])->lockForUpdate()->exists()) {
+                throw new InvalidArgumentException('Inventory movement already has a reversal.');
+            }
 
-        $direction = $movement->direction === InventoryDirection::In ? InventoryDirection::Out : InventoryDirection::In;
-        $type = $direction === InventoryDirection::In ? InventoryMovementType::AdjustmentIn : InventoryMovementType::AdjustmentOut;
+            $direction = $movement->direction === InventoryDirection::In ? InventoryDirection::Out : InventoryDirection::In;
+            $type = $direction === InventoryDirection::In ? InventoryMovementType::AdjustmentIn : InventoryMovementType::AdjustmentOut;
+            [$reversalQuantity, $reversalUnitCost] = $this->reversalBasis($movement);
+            $reversal = $this->create(new StockMovementData(
+                tenantId: (int) $movement->tenant_id,
+                movementDate: now()->toDateString(),
+                movementType: $type,
+                direction: $direction,
+                itemId: (int) $movement->item_id,
+                warehouseId: (int) $movement->warehouse_id,
+                quantity: $reversalQuantity,
+                organizationUnitId: $movement->organization_unit_id,
+                itemVariantId: $movement->item_variant_id,
+                warehouseLocationId: $movement->warehouse_location_id,
+                batchId: $movement->batch_id,
+                serialNumberId: $movement->serial_number_id,
+                unitCost: $reversalUnitCost,
+                sourceType: 'inventory_movement',
+                sourceId: (int) $movement->getKey(),
+                description: 'Reversal of '.$movement->movement_number,
+            ));
+            $reversal->reversal_of_id = $movement->getKey();
+            $reversal->save();
+            $reversal = $this->post($reversal, $reversedBy);
 
-        [$reversalQuantity, $reversalUnitCost] = $this->reversalBasis($movement);
-        $reversal = $this->record(new StockMovementData(
-            tenantId: (int) $movement->tenant_id,
-            movementDate: now()->toDateString(),
-            movementType: $type,
-            direction: $direction,
-            itemId: (int) $movement->item_id,
-            warehouseId: (int) $movement->warehouse_id,
-            quantity: $reversalQuantity,
-            organizationUnitId: $movement->organization_unit_id,
-            itemVariantId: $movement->item_variant_id,
-            warehouseLocationId: $movement->warehouse_location_id,
-            batchId: $movement->batch_id,
-            serialNumberId: $movement->serial_number_id,
-            unitCost: $reversalUnitCost,
-            sourceType: 'inventory_movement',
-            sourceId: (int) $movement->getKey(),
-            description: 'Reversal of '.$movement->movement_number,
-        ), $reversedBy);
+            $movement->status = InventoryStatus::Reversed;
+            $movement->reversed_by = $reversedBy;
+            $movement->reversed_at = now();
+            $movement->save();
+            $this->markAllocationIssueReversed($movement, $reversal);
 
-        $movement->status = InventoryStatus::Reversed;
-        $movement->reversed_by = $reversedBy;
-        $movement->reversed_at = now();
-        $movement->save();
-        $reversal->reversal_of_id = $movement->getKey();
-        $reversal->save();
-
-        return $reversal->refresh();
+            return $reversal->refresh();
+        });
     }
 
     /**
@@ -237,5 +241,55 @@ final class StockMovementService
             warehouseLocationId: $movement->warehouse_location_id,
             batchId: $movement->batch_id,
         );
+    }
+
+    private function updateSerial(InventoryMovement $movement): void
+    {
+        if ($movement->serial_number_id === null) {
+            return;
+        }
+
+        $serial = InventorySerialNumber::query()->lockForUpdate()->findOrFail($movement->serial_number_id);
+        if ($movement->direction === InventoryDirection::In) {
+            $serial->status = SerialStatus::Available;
+            $serial->warehouse_id = $movement->warehouse_id;
+            $serial->warehouse_location_id = $movement->warehouse_location_id;
+            $serial->batch_id = $movement->batch_id;
+        } else {
+            if (! in_array($serial->status, [SerialStatus::Available, SerialStatus::Reserved], true)) {
+                throw new InvalidArgumentException('Inventory serial number is not available for issue.');
+            }
+            $serial->status = $movement->reversal_of_id === null ? SerialStatus::Issued : SerialStatus::Returned;
+        }
+        $serial->save();
+    }
+
+    private function markAllocationIssueReversed(InventoryMovement $movement, InventoryMovement $reversal): void
+    {
+        $issue = InventoryAllocationIssue::query()
+            ->where('movement_id', $movement->getKey())
+            ->lockForUpdate()
+            ->first();
+        if (! $issue instanceof InventoryAllocationIssue) {
+            return;
+        }
+
+        $issue->reversal_movement_id = $reversal->getKey();
+        $issue->reversed_at = now();
+        $issue->save();
+
+        $line = InventoryAllocationLine::query()->lockForUpdate()->findOrFail($issue->allocation_line_id);
+        $line->quantity_reversed = $this->math->add((string) $line->quantity_reversed, (string) $issue->quantity_issued);
+        $line->save();
+
+        $allocation = InventoryAllocation::query()->lockForUpdate()->findOrFail($issue->allocation_id);
+        $allocation->quantity_reversed = $this->math->add((string) $allocation->quantity_reversed, (string) $issue->quantity_issued);
+        if ($this->math->isZero((string) $allocation->quantity_remaining)
+            && $this->math->compare((string) $allocation->quantity_reversed, (string) $allocation->quantity_issued) === 0) {
+            $allocation->status = $this->math->isZero((string) $allocation->quantity_released)
+                ? AllocationStatus::Reversed
+                : AllocationStatus::Released;
+        }
+        $allocation->save();
     }
 }

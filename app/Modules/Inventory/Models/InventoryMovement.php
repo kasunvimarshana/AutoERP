@@ -13,9 +13,9 @@ use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
-use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InventoryMovement extends CoreModel
 {
@@ -102,5 +102,15 @@ final class InventoryMovement extends CoreModel
     public function valuationLayers(): HasMany
     {
         return $this->hasMany(InventoryValuationLayer::class, 'movement_id');
+    }
+
+    public function valuationConsumptions(): HasMany
+    {
+        return $this->hasMany(InventoryValuationConsumption::class, 'issue_movement_id');
+    }
+
+    public function allocationIssues(): HasMany
+    {
+        return $this->hasMany(InventoryAllocationIssue::class, 'movement_id');
     }
 }

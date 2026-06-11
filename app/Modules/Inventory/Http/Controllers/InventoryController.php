@@ -29,11 +29,8 @@ use Modules\Inventory\Models\InventoryReservation;
 use Modules\Inventory\Models\InventorySerialNumber;
 use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Models\InventoryTransfer;
-use Modules\Inventory\Services\StockAdjustmentService;
-use Modules\Inventory\Services\StockAllocationService;
+use Modules\Inventory\Services\InventoryFacade;
 use Modules\Inventory\Services\StockAvailabilityService;
-use Modules\Inventory\Services\StockReservationService;
-use Modules\Inventory\Services\StockTransferService;
 
 final class InventoryController
 {
@@ -69,52 +66,55 @@ final class InventoryController
         return response()->json(['data' => get_object_vars($result)]);
     }
 
-    public function reserve(StoreReservationRequest $request, StockReservationService $service): InventoryReservationResource
+    public function reserve(StoreReservationRequest $request, InventoryFacade $inventory): InventoryReservationResource
     {
-        return new InventoryReservationResource($service->reserve($request->toData()));
+        return new InventoryReservationResource($inventory->reserve($request->toData()));
     }
 
-    public function releaseReservation(ReleaseQuantityRequest $request, int $reservation, StockReservationService $service): InventoryReservationResource
+    public function releaseReservation(ReleaseQuantityRequest $request, int $reservation, InventoryFacade $inventory): InventoryReservationResource
     {
         $model = $this->scope(InventoryReservation::query(), $request)->findOrFail($reservation);
 
-        return new InventoryReservationResource($service->release($model, $request->filled('quantity') ? (string) $request->input('quantity') : null));
+        return new InventoryReservationResource($inventory->unreserve($model, $request->filled('quantity') ? (string) $request->input('quantity') : null));
     }
 
-    public function allocate(StoreAllocationRequest $request, StockAllocationService $service): InventoryAllocationResource
+    public function allocate(StoreAllocationRequest $request, InventoryFacade $inventory): InventoryAllocationResource
     {
-        return new InventoryAllocationResource($service->allocate($request->toData()));
+        return new InventoryAllocationResource($inventory->allocate($request->toData()));
     }
 
-    public function releaseAllocation(ReleaseQuantityRequest $request, int $allocation, StockAllocationService $service): InventoryAllocationResource
+    public function releaseAllocation(ReleaseQuantityRequest $request, int $allocation, InventoryFacade $inventory): InventoryAllocationResource
     {
         $model = $this->scope(InventoryAllocation::query(), $request)->findOrFail($allocation);
 
-        return new InventoryAllocationResource($service->release($model));
+        return new InventoryAllocationResource($inventory->release(
+            $model,
+            $request->filled('quantity') ? (string) $request->input('quantity') : null,
+        ));
     }
 
-    public function createAdjustment(StoreAdjustmentRequest $request, StockAdjustmentService $service): InventoryAdjustmentResource
+    public function createAdjustment(StoreAdjustmentRequest $request, InventoryFacade $inventory): InventoryAdjustmentResource
     {
-        return new InventoryAdjustmentResource($service->create($request->toData()));
+        return new InventoryAdjustmentResource($inventory->adjust($request->toData()));
     }
 
-    public function postAdjustment(ReleaseQuantityRequest $request, int $adjustment, StockAdjustmentService $service): InventoryAdjustmentResource
+    public function postAdjustment(ReleaseQuantityRequest $request, int $adjustment, InventoryFacade $inventory): InventoryAdjustmentResource
     {
         $model = $this->scope(InventoryAdjustment::query(), $request)->with('lines')->findOrFail($adjustment);
 
-        return new InventoryAdjustmentResource($service->post($model, $request->currentUserId()));
+        return new InventoryAdjustmentResource($inventory->postAdjustment($model, $request->currentUserId()));
     }
 
-    public function createTransfer(StoreTransferRequest $request, StockTransferService $service): InventoryTransferResource
+    public function createTransfer(StoreTransferRequest $request, InventoryFacade $inventory): InventoryTransferResource
     {
-        return new InventoryTransferResource($service->create($request->toData()));
+        return new InventoryTransferResource($inventory->transfer($request->toData()));
     }
 
-    public function postTransfer(ReleaseQuantityRequest $request, int $transfer, StockTransferService $service): InventoryTransferResource
+    public function postTransfer(ReleaseQuantityRequest $request, int $transfer, InventoryFacade $inventory): InventoryTransferResource
     {
         $model = $this->scope(InventoryTransfer::query(), $request)->with('lines')->findOrFail($transfer);
 
-        return new InventoryTransferResource($service->post($model, $request->currentUserId()));
+        return new InventoryTransferResource($inventory->postTransfer($model, $request->currentUserId()));
     }
 
     public function batches(InventoryLookupRequest $request): AnonymousResourceCollection

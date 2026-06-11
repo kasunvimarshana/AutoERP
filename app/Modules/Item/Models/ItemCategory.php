@@ -25,6 +25,7 @@ final class ItemCategory extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'parent_id' => 'integer',
+            'metadata' => 'array',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ]);

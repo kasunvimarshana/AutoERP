@@ -34,11 +34,7 @@ final class StockReservationService
         $this->validator->batch($item, $data->batchId);
 
         return DB::transaction(function () use ($data, $quantity, $item): InventoryReservation {
-            $balance = $this->balances->getOrCreate($this->balanceData($data));
-            if ($this->math->compare((string) $balance->quantity_available, $quantity) < 0) {
-                throw new InvalidArgumentException('Inventory reservation quantity cannot exceed available stock.');
-            }
-
+            $balance = $this->balances->getOrCreateForUpdate($this->balanceData($data));
             $this->balances->reserve($balance, $quantity);
 
             return InventoryReservation::query()->create([
@@ -67,17 +63,19 @@ final class StockReservationService
 
     public function release(InventoryReservation $reservation, ?string $quantity = null): InventoryReservation
     {
-        if (! in_array($reservation->status, [ReservationStatus::Active, ReservationStatus::PartiallyAllocated], true)) {
-            throw new InvalidArgumentException('Only active inventory reservations can be released.');
-        }
+        return DB::transaction(function () use ($reservation, $quantity): InventoryReservation {
+            $reservation = InventoryReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            if (! in_array($reservation->status, [ReservationStatus::Active, ReservationStatus::PartiallyAllocated], true)) {
+                throw new InvalidArgumentException('Only active inventory reservations can be released.');
+            }
 
-        $releaseQty = $this->math->normalize($quantity ?? (string) $reservation->quantity_remaining);
-        if ($this->math->compare($releaseQty, (string) $reservation->quantity_remaining) > 0) {
-            throw new InvalidArgumentException('Inventory reservation release cannot exceed remaining quantity.');
-        }
+            $releaseQty = $this->math->normalize($quantity ?? (string) $reservation->quantity_remaining);
+            $this->validator->assertPositiveQuantity($releaseQty);
+            if ($this->math->compare($releaseQty, (string) $reservation->quantity_remaining) > 0) {
+                throw new InvalidArgumentException('Inventory reservation release cannot exceed remaining quantity.');
+            }
 
-        return DB::transaction(function () use ($reservation, $releaseQty): InventoryReservation {
-            $balance = $this->balances->getOrCreate($this->balanceDataFromReservation($reservation));
+            $balance = $this->balances->getOrCreateForUpdate($this->balanceDataFromReservation($reservation));
             $this->balances->releaseReserved($balance, $releaseQty);
 
             $reservation->quantity_released = $this->math->add((string) $reservation->quantity_released, $releaseQty);

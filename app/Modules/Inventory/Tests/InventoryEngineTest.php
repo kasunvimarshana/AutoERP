@@ -18,13 +18,20 @@ use Modules\Inventory\DTOs\StockTransferData;
 use Modules\Inventory\DTOs\StockTransferLineData;
 use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Inventory\Enums\AdjustmentType;
+use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Enums\ReservationStatus;
+use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Enums\TransferStatus;
+use Modules\Inventory\Models\InventoryAllocationIssue;
+use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryStockBalance;
+use Modules\Inventory\Models\InventoryValuationConsumption;
 use Modules\Inventory\Models\InventoryValuationLayer;
+use Modules\Inventory\Services\BatchTrackingService;
+use Modules\Inventory\Services\InventoryMethodResolver;
 use Modules\Inventory\Services\SerialTrackingService;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAllocationService;
@@ -37,7 +44,9 @@ use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
+use Modules\Item\Models\ItemCategory;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Warehouse\Models\WarehouseModel;
 use Tests\TestCase;
 
 final class InventoryEngineTest extends TestCase
@@ -200,6 +209,10 @@ final class InventoryEngineTest extends TestCase
 
         $this->assertSame('15.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId))->quantityOnHand);
         $this->assertSame(AdjustmentStatus::Posted, $adjustment->refresh()->status);
+
+        app(StockAdjustmentService::class)->reverse($adjustment);
+        $this->assertSame('0.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId))->quantityOnHand);
+        $this->assertSame(AdjustmentStatus::Reversed, $adjustment->refresh()->status);
     }
 
     public function test_transfer_moves_stock_between_warehouses(): void
@@ -223,6 +236,11 @@ final class InventoryEngineTest extends TestCase
         $this->assertSame(TransferStatus::Posted, $transfer->refresh()->status);
         $this->assertSame('7.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $fromWarehouseId))->quantityOnHand);
         $this->assertSame('3.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId))->quantityOnHand);
+
+        app(StockTransferService::class)->reverse($transfer);
+        $this->assertSame(TransferStatus::Reversed, $transfer->refresh()->status);
+        $this->assertSame('10.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $fromWarehouseId))->quantityOnHand);
+        $this->assertSame('0.000000', app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $toWarehouseId))->quantityOnHand);
     }
 
     public function test_fifo_layers_are_consumed_and_weighted_average_recalculates(): void
@@ -243,6 +261,280 @@ final class InventoryEngineTest extends TestCase
 
         $balance = InventoryStockBalance::query()->where('item_id', $weightedItem->getKey())->firstOrFail();
         $this->assertSame('10.000000', (string) $balance->average_cost);
+    }
+
+    public function test_fifo_issue_audits_each_consumed_layer_and_reversal_restores_exact_cost(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $this->receipt($tenantId, $warehouseId, $item, '10.000000', '5.000000');
+        $this->receipt($tenantId, $warehouseId, $item, '5.000000', '8.000000');
+
+        $issue = app(StockMovementService::class)->record(new StockMovementData(
+            $tenantId,
+            '2026-06-06',
+            InventoryMovementType::Issue,
+            InventoryDirection::Out,
+            (int) $item->getKey(),
+            $warehouseId,
+            '12.000000',
+        ));
+
+        $this->assertSame('5.500000', (string) $issue->unit_cost);
+        $this->assertSame('66.000000', (string) $issue->total_cost);
+        $consumptions = InventoryValuationConsumption::query()
+            ->where('issue_movement_id', $issue->getKey())
+            ->orderBy('id')
+            ->get();
+        $this->assertCount(2, $consumptions);
+        $this->assertSame('10.000000', (string) $consumptions[0]->quantity_consumed);
+        $this->assertSame('50.000000', (string) $consumptions[0]->total_cost);
+        $this->assertSame('2.000000', (string) $consumptions[1]->quantity_consumed);
+        $this->assertSame('16.000000', (string) $consumptions[1]->total_cost);
+
+        $reversal = app(StockMovementService::class)->reverse($issue);
+        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $this->assertSame('15.000000', (string) $balance->quantity_on_hand);
+        $this->assertSame('90.000000', (string) $balance->total_value);
+        $this->assertSame('66.000000', (string) $reversal->total_cost);
+        $this->assertSame(2, InventoryValuationConsumption::query()
+            ->where('issue_movement_id', $issue->getKey())
+            ->where('reversed_by_movement_id', $reversal->getKey())
+            ->count());
+    }
+
+    public function test_weighted_average_standard_and_manual_cost_methods_reconcile(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-COST');
+
+        $weighted = $this->createItem($tenantId, 'WA-COST', costing: CostingMethod::WeightedAverage);
+        $this->receipt($tenantId, $warehouseId, $weighted, '10.000000', '5.000000');
+        $this->receipt($tenantId, $warehouseId, $weighted, '10.000000', '15.000000');
+        $weightedIssue = app(StockMovementService::class)->record(new StockMovementData(
+            $tenantId,
+            '2026-06-06',
+            InventoryMovementType::Issue,
+            InventoryDirection::Out,
+            (int) $weighted->getKey(),
+            $warehouseId,
+            '4.000000',
+        ));
+        $this->assertSame('10.000000', (string) $weightedIssue->unit_cost);
+        $this->assertSame('40.000000', (string) $weightedIssue->total_cost);
+        $weightedLayer = InventoryValuationLayer::query()->where('item_id', $weighted->getKey())->firstOrFail();
+        $this->assertSame('16.000000', (string) $weightedLayer->remaining_quantity);
+        $this->assertSame('160.000000', (string) $weightedLayer->remaining_value);
+
+        $standard = $this->createItem($tenantId, 'STD-COST', costing: CostingMethod::Standard);
+        $standard->metadata = ['inventory' => ['standard_cost' => '7.250000']];
+        $standard->save();
+        $standardReceipt = $this->receipt($tenantId, $warehouseId, $standard, '3.000000', '99.000000');
+        $this->assertSame('7.250000', (string) $standardReceipt->unit_cost);
+        $this->assertSame('21.750000', (string) $standardReceipt->total_cost);
+
+        $manual = $this->createItem($tenantId, 'MAN-COST', costing: CostingMethod::Manual);
+        $this->receipt($tenantId, $warehouseId, $manual, '3.000000', '2.125000');
+        $manualIssue = app(StockMovementService::class)->record(new StockMovementData(
+            $tenantId,
+            '2026-06-06',
+            InventoryMovementType::Issue,
+            InventoryDirection::Out,
+            (int) $manual->getKey(),
+            $warehouseId,
+            '2.000000',
+        ));
+        $this->assertSame('4.250000', (string) $manualIssue->total_cost);
+    }
+
+    public function test_fefo_batch_serial_and_manual_allocation_strategies(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-ALLOC');
+
+        $fefoItem = $this->createItem($tenantId, 'FEFO-ITEM');
+        $fefoItem->metadata = ['inventory' => ['allocation_method' => 'fefo']];
+        $fefoItem->save();
+        $lateBatch = app(BatchTrackingService::class)->create($tenantId, (int) $fefoItem->getKey(), 'LATE');
+        $lateBatch->expiry_date = '2027-12-31';
+        $lateBatch->save();
+        $earlyBatch = app(BatchTrackingService::class)->create($tenantId, (int) $fefoItem->getKey(), 'EARLY');
+        $earlyBatch->expiry_date = '2026-12-31';
+        $earlyBatch->save();
+        $this->receipt($tenantId, $warehouseId, $fefoItem, '3.000000', '4.000000', (int) $lateBatch->getKey());
+        $this->receipt($tenantId, $warehouseId, $fefoItem, '3.000000', '4.000000', (int) $earlyBatch->getKey());
+
+        $fefo = app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $fefoItem->getKey(),
+            $warehouseId,
+            '4.000000',
+        ));
+        $this->assertSame(AllocationMethod::FEFO, $fefo->allocation_method);
+        $this->assertCount(2, $fefo->lines);
+        $this->assertSame($earlyBatch->getKey(), $fefo->lines[0]->batch_id);
+        $this->assertSame('3.000000', (string) $fefo->lines[0]->quantity_allocated);
+
+        $batchItem = $this->createItem($tenantId, 'BATCH-AUTO', TrackingType::Batch);
+        $batch = app(BatchTrackingService::class)->create($tenantId, (int) $batchItem->getKey(), 'B-001');
+        $this->receipt($tenantId, $warehouseId, $batchItem, '2.000000', '3.000000', (int) $batch->getKey());
+        $batchAllocation = app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $batchItem->getKey(),
+            $warehouseId,
+            '1.000000',
+        ));
+        $this->assertSame(AllocationMethod::Batch, $batchAllocation->allocation_method);
+        $this->assertSame($batch->getKey(), $batchAllocation->lines[0]->batch_id);
+
+        $serialItem = $this->createItem($tenantId, 'SER-AUTO', TrackingType::Serial);
+        $serial = app(SerialTrackingService::class)->create($tenantId, (int) $serialItem->getKey(), 'SN-AUTO');
+        $this->receipt($tenantId, $warehouseId, $serialItem, '1.000000', '6.000000', serialId: (int) $serial->getKey());
+        $serialAllocation = app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $serialItem->getKey(),
+            $warehouseId,
+            '1.000000',
+        ));
+        $this->assertSame(SerialStatus::Reserved, $serial->refresh()->status);
+        app(StockAllocationService::class)->issue($serialAllocation);
+        $this->assertSame(SerialStatus::Issued, $serial->refresh()->status);
+        $this->assertDatabaseHas('inventory_allocation_issues', [
+            'allocation_id' => $serialAllocation->getKey(),
+            'quantity_issued' => '1',
+        ]);
+        $serialIssue = InventoryAllocationIssue::query()
+            ->where('allocation_id', $serialAllocation->getKey())
+            ->with('movement')
+            ->firstOrFail();
+        $serialReversal = app(StockMovementService::class)->reverse($serialIssue->movement);
+        $this->assertSame(SerialStatus::Available, $serial->refresh()->status);
+        $this->assertSame(AllocationStatus::Reversed, $serialAllocation->refresh()->status);
+        $this->assertSame('1.000000', (string) $serialAllocation->quantity_reversed);
+        $this->assertSame($serialReversal->getKey(), $serialIssue->refresh()->reversal_movement_id);
+
+        $manualItem = $this->createItem($tenantId, 'MAN-ALLOC');
+        $manualItem->metadata = ['inventory' => ['allocation_method' => 'manual']];
+        $manualItem->save();
+        $this->receipt($tenantId, $warehouseId, $manualItem, '2.000000', '1.000000');
+        $manualAllocation = app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $manualItem->getKey(),
+            $warehouseId,
+            '1.000000',
+        ));
+        $this->assertSame(AllocationMethod::Manual, $manualAllocation->allocation_method);
+    }
+
+    public function test_partial_allocation_issue_and_release_reconcile_parent_lines_and_audit(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $this->receipt($tenantId, $warehouseId, $item, '10.000000', '5.000000');
+        $allocation = app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $item->getKey(),
+            $warehouseId,
+            '6.000000',
+        ));
+
+        app(StockAllocationService::class)->issue($allocation, '2.000000');
+        app(StockAllocationService::class)->release($allocation->refresh(), '1.000000');
+        $allocation->refresh();
+
+        $this->assertSame('2.000000', (string) $allocation->quantity_issued);
+        $this->assertSame('1.000000', (string) $allocation->quantity_released);
+        $this->assertSame('3.000000', (string) $allocation->quantity_remaining);
+        $this->assertSame(AllocationStatus::Active, $allocation->status);
+        $this->assertSame('2.000000', (string) InventoryAllocationIssue::query()
+            ->where('allocation_id', $allocation->getKey())
+            ->value('quantity_issued'));
+        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $this->assertSame('8.000000', (string) $balance->quantity_on_hand);
+        $this->assertSame('3.000000', (string) $balance->quantity_allocated);
+        $this->assertSame('5.000000', (string) $balance->quantity_available);
+    }
+
+    public function test_scoped_method_priority_uses_item_then_category_then_warehouse(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-PRIORITY');
+        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
+        $warehouse->metadata = ['inventory' => ['allocation_method' => 'manual']];
+        $warehouse->save();
+        $category = ItemCategory::query()->create([
+            'tenant_id' => $tenantId,
+            'code' => 'ALLOC-CAT',
+            'name' => 'Allocation Category',
+            'metadata' => ['inventory' => ['allocation_method' => 'fefo']],
+            'is_active' => true,
+        ]);
+        $item = $this->createItem($tenantId, 'PRIORITY');
+        $item->item_category_id = $category->getKey();
+        $item->metadata = ['inventory' => ['allocation_method' => 'fifo']];
+        $item->save();
+
+        $resolver = app(InventoryMethodResolver::class);
+        $this->assertSame(AllocationMethod::FIFO, $resolver->allocation($item->refresh(), $warehouseId, null));
+        $item->metadata = null;
+        $item->save();
+        $this->assertSame(AllocationMethod::FEFO, $resolver->allocation($item->refresh(), $warehouseId, null));
+        $category->metadata = null;
+        $category->save();
+        $this->assertSame(AllocationMethod::Manual, $resolver->allocation($item->refresh(), $warehouseId, null));
+    }
+
+    public function test_two_issue_and_allocation_callers_cannot_overdraw_stock(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $this->receipt($tenantId, $warehouseId, $item, '5.000000', '2.000000');
+        $movements = app(StockMovementService::class);
+        $first = $movements->create(new StockMovementData(
+            $tenantId,
+            '2026-06-06',
+            InventoryMovementType::Issue,
+            InventoryDirection::Out,
+            (int) $item->getKey(),
+            $warehouseId,
+            '4.000000',
+        ));
+        $second = $movements->create(new StockMovementData(
+            $tenantId,
+            '2026-06-06',
+            InventoryMovementType::Issue,
+            InventoryDirection::Out,
+            (int) $item->getKey(),
+            $warehouseId,
+            '4.000000',
+        ));
+        $movements->post($first);
+        try {
+            $movements->post($second);
+            $this->fail('Expected the second issue caller to be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Inventory issue quantity cannot exceed available stock.', $exception->getMessage());
+        }
+
+        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $this->assertSame('1.000000', (string) $balance->quantity_on_hand);
+        $this->assertSame('1.000000', (string) $balance->quantity_available);
+
+        $other = $this->createItem($tenantId, 'ALLOC-RACE');
+        $this->receipt($tenantId, $warehouseId, $other, '5.000000', '2.000000');
+        $allocations = app(StockAllocationService::class);
+        $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000'));
+        try {
+            $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000'));
+            $this->fail('Expected the second allocation caller to be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Inventory allocation cannot exceed available stock.', $exception->getMessage());
+        }
+        $otherBalance = InventoryStockBalance::query()->where('item_id', $other->getKey())->firstOrFail();
+        $this->assertSame('4.000000', (string) $otherBalance->quantity_allocated);
+        $this->assertSame('1.000000', (string) $otherBalance->quantity_available);
     }
 
     public function test_service_item_and_scope_mismatch_do_not_affect_stock(): void
@@ -285,8 +577,8 @@ final class InventoryEngineTest extends TestCase
         string $unitCost,
         ?int $batchId = null,
         ?int $serialId = null,
-    ): void {
-        app(StockMovementService::class)->record(new StockMovementData(
+    ): InventoryMovement {
+        return app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-06',
             movementType: InventoryMovementType::Receipt,

@@ -13,8 +13,8 @@ use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
+use Modules\Inventory\Services\InventoryFacade;
 use Modules\Inventory\Services\StockAvailabilityService;
-use Modules\Inventory\Services\StockMovementService;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Services\ItemBaseUomConversionService;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -28,7 +28,7 @@ final class VehicleServiceInventoryIntegrationService
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceLineService $lines,
         private readonly StockAvailabilityService $availability,
-        private readonly StockMovementService $movements,
+        private readonly InventoryFacade $inventory,
         private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
@@ -121,7 +121,7 @@ final class VehicleServiceInventoryIntegrationService
                     (string) $line->quantity,
                     (string) $line->unit_cost,
                 );
-                $movement = $this->movements->record(new StockMovementData(
+                $movement = $this->inventory->issue(new StockMovementData(
                     tenantId: (int) $job->tenant_id,
                     movementDate: now()->toDateString(),
                     movementType: InventoryMovementType::Issue,

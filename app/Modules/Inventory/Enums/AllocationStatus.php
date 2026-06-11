@@ -8,6 +8,7 @@ enum AllocationStatus: string
 {
     case Active = 'active';
     case Issued = 'issued';
+    case Reversed = 'reversed';
     case Released = 'released';
     case Cancelled = 'cancelled';
 }

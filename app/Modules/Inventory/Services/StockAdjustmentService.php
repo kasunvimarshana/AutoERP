@@ -13,8 +13,10 @@ use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Inventory\Models\InventoryAdjustment;
 use Modules\Inventory\Models\InventoryAdjustmentLine;
+use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Validators\InventoryValidationService;
 
 final class StockAdjustmentService
@@ -59,25 +61,32 @@ final class StockAdjustmentService
 
     public function approve(InventoryAdjustment $adjustment, ?int $approvedBy = null): InventoryAdjustment
     {
-        if ($adjustment->status !== AdjustmentStatus::Draft) {
-            throw new InvalidArgumentException('Only draft inventory adjustments can be approved.');
-        }
+        return DB::transaction(function () use ($adjustment, $approvedBy): InventoryAdjustment {
+            $adjustment = InventoryAdjustment::query()->lockForUpdate()->findOrFail($adjustment->getKey());
+            if ($adjustment->status !== AdjustmentStatus::Draft) {
+                throw new InvalidArgumentException('Only draft inventory adjustments can be approved.');
+            }
 
-        $adjustment->status = AdjustmentStatus::Approved;
-        $adjustment->approved_by = $approvedBy;
-        $adjustment->approved_at = now();
-        $adjustment->save();
+            $adjustment->status = AdjustmentStatus::Approved;
+            $adjustment->approved_by = $approvedBy;
+            $adjustment->approved_at = now();
+            $adjustment->save();
 
-        return $adjustment->refresh();
+            return $adjustment->refresh();
+        });
     }
 
     public function post(InventoryAdjustment $adjustment, ?int $postedBy = null): InventoryAdjustment
     {
-        if (! in_array($adjustment->status, [AdjustmentStatus::Draft, AdjustmentStatus::Approved], true)) {
-            throw new InvalidArgumentException('Only draft or approved inventory adjustments can be posted.');
-        }
-
         return DB::transaction(function () use ($adjustment, $postedBy): InventoryAdjustment {
+            $adjustment = InventoryAdjustment::query()
+                ->with('lines')
+                ->lockForUpdate()
+                ->findOrFail($adjustment->getKey());
+            if (! in_array($adjustment->status, [AdjustmentStatus::Draft, AdjustmentStatus::Approved], true)) {
+                throw new InvalidArgumentException('Only draft or approved inventory adjustments can be posted.');
+            }
+
             foreach ($adjustment->lines as $line) {
                 if ($this->math->isZero((string) $line->adjustment_quantity)) {
                     continue;
@@ -111,6 +120,32 @@ final class StockAdjustmentService
             $adjustment->status = AdjustmentStatus::Posted;
             $adjustment->posted_by = $postedBy;
             $adjustment->posted_at = now();
+            $adjustment->save();
+
+            return $adjustment->refresh();
+        });
+    }
+
+    public function reverse(InventoryAdjustment $adjustment, ?int $reversedBy = null): InventoryAdjustment
+    {
+        return DB::transaction(function () use ($adjustment, $reversedBy): InventoryAdjustment {
+            $adjustment = InventoryAdjustment::query()->lockForUpdate()->findOrFail($adjustment->getKey());
+            if ($adjustment->status !== AdjustmentStatus::Posted) {
+                throw new InvalidArgumentException('Only posted inventory adjustments can be reversed.');
+            }
+
+            $movements = InventoryMovement::query()
+                ->where('source_type', 'inventory_adjustment')
+                ->where('source_id', $adjustment->getKey())
+                ->where('status', InventoryStatus::Posted->value)
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+            foreach ($movements as $movement) {
+                $this->movements->reverse($movement, $reversedBy);
+            }
+
+            $adjustment->status = AdjustmentStatus::Reversed;
             $adjustment->save();
 
             return $adjustment->refresh();

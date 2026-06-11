@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\AllocationData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryAllocation;
+use Modules\Inventory\Models\InventoryAllocationIssue;
 use Modules\Inventory\Models\InventoryMovement;
-use Modules\Inventory\Services\StockAllocationService;
-use Modules\Inventory\Services\StockMovementService;
+use Modules\Inventory\Services\InventoryFacade;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemBaseUomConversionService;
@@ -23,9 +24,9 @@ use Modules\Sales\Models\SalesReturnLine;
 final class SalesInventoryIntegrationService
 {
     public function __construct(
-        private readonly StockAllocationService $allocations,
-        private readonly StockMovementService $movements,
+        private readonly InventoryFacade $inventory,
         private readonly ItemBaseUomConversionService $baseUomConversions,
+        private readonly DecimalMath $math,
     ) {}
 
     public function allocateForDelivery(SalesDelivery $delivery, SalesDeliveryLine $line): ?InventoryAllocation
@@ -42,7 +43,7 @@ final class SalesInventoryIntegrationService
             (string) $line->unit_price,
         )['quantity'];
 
-        return $this->allocations->allocate(new AllocationData(
+        return $this->inventory->allocate(new AllocationData(
             tenantId: (int) $delivery->tenant_id,
             allocationDate: $delivery->delivery_date->toDateString(),
             itemId: (int) $line->item_id,
@@ -65,24 +66,35 @@ final class SalesInventoryIntegrationService
             return null;
         }
 
-        $this->allocations->issue($allocation);
+        $allocation = $this->inventory->issueAllocation($allocation);
 
-        return InventoryMovement::query()
-            ->where('source_type', $allocation->source_type)
-            ->where('source_id', $allocation->source_id)
-            ->where('source_line_type', $allocation->source_line_type)
-            ->where('source_line_id', $allocation->source_line_id)
-            ->latest('id')
-            ->first();
+        return $allocation->issues()->with('movement')->latest('id')->first()?->movement;
     }
 
     public function reverseDelivery(SalesDeliveryLine $line, ?int $userId = null): ?InventoryMovement
     {
-        if ($line->inventoryMovement === null) {
-            return null;
+        $issues = InventoryAllocationIssue::query()
+            ->whereHas('allocation', fn ($query) => $query
+                ->where('source_line_type', 'sales_delivery_line')
+                ->where('source_line_id', $line->getKey()))
+            ->with('movement')
+            ->orderBy('id')
+            ->get();
+        if ($issues->isEmpty()) {
+            return $line->inventoryMovement === null
+                ? null
+                : $this->inventory->reverse($line->inventoryMovement, $userId);
         }
 
-        return $this->movements->reverse($line->inventoryMovement, $userId);
+        $first = null;
+        foreach ($issues as $issue) {
+            if ($issue->movement instanceof InventoryMovement) {
+                $reversal = $this->inventory->reverse($issue->movement, $userId);
+                $first ??= $reversal;
+            }
+        }
+
+        return $first;
     }
 
     public function returnIn(SalesReturn $return, SalesReturnLine $line, ?int $userId = null): ?InventoryMovement
@@ -93,8 +105,19 @@ final class SalesInventoryIntegrationService
 
         $unitCost = '0.000000';
         if ($line->source_line_type === 'sales_delivery_line' && $line->source_line_id !== null) {
-            $deliveryLine = SalesDeliveryLine::query()->with('inventoryMovement')->find($line->source_line_id);
-            $unitCost = (string) ($deliveryLine?->inventoryMovement?->unit_cost ?? '0.000000');
+            $issues = InventoryAllocationIssue::query()
+                ->whereHas('allocation', fn ($query) => $query
+                    ->where('source_line_type', 'sales_delivery_line')
+                    ->where('source_line_id', $line->source_line_id))
+                ->get();
+            $issuedQuantity = $this->math->sum($issues->pluck('quantity_issued')->all());
+            $issuedCost = $this->math->sum($issues->pluck('total_cost')->all());
+            if (! $this->math->isZero($issuedQuantity)) {
+                $unitCost = $this->math->div($issuedCost, $issuedQuantity);
+            } else {
+                $deliveryLine = SalesDeliveryLine::query()->with('inventoryMovement')->find($line->source_line_id);
+                $unitCost = (string) ($deliveryLine?->inventoryMovement?->unit_cost ?? '0.000000');
+            }
         }
 
         $item = Item::query()->findOrFail($line->item_id);
@@ -105,7 +128,7 @@ final class SalesInventoryIntegrationService
             $unitCost,
         );
 
-        return $this->movements->record(new StockMovementData(
+        return $this->inventory->receive(new StockMovementData(
             tenantId: (int) $return->tenant_id,
             movementDate: $return->return_date->toDateString(),
             movementType: InventoryMovementType::ReturnIn,

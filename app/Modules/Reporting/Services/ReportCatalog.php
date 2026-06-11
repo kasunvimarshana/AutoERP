@@ -11,11 +11,14 @@ use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Inventory\Models\InventoryAllocation;
+use Modules\Inventory\Models\InventoryAllocationIssue;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryReservation;
 use Modules\Inventory\Models\InventorySerialNumber;
 use Modules\Inventory\Models\InventoryStockBalance;
+use Modules\Inventory\Models\InventoryValuationConsumption;
+use Modules\Inventory\Models\InventoryValuationLayer;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Item\Models\Item;
@@ -143,6 +146,31 @@ final class ReportCatalog
             ], ['serial_number', 'item.code', 'item.name', 'batch.batch_number', 'warehouse.name'], ['item', 'batch', 'warehouse']),
             $this->inventoryFlow('inventory.reservation', 'Reservation', InventoryReservation::class, 'reservation_date', 'quantity_reserved'),
             $this->inventoryFlow('inventory.allocation', 'Allocation', InventoryAllocation::class, 'allocation_date', 'quantity_allocated'),
+            $this->inventory('inventory.valuation-layer', 'Valuation Layer', InventoryValuationLayer::class, [
+                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
+                $this->col('valuation_method', 'Method', format: 'enum', sort: 'valuation_method'),
+                $this->qty('original_quantity', 'Original Qty'), $this->qty('remaining_quantity', 'Remaining Qty'),
+                $this->money('unit_cost', 'Unit Cost', false), $this->money('remaining_value', 'Remaining Value'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch']),
+            $this->inventory('inventory.valuation-consumption', 'Valuation Consumption', InventoryValuationConsumption::class, [
+                $this->col('movement', 'Issue Movement', 'issueMovement.movement_number'),
+                $this->col('item', 'Item', 'valuationLayer.item.name'),
+                $this->qty('quantity_consumed', 'Consumed Qty'), $this->money('unit_cost', 'Unit Cost', false),
+                $this->money('total_cost', 'Consumed Cost'), $this->col('reversed_at', 'Reversed', format: 'datetime', sort: 'reversed_at'),
+            ], ['issueMovement.movement_number', 'valuationLayer.item.code', 'valuationLayer.item.name'], ['issueMovement', 'valuationLayer.item']),
+            $this->inventory('inventory.allocation-issue', 'Allocation Issue', InventoryAllocationIssue::class, [
+                $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
+                $this->col('movement', 'Movement', 'movement.movement_number'),
+                $this->qty('quantity_issued', 'Issued Qty'), $this->money('unit_cost', 'Unit Cost', false),
+                $this->money('total_cost', 'Issue Cost'),
+            ], ['allocation.allocation_number', 'movement.movement_number'], ['allocation', 'movement']),
+            $this->inventory('inventory.cost', 'Inventory Cost', InventoryMovement::class, [
+                $this->col('movement_date', 'Date', format: 'date', sort: 'movement_date'), $this->itemCol(),
+                $this->col('movement_type', 'Type', format: 'enum', sort: 'movement_type'),
+                $this->qty('quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false),
+                $this->money('total_cost', 'Total Cost'), $this->money('balance_value_after', 'Balance Value', false),
+            ], ['movement_number', 'item.code', 'item.name'], ['item'], 'movement_date'),
 
             $this->purchase('purchase.orders', 'Purchase Orders', PurchaseOrder::class, 'purchase_order_date', 'purchase_order_number', 'grand_total'),
             $this->purchase('purchase.grns', 'GRNs', GoodsReceiptNote::class, 'received_date', 'grn_number', 'grand_total'),

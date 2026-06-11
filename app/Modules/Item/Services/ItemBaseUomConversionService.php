@@ -6,9 +6,11 @@ namespace Modules\Item\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
-use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Models\InventoryAllocation;
+use Modules\Inventory\Models\InventoryAllocationLine;
 use Modules\Inventory\Models\InventoryReservation;
+use Modules\Inventory\Models\InventoryStockBalance;
+use Modules\Inventory\Models\InventoryValuationConsumption;
 use Modules\Inventory\Models\InventoryValuationLayer;
 use Modules\Item\Enums\ItemBaseUomRevisionStatus;
 use Modules\Item\Enums\ItemUnitRole;
@@ -93,10 +95,21 @@ final class ItemBaseUomConversionService
                     ->get();
                 foreach ($allocations as $allocation) {
                     $allocation->base_uom_id = $newBaseUomId;
-                    foreach (['quantity_allocated', 'quantity_issued', 'quantity_released', 'quantity_remaining'] as $column) {
+                    foreach (['quantity_allocated', 'quantity_issued', 'quantity_reversed', 'quantity_released', 'quantity_remaining'] as $column) {
                         $allocation->{$column} = $this->math->mul((string) $allocation->{$column}, $factor);
                     }
                     $allocation->save();
+                }
+
+                $allocationLines = InventoryAllocationLine::query()
+                    ->whereIn('allocation_id', $allocations->modelKeys())
+                    ->lockForUpdate()
+                    ->get();
+                foreach ($allocationLines as $allocationLine) {
+                    foreach (['quantity_allocated', 'quantity_issued', 'quantity_reversed', 'quantity_released', 'quantity_remaining'] as $column) {
+                        $allocationLine->{$column} = $this->math->mul((string) $allocationLine->{$column}, $factor);
+                    }
+                    $allocationLine->save();
                 }
 
                 $layers = $this->scope(InventoryValuationLayer::query(), $lockedItem)
@@ -109,6 +122,17 @@ final class ItemBaseUomConversionService
                     $layer->remaining_quantity = $this->math->mul((string) $layer->remaining_quantity, $factor);
                     $layer->unit_cost = $this->math->div((string) $layer->unit_cost, $factor);
                     $layer->save();
+                }
+
+                $consumptions = InventoryValuationConsumption::query()
+                    ->whereNull('reversed_by_movement_id')
+                    ->whereHas('valuationLayer', fn ($query) => $this->scope($query, $lockedItem))
+                    ->lockForUpdate()
+                    ->get();
+                foreach ($consumptions as $consumption) {
+                    $consumption->quantity_consumed = $this->math->mul((string) $consumption->quantity_consumed, $factor);
+                    $consumption->unit_cost = $this->math->div((string) $consumption->unit_cost, $factor);
+                    $consumption->save();
                 }
 
                 $this->convertItemUnits($lockedItem, $newBaseUomId, $factor);
@@ -187,6 +211,7 @@ final class ItemBaseUomConversionService
      */
     public function convertOperationalBasis(Item $item, int $fromUomId, string $quantity, string $unitCost): array
     {
+        $item = $this->ensureOperationalBaseUom($item, $fromUomId);
         $factor = $this->factorToCurrentBase($item, $fromUomId);
 
         return [
@@ -194,6 +219,23 @@ final class ItemBaseUomConversionService
             'unit_cost' => $this->math->div($unitCost, $factor),
             'factor' => $factor,
         ];
+    }
+
+    private function ensureOperationalBaseUom(Item $item, int $fromUomId): Item
+    {
+        if ($item->base_uom_id !== null) {
+            return $item;
+        }
+
+        return DB::transaction(function () use ($item, $fromUomId): Item {
+            $locked = Item::query()->lockForUpdate()->findOrFail($item->getKey());
+            if ($locked->base_uom_id === null) {
+                $locked->base_uom_id = $fromUomId;
+                $locked->save();
+            }
+
+            return $locked->refresh();
+        });
     }
 
     private function convertItemUnits(Item $item, int $newBaseUomId, string $factor): void
