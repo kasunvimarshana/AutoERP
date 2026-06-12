@@ -19,6 +19,7 @@ return new class extends Migration
 
             $table->string('first_name');
             $table->string('last_name')->nullable();
+            $table->string('username', 100)->nullable();
             $table->string('email');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
@@ -35,6 +36,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'email'], 'users_email_uk');
+            $table->unique(['tenant_id', 'username'], 'users_tenant_username_uk');
         });
     }
 

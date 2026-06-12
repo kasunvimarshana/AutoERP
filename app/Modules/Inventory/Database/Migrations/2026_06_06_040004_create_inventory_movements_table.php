@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('movement_type', 40);
             $table->string('direction', 20);
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
@@ -29,6 +30,8 @@ return new class extends Migration
             $table->decimal('total_cost', 20, 6)->default('0.000000');
             $table->decimal('balance_quantity_after', 20, 6)->default('0.000000');
             $table->decimal('balance_value_after', 20, 6)->default('0.000000');
+            $table->string('from_state', 40)->nullable();
+            $table->string('to_state', 40)->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('source_line_type')->nullable();

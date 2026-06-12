@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('adjustment_type');
             $table->string('effect');
             $table->string('calculation_type')->default('fixed');
+            $table->string('calculation_base')->default('subtotal');
             $table->decimal('rate', 20, 6)->default('0.000000');
             $table->decimal('amount', 20, 6);
             $table->decimal('allocated_amount', 20, 6)->default('0.000000');

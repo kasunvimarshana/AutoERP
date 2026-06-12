@@ -25,6 +25,7 @@ return new class extends Migration
             $table->decimal('previously_returned_quantity', 20, 6)->default('0.000000');
             $table->decimal('remaining_quantity', 20, 6);
             $table->decimal('unit_price', 20, 6);
+            $table->decimal('cost_basis', 20, 6)->nullable();
             $table->decimal('discount_amount', 20, 6)->default('0.000000');
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
             $table->decimal('charge_amount', 20, 6)->default('0.000000');

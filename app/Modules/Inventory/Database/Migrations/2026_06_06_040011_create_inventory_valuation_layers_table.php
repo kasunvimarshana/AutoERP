@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
             $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();

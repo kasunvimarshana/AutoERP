@@ -28,7 +28,7 @@ final class WarehouseLocationModel extends CoreModel
             'is_active' => 'boolean',
             'is_pickable' => 'boolean',
             'is_receivable' => 'boolean',
-            'capacity' => 'decimal:4',
+            'capacity' => 'decimal:6',
         ]);
     }
 }

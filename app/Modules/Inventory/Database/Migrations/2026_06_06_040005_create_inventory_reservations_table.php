@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('reservation_number', 80);
             $table->date('reservation_date');
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
@@ -32,6 +33,9 @@ return new class extends Migration
             $table->string('status', 40)->default('active');
             $table->timestamp('expires_at')->nullable();
             $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('released_by')->nullable();
+            $table->timestamp('released_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

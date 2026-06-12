@@ -19,10 +19,15 @@ return new class extends Migration
             $table->unsignedSmallInteger('period_number');
             $table->date('start_date');
             $table->date('end_date');
-            $table->enum('status', ['open', 'closed', 'locked'])->default('open');
+            $table->string('status', 30)->default('open');
             $table->timestamps();
 
+            $table->unique(['fiscal_year_id', 'period_number'], 'finance_fiscal_periods_year_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'finance_periods_tenant_org_idx');
+            $table->index(
+                ['tenant_id', 'organization_unit_id', 'start_date', 'end_date'],
+                'finance_fiscal_periods_scope_dates_idx',
+            );
             $table->index('fiscal_year_id', 'finance_periods_year_idx');
             $table->index('status', 'finance_periods_status_idx');
         });

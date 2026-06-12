@@ -28,6 +28,14 @@ return new class extends Migration
             $table->timestamp('approved_at')->nullable();
             $table->unsignedBigInteger('posted_by')->nullable();
             $table->timestamp('posted_at')->nullable();
+            $table->unsignedBigInteger('dispatched_by')->nullable();
+            $table->timestamp('dispatched_at')->nullable();
+            $table->unsignedBigInteger('received_by')->nullable();
+            $table->timestamp('received_at')->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('reversed_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

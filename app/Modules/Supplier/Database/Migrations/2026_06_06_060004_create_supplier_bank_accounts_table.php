@@ -31,6 +31,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'supplier_bank_accounts_tenant_org_idx');
             $table->index('supplier_id', 'supplier_bank_accounts_supplier_idx');
             $table->index('account_number', 'supplier_bank_accounts_number_idx');
+            $table->unique(['supplier_id', 'account_number'], 'supplier_bank_accounts_supplier_number_uk');
         });
     }
 

@@ -39,7 +39,7 @@ final class UpdateTenantPlanService
                     ? $payload['features']
                     : $existing->get('features'),
                 'limits' => is_array($payload['limits'] ?? null) ? $payload['limits'] : $existing->get('limits'),
-                'price' => array_key_exists('price', $payload) ? (float) $payload['price'] : $existing->get('price'),
+                'price' => array_key_exists('price', $payload) ? (string) $payload['price'] : $existing->get('price'),
                 'currency_id' => array_key_exists('currency_id', $payload)
                     ? (isset($payload['currency_id']) ? (int) $payload['currency_id'] : null)
                     : $existing->get('currency_id'),

@@ -27,10 +27,18 @@ return new class extends Migration
             $table->enum('direction', ['inbound', 'outbound']);
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
+            $table->string('source_type', 150)->nullable();
+            $table->unsignedBigInteger('source_id')->nullable();
+            $table->string('allocation_status', 50)->default('unapplied');
             $table->date('payment_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->string('reference_number')->nullable();
+            $table->string('cheque_number', 100)->nullable();
+            $table->date('cheque_date')->nullable();
+            $table->foreignId('bank_account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
+            $table->string('payee_name')->nullable();
+            $table->text('amount_in_words')->nullable();
             $table->enum('status', [
                 'draft',
                 'pending_approval',
@@ -49,6 +57,7 @@ return new class extends Migration
             $table->decimal('unapplied_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');
             $table->text('notes')->nullable();
+            $table->json('metadata')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
@@ -63,6 +72,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'payments_tenant_org_idx');
             $table->index(['payment_type', 'direction', 'status'], 'payments_type_direction_status_idx');
             $table->index(['party_type', 'party_id'], 'payments_party_idx');
+            $table->index(['source_type', 'source_id'], 'payments_source_idx');
+            $table->index('cheque_number', 'payments_cheque_number_idx');
             $table->index('payment_date', 'payments_date_idx');
         });
     }

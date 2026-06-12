@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
             $table->foreignId('purchase_return_id')->nullable()->constrained('purchase_returns')->nullOnDelete();
+            $table->string('source_type')->nullable();
+            $table->unsignedBigInteger('source_id')->nullable();
             $table->string('debit_note_number');
             $table->date('debit_note_date');
             $table->string('status')->default('draft');
@@ -24,6 +26,8 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 6)->default('0.000000');
             $table->decimal('remaining_amount', 20, 6);
             $table->text('reason')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
@@ -32,6 +36,7 @@ return new class extends Migration
             $table->index(['supplier_type', 'supplier_id'], 'purchase_debit_notes_supplier_idx');
             $table->index('purchase_return_id', 'purchase_debit_notes_return_idx');
             $table->index('status', 'purchase_debit_notes_status_idx');
+            $table->index(['source_type', 'source_id'], 'purchase_debit_notes_source_idx');
         });
     }
 

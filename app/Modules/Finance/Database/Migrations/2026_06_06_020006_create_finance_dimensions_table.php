@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('code', 100);
             $table->string('name');
             $table->enum('dimension_type', [
+                'organization_unit',
                 'department',
                 'project',
                 'cost_center',

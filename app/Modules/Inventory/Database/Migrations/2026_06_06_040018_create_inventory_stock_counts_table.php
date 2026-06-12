@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('inventory_stock_counts', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->string('count_number', 80);
+            $table->date('count_date');
+            $table->string('count_type', 30)->default('stock_count');
+            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->string('status', 30)->default('draft');
+            $table->foreignId('inventory_adjustment_id')->nullable()->constrained('inventory_adjustments')->nullOnDelete();
+            $table->text('reason')->nullable();
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
+            $table->timestamp('posted_at')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['tenant_id', 'count_number'], 'inventory_stock_counts_tenant_number_uk');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_counts_scope_idx');
+            $table->index(['warehouse_id', 'warehouse_location_id'], 'inventory_stock_counts_wh_idx');
+            $table->index('status', 'inventory_stock_counts_status_idx');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('inventory_stock_counts');
+    }
+};

@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('inventory_cost_adjustments', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->string('adjustment_number', 80);
+            $table->date('adjustment_date');
+            $table->string('status', 30)->default('draft');
+            $table->text('reason')->nullable();
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
+            $table->timestamp('posted_at')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['tenant_id', 'adjustment_number'], 'inventory_cost_adjustments_tenant_number_uk');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_cost_adjustments_scope_idx');
+            $table->index('status', 'inventory_cost_adjustments_status_idx');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('inventory_cost_adjustments');
+    }
+};

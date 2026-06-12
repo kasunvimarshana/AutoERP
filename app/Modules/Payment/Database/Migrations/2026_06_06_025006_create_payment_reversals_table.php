@@ -22,9 +22,11 @@ return new class extends Migration
             $table->decimal('original_amount', 20, 6);
             $table->decimal('reversed_amount', 20, 6);
             $table->string('status')->default('posted');
+            $table->json('metadata')->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'reversal_number'], 'payment_reversals_tenant_number_uk');
+            $table->unique('payment_id', 'payment_reversals_payment_uk');
         });
     }
 

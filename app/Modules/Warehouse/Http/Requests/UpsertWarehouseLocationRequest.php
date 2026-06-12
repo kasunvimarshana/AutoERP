@@ -62,7 +62,7 @@ final class UpsertWarehouseLocationRequest extends TenantScopedRequest
             'is_active' => ['nullable', 'boolean'],
             'is_pickable' => ['nullable', 'boolean'],
             'is_receivable' => ['nullable', 'boolean'],
-            'capacity' => ['nullable', 'decimal:0,4', 'gte:0'],
+            'capacity' => ['nullable', 'decimal:0,6', 'gte:0'],
         ];
     }
 }

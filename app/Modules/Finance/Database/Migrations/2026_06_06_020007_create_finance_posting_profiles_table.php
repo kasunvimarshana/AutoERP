@@ -10,25 +10,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('finance_fiscal_years', function (Blueprint $table) {
+        Schema::create('finance_posting_profiles', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->string('code', 100);
             $table->string('name');
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->string('status', 30)->default('open');
+            $table->text('description')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'start_date', 'end_date'],
-                'finance_fiscal_years_scope_dates_uk',
+                ['tenant_id', 'organization_unit_id', 'code'],
+                'finance_posting_profiles_scope_code_uk',
             );
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('finance_fiscal_years');
+        Schema::dropIfExists('finance_posting_profiles');
     }
 };

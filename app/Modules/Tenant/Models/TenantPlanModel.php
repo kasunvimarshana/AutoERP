@@ -21,7 +21,7 @@ final class TenantPlanModel extends CoreModel
         return array_merge(parent::casts(), [
             'features' => 'array',
             'limits' => 'array',
-            'price' => 'decimal:4',
+            'price' => 'decimal:6',
             'is_active' => 'boolean',
             'metadata' => 'array',
         ]);

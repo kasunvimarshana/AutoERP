@@ -16,8 +16,10 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('allocation_number', 80);
             $table->date('allocation_date');
+            $table->string('allocation_method', 30)->default('manual');
             $table->foreignId('reservation_id')->nullable()->constrained('inventory_reservations')->nullOnDelete();
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
@@ -25,6 +27,7 @@ return new class extends Migration
             $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->nullOnDelete();
             $table->decimal('quantity_allocated', 20, 6);
             $table->decimal('quantity_issued', 20, 6)->default('0.000000');
+            $table->decimal('quantity_reversed', 20, 6)->default('0.000000');
             $table->decimal('quantity_released', 20, 6)->default('0.000000');
             $table->decimal('quantity_remaining', 20, 6);
             $table->string('source_type')->nullable();
@@ -33,6 +36,11 @@ return new class extends Migration
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->string('status', 30)->default('active');
             $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('issued_by')->nullable();
+            $table->timestamp('issued_at')->nullable();
+            $table->unsignedBigInteger('released_by')->nullable();
+            $table->timestamp('released_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

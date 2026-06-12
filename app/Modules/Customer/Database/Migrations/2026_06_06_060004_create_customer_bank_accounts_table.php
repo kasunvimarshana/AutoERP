@@ -31,6 +31,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'customer_bank_accounts_tenant_org_idx');
             $table->index('customer_id', 'customer_bank_accounts_customer_idx');
             $table->index('account_number', 'customer_bank_accounts_number_idx');
+            $table->unique(['customer_id', 'account_number'], 'customer_bank_accounts_customer_number_uk');
         });
     }
 

@@ -22,7 +22,6 @@ abstract class HrMasterModel extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'is_active' => 'boolean',
-            'sort_order' => 'integer',
         ]);
     }
 

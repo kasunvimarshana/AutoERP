@@ -25,6 +25,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'item_units_tenant_org_idx');
             $table->index('item_id', 'item_units_item_idx');
             $table->index('uom_id', 'item_units_uom_idx');
+            $table->unique(['item_id', 'uom_id', 'unit_role'], 'item_units_item_uom_role_uk');
         });
     }
 

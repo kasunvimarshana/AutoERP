@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->foreignId('journal_entry_id')->constrained('finance_journal_entries', 'id')->cascadeOnDelete();
+            $table->foreignId('journal_entry_id')->constrained('finance_journal_entries', 'id')->restrictOnDelete();
             $table->foreignId('account_id')->constrained('finance_accounts', 'id');
             $table->text('description')->nullable();
             $table->decimal('debit', 20, 6)->default('0');

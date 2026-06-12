@@ -102,7 +102,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_contacts', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_contacts');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('contact_name');
             $table->string('relationship')->nullable();
@@ -120,7 +120,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_addresses', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_addresses');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('address_type');
             $table->string('address_line_1');
@@ -138,7 +138,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_documents', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_documents');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('document_type');
             $table->string('document_number')->nullable();
@@ -155,7 +155,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_skill_assignments', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_skills');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->foreignId('skill_id')->constrained('hr_skills')->cascadeOnDelete();
             $table->string('proficiency_level');
@@ -168,7 +168,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_certification_assignments', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_certifications');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->foreignId('certification_id')->constrained('hr_certifications')->cascadeOnDelete();
             $table->string('certificate_number')->nullable();
@@ -182,7 +182,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_license_assignments', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_licenses');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->foreignId('license_id')->constrained('hr_licenses')->cascadeOnDelete();
             $table->string('license_number')->nullable();
@@ -196,7 +196,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_rates', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_rates');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('rate_type');
             $table->decimal('amount', 20, 6);
@@ -211,7 +211,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_availabilities', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_availability');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->date('availability_date')->nullable();
             $table->string('availability_status');
@@ -228,7 +228,7 @@ return new class extends Migration
 
         Schema::create('hr_employee_status_histories', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table);
+            $this->scope($table, 'hr_emp_status_history');
             $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('old_status')->nullable();
             $table->string('new_status');
@@ -264,9 +264,17 @@ return new class extends Migration
         }
     }
 
-    private function scope(Blueprint $table): void
+    private function scope(Blueprint $table, string $constraintPrefix): void
     {
-        $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-        $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+        $table->foreignId('tenant_id');
+        $table->foreign('tenant_id', $constraintPrefix.'_tenant_fk')
+            ->references('id')
+            ->on('tenants')
+            ->cascadeOnDelete();
+        $table->foreignId('organization_unit_id')->nullable();
+        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
+            ->references('id')
+            ->on('organization_units')
+            ->nullOnDelete();
     }
 };

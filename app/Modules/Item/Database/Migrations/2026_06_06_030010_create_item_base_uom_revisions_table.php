@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -33,55 +32,10 @@ return new class extends Migration
             $table->index('status', 'item_base_uom_revisions_status_idx');
         });
 
-        foreach ([
-            'inventory_movements',
-            'inventory_reservations',
-            'inventory_allocations',
-            'inventory_valuation_layers',
-        ] as $tableName) {
-            Schema::table($tableName, function (Blueprint $table): void {
-                $table->foreignId('base_uom_id')
-                    ->nullable()
-                    ->after('item_id')
-                    ->constrained('unit_of_measures')
-                    ->nullOnDelete();
-            });
-        }
-
-        DB::table('items')
-            ->whereNotNull('base_uom_id')
-            ->select(['id', 'base_uom_id'])
-            ->orderBy('id')
-            ->chunkById(200, function ($items): void {
-                foreach ($items as $item) {
-                    foreach ([
-                        'inventory_movements',
-                        'inventory_reservations',
-                        'inventory_allocations',
-                        'inventory_valuation_layers',
-                    ] as $tableName) {
-                        DB::table($tableName)
-                            ->where('item_id', $item->id)
-                            ->whereNull('base_uom_id')
-                            ->update(['base_uom_id' => $item->base_uom_id]);
-                    }
-                }
-            });
     }
 
     public function down(): void
     {
-        foreach ([
-            'inventory_valuation_layers',
-            'inventory_allocations',
-            'inventory_reservations',
-            'inventory_movements',
-        ] as $tableName) {
-            Schema::table($tableName, function (Blueprint $table): void {
-                $table->dropConstrainedForeignId('base_uom_id');
-            });
-        }
-
         Schema::dropIfExists('item_base_uom_revisions');
     }
 };

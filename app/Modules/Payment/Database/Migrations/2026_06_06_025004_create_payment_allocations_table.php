@@ -22,7 +22,9 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 6);
             $table->decimal('invoice_balance_after', 20, 6);
             $table->date('allocation_date');
+            $table->string('allocation_method', 50)->default('specific_invoice');
             $table->enum('status', ['active', 'reversed', 'void'])->default('active');
+            $table->json('metadata')->nullable();
             $table->timestamps();
 
             $table->index(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_idx');

@@ -29,9 +29,13 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default('0.000000');
             $table->decimal('charge_total', 20, 6)->default('0.000000');
             $table->decimal('adjustment_total', 20, 6)->default('0.000000');
+            $table->decimal('header_increase_total', 20, 6)->default('0.000000');
+            $table->decimal('header_decrease_total', 20, 6)->default('0.000000');
             $table->decimal('grand_total', 20, 6)->default('0.000000');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->unsignedBigInteger('closed_by')->nullable();

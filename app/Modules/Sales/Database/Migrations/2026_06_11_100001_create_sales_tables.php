@@ -317,7 +317,11 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('sales_return_id')->constrained('sales_returns')->cascadeOnDelete();
-            $table->foreignId('sales_header_adjustment_id')->constrained('sales_header_adjustments')->cascadeOnDelete();
+            $table->foreignId('sales_header_adjustment_id');
+            $table->foreign('sales_header_adjustment_id', 'sales_return_adj_alloc_header_fk')
+                ->references('id')
+                ->on('sales_header_adjustments')
+                ->cascadeOnDelete();
             $table->string('adjustment_type');
             $table->string('effect');
             $table->decimal('source_amount', 20, 6);

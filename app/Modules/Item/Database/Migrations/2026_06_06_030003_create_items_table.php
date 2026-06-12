@@ -33,6 +33,8 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'code'], 'items_tenant_code_uk');
+            $table->unique(['tenant_id', 'sku'], 'items_tenant_sku_uk');
+            $table->unique(['tenant_id', 'barcode'], 'items_tenant_barcode_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'items_tenant_org_idx');
             $table->index('sku', 'items_sku_idx');
             $table->index('barcode', 'items_barcode_idx');

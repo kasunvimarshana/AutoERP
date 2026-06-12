@@ -111,7 +111,11 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('vehicle_service_job_id')->constrained('vehicle_service_jobs')->cascadeOnDelete();
-            $table->foreignId('vehicle_service_job_line_id')->constrained('vehicle_service_job_lines')->cascadeOnDelete();
+            $table->foreignId('vehicle_service_job_line_id');
+            $table->foreign('vehicle_service_job_line_id', 'vehicle_service_line_employees_job_line_fk')
+                ->references('id')
+                ->on('vehicle_service_job_lines')
+                ->cascadeOnDelete();
             $table->foreignId('employee_id')->constrained('hr_employees')->restrictOnDelete();
             $table->string('role_type', 30);
             $table->decimal('assigned_hours', 20, 6)->default('0.000000');

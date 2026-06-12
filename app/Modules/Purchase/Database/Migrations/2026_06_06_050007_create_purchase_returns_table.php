@@ -19,9 +19,16 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->string('return_number');
+            $table->string('return_type')->default('referenced');
+            $table->string('source_type')->nullable();
+            $table->unsignedBigInteger('source_id')->nullable();
             $table->date('return_date');
             $table->string('status')->default('draft');
             $table->text('reason')->nullable();
+            $table->boolean('approval_required')->default(false);
+            $table->boolean('affects_supplier_balance')->default(true);
+            $table->decimal('cost_basis', 20, 6)->nullable();
+            $table->json('audit_metadata')->nullable();
             $table->decimal('subtotal', 20, 6)->default('0.000000');
             $table->decimal('adjustment_return_total', 20, 6)->default('0.000000');
             $table->decimal('grand_total', 20, 6)->default('0.000000');
@@ -40,6 +47,7 @@ return new class extends Migration
             $table->index('warehouse_id', 'purchase_returns_warehouse_idx');
             $table->index('status', 'purchase_returns_status_idx');
             $table->index('return_date', 'purchase_returns_date_idx');
+            $table->index(['source_type', 'source_id'], 'purchase_returns_source_idx');
         });
     }
 

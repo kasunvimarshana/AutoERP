@@ -23,6 +23,12 @@ return new class extends Migration
             $table->decimal('quantity_reserved', 20, 6)->default('0.000000');
             $table->decimal('quantity_allocated', 20, 6)->default('0.000000');
             $table->decimal('quantity_available', 20, 6)->default('0.000000');
+            $table->decimal('quantity_returned', 20, 6)->default('0.000000');
+            $table->decimal('quantity_in_transit', 20, 6)->default('0.000000');
+            $table->decimal('quantity_damaged', 20, 6)->default('0.000000');
+            $table->decimal('quantity_quarantine', 20, 6)->default('0.000000');
+            $table->decimal('quantity_expired', 20, 6)->default('0.000000');
+            $table->decimal('quantity_scrapped', 20, 6)->default('0.000000');
             $table->decimal('average_cost', 20, 6)->default('0.000000');
             $table->decimal('total_value', 20, 6)->default('0.000000');
             $table->timestamps();

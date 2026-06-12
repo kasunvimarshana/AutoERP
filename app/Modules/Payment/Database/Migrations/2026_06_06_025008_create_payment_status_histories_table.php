@@ -10,25 +10,26 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_lines', function (Blueprint $table) {
+        Schema::create('payment_status_histories', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->foreignId('payment_id')->constrained('payments', 'id')->cascadeOnDelete();
-            $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods', 'id')->nullOnDelete();
-            $table->string('reference_number')->nullable();
-            $table->decimal('amount', 20, 6);
-            $table->decimal('cleared_amount', 20, 6)->default('0');
-            $table->string('status')->default('pending');
-            $table->text('notes')->nullable();
+            $table->string('from_status', 50)->nullable();
+            $table->string('to_status', 50);
+            $table->text('reason')->nullable();
+            $table->unsignedBigInteger('changed_by')->nullable();
+            $table->timestamp('changed_at');
+            $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index('payment_id', 'payment_lines_payment_idx');
+            $table->index(['payment_id', 'changed_at'], 'payment_status_histories_payment_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'payment_status_histories_tenant_org_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('payment_lines');
+        Schema::dropIfExists('payment_status_histories');
     }
 };

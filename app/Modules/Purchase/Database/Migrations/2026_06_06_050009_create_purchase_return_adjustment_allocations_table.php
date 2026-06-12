@@ -13,9 +13,21 @@ return new class extends Migration
         Schema::create('purchase_return_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('purchase_return_id')->constrained('purchase_returns')->cascadeOnDelete();
-            $table->foreignId('purchase_header_adjustment_id')->constrained('purchase_header_adjustments')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreign('organization_unit_id', 'purchase_return_adj_alloc_org_fk')
+                ->references('id')
+                ->on('organization_units')
+                ->nullOnDelete();
+            $table->foreignId('purchase_return_id');
+            $table->foreign('purchase_return_id', 'purchase_return_adj_alloc_return_fk')
+                ->references('id')
+                ->on('purchase_returns')
+                ->cascadeOnDelete();
+            $table->foreignId('purchase_header_adjustment_id');
+            $table->foreign('purchase_header_adjustment_id', 'purchase_return_adj_alloc_header_fk')
+                ->references('id')
+                ->on('purchase_header_adjustments')
+                ->cascadeOnDelete();
             $table->string('adjustment_type');
             $table->string('effect');
             $table->decimal('source_amount', 20, 6);

@@ -38,6 +38,7 @@ return new class extends Migration
             $table->boolean('requires_bank_account')->default(false);
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
+            $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

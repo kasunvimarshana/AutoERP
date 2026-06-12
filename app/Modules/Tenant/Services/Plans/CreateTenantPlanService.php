@@ -32,7 +32,7 @@ final class CreateTenantPlanService
                 'slug' => $slug,
                 'features' => is_array($payload['features'] ?? null) ? $payload['features'] : null,
                 'limits' => is_array($payload['limits'] ?? null) ? $payload['limits'] : null,
-                'price' => isset($payload['price']) ? (float) $payload['price'] : 0,
+                'price' => isset($payload['price']) ? (string) $payload['price'] : '0.000000',
                 'currency_id' => isset($payload['currency_id']) ? (int) $payload['currency_id'] : null,
                 'billing_interval' => $this->domain->normalizeBillingInterval(
                     isset($payload['billing_interval']) ? (string) $payload['billing_interval'] : null,

@@ -32,6 +32,10 @@ return new class extends Migration
             $table->index('item_id', 'supplier_item_mappings_item_idx');
             $table->index('item_variant_id', 'supplier_item_mappings_variant_idx');
             $table->index('supplier_item_code', 'supplier_item_mappings_code_idx');
+            $table->unique(
+                ['supplier_id', 'item_id', 'item_variant_id'],
+                'supplier_item_mappings_supplier_item_variant_uk',
+            );
         });
     }
 

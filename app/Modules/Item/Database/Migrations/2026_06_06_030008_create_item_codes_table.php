@@ -28,6 +28,7 @@ return new class extends Migration
             $table->index('item_variant_id', 'item_codes_variant_idx');
             $table->index(['code_type', 'code'], 'item_codes_type_code_idx');
             $table->index(['party_type', 'party_id'], 'item_codes_party_idx');
+            $table->unique(['tenant_id', 'code_type', 'code'], 'item_codes_tenant_type_code_uk');
         });
     }
 
