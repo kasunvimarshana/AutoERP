@@ -7,8 +7,6 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentAllocationData;
@@ -174,39 +172,26 @@ final class PaymentAllocationService
 
         $this->validator->assertPositive($remaining, 'FIFO allocation amount');
 
-        $invoiceQuery = Invoice::query()
-            ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
-            ->where('invoices.tenant_id', $payment->tenant_id)
-            ->where('invoices.party_type', $payment->party_type)
-            ->where('invoices.party_id', $payment->party_id)
-            ->where('invoice_balances.remaining_amount', '>', '0')
-            ->whereNotIn('invoices.status', ['draft', 'cancelled', 'void'])
-            ->orderBy('invoices.invoice_date')
-            ->orderBy('invoices.id');
-
-        $payment->organization_unit_id === null
-            ? $invoiceQuery->whereNull('invoices.organization_unit_id')
-            : $invoiceQuery->where('invoices.organization_unit_id', $payment->organization_unit_id);
-
-        $invoiceIds = $invoiceQuery
-            ->pluck('invoices.id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->all();
-
         $allocations = [];
-        foreach ($invoiceIds as $invoiceId) {
+        $invoiceBalances = $this->invoiceBalances->getPayableBalancesForParty(
+            tenantId: (int) $payment->tenant_id,
+            organizationUnitId: $payment->organization_unit_id,
+            partyType: $payment->party_type,
+            partyId: (int) $payment->party_id,
+        );
+
+        foreach ($invoiceBalances as $invoiceBalance) {
             if ($this->math->isZero($remaining)) {
                 break;
             }
 
-            $balance = InvoiceBalance::query()->where('invoice_id', $invoiceId)->firstOrFail();
-            $invoiceRemaining = (string) $balance->remaining_amount;
+            $invoiceRemaining = $invoiceBalance->remainingAmount;
             $allocatedAmount = $this->math->compare($remaining, $invoiceRemaining) > 0
                 ? $invoiceRemaining
                 : $remaining;
 
             $allocations[] = new PaymentAllocationData(
-                invoiceId: $invoiceId,
+                invoiceId: $invoiceBalance->sourceId,
                 allocatedAmount: $allocatedAmount,
                 allocationDate: $allocationDate,
                 allocationMethod: 'fifo',

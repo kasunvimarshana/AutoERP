@@ -8,6 +8,7 @@ Conventions:
 - `tenant_id` identifies tenant ownership; nullable `organization_unit_id` adds operational scope where the domain requires it.
 - Polymorphic `source_type`/`source_id` pairs preserve source traceability without cross-module database coupling.
 - Database comments are supplementary only; this catalog is the portable source of table documentation.
+- Sections describe table ownership, not exact migration execution order. FK-dependent extension tables may run after the module they extend.
 
 ## Infrastructure
 
@@ -127,6 +128,8 @@ No business tables. Core contains shared application infrastructure only.
 
 ## Tax
 
+`customer_tax_profiles` and `supplier_tax_profiles` are intentionally Tax-owned extension tables. Their migrations run after Customer and Supplier because they enforce FKs to those module-owned tables.
+
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
 | `customer_tax_profiles` | Stores tax registration and default tax behavior for customer tax profile. | `customer_id` -> `customers`; `tax_group_id` -> `tax_groups`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `customer_id`; tenant scoped; organization-unit aware |
@@ -140,6 +143,8 @@ No business tables. Core contains shared application infrastructure only.
 | `taxes` | Stores tenant tax definitions and calculation behavior. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware |
 
 ## Item
+
+Tax override columns remain on the Item-owned `items` table because Item services, requests, resources, and frontend payloads directly own those fields. The Item create migration therefore runs after the Tax master tables.
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |

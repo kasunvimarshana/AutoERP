@@ -79,6 +79,32 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             : (string) $invoice->status;
     }
 
+    public function getPayableBalancesForParty(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+    ): array {
+        $invoiceQuery = Invoice::query()
+            ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
+            ->where('invoices.tenant_id', $tenantId)
+            ->where('invoices.party_type', $partyType)
+            ->where('invoices.party_id', $partyId)
+            ->where('invoice_balances.remaining_amount', '>', '0')
+            ->whereNotIn('invoices.status', ['draft', 'cancelled', 'void'])
+            ->orderBy('invoices.invoice_date')
+            ->orderBy('invoices.id');
+
+        $organizationUnitId === null
+            ? $invoiceQuery->whereNull('invoices.organization_unit_id')
+            : $invoiceQuery->where('invoices.organization_unit_id', $organizationUnitId);
+
+        return $invoiceQuery
+            ->pluck('invoices.id')
+            ->map(fn (mixed $invoiceId): BalanceResultData => $this->getBalance((int) $invoiceId))
+            ->all();
+    }
+
     public function validatePayableState(int $invoiceId): BalanceResultData
     {
         $invoice = Invoice::query()->with('balance')->findOrFail($invoiceId);

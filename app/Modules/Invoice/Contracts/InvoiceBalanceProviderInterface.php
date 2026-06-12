@@ -21,5 +21,15 @@ interface InvoiceBalanceProviderInterface
 
     public function getInvoiceStatus(int $invoiceId): string;
 
+    /**
+     * @return list<BalanceResultData>
+     */
+    public function getPayableBalancesForParty(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+    ): array;
+
     public function validatePayableState(int $invoiceId): BalanceResultData;
 }
