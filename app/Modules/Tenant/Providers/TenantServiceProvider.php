@@ -12,20 +12,17 @@ use Modules\Tenant\Console\Commands\TenantCreateCommand;
 use Modules\Tenant\Console\Commands\TenantDeactivateCommand;
 use Modules\Tenant\Console\Commands\TenantSuspendCommand;
 use Modules\Tenant\Contracts\TenantRecordMapperInterface;
-use Modules\Tenant\Models\TenantDocumentModel;
 use Modules\Tenant\Models\TenantDomainModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantSettingGroupModel;
 use Modules\Tenant\Models\TenantSettingModel;
 use Modules\Tenant\Policies\TenantPolicy;
-use Modules\Tenant\Repositories\EloquentTenantDocumentRepository;
 use Modules\Tenant\Repositories\EloquentTenantDomainRepository;
 use Modules\Tenant\Repositories\EloquentTenantPlanRepository;
 use Modules\Tenant\Repositories\EloquentTenantRepository;
 use Modules\Tenant\Repositories\EloquentTenantSettingGroupRepository;
 use Modules\Tenant\Repositories\EloquentTenantSettingRepository;
-use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
@@ -62,10 +59,6 @@ final class TenantServiceProvider extends ServiceProvider
 
         $this->app->singleton(TenantSettingRepositoryInterface::class, function (): TenantSettingRepositoryInterface {
             return new EloquentTenantSettingRepository(new TenantSettingModel);
-        });
-
-        $this->app->singleton(TenantDocumentRepositoryInterface::class, function (): TenantDocumentRepositoryInterface {
-            return new EloquentTenantDocumentRepository(new TenantDocumentModel);
         });
 
         $this->app->singleton(TenantDomainRepositoryInterface::class, function (): TenantDomainRepositoryInterface {

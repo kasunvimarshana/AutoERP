@@ -7,8 +7,10 @@ namespace Modules\VehicleService\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Storage;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Extension\Http\Resources\AttachmentResource;
+use Modules\Extension\Models\AttachmentModel;
+use Modules\Extension\Services\Attachments\AttachmentService;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Http\Requests\CreateVehicleServiceInvoiceRequest;
@@ -21,12 +23,10 @@ use Modules\VehicleService\Http\Requests\StoreVehicleServiceInspectionRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceLineRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
-use Modules\VehicleService\Http\Resources\VehicleServiceDocumentResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceEmployeeAssignmentResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceInspectionResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
-use Modules\VehicleService\Models\VehicleServiceDocument;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -275,37 +275,79 @@ final class VehicleServiceController
         )))->response()->setStatusCode(201);
     }
 
-    public function documents(ListVehicleServiceJobRequest $request, int $job): AnonymousResourceCollection
-    {
-        return VehicleServiceDocumentResource::collection($this->job($request, $job)->documents()->latest()->get());
-    }
-
-    public function storeDocument(StoreVehicleServiceDocumentRequest $request, int $job): JsonResponse
+    public function documents(
+        ListVehicleServiceJobRequest $request,
+        int $job,
+        AttachmentService $attachments,
+    ): JsonResponse
     {
         $jobModel = $this->job($request, $job);
-        $path = $request->hasFile('file')
-            ? $request->file('file')->store('vehicle-service-documents', 'public')
-            : ($request->filled('file_path') ? (string) $request->input('file_path') : null);
-        $document = VehicleServiceDocument::query()->create([
-            'tenant_id' => $jobModel->tenant_id,
-            'organization_unit_id' => $jobModel->organization_unit_id,
-            'vehicle_service_job_id' => $jobModel->getKey(),
-            'document_type' => $request->input('document_type'),
-            'file_path' => $path,
-            'description' => $request->input('description'),
-            'uploaded_by' => $request->currentUserId(),
-        ]);
+        $result = $attachments->list([
+            'attachable_type' => 'vehicle_service_job',
+            'attachable_id' => (int) $jobModel->getKey(),
+        ], 100, 1);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
 
-        return (new VehicleServiceDocumentResource($document))->response()->setStatusCode(201);
+        return response()->json([
+            'data' => AttachmentResource::collection($result->valueOrFail()->items())->resolve(),
+        ]);
     }
 
-    public function destroyDocument(VehicleServiceActionRequest $request, int $job, int $document): JsonResponse
+    public function storeDocument(
+        StoreVehicleServiceDocumentRequest $request,
+        int $job,
+        AttachmentService $attachments,
+    ): JsonResponse
     {
-        $model = $this->job($request, $job)->documents()->findOrFail($document);
-        if ($model->file_path !== null && str_starts_with($model->file_path, 'vehicle-service-documents/')) {
-            Storage::disk('public')->delete($model->file_path);
+        $jobModel = $this->job($request, $job);
+        $file = $request->file('file');
+        if (! $file instanceof \Illuminate\Http\UploadedFile) {
+            return response()->json(['message' => 'A file is required.'], 422);
         }
-        $model->delete();
+
+        $result = $attachments->create([
+            'attachable_type' => 'vehicle_service_job',
+            'attachable_id' => (int) $jobModel->getKey(),
+            'category' => $this->vehicleServiceDocumentCategory((string) $request->input('document_type')),
+            'display_name' => $file->getClientOriginalName(),
+            'description' => $request->input('description'),
+            'metadata' => ['document_type' => $request->input('document_type')],
+        ], $file);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return (new AttachmentResource($result->valueOrFail()))->response()->setStatusCode(201);
+    }
+
+    public function destroyDocument(
+        VehicleServiceActionRequest $request,
+        int $job,
+        int $document,
+        AttachmentService $attachments,
+    ): JsonResponse
+    {
+        $jobModel = $this->job($request, $job);
+        $existing = $attachments->get($document);
+        if ($existing->isFailure()) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+
+        $model = $existing->valueOrFail();
+        if (
+            ! $model instanceof AttachmentModel
+            || $model->attachable_type !== 'vehicle_service_job'
+            || (int) $model->attachable_id !== (int) $jobModel->getKey()
+        ) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+
+        $result = $attachments->delete($document);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
 
         return response()->json(status: 204);
     }
@@ -340,6 +382,17 @@ final class VehicleServiceController
     {
         return VehicleServiceJobLineResource::collection($this->job($request, $job)->lines()
             ->where('is_employee_assignable', true)->with(['item', 'variant', 'uom', 'employeeAssignments.employee'])->get());
+    }
+
+    private function vehicleServiceDocumentCategory(string $documentType): string
+    {
+        return match ($documentType) {
+            'image' => 'image',
+            'inspection_report' => 'inspection',
+            'warranty' => 'warranty',
+            'invoice_copy' => 'invoice',
+            default => 'other',
+        };
     }
 
     private function job(TenantScopedRequest $request, int $id): VehicleServiceJob

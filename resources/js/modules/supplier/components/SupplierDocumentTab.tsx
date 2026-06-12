@@ -35,7 +35,6 @@ function DocumentForm({ row, error, submitting, onCancel, onSubmit }: { row: Sup
         <Input label="Document number" value={form.document_number ?? ''} onChange={(event) => set('document_number', event.target.value || null)} />
         <Input label="Issued date" type="date" value={form.issued_date ?? ''} onChange={(event) => set('issued_date', event.target.value || null)} />
         <Input label="Expiry date" type="date" value={form.expiry_date ?? ''} onChange={(event) => set('expiry_date', event.target.value || null)} error={fieldError(error, 'expiry_date')} />
-        <Input label="File reference" value={form.file_path ?? ''} onChange={(event) => set('file_path', event.target.value || null)} />
         <Select label="Status" value={form.status} onChange={(event) => set('status', event.target.value)} options={options(supplierDocumentStatuses)} /></div><Footer submitting={submitting} onCancel={onCancel} /></form>;
 }
 function Footer({ submitting, onCancel }: { submitting: boolean; onCancel: () => void }) { return <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting}>Save</Button></div>; }

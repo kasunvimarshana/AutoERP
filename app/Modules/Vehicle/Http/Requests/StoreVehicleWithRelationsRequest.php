@@ -29,7 +29,6 @@ final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
             'documents.*.document_number' => ['nullable', 'string', 'max:150'],
             'documents.*.issued_date' => ['nullable', 'date'],
             'documents.*.expiry_date' => ['nullable', 'date'],
-            'documents.*.file_path' => ['nullable', 'string', 'max:500'],
             'documents.*.status' => ['nullable', Rule::enum(VehicleDocumentStatus::class)],
             'documents.*.notes' => ['nullable', 'string'],
             'ownerships' => ['nullable', 'array'],

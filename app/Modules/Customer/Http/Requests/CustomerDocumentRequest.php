@@ -21,7 +21,6 @@ abstract class CustomerDocumentRequest extends TenantScopedRequest
             'document_number' => ['nullable', 'string', 'max:150'],
             'issued_date' => ['nullable', 'date'],
             'expiry_date' => ['nullable', 'date'],
-            'file_path' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', Rule::enum(CustomerDocumentStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
@@ -34,7 +33,7 @@ abstract class CustomerDocumentRequest extends TenantScopedRequest
             documentNumber: $this->nullableString('document_number'),
             issuedDate: $this->nullableString('issued_date'),
             expiryDate: $this->nullableString('expiry_date'),
-            filePath: $this->nullableString('file_path'),
+            filePath: null,
             status: CustomerDocumentStatus::from((string) $this->input('status', CustomerDocumentStatus::Pending->value)),
             notes: $this->nullableString('notes'),
         );

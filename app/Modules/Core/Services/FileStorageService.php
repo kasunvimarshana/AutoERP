@@ -39,12 +39,36 @@ final class FileStorageService implements FileStorageServiceInterface
             throw new InvalidArgumentException(sprintf('Temporary file not found: %s', $tmpPath));
         }
 
-        $contents = file_get_contents($tmpPath);
-        if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to read temporary file: %s', $tmpPath));
+        $stream = fopen($tmpPath, 'rb');
+        if ($stream === false) {
+            throw new RuntimeException(sprintf('Unable to open temporary file: %s', $tmpPath));
         }
 
-        return $this->storeContent($contents, $directory, $filename, $disk);
+        try {
+            $adapter = $this->getDisk($disk);
+            $targetPath = $this->buildTargetPath($directory, $filename);
+            if (! $adapter->writeStream($targetPath, $stream)) {
+                throw new RuntimeException(sprintf('Unable to store file at path: %s', $targetPath));
+            }
+
+            return $targetPath;
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    public function storeUploadedFile(
+        UploadedFile $file,
+        string $directory,
+        string $filename,
+        ?string $disk = null,
+    ): string {
+        $realPath = $file->getRealPath();
+        if ($realPath === false || ! is_file($realPath)) {
+            throw new InvalidArgumentException('Uploaded file is not readable.');
+        }
+
+        return $this->store($realPath, $directory, $filename, $disk);
     }
 
     public function storeContent(
@@ -76,22 +100,7 @@ final class FileStorageService implements FileStorageServiceInterface
         ?string $filename = null,
         ?string $disk = null,
     ): string {
-        $realPath = $file->getRealPath();
-        if ($realPath === false || ! is_file($realPath)) {
-            return '';
-        }
-
-        $contents = file_get_contents($realPath);
-        if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to read uploaded file: %s', $realPath));
-        }
-
-        return $this->storeContent(
-            $contents,
-            $directory,
-            $filename ?? $file->getClientOriginalName(),
-            $disk,
-        );
+        return $this->storeUploadedFile($file, $directory, $filename ?? $file->getClientOriginalName(), $disk);
     }
 
     public function delete(string $path, ?string $disk = null): bool

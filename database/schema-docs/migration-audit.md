@@ -63,21 +63,21 @@ Tables: `countries`, `currencies`, `languages`, `timezones`, `system_configurati
 
 ### Tenant
 
-Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_setting_groups_table`, `create_tenant_settings_table`, `create_tenant_documents_table`, `create_tenant_domains_table`.
+Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_setting_groups_table`, `create_tenant_settings_table`, `create_tenant_documents_table`, `create_tenant_domains_table`. The legacy document table is migrated into `attachments` and dropped by the Extension consolidation migration.
 
-Tables: `tenant_plans`, `tenants`, `tenant_setting_groups`, `tenant_settings`, `tenant_documents`, `tenant_domains`.
+Final tables: `tenant_plans`, `tenants`, `tenant_setting_groups`, `tenant_settings`, `tenant_domains`.
 
 ### OrganizationUnit
 
-Migrations: `create_organization_unit_types_table`, `create_organization_units_table`, `create_organization_unit_setting_groups_table`, `create_organization_unit_settings_table`, `create_organization_unit_documents_table`.
+Migrations: `create_organization_unit_types_table`, `create_organization_units_table`, `create_organization_unit_setting_groups_table`, `create_organization_unit_settings_table`, `create_organization_unit_documents_table`. The legacy document table is migrated into `attachments` and dropped by the Extension consolidation migration.
 
-Tables: `organization_unit_types`, `organization_units`, `organization_unit_setting_groups`, `organization_unit_settings`, `organization_unit_documents`.
+Final tables: `organization_unit_types`, `organization_units`, `organization_unit_setting_groups`, `organization_unit_settings`.
 
 ### User
 
-Migrations: `create_users_table`, `create_roles_table`, `create_permissions_table`, `create_role_permissions_table`, `create_user_roles_table`, `create_user_permissions_table`, `create_user_tenants_table`, `create_user_documents_table`, `create_user_devices_table`.
+Migrations: `create_users_table`, `create_roles_table`, `create_permissions_table`, `create_role_permissions_table`, `create_user_roles_table`, `create_user_permissions_table`, `create_user_tenants_table`, `create_user_documents_table`, `create_user_devices_table`. The legacy document table is migrated into `attachments` and dropped by the Extension consolidation migration.
 
-Tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_tenants`, `user_documents`, `user_devices`.
+Final tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_tenants`, `user_devices`.
 
 ### Auth
 
@@ -171,7 +171,7 @@ Tables use the same names as the migrations.
 
 ### VehicleService
 
-Migrations: `create_vehicle_service_jobs_table`, `create_vehicle_service_inspections_table`, `create_vehicle_service_job_lines_table`, `create_vehicle_service_line_employees_table`, `create_vehicle_service_documents_table`, `create_vehicle_service_invoice_links_table`, `create_vehicle_service_payment_links_table`, `create_vehicle_service_status_histories_table`.
+Migrations: `create_vehicle_service_jobs_table`, `create_vehicle_service_inspections_table`, `create_vehicle_service_job_lines_table`, `create_vehicle_service_line_employees_table`, `create_vehicle_service_documents_table`, `create_vehicle_service_invoice_links_table`, `create_vehicle_service_payment_links_table`, `create_vehicle_service_status_histories_table`. Vehicle-service document rows are migrated into `attachments`, then the legacy table is dropped.
 
 Tables use the same names as the migrations.
 
@@ -185,7 +185,9 @@ Migration/table: `create_audit_logs_table` / `audit_logs`.
 
 ### Extension
 
-Migrations/tables: `create_attachments_table`, `create_entity_attributes_table`, `create_comments_table`.
+Migrations: `create_attachments_table`, `create_entity_attributes_table`, `create_comments_table`, `upgrade_attachments_for_document_management`, `consolidate_vehicle_service_documents`, `consolidate_legacy_document_stores`.
+
+Final tables: `attachments`, `entity_attributes`, `comments`.
 
 ## Mega Migrations Split
 

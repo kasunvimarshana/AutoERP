@@ -61,7 +61,7 @@ trait MapsVehicleData
             documentNumber: $row['document_number'] ?? null,
             issuedDate: $row['issued_date'] ?? null,
             expiryDate: $row['expiry_date'] ?? null,
-            filePath: $row['file_path'] ?? null,
+            filePath: null,
             status: VehicleDocumentStatus::from((string) ($row['status'] ?? VehicleDocumentStatus::Pending->value)),
             notes: $row['notes'] ?? null,
         );

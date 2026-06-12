@@ -14,7 +14,6 @@ use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\RolePermissionModel;
 use Modules\User\Models\UserDeviceModel;
-use Modules\User\Models\UserDocumentModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserPermissionModel;
 use Modules\User\Models\UserRoleModel;
@@ -24,7 +23,6 @@ use Modules\User\Repositories\EloquentPermissionRepository;
 use Modules\User\Repositories\EloquentRolePermissionRepository;
 use Modules\User\Repositories\EloquentRoleRepository;
 use Modules\User\Repositories\EloquentUserDeviceRepository;
-use Modules\User\Repositories\EloquentUserDocumentRepository;
 use Modules\User\Repositories\EloquentUserPermissionRepository;
 use Modules\User\Repositories\EloquentUserRepository;
 use Modules\User\Repositories\EloquentUserRoleRepository;
@@ -33,7 +31,6 @@ use Modules\User\Repositories\PermissionRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\RoleRepositoryInterface;
 use Modules\User\Repositories\UserDeviceRepositoryInterface;
-use Modules\User\Repositories\UserDocumentRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserRoleRepositoryInterface;
@@ -78,10 +75,6 @@ final class UserServiceProvider extends ServiceProvider
         $this->app->singleton(
             UserTenantRepositoryInterface::class,
             fn (): UserTenantRepositoryInterface => new EloquentUserTenantRepository(new UserTenantModel),
-        );
-        $this->app->singleton(
-            UserDocumentRepositoryInterface::class,
-            fn (): UserDocumentRepositoryInterface => new EloquentUserDocumentRepository(new UserDocumentModel),
         );
         $this->app->singleton(
             UserDeviceRepositoryInterface::class,

@@ -33,7 +33,7 @@ export interface EmployeeContact { id: number; contact_name: string; relationshi
 export type EmployeeContactPayload = Omit<EmployeeContact, 'id'>;
 export interface EmployeeAddress { id: number; address_type: string; address_line_1: string; address_line_2?: string | null; city?: string | null; state?: string | null; postal_code?: string | null; country?: string | null; is_primary: boolean; is_active: boolean; }
 export type EmployeeAddressPayload = Omit<EmployeeAddress, 'id'>;
-export interface EmployeeDocument { id: number; document_type: string; document_number?: string | null; issued_date?: string | null; expiry_date?: string | null; file_path?: string | null; status: string; notes?: string | null; }
+export interface EmployeeDocument { id: number; document_type: string; document_number?: string | null; issued_date?: string | null; expiry_date?: string | null; status: string; notes?: string | null; }
 export type EmployeeDocumentPayload = Omit<EmployeeDocument, 'id'>;
 export interface EmployeeSkillAssignment { id: number; skill_id: number; skill?: HrSkill; proficiency_level: string; years_of_experience: string; is_primary: boolean; }
 export type EmployeeSkillPayload = Omit<EmployeeSkillAssignment, 'id' | 'skill'>;

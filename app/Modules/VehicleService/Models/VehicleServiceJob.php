@@ -78,11 +78,6 @@ final class VehicleServiceJob extends CoreModel
         return $this->hasMany(VehicleServiceLineEmployee::class, 'vehicle_service_job_id');
     }
 
-    public function documents(): HasMany
-    {
-        return $this->hasMany(VehicleServiceDocument::class, 'vehicle_service_job_id');
-    }
-
     public function invoiceLinks(): HasMany
     {
         return $this->hasMany(VehicleServiceInvoiceLink::class, 'vehicle_service_job_id');

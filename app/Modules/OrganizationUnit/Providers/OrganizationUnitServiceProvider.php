@@ -6,18 +6,15 @@ namespace Modules\OrganizationUnit\Providers;
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Modules\OrganizationUnit\Models\OrganizationUnitDocumentModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitSettingGroupModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitSettingModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
 use Modules\OrganizationUnit\Policies\OrganizationUnitPolicy;
-use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitDocumentRepository;
 use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitRepository;
 use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitSettingGroupRepository;
 use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitSettingRepository;
 use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitTypeRepository;
-use Modules\OrganizationUnit\Repositories\OrganizationUnitDocumentRepositoryInterface;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitSettingGroupRepositoryInterface;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitSettingRepositoryInterface;
@@ -68,12 +65,6 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
             },
         );
 
-        $this->app->singleton(
-            OrganizationUnitDocumentRepositoryInterface::class,
-            function (): OrganizationUnitDocumentRepositoryInterface {
-                return new EloquentOrganizationUnitDocumentRepository(new OrganizationUnitDocumentModel);
-            },
-        );
     }
 
     public function boot(): void

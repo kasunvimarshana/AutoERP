@@ -11,7 +11,7 @@ Tenant aggregate boundaries are defined by these migrations:
 - tenant_plans
 - tenant_setting_groups
 - tenant_settings
-- tenant_documents
+- tenant document binaries are owned by the shared Extension `attachments` table
 - tenant_domains
 
 ## Capabilities

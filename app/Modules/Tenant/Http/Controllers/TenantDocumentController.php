@@ -7,86 +7,147 @@ namespace Modules\Tenant\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
+use Modules\Extension\Http\Resources\AttachmentResource;
+use Modules\Extension\Models\AttachmentModel;
+use Modules\Extension\Services\Attachments\AttachmentService;
 use Modules\Tenant\Http\Requests\ListTenantDocumentRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantDocumentRequest;
-use Modules\Tenant\Http\Resources\TenantDocumentResource;
-use Modules\Tenant\Services\Documents\TenantDocumentService;
 
 final class TenantDocumentController extends Controller
 {
-    public function __construct(private readonly TenantDocumentService $documents) {}
+    public function __construct(private readonly AttachmentService $attachments) {}
 
     public function index(ListTenantDocumentRequest $request): JsonResponse
     {
-        $result = $this->documents->listByTenant((int) $request->validated('tenant_id'));
+        $result = $this->attachments->list([
+            'attachable_type' => 'tenant',
+            'attachable_id' => (int) $request->validated('tenant_id'),
+        ], 100, 1);
+
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return response()->json(['data' => TenantDocumentResource::collection($result->valueOrFail())->resolve()]);
+        return response()->json([
+            'data' => AttachmentResource::collection($result->valueOrFail()->items())->resolve(),
+        ]);
     }
 
-    public function show(int|string $tenantDocument): JsonResponse|TenantDocumentResource
+    public function show(int|string $tenantDocument): JsonResponse|AttachmentResource
     {
-        $result = $this->documents->get($tenantDocument);
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        $attachment = $this->attachment($tenantDocument);
+
+        return $attachment instanceof JsonResponse ? $attachment : new AttachmentResource($attachment);
+    }
+
+    public function store(UpsertTenantDocumentRequest $request): JsonResponse|AttachmentResource
+    {
+        $file = $request->file('file_upload');
+        if (! $file instanceof UploadedFile) {
+            return response()->json(['message' => 'A file is required.'], 422);
         }
 
-        return new TenantDocumentResource($result->valueOrFail());
-    }
+        $result = $this->attachments->create(
+            $this->payload($request, (int) $request->validated('tenant_id')),
+            $file,
+        );
 
-    public function store(UpsertTenantDocumentRequest $request): JsonResponse|TenantDocumentResource
-    {
-        $result = $this->documents->create($this->preparePayload($request));
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new TenantDocumentResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new AttachmentResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(
         UpsertTenantDocumentRequest $request,
         int|string $tenantDocument,
-    ): JsonResponse|TenantDocumentResource {
-        $result = $this->documents->update($tenantDocument, $this->preparePayload($request));
-        if ($result->isFailure()) {
-            $status = $result->errorOrFail()->code === 'TENANT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $result->errorOrFail()->message], $status);
+    ): JsonResponse|AttachmentResource {
+        $existing = $this->attachment($tenantDocument);
+        if ($existing instanceof JsonResponse) {
+            return $existing;
         }
 
-        return new TenantDocumentResource($result->valueOrFail());
+        $file = $request->file('file_upload');
+        $result = $file instanceof UploadedFile
+            ? $this->attachments->createVersion($tenantDocument, $this->metadataPayload($request), $file)
+            : $this->attachments->update($tenantDocument, [
+                ...$this->metadataPayload($request),
+                'row_version' => (int) $request->validated('row_version'),
+            ]);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return new AttachmentResource($result->valueOrFail());
     }
 
     public function destroy(int|string $tenantDocument): JsonResponse
     {
-        $result = $this->documents->delete($tenantDocument);
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        $existing = $this->attachment($tenantDocument);
+        if ($existing instanceof JsonResponse) {
+            return $existing;
         }
 
-        return response()->json(null, 204);
+        $result = $this->attachments->delete($tenantDocument);
+
+        return $result->isFailure()
+            ? response()->json(['message' => $result->errorOrFail()->message], 422)
+            : response()->json(null, 204);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function preparePayload(UpsertTenantDocumentRequest $request): array
+    private function attachment(int|string $id): AttachmentModel|JsonResponse
     {
-        $payload = $request->validated();
-        $upload = $request->file('file_upload');
+        $result = $this->attachments->get($id);
+        if ($result->isFailure()) {
+            return response()->json(['message' => 'Tenant attachment not found.'], 404);
+        }
 
-        if ($upload instanceof UploadedFile) {
-            unset($payload['file_upload']);
+        $attachment = $result->valueOrFail();
+        if (! $attachment instanceof AttachmentModel || $attachment->attachable_type !== 'tenant') {
+            return response()->json(['message' => 'Tenant attachment not found.'], 404);
+        }
 
-            $payload['file_tmp_path'] = $upload->getRealPath();
-            $payload['file_original_name'] = $upload->getClientOriginalName();
-            $payload['mime_type'] = $payload['mime_type'] ?? $upload->getClientMimeType();
-            $payload['size'] = $payload['size'] ?? $upload->getSize();
+        return $attachment;
+    }
+
+    private function payload(UpsertTenantDocumentRequest $request, int $tenantId): array
+    {
+        return [
+            ...$this->metadataPayload($request),
+            'attachable_type' => 'tenant',
+            'attachable_id' => $tenantId,
+        ];
+    }
+
+    private function metadataPayload(UpsertTenantDocumentRequest $request): array
+    {
+        $validated = $request->validated();
+        $payload = [];
+        if (array_key_exists('name', $validated)) {
+            $payload['display_name'] = $validated['name'];
+        }
+        if (array_key_exists('is_public', $validated)) {
+            $payload['visibility'] = $validated['is_public'] ? 'public' : 'private';
+        }
+        if (array_key_exists('type', $validated)) {
+            $payload['category'] = $this->category((string) $validated['type']);
+        }
+        if (array_key_exists('metadata', $validated) || array_key_exists('type', $validated)) {
+            $payload['metadata'] = array_filter([
+                ...($validated['metadata'] ?? []),
+                'legacy_type' => $validated['type'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null);
         }
 
         return $payload;
+    }
+
+    private function category(?string $type): string
+    {
+        return in_array($type, (array) config('extension.attachments.categories', []), true)
+            ? $type
+            : 'general';
     }
 }

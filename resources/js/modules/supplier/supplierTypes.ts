@@ -135,7 +135,6 @@ export interface SupplierDocument {
     document_number?: string | null;
     issued_date?: string | null;
     expiry_date?: string | null;
-    file_path?: string | null;
     status: string;
     notes?: string | null;
 }

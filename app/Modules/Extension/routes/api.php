@@ -25,6 +25,18 @@ Route::prefix('api/extension')
     ])
     ->name('extension.')
     ->group(function (): void {
+        Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download'])
+            ->whereNumber('attachment')
+            ->name('attachments.download');
+        Route::get('attachments/{attachment}/preview', [AttachmentController::class, 'preview'])
+            ->whereNumber('attachment')
+            ->name('attachments.preview');
+        Route::get('attachments/{attachment}/versions', [AttachmentController::class, 'versions'])
+            ->whereNumber('attachment')
+            ->name('attachments.versions');
+        Route::post('attachments/{attachment}/versions', [AttachmentController::class, 'storeVersion'])
+            ->whereNumber('attachment')
+            ->name('attachments.versions.store');
         Route::apiResource('attachments', AttachmentController::class);
         Route::apiResource('entity-attributes', EntityAttributeController::class);
         Route::apiResource('comments', CommentController::class);

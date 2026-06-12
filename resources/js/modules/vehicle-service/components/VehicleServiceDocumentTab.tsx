@@ -50,9 +50,9 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                     rows={result.data ?? []}
                     rowKey={(document) => document.id}
                     columns={[
-                        { key: 'type', header: 'Type', render: (document) => document.document_type.replaceAll('_', ' ') },
+                        { key: 'type', header: 'Type', render: (document) => (document.metadata?.document_type ?? document.category).replaceAll('_', ' ') },
                         { key: 'description', header: 'Description', render: (document) => document.description ?? '-' },
-                        { key: 'path', header: 'File', render: (document) => document.file_path ?? '-' },
+                        { key: 'path', header: 'File', render: (document) => <a className="font-semibold text-sky-700 hover:underline" href={document.download_url}>{document.display_name ?? document.original_file_name}</a> },
                         { key: 'actions', header: '', render: (document) => <Button type="button" variant="danger" loading={deletingId === document.id} onClick={async () => {
                             setError(null);
                             setDeletingId(document.id);

@@ -19,14 +19,15 @@ final class ListAttachmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('extension.pagination.max_per_page', 200)],
-            'attachable_type' => ['nullable', 'string', 'max:255'],
+            'attachable_type' => ['nullable', 'string', 'max:100'],
             'attachable_id' => ['nullable', 'integer', 'min:1'],
-            'file_name' => ['nullable', 'string', 'max:255'],
-            'mime_type' => ['nullable', 'string', 'max:255'],
+            'source_module' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'visibility' => ['nullable', 'in:public,private,restricted'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'include_versions' => ['nullable', 'boolean'],
         ];
     }
 }

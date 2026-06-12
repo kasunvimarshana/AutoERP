@@ -1,6 +1,6 @@
 # AutoERP Table Catalog
 
-This catalog documents the schema produced by the module migrations. The enclosing section is the owning module for every listed table. Laravel infrastructure tables are included for completeness. Foreign-key and unique-constraint summaries were verified against the migrated MySQL schema on 2026-06-12.
+This catalog documents the schema produced by the module migrations. The enclosing section is the owning module for every listed table. Laravel infrastructure tables are included for completeness. The current migration set was verified with a fresh SQLite migration and seed run on 2026-06-13; MySQL verification still requires an available local server.
 
 Conventions:
 
@@ -29,7 +29,6 @@ No business tables. Core contains shared application infrastructure only.
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `tenant_documents` | Stores document metadata associated with tenant document. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
 | `tenant_domains` | Stores tenant domain records used by the owning module. | `tenant_id` -> `tenants` | unique `domain`; unique `tenant_id,domain`; tenant scoped; soft deletes |
 | `tenant_plans` | Stores tenant plan records used by the owning module. | `currency_id` -> `currencies` | unique `slug`; soft deletes |
 | `tenant_setting_groups` | Groups related configuration keys for tenant setting group. | `tenant_id` -> `tenants`; `parent_id` -> `tenant_setting_groups` | unique `tenant_id,key`; tenant scoped; soft deletes |
@@ -40,7 +39,6 @@ No business tables. Core contains shared application infrastructure only.
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `organization_unit_documents` | Stores document metadata associated with organization unit document. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,name`; tenant scoped; organization-unit aware |
 | `organization_unit_setting_groups` | Groups related configuration keys for organization unit setting group. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `parent_id` -> `organization_unit_setting_groups` | unique `tenant_id,organization_unit_id,key`; tenant scoped; organization-unit aware |
 | `organization_unit_settings` | Stores scoped configuration values for organization unit setting. | `group_id` -> `organization_unit_setting_groups`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,organization_unit_id,group_id,key`; tenant scoped; organization-unit aware |
 | `organization_unit_types` | Stores reusable type definitions for organization unit type. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
@@ -54,7 +52,6 @@ No business tables. Core contains shared application infrastructure only.
 | `role_permissions` | Stores role permission records used by the owning module. | `permission_id` -> `permissions`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `role_id` -> `roles` | unique `tenant_id,role_id,permission_id`; tenant scoped; organization-unit aware |
 | `roles` | Stores role records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,name,guard_name`; tenant scoped; organization-unit aware; soft deletes |
 | `user_devices` | Stores user device records used by the owning module. | `organization_unit_id` -> `organization_units`; `user_id` -> `users`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,device_token`; tenant scoped; organization-unit aware |
-| `user_documents` | Stores document metadata associated with user document. | `organization_unit_id` -> `organization_units`; `user_id` -> `users`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,name`; tenant scoped; organization-unit aware |
 | `user_permissions` | Stores user permission records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `permission_id` -> `permissions`; `user_id` -> `users` | unique `tenant_id,user_id,permission_id`; tenant scoped; organization-unit aware |
 | `user_roles` | Stores user role records used by the owning module. | `role_id` -> `roles`; `user_id` -> `users`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,role_id`; tenant scoped; organization-unit aware |
 | `user_tenants` | Stores user tenant records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `role_id` -> `roles`; `user_id` -> `users` | unique `tenant_id,organization_unit_id,user_id`; tenant scoped; organization-unit aware |
@@ -312,7 +309,6 @@ Tax override columns remain on the Item-owned `items` table because Item service
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `vehicle_service_documents` | Stores document metadata associated with vehicle service document. | `vehicle_service_job_id` -> `vehicle_service_jobs`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
 | `vehicle_service_inspections` | Stores vehicle service inspection records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs` | unique `vehicle_service_job_id`; tenant scoped; organization-unit aware |
 | `vehicle_service_invoice_links` | Stores traceable links between vehicle service invoice link and downstream documents. | `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs` | unique `vehicle_service_job_id,invoice_id`; tenant scoped; organization-unit aware |
 | `vehicle_service_job_lines` | Stores line-level detail and traceability for vehicle service job line. | `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `vehicle_service_job_id` -> `vehicle_service_jobs`; `inventory_movement_id` -> `inventory_movements`; `item_variant_id` -> `item_variants`; `parent_line_id` -> `vehicle_service_job_lines`; `uom_id` -> `unit_of_measures` | unique `vehicle_service_job_id,line_number`; tenant scoped; organization-unit aware |
@@ -335,7 +331,7 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `attachments` | Stores tenant-scoped file attachment metadata for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
+| `attachments` | Owns all tenant business-document binaries, polymorphic ownership, immutable versions, visibility, checksums, previews, and audit metadata. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; morph-map `attachable_type`/`attachable_id`; `previous_version_id` version link | unique `uuid`; tenant/org/access scoped; soft deletes; indexed target, source, category, visibility, expiry, and version group |
 | `comments` | Stores threaded comments for polymorphic business records. | `organization_unit_id` -> `organization_units`; `author_id` -> `users`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
 | `entity_attributes` | Stores extensible typed attributes for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,entity_type,entity_id,attribute_key`; tenant scoped; organization-unit aware |
 

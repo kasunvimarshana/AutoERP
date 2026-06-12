@@ -60,11 +60,6 @@ final class TenantModel extends CoreModel
         return $this->hasMany(TenantSettingModel::class, 'tenant_id');
     }
 
-    public function documents(): HasMany
-    {
-        return $this->hasMany(TenantDocumentModel::class, 'tenant_id');
-    }
-
     public function domains(): HasMany
     {
         return $this->hasMany(TenantDomainModel::class, 'tenant_id');
