@@ -61,6 +61,7 @@ final class StoreSupplierWithRelationsRequest extends TenantScopedRequest
             'documents.*.document_number' => ['nullable', 'string', 'max:150'],
             'documents.*.issued_date' => ['nullable', 'date'],
             'documents.*.expiry_date' => ['nullable', 'date'],
+            'documents.*.file_path' => ['nullable', 'string', 'max:500'],
             'documents.*.status' => ['nullable', Rule::enum(SupplierDocumentStatus::class)],
             'documents.*.notes' => ['nullable', 'string'],
             'item_mappings' => ['nullable', 'array'],

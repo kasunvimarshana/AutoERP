@@ -21,6 +21,7 @@ abstract class VehicleDocumentRequest extends TenantScopedRequest
             'document_number' => ['nullable', 'string', 'max:150'],
             'issued_date' => ['nullable', 'date'],
             'expiry_date' => ['nullable', 'date'],
+            'file_path' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', Rule::enum(VehicleDocumentStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
@@ -33,7 +34,7 @@ abstract class VehicleDocumentRequest extends TenantScopedRequest
             documentNumber: $this->filled('document_number') ? (string) $this->input('document_number') : null,
             issuedDate: $this->filled('issued_date') ? (string) $this->input('issued_date') : null,
             expiryDate: $this->filled('expiry_date') ? (string) $this->input('expiry_date') : null,
-            filePath: null,
+            filePath: $this->filled('file_path') ? (string) $this->input('file_path') : null,
             status: VehicleDocumentStatus::from((string) $this->input('status', VehicleDocumentStatus::Pending->value)),
             notes: $this->filled('notes') ? (string) $this->input('notes') : null,
         );

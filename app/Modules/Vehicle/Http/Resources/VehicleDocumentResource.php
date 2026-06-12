@@ -20,6 +20,7 @@ final class VehicleDocumentResource extends JsonResource
             'document_number' => $this->document_number,
             'issued_date' => $this->issued_date?->toDateString(),
             'expiry_date' => $this->expiry_date?->toDateString(),
+            'file_path' => $this->file_path,
             'status' => $this->enumValue($this->status),
             'notes' => $this->notes,
             'created_at' => $this->created_at?->toISOString(),

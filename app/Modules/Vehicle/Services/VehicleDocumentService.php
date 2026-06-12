@@ -55,6 +55,7 @@ final class VehicleDocumentService
             'document_number' => $data->documentNumber,
             'issued_date' => $data->issuedDate,
             'expiry_date' => $data->expiryDate,
+            'file_path' => $data->filePath,
             'status' => $data->status,
             'notes' => $data->notes,
         ];

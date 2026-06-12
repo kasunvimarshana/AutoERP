@@ -21,6 +21,7 @@ abstract class SupplierDocumentRequest extends TenantScopedRequest
             'document_number' => ['nullable', 'string', 'max:150'],
             'issued_date' => ['nullable', 'date'],
             'expiry_date' => ['nullable', 'date'],
+            'file_path' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', Rule::enum(SupplierDocumentStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
@@ -33,7 +34,7 @@ abstract class SupplierDocumentRequest extends TenantScopedRequest
             documentNumber: $this->nullableString('document_number'),
             issuedDate: $this->nullableString('issued_date'),
             expiryDate: $this->nullableString('expiry_date'),
-            filePath: null,
+            filePath: $this->nullableString('file_path'),
             status: SupplierDocumentStatus::from((string) $this->input('status', SupplierDocumentStatus::Pending->value)),
             notes: $this->nullableString('notes'),
         );

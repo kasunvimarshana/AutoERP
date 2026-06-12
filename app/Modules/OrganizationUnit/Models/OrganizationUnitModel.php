@@ -61,4 +61,8 @@ final class OrganizationUnitModel extends CoreModel
         return $this->hasMany(OrganizationUnitSettingModel::class, 'organization_unit_id');
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(OrganizationUnitDocumentModel::class, 'organization_unit_id');
+    }
 }

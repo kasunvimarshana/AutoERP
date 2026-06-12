@@ -111,6 +111,7 @@ export interface VehicleDocument {
     document_number?: string | null;
     issued_date?: string | null;
     expiry_date?: string | null;
+    file_path?: string | null;
     status: VehicleDocumentStatus;
     notes?: string | null;
 }

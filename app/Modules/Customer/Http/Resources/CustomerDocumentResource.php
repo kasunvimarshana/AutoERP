@@ -20,6 +20,7 @@ final class CustomerDocumentResource extends JsonResource
             'document_number' => $this->document_number,
             'issued_date' => $this->issued_date?->format('Y-m-d'),
             'expiry_date' => $this->expiry_date?->format('Y-m-d'),
+            'file_path' => $this->file_path,
             'status' => $this->enumValue($this->status),
             'notes' => $this->notes,
         ];

@@ -7,131 +7,80 @@ namespace Modules\OrganizationUnit\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
-use Modules\Extension\Http\Resources\AttachmentResource;
-use Modules\Extension\Models\AttachmentModel;
-use Modules\Extension\Services\Attachments\AttachmentService;
 use Modules\OrganizationUnit\Http\Requests\ListOrganizationUnitDocumentRequest;
 use Modules\OrganizationUnit\Http\Requests\UpsertOrganizationUnitDocumentRequest;
+use Modules\OrganizationUnit\Http\Resources\OrganizationUnitDocumentResource;
+use Modules\OrganizationUnit\Services\OrganizationUnitDocuments\OrganizationUnitDocumentService;
 
 final class OrganizationUnitDocumentController extends Controller
 {
-    public function __construct(private readonly AttachmentService $attachments) {}
+    public function __construct(private readonly OrganizationUnitDocumentService $documents) {}
 
     public function index(ListOrganizationUnitDocumentRequest $request): JsonResponse
     {
-        $filters = ['attachable_type' => 'organization_unit'];
-        if ($request->filled('organization_unit_id')) {
-            $filters['attachable_id'] = (int) $request->validated('organization_unit_id');
-        }
-        $result = $this->attachments->list($filters, 100, 1);
-
+        $result = $this->documents->listByTenant((int) $request->validated('tenant_id'));
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return response()->json([
-            'data' => AttachmentResource::collection($result->valueOrFail()->items())->resolve(),
-        ]);
+        return response()->json(['data' => OrganizationUnitDocumentResource::collection($result->valueOrFail())->resolve()]);
     }
 
-    public function show(int|string $organizationUnitDocument): JsonResponse|AttachmentResource
+    public function show(int|string $organizationUnitDocument): JsonResponse|OrganizationUnitDocumentResource
     {
-        $attachment = $this->attachment($organizationUnitDocument);
+        $result = $this->documents->get($organizationUnitDocument);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
 
-        return $attachment instanceof JsonResponse ? $attachment : new AttachmentResource($attachment);
+        return new OrganizationUnitDocumentResource($result->valueOrFail());
     }
 
-    public function store(UpsertOrganizationUnitDocumentRequest $request): JsonResponse|AttachmentResource
+    public function store(UpsertOrganizationUnitDocumentRequest $request): JsonResponse|OrganizationUnitDocumentResource
     {
-        $file = $request->file('file');
-        if (! $file instanceof UploadedFile) {
-            return response()->json(['message' => 'A file is required.'], 422);
-        }
-
-        $result = $this->attachments->create([
-            ...$this->metadataPayload($request),
-            'attachable_type' => 'organization_unit',
-            'attachable_id' => (int) $request->validated('organization_unit_id'),
-        ], $file);
-
+        $result = $this->documents->create($this->prepareMutationPayload($request));
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new AttachmentResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new OrganizationUnitDocumentResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function update(
-        UpsertOrganizationUnitDocumentRequest $request,
-        int|string $organizationUnitDocument,
-    ): JsonResponse|AttachmentResource {
-        $existing = $this->attachment($organizationUnitDocument);
-        if ($existing instanceof JsonResponse) {
-            return $existing;
-        }
-
-        $file = $request->file('file');
-        $result = $file instanceof UploadedFile
-            ? $this->attachments->createVersion($organizationUnitDocument, $this->metadataPayload($request), $file)
-            : $this->attachments->update($organizationUnitDocument, [
-                ...$this->metadataPayload($request),
-                'row_version' => (int) $request->validated('row_version'),
-            ]);
-
+    public function update(UpsertOrganizationUnitDocumentRequest $request, int|string $organizationUnitDocument): JsonResponse|OrganizationUnitDocumentResource
+    {
+        $result = $this->documents->update($organizationUnitDocument, $this->prepareMutationPayload($request));
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            $status = $result->errorOrFail()->code === 'ORGANIZATION_UNIT_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $result->errorOrFail()->message], $status);
         }
 
-        return new AttachmentResource($result->valueOrFail());
+        return new OrganizationUnitDocumentResource($result->valueOrFail());
     }
 
     public function destroy(int|string $organizationUnitDocument): JsonResponse
     {
-        $existing = $this->attachment($organizationUnitDocument);
-        if ($existing instanceof JsonResponse) {
-            return $existing;
-        }
-
-        $result = $this->attachments->delete($organizationUnitDocument);
-
-        return $result->isFailure()
-            ? response()->json(['message' => $result->errorOrFail()->message], 422)
-            : response()->json(null, 204);
-    }
-
-    private function attachment(int|string $id): AttachmentModel|JsonResponse
-    {
-        $result = $this->attachments->get($id);
+        $result = $this->documents->delete($organizationUnitDocument);
         if ($result->isFailure()) {
-            return response()->json(['message' => 'Organization unit attachment not found.'], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
-        $attachment = $result->valueOrFail();
-        if (! $attachment instanceof AttachmentModel || $attachment->attachable_type !== 'organization_unit') {
-            return response()->json(['message' => 'Organization unit attachment not found.'], 404);
-        }
-
-        return $attachment;
+        return response()->json(null, 204);
     }
 
-    private function metadataPayload(UpsertOrganizationUnitDocumentRequest $request): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function prepareMutationPayload(UpsertOrganizationUnitDocumentRequest $request): array
     {
-        $validated = $request->validated();
-        $payload = [];
-        if (array_key_exists('name', $validated)) {
-            $payload['display_name'] = $validated['name'];
-        }
-        if (array_key_exists('type', $validated)) {
-            $type = (string) $validated['type'];
-            $payload['category'] = in_array($type, (array) config('extension.attachments.categories', []), true)
-                ? $type
-                : 'general';
-        }
-        if (array_key_exists('metadata', $validated) || array_key_exists('type', $validated)) {
-            $payload['metadata'] = array_filter([
-                ...($validated['metadata'] ?? []),
-                'legacy_type' => $validated['type'] ?? null,
-            ], static fn (mixed $value): bool => $value !== null);
+        $payload = $request->validated();
+        $upload = $request->file('file');
+
+        if ($upload instanceof UploadedFile) {
+            unset($payload['file']);
+
+            $payload['file_tmp_path'] = $upload->getRealPath();
+            $payload['file_original_name'] = $upload->getClientOriginalName();
         }
 
         return $payload;

@@ -227,12 +227,8 @@ export interface VehicleServiceStatusHistory {
 
 export interface VehicleServiceDocument {
     id: number;
-    category: string;
-    display_name?: string | null;
-    original_file_name: string;
-    download_url: string;
-    preview_url?: string | null;
-    metadata?: { document_type?: string };
+    document_type: string;
+    file_path?: string | null;
     description?: string | null;
     uploaded_by?: number | null;
     created_at?: string | null;

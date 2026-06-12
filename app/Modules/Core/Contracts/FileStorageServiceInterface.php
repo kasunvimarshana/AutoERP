@@ -4,20 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Contracts;
 
-use Illuminate\Http\UploadedFile;
-
 interface FileStorageServiceInterface
 {
     /** @return string Stored file path. */
     public function store(string $tmpPath, string $directory, string $filename, ?string $disk = null): string;
-
-    /** @return string Stored file path. */
-    public function storeUploadedFile(
-        UploadedFile $file,
-        string $directory,
-        string $filename,
-        ?string $disk = null,
-    ): string;
 
     /** @return string Stored file path. */
     public function storeContent(

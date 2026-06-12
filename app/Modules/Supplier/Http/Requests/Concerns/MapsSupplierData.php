@@ -112,7 +112,7 @@ trait MapsSupplierData
             documentNumber: $row['document_number'] ?? null,
             issuedDate: $row['issued_date'] ?? null,
             expiryDate: $row['expiry_date'] ?? null,
-            filePath: null,
+            filePath: $row['file_path'] ?? null,
             status: SupplierDocumentStatus::from((string) ($row['status'] ?? SupplierDocumentStatus::Pending->value)),
             notes: $row['notes'] ?? null,
         );

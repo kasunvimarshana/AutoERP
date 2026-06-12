@@ -12,7 +12,7 @@ import type { VehicleDocument, VehicleDocumentPayload } from '../vehicleTypes';
 
 const documentTypes = ['registration', 'insurance', 'emission_test', 'revenue_license', 'fitness_certificate', 'lease_document', 'ownership_document', 'warranty', 'other'];
 const statuses = ['active', 'expired', 'revoked', 'pending'];
-const emptyPayload: VehicleDocumentPayload = { document_type: 'registration', document_number: '', issued_date: '', expiry_date: '', status: 'pending', notes: '' };
+const emptyPayload: VehicleDocumentPayload = { document_type: 'registration', document_number: '', issued_date: '', expiry_date: '', file_path: '', status: 'pending', notes: '' };
 
 export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
     const [rows, setRows] = useState<VehicleDocument[]>([]);
@@ -82,7 +82,7 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
                     { key: 'number', header: 'Number', render: (row) => row.document_number ?? '-' },
                     { key: 'expiry', header: 'Expiry', render: (row) => row.expiry_date ?? '-' },
                     { key: 'status', header: 'Status', render: (row) => row.status },
-                    { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => { setEditing(row.id); setForm({ document_type: row.document_type, document_number: row.document_number ?? '', issued_date: row.issued_date ?? '', expiry_date: row.expiry_date ?? '', status: row.status, notes: row.notes ?? '' }); }}>Edit</Button><Button variant="danger" onClick={() => deleteVehicleDocument(vehicleId, row.id).then(() => load()).catch((requestError) => setError(toApiError(requestError)))}>Delete</Button></div> },
+                    { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => { setEditing(row.id); setForm({ document_type: row.document_type, document_number: row.document_number ?? '', issued_date: row.issued_date ?? '', expiry_date: row.expiry_date ?? '', file_path: row.file_path ?? '', status: row.status, notes: row.notes ?? '' }); }}>Edit</Button><Button variant="danger" onClick={() => deleteVehicleDocument(vehicleId, row.id).then(() => load()).catch((requestError) => setError(toApiError(requestError)))}>Delete</Button></div> },
                 ]}
             />
         </div>

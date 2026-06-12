@@ -63,6 +63,11 @@ final class UserModel extends Authenticatable
         return $this->hasMany(UserTenantModel::class, 'user_id');
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(UserDocumentModel::class, 'user_id');
+    }
+
     public function devices(): HasMany
     {
         return $this->hasMany(UserDeviceModel::class, 'user_id');

@@ -117,7 +117,7 @@ trait MapsCustomerData
             documentNumber: $row['document_number'] ?? null,
             issuedDate: $row['issued_date'] ?? null,
             expiryDate: $row['expiry_date'] ?? null,
-            filePath: null,
+            filePath: $row['file_path'] ?? null,
             status: CustomerDocumentStatus::from((string) ($row['status'] ?? CustomerDocumentStatus::Pending->value)),
             notes: $row['notes'] ?? null,
         );
