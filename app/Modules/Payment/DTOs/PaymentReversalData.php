@@ -13,5 +13,6 @@ final readonly class PaymentReversalData
         public string $reason,
         public ?int $reversedBy = null,
         public string $status = 'posted',
+        public ?array $metadata = null,
     ) {}
 }

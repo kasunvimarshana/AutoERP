@@ -11,10 +11,30 @@ use Modules\Payment\Models\PaymentMethod;
 
 final class PaymentMethodService
 {
-    public function assertUsable(?PaymentMethod $method, PaymentDirection $direction, ?string $referenceNumber): void
+    public function assertUsable(
+        ?PaymentMethod $method,
+        PaymentDirection|string $direction,
+        ?string $referenceNumber,
+        ?int $tenantId = null,
+        ?int $organizationUnitId = null,
+        ?int $bankAccountId = null,
+    ): void
     {
         if (! $method instanceof PaymentMethod) {
             return;
+        }
+
+        $direction = $direction instanceof PaymentDirection
+            ? $direction
+            : PaymentDirection::from((string) $direction);
+
+        if ($method->tenant_id !== null && $tenantId !== null && (int) $method->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Payment method tenant must match payment tenant.');
+        }
+
+        if ($method->organization_unit_id !== null
+            && (int) $method->organization_unit_id !== (int) $organizationUnitId) {
+            throw new InvalidArgumentException('Payment method organization unit must match payment organization unit.');
         }
 
         if (! (bool) $method->is_active) {
@@ -31,6 +51,10 @@ final class PaymentMethodService
 
         if ((bool) $method->requires_reference && trim((string) $referenceNumber) === '') {
             throw new InvalidArgumentException('Payment method requires a reference number.');
+        }
+
+        if ((bool) $method->requires_bank_account && ($bankAccountId === null || $bankAccountId < 1)) {
+            throw new InvalidArgumentException('Payment method requires a bank account.');
         }
     }
 }

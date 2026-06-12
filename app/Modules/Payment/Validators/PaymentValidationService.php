@@ -10,6 +10,7 @@ use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
@@ -51,10 +52,15 @@ final class PaymentValidationService
             $this->assertPositive($line->amount, 'Payment line amount');
             $this->assertNonNegative($line->clearedAmount, 'Payment line cleared amount');
 
-            $method = $line->paymentMethodId !== null
-                ? PaymentMethod::query()->find($line->paymentMethodId)
-                : null;
-            $this->paymentMethods->assertUsable($method, $data->direction, $line->referenceNumber ?? $data->referenceNumber);
+            $method = $this->resolvePaymentMethod($line->paymentMethodId);
+            $this->validatePaymentMethod(
+                $method,
+                $data->tenantId,
+                $data->organizationUnitId,
+                $data->direction,
+                $line->referenceNumber ?? $data->referenceNumber,
+                $this->lineBankAccountId($line, $data->bankAccountId),
+            );
         }
 
         foreach ($data->allocations as $allocation) {
@@ -78,6 +84,24 @@ final class PaymentValidationService
         $this->assertPositive($allocation->allocatedAmount, 'Payment allocation amount');
     }
 
+    public function validatePaymentMethod(
+        ?PaymentMethod $method,
+        int $tenantId,
+        ?int $organizationUnitId,
+        PaymentDirection|string $direction,
+        ?string $referenceNumber,
+        ?int $bankAccountId,
+    ): void {
+        $this->paymentMethods->assertUsable(
+            $method,
+            $direction,
+            $referenceNumber,
+            $tenantId,
+            $organizationUnitId,
+            $bankAccountId,
+        );
+    }
+
     public function assertPositive(string $amount, string $label): void
     {
         if ($this->math->isNegative($amount) || $this->math->isZero($amount)) {
@@ -90,5 +114,26 @@ final class PaymentValidationService
         if ($this->math->isNegative($amount)) {
             throw new InvalidArgumentException($label.' cannot be negative.');
         }
+    }
+
+    private function resolvePaymentMethod(?int $paymentMethodId): ?PaymentMethod
+    {
+        if ($paymentMethodId === null) {
+            return null;
+        }
+
+        $method = PaymentMethod::query()->find($paymentMethodId);
+        if (! $method instanceof PaymentMethod) {
+            throw new InvalidArgumentException('Payment method was not found.');
+        }
+
+        return $method;
+    }
+
+    private function lineBankAccountId(PaymentLineData $line, ?int $headerBankAccountId): ?int
+    {
+        $metadataValue = is_array($line->metadata) ? ($line->metadata['bank_account_id'] ?? null) : null;
+
+        return is_numeric($metadataValue) ? (int) $metadataValue : $headerBankAccountId;
     }
 }

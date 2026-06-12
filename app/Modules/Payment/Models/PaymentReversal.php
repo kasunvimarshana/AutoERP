@@ -25,6 +25,7 @@ final class PaymentReversal extends CoreModel
             'reversed_by' => 'integer',
             'original_amount' => 'decimal:6',
             'reversed_amount' => 'decimal:6',
+            'metadata' => 'array',
         ]);
     }
 

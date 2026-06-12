@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentCalculationResult;
@@ -41,6 +42,9 @@ final class PaymentCalculationService
             ->sum('allocated_amount'));
         $refundedAmount = $this->math->normalize((string) $payment->refunds()->sum('amount'));
         $unappliedAmount = $this->math->sub($this->math->sub($totalAmount, $allocatedAmount), $refundedAmount);
+        if ($this->math->isNegative($unappliedAmount)) {
+            throw new InvalidArgumentException('Payment unapplied amount cannot be negative.');
+        }
 
         return new PaymentCalculationResult(
             totalAmount: $totalAmount,

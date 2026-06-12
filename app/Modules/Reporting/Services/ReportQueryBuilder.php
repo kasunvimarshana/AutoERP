@@ -126,11 +126,21 @@ final class ReportQueryBuilder
         }
 
         if (! empty($input['date_from'])) {
-            $query->whereDate($definition->dateColumn, '>=', (string) $input['date_from']);
+            if (str_contains($definition->dateColumn, '.')) {
+                [$relation, $field] = explode('.', $definition->dateColumn, 2);
+                $query->whereHas($relation, fn (Builder $scope): Builder => $scope->whereDate($field, '>=', (string) $input['date_from']));
+            } else {
+                $query->whereDate($definition->dateColumn, '>=', (string) $input['date_from']);
+            }
         }
 
         if (! empty($input['date_to'])) {
-            $query->whereDate($definition->dateColumn, '<=', (string) $input['date_to']);
+            if (str_contains($definition->dateColumn, '.')) {
+                [$relation, $field] = explode('.', $definition->dateColumn, 2);
+                $query->whereHas($relation, fn (Builder $scope): Builder => $scope->whereDate($field, '<=', (string) $input['date_to']));
+            } else {
+                $query->whereDate($definition->dateColumn, '<=', (string) $input['date_to']);
+            }
         }
     }
 

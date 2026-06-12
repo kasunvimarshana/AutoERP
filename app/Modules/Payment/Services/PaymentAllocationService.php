@@ -7,6 +7,8 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentAllocationData;
@@ -49,6 +51,39 @@ final class PaymentAllocationService
         });
     }
 
+    /**
+     * @param  list<PaymentAllocationData>  $allocations
+     */
+    public function allocateByMethod(
+        Payment $payment,
+        string $method,
+        string $allocationDate,
+        array $allocations = [],
+        ?string $amount = null,
+    ): Payment {
+        $method = strtolower(trim($method));
+
+        if (in_array($method, ['manual', 'specific_invoice'], true)) {
+            return $this->allocate($payment, array_map(
+                static fn (PaymentAllocationData $allocation): PaymentAllocationData => new PaymentAllocationData(
+                    invoiceId: $allocation->invoiceId,
+                    allocatedAmount: $allocation->allocatedAmount,
+                    allocationDate: $allocation->allocationDate,
+                    allowOverpayment: $allocation->allowOverpayment,
+                    allocationMethod: $method,
+                    metadata: $allocation->metadata,
+                ),
+                $allocations,
+            ));
+        }
+
+        if ($method !== 'fifo') {
+            throw new InvalidArgumentException('Unsupported payment allocation method.');
+        }
+
+        return $this->allocate($payment, $this->fifoAllocations($payment, $allocationDate, $amount));
+    }
+
     private function allocateOne(Payment $payment, PaymentAllocationData $allocation): PaymentAllocation
     {
         $invoiceBalance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
@@ -69,6 +104,9 @@ final class PaymentAllocationService
             ->where('invoice_id', $allocation->invoiceId)
             ->where('status', AllocationStatus::Active->value)
             ->sum('allocated_amount'));
+        if (! $this->math->isZero($previouslyAllocated)) {
+            throw new InvalidArgumentException('Payment is already allocated to this invoice.');
+        }
 
         $settlement = $this->invoiceSettlements->applyPaymentAllocation(
             $allocation->invoiceId,
@@ -87,7 +125,9 @@ final class PaymentAllocationService
             'allocated_amount' => $this->math->normalize($allocation->allocatedAmount),
             'invoice_balance_after' => $settlement->balanceAfter,
             'allocation_date' => $allocation->allocationDate,
+            'allocation_method' => $allocation->allocationMethod,
             'status' => AllocationStatus::Active->value,
+            'metadata' => $allocation->metadata,
         ]);
     }
 
@@ -102,7 +142,13 @@ final class PaymentAllocationService
             'refunded_amount' => $calculation->refundedAmount,
         ])->save();
 
-        $payment = $this->statuses->applyCalculatedStatus($payment->refresh(), $calculation->totalAmount, $calculation->allocatedAmount);
+        $payment = $this->statuses->applyCalculatedStatus(
+            $payment->refresh(),
+            $calculation->totalAmount,
+            $calculation->allocatedAmount,
+            $calculation->refundedAmount,
+            reason: 'Payment allocation recalculated.',
+        );
         $this->unappliedBalances->sync($payment);
 
         return $payment->refresh();
@@ -111,5 +157,67 @@ final class PaymentAllocationService
     private function availableAmount(Payment $payment): string
     {
         return $this->math->normalize((string) $payment->unapplied_amount);
+    }
+
+    /**
+     * @return list<PaymentAllocationData>
+     */
+    private function fifoAllocations(Payment $payment, string $allocationDate, ?string $amount = null): array
+    {
+        if ($payment->party_type === null || $payment->party_id === null) {
+            throw new InvalidArgumentException('FIFO allocation requires a payment party.');
+        }
+
+        $remaining = $amount === null
+            ? $this->availableAmount($payment)
+            : $this->math->normalize($amount);
+
+        $this->validator->assertPositive($remaining, 'FIFO allocation amount');
+
+        $invoiceQuery = Invoice::query()
+            ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
+            ->where('invoices.tenant_id', $payment->tenant_id)
+            ->where('invoices.party_type', $payment->party_type)
+            ->where('invoices.party_id', $payment->party_id)
+            ->where('invoice_balances.remaining_amount', '>', '0')
+            ->whereNotIn('invoices.status', ['draft', 'cancelled', 'void'])
+            ->orderBy('invoices.invoice_date')
+            ->orderBy('invoices.id');
+
+        $payment->organization_unit_id === null
+            ? $invoiceQuery->whereNull('invoices.organization_unit_id')
+            : $invoiceQuery->where('invoices.organization_unit_id', $payment->organization_unit_id);
+
+        $invoiceIds = $invoiceQuery
+            ->pluck('invoices.id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $allocations = [];
+        foreach ($invoiceIds as $invoiceId) {
+            if ($this->math->isZero($remaining)) {
+                break;
+            }
+
+            $balance = InvoiceBalance::query()->where('invoice_id', $invoiceId)->firstOrFail();
+            $invoiceRemaining = (string) $balance->remaining_amount;
+            $allocatedAmount = $this->math->compare($remaining, $invoiceRemaining) > 0
+                ? $invoiceRemaining
+                : $remaining;
+
+            $allocations[] = new PaymentAllocationData(
+                invoiceId: $invoiceId,
+                allocatedAmount: $allocatedAmount,
+                allocationDate: $allocationDate,
+                allocationMethod: 'fifo',
+            );
+            $remaining = $this->math->sub($remaining, $allocatedAmount);
+        }
+
+        if ($allocations === []) {
+            throw new InvalidArgumentException('No payable invoices were found for FIFO allocation.');
+        }
+
+        return $allocations;
     }
 }

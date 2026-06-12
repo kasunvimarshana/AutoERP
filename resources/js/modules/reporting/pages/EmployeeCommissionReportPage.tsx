@@ -41,7 +41,7 @@ interface EmployeeLookupOption extends NamedResource {
 
 const jobStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced', 'partially_paid', 'paid', 'cancelled'];
 const invoiceStatuses = ['draft', 'approved', 'posted', 'partially_paid', 'paid', 'cancelled', 'void'];
-const paymentStatuses = ['draft', 'approved', 'posted', 'partially_allocated', 'allocated', 'void', 'reversed', 'cancelled'];
+const paymentStatuses = ['draft', 'pending_approval', 'approved', 'posted', 'partially_allocated', 'fully_allocated', 'refunded', 'allocated', 'void', 'reversed', 'cancelled'];
 const commissionTypes = ['none', 'fixed', 'percentage'];
 const enumOptions = (values: string[]) => values.map((value) => ({ value, label: humanize(value) }));
 

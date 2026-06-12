@@ -22,11 +22,14 @@ final class PaymentUnappliedBalance extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
+            'party_id' => 'integer',
+            'source_id' => 'integer',
             'original_amount' => 'decimal:6',
             'allocated_amount' => 'decimal:6',
             'refunded_amount' => 'decimal:6',
             'remaining_amount' => 'decimal:6',
             'status' => UnappliedBalanceStatus::class,
+            'metadata' => 'array',
         ]);
     }
 

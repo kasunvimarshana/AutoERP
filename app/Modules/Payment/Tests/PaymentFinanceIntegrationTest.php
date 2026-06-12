@@ -19,6 +19,7 @@ use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\DTOs\PaymentPostingContext;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentFinanceIntegrationService;
 use Tests\TestCase;
@@ -47,8 +48,11 @@ final class PaymentFinanceIntegrationTest extends TestCase
             new FinancePostingLine('3000', 'Capital', credit: '1000.000000'),
         ]);
         $financeRequest = $service->toFinancePostingRequest($paymentRequest);
+        $paymentContext = $service->toPaymentPostingContext($paymentRequest);
 
         $this->assertSame((int) $payment->getKey(), $paymentRequest->paymentId);
+        $this->assertInstanceOf(PaymentPostingContext::class, $paymentContext);
+        $this->assertSame('payment', $paymentContext->source->sourceType);
         $this->assertSame('payment', $financeRequest->source->sourceType);
         $this->assertSame($tenantId, $financeRequest->source->tenantId);
         $this->assertSame('payment', $financeRequest->source->sourceModule);

@@ -16,5 +16,6 @@ final readonly class PaymentRefundData
         public ?int $paymentMethodId = null,
         public ?string $reason = null,
         public string $status = 'posted',
+        public ?array $metadata = null,
     ) {}
 }

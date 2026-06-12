@@ -24,6 +24,7 @@ final class PaymentLine extends CoreModel
             'payment_method_id' => 'integer',
             'amount' => 'decimal:6',
             'cleared_amount' => 'decimal:6',
+            'metadata' => 'array',
         ]);
     }
 

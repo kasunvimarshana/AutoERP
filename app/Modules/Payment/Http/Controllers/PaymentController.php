@@ -15,6 +15,7 @@ use Modules\Payment\Http\Requests\ListPaymentRequest;
 use Modules\Payment\Http\Requests\PaymentActionRequest;
 use Modules\Payment\Http\Requests\RefundPaymentRequest;
 use Modules\Payment\Http\Requests\ReversePaymentRequest;
+use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
@@ -22,6 +23,7 @@ use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentRefundService;
 use Modules\Payment\Services\PaymentReversalService;
+use Modules\Payment\Services\PaymentSettlementService;
 use Modules\Payment\Services\PaymentStatusService;
 
 final class PaymentController
@@ -64,7 +66,7 @@ final class PaymentController
         $row = $this->scope(Payment::query(), $request)
             ->with([
                 'currency', 'lines.paymentMethod', 'allocations',
-                'unappliedBalance', 'refunds', 'reversals',
+                'unappliedBalance', 'refunds', 'reversals', 'statusHistory',
             ])->findOrFail($payment);
         $this->attachInvoiceReferences($row->allocations, $invoices);
 
@@ -74,6 +76,15 @@ final class PaymentController
     public function approve(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
     {
         return new PaymentResource($service->transition($this->find($request, $payment), PaymentStatus::Approved, $request->currentUserId()));
+    }
+
+    public function submitForApproval(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
+    {
+        return new PaymentResource($service->transition(
+            $this->find($request, $payment),
+            PaymentStatus::PendingApproval,
+            $request->currentUserId(),
+        ));
     }
 
     public function post(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
@@ -119,6 +130,22 @@ final class PaymentController
         return response()->json(['data' => $this->find($request, $payment)->unappliedBalance()->first()]);
     }
 
+    public function settleLine(
+        SettlePaymentLineRequest $request,
+        int $payment,
+        int $line,
+        PaymentSettlementService $service,
+    ): JsonResponse {
+        return response()->json([
+            'data' => $service->transitionLine(
+                $this->find($request, $payment),
+                $line,
+                $request->settlementStatus(),
+                $request->metadata(),
+            ),
+        ]);
+    }
+
     public function refund(RefundPaymentRequest $request, int $payment, PaymentRefundService $service): JsonResponse
     {
         $this->find($request, $payment);
@@ -126,12 +153,12 @@ final class PaymentController
         return response()->json(['data' => $service->refund($request->toData($payment))], 201);
     }
 
-    private function find(PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest $request, int $payment): Payment
+    private function find(PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request, int $payment): Payment
     {
         return $this->scope(Payment::query(), $request)->findOrFail($payment);
     }
 
-    private function scope(Builder $query, ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest $request): Builder
+    private function scope(Builder $query, ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request): Builder
     {
         $query->where('tenant_id', $request->tenantId());
 

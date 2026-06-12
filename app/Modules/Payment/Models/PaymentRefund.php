@@ -28,6 +28,7 @@ final class PaymentRefund extends CoreModel
             'party_id' => 'integer',
             'payment_method_id' => 'integer',
             'amount' => 'decimal:6',
+            'metadata' => 'array',
         ]);
     }
 

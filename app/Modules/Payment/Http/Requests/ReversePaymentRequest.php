@@ -17,6 +17,7 @@ final class ReversePaymentRequest extends TenantScopedRequest
             'reversal_number' => ['required', 'string', 'max:100'],
             'reversal_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
+            'metadata' => ['nullable', 'array'],
         ];
     }
 
@@ -28,6 +29,7 @@ final class ReversePaymentRequest extends TenantScopedRequest
             reversalDate: (string) $this->input('reversal_date'),
             reason: (string) $this->input('reason'),
             reversedBy: $this->currentUserId(),
+            metadata: $this->input('metadata'),
         );
     }
 }

@@ -18,13 +18,18 @@ return new class extends Migration
             $table->string('name');
             $table->enum('method_type', [
                 'cash',
-                'bank',
-                'card',
                 'cheque',
+                'bank_transfer',
+                'card',
+                'credit_note',
+                'advance',
+                'deposit',
+                'wallet',
+                'custom',
+                'bank',
                 'online',
                 'transfer',
                 'mobile_wallet',
-                'credit_note',
                 'debit_note',
                 'other',
             ]);

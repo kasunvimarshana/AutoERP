@@ -20,6 +20,7 @@ final class PaymentCreationService
         private readonly PaymentCalculationService $calculations,
         private readonly PaymentUnappliedBalanceService $unappliedBalances,
         private readonly PaymentAllocationService $allocations,
+        private readonly PaymentStatusService $statuses,
     ) {}
 
     public function create(CreatePaymentData $data): Payment
@@ -37,6 +38,9 @@ final class PaymentCreationService
                 'direction' => $data->direction->value,
                 'party_type' => $data->partyType,
                 'party_id' => $data->partyId,
+                'source_type' => $data->sourceType,
+                'source_id' => $data->sourceId,
+                'allocation_status' => $data->allocationStatus,
                 'payment_date' => $data->paymentDate,
                 'currency_id' => $data->currencyId,
                 'exchange_rate' => $this->math->normalize($data->exchangeRate),
@@ -52,8 +56,10 @@ final class PaymentCreationService
                 'unapplied_amount' => $calculation->unappliedAmount,
                 'refunded_amount' => $calculation->refundedAmount,
                 'notes' => $data->notes,
+                'metadata' => $data->metadata,
                 'created_by' => $data->createdBy,
             ]);
+            $this->statuses->recordInitial($payment, $data->createdBy);
 
             foreach ($data->lines as $index => $line) {
                 PaymentLine::query()->create([
@@ -66,6 +72,7 @@ final class PaymentCreationService
                     'cleared_amount' => $this->math->normalize($line->clearedAmount),
                     'status' => $line->status,
                     'notes' => $line->notes,
+                    'metadata' => $line->metadata,
                 ]);
             }
 

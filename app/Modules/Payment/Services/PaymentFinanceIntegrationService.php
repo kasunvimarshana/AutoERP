@@ -8,6 +8,7 @@ use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Payment\DTOs\PaymentPostingContext;
 use Modules\Payment\DTOs\PaymentPostingRequest;
 use Modules\Payment\Models\Payment;
 
@@ -41,9 +42,24 @@ final class PaymentFinanceIntegrationService
 
     public function toFinancePostingRequest(PaymentPostingRequest $request): FinancePostingRequest
     {
-        $payment = Payment::query()->findOrFail($request->paymentId);
+        $context = $this->toPaymentPostingContext($request);
 
         return new FinancePostingRequest(
+            source: $context->source,
+            postingDate: $context->postingDate,
+            currencyId: $context->currencyId,
+            exchangeRate: $context->exchangeRate,
+            lines: $context->lines,
+            description: $context->description,
+            postingProfileCode: $context->postingProfileCode,
+        );
+    }
+
+    public function toPaymentPostingContext(PaymentPostingRequest $request): PaymentPostingContext
+    {
+        $payment = Payment::query()->findOrFail($request->paymentId);
+
+        return new PaymentPostingContext(
             source: new PostingSourceData(
                 sourceType: 'payment',
                 sourceId: (int) $payment->getKey(),

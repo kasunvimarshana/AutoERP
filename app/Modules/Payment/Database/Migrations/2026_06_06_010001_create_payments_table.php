@@ -33,10 +33,13 @@ return new class extends Migration
             $table->string('reference_number')->nullable();
             $table->enum('status', [
                 'draft',
+                'pending_approval',
                 'approved',
                 'posted',
                 'partially_allocated',
+                'fully_allocated',
                 'allocated',
+                'refunded',
                 'void',
                 'reversed',
                 'cancelled',

@@ -17,8 +17,11 @@ final class RefundPaymentRequest extends TenantScopedRequest
             'refund_number' => ['required', 'string', 'max:100'],
             'refund_date' => ['required', 'date'],
             'amount' => ['required', 'decimal:0,6', 'gt:0'],
+            'party_type' => ['nullable', 'string', 'max:150'],
+            'party_id' => ['nullable', 'integer', 'min:1'],
             'payment_method_id' => ['nullable', 'integer', 'min:1'],
             'reason' => ['nullable', 'string'],
+            'metadata' => ['nullable', 'array'],
         ];
     }
 
@@ -33,6 +36,7 @@ final class RefundPaymentRequest extends TenantScopedRequest
             partyId: $this->filled('party_id') ? (int) $this->input('party_id') : null,
             paymentMethodId: $this->filled('payment_method_id') ? (int) $this->input('payment_method_id') : null,
             reason: $this->filled('reason') ? (string) $this->input('reason') : null,
+            metadata: $this->input('metadata'),
         );
     }
 }

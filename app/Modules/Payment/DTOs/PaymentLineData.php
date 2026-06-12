@@ -13,5 +13,6 @@ final readonly class PaymentLineData
         public string $clearedAmount = '0.000000',
         public string $status = 'pending',
         public ?string $notes = null,
+        public ?array $metadata = null,
     ) {}
 }

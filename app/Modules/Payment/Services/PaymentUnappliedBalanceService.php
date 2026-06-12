@@ -6,6 +6,7 @@ namespace Modules\Payment\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\PaymentBalanceResult;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentUnappliedBalance;
@@ -32,11 +33,18 @@ final class PaymentUnappliedBalanceService
         $balance->forceFill([
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
+            'balance_type' => $this->balanceType($payment, $allocatedAmount),
+            'party_type' => $payment->party_type,
+            'party_id' => $payment->party_id,
+            'source_type' => $payment->source_type,
+            'source_id' => $payment->source_id,
+            'allocation_status' => $this->allocationStatus($remainingAmount),
             'original_amount' => $originalAmount,
             'allocated_amount' => $allocatedAmount,
             'refunded_amount' => $refundedAmount,
             'remaining_amount' => $remainingAmount,
             'status' => $this->statusForAmounts($originalAmount, $allocatedAmount, $refundedAmount, $remainingAmount)->value,
+            'metadata' => $payment->metadata,
         ])->save();
 
         return $balance->refresh();
@@ -74,5 +82,32 @@ final class PaymentUnappliedBalanceService
         }
 
         return UnappliedBalanceStatus::Available;
+    }
+
+    private function balanceType(Payment $payment, string $allocatedAmount): string
+    {
+        $sourceType = strtolower((string) $payment->source_type);
+        if (str_contains($sourceType, 'deposit')) {
+            return 'deposit';
+        }
+
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+
+        if ($paymentType === PaymentType::Advance) {
+            return 'advance';
+        }
+
+        if (! $this->math->isZero($allocatedAmount)) {
+            return 'overpayment';
+        }
+
+        return 'credit';
+    }
+
+    private function allocationStatus(string $remainingAmount): string
+    {
+        return $this->math->isZero($remainingAmount) ? 'fully_allocated' : 'unapplied';
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use InvalidArgumentException;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Finance\Models\FinanceAccount;
@@ -31,6 +32,7 @@ final class Payment extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'party_id' => 'integer',
+            'source_id' => 'integer',
             'currency_id' => 'integer',
             'bank_account_id' => 'integer',
             'payment_type' => PaymentType::class,
@@ -43,6 +45,7 @@ final class Payment extends CoreModel
             'allocated_amount' => 'decimal:6',
             'unapplied_amount' => 'decimal:6',
             'refunded_amount' => 'decimal:6',
+            'metadata' => 'array',
             'created_by' => 'integer',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
@@ -50,6 +53,19 @@ final class Payment extends CoreModel
             'voided_by' => 'integer',
             'voided_at' => 'datetime',
         ]);
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Payment $payment): void {
+            $status = $payment->status instanceof PaymentStatus
+                ? $payment->status
+                : PaymentStatus::from((string) $payment->status);
+
+            if (! in_array($status, [PaymentStatus::Draft, PaymentStatus::Cancelled], true)) {
+                throw new InvalidArgumentException('Posted, allocated, refunded, or reversed payments cannot be deleted.');
+            }
+        });
     }
 
     public function tenant(): BelongsTo
@@ -100,5 +116,10 @@ final class Payment extends CoreModel
     public function chequePrintLogs(): HasMany
     {
         return $this->hasMany(ChequePrintLog::class, 'payment_id');
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(PaymentStatusHistory::class, 'payment_id');
     }
 }

@@ -54,6 +54,7 @@ const paymentStatusOptions = [
     { value: 'approved', label: 'Approved' },
     { value: 'posted', label: 'Posted' },
     { value: 'partially_allocated', label: 'Partially allocated' },
+    { value: 'fully_allocated', label: 'Fully allocated' },
     { value: 'allocated', label: 'Allocated' },
     { value: 'void', label: 'Void' },
     { value: 'reversed', label: 'Reversed' },

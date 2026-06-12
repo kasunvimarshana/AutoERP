@@ -27,6 +27,9 @@ use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Item\Models\Item;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
+use Modules\Payment\Models\PaymentLine;
+use Modules\Payment\Models\PaymentRefund;
+use Modules\Payment\Models\PaymentReversal;
 use Modules\Payment\Models\PaymentUnappliedBalance;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
@@ -253,12 +256,36 @@ final class ReportCatalog
             $this->payment('payment.register', 'Payment Register', Payment::class, 'payment_date', 'payment_number', 'total_amount'),
             $this->definition('payment.allocation', 'Payment Allocation', 'Invoice & Payment', PaymentAllocation::class, [
                 $this->col('allocation_date', 'Date', format: 'date', sort: 'allocation_date'), $this->col('payment', 'Payment', 'payment.payment_number'),
-                $this->money('invoice_total', 'Invoice Total'), $this->money('allocated_amount', 'Allocated'), $this->money('invoice_balance_after', 'Balance After'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['payment.payment_number'], ['payment'], 'allocation_date'),
-            $this->definition('payment.unapplied', 'Unapplied Payments', 'Invoice & Payment', PaymentUnappliedBalance::class, [
+                $this->col('invoice', 'Invoice', 'invoice.invoice_number'), $this->money('invoice_total', 'Invoice Total'), $this->money('allocated_amount', 'Allocated'),
+                $this->money('invoice_balance_after', 'Balance After'), $this->col('allocation_method', 'Method', format: 'enum', sort: 'allocation_method'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['payment.payment_number', 'invoice.invoice_number'], ['payment', 'invoice'], 'allocation_date'),
+            $this->definition('payment.advance', 'Advance Payment Report', 'Invoice & Payment', Payment::class, [
+                $this->col('payment_date', 'Date', format: 'date', sort: 'payment_date'), $this->col('payment_number', 'Payment', sort: 'payment_number'),
+                $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'), $this->col('party_id', 'Party ID', sort: 'party_id'),
+                $this->col('source_type', 'Source', format: 'enum', sort: 'source_type'), $this->col('source_id', 'Source ID', sort: 'source_id'),
+                $this->money('total_amount', 'Amount'), $this->money('allocated_amount', 'Allocated'), $this->money('unapplied_amount', 'Unapplied'),
+                $this->col('allocation_status', 'Allocation Status', format: 'enum', sort: 'allocation_status'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['payment_number', 'party_type', 'source_type'], [], 'payment_date', constraints: ['payment_type' => 'advance']),
+            $this->definition('payment.unapplied', 'Unapplied Balance Report', 'Invoice & Payment', PaymentUnappliedBalance::class, [
                 $this->col('payment', 'Payment', 'payment.payment_number'), $this->money('original_amount', 'Original'), $this->money('allocated_amount', 'Allocated'),
-                $this->money('refunded_amount', 'Refunded'), $this->money('remaining_amount', 'Remaining'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['payment.payment_number'], ['payment']),
+                $this->money('refunded_amount', 'Refunded'), $this->money('remaining_amount', 'Remaining'), $this->col('balance_type', 'Type', format: 'enum', sort: 'balance_type'),
+                $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'), $this->col('party_id', 'Party ID', sort: 'party_id'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['payment.payment_number', 'party_type'], ['payment']),
+            $this->creditReport('payment.customer-credit', 'Customer Credit Report', 'customer'),
+            $this->creditReport('payment.supplier-credit', 'Supplier Credit Report', 'supplier'),
+            $this->definition('payment.refund', 'Refund Report', 'Invoice & Payment', PaymentRefund::class, [
+                $this->col('refund_date', 'Date', format: 'date', sort: 'refund_date'), $this->col('refund_number', 'Refund', sort: 'refund_number'),
+                $this->col('payment', 'Payment', 'payment.payment_number'), $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
+                $this->col('party_id', 'Party ID', sort: 'party_id'), $this->money('amount', 'Amount'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['refund_number', 'payment.payment_number', 'party_type'], ['payment'], 'refund_date'),
+            $this->definition('payment.reversal', 'Payment Reversal Report', 'Invoice & Payment', PaymentReversal::class, [
+                $this->col('reversal_date', 'Date', format: 'date', sort: 'reversal_date'), $this->col('reversal_number', 'Reversal', sort: 'reversal_number'),
+                $this->col('payment', 'Payment', 'payment.payment_number'), $this->money('original_amount', 'Original'), $this->money('reversed_amount', 'Reversed'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reversal_number', 'payment.payment_number'], ['payment'], 'reversal_date'),
+            $this->paymentLineReport('payment.cheque-status', 'Cheque Status Report', ['cheque']),
+            $this->paymentLineReport('payment.bank-transfer', 'Bank Transfer Report', ['bank_transfer', 'bank', 'transfer']),
+            $this->paymentLineReport('payment.cash-collection', 'Cash Collection Report', ['cash'], 'inbound'),
 
             $this->definition('finance.account-balances', 'Account Balances', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('opening_debit', 'Opening Dr'),
@@ -471,10 +498,108 @@ final class ReportCatalog
 
     private function payment(string $key, string $title, string $model, string $dateColumn, string $numberColumn, string $amountColumn): ReportDefinition
     {
-        return $this->definition($key, $title, 'Invoice & Payment', $model, [
-            $this->col($dateColumn, 'Date', format: 'date', sort: $dateColumn), $this->col($numberColumn, 'Number', sort: $numberColumn), $this->col('party_name', 'Party', sort: 'party_name'),
-            $this->money($amountColumn, 'Amount'), $this->money('allocated_amount', 'Allocated'), $this->money('unapplied_amount', 'Unapplied'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-        ], [$numberColumn, 'party_name'], [], $dateColumn);
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Invoice & Payment',
+            model: $model,
+            columns: [
+                $this->col($dateColumn, 'Date', format: 'date', sort: $dateColumn),
+                $this->col($numberColumn, 'Number', sort: $numberColumn),
+                $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
+                $this->col('party_id', 'Party ID', sort: 'party_id'),
+                $this->money($amountColumn, 'Amount'),
+                $this->money('allocated_amount', 'Allocated'),
+                $this->money('unapplied_amount', 'Unapplied'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: [$numberColumn, 'reference_number', 'party_type'],
+            filters: [
+                $this->filter('status', 'Status', 'status'),
+                $this->filter('direction', 'Direction', 'direction'),
+                $this->filter('party_type', 'Party Type', 'party_type'),
+                $this->filter('party_id', 'Party ID', 'party_id'),
+            ],
+            dateColumn: $dateColumn,
+            defaultSort: $dateColumn,
+            defaultDirection: 'desc',
+            description: 'Payment module register with allocation and unapplied balance totals.',
+        );
+    }
+
+    private function creditReport(string $key, string $title, string $partyType): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Invoice & Payment',
+            model: PaymentUnappliedBalance::class,
+            columns: [
+                $this->col('payment_date', 'Payment Date', 'payment.payment_date', 'date'),
+                $this->col('payment', 'Payment', 'payment.payment_number'),
+                $this->col('party_id', 'Party ID', sort: 'party_id'),
+                $this->col('balance_type', 'Type', format: 'enum', sort: 'balance_type'),
+                $this->money('original_amount', 'Original'),
+                $this->money('allocated_amount', 'Allocated'),
+                $this->money('refunded_amount', 'Refunded'),
+                $this->money('remaining_amount', 'Credit'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['payment.payment_number', 'balance_type'],
+            relations: ['payment'],
+            filters: [$this->filter('status', 'Status', 'status')],
+            dateColumn: 'payment.payment_date',
+            defaultSort: 'id',
+            defaultDirection: 'desc',
+            scope: static fn ($query) => $query
+                ->where('party_type', $partyType)
+                ->where('remaining_amount', '>', '0')
+                ->whereIn('balance_type', ['credit', 'overpayment', 'advance', 'deposit']),
+            description: 'Open credit balances owned by Payment and available for later settlement.',
+        );
+    }
+
+    /**
+     * @param  list<string>  $methodTypes
+     */
+    private function paymentLineReport(string $key, string $title, array $methodTypes, ?string $direction = null): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Invoice & Payment',
+            model: PaymentLine::class,
+            columns: [
+                $this->col('payment_date', 'Payment Date', 'payment.payment_date', 'date'),
+                $this->col('payment', 'Payment', 'payment.payment_number'),
+                $this->col('method', 'Method', 'paymentMethod.name'),
+                $this->col('method_type', 'Type', 'paymentMethod.method_type', 'enum'),
+                $this->col('reference_number', 'Reference', sort: 'reference_number'),
+                $this->money('amount', 'Amount'),
+                $this->money('cleared_amount', 'Cleared'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['payment.payment_number', 'reference_number', 'paymentMethod.name'],
+            relations: ['payment', 'paymentMethod'],
+            filters: [
+                $this->filter('status', 'Status', 'status'),
+                $this->filter('method_type', 'Payment Method', 'paymentMethod.method_type'),
+            ],
+            dateColumn: 'payment.payment_date',
+            defaultSort: 'id',
+            defaultDirection: 'desc',
+            scope: static function ($query) use ($methodTypes, $direction) {
+                $query->whereHas('paymentMethod', fn ($method) => $method->whereIn('method_type', $methodTypes));
+
+                if ($direction !== null) {
+                    $query->whereHas('payment', fn ($payment) => $payment->where('direction', $direction));
+                }
+
+                return $query;
+            },
+            description: 'Payment line settlement report driven by Payment method configuration.',
+            orientation: 'landscape',
+        );
     }
 
     private function aging(string $key, string $title, string $direction): ReportDefinition

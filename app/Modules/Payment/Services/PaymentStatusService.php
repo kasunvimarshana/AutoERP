@@ -21,8 +21,14 @@ final class PaymentStatusService
     {
         return [
             PaymentStatus::Draft->value => [
+                PaymentStatus::PendingApproval->value,
                 PaymentStatus::Approved->value,
                 PaymentStatus::Posted->value,
+                PaymentStatus::Cancelled->value,
+                PaymentStatus::Void->value,
+            ],
+            PaymentStatus::PendingApproval->value => [
+                PaymentStatus::Approved->value,
                 PaymentStatus::Cancelled->value,
                 PaymentStatus::Void->value,
             ],
@@ -33,20 +39,24 @@ final class PaymentStatusService
             ],
             PaymentStatus::Posted->value => [
                 PaymentStatus::PartiallyAllocated->value,
+                PaymentStatus::FullyAllocated->value,
                 PaymentStatus::Allocated->value,
+                PaymentStatus::Refunded->value,
                 PaymentStatus::Reversed->value,
-                PaymentStatus::Cancelled->value,
-                PaymentStatus::Void->value,
             ],
             PaymentStatus::PartiallyAllocated->value => [
+                PaymentStatus::FullyAllocated->value,
                 PaymentStatus::Allocated->value,
+                PaymentStatus::Refunded->value,
                 PaymentStatus::Reversed->value,
-                PaymentStatus::Void->value,
             ],
             PaymentStatus::Allocated->value => [
                 PaymentStatus::Reversed->value,
-                PaymentStatus::Void->value,
             ],
+            PaymentStatus::FullyAllocated->value => [
+                PaymentStatus::Reversed->value,
+            ],
+            PaymentStatus::Refunded->value => [],
             PaymentStatus::Void->value => [],
             PaymentStatus::Reversed->value => [],
             PaymentStatus::Cancelled->value => [],
@@ -69,13 +79,18 @@ final class PaymentStatusService
             ? $payment->status
             : PaymentStatus::from((string) $payment->status);
 
-        if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed], true)) {
-            throw new InvalidArgumentException('Cancelled, void, or reversed payments cannot be allocated.');
+        if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed, PaymentStatus::Refunded], true)) {
+            throw new InvalidArgumentException('Cancelled, void, refunded, or reversed payments cannot be allocated.');
         }
     }
 
-    public function statusForAmounts(string $totalAmount, string $allocatedAmount): PaymentStatus
+    public function statusForAmounts(string $totalAmount, string $allocatedAmount, string $refundedAmount = '0.000000'): PaymentStatus
     {
+        if (! $this->math->isZero($refundedAmount)
+            && $this->math->compare($this->math->add($allocatedAmount, $refundedAmount), $totalAmount) >= 0) {
+            return PaymentStatus::Refunded;
+        }
+
         if ($this->math->isZero($allocatedAmount)) {
             return PaymentStatus::Posted;
         }
@@ -84,20 +99,36 @@ final class PaymentStatusService
             return PaymentStatus::PartiallyAllocated;
         }
 
-        return PaymentStatus::Allocated;
+        return PaymentStatus::FullyAllocated;
     }
 
-    public function applyCalculatedStatus(Payment $payment, string $totalAmount, string $allocatedAmount): Payment
+    public function applyCalculatedStatus(
+        Payment $payment,
+        string $totalAmount,
+        string $allocatedAmount,
+        string $refundedAmount = '0.000000',
+        ?int $actorId = null,
+        ?string $reason = null,
+    ): Payment
     {
+        $from = $payment->status instanceof PaymentStatus
+            ? $payment->status
+            : PaymentStatus::from((string) $payment->status);
+        $to = $this->statusForAmounts($totalAmount, $allocatedAmount, $refundedAmount);
+
         $payment->forceFill([
-            'status' => $this->statusForAmounts($totalAmount, $allocatedAmount)->value,
+            'status' => $to->value,
             'posted_at' => $payment->posted_at ?? now(),
         ])->save();
+
+        if ($from !== $to) {
+            $this->record($payment->refresh(), $from, $to, $actorId, $reason);
+        }
 
         return $payment->refresh();
     }
 
-    public function transition(Payment $payment, PaymentStatus $to, ?int $actorId = null): Payment
+    public function transition(Payment $payment, PaymentStatus $to, ?int $actorId = null, ?string $reason = null): Payment
     {
         $from = $payment->status instanceof PaymentStatus
             ? $payment->status
@@ -114,6 +145,7 @@ final class PaymentStatusService
         }
 
         $payment->forceFill($updates)->save();
+        $this->record($payment->refresh(), $from, $to, $actorId, $reason);
 
         return $payment->refresh();
     }
@@ -124,7 +156,7 @@ final class PaymentStatusService
             throw new InvalidArgumentException('Allocated payments must be reversed before they can be voided.');
         }
 
-        $payment = $this->transition($payment, PaymentStatus::Void, $voidedBy);
+        $payment = $this->transition($payment, PaymentStatus::Void, $voidedBy, $reason);
         $payment->forceFill([
             'voided_by' => $voidedBy,
             'voided_at' => now(),
@@ -132,5 +164,37 @@ final class PaymentStatusService
         ])->save();
 
         return $payment->refresh();
+    }
+
+    public function recordInitial(Payment $payment, ?int $actorId = null): void
+    {
+        $to = $payment->status instanceof PaymentStatus
+            ? $payment->status
+            : PaymentStatus::from((string) $payment->status);
+
+        $this->record($payment, null, $to, $actorId, 'Payment created.');
+    }
+
+    public function record(
+        Payment $payment,
+        PaymentStatus|string|null $from,
+        PaymentStatus|string $to,
+        ?int $actorId = null,
+        ?string $reason = null,
+        ?array $metadata = null,
+    ): void {
+        $fromValue = $from instanceof PaymentStatus ? $from->value : $from;
+        $toValue = $to instanceof PaymentStatus ? $to->value : $to;
+
+        $payment->statusHistory()->create([
+            'tenant_id' => $payment->tenant_id,
+            'organization_unit_id' => $payment->organization_unit_id,
+            'from_status' => $fromValue,
+            'to_status' => $toValue,
+            'reason' => $reason,
+            'changed_by' => $actorId,
+            'changed_at' => now(),
+            'metadata' => $metadata,
+        ]);
     }
 }

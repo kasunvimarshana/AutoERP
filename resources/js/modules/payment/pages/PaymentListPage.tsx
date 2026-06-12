@@ -13,6 +13,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
+import { Button } from '@/shared/components/Button';
 
 export default function PaymentListPage() {
     const [search, setSearch] = useState('');
@@ -29,7 +30,7 @@ export default function PaymentListPage() {
     ];
     return (
         <>
-            <ContentHeader title="Payments" description="Payment activity with on-demand allocation data." />
+            <ContentHeader title="Payments" description="Payment activity with on-demand allocation data." actions={<Link to="/payments/create"><Button>New payment</Button></Link>} />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

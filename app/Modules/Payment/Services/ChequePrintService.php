@@ -20,6 +20,7 @@ final class ChequePrintService
         PaymentStatus::Approved,
         PaymentStatus::Posted,
         PaymentStatus::PartiallyAllocated,
+        PaymentStatus::FullyAllocated,
         PaymentStatus::Allocated,
     ];
 

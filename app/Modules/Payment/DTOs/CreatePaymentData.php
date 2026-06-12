@@ -23,6 +23,9 @@ final readonly class CreatePaymentData
         public ?string $paymentNumber = null,
         public ?string $partyType = null,
         public ?int $partyId = null,
+        public ?string $sourceType = null,
+        public ?int $sourceId = null,
+        public string $allocationStatus = 'unapplied',
         public ?int $currencyId = null,
         public string $exchangeRate = '1.000000',
         public ?string $referenceNumber = null,
@@ -36,5 +39,6 @@ final readonly class CreatePaymentData
         public ?int $bankAccountId = null,
         public ?string $payeeName = null,
         public ?string $amountInWords = null,
+        public ?array $metadata = null,
     ) {}
 }

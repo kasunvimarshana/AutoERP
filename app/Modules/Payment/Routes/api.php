@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Payment\Http\Controllers\ChequePrintController;
 use Modules\Payment\Http\Controllers\ChequeTemplateController;
 use Modules\Payment\Http\Controllers\PaymentController;
+use Modules\Payment\Http\Controllers\PaymentMethodController;
 
 $middleware = [
     'api',
@@ -21,9 +22,11 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::get('cheque-templates/{id}', [ChequeTemplateController::class, 'show'])->whereNumber('id')->name('cheque-templates.show');
     Route::put('cheque-templates/{id}', [ChequeTemplateController::class, 'update'])->whereNumber('id')->name('cheque-templates.update');
     Route::delete('cheque-templates/{id}', [ChequeTemplateController::class, 'destroy'])->whereNumber('id')->name('cheque-templates.destroy');
+    Route::get('methods', [PaymentMethodController::class, 'index'])->name('methods.index');
     Route::get('/', [PaymentController::class, 'index'])->name('index');
     Route::post('/', [PaymentController::class, 'store'])->name('store');
     Route::get('{payment}', [PaymentController::class, 'show'])->whereNumber('payment')->name('show');
+    Route::post('{payment}/submit-approval', [PaymentController::class, 'submitForApproval'])->whereNumber('payment')->name('submit-approval');
     Route::post('{payment}/approve', [PaymentController::class, 'approve'])->whereNumber('payment')->name('approve');
     Route::post('{payment}/post', [PaymentController::class, 'post'])->whereNumber('payment')->name('post');
     Route::post('{payment}/void', [PaymentController::class, 'void'])->whereNumber('payment')->name('void');
@@ -31,6 +34,10 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::post('{payment}/allocations', [PaymentController::class, 'allocate'])->whereNumber('payment')->name('allocations.store');
     Route::get('{payment}/allocations', [PaymentController::class, 'allocations'])->whereNumber('payment')->name('allocations.index');
     Route::get('{payment}/unapplied-balance', [PaymentController::class, 'unappliedBalance'])->whereNumber('payment')->name('unapplied-balance');
+    Route::post('{payment}/lines/{line}/settlement', [PaymentController::class, 'settleLine'])
+        ->whereNumber('payment')
+        ->whereNumber('line')
+        ->name('lines.settlement');
     Route::post('{payment}/refunds', [PaymentController::class, 'refund'])->whereNumber('payment')->name('refunds.store');
     Route::get('{payment}/cheque-print/preview', [ChequePrintController::class, 'preview'])->whereNumber('payment')->name('cheque-print.preview');
     Route::post('{payment}/cheque-print/mark-printed', [ChequePrintController::class, 'markPrinted'])->whereNumber('payment')->name('cheque-print.mark-printed');

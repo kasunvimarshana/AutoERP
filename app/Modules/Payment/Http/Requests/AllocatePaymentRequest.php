@@ -19,6 +19,8 @@ final class AllocatePaymentRequest extends TenantScopedRequest
             'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
             'allocations.*.allocation_date' => ['required', 'date'],
             'allocations.*.allow_overpayment' => ['nullable', 'boolean'],
+            'allocations.*.allocation_method' => ['nullable', 'string', 'in:manual,specific_invoice,fifo'],
+            'allocations.*.metadata' => ['nullable', 'array'],
         ];
     }
 
@@ -29,6 +31,8 @@ final class AllocatePaymentRequest extends TenantScopedRequest
             allocatedAmount: (string) $row['allocated_amount'],
             allocationDate: (string) $row['allocation_date'],
             allowOverpayment: (bool) ($row['allow_overpayment'] ?? false),
+            allocationMethod: (string) ($row['allocation_method'] ?? 'specific_invoice'),
+            metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
         ), $this->input('allocations'));
     }
 }

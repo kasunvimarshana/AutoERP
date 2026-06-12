@@ -32,6 +32,7 @@ final class PaymentMethod extends CoreModel
             'requires_bank_account' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'metadata' => 'array',
         ]);
     }
 

@@ -20,6 +20,7 @@ final class PaymentReversalService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
+        private readonly PaymentStatusService $statuses,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -34,11 +35,14 @@ final class PaymentReversalService
                 ? $payment->status
                 : PaymentStatus::from((string) $payment->status);
 
+            if ($payment->reversals()->exists()) {
+                throw new InvalidArgumentException('Payment reversal already exists for this payment.');
+            }
+
             if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed], true)) {
                 throw new InvalidArgumentException('Cancelled, void, or reversed payments cannot be reversed.');
             }
 
-            $reversedAmount = '0.000000';
             foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->get() as $allocation) {
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
@@ -48,8 +52,6 @@ final class PaymentReversalService
                 $allocation->forceFill([
                     'status' => AllocationStatus::Reversed->value,
                 ])->save();
-
-                $reversedAmount = $this->math->add($reversedAmount, (string) $allocation->allocated_amount);
             }
 
             $reversal = PaymentReversal::query()->create([
@@ -61,8 +63,9 @@ final class PaymentReversalService
                 'reason' => $data->reason,
                 'reversed_by' => $data->reversedBy,
                 'original_amount' => $payment->total_amount,
-                'reversed_amount' => $reversedAmount,
+                'reversed_amount' => $this->math->normalize((string) $payment->total_amount),
                 'status' => $data->status,
+                'metadata' => $data->metadata,
             ]);
 
             $payment->forceFill([
@@ -73,6 +76,7 @@ final class PaymentReversalService
                 'voided_at' => now(),
                 'void_reason' => $data->reason,
             ])->save();
+            $this->statuses->record($payment->refresh(), $status, PaymentStatus::Reversed, $data->reversedBy, $data->reason);
 
             if ($payment->unappliedBalance !== null) {
                 $payment->unappliedBalance->forceFill([

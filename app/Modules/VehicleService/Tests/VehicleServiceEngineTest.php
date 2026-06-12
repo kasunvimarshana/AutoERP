@@ -451,14 +451,14 @@ final class VehicleServiceEngineTest extends TestCase
         }
 
         $first = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '100.000000');
-        $this->assertSame(PaymentStatus::Allocated, $first->status);
+        $this->assertSame(PaymentStatus::FullyAllocated, $first->status);
         $this->assertSame('150.000000', (string) Invoice::query()->findOrFail($invoice->getKey())->balance_due);
         $this->assertSame(VehicleServiceJobStatus::PartiallyPaid, $job->refresh()->status);
         $resource = (new VehicleServiceJobResource($job->refresh()->load(app(VehicleServiceJobService::class)->relations())))->resolve();
         $this->assertSame('150.000000', $resource['invoice_links'][0]['balance_due']);
 
         $second = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '150.000000');
-        $this->assertSame(PaymentStatus::Allocated, $second->status);
+        $this->assertSame(PaymentStatus::FullyAllocated, $second->status);
         $this->assertSame(VehicleServiceJobStatus::Paid, $job->refresh()->status);
         $this->assertSame(2, VehicleServicePaymentLink::query()->where('vehicle_service_job_id', $job->getKey())->count());
     }

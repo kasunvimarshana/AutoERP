@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\PaymentRefundData;
+use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentRefund;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -29,8 +30,27 @@ final class PaymentRefundService
             $this->statuses->assertAllocatable($payment);
             $this->validator->assertPositive($data->amount, 'Payment refund amount');
 
+            if (PaymentRefund::query()
+                ->where('tenant_id', $payment->tenant_id)
+                ->where('payment_id', $payment->getKey())
+                ->where('refund_number', $data->refundNumber)
+                ->exists()) {
+                throw new InvalidArgumentException('Duplicate payment refund detected.');
+            }
+
             if ($this->math->compare($data->amount, (string) $payment->unapplied_amount) > 0) {
                 throw new InvalidArgumentException('Payment refund cannot exceed unapplied payment balance.');
+            }
+
+            if ($data->paymentMethodId !== null) {
+                $this->validator->validatePaymentMethod(
+                    PaymentMethod::query()->find($data->paymentMethodId),
+                    (int) $payment->tenant_id,
+                    $payment->organization_unit_id,
+                    $payment->direction,
+                    null,
+                    null,
+                );
             }
 
             $refund = PaymentRefund::query()->create([
@@ -45,6 +65,7 @@ final class PaymentRefundService
                 'amount' => $this->math->normalize($data->amount),
                 'reason' => $data->reason,
                 'status' => $data->status,
+                'metadata' => $data->metadata,
             ]);
 
             $this->syncPayment($payment->refresh());
@@ -64,7 +85,13 @@ final class PaymentRefundService
             'refunded_amount' => $calculation->refundedAmount,
         ])->save();
 
-        $payment = $this->statuses->applyCalculatedStatus($payment->refresh(), $calculation->totalAmount, $calculation->allocatedAmount);
+        $payment = $this->statuses->applyCalculatedStatus(
+            $payment->refresh(),
+            $calculation->totalAmount,
+            $calculation->allocatedAmount,
+            $calculation->refundedAmount,
+            reason: 'Payment refund recalculated.',
+        );
         $this->unappliedBalances->sync($payment);
 
         return $payment->refresh();
