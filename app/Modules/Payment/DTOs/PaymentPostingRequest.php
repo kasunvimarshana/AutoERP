@@ -18,5 +18,6 @@ final readonly class PaymentPostingRequest
         public ?int $currencyId = null,
         public string $exchangeRate = '1.000000',
         public array $lines = [],
+        public ?string $postingProfileCode = null,
     ) {}
 }

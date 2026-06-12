@@ -6,6 +6,7 @@ namespace Modules\Finance\Enums;
 
 enum AccountDimensionType: string
 {
+    case OrganizationUnit = 'organization_unit';
     case Department = 'department';
     case Project = 'project';
     case CostCenter = 'cost_center';

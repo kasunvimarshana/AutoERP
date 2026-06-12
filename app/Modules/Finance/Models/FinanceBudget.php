@@ -10,9 +10,9 @@ use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinancePostingProfile extends CoreModel
+final class FinanceBudget extends CoreModel
 {
-    protected $table = 'finance_posting_profiles';
+    protected $table = 'finance_budgets';
 
     protected $guarded = ['id'];
 
@@ -21,7 +21,8 @@ final class FinancePostingProfile extends CoreModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'is_active' => 'boolean',
+            'fiscal_year_id' => 'integer',
+            'budget_year' => 'integer',
         ]);
     }
 
@@ -35,18 +36,13 @@ final class FinancePostingProfile extends CoreModel
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function rules(): HasMany
+    public function fiscalYear(): BelongsTo
     {
-        return $this->hasMany(FinancePostingProfileRule::class, 'posting_profile_id');
+        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
     }
 
     public function lines(): HasMany
     {
-        return $this->rules();
-    }
-
-    public function journalEntries(): HasMany
-    {
-        return $this->hasMany(FinanceJournalEntry::class, 'posting_profile_id');
+        return $this->hasMany(FinanceBudgetLine::class, 'budget_id');
     }
 }

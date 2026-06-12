@@ -8,6 +8,8 @@ use InvalidArgumentException;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountBalance;
+use Modules\Finance\Models\FinanceBankReconciliation;
+use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Hr\Models\HrEmployee;
@@ -277,12 +279,34 @@ final class ReportCatalog
             $this->definition('finance.trial-balance', 'Trial Balance', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('closing_debit', 'Debit'), $this->money('closing_credit', 'Credit'),
             ], ['account.code', 'account.name'], ['account']),
+            $this->cashFlowReport(),
             $this->aging('finance.ar-aging', 'Accounts Receivable Aging', 'outbound'),
             $this->aging('finance.ap-aging', 'Accounts Payable Aging', 'inbound'),
+            $this->definition('finance.bank-reconciliation', 'Bank Reconciliation Report', 'Finance', FinanceBankReconciliation::class, [
+                $this->col('statement_date', 'Statement Date', format: 'date', sort: 'statement_date'),
+                $this->col('statement_reference', 'Statement', sort: 'statement_reference'),
+                $this->col('bank_account', 'Bank Account', 'bankAccount.code'),
+                $this->money('opening_balance', 'Opening'),
+                $this->money('closing_balance', 'Closing'),
+                $this->money('reconciled_balance', 'Reconciled'),
+                $this->col('status', 'Status', sort: 'status'),
+            ], ['statement_reference', 'bankAccount.code', 'bankAccount.name'], ['bankAccount'], 'statement_date'),
+            $this->definition('finance.budget-vs-actual', 'Actual vs Budget', 'Finance', FinanceBudget::class, [
+                $this->col('budget_year', 'Year', sort: 'budget_year'),
+                $this->col('name', 'Budget', sort: 'name'),
+                $this->col('status', 'Status', sort: 'status'),
+                new ReportColumn(
+                    key: 'line_count',
+                    label: 'Lines',
+                    value: static fn (FinanceBudget $budget): int => $budget->lines->count(),
+                ),
+            ], ['name'], ['lines'], null),
 
             $this->taxTransactions('tax.transactions', 'Tax Transactions'),
             $this->taxTransactions('tax.summary', 'Tax Summary'),
             $this->taxTransactions('tax.liability', 'Tax Liability', ['payable' => true]),
+            $this->taxTransactions('finance.tax-liability', 'Tax Liability Report', ['payable' => true]),
+            $this->taxTransactions('finance.tax-reconciliation', 'Tax Reconciliation Report'),
             $this->taxTransactions('tax.receivable', 'Tax Receivable', ['receivable' => true]),
             $this->taxTransactions('tax.vat', 'VAT Report', ['tax_type' => 'VAT']),
             $this->taxTransactions('tax.wht', 'WHT Report', ['is_withholding' => true]),
@@ -533,6 +557,33 @@ final class ReportCatalog
             relations: ['accountType', 'accountCategory', 'parent'],
             defaultSort: 'code',
             defaultDirection: 'asc',
+        );
+    }
+
+    private function cashFlowReport(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'finance.cash-flow',
+            title: 'Cash Flow',
+            group: 'Finance',
+            model: FinanceLedgerEntry::class,
+            columns: [
+                $this->col('entry_date', 'Date', format: 'date', sort: 'entry_date'),
+                $this->col('account', 'Cash/Bank Account', 'account.code'),
+                $this->col('account_name', 'Account Name', 'account.name'),
+                $this->col('source_module', 'Source Module', sort: 'source_module'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'),
+                $this->money('debit', 'Inflow'),
+                $this->money('credit', 'Outflow'),
+            ],
+            search: ['account.code', 'account.name', 'source_number'],
+            relations: ['account'],
+            dateColumn: 'entry_date',
+            defaultSort: 'entry_date',
+            scope: static fn ($query) => $query->whereHas('account', fn ($account) => $account
+                ->where('is_cash_account', true)
+                ->orWhere('is_bank_account', true)),
+            description: 'Ledger-derived cash and bank account movements.',
         );
     }
 

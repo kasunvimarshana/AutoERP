@@ -21,6 +21,19 @@ final class UpsertPostingProfileRequest extends TenantScopedRequest
             'rules.*.line_key' => ['required', 'string', 'max:100', 'distinct'],
             'rules.*.account_id' => ['required', 'integer', 'min:1', 'exists:finance_accounts,id'],
             'rules.*.description' => ['nullable', 'string', 'max:255'],
+            'lines' => ['nullable', 'array', 'min:1'],
+            'lines.*.line_key' => ['required_with:lines', 'string', 'max:100', 'distinct'],
+            'lines.*.account_id' => ['required_with:lines', 'integer', 'min:1', 'exists:finance_accounts,id'],
+            'lines.*.description' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        if (! $this->has('rules') && $this->has('lines')) {
+            $this->merge(['rules' => $this->input('lines')]);
+        }
     }
 }

@@ -46,7 +46,7 @@ export interface FiscalPeriod extends Record<string, unknown> {
 }
 
 export interface PostingProfile extends FinanceLookup {
-    rules?: Array<{ id: number; line_key: string; account?: FinanceLookup }>;
+    rules?: Array<{ id: number; line_key: string; account_id?: number; account?: FinanceLookup; description?: string | null }>;
 }
 
 export interface FinanceLookups {
@@ -55,6 +55,8 @@ export interface FinanceLookups {
     accounts: FinanceLookup[];
     periods: FiscalPeriod[];
     profiles: PostingProfile[];
+    dimensions?: FinanceLookup[];
+    bankAccounts?: FinanceLookup[];
 }
 
 export interface AccountPayload {
@@ -178,6 +180,68 @@ export interface TrialBalance {
     }>;
 }
 
+export interface PostingProfilePayload {
+    code: string;
+    name: string;
+    description?: string | null;
+    is_active: boolean;
+    rules: Array<{ line_key: string; account_id: number | null; description?: string | null }>;
+}
+
+export interface AgingReport {
+    as_of_date: string;
+    direction: string;
+    buckets: Record<string, string>;
+    total: string;
+    rows: Array<Record<string, unknown>>;
+}
+
+export interface BankReconciliation extends Record<string, unknown> {
+    id: number;
+    statement_reference: string;
+    statement_date: string;
+    status: string;
+    opening_balance: string;
+    closing_balance: string;
+    reconciled_balance: string;
+    matched_count?: number;
+    unmatched_count?: number;
+    bank_account?: FinanceLookup | null;
+    lines?: Array<Record<string, unknown>>;
+}
+
+export interface BankReconciliationPayload {
+    bank_account_id: number | null;
+    statement_reference: string;
+    statement_date: string;
+    opening_balance: string;
+    closing_balance: string;
+    statement_lines: Array<{
+        statement_date?: string;
+        reference?: string | null;
+        description?: string | null;
+        debit: string;
+        credit: string;
+    }>;
+}
+
+export interface Budget extends Record<string, unknown> {
+    id: number;
+    name: string;
+    budget_year: number;
+    status: string;
+    lines?: Array<Record<string, unknown>>;
+}
+
+export interface BudgetPayload {
+    name: string;
+    budget_year: number;
+    status: string;
+    description?: string | null;
+    fiscal_year_id?: number | null;
+    lines: Array<{ account_id: number | null; budget_month?: number | null; amount: string }>;
+}
+
 export async function listAccounts(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<FinanceAccount>>(`${endpoints.finance}/accounts`, { params, signal });
     return response.data;
@@ -267,5 +331,102 @@ export async function getProfitAndLoss(params: ListParams, signal?: AbortSignal)
 
 export async function getBalanceSheet(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/balance-sheet`, { params, signal });
+    return response.data.data;
+}
+
+export async function getCashFlow(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/cash-flow`, { params, signal });
+    return response.data.data;
+}
+
+export async function getArAging(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<AgingReport>>(`${endpoints.finance}/ar-aging`, { params, signal });
+    return response.data.data;
+}
+
+export async function getApAging(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<AgingReport>>(`${endpoints.finance}/ap-aging`, { params, signal });
+    return response.data.data;
+}
+
+export async function getTaxLiability(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/tax-liability`, { params, signal });
+    return response.data.data;
+}
+
+export async function getTaxReconciliation(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/tax-reconciliation`, { params, signal });
+    return response.data.data;
+}
+
+export async function listPostingProfiles(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PostingProfile>>(`${endpoints.finance}/posting-profiles`, { params, signal });
+    return response.data;
+}
+
+export async function createPostingProfile(payload: PostingProfilePayload) {
+    const response = await apiClient.post<ApiResource<PostingProfile>>(`${endpoints.finance}/posting-profiles`, payload);
+    return response.data.data;
+}
+
+export async function updatePostingProfile(id: number, payload: PostingProfilePayload) {
+    const response = await apiClient.patch<ApiResource<PostingProfile>>(`${endpoints.finance}/posting-profiles/${id}`, payload);
+    return response.data.data;
+}
+
+export async function listFiscalPeriods(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<FiscalPeriod>>(`${endpoints.finance}/fiscal-periods`, { params, signal });
+    return response.data;
+}
+
+export async function updateFiscalPeriodStatus(id: number, status: string) {
+    const response = await apiClient.patch<ApiResource<FiscalPeriod>>(`${endpoints.finance}/fiscal-periods/${id}/status`, { status });
+    return response.data.data;
+}
+
+export async function listBankReconciliations(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<BankReconciliation>>(`${endpoints.finance}/bank-reconciliations`, { params, signal });
+    return response.data;
+}
+
+export async function getBankReconciliation(id: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<BankReconciliation>>(`${endpoints.finance}/bank-reconciliations/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function createBankReconciliation(payload: BankReconciliationPayload) {
+    const response = await apiClient.post<ApiResource<BankReconciliation>>(`${endpoints.finance}/bank-reconciliations`, payload);
+    return response.data.data;
+}
+
+export async function completeBankReconciliation(id: number) {
+    const response = await apiClient.post<ApiResource<BankReconciliation>>(`${endpoints.finance}/bank-reconciliations/${id}/complete`);
+    return response.data.data;
+}
+
+export async function matchBankStatementLine(reconciliationId: number, lineId: number, ledgerEntryId: number) {
+    const response = await apiClient.post<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/bank-reconciliations/${reconciliationId}/lines/${lineId}/match`, {
+        ledger_entry_id: ledgerEntryId,
+    });
+    return response.data.data;
+}
+
+export async function unmatchBankStatementLine(reconciliationId: number, lineId: number) {
+    const response = await apiClient.post<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/bank-reconciliations/${reconciliationId}/lines/${lineId}/unmatch`);
+    return response.data.data;
+}
+
+export async function listBudgets(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<Budget>>(`${endpoints.finance}/budgets`, { params, signal });
+    return response.data;
+}
+
+export async function createBudget(payload: BudgetPayload) {
+    const response = await apiClient.post<ApiResource<Budget>>(`${endpoints.finance}/budgets`, payload);
+    return response.data.data;
+}
+
+export async function getBudgetActuals(id: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.finance}/budgets/${id}/actuals`, { signal });
     return response.data.data;
 }

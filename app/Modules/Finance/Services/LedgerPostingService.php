@@ -17,6 +17,10 @@ final class LedgerPostingService
 
     public function post(FinanceJournalEntry $journal): int
     {
+        if ($journal->ledgerEntries()->exists()) {
+            throw new \InvalidArgumentException('Journal has already been posted to ledger.');
+        }
+
         $count = 0;
 
         foreach ($journal->lines as $line) {

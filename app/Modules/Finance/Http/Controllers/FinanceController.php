@@ -21,14 +21,23 @@ use Modules\Finance\Http\Resources\LedgerEntryResource;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceBankReconciliation;
+use Modules\Finance\Models\FinanceBankStatementLine;
+use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\AccountBalanceService;
+use Modules\Finance\Services\AgingReportService;
+use Modules\Finance\Services\BankReconciliationService;
+use Modules\Finance\Services\BudgetService;
+use Modules\Finance\Services\CashFlowReportService;
 use Modules\Finance\Services\ChartOfAccountsService;
+use Modules\Finance\Services\CurrencyRevaluationService;
 use Modules\Finance\Services\FinanceStatementService;
+use Modules\Finance\Services\FinanceTaxReportService;
 use Modules\Finance\Services\FiscalPeriodService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
@@ -252,6 +261,100 @@ final class FinanceController
         )]);
     }
 
+    public function cashFlow(ListFinanceRequest $request, CashFlowReportService $service): JsonResponse
+    {
+        [$dateFrom, $dateTo] = $this->reportDates($request);
+
+        return response()->json(['data' => $service->calculate(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $dateFrom,
+            $dateTo,
+        )]);
+    }
+
+    public function arAging(ListFinanceRequest $request, AgingReportService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->receivables(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->filled('date_to') ? (string) $request->input('date_to') : null,
+        )]);
+    }
+
+    public function apAging(ListFinanceRequest $request, AgingReportService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->payables(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->filled('date_to') ? (string) $request->input('date_to') : null,
+        )]);
+    }
+
+    public function taxLiability(ListFinanceRequest $request, FinanceTaxReportService $service): JsonResponse
+    {
+        [$dateFrom, $dateTo] = $this->reportDates($request);
+
+        return response()->json(['data' => $service->liability(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $dateFrom,
+            $dateTo,
+        )]);
+    }
+
+    public function taxReconciliation(ListFinanceRequest $request, FinanceTaxReportService $service): JsonResponse
+    {
+        [$dateFrom, $dateTo] = $this->reportDates($request);
+
+        return response()->json(['data' => $service->reconciliation(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $dateFrom,
+            $dateTo,
+        )]);
+    }
+
+    public function postCurrencyRevaluation(
+        FinanceActionRequest $request,
+        CurrencyRevaluationService $service,
+    ): JsonResponse {
+        $data = $request->validate([
+            'tenant_id' => ['required', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'exposure_type' => ['required', 'string', 'max:60'],
+            'source_id' => ['required', 'integer', 'min:1'],
+            'posting_date' => ['required', 'date'],
+            'posting_profile' => ['required', 'string', 'max:100'],
+            'currency_id' => ['nullable', 'integer', 'min:1'],
+            'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            'gain_profile_key' => ['nullable', 'string', 'max:100'],
+            'loss_profile_key' => ['nullable', 'string', 'max:100'],
+            'exposures' => ['required', 'array', 'min:1'],
+            'exposures.*.exposure_key' => ['required', 'string', 'max:100'],
+            'exposures.*.carrying_amount' => ['required', 'decimal:0,6'],
+            'exposures.*.revalued_amount' => ['required', 'decimal:0,6'],
+            'exposures.*.description' => ['nullable', 'string', 'max:255'],
+            'exposures.*.source_line_type' => ['nullable', 'string', 'max:100'],
+            'exposures.*.source_line_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        return response()->json(['data' => get_object_vars($service->revalue(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            (string) $data['exposure_type'],
+            (int) $data['source_id'],
+            (string) $data['posting_date'],
+            (string) $data['posting_profile'],
+            $data['exposures'],
+            isset($data['currency_id']) ? (int) $data['currency_id'] : null,
+            (string) ($data['exchange_rate'] ?? '1.000000'),
+            $request->currentUserId(),
+            (string) ($data['gain_profile_key'] ?? 'unrealized_gain'),
+            (string) ($data['loss_profile_key'] ?? 'unrealized_loss'),
+        ))]);
+    }
+
     public function lookups(ListFinanceRequest $request): JsonResponse
     {
         $tenantId = $request->tenantId();
@@ -286,7 +389,18 @@ final class FinanceController
             ->orderBy('code')
             ->get();
 
-        return response()->json(['data' => compact('types', 'categories', 'accounts', 'periods', 'profiles')]);
+        $dimensions = $this->scope(\Modules\Finance\Models\FinanceDimension::query(), $request)
+            ->where('is_active', true)
+            ->orderBy('dimension_type')
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'dimension_type']);
+        $bankAccounts = $this->scope(FinanceAccount::query(), $request)
+            ->where('is_bank_account', true)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
+
+        return response()->json(['data' => compact('types', 'categories', 'accounts', 'periods', 'profiles', 'dimensions', 'bankAccounts')]);
     }
 
     public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
@@ -345,11 +459,14 @@ final class FinanceController
 
     public function fiscalPeriods(ListFinanceRequest $request): AnonymousResourceCollection
     {
+        $query = $this->scope(FinanceFiscalPeriod::query(), $request)
+            ->with('fiscalYear');
+        if ($request->filled('status')) {
+            $query->where('status', (string) $request->input('status'));
+        }
+
         return JsonResource::collection(
-            $this->scope(FinanceFiscalPeriod::query(), $request)
-                ->with('fiscalYear')
-                ->orderByDesc('start_date')
-                ->paginate($request->perPage()),
+            $query->orderByDesc('start_date')->paginate($request->perPage()),
         );
     }
 
@@ -371,6 +488,185 @@ final class FinanceController
         $model = $this->scope(FinanceFiscalPeriod::query(), $request)->with('fiscalYear')->findOrFail($period);
 
         return response()->json(['data' => $service->changePeriodStatus($model, $request->status())]);
+    }
+
+    public function bankReconciliations(ListFinanceRequest $request): AnonymousResourceCollection
+    {
+        $query = $this->scope(FinanceBankReconciliation::query(), $request)
+            ->with('bankAccount');
+        if ($request->filled('account_id')) {
+            $query->where('bank_account_id', (int) $request->input('account_id'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', (string) $request->input('status'));
+        }
+        $this->dateRange($query, $request, 'statement_date');
+
+        return JsonResource::collection(
+            $query->orderByDesc('statement_date')->orderByDesc('id')->paginate($request->perPage()),
+        );
+    }
+
+    public function showBankReconciliation(
+        ListFinanceRequest $request,
+        int $reconciliation,
+        BankReconciliationService $service,
+    ): JsonResponse {
+        $model = $this->scope(FinanceBankReconciliation::query(), $request)
+            ->with(['bankAccount', 'statementLines.matchedLedgerEntry'])
+            ->findOrFail($reconciliation);
+
+        return response()->json(['data' => $service->report($model)]);
+    }
+
+    public function createBankReconciliation(
+        FinanceActionRequest $request,
+        BankReconciliationService $service,
+    ): JsonResponse {
+        $data = $request->validate([
+            'tenant_id' => ['required', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'bank_account_id' => ['required', 'integer', 'min:1', 'exists:finance_accounts,id'],
+            'statement_reference' => ['required', 'string', 'max:150'],
+            'statement_date' => ['required', 'date'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'opening_balance' => ['nullable', 'decimal:0,6'],
+            'closing_balance' => ['nullable', 'decimal:0,6'],
+            'notes' => ['nullable', 'string'],
+            'statement_lines' => ['nullable', 'array'],
+            'statement_lines.*.statement_date' => ['nullable', 'date'],
+            'statement_lines.*.reference' => ['nullable', 'string', 'max:150'],
+            'statement_lines.*.description' => ['nullable', 'string', 'max:255'],
+            'statement_lines.*.debit' => ['nullable', 'decimal:0,6', 'gte:0'],
+            'statement_lines.*.credit' => ['nullable', 'decimal:0,6', 'gte:0'],
+        ]);
+
+        $reconciliation = $service->create(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            (int) $data['bank_account_id'],
+            (string) $data['statement_reference'],
+            (string) $data['statement_date'],
+            (string) ($data['opening_balance'] ?? '0.000000'),
+            (string) ($data['closing_balance'] ?? '0.000000'),
+            $data['start_date'] ?? null,
+            $data['end_date'] ?? null,
+            $data['notes'] ?? null,
+            $data['statement_lines'] ?? [],
+        );
+
+        return response()->json(['data' => $service->report($reconciliation)]);
+    }
+
+    public function matchBankStatementLine(
+        FinanceActionRequest $request,
+        int $reconciliation,
+        int $line,
+        BankReconciliationService $service,
+    ): JsonResponse {
+        $data = $request->validate([
+            'tenant_id' => ['required', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'ledger_entry_id' => ['required', 'integer', 'min:1', 'exists:finance_ledger_entries,id'],
+        ]);
+        $model = $this->scope(FinanceBankStatementLine::query(), $request)
+            ->where('reconciliation_id', $reconciliation)
+            ->findOrFail($line);
+
+        return response()->json(['data' => $service->matchLine($model, (int) $data['ledger_entry_id'])]);
+    }
+
+    public function unmatchBankStatementLine(
+        FinanceActionRequest $request,
+        int $reconciliation,
+        int $line,
+        BankReconciliationService $service,
+    ): JsonResponse {
+        $model = $this->scope(FinanceBankStatementLine::query(), $request)
+            ->where('reconciliation_id', $reconciliation)
+            ->findOrFail($line);
+
+        return response()->json(['data' => $service->unmatchLine($model)]);
+    }
+
+    public function completeBankReconciliation(
+        FinanceActionRequest $request,
+        int $reconciliation,
+        BankReconciliationService $service,
+    ): JsonResponse {
+        $model = $this->scope(FinanceBankReconciliation::query(), $request)->findOrFail($reconciliation);
+
+        return response()->json(['data' => $service->report($service->complete($model, $request->currentUserId()))]);
+    }
+
+    public function budgets(ListFinanceRequest $request): AnonymousResourceCollection
+    {
+        return JsonResource::collection(
+            $this->scope(FinanceBudget::query(), $request)
+                ->withCount('lines')
+                ->orderByDesc('budget_year')
+                ->orderBy('name')
+                ->paginate($request->perPage()),
+        );
+    }
+
+    public function showBudget(
+        ListFinanceRequest $request,
+        int $budget,
+    ): JsonResource {
+        return new JsonResource($this->scope(FinanceBudget::query(), $request)
+            ->with(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])
+            ->findOrFail($budget));
+    }
+
+    public function createBudget(FinanceActionRequest $request, BudgetService $service): JsonResponse
+    {
+        $data = $request->validate($this->budgetRules());
+
+        return response()->json(['data' => $service->save(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            (int) $data['budget_year'],
+            (string) $data['name'],
+            $data['lines'],
+            isset($data['fiscal_year_id']) ? (int) $data['fiscal_year_id'] : null,
+            (string) ($data['status'] ?? 'draft'),
+            $data['description'] ?? null,
+        )->load(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])]);
+    }
+
+    public function updateBudget(
+        FinanceActionRequest $request,
+        int $budget,
+        BudgetService $service,
+    ): JsonResponse {
+        $data = $request->validate($this->budgetRules());
+        $model = $this->scope(FinanceBudget::query(), $request)->findOrFail($budget);
+
+        return response()->json(['data' => $service->save(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            (int) $data['budget_year'],
+            (string) $data['name'],
+            $data['lines'],
+            isset($data['fiscal_year_id']) ? (int) $data['fiscal_year_id'] : null,
+            (string) ($data['status'] ?? 'draft'),
+            $data['description'] ?? null,
+            $model,
+        )->load(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])]);
+    }
+
+    public function budgetActuals(
+        ListFinanceRequest $request,
+        int $budget,
+        BudgetService $service,
+    ): JsonResponse {
+        $model = $this->scope(FinanceBudget::query(), $request)
+            ->with(['lines.account', 'lines.fiscalPeriod'])
+            ->findOrFail($budget);
+
+        return response()->json(['data' => $service->actualVsBudget($model)]);
     }
 
     private function findJournal(
@@ -416,6 +712,28 @@ final class FinanceController
         return [
             $request->filled('date_from') ? (string) $request->input('date_from') : null,
             $request->filled('date_to') ? (string) $request->input('date_to') : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function budgetRules(): array
+    {
+        return [
+            'tenant_id' => ['required', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'fiscal_year_id' => ['nullable', 'integer', 'min:1', 'exists:finance_fiscal_years,id'],
+            'budget_year' => ['required', 'integer', 'between:1900,2200'],
+            'name' => ['required', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:30'],
+            'description' => ['nullable', 'string'],
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.account_id' => ['required', 'integer', 'min:1', 'exists:finance_accounts,id'],
+            'lines.*.fiscal_period_id' => ['nullable', 'integer', 'min:1', 'exists:finance_fiscal_periods,id'],
+            'lines.*.dimension_id' => ['nullable', 'integer', 'min:1', 'exists:finance_dimensions,id'],
+            'lines.*.budget_month' => ['nullable', 'integer', 'between:1,12'],
+            'lines.*.amount' => ['required', 'decimal:0,6', 'gte:0'],
         ];
     }
 }

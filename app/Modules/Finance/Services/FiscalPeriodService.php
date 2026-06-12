@@ -83,12 +83,18 @@ final class FiscalPeriodService
         FinanceFiscalPeriod $period,
         FiscalPeriodStatus $status,
     ): FinanceFiscalPeriod {
+        $current = $period->status instanceof FiscalPeriodStatus
+            ? $period->status
+            : FiscalPeriodStatus::from((string) $period->status);
         $yearStatus = $period->fiscalYear->status instanceof FiscalPeriodStatus
             ? $period->fiscalYear->status
             : FiscalPeriodStatus::from((string) $period->fiscalYear->status);
 
         if ($yearStatus === FiscalPeriodStatus::YearClosed) {
             throw new InvalidArgumentException('Periods in a year-closed fiscal year cannot be reopened.');
+        }
+        if ($current === FiscalPeriodStatus::Closed && $status === FiscalPeriodStatus::Open) {
+            throw new InvalidArgumentException('Closed fiscal periods cannot be reopened without year-close permissions.');
         }
         if ($status === FiscalPeriodStatus::YearClosed) {
             throw new InvalidArgumentException('Year-closed status applies to fiscal years.');
@@ -109,6 +115,9 @@ final class FiscalPeriodService
 
         if ($current === FiscalPeriodStatus::YearClosed && $status !== FiscalPeriodStatus::YearClosed) {
             throw new InvalidArgumentException('A year-closed fiscal year cannot be reopened.');
+        }
+        if ($current === FiscalPeriodStatus::Closed && $status === FiscalPeriodStatus::Open) {
+            throw new InvalidArgumentException('Closed fiscal years cannot be reopened without year-close permissions.');
         }
 
         return DB::transaction(function () use ($year, $status): FinanceFiscalYear {

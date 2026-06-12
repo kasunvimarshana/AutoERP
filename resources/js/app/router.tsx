@@ -71,6 +71,12 @@ const FinanceJournalDetailPage = lazy(() => import('@/modules/finance/pages/Fina
 const LedgerReportPage = lazy(() => import('@/modules/finance/pages/LedgerReportPage'));
 const TrialBalanceReportPage = lazy(() => import('@/modules/finance/pages/TrialBalanceReportPage'));
 const AccountBalanceReportPage = lazy(() => import('@/modules/finance/pages/AccountBalanceReportPage'));
+const PostingProfilePage = lazy(() => import('@/modules/finance/pages/PostingProfilePage'));
+const FiscalPeriodsPage = lazy(() => import('@/modules/finance/pages/FiscalPeriodsPage'));
+const FinanceReportsPage = lazy(() => import('@/modules/finance/pages/FinanceReportsPage'));
+const BankReconciliationPage = lazy(() => import('@/modules/finance/pages/BankReconciliationPage'));
+const FinanceReversalsPage = lazy(() => import('@/modules/finance/pages/FinanceReversalsPage'));
+const BudgetPage = lazy(() => import('@/modules/finance/pages/BudgetPage'));
 const TaxListPage = lazy(() => import('@/modules/tax/pages/TaxListPage'));
 const TaxCreatePage = lazy(() => import('@/modules/tax/pages/TaxCreatePage'));
 const TaxEditPage = lazy(() => import('@/modules/tax/pages/TaxEditPage'));
@@ -177,6 +183,12 @@ export function AppRouter() {
                     <Route path="/finance/ledger" element={<LedgerReportPage />} />
                     <Route path="/finance/trial-balance" element={<TrialBalanceReportPage />} />
                     <Route path="/finance/account-balances" element={<AccountBalanceReportPage />} />
+                    <Route path="/finance/posting-profiles" element={<PostingProfilePage />} />
+                    <Route path="/finance/fiscal-periods" element={<FiscalPeriodsPage />} />
+                    <Route path="/finance/reversals" element={<FinanceReversalsPage />} />
+                    <Route path="/finance/reports" element={<FinanceReportsPage />} />
+                    <Route path="/finance/bank-reconciliations" element={<BankReconciliationPage />} />
+                    <Route path="/finance/budgets" element={<BudgetPage />} />
                     <Route path="/tax/taxes" element={<TaxListPage />} />
                     <Route path="/tax/taxes/create" element={<TaxCreatePage />} />
                     <Route path="/tax/taxes/:id/edit" element={<TaxEditPage />} />

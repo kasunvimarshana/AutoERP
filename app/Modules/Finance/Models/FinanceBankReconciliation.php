@@ -10,9 +10,9 @@ use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinancePostingProfile extends CoreModel
+final class FinanceBankReconciliation extends CoreModel
 {
-    protected $table = 'finance_posting_profiles';
+    protected $table = 'finance_bank_reconciliations';
 
     protected $guarded = ['id'];
 
@@ -21,7 +21,15 @@ final class FinancePostingProfile extends CoreModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'is_active' => 'boolean',
+            'bank_account_id' => 'integer',
+            'statement_date' => 'date',
+            'start_date' => 'date',
+            'end_date' => 'date',
+            'opening_balance' => 'decimal:6',
+            'closing_balance' => 'decimal:6',
+            'reconciled_balance' => 'decimal:6',
+            'completed_by' => 'integer',
+            'completed_at' => 'datetime',
         ]);
     }
 
@@ -35,18 +43,13 @@ final class FinancePostingProfile extends CoreModel
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function rules(): HasMany
+    public function bankAccount(): BelongsTo
     {
-        return $this->hasMany(FinancePostingProfileRule::class, 'posting_profile_id');
+        return $this->belongsTo(FinanceAccount::class, 'bank_account_id');
     }
 
-    public function lines(): HasMany
+    public function statementLines(): HasMany
     {
-        return $this->rules();
-    }
-
-    public function journalEntries(): HasMany
-    {
-        return $this->hasMany(FinanceJournalEntry::class, 'posting_profile_id');
+        return $this->hasMany(FinanceBankStatementLine::class, 'reconciliation_id');
     }
 }

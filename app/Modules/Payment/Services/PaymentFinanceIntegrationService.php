@@ -18,7 +18,11 @@ final class PaymentFinanceIntegrationService
     /**
      * @param  list<FinancePostingLine>  $lines
      */
-    public function preparePaymentPostingRequest(int $paymentId, array $lines): PaymentPostingRequest
+    public function preparePaymentPostingRequest(
+        int $paymentId,
+        array $lines,
+        ?string $postingProfileCode = null,
+    ): PaymentPostingRequest
     {
         $payment = Payment::query()->findOrFail($paymentId);
 
@@ -31,6 +35,7 @@ final class PaymentFinanceIntegrationService
             currencyId: $payment->currency_id,
             exchangeRate: (string) $payment->exchange_rate,
             lines: $lines,
+            postingProfileCode: $postingProfileCode,
         );
     }
 
@@ -53,6 +58,7 @@ final class PaymentFinanceIntegrationService
             exchangeRate: $request->exchangeRate,
             lines: $request->lines,
             description: 'Payment posting '.$payment->payment_number,
+            postingProfileCode: $request->postingProfileCode,
         );
     }
 

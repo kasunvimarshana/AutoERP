@@ -17,7 +17,12 @@ final class InvoiceFinanceIntegrationService
     /**
      * @param  list<FinancePostingLine>  $lines
      */
-    public function preparePostingRequest(int $invoiceId, string $postingDate, array $lines): FinancePostingRequest
+    public function preparePostingRequest(
+        int $invoiceId,
+        string $postingDate,
+        array $lines,
+        ?string $postingProfileCode = null,
+    ): FinancePostingRequest
     {
         $invoice = Invoice::query()->findOrFail($invoiceId);
 
@@ -36,6 +41,7 @@ final class InvoiceFinanceIntegrationService
             exchangeRate: (string) $invoice->exchange_rate,
             lines: $lines,
             description: 'Invoice posting '.$invoice->invoice_number,
+            postingProfileCode: $postingProfileCode,
         );
     }
 
