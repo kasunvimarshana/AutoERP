@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -14,6 +14,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
     const [type, setType] = useState('image');
     const [description, setDescription] = useState('');
     const [file, setFile] = useState<File | null>(null);
+    const [fileInputKey, setFileInputKey] = useState(0);
     const [saving, setSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
@@ -33,6 +34,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                     await createVehicleServiceDocument(jobId, payload);
                     setDescription('');
                     setFile(null);
+                    setFileInputKey((current) => current + 1);
                     result.reload();
                 } catch (requestError) {
                     setError(toApiError(requestError));
@@ -40,10 +42,10 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                     setSaving(false);
                 }
             }}>
-                <Select label="Document type" value={type} options={['image', 'inspection_report', 'warranty', 'invoice_copy', 'other'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setType(event.target.value)} />
-                <Input label="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
-                <Input label="File" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-                <Button type="submit" loading={saving}>Upload document</Button>
+                <Select label="Document type" value={type} error={fieldError(error, 'document_type')} options={['image', 'inspection_report', 'warranty', 'invoice_copy', 'other'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setType(event.target.value)} />
+                <Input label="Description" value={description} error={fieldError(error, 'description')} onChange={(event) => setDescription(event.target.value)} />
+                <Input key={fileInputKey} label="File" type="file" error={fieldError(error, 'file')} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+                <Button type="submit" loading={saving} disabled={!file}>Upload document</Button>
             </form>
             {result.loading ? <LoadingState /> : (
                 <DataTable

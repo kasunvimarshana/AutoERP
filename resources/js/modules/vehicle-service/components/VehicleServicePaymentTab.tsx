@@ -18,7 +18,7 @@ export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJ
                 <DetailGrid items={[
                     { label: 'Linked invoices', value: String((job.invoice_links ?? []).length) },
                     { label: 'Outstanding invoices', value: String(outstanding.length) },
-                    { label: 'Outstanding balance', value: outstanding.map((link) => `${link.invoice_number ?? `#${link.invoice_id}`}: ${link.balance_due}`).join(', ') || '0.000000' },
+                    { label: 'Outstanding balance', value: outstanding.map((link) => `${link.invoice_number ?? 'Invoice'}: ${link.balance_due}`).join(', ') || '0.000000' },
                 ]} />
             </div>
             <DataTable

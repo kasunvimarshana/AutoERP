@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\VehicleService\Services;
+
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
+use Modules\VehicleService\DTOs\VehicleServiceLineData;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceLineStatus;
+use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
+
+final class VehicleServiceLineWriteService
+{
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly VehicleServiceValidationService $jobValidator,
+        private readonly VehicleServiceLineValidator $lineValidator,
+        private readonly VehicleServiceLineRuleService $rules,
+        private readonly VehicleServiceLineCalculationService $calculations,
+    ) {}
+
+    public function create(VehicleServiceJob $job, VehicleServiceLineData $data): VehicleServiceJobLine
+    {
+        $this->jobValidator->assertMutable($job);
+
+        return DB::transaction(function () use ($job, $data): VehicleServiceJobLine {
+            $line = $this->persist($job, $data);
+            if ($data->lineSourceType === VehicleServiceLineSourceType::ComboParent && $data->expandCombo) {
+                $this->expandCombo($job, $line);
+            }
+            $this->calculations->recalculateJob($job);
+
+            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
+        });
+    }
+
+    public function update(
+        VehicleServiceJob $job,
+        VehicleServiceJobLine $line,
+        VehicleServiceLineData $data,
+    ): VehicleServiceJobLine {
+        $this->rules->assertBelongsToJob($job, $line);
+        $this->jobValidator->assertMutable($job);
+        $this->rules->assertCanUpdate($line, $data);
+
+        return DB::transaction(function () use ($job, $line, $data): VehicleServiceJobLine {
+            $item = $this->lineValidator->validate($job, $data);
+            $attributes = $this->calculations->attributes($data, $item);
+            if ($line->employeeAssignments()->exists() && ! $attributes['is_employee_assignable']) {
+                throw new InvalidArgumentException(
+                    'Remove employee assignments before changing this to a non-assignable line.',
+                );
+            }
+
+            $line->fill($attributes);
+            $line->save();
+            $this->calculations->recalculateAssignments($line);
+            $this->calculations->recalculateJob($job);
+
+            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
+        });
+    }
+
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line): void
+    {
+        $this->rules->assertBelongsToJob($job, $line);
+        $this->jobValidator->assertMutable($job);
+        $this->rules->assertCanDelete($line);
+
+        DB::transaction(function () use ($job, $line): void {
+            $line->delete();
+            $this->renumber($job);
+            $this->calculations->recalculateJob($job);
+        });
+    }
+
+    private function persist(VehicleServiceJob $job, VehicleServiceLineData $data): VehicleServiceJobLine
+    {
+        $item = $this->lineValidator->validate($job, $data);
+
+        return VehicleServiceJobLine::query()->create(array_merge(
+            $this->calculations->attributes($data, $item),
+            [
+                'tenant_id' => $job->tenant_id,
+                'organization_unit_id' => $job->organization_unit_id,
+                'vehicle_service_job_id' => $job->getKey(),
+                'line_number' => ((int) $job->lines()->max('line_number')) + 1,
+                'status' => VehicleServiceLineStatus::Pending->value,
+            ],
+        ));
+    }
+
+    private function expandCombo(VehicleServiceJob $job, VehicleServiceJobLine $parent): void
+    {
+        $parent->load('item.bundleLines.childItem');
+        if ($parent->item === null || $parent->item->bundleLines->isEmpty()) {
+            throw new InvalidArgumentException('Combo parent item must contain at least one valid bundle line.');
+        }
+
+        foreach ($parent->item->bundleLines as $bundleLine) {
+            $child = $bundleLine->childItem;
+            if ($child === null) {
+                throw new InvalidArgumentException('Combo bundle contains an unavailable child item.');
+            }
+
+            $this->persist($job, new VehicleServiceLineData(
+                lineSourceType: VehicleServiceLineSourceType::ComboChild,
+                description: (string) $child->name,
+                quantity: $this->math->mul((string) $parent->quantity, (string) $bundleLine->quantity),
+                unitPrice: '0.000000',
+                parentLineId: (int) $parent->getKey(),
+                itemId: (int) $child->getKey(),
+                itemVariantId: $bundleLine->child_variant_id,
+                uomId: $bundleLine->uom_id ?? $child->base_uom_id,
+                isBillable: false,
+                expandCombo: false,
+            ));
+        }
+    }
+
+    private function renumber(VehicleServiceJob $job): void
+    {
+        foreach ($job->lines()->orderBy('line_number')->get() as $index => $line) {
+            $line->line_number = $index + 1;
+            $line->save();
+        }
+    }
+}

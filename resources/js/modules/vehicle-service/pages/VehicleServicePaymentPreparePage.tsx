@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -54,19 +54,19 @@ export default function VehicleServicePaymentPreparePage() {
                         setBusy(false);
                     }
                 }}>
-                    <Select label="Invoice" value={invoiceId} options={(job.data.invoice_links ?? []).filter((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0).map((link) => ({ value: link.invoice_id, label: `${link.invoice_number ?? 'Invoice'} / balance ${link.balance_due ?? link.invoice_total}` }))} onChange={(event) => {
+                    <Select label="Invoice" value={invoiceId} error={fieldError(error, 'invoice_id')} options={(job.data.invoice_links ?? []).filter((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0).map((link) => ({ value: link.invoice_id, label: `${link.invoice_number ?? 'Invoice'} / balance ${link.balance_due ?? link.invoice_total}` }))} onChange={(event) => {
                         setInvoiceId(event.target.value);
                         setPrepared(null);
                         const link = job.data?.invoice_links?.find((entry) => entry.invoice_id === Number(event.target.value));
                         if (link?.balance_due) setAmount(link.balance_due);
                     }} />
-                    <Input label="Payment date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-                    <DecimalInput label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-                    <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
+                    <Input label="Payment date" type="date" value={date} error={fieldError(error, 'payment_date')} onChange={(event) => setDate(event.target.value)} />
+                    <DecimalInput label="Amount" value={amount} error={fieldError(error, 'amount')} onChange={(event) => setAmount(event.target.value)} />
+                    <Input label="Reference" value={reference} error={fieldError(error, 'reference_number')} onChange={(event) => setReference(event.target.value)} />
                     {invoice && (
                         <div className="rounded-lg border border-sky-100 bg-sky-50 p-4 md:col-span-2">
                             <DetailGrid items={[
-                                { label: 'Invoice', value: invoice.invoice_number ?? `#${invoice.invoice_id}` },
+                                { label: 'Invoice', value: invoice.invoice_number ?? 'Invoice' },
                                 { label: 'Invoice total', value: invoice.invoice_total },
                                 { label: 'Outstanding balance', value: invoice.balance_due ?? '-' },
                                 { label: 'Invoice status', value: invoice.invoice_status ?? '-' },

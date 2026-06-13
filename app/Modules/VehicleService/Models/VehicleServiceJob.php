@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -46,6 +47,15 @@ final class VehicleServiceJob extends CoreModel
             'approved_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);
+    }
+
+    public function scopeForContext(Builder $query, int $tenantId, ?int $organizationUnitId): Builder
+    {
+        $query->where('tenant_id', $tenantId);
+
+        return $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
     }
 
     public function customer(): BelongsTo

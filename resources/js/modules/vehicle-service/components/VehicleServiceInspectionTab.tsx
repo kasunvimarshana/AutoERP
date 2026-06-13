@@ -45,8 +45,8 @@ export default function VehicleServiceInspectionTab({ jobId }: { jobId: number }
                 <Textarea label="Inspection notes" value={form.inspection_notes} error={fieldError(error, 'inspection_notes')} onChange={(event) => setForm({ ...form, inspection_notes: event.target.value })} />
                 <Textarea label="Diagnosis" value={form.diagnosis} error={fieldError(error, 'diagnosis')} onChange={(event) => setForm({ ...form, diagnosis: event.target.value })} />
                 <Textarea label="Recommended work" value={form.recommended_work} error={fieldError(error, 'recommended_work')} onChange={(event) => setForm({ ...form, recommended_work: event.target.value })} />
-                <DecimalInput label="Odometer" value={form.odometer_reading} onChange={(event) => setForm({ ...form, odometer_reading: event.target.value })} />
-                <Input label="Fuel level" value={form.fuel_level} onChange={(event) => setForm({ ...form, fuel_level: event.target.value })} />
+                <DecimalInput label="Odometer" value={form.odometer_reading} error={fieldError(error, 'odometer_reading')} onChange={(event) => setForm({ ...form, odometer_reading: event.target.value })} />
+                <Input label="Fuel level" value={form.fuel_level} error={fieldError(error, 'fuel_level')} onChange={(event) => setForm({ ...form, fuel_level: event.target.value })} />
             </div>
             <Button type="submit" loading={saving}>Save inspection</Button>
         </form>

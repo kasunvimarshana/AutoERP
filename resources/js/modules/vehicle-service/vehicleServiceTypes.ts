@@ -41,6 +41,16 @@ export interface VehicleServiceInspection {
     inspected_at?: string | null;
 }
 
+export interface VehicleServiceInspectionPayload {
+    customer_complaint?: string;
+    inspection_notes?: string;
+    diagnosis?: string;
+    recommended_work?: string;
+    odometer_reading?: string;
+    fuel_level?: string;
+    mark_inspected?: boolean;
+}
+
 export interface VehicleServiceEmployeeAssignment {
     id: number;
     vehicle_service_job_line_id: number;
@@ -55,6 +65,16 @@ export interface VehicleServiceEmployeeAssignment {
     status: string;
     assigned_at?: string | null;
     completed_at?: string | null;
+}
+
+export interface VehicleServiceEmployeeAssignmentPayload {
+    employee_id: number;
+    role_type: string;
+    assigned_hours?: string;
+    rate?: string;
+    commission_type?: CommissionType;
+    commission_value?: string;
+    status?: 'assigned' | 'completed' | 'cancelled';
 }
 
 export interface VehicleServiceJobLine {
@@ -197,6 +217,34 @@ export interface VehicleServiceInvoicePreview {
     grandTotal: string;
 }
 
+export interface VehicleServiceInvoicePayload {
+    invoice_date: string;
+    due_date?: string;
+    currency_id?: number;
+    exchange_rate?: string;
+    notes?: string;
+    line_quantities?: Record<number, string>;
+}
+
+export interface VehicleServiceInvoiceCreated {
+    id: number;
+    invoice_number?: string | null;
+}
+
+export interface VehicleServiceInventoryIssuePayload {
+    warehouse_id: number;
+    warehouse_location_id?: number;
+    line_ids?: number[];
+}
+
+export interface VehicleServiceInventoryMovement {
+    id: number;
+    movement_number: string;
+    source_line_id?: number | null;
+    quantity: string;
+    status: string;
+}
+
 export interface VehicleServicePaymentPayload {
     invoice_id: number;
     payment_date: string;
@@ -205,6 +253,11 @@ export interface VehicleServicePaymentPayload {
     currency_id?: number;
     exchange_rate?: string;
     reference_number?: string;
+}
+
+export interface VehicleServicePaymentCreated {
+    id: number;
+    payment_number?: string | null;
 }
 
 export interface PreparedVehicleServicePayment {

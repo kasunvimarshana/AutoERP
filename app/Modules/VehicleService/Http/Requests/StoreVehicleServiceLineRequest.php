@@ -37,11 +37,8 @@ final class StoreVehicleServiceLineRequest extends TenantScopedRequest
             'charge_calculation_type' => ['nullable', Rule::in(['fixed', 'percentage'])],
             'charge_rate' => ['nullable', 'decimal:0,6', 'between:0,100'],
             'charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
-            'is_inventory_tracked' => ['nullable', 'boolean'],
             'is_customer_supplied' => ['nullable', 'boolean'],
-            'is_external' => ['nullable', 'boolean'],
             'is_billable' => ['nullable', 'boolean'],
-            'is_employee_assignable' => ['nullable', 'boolean'],
             'expand_combo' => ['nullable', 'boolean'],
         ];
     }
@@ -67,11 +64,8 @@ final class StoreVehicleServiceLineRequest extends TenantScopedRequest
             chargeCalculationType: $this->stringOrNull('charge_calculation_type'),
             chargeRate: (string) $this->input('charge_rate', '0.000000'),
             chargeAmount: (string) $this->input('charge_amount', '0.000000'),
-            isInventoryTracked: $this->has('is_inventory_tracked') ? $this->boolean('is_inventory_tracked') : null,
             isCustomerSupplied: $this->boolean('is_customer_supplied'),
-            isExternal: $this->has('is_external') ? $this->boolean('is_external') : null,
             isBillable: $this->has('is_billable') ? $this->boolean('is_billable') : ! $this->boolean('is_customer_supplied'),
-            isEmployeeAssignable: $this->has('is_employee_assignable') ? $this->boolean('is_employee_assignable') : null,
             expandCombo: ! $this->has('expand_combo') || $this->boolean('expand_combo'),
         );
     }

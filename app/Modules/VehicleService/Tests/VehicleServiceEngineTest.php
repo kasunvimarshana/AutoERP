@@ -505,6 +505,36 @@ final class VehicleServiceEngineTest extends TestCase
         );
     }
 
+    public function test_split_http_endpoints_preserve_resources_and_document_validation(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $line = $this->line(
+            $job,
+            VehicleServiceLineSourceType::ServiceItem,
+            $context['service'],
+            '1.000000',
+            '25.000000',
+        );
+        $query = http_build_query(['tenant_id' => $context['tenant_id']]);
+
+        $this->getJson("/api/v1/vehicle-service/jobs/{$job->getKey()}/lines?{$query}")
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $line->getKey())
+            ->assertJsonPath('data.0.line_total', '25.000000');
+
+        $this->getJson("/api/v1/vehicle-service/jobs/{$job->getKey()}/status-history?{$query}")
+            ->assertOk()
+            ->assertJsonPath('data.0.new_status', VehicleServiceJobStatus::Draft->value);
+
+        $this->postJson("/api/v1/vehicle-service/jobs/{$job->getKey()}/documents", [
+            'tenant_id' => $context['tenant_id'],
+            'document_type' => 'image',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('file');
+    }
+
     /** @return array<string, mixed> */
     private function context(string $suffix = ''): array
     {

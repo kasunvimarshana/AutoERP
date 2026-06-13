@@ -27,11 +27,8 @@ final readonly class VehicleServiceLineData
         public ?string $chargeCalculationType = null,
         public string $chargeRate = '0.000000',
         public string $chargeAmount = '0.000000',
-        public ?bool $isInventoryTracked = null,
         public bool $isCustomerSupplied = false,
-        public ?bool $isExternal = null,
         public ?bool $isBillable = null,
-        public ?bool $isEmployeeAssignable = null,
         public bool $expandCombo = true,
     ) {}
 }

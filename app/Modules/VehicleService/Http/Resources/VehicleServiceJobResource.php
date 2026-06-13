@@ -42,26 +42,16 @@ final class VehicleServiceJobResource extends ModuleResource
             'completed_at' => $this->completed_at?->toISOString(),
             'inspection' => $this->whenLoaded('inspection', fn () => $this->inspection === null ? null : (new VehicleServiceInspectionResource($this->inspection))->resolve($request)),
             'lines' => $this->whenLoaded('lines', fn () => VehicleServiceJobLineResource::collection($this->lines)->resolve($request), []),
-            'invoice_links' => $this->whenLoaded('invoiceLinks', fn () => $this->invoiceLinks->map(fn ($link) => [
-                'id' => (int) $link->getKey(),
-                'invoice_id' => (int) $link->invoice_id,
-                'invoice_number' => $link->invoice?->invoice_number,
-                'invoice_total' => (string) $link->invoice_total,
-                'balance_due' => $link->invoice?->balance === null ? null : (string) $link->invoice->balance->remaining_amount,
-                'invoice_status' => $this->enum($link->invoice?->status),
-                'status' => in_array($this->enum($link->invoice?->status), ['cancelled', 'void'], true)
-                    ? 'inactive'
-                    : $link->status,
-            ])->values()->all(), []),
-            'payment_links' => $this->whenLoaded('paymentLinks', fn () => $this->paymentLinks->map(fn ($link) => [
-                'id' => (int) $link->getKey(),
-                'payment_id' => (int) $link->payment_id,
-                'payment_number' => $link->payment?->payment_number,
-                'invoice_id' => $link->invoice_id,
-                'invoice_number' => $link->invoice?->invoice_number,
-                'allocated_amount' => (string) $link->allocated_amount,
-                'status' => $link->status,
-            ])->values()->all(), []),
+            'invoice_links' => $this->whenLoaded(
+                'invoiceLinks',
+                fn () => VehicleServiceInvoiceLinkResource::collection($this->invoiceLinks)->resolve($request),
+                [],
+            ),
+            'payment_links' => $this->whenLoaded(
+                'paymentLinks',
+                fn () => VehicleServicePaymentLinkResource::collection($this->paymentLinks)->resolve($request),
+                [],
+            ),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
