@@ -4,47 +4,35 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Http\Controllers;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Core\Services\DecimalMath;
+use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
 use Modules\Sales\Http\Requests\ListSalesRequest;
 use Modules\Sales\Http\Requests\SalesActionRequest;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
 use Modules\Sales\Http\Requests\UpdateSalesOrderRequest;
 use Modules\Sales\Http\Resources\SalesOrderResource;
+use Modules\Sales\Http\Resources\SalesOrderLineLookupResource;
 use Modules\Sales\Models\SalesOrder;
+use Modules\Sales\Models\SalesOrderLine;
+use Modules\Sales\Services\SalesOrderQuantityService;
 use Modules\Sales\Services\SalesOrderService;
 
 final class SalesOrderController
 {
     use ScopesSalesRequests;
+    use FiltersSalesQueries;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(SalesOrder::query(), $request)->with($this->relations());
-        if ($request->filled('search')) {
-            $search = trim((string) $request->input('search'));
-            $query->where(function (Builder $builder) use ($search): void {
-                $builder->where('sales_order_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', fn (Builder $customer) => $customer
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('display_name', 'like', "%{$search}%")
-                        ->orWhere('customer_number', 'like', "%{$search}%"));
-            });
-        }
-        foreach (['status', 'customer_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
-        if ($request->filled('date_from')) {
-            $query->whereDate('sales_order_date', '>=', $request->input('date_from'));
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('sales_order_date', '<=', $request->input('date_to'));
-        }
+        $this->applySalesFilters(
+            $query,
+            $request,
+            'sales_order_number',
+            'sales_order_date',
+        );
 
         return SalesOrderResource::collection($query->latest('sales_order_date')->paginate($request->perPage()));
     }
@@ -91,56 +79,59 @@ final class SalesOrderController
         return new SalesOrderResource($service->close($this->scope(SalesOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
-    public function allocatableLines(ListSalesRequest $request, int $order, DecimalMath $math): JsonResponse
+    public function allocatableLines(
+        ListSalesRequest $request,
+        int $order,
+        SalesOrderQuantityService $quantities,
+    ): JsonResponse
     {
-        return $this->lineLookup($request, $order, 'remaining_allocatable_quantity', $math);
+        return $this->lineLookup(
+            $request,
+            $order,
+            fn (SalesOrderLine $line): bool => $quantities->isAllocatable($line),
+        );
     }
 
-    public function deliverableLines(ListSalesRequest $request, int $order, DecimalMath $math): JsonResponse
+    public function deliverableLines(
+        ListSalesRequest $request,
+        int $order,
+        SalesOrderQuantityService $quantities,
+    ): JsonResponse
     {
-        return $this->lineLookup($request, $order, 'remaining_deliverable_quantity', $math);
+        return $this->lineLookup(
+            $request,
+            $order,
+            fn (SalesOrderLine $line): bool => $quantities->isDeliverable($line),
+        );
     }
 
-    public function invoiceableLines(ListSalesRequest $request, int $order, DecimalMath $math): JsonResponse
+    public function invoiceableLines(
+        ListSalesRequest $request,
+        int $order,
+        SalesOrderQuantityService $quantities,
+    ): JsonResponse
     {
-        $model = $this->scope(SalesOrder::query(), $request)->with($this->relations())->findOrFail($order);
-
-        return response()->json(['data' => $model->lines->filter(function ($line) use ($math): bool {
-            $basis = $math->compare((string) $line->delivered_quantity, '0.000000') > 0
-                ? (string) $line->delivered_quantity
-                : (string) $line->ordered_quantity;
-
-            return $math->compare($math->sub($basis, (string) $line->invoiced_quantity), '0.000000') > 0;
-        })->values()->map(fn ($line): array => $this->lineSummary($line))->all()]);
+        return $this->lineLookup(
+            $request,
+            $order,
+            fn (SalesOrderLine $line): bool => $quantities->isInvoiceable($line),
+        );
     }
 
-    private function lineLookup(ListSalesRequest $request, int $order, string $column, DecimalMath $math): JsonResponse
+    private function lineLookup(
+        ListSalesRequest $request,
+        int $order,
+        callable $eligible,
+    ): JsonResponse
     {
-        $model = $this->scope(SalesOrder::query(), $request)->with($this->relations())->findOrFail($order);
+        $model = $this->scope(SalesOrder::query(), $request)
+            ->with($this->relations())
+            ->findOrFail($order);
+        $lines = $model->lines->filter($eligible)->values();
 
-        return response()->json(['data' => $model->lines
-            ->filter(fn ($line): bool => $math->compare((string) $line->{$column}, '0.000000') > 0)
-            ->values()
-            ->map(fn ($line): array => $this->lineSummary($line))
-            ->all()]);
-    }
-
-    private function lineSummary($line): array
-    {
-        return [
-            'id' => (int) $line->getKey(),
-            'sales_order_line_id' => (int) $line->getKey(),
-            'item' => $line->item ? ['id' => (int) $line->item->getKey(), 'code' => $line->item->code, 'name' => $line->item->name] : null,
-            'uom' => $line->orderedUom ? ['id' => (int) $line->orderedUom->getKey(), 'code' => $line->orderedUom->code, 'name' => $line->orderedUom->name, 'symbol' => $line->orderedUom->symbol] : null,
-            'ordered_quantity' => (string) $line->ordered_quantity,
-            'allocated_quantity' => (string) $line->allocated_quantity,
-            'delivered_quantity' => (string) $line->delivered_quantity,
-            'invoiced_quantity' => (string) $line->invoiced_quantity,
-            'remaining_allocatable_quantity' => (string) $line->remaining_allocatable_quantity,
-            'remaining_deliverable_quantity' => (string) $line->remaining_deliverable_quantity,
-            'remaining_invoiceable_quantity' => (string) $line->remaining_invoiceable_quantity,
-            'unit_price' => (string) $line->unit_price,
-        ];
+        return response()->json([
+            'data' => SalesOrderLineLookupResource::collection($lines)->resolve($request),
+        ]);
     }
 
     private function relations(): array

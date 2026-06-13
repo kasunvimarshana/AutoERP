@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace Modules\Sales\Http\Requests;
 
 use Illuminate\Validation\Rule;
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Sales\DTOs\CreateSalesReturnData;
 use Modules\Sales\DTOs\SalesReturnLineData;
 use Modules\Sales\Enums\SalesReturnType;
 
-final class StoreSalesReturnRequest extends TenantScopedRequest
+final class StoreSalesReturnRequest extends SalesRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'return_number' => ['nullable', 'string', 'max:100'],
             'return_date' => ['required', 'date'],
             'customer_id' => ['required', 'integer', 'min:1'],
@@ -39,7 +36,7 @@ final class StoreSalesReturnRequest extends TenantScopedRequest
             'lines.*.cost_basis' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.condition_status' => ['nullable', 'in:sellable,damaged,quarantine,scrap'],
             'lines.*.reason' => ['nullable', 'string'],
-        ];
+        ]);
     }
 
     public function toData(): CreateSalesReturnData
@@ -50,13 +47,13 @@ final class StoreSalesReturnRequest extends TenantScopedRequest
             customerId: (int) $this->input('customer_id'),
             returnType: SalesReturnType::from((string) $this->input('return_type')),
             organizationUnitId: $this->organizationUnitId(),
-            returnNumber: $this->filled('return_number') ? (string) $this->input('return_number') : null,
-            warehouseId: $this->filled('warehouse_id') ? (int) $this->input('warehouse_id') : null,
-            warehouseLocationId: $this->filled('warehouse_location_id') ? (int) $this->input('warehouse_location_id') : null,
-            reason: $this->filled('reason') ? (string) $this->input('reason') : null,
-            replacementSalesOrderId: $this->filled('replacement_sales_order_id') ? (int) $this->input('replacement_sales_order_id') : null,
+            returnNumber: $this->stringOrNull('return_number'),
+            warehouseId: $this->intOrNull('warehouse_id'),
+            warehouseLocationId: $this->intOrNull('warehouse_location_id'),
+            reason: $this->stringOrNull('reason'),
+            replacementSalesOrderId: $this->intOrNull('replacement_sales_order_id'),
             approvalRequired: (bool) $this->input('approval_required', false),
-            costBasis: $this->filled('cost_basis') ? (string) $this->input('cost_basis') : null,
+            costBasis: $this->stringOrNull('cost_basis'),
             auditMetadata: $this->input('audit_metadata'),
             createdBy: $this->currentUserId(),
             lines: array_map(static fn (array $row): SalesReturnLineData => new SalesReturnLineData(

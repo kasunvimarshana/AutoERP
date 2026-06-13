@@ -6,6 +6,7 @@ namespace Modules\Sales\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
 use Modules\Sales\Http\Requests\ListSalesRequest;
 use Modules\Sales\Http\Requests\StoreSalesCreditNoteRequest;
@@ -16,15 +17,17 @@ use Modules\Sales\Services\SalesCreditNoteService;
 final class SalesCreditNoteController
 {
     use ScopesSalesRequests;
+    use FiltersSalesQueries;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(SalesCreditNote::query(), $request)->with(['customer', 'salesReturn']);
-        foreach (['status', 'customer_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
+        $this->applySalesFilters(
+            $query,
+            $request,
+            'credit_note_number',
+            'credit_note_date',
+        );
 
         return SalesCreditNoteResource::collection($query->latest('credit_note_date')->paginate($request->perPage()));
     }

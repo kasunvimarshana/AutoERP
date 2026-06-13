@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
-
-final class PrepareSalesPaymentRequest extends TenantScopedRequest
+final class PrepareSalesPaymentRequest extends SalesRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'decimal:0,6', 'gt:0'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
@@ -23,6 +19,6 @@ final class PrepareSalesPaymentRequest extends TenantScopedRequest
             'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
             'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
             'allocations.*.allocation_date' => ['nullable', 'date'],
-        ];
+        ]);
     }
 }

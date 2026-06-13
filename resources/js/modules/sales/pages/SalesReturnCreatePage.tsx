@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -66,8 +66,10 @@ export default function SalesReturnCreatePage() {
     const [manualPrice, setManualPrice] = useState('0.000000');
     const [manualCost, setManualCost] = useState('0.000000');
     const [condition, setCondition] = useState<ReturnLineDraft['condition_status']>('sellable');
+    const [sourceLoading, setSourceLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const errorFor = (name: string) => fieldError(error, name);
     const referenced = type === 'referenced_customer_return';
     const replacement = type === 'warranty_replacement' || type === 'exchange_return';
     const approvalRequired = ['manual_customer_return', 'inventory_adjustment_only', 'warranty_replacement', 'exchange_return', 'opening_imported_return'].includes(type);
@@ -77,11 +79,15 @@ export default function SalesReturnCreatePage() {
         setDelivery(source);
         setLines([]);
         if (!source) return;
+        setSourceLoading(true);
+        setError(null);
         try {
             const returnable = await getReturnableSalesDeliveryLines(source.id);
             setLines(returnable.map(fromReturnableLine));
         } catch (requestError) {
             setError(toApiError(requestError));
+        } finally {
+            setSourceLoading(false);
         }
     };
 
@@ -115,7 +121,7 @@ export default function SalesReturnCreatePage() {
             <ContentHeader title="Create sales return" description="Select the business scenario first; backend services decide Inventory and customer-balance effects." />
             <form className="space-y-5" onSubmit={async (event) => {
                 event.preventDefault();
-                if (!customer || lines.length === 0 || submitting) return;
+                if (!customer || lines.length === 0 || submitting || sourceLoading) return;
                 setSubmitting(true);
                 setError(null);
                 const payload: SalesReturnPayload = {
@@ -154,15 +160,15 @@ export default function SalesReturnCreatePage() {
                 <Panel title="Return scenario">
                     <div className="grid gap-4 md:grid-cols-4">
                         <Select label="Return type" value={type} options={returnTypes} onChange={(event) => { setType(event.target.value as SalesReturnType); setLines([]); setDelivery(null); }} />
-                        <CustomerLookupSelect value={customer} onChange={setCustomer} />
-                        <Input type="date" label="Return date" value={date} onChange={(event) => setDate(event.target.value)} />
+                        <CustomerLookupSelect value={customer} onChange={setCustomer} error={errorFor('customer_id')} />
+                        <Input type="date" label="Return date" value={date} error={errorFor('return_date')} onChange={(event) => setDate(event.target.value)} />
                         {referenced && <SalesDeliveryLookupSelect value={delivery} onChange={(value) => void loadDelivery(value)} />}
-                        {replacement && <SalesOrderLookupSelect value={replacementOrder} onChange={setReplacementOrder} />}
-                        {inventoryAffected && <SalesWarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setLocation(null); }} />}
-                        {inventoryAffected && <SalesWarehouseLocationLookupSelect warehouseId={warehouse?.id} value={location} onChange={setLocation} />}
-                        {approvalRequired && <DecimalInput label="Cost basis" value={headerCostBasis} onChange={(event) => setHeaderCostBasis(event.target.value)} />}
+                        {replacement && <SalesOrderLookupSelect value={replacementOrder} onChange={setReplacementOrder} error={errorFor('replacement_sales_order_id')} />}
+                        {inventoryAffected && <SalesWarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setLocation(null); }} error={errorFor('warehouse_id')} />}
+                        {inventoryAffected && <SalesWarehouseLocationLookupSelect warehouseId={warehouse?.id} value={location} onChange={setLocation} error={errorFor('warehouse_location_id')} />}
+                        {approvalRequired && <DecimalInput label="Cost basis" value={headerCostBasis} error={errorFor('cost_basis')} onChange={(event) => setHeaderCostBasis(event.target.value)} />}
                     </div>
-                    <div className="mt-4"><Textarea label="Reason / audit note" value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+                    <div className="mt-4"><Textarea label="Reason / audit note" value={reason} error={errorFor('reason')} onChange={(event) => setReason(event.target.value)} /></div>
                 </Panel>
                 {!referenced && (
                     <Panel title="Add return line">
@@ -178,11 +184,11 @@ export default function SalesReturnCreatePage() {
                     </Panel>
                 )}
                 <Panel title="Return lines">
-                    <DataTable rows={lines} columns={columns} rowKey={(row) => row.key} emptyMessage={referenced ? 'Select a delivery to load returnable lines.' : 'Add at least one return line.'} />
+                    <DataTable rows={lines} columns={columns} rowKey={(row) => row.key} emptyMessage={sourceLoading ? 'Loading returnable lines...' : referenced ? 'Select a delivery to load returnable lines.' : 'Add at least one return line.'} />
                 </Panel>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={() => navigate('/sales/returns')}>Cancel</Button>
-                    <Button type="submit" loading={submitting} disabled={!customer || lines.length === 0}>Create return</Button>
+                    <Button type="submit" loading={submitting} disabled={!customer || lines.length === 0 || sourceLoading}>Create return</Button>
                 </div>
             </form>
         </>

@@ -37,6 +37,7 @@ use Modules\Sales\Enums\SalesQuotationStatus;
 use Modules\Sales\Enums\SalesReturnType;
 use Modules\Sales\Models\SalesCreditNote;
 use Modules\Sales\Models\SalesDelivery;
+use Modules\Sales\Models\SalesHeaderAdjustment;
 use Modules\Sales\Models\SalesInvoiceLink;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesReturn;
@@ -185,6 +186,129 @@ final class SalesEngineTest extends TestCase
         $this->assertSame('invoiced', $second->refresh()->status->value);
         $this->assertSame('4.000000', (string) $first->lines->first()->refresh()->invoiced_quantity);
         $this->assertSame($firstLineId, $invoice->lines->first()->source_line_id);
+    }
+
+    public function test_reversing_a_full_delivery_reopens_the_sales_order(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '2.000000');
+
+        $this->assertSame(SalesOrderStatus::Delivered, $order->refresh()->status);
+
+        app(SalesDeliveryService::class)->reverse($delivery);
+
+        $line = $order->refresh()->load('lines')->lines->first();
+        $this->assertSame(SalesOrderStatus::Approved, $order->status);
+        $this->assertSame('0.000000', (string) $line->delivered_quantity);
+        $this->assertSame('2.000000', (string) $line->remaining_deliverable_quantity);
+    }
+
+    public function test_cancelled_sales_return_releases_reserved_adjustments(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ], [
+            new SalesHeaderAdjustmentData('Freight', SalesAdjustmentType::Freight, SalesAdjustmentEffect::Increase, '10.000000'),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '2.000000');
+        $deliveryLine = $delivery->lines->first();
+        $adjustment = SalesHeaderAdjustment::query()
+            ->where('source_type', 'sales_delivery')
+            ->where('source_id', $delivery->getKey())
+            ->firstOrFail();
+
+        $return = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ReferencedCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesReturnLineData('1.000000', 'sales_delivery_line', (int) $deliveryLine->getKey())],
+        ));
+
+        $this->assertSame('5.000000', (string) $adjustment->refresh()->returned_amount);
+        $this->assertSame('5.000000', (string) $adjustment->remaining_amount);
+
+        app(SalesReturnService::class)->cancel($return);
+
+        $this->assertSame('0.000000', (string) $adjustment->refresh()->returned_amount);
+        $this->assertSame('10.000000', (string) $adjustment->remaining_amount);
+    }
+
+    public function test_stale_sales_return_draft_is_revalidated_when_posted(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '2.000000');
+        $deliveryLineId = (int) $delivery->lines->first()->getKey();
+
+        $first = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ReferencedCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesReturnLineData('2.000000', 'sales_delivery_line', $deliveryLineId)],
+        ));
+        $stale = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ReferencedCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesReturnLineData('2.000000', 'sales_delivery_line', $deliveryLineId)],
+        ));
+
+        app(SalesReturnService::class)->post($first);
+
+        try {
+            app(SalesReturnService::class)->post($stale);
+            $this->fail('Expected stale return post validation to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Returned quantity cannot exceed source remaining quantity.', $exception->getMessage());
+        }
+    }
+
+    public function test_same_sales_source_cannot_be_invoiced_twice(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '2.000000');
+
+        app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(new CreateSalesInvoiceData(
+            tenantId: $context['tenant_id'],
+            invoiceDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            sources: [new SalesInvoiceSourceData('sales_delivery', (int) $delivery->getKey())],
+        ));
+
+        try {
+            app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(new CreateSalesInvoiceData(
+                tenantId: $context['tenant_id'],
+                invoiceDate: '2026-06-12',
+                customerId: $context['customer_id'],
+                sources: [new SalesInvoiceSourceData('sales_delivery', (int) $delivery->getKey())],
+            ));
+            $this->fail('Expected duplicate invoice prevention to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Only posted sales deliveries can be invoiced.', $exception->getMessage());
+        }
     }
 
     public function test_return_scenarios_apply_only_the_owned_inventory_and_credit_effects(): void

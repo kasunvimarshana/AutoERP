@@ -11,6 +11,14 @@ trait FormatsSalesResources
         return $value instanceof \BackedEnum ? $value->value : $value;
     }
 
+    private function statusLabel(mixed $status): string
+    {
+        return str((string) $this->enumValue($status))
+            ->replace('_', ' ')
+            ->title()
+            ->toString();
+    }
+
     private function summary(mixed $model, array $fields): ?array
     {
         if ($model === null) {

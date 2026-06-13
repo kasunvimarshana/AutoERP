@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Http\Controllers;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
 use Modules\Sales\Http\Requests\ConvertSalesQuotationRequest;
 use Modules\Sales\Http\Requests\ListSalesRequest;
@@ -21,21 +21,17 @@ use Modules\Sales\Services\SalesQuotationService;
 final class SalesQuotationController
 {
     use ScopesSalesRequests;
+    use FiltersSalesQueries;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(SalesQuotation::query(), $request)->with($this->relations());
-        if ($request->filled('search')) {
-            $search = trim((string) $request->input('search'));
-            $query->where(function (Builder $builder) use ($search): void {
-                $builder->where('quotation_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', fn (Builder $customer) => $customer
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('display_name', 'like', "%{$search}%")
-                        ->orWhere('customer_number', 'like', "%{$search}%"));
-            });
-        }
-        $this->filters($query, $request, 'quotation_date');
+        $this->applySalesFilters(
+            $query,
+            $request,
+            'quotation_number',
+            'quotation_date',
+        );
 
         return SalesQuotationResource::collection($query->latest('quotation_date')->paginate($request->perPage()));
     }
@@ -99,18 +95,4 @@ final class SalesQuotationController
         return ['customer.creditProfile', 'currency', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments'];
     }
 
-    private function filters(Builder $query, ListSalesRequest $request, string $dateColumn): void
-    {
-        foreach (['status', 'customer_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
-        if ($request->filled('date_from')) {
-            $query->whereDate($dateColumn, '>=', $request->input('date_from'));
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate($dateColumn, '<=', $request->input('date_to'));
-        }
-    }
 }

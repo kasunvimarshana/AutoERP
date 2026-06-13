@@ -6,27 +6,31 @@ namespace Modules\Sales\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Core\Services\DecimalMath;
+use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
 use Modules\Sales\Http\Requests\ListSalesRequest;
 use Modules\Sales\Http\Requests\SalesActionRequest;
 use Modules\Sales\Http\Requests\StoreSalesDeliveryRequest;
 use Modules\Sales\Http\Resources\SalesDeliveryResource;
+use Modules\Sales\Http\Resources\SalesReturnableDeliveryLineResource;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Services\SalesDeliveryService;
+use Modules\Sales\Services\SalesReturnSourceService;
 
 final class SalesDeliveryController
 {
     use ScopesSalesRequests;
+    use FiltersSalesQueries;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(SalesDelivery::query(), $request)->with($this->relations());
-        foreach (['status', 'customer_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
+        $this->applySalesFilters(
+            $query,
+            $request,
+            'delivery_number',
+            'delivery_date',
+        );
 
         return SalesDeliveryResource::collection($query->latest('delivery_date')->paginate($request->perPage()));
     }
@@ -51,21 +55,21 @@ final class SalesDeliveryController
         return new SalesDeliveryResource($service->reverse($this->scope(SalesDelivery::query(), $request)->findOrFail($delivery), $request->currentUserId()));
     }
 
-    public function returnableLines(ListSalesRequest $request, int $delivery, DecimalMath $math): JsonResponse
+    public function returnableLines(
+        ListSalesRequest $request,
+        int $delivery,
+        SalesReturnSourceService $sources,
+    ): JsonResponse
     {
-        $model = $this->scope(SalesDelivery::query(), $request)->with($this->relations())->findOrFail($delivery);
+        $model = $this->scope(SalesDelivery::query(), $request)
+            ->with($this->relations())
+            ->findOrFail($delivery);
 
-        return response()->json(['data' => $model->lines->filter(function ($line) use ($math): bool {
-            return $math->compare($math->sub((string) $line->delivered_quantity, (string) $line->returned_quantity), '0.000000') > 0;
-        })->values()->map(fn ($line): array => [
-            'id' => (int) $line->getKey(),
-            'source_line_type' => 'sales_delivery_line',
-            'source_line_id' => (int) $line->getKey(),
-            'item' => $line->item ? ['id' => (int) $line->item->getKey(), 'code' => $line->item->code, 'name' => $line->item->name] : null,
-            'uom' => $line->uom ? ['id' => (int) $line->uom->getKey(), 'code' => $line->uom->code, 'name' => $line->uom->name] : null,
-            'returnable_quantity' => $math->sub((string) $line->delivered_quantity, (string) $line->returned_quantity),
-            'unit_price' => (string) $line->unit_price,
-        ])->all()]);
+        return response()->json([
+            'data' => SalesReturnableDeliveryLineResource::collection(
+                $sources->returnableDeliveryLines($model),
+            )->resolve($request),
+        ]);
     }
 
     private function relations(): array

@@ -6,6 +6,7 @@ namespace Modules\Sales\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
 use Modules\Sales\Http\Requests\ListSalesRequest;
 use Modules\Sales\Http\Requests\SalesActionRequest;
@@ -17,15 +18,17 @@ use Modules\Sales\Services\SalesReturnService;
 final class SalesReturnController
 {
     use ScopesSalesRequests;
+    use FiltersSalesQueries;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(SalesReturn::query(), $request)->with($this->relations());
-        foreach (['status', 'customer_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
+        $this->applySalesFilters(
+            $query,
+            $request,
+            'return_number',
+            'return_date',
+        );
 
         return SalesReturnResource::collection($query->latest('return_date')->paginate($request->perPage()));
     }

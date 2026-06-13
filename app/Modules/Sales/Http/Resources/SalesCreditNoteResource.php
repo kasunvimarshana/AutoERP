@@ -19,7 +19,7 @@ final class SalesCreditNoteResource extends ModuleResource
             'credit_note_number' => $this->credit_note_number,
             'credit_note_date' => $this->credit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
-            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'status_label' => $this->statusLabel($this->status),
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'sales_return' => $this->whenLoaded('salesReturn', fn () => $this->summary($this->salesReturn, ['return_number', 'return_date', 'status'])),
             'amount' => (string) $this->amount,

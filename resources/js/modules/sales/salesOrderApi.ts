@@ -1,0 +1,82 @@
+import { apiClient } from '@/shared/api/apiClient';
+import { endpoints } from '@/shared/api/endpoints';
+import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { NamedResource } from '@/shared/types/common';
+import type { SalesDocumentPayload, SalesLineSummary, SalesOrder } from './salesTypes';
+
+const base = `${endpoints.sales}/orders`;
+
+export async function listSalesOrders(params: ListParams, signal?: AbortSignal) {
+    return (await apiClient.get<ApiCollection<SalesOrder>>(base, { params, signal })).data;
+}
+
+export async function getSalesOrder(id: number, signal?: AbortSignal) {
+    return (await apiClient.get<ApiResource<SalesOrder>>(`${base}/${id}`, { signal })).data.data;
+}
+
+export async function createSalesOrder(payload: SalesDocumentPayload) {
+    return (await apiClient.post<ApiResource<SalesOrder>>(base, payload)).data.data;
+}
+
+export async function updateSalesOrder(id: number, payload: SalesDocumentPayload) {
+    return (await apiClient.put<ApiResource<SalesOrder>>(`${base}/${id}`, payload)).data.data;
+}
+
+export async function deleteSalesOrder(id: number) {
+    await apiClient.delete(`${base}/${id}`);
+}
+
+export async function submitSalesOrder(id: number) {
+    return (await apiClient.patch<ApiResource<SalesOrder>>(`${base}/${id}/submit`)).data.data;
+}
+
+export async function approveSalesOrder(id: number) {
+    return (await apiClient.patch<ApiResource<SalesOrder>>(`${base}/${id}/approve`)).data.data;
+}
+
+export async function cancelSalesOrder(id: number) {
+    return (await apiClient.patch<ApiResource<SalesOrder>>(`${base}/${id}/cancel`)).data.data;
+}
+
+export async function closeSalesOrder(id: number) {
+    return (await apiClient.patch<ApiResource<SalesOrder>>(`${base}/${id}/close`)).data.data;
+}
+
+export async function getAllocatableSalesOrderLines(id: number, signal?: AbortSignal) {
+    return (
+        await apiClient.get<ApiResource<SalesLineSummary[]>>(`${base}/${id}/allocatable-lines`, {
+            signal,
+        })
+    ).data.data;
+}
+
+export async function getDeliverableSalesOrderLines(id: number, signal?: AbortSignal) {
+    return (
+        await apiClient.get<ApiResource<SalesLineSummary[]>>(`${base}/${id}/deliverable-lines`, {
+            signal,
+        })
+    ).data.data;
+}
+
+export async function getInvoiceableSalesOrderLines(id: number, signal?: AbortSignal) {
+    return (
+        await apiClient.get<ApiResource<SalesLineSummary[]>>(`${base}/${id}/invoiceable-lines`, {
+            signal,
+        })
+    ).data.data;
+}
+
+export async function searchSalesOrders(
+    search: string,
+    signal?: AbortSignal,
+): Promise<NamedResource[]> {
+    const response = await listSalesOrders({ search, per_page: 20 }, signal);
+
+    return response.data.map((order) => ({
+        id: order.id,
+        code: order.sales_order_number,
+        name: `${order.sales_order_number ?? 'Sales order'}${
+            order.customer?.name ? ` - ${order.customer.name}` : ''
+        }`,
+    }));
+}

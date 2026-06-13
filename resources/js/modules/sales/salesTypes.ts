@@ -317,3 +317,34 @@ export interface SalesCreditNotePayload {
     sales_return_id?: number;
     credit_note_number?: string;
 }
+
+export interface SalesLineSummary {
+    id: number;
+    sales_order_line_id?: number;
+    item?: NamedResource | null;
+    uom?: NamedResource | null;
+    unit_price: string;
+    remaining_quantity?: string;
+    remaining_allocatable_quantity?: string;
+    remaining_deliverable_quantity?: string;
+    remaining_invoiceable_quantity?: string;
+}
+
+export interface ReturnableSalesLine {
+    id: number;
+    source_line_type: 'sales_delivery_line';
+    source_line_id: number;
+    item?: NamedResource | null;
+    uom?: NamedResource | null;
+    returnable_quantity: string;
+    unit_price: string;
+}
+
+export interface SalesInvoicePreview {
+    subtotal?: string;
+    discountTotal?: string;
+    taxTotal?: string;
+    chargeTotal?: string;
+    adjustmentTotal?: string;
+    grandTotal?: string;
+}

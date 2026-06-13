@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Sales\DTOs\CreateSalesDeliveryData;
 use Modules\Sales\DTOs\SalesDeliveryLineData;
 
-final class StoreSalesDeliveryRequest extends TenantScopedRequest
+final class StoreSalesDeliveryRequest extends SalesRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'delivery_number' => ['nullable', 'string', 'max:100'],
             'delivery_date' => ['required', 'date'],
             'sales_order_id' => ['nullable', 'integer', 'min:1'],
@@ -31,7 +28,7 @@ final class StoreSalesDeliveryRequest extends TenantScopedRequest
             'lines.*.ordered_quantity' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.delivered_quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.unit_price' => ['required', 'decimal:0,6', 'min:0'],
-        ];
+        ]);
     }
 
     public function toData(): CreateSalesDeliveryData
@@ -42,10 +39,10 @@ final class StoreSalesDeliveryRequest extends TenantScopedRequest
             customerId: (int) $this->input('customer_id'),
             warehouseId: (int) $this->input('warehouse_id'),
             organizationUnitId: $this->organizationUnitId(),
-            deliveryNumber: $this->filled('delivery_number') ? (string) $this->input('delivery_number') : null,
-            salesOrderId: $this->filled('sales_order_id') ? (int) $this->input('sales_order_id') : null,
-            warehouseLocationId: $this->filled('warehouse_location_id') ? (int) $this->input('warehouse_location_id') : null,
-            notes: $this->filled('notes') ? (string) $this->input('notes') : null,
+            deliveryNumber: $this->stringOrNull('delivery_number'),
+            salesOrderId: $this->intOrNull('sales_order_id'),
+            warehouseLocationId: $this->intOrNull('warehouse_location_id'),
+            notes: $this->stringOrNull('notes'),
             deliveredBy: $this->currentUserId(),
             lines: array_map(static fn (array $row): SalesDeliveryLineData => new SalesDeliveryLineData(
                 itemId: (int) $row['item_id'],

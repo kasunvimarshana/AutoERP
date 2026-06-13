@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Sales\Http\Requests;
 
 use Illuminate\Validation\Rule;
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Sales\DTOs\SalesHeaderAdjustmentData;
 use Modules\Sales\DTOs\SalesLineData;
 use Modules\Sales\Enums\SalesAdjustmentAllocationMethod;
@@ -14,13 +13,11 @@ use Modules\Sales\Enums\SalesAdjustmentCalculationType;
 use Modules\Sales\Enums\SalesAdjustmentEffect;
 use Modules\Sales\Enums\SalesAdjustmentType;
 
-abstract class SalesDocumentRequest extends TenantScopedRequest
+abstract class SalesDocumentRequest extends SalesRequest
 {
     protected function documentRules(string $dateField): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             $dateField => ['required', 'date'],
             'customer_id' => ['required', 'integer', 'min:1'],
             'currency_id' => ['nullable', 'integer', 'min:1'],
@@ -54,7 +51,7 @@ abstract class SalesDocumentRequest extends TenantScopedRequest
             'adjustments.*.is_allocatable' => ['nullable', 'boolean'],
             'adjustments.*.sort_order' => ['nullable', 'integer'],
             'adjustments.*.description' => ['nullable', 'string'],
-        ];
+        ]);
     }
 
     /**
@@ -102,13 +99,4 @@ abstract class SalesDocumentRequest extends TenantScopedRequest
         ), $this->input('adjustments', []));
     }
 
-    protected function intOrNull(string $key): ?int
-    {
-        return $this->filled($key) ? (int) $this->input($key) : null;
-    }
-
-    protected function stringOrNull(string $key): ?string
-    {
-        return $this->filled($key) ? (string) $this->input($key) : null;
-    }
 }

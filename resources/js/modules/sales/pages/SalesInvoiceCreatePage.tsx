@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -18,7 +18,7 @@ import {
     getSalesDelivery,
     previewSalesInvoice,
 } from '../salesApi';
-import type { SalesInvoicePayload } from '../salesTypes';
+import type { SalesInvoicePayload, SalesInvoicePreview } from '../salesTypes';
 import { SalesDeliveryLookupSelect, SalesOrderLookupSelect } from '../components/SalesLookups';
 
 interface InvoiceSourceDraft {
@@ -33,6 +33,15 @@ interface InvoiceSourceDraft {
     }>;
 }
 
+const previewFields: Array<{ key: keyof SalesInvoicePreview; label: string }> = [
+    { key: 'subtotal', label: 'Subtotal' },
+    { key: 'discountTotal', label: 'Discount total' },
+    { key: 'taxTotal', label: 'Tax total' },
+    { key: 'chargeTotal', label: 'Charge total' },
+    { key: 'adjustmentTotal', label: 'Adjustment total' },
+    { key: 'grandTotal', label: 'Grand total' },
+];
+
 export default function SalesInvoiceCreatePage() {
     const navigate = useNavigate();
     const [sourceType, setSourceType] = useState<'sales_delivery' | 'sales_order'>('sales_delivery');
@@ -41,14 +50,18 @@ export default function SalesInvoiceCreatePage() {
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
     const [dueDate, setDueDate] = useState('');
     const [notes, setNotes] = useState('');
-    const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
+    const [preview, setPreview] = useState<SalesInvoicePreview | null>(null);
+    const [sourceLoading, setSourceLoading] = useState(false);
+    const [previewing, setPreviewing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const errorFor = (name: string) => fieldError(error, name);
 
     const addSource = async () => {
-        if (!selectedSource) return;
+        if (!selectedSource || sourceLoading) return;
         const key = `${sourceType}:${selectedSource.id}`;
         if (sources.some((source) => source.key === key)) return;
+        setSourceLoading(true);
         setError(null);
         try {
             const lines = sourceType === 'sales_delivery'
@@ -68,6 +81,8 @@ export default function SalesInvoiceCreatePage() {
             setSelectedSource(null);
         } catch (requestError) {
             setError(toApiError(requestError));
+        } finally {
+            setSourceLoading(false);
         }
     };
 
@@ -99,8 +114,7 @@ export default function SalesInvoiceCreatePage() {
                 setError(null);
                 try {
                     const invoice = await createSalesInvoice(payload());
-                    const id = Number(invoice.id ?? 0);
-                    navigate(id ? `/invoices/${id}` : '/invoices');
+                    navigate(`/invoices/${invoice.id}`);
                 } catch (requestError) {
                     setError(toApiError(requestError));
                 } finally {
@@ -110,10 +124,10 @@ export default function SalesInvoiceCreatePage() {
                 <ErrorAlert error={error} />
                 <Panel title="Invoice header">
                     <div className="grid gap-4 md:grid-cols-3">
-                        <Input type="date" label="Invoice date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
-                        <Input type="date" label="Due date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+                        <Input type="date" label="Invoice date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => setInvoiceDate(event.target.value)} />
+                        <Input type="date" label="Due date" value={dueDate} error={errorFor('due_date')} onChange={(event) => setDueDate(event.target.value)} />
                     </div>
-                    <div className="mt-4"><Textarea label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+                    <div className="mt-4"><Textarea label="Notes" value={notes} error={errorFor('notes')} onChange={(event) => setNotes(event.target.value)} /></div>
                 </Panel>
                 <Panel title="Sources">
                     <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto]">
@@ -121,7 +135,7 @@ export default function SalesInvoiceCreatePage() {
                         {sourceType === 'sales_delivery'
                             ? <SalesDeliveryLookupSelect value={selectedSource} onChange={setSelectedSource} />
                             : <SalesOrderLookupSelect value={selectedSource} onChange={setSelectedSource} />}
-                        <div className="self-end"><Button type="button" variant="secondary" disabled={!selectedSource} onClick={() => void addSource()}>Add source</Button></div>
+                        <div className="self-end"><Button type="button" variant="secondary" loading={sourceLoading} disabled={!selectedSource || sourceLoading} onClick={() => void addSource()}>Add source</Button></div>
                     </div>
                     <div className="mt-4 space-y-4">
                         {sources.map((source) => (
@@ -145,22 +159,25 @@ export default function SalesInvoiceCreatePage() {
                 {preview && (
                     <Panel title="Backend preview">
                         <dl className="grid gap-3 text-sm sm:grid-cols-3">
-                            {['subtotal', 'discountTotal', 'taxTotal', 'chargeTotal', 'adjustmentTotal', 'grandTotal'].map((key) => (
-                                <div key={key}><dt className="text-slate-500">{key.replaceAll(/([A-Z])/g, ' $1')}</dt><dd className="font-semibold">{String(preview[key] ?? '-')}</dd></div>
+                            {previewFields.map((field) => (
+                                <div key={field.key}><dt className="text-slate-500">{field.label}</dt><dd className="font-semibold">{preview[field.key] ?? '-'}</dd></div>
                             ))}
                         </dl>
                     </Panel>
                 )}
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" disabled={sources.length === 0} onClick={async () => {
+                    <Button type="button" variant="secondary" loading={previewing} disabled={sources.length === 0 || previewing} onClick={async () => {
+                        setPreviewing(true);
                         setError(null);
                         try {
                             setPreview(await previewSalesInvoice(payload()));
                         } catch (requestError) {
                             setError(toApiError(requestError));
+                        } finally {
+                            setPreviewing(false);
                         }
                     }}>Preview</Button>
-                    <Button type="submit" loading={submitting} disabled={sources.length === 0}>Create invoice</Button>
+                    <Button type="submit" loading={submitting} disabled={sources.length === 0 || sourceLoading || previewing}>Create invoice</Button>
                 </div>
             </form>
         </>
