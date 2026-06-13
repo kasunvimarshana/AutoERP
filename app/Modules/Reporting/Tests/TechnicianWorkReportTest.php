@@ -30,6 +30,8 @@ use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
+use Spatie\LaravelPdf\Facades\Pdf;
+use Spatie\LaravelPdf\PdfBuilder;
 use Tests\TestCase;
 
 final class TechnicianWorkReportTest extends TestCase
@@ -229,6 +231,31 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertHeader('content-type', 'text/csv; charset=UTF-8')
             ->assertSee('Employee code')
             ->assertSee('EMP-COM-FILT');
+    }
+
+    public function test_existing_generic_and_specialized_pdf_export_endpoints_keep_working(): void
+    {
+        $context = $this->context('PDF');
+        $this->assignmentForContext($context, 'PDF export assignment');
+        Pdf::fake();
+
+        foreach ([
+            '/api/v1/reports/invoice.register/export/pdf' => 'invoice.register.pdf',
+            '/api/v1/reports/vehicle-service/technician-work/export/pdf' => 'vehicle-service-technician-work.pdf',
+            '/api/v1/reports/vehicle-service/employee-commissions/export/pdf' => 'vehicle-service-employee-commissions.pdf',
+        ] as $path => $filename) {
+            $this->get($path.'?'.http_build_query($this->scope($context)))->assertOk();
+
+            Pdf::assertRespondedWithPdf(
+                fn (PdfBuilder $pdf): bool => $pdf->viewName === (
+                    str_starts_with($path, '/api/v1/reports/invoice.')
+                        ? 'reports.finance.report'
+                        : 'reports.vehicle-service.report'
+                )
+                    && $pdf->downloadName === $filename
+                    && $pdf->viewData['mode'] === 'pdf',
+            );
+        }
     }
 
     /**

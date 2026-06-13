@@ -27,7 +27,12 @@ final readonly class ReportData
 
     public function orientation(): string
     {
-        return $this->definition->orientation ?? (count($this->definition->columns) > 7 ? 'landscape' : 'portrait');
+        $orientation = $this->definition->orientation
+            ?? (count($this->definition->columns) > 7
+                ? 'landscape'
+                : (string) config('reporting.pdf.orientation', 'portrait'));
+
+        return $orientation === 'landscape' ? 'landscape' : 'portrait';
     }
 
     public function withMode(string $mode): self

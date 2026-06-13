@@ -1,4 +1,6 @@
-<footer class="report-footer">
-    <span>{{ $branding['tenant_name'] ?? $branding['company_name'] }}</span>
-    <span>{{ $definition->title }} · {{ count($rows) }} rows</span>
-</footer>
+<table class="report-footer" role="presentation">
+    <tr>
+        <td>{{ $branding['tenant_name'] ?? $branding['company_name'] }}</td>
+        <td class="footer-right">{{ $definition->title }} &middot; {{ count($rows) }} rows</td>
+    </tr>
+</table>
