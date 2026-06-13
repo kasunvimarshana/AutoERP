@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -14,11 +14,18 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
-import { createSalesCreditNote, listSalesCreditNotes } from '../salesApi';
+import {
+    allocateSalesCreditNote,
+    approveSalesCreditNote,
+    createSalesCreditNote,
+    listSalesCreditNotes,
+    postSalesCreditNote,
+} from '../salesApi';
 import type { SalesCreditNote } from '../salesTypes';
-import { CustomerLookupSelect } from '../components/SalesLookups';
+import { CustomerLookupSelect, SalesInvoiceLookupSelect } from '../components/SalesLookups';
 
 export default function SalesCreditNotePage() {
     const [search, setSearch] = useState('');
@@ -29,6 +36,10 @@ export default function SalesCreditNotePage() {
     const [amount, setAmount] = useState('0.000000');
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [acting, setActing] = useState<string | null>(null);
+    const [allocationNote, setAllocationNote] = useState<SalesCreditNote | null>(null);
+    const [invoice, setInvoice] = useState<NamedResource | null>(null);
+    const [allocationAmount, setAllocationAmount] = useState('0.000000');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debounced = useDebounce(search);
     const result = useApi((signal) => listSalesCreditNotes({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
@@ -40,11 +51,37 @@ export default function SalesCreditNotePage() {
         { key: 'amount', header: 'Amount', render: (row) => <MoneyDisplay value={row.amount} /> },
         { key: 'remaining', header: 'Remaining', render: (row) => <MoneyDisplay value={row.remaining_amount} /> },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'actions', header: 'Actions', render: (row) => (
+            <div className="flex flex-wrap gap-2">
+                {row.status === 'draft' && <Button
+                    variant="secondary"
+                    loading={acting === `${row.id}:approve`}
+                    onClick={() => void runAction(row, 'approve')}
+                >Approve</Button>}
+                {row.status === 'approved' && <Button
+                    variant="secondary"
+                    loading={acting === `${row.id}:post`}
+                    onClick={() => void runAction(row, 'post')}
+                >Post</Button>}
+                {row.status === 'posted' && compareDecimalStrings(row.remaining_amount ?? '0', '0') > 0 && <Button
+                    variant="secondary"
+                    onClick={() => {
+                        setActionError(null);
+                        setAllocationNote(row);
+                        setInvoice(null);
+                        setAllocationAmount(row.remaining_amount ?? '0.000000');
+                    }}
+                >Allocate</Button>}
+            </div>
+        ) },
     ];
 
     return (
         <>
-            <ContentHeader title="Sales credit notes" description="Customer credit-note orchestration; Invoice owns allocation against customer invoices." actions={<Button onClick={() => setOpen(true)}>New credit note</Button>} />
+            <ContentHeader title="Sales credit notes" description="Customer credit-note orchestration; Invoice owns allocation against customer invoices." actions={<Button onClick={() => {
+                setActionError(null);
+                setOpen(true);
+            }}>New credit note</Button>} />
             <div className="mb-4"><Input type="search" label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={actionError ?? result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => row.credit_note_number ?? 'Credit note'} />}
@@ -73,13 +110,80 @@ export default function SalesCreditNotePage() {
                         setSubmitting(false);
                     }
                 }}>
-                    <CustomerLookupSelect value={customer} onChange={setCustomer} />
-                    <Input type="date" label="Credit note date" value={date} onChange={(event) => setDate(event.target.value)} />
-                    <DecimalInput label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
-                    <Input label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} />
+                    <CustomerLookupSelect value={customer} onChange={setCustomer} error={fieldError(actionError, 'customer_id')} />
+                    <Input type="date" label="Credit note date" value={date} error={fieldError(actionError, 'credit_note_date')} onChange={(event) => setDate(event.target.value)} />
+                    <DecimalInput label="Amount" value={amount} error={fieldError(actionError, 'amount')} onChange={(event) => setAmount(event.target.value)} />
+                    <Input label="Reason" value={reason} error={fieldError(actionError, 'reason')} onChange={(event) => setReason(event.target.value)} />
                     <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" loading={submitting}>Create</Button></div>
+                </form>
+            </FormDrawer>
+            <FormDrawer open={allocationNote !== null} title="Allocate credit note" onClose={closeAllocation}>
+                <form className="space-y-4" onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!allocationNote || !invoice || submitting) return;
+                    setSubmitting(true);
+                    setActionError(null);
+                    try {
+                        await allocateSalesCreditNote(allocationNote.id, {
+                            invoice_id: invoice.id,
+                            amount: allocationAmount,
+                        });
+                        setAllocationNote(null);
+                        setInvoice(null);
+                        setAllocationAmount('0.000000');
+                        result.reload();
+                    } catch (error) {
+                        setActionError(toApiError(error));
+                    } finally {
+                        setSubmitting(false);
+                    }
+                }}>
+                    <ErrorAlert error={actionError} />
+                    <SalesInvoiceLookupSelect
+                        partyId={allocationNote?.customer?.id}
+                        value={invoice}
+                        onChange={setInvoice}
+                        error={fieldError(actionError, 'invoice_id')}
+                    />
+                    <DecimalInput
+                        label="Allocation amount"
+                        value={allocationAmount}
+                        error={fieldError(actionError, 'amount')}
+                        onChange={(event) => setAllocationAmount(event.target.value)}
+                    />
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="secondary" onClick={closeAllocation}>Cancel</Button>
+                        <Button type="submit" loading={submitting}>Allocate</Button>
+                    </div>
                 </form>
             </FormDrawer>
         </>
     );
+
+    async function runAction(note: SalesCreditNote, action: 'approve' | 'post') {
+        const actionKey = `${note.id}:${action}`;
+        if (acting) return;
+        setActing(actionKey);
+        setActionError(null);
+        try {
+            if (action === 'approve') {
+                await approveSalesCreditNote(note.id);
+            } else {
+                await postSalesCreditNote(note.id);
+            }
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setActing(null);
+        }
+    }
+
+    function closeAllocation() {
+        if (submitting) return;
+        setAllocationNote(null);
+        setInvoice(null);
+        setAllocationAmount('0.000000');
+        setActionError(null);
+    }
 }

@@ -63,4 +63,7 @@ Route::prefix('api/v1/sales')->middleware($middleware)->name('api.v1.sales.')->g
     Route::get('credit-notes', [SalesCreditNoteController::class, 'index'])->name('credit-notes.index');
     Route::post('credit-notes', [SalesCreditNoteController::class, 'store'])->name('credit-notes.store');
     Route::get('credit-notes/{creditNote}', [SalesCreditNoteController::class, 'show'])->whereNumber('creditNote')->name('credit-notes.show');
+    Route::patch('credit-notes/{creditNote}/approve', [SalesCreditNoteController::class, 'approve'])->whereNumber('creditNote')->name('credit-notes.approve');
+    Route::patch('credit-notes/{creditNote}/post', [SalesCreditNoteController::class, 'post'])->whereNumber('creditNote')->name('credit-notes.post');
+    Route::post('credit-notes/{creditNote}/allocations', [SalesCreditNoteController::class, 'allocate'])->whereNumber('creditNote')->name('credit-notes.allocations.store');
 });

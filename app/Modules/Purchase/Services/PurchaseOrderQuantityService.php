@@ -58,6 +58,28 @@ final class PurchaseOrderQuantityService
         $this->refreshOrderStatus($line->order);
     }
 
+    public function reverseInvoiced(PurchaseOrderLine $line, string $quantity): void
+    {
+        $line->invoiced_quantity = $this->subtractToZero(
+            (string) $line->invoiced_quantity,
+            $quantity,
+        );
+        $invoiceableBasis = $this->math->compare(
+            (string) $line->received_quantity,
+            '0.000000',
+        ) > 0
+            ? (string) $line->received_quantity
+            : (string) $line->ordered_quantity;
+        $line->remaining_invoiceable_quantity = $this->math->sub(
+            $invoiceableBasis,
+            (string) $line->invoiced_quantity,
+        );
+        $line->status = $this->lineStatus($line);
+        $line->save();
+
+        $this->refreshOrderStatus($line->order);
+    }
+
     public function applyReturned(PurchaseOrderLine $line, string $quantity): void
     {
         $line->returned_quantity = $this->math->add((string) $line->returned_quantity, $quantity);
@@ -114,6 +136,36 @@ final class PurchaseOrderQuantityService
             $this->math->sub($basis, (string) $line->invoiced_quantity),
             '0.000000',
         ) > 0;
+    }
+
+    private function lineStatus(PurchaseOrderLine $line): PurchaseOrderLineStatus
+    {
+        if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
+            return $this->math->compare(
+                (string) $line->invoiced_quantity,
+                (string) $line->ordered_quantity,
+            ) >= 0
+                ? PurchaseOrderLineStatus::Invoiced
+                : PurchaseOrderLineStatus::PartiallyInvoiced;
+        }
+
+        if ($this->math->compare((string) $line->received_quantity, '0.000000') > 0) {
+            return $this->math->compare(
+                (string) $line->received_quantity,
+                (string) $line->ordered_quantity,
+            ) >= 0
+                ? PurchaseOrderLineStatus::Received
+                : PurchaseOrderLineStatus::PartiallyReceived;
+        }
+
+        return PurchaseOrderLineStatus::Open;
+    }
+
+    private function subtractToZero(string $current, string $quantity): string
+    {
+        $result = $this->math->sub($current, $quantity);
+
+        return $this->math->isNegative($result) ? '0.000000' : $result;
     }
 
     private function refreshOrderStatus(?PurchaseOrder $order): void

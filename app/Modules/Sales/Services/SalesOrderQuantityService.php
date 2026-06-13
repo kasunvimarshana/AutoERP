@@ -97,6 +97,22 @@ final class SalesOrderQuantityService
         $this->refreshOrder($line->order);
     }
 
+    public function reverseInvoiced(SalesOrderLine $line, string $quantity): void
+    {
+        $line->invoiced_quantity = $this->subtractToZero(
+            (string) $line->invoiced_quantity,
+            $quantity,
+        );
+        $line->remaining_invoiceable_quantity = $this->math->sub(
+            $this->invoiceableBasis($line),
+            (string) $line->invoiced_quantity,
+        );
+        $line->status = $this->lineStatus($line);
+        $line->save();
+
+        $this->refreshOrder($line->order);
+    }
+
     public function applyReturned(SalesOrderLine $line, string $quantity): void
     {
         $line->returned_quantity = $this->math->add((string) $line->returned_quantity, $quantity);
@@ -187,6 +203,54 @@ final class SalesOrderQuantityService
         return $this->isPositive((string) $line->delivered_quantity)
             ? (string) $line->delivered_quantity
             : (string) $line->ordered_quantity;
+    }
+
+    private function lineStatus(SalesOrderLine $line): SalesOrderLineStatus
+    {
+        if ($this->isPositive((string) $line->returned_quantity)) {
+            return $this->math->compare(
+                (string) $line->returned_quantity,
+                (string) $line->delivered_quantity,
+            ) >= 0
+                ? SalesOrderLineStatus::Returned
+                : SalesOrderLineStatus::PartiallyReturned;
+        }
+
+        if ($this->isPositive((string) $line->invoiced_quantity)) {
+            return $this->math->compare(
+                (string) $line->invoiced_quantity,
+                $this->invoiceableBasis($line),
+            ) >= 0
+                ? SalesOrderLineStatus::Invoiced
+                : SalesOrderLineStatus::PartiallyInvoiced;
+        }
+
+        if ($this->isPositive((string) $line->delivered_quantity)) {
+            return $this->math->compare(
+                (string) $line->delivered_quantity,
+                (string) $line->ordered_quantity,
+            ) >= 0
+                ? SalesOrderLineStatus::Delivered
+                : SalesOrderLineStatus::PartiallyDelivered;
+        }
+
+        if ($this->isPositive((string) $line->allocated_quantity)) {
+            return $this->math->compare(
+                (string) $line->allocated_quantity,
+                (string) $line->ordered_quantity,
+            ) >= 0
+                ? SalesOrderLineStatus::Allocated
+                : SalesOrderLineStatus::PartiallyAllocated;
+        }
+
+        return SalesOrderLineStatus::Open;
+    }
+
+    private function subtractToZero(string $current, string $quantity): string
+    {
+        $result = $this->math->sub($current, $quantity);
+
+        return $this->math->isNegative($result) ? '0.000000' : $result;
     }
 
     private function isPositive(string $value): bool

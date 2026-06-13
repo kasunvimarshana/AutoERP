@@ -6,9 +6,12 @@ namespace Modules\Sales\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Invoice\Models\Invoice;
 use Modules\Sales\Http\Controllers\Concerns\FiltersSalesQueries;
 use Modules\Sales\Http\Controllers\Concerns\ScopesSalesRequests;
+use Modules\Sales\Http\Requests\AllocateSalesCreditNoteRequest;
 use Modules\Sales\Http\Requests\ListSalesRequest;
+use Modules\Sales\Http\Requests\SalesActionRequest;
 use Modules\Sales\Http\Requests\StoreSalesCreditNoteRequest;
 use Modules\Sales\Http\Resources\SalesCreditNoteResource;
 use Modules\Sales\Models\SalesCreditNote;
@@ -16,8 +19,8 @@ use Modules\Sales\Services\SalesCreditNoteService;
 
 final class SalesCreditNoteController
 {
-    use ScopesSalesRequests;
     use FiltersSalesQueries;
+    use ScopesSalesRequests;
 
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
@@ -40,5 +43,49 @@ final class SalesCreditNoteController
     public function show(ListSalesRequest $request, int $creditNote): SalesCreditNoteResource
     {
         return new SalesCreditNoteResource($this->scope(SalesCreditNote::query(), $request)->with(['customer', 'salesReturn'])->findOrFail($creditNote));
+    }
+
+    public function approve(
+        SalesActionRequest $request,
+        int $creditNote,
+        SalesCreditNoteService $service,
+    ): SalesCreditNoteResource {
+        return new SalesCreditNoteResource(
+            $service->approve($this->find($request, $creditNote))->load(['customer', 'salesReturn']),
+        );
+    }
+
+    public function post(
+        SalesActionRequest $request,
+        int $creditNote,
+        SalesCreditNoteService $service,
+    ): SalesCreditNoteResource {
+        return new SalesCreditNoteResource(
+            $service->post($this->find($request, $creditNote))->load(['customer', 'salesReturn']),
+        );
+    }
+
+    public function allocate(
+        AllocateSalesCreditNoteRequest $request,
+        int $creditNote,
+        SalesCreditNoteService $service,
+    ): SalesCreditNoteResource {
+        $invoice = $this->scope(Invoice::query(), $request)
+            ->findOrFail($request->invoiceId());
+
+        return new SalesCreditNoteResource(
+            $service->allocate(
+                $this->find($request, $creditNote),
+                $invoice,
+                $request->amount(),
+            )->load(['customer', 'salesReturn']),
+        );
+    }
+
+    private function find(
+        SalesActionRequest|AllocateSalesCreditNoteRequest $request,
+        int $creditNote,
+    ): SalesCreditNote {
+        return $this->scope(SalesCreditNote::query(), $request)->findOrFail($creditNote);
     }
 }

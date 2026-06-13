@@ -95,26 +95,13 @@ final class InvoiceBalanceUpdater
                     );
                 }
 
-                $previouslyAllocated = $this->math->normalize((string) InvoiceCreditAllocation::query()
-                    ->where('tenant_id', $lockedInvoice->tenant_id)
-                    ->where('credit_source_type', $creditSourceType)
-                    ->where('credit_source_id', $creditSourceId)
-                    ->sum('allocated_amount'));
-
-                InvoiceCreditAllocation::query()->create([
-                    'tenant_id' => $lockedInvoice->tenant_id,
-                    'organization_unit_id' => $lockedInvoice->organization_unit_id,
-                    'credit_source_type' => $creditSourceType,
-                    'credit_source_id' => $creditSourceId,
-                    'invoice_id' => $lockedInvoice->getKey(),
-                    'invoice_total' => $balance->invoice_total,
-                    'previously_allocated_amount' => $previouslyAllocated,
-                    'allocated_amount' => $amount,
-                    'remaining_invoice_balance' => $this->math->sub(
-                        (string) $balance->remaining_amount,
-                        $amount,
-                    ),
-                ]);
+                $this->recordCreditAllocation(
+                    $lockedInvoice,
+                    $balance,
+                    $creditSourceType,
+                    $creditSourceId,
+                    $amount,
+                );
 
                 $balance->credit_allocated_amount = $this->math->add(
                     (string) $balance->credit_allocated_amount,
@@ -128,9 +115,18 @@ final class InvoiceBalanceUpdater
     {
         return DB::transaction(function () use ($invoice): InvoiceBalance {
             $lockedInvoice = $this->lockInvoice($invoice);
+            $status = $lockedInvoice->status instanceof InvoiceStatus
+                ? $lockedInvoice->status
+                : InvoiceStatus::from((string) $lockedInvoice->status);
+            if (! in_array($status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
+                throw new InvalidArgumentException(
+                    'Invoice balance can only be cancelled after the invoice is cancelled or void.',
+                );
+            }
+
             $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
             $balance->remaining_amount = '0.000000';
-            $balance->status = $lockedInvoice->status === InvoiceStatus::Void
+            $balance->status = $status === InvoiceStatus::Void
                 ? InvoiceBalanceStatus::Void->value
                 : InvoiceBalanceStatus::Cancelled->value;
             $balance->save();
@@ -199,6 +195,35 @@ final class InvoiceBalanceUpdater
         ])->save();
 
         return $balance->refresh();
+    }
+
+    private function recordCreditAllocation(
+        Invoice $invoice,
+        InvoiceBalance $balance,
+        string $creditSourceType,
+        int $creditSourceId,
+        string $amount,
+    ): void {
+        $previouslyAllocated = $this->math->normalize((string) InvoiceCreditAllocation::query()
+            ->where('tenant_id', $invoice->tenant_id)
+            ->where('credit_source_type', $creditSourceType)
+            ->where('credit_source_id', $creditSourceId)
+            ->sum('allocated_amount'));
+
+        InvoiceCreditAllocation::query()->create([
+            'tenant_id' => $invoice->tenant_id,
+            'organization_unit_id' => $invoice->organization_unit_id,
+            'credit_source_type' => $creditSourceType,
+            'credit_source_id' => $creditSourceId,
+            'invoice_id' => $invoice->getKey(),
+            'invoice_total' => $balance->invoice_total,
+            'previously_allocated_amount' => $previouslyAllocated,
+            'allocated_amount' => $amount,
+            'remaining_invoice_balance' => $this->math->sub(
+                (string) $balance->remaining_amount,
+                $amount,
+            ),
+        ]);
     }
 
     private function lockInvoice(Invoice $invoice): Invoice

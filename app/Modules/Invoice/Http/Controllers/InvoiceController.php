@@ -7,6 +7,7 @@ namespace Modules\Invoice\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
@@ -88,8 +89,20 @@ final class InvoiceController
         InvoiceStatusService $statuses,
         InvoiceBalanceService $balances,
     ): InvoiceResource {
-        $model = $statuses->transition($this->find($request, $invoice), InvoiceStatus::Cancelled);
-        $balances->cancel($model);
+        $model = DB::transaction(function () use (
+            $request,
+            $invoice,
+            $statuses,
+            $balances,
+        ): Invoice {
+            $model = $statuses->transition(
+                $this->find($request, $invoice),
+                InvoiceStatus::Cancelled,
+            );
+            $balances->cancel($model);
+
+            return $model;
+        });
 
         return new InvoiceResource($model->refresh()->load('balance'));
     }

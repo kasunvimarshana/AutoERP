@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Invoice\Models\Invoice;
 use Modules\Payment\Models\Payment;
@@ -25,8 +26,8 @@ use Modules\Tax\Models\TaxDocumentSnapshot;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Tax\Models\TaxTransaction;
 use Modules\Tax\Services\TaxCalculationService;
-use Modules\Tax\Services\TaxDocumentIntegrationService;
 use Modules\Tax\Services\TaxDeterminationService;
+use Modules\Tax\Services\TaxDocumentIntegrationService;
 use Modules\Tax\Services\TaxMasterDataService;
 use Modules\Tax\Services\TaxPostingContextService;
 use Modules\Tax\Services\TaxReportService;
@@ -403,6 +404,46 @@ final class TaxEngineTest extends TestCase
         app(TaxDocumentIntegrationService::class)->snapshotGoodsReceiptNote($grn->refresh());
     }
 
+    public function test_posted_invoice_snapshot_is_immutable_after_rate_change(): void
+    {
+        $tenantId = $this->createTenant();
+        $customerId = $this->createCustomer($tenantId, 'CUST-INV-SNAP');
+        $tax = $this->createTax($tenantId, 'INV-SNAP', 'VAT', 'exclusive', '10.000000');
+        $group = $this->createGroup($tenantId, 'INV-SNAP-GROUP', $tax);
+        $itemId = $this->createItem(
+            $tenantId,
+            'INV-SNAP-ITEM',
+            defaultTaxGroupId: (int) $group->getKey(),
+        );
+        $invoice = $this->createInvoice(
+            $tenantId,
+            'sales',
+            'outbound',
+            'customer',
+            $customerId,
+            $itemId,
+            '100.000000',
+        );
+
+        $integration = app(TaxDocumentIntegrationService::class);
+        $integration->snapshotInvoice($invoice);
+        $integration->postInvoice($invoice->refresh());
+        DB::table('tax_rates')->where('tax_id', $tax->getKey())->update([
+            'rate' => '20.000000',
+        ]);
+
+        $this->assertSame(
+            '10.000000',
+            (string) TaxDocumentSnapshot::query()
+                ->where('source_type', 'invoice')
+                ->where('source_id', $invoice->getKey())
+                ->value('rate'),
+        );
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Posted tax snapshots cannot be recalculated');
+        $integration->snapshotInvoice($invoice->refresh());
+    }
+
     public function test_partial_purchase_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
     {
         $tenantId = $this->createTenant();
@@ -438,11 +479,16 @@ final class TaxEngineTest extends TestCase
         $delivery = $this->createSalesDelivery($tenantId, $customerId, $warehouseId, $itemId, '10.000000', '100.000000');
 
         app(TaxDocumentIntegrationService::class)->postSalesDelivery($delivery);
+        DB::table('tax_rates')->where('tax_id', $tax->getKey())->update([
+            'rate' => '20.000000',
+        ]);
         $return = $this->createSalesReturn($tenantId, $customerId, $warehouseId, $delivery->lines()->firstOrFail()->getKey(), $itemId, '4.000000', '10.000000', '100.000000');
-        $created = app(TaxReturnAllocationService::class)->reverseSalesReturn($return);
+        $created = app(TaxReturnAllocationService::class)->reverseSalesReturn($return, 123);
 
         $this->assertCount(1, $created);
+        $this->assertSame('10.000000', (string) $created[0]->rate);
         $this->assertSame('-40.000000', (string) $created[0]->tax_amount);
+        $this->assertSame(123, $created[0]->metadata['credit_note_id']);
         $summary = app(TaxReportService::class)->summary($tenantId, null, ['tax_code' => 'SOUT-10']);
         $this->assertSame('60.000000', $summary['totals']['tax_amount']);
 
@@ -677,7 +723,7 @@ final class TaxEngineTest extends TestCase
         string $quantity,
         string $unitPrice,
     ): GoodsReceiptNote {
-        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($quantity, $unitPrice);
+        $lineTotal = app(DecimalMath::class)->mul($quantity, $unitPrice);
         $grnId = (int) DB::table('goods_receipt_notes')->insertGetId([
             'tenant_id' => $tenantId,
             'supplier_type' => 'supplier',
@@ -717,7 +763,7 @@ final class TaxEngineTest extends TestCase
         string $quantity,
         string $unitPrice,
     ): SalesDelivery {
-        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($quantity, $unitPrice);
+        $lineTotal = app(DecimalMath::class)->mul($quantity, $unitPrice);
         $deliveryId = (int) DB::table('sales_deliveries')->insertGetId([
             'tenant_id' => $tenantId,
             'delivery_number' => 'SD-TAX-'.Str::upper(Str::random(6)),
@@ -755,7 +801,7 @@ final class TaxEngineTest extends TestCase
         string $sourceQuantity,
         string $unitPrice,
     ): PurchaseReturn {
-        $lineTotal = app(\Modules\Core\Services\DecimalMath::class)->mul($returnedQuantity, $unitPrice);
+        $lineTotal = app(DecimalMath::class)->mul($returnedQuantity, $unitPrice);
         $returnId = (int) DB::table('purchase_returns')->insertGetId([
             'tenant_id' => $tenantId,
             'supplier_type' => 'supplier',
@@ -780,7 +826,7 @@ final class TaxEngineTest extends TestCase
             'returned_quantity' => $returnedQuantity,
             'source_quantity' => $sourceQuantity,
             'previously_returned_quantity' => '0.000000',
-            'remaining_quantity' => app(\Modules\Core\Services\DecimalMath::class)->sub($sourceQuantity, $returnedQuantity),
+            'remaining_quantity' => app(DecimalMath::class)->sub($sourceQuantity, $returnedQuantity),
             'unit_price' => $unitPrice,
             'cost_basis' => $unitPrice,
             'line_total' => $lineTotal,
@@ -801,7 +847,7 @@ final class TaxEngineTest extends TestCase
         string $sourceQuantity,
         string $unitPrice,
     ): SalesReturn {
-        $math = app(\Modules\Core\Services\DecimalMath::class);
+        $math = app(DecimalMath::class);
         $lineTotal = $math->mul($returnedQuantity, $unitPrice);
         $returnId = (int) DB::table('sales_returns')->insertGetId([
             'tenant_id' => $tenantId,
@@ -911,7 +957,7 @@ final class TaxEngineTest extends TestCase
             'invoice_balance_before' => (string) $invoice->grand_total,
             'previously_allocated_amount' => '0.000000',
             'allocated_amount' => $allocatedAmount,
-            'invoice_balance_after' => app(\Modules\Core\Services\DecimalMath::class)->sub((string) $invoice->grand_total, $allocatedAmount),
+            'invoice_balance_after' => app(DecimalMath::class)->sub((string) $invoice->grand_total, $allocatedAmount),
             'allocation_date' => '2026-06-11',
             'status' => 'active',
             'created_at' => now(),

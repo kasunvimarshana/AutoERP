@@ -62,6 +62,14 @@ final class SalesCreditNoteService
                 ->lockForUpdate()
                 ->findOrFail($note->getKey());
             $this->assertAllocationScope($lockedNote, $invoice);
+            if (! in_array($lockedNote->status, [
+                SalesCreditNoteStatus::Posted,
+                SalesCreditNoteStatus::Allocated,
+            ], true)) {
+                throw new InvalidArgumentException(
+                    'Only posted sales credit notes can be allocated.',
+                );
+            }
 
             if ($this->math->compare($amount, (string) $lockedNote->remaining_amount) > 0) {
                 throw new InvalidArgumentException(
@@ -90,6 +98,30 @@ final class SalesCreditNoteService
 
             return $lockedNote->refresh();
         });
+    }
+
+    public function approve(SalesCreditNote $note): SalesCreditNote
+    {
+        if ($note->status !== SalesCreditNoteStatus::Draft) {
+            throw new InvalidArgumentException('Only draft sales credit notes can be approved.');
+        }
+
+        $note->status = SalesCreditNoteStatus::Approved;
+        $note->save();
+
+        return $note->refresh();
+    }
+
+    public function post(SalesCreditNote $note): SalesCreditNote
+    {
+        if ($note->status !== SalesCreditNoteStatus::Approved) {
+            throw new InvalidArgumentException('Only approved sales credit notes can be posted.');
+        }
+
+        $note->status = SalesCreditNoteStatus::Posted;
+        $note->save();
+
+        return $note->refresh();
     }
 
     private function assertAllocationScope(SalesCreditNote $note, Invoice $invoice): void

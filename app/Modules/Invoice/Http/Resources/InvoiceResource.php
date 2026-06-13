@@ -20,11 +20,9 @@ final class InvoiceResource extends ModuleResource
             'invoice_type' => $this->enumValue($this->invoice_type),
             'direction' => $this->enumValue($this->direction),
             'party_type' => $this->party_type,
-            'party_id' => $this->party_id,
             'party' => $this->partySummary(),
             'invoice_date' => $this->invoice_date?->toDateString(),
             'due_date' => $this->due_date?->toDateString(),
-            'currency_id' => $this->currency_id,
             'currency' => $this->whenLoaded(
                 'currency',
                 fn () => $this->summary($this->currency, ['code', 'name', 'symbol']),

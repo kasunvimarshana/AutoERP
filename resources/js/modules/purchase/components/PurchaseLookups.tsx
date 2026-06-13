@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { listInvoices } from '@/modules/invoice/invoiceApi';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { listUoms, searchCurrencies, searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
@@ -57,4 +58,27 @@ export function PurchaseOrderLookupSelect(props: LookupProps) {
 
 export function GoodsReceiptLookupSelect(props: LookupProps) {
     return <LookupSelect label="Goods receipt" search={searchGoodsReceipts} placeholder="Search GRN number or supplier..." {...props} />;
+}
+
+export function PurchaseInvoiceLookupSelect({ partyId, ...props }: LookupProps & { partyId?: number | null }) {
+    const search = useCallback(
+        async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
+            const response = await listInvoices({
+                search: query,
+                invoice_type: 'purchase',
+                direction: 'inbound',
+                party_id: partyId ?? undefined,
+                per_page: 20,
+            }, signal);
+
+            return response.data.map((invoice) => ({
+                id: invoice.id,
+                code: invoice.invoice_number,
+                name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
+            }));
+        },
+        [partyId],
+    );
+
+    return <LookupSelect label="Supplier invoice" search={search} placeholder="Search invoice number..." {...props} />;
 }

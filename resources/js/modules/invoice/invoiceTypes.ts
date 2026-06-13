@@ -3,12 +3,10 @@ import type { NamedResource } from '@/shared/types/common';
 export interface InvoiceLine extends Record<string, unknown> {
     id: number;
     line_number: number;
-    item_id?: number | null;
     item?: NamedResource | null;
     description: string;
     line_type: string;
     quantity: string;
-    uom_id?: number | null;
     uom?: NamedResource | null;
     unit_price: string;
     discount_amount: string;
@@ -33,6 +31,8 @@ export interface InvoiceBalanceResult extends Record<string, unknown> {
     invoiceTotal: string;
     paidAmount: string;
     creditAmount: string;
+    debitAmount: string;
+    refundedAmount: string;
     remainingAmount: string;
     status: string;
 }
@@ -100,6 +100,8 @@ export interface Invoice extends Record<string, unknown> {
     party?: NamedResource | null;
     currency?: NamedResource | null;
     grand_total?: string;
+    paid_total?: string;
+    credit_total?: string;
     balance_due?: string;
     balance?: InvoiceBalance | null;
     lines?: InvoiceLine[];

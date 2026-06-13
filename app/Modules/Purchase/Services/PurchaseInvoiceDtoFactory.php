@@ -383,9 +383,7 @@ final class PurchaseInvoiceDtoFactory
             throw new InvalidArgumentException('Purchase invoice source belongs to a different tenant.');
         }
 
-        if ($data->organizationUnitId !== null
-            && $sourceOrganizationUnitId !== null
-            && (int) $sourceOrganizationUnitId !== $data->organizationUnitId) {
+        if ($sourceOrganizationUnitId !== $data->organizationUnitId) {
             throw new InvalidArgumentException(
                 'Purchase invoice source belongs to a different organization unit.',
             );

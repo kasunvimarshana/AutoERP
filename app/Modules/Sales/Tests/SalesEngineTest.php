@@ -321,6 +321,65 @@ final class SalesEngineTest extends TestCase
         }
     }
 
+    public function test_cancelled_sales_invoice_restores_delivery_and_order_invoiceable_quantity(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '5.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData(
+                $context['item_id'],
+                '2.000000',
+                '10.000000',
+                uomId: $context['uom_id'],
+            ),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '2.000000');
+        $invoice = app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(
+            new CreateSalesInvoiceData(
+                tenantId: $context['tenant_id'],
+                invoiceDate: '2026-06-11',
+                customerId: $context['customer_id'],
+                sources: [
+                    new SalesInvoiceSourceData(
+                        'sales_delivery',
+                        (int) $delivery->getKey(),
+                    ),
+                ],
+            ),
+        );
+
+        app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Cancelled);
+
+        $delivery = $delivery->refresh()->load('lines');
+        $order = $order->refresh()->load('lines');
+        $this->assertSame('posted', $delivery->status->value);
+        $this->assertSame('0.000000', (string) $delivery->lines->first()->invoiced_quantity);
+        $this->assertSame('2.000000', (string) $delivery->lines->first()->remaining_quantity);
+        $this->assertSame(SalesOrderStatus::Delivered, $order->status);
+        $this->assertSame('0.000000', (string) $order->lines->first()->invoiced_quantity);
+        $this->assertSame('2.000000', (string) $order->lines->first()->remaining_invoiceable_quantity);
+        $this->assertSame(
+            'cancelled',
+            SalesInvoiceLink::query()->where('invoice_id', $invoice->getKey())->value('status'),
+        );
+
+        $replacement = app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(
+            new CreateSalesInvoiceData(
+                tenantId: $context['tenant_id'],
+                invoiceDate: '2026-06-12',
+                customerId: $context['customer_id'],
+                sources: [
+                    new SalesInvoiceSourceData(
+                        'sales_delivery',
+                        (int) $delivery->getKey(),
+                    ),
+                ],
+            ),
+        );
+        $this->assertSame('20.000000', (string) $replacement->grand_total);
+    }
+
     public function test_return_scenarios_apply_only_the_owned_inventory_and_credit_effects(): void
     {
         $context = $this->context();
@@ -462,11 +521,63 @@ final class SalesEngineTest extends TestCase
         $note->status = SalesCreditNoteStatus::Posted;
         $note->save();
 
-        $allocated = $creditNotes->allocate($note, $invoice, '40.000000');
+        $allocated = $creditNotes->allocate($note, $invoice, '15.000000');
+
+        $this->assertSame(SalesCreditNoteStatus::Posted, $allocated->status);
+        $this->assertSame('25.000000', (string) $allocated->remaining_amount);
+        $this->assertSame('85.000000', (string) $invoice->refresh()->balance_due);
+
+        $allocated = $creditNotes->allocate($allocated, $invoice->refresh(), '25.000000');
 
         $this->assertSame(SalesCreditNoteStatus::Allocated, $allocated->status);
         $this->assertSame('0.000000', (string) $allocated->remaining_amount);
         $this->assertSame('60.000000', (string) $invoice->refresh()->balance_due);
+    }
+
+    public function test_sales_invoice_source_requires_exact_organization_scope(): void
+    {
+        $context = $this->context();
+        $organizationUnitId = $this->createOrganizationUnit(
+            $context['tenant_id'],
+            'SALES-ORG-A',
+        );
+        $otherOrganizationUnitId = $this->createOrganizationUnit(
+            $context['tenant_id'],
+            'SALES-ORG-B',
+        );
+        $this->seedStock($context, '2.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData(
+                $context['item_id'],
+                '1.000000',
+                '10.000000',
+                uomId: $context['uom_id'],
+            ),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+        $delivery = $this->deliver($context, $order, '1.000000');
+        $delivery->organization_unit_id = $organizationUnitId;
+        $delivery->save();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Sales invoice source belongs to a different organization unit.',
+        );
+
+        app(SalesInvoiceIntegrationService::class)->createCustomerInvoice(
+            new CreateSalesInvoiceData(
+                tenantId: $context['tenant_id'],
+                invoiceDate: '2026-06-11',
+                organizationUnitId: $otherOrganizationUnitId,
+                customerId: $context['customer_id'],
+                sources: [
+                    new SalesInvoiceSourceData(
+                        'sales_delivery',
+                        (int) $delivery->getKey(),
+                    ),
+                ],
+            ),
+        );
     }
 
     public function test_over_quantities_and_missing_uom_conversion_are_rejected(): void
@@ -629,6 +740,22 @@ final class SalesEngineTest extends TestCase
             'status' => 'active',
             'is_active' => true,
             'is_isolated' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createOrganizationUnit(int $tenantId, string $name): int
+    {
+        return (int) DB::table('organization_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => $name,
+            'code' => $name,
+            'depth' => 0,
+            'is_active' => true,
+            '_lft' => 0,
+            '_rgt' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

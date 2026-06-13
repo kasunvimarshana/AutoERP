@@ -40,10 +40,12 @@ export default function InvoiceDetailPage() {
                         { label: 'Direction', value: humanize(value.direction) },
                         { label: 'Due date', value: formatDate(value.due_date) },
                         { label: 'Total', value: <MoneyDisplay value={value.grand_total} /> },
+                        { label: 'Paid', value: <MoneyDisplay value={value.paid_total} /> },
+                        { label: 'Credits', value: <MoneyDisplay value={value.credit_total} /> },
                         { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
                     ]} />}
                     {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} />}
-                    {tabState.activeTab === 'balance' && <AsyncRecord loading={balance.loading} error={balance.error} rows={balance.data ? [balance.data] : []} fields={['invoiceTotal', 'paidAmount', 'creditAmount', 'remainingAmount', 'status']} />}
+                    {tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
                     {tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
                     {tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
@@ -52,10 +54,23 @@ export default function InvoiceDetailPage() {
     );
 }
 
-function AsyncRecord({ loading, error, rows, fields }: { loading: boolean; error: import('@/shared/api/apiError').ApiError | null; rows: Record<string, unknown>[]; fields: string[] }) {
+function BalanceSummary({ loading, error, balance }: {
+    loading: boolean;
+    error: import('@/shared/api/apiError').ApiError | null;
+    balance: import('../invoiceTypes').InvoiceBalanceResult | null;
+}) {
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
-    return <RecordTable rows={rows} fields={fields} />;
+    if (!balance) return null;
+    return <DetailGrid items={[
+        { label: 'Invoice total', value: <MoneyDisplay value={balance.invoiceTotal} /> },
+        { label: 'Payments', value: <MoneyDisplay value={balance.paidAmount} /> },
+        { label: 'Credits and debit notes', value: <MoneyDisplay value={balance.creditAmount} /> },
+        { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} /> },
+        { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} /> },
+        { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} /> },
+        { label: 'Balance status', value: <StatusBadge status={balance.status} /> },
+    ]} />;
 }
 
 function SourceRecords({ loading, error, data }: {

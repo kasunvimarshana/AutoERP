@@ -11,6 +11,7 @@ use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\PurchasePostingResult;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
@@ -210,6 +211,8 @@ final class PurchaseReturnService
                     sourceId: (int) $return->getKey(),
                     reason: $return->reason ?: 'Purchase return '.$return->return_number,
                 ));
+                $debitNote->status = PurchaseDebitNoteStatus::Posted;
+                $debitNote->save();
             }
 
             $return->status = PurchaseReturnStatus::Posted;

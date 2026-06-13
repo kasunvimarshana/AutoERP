@@ -10,6 +10,7 @@ use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\Enums\AllocationMethod;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\InvoiceAdjustmentAllocation;
 
 final class InvoiceAdjustmentAllocationService
@@ -154,8 +155,17 @@ final class InvoiceAdjustmentAllocationService
 
         return $this->math->normalize((string) InvoiceAdjustmentAllocation::query()
             ->where('tenant_id', $data->tenantId)
+            ->when(
+                $data->organizationUnitId === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where('organization_unit_id', $data->organizationUnitId),
+            )
             ->where('source_adjustment_type', $adjustment->sourceAdjustmentType)
             ->where('source_adjustment_id', $adjustment->sourceAdjustmentId)
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]))
             ->sum('allocated_amount'));
     }
 

@@ -88,6 +88,13 @@ final class InvoiceSourceAllocationService
     {
         $databaseQuantity = (string) InvoiceSourceLine::query()
             ->where('tenant_id', $data->tenantId)
+            ->when(
+                $data->organizationUnitId === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where('organization_unit_id', $data->organizationUnitId),
+            )
+            ->where('source_type', $sourceLine->sourceType)
+            ->where('source_id', $sourceLine->sourceId)
             ->where('source_line_type', $sourceLine->sourceLineType)
             ->where('source_line_id', $sourceLine->sourceLineId)
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [

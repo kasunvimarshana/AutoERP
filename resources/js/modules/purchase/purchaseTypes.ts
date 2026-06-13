@@ -318,6 +318,11 @@ export interface PurchaseDebitNotePayload {
     source_id?: number;
 }
 
+export interface PurchaseDebitNoteAllocationPayload {
+    invoice_id: number;
+    amount: string;
+}
+
 export interface PurchaseInvoicePayload {
     invoice_date: string;
     invoice_number?: string;

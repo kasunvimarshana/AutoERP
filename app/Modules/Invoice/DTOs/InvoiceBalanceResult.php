@@ -13,6 +13,8 @@ final readonly class InvoiceBalanceResult
         public string $invoiceTotal,
         public string $paidAmount,
         public string $creditAmount,
+        public string $debitAmount,
+        public string $refundedAmount,
         public string $remainingAmount,
         public InvoiceBalanceStatus $status,
     ) {}

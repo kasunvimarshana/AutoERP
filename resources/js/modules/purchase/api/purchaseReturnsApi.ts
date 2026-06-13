@@ -4,6 +4,7 @@ import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api'
 import type {
     InventoryAdjustmentRequestPayload,
     PurchaseDebitNote,
+    PurchaseDebitNoteAllocationPayload,
     PurchaseDebitNotePayload,
     PurchaseReturn,
     PurchaseReturnPayload,
@@ -56,6 +57,31 @@ export async function getPurchaseDebitNote(id: number, signal?: AbortSignal) {
 
 export async function createPurchaseDebitNote(payload: PurchaseDebitNotePayload) {
     const response = await apiClient.post<ApiResource<PurchaseDebitNote>>(`${endpoints.purchase}/debit-notes`, payload);
+    return response.data.data;
+}
+
+export async function approvePurchaseDebitNote(id: number) {
+    const response = await apiClient.patch<ApiResource<PurchaseDebitNote>>(
+        `${endpoints.purchase}/debit-notes/${id}/approve`,
+    );
+    return response.data.data;
+}
+
+export async function postPurchaseDebitNote(id: number) {
+    const response = await apiClient.patch<ApiResource<PurchaseDebitNote>>(
+        `${endpoints.purchase}/debit-notes/${id}/post`,
+    );
+    return response.data.data;
+}
+
+export async function allocatePurchaseDebitNote(
+    id: number,
+    payload: PurchaseDebitNoteAllocationPayload,
+) {
+    const response = await apiClient.post<ApiResource<PurchaseDebitNote>>(
+        `${endpoints.purchase}/debit-notes/${id}/allocations`,
+        payload,
+    );
     return response.data.data;
 }
 

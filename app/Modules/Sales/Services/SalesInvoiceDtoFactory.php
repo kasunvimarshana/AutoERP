@@ -34,8 +34,7 @@ final class SalesInvoiceDtoFactory
     public function prepare(
         CreateSalesInvoiceData $data,
         bool $lockSources = false,
-    ): PreparedSalesInvoiceData
-    {
+    ): PreparedSalesInvoiceData {
         if ($data->sources === []) {
             throw new InvalidArgumentException('Sales invoice requires at least one source.');
         }
@@ -375,8 +374,10 @@ final class SalesInvoiceDtoFactory
         if ((int) $source->tenant_id !== $data->tenantId) {
             throw new InvalidArgumentException('Sales invoice source belongs to a different tenant.');
         }
-        if ($data->organizationUnitId !== null && $source->organization_unit_id !== null
-            && (int) $source->organization_unit_id !== $data->organizationUnitId) {
+        $sourceOrganizationUnitId = $source->organization_unit_id === null
+            ? null
+            : (int) $source->organization_unit_id;
+        if ($sourceOrganizationUnitId !== $data->organizationUnitId) {
             throw new InvalidArgumentException('Sales invoice source belongs to a different organization unit.');
         }
     }
@@ -389,5 +390,4 @@ final class SalesInvoiceDtoFactory
 
         return $source;
     }
-
 }

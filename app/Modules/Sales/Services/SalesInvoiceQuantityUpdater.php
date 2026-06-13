@@ -44,6 +44,30 @@ final class SalesInvoiceQuantityUpdater
         $this->refreshDeliveryStatuses($deliveries);
     }
 
+    /**
+     * @param  array<string, string>  $lineQuantities
+     * @param  Collection<int, SalesDelivery>  $deliveries
+     */
+    public function reverse(array $lineQuantities, Collection $deliveries): void
+    {
+        foreach ($lineQuantities as $lineKey => $quantity) {
+            [$lineType, $lineId] = explode(':', (string) $lineKey, 2);
+
+            if ($lineType === 'sales_delivery_line') {
+                $this->reverseDeliveryQuantity((int) $lineId, $quantity);
+
+                continue;
+            }
+
+            if ($lineType === 'sales_order_line') {
+                $line = SalesOrderLine::query()->lockForUpdate()->findOrFail((int) $lineId);
+                $this->orderQuantities->reverseInvoiced($line, $quantity);
+            }
+        }
+
+        $this->refreshDeliveryStatuses($deliveries);
+    }
+
     private function applyDeliveryQuantity(int $lineId, string $quantity): void
     {
         $line = SalesDeliveryLine::query()
@@ -67,6 +91,28 @@ final class SalesInvoiceQuantityUpdater
         }
     }
 
+    private function reverseDeliveryQuantity(int $lineId, string $quantity): void
+    {
+        $line = SalesDeliveryLine::query()
+            ->with('salesOrderLine')
+            ->lockForUpdate()
+            ->findOrFail($lineId);
+        $line->invoiced_quantity = $this->subtractToZero(
+            (string) $line->invoiced_quantity,
+            $quantity,
+        );
+        $line->remaining_quantity = $this->math->sub(
+            (string) $line->delivered_quantity,
+            (string) $line->invoiced_quantity,
+        );
+        $line->status = $this->deliveryLineStatus($line);
+        $line->save();
+
+        if ($line->salesOrderLine instanceof SalesOrderLine) {
+            $this->orderQuantities->reverseInvoiced($line->salesOrderLine, $quantity);
+        }
+    }
+
     /**
      * @param  Collection<int, SalesDelivery>  $deliveries
      */
@@ -76,10 +122,41 @@ final class SalesInvoiceQuantityUpdater
             $delivery->load('lines');
             $delivered = $this->math->sum($delivery->lines->pluck('delivered_quantity')->all());
             $invoiced = $this->math->sum($delivery->lines->pluck('invoiced_quantity')->all());
-            $delivery->status = $this->math->compare($invoiced, $delivered) >= 0
-                ? SalesDeliveryStatus::Invoiced
-                : SalesDeliveryStatus::PartiallyInvoiced;
+            $returned = $this->math->sum($delivery->lines->pluck('returned_quantity')->all());
+            $delivery->status = match (true) {
+                $this->math->compare($returned, $delivered) >= 0 => SalesDeliveryStatus::Returned,
+                $this->math->compare($returned, '0.000000') > 0 => SalesDeliveryStatus::PartiallyReturned,
+                $this->math->compare($invoiced, $delivered) >= 0 => SalesDeliveryStatus::Invoiced,
+                $this->math->compare($invoiced, '0.000000') > 0 => SalesDeliveryStatus::PartiallyInvoiced,
+                default => SalesDeliveryStatus::Posted,
+            };
             $delivery->save();
         }
+    }
+
+    private function deliveryLineStatus(SalesDeliveryLine $line): string
+    {
+        if ($this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
+            return $this->math->compare(
+                (string) $line->returned_quantity,
+                (string) $line->delivered_quantity,
+            ) >= 0 ? 'returned' : 'partially_returned';
+        }
+
+        if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
+            return $this->math->compare(
+                (string) $line->invoiced_quantity,
+                (string) $line->delivered_quantity,
+            ) >= 0 ? 'invoiced' : 'partially_invoiced';
+        }
+
+        return 'posted';
+    }
+
+    private function subtractToZero(string $current, string $quantity): string
+    {
+        $result = $this->math->sub($current, $quantity);
+
+        return $this->math->isNegative($result) ? '0.000000' : $result;
     }
 }

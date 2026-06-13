@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
@@ -11,7 +12,10 @@ use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceStatusService
 {
-    public function __construct(private readonly TaxDocumentIntegrationService $taxDocuments) {}
+    public function __construct(
+        private readonly TaxDocumentIntegrationService $taxDocuments,
+        private readonly InvoiceSourceRestorationService $sourceRestoration,
+    ) {}
 
     /**
      * @return array<string, list<string>>
@@ -61,28 +65,36 @@ final class InvoiceStatusService
 
     public function transition(Invoice $invoice, InvoiceStatus $to): Invoice
     {
-        $from = $invoice->status instanceof InvoiceStatus
-            ? $invoice->status
-            : InvoiceStatus::from((string) $invoice->status);
+        return DB::transaction(function () use ($invoice, $to): Invoice {
+            $invoice = Invoice::query()
+                ->lockForUpdate()
+                ->findOrFail($invoice->getKey());
+            $from = $invoice->status instanceof InvoiceStatus
+                ? $invoice->status
+                : InvoiceStatus::from((string) $invoice->status);
 
-        $this->assertCanTransition($from, $to);
+            $this->assertCanTransition($from, $to);
 
-        $updates = ['status' => $to->value];
-        if ($to === InvoiceStatus::Approved) {
-            $updates['approved_at'] = now();
-        }
-        if ($to === InvoiceStatus::Posted) {
-            $this->taxDocuments->snapshotInvoice($invoice);
-            $updates['posted_at'] = now();
-        }
+            $updates = ['status' => $to->value];
+            if ($to === InvoiceStatus::Approved) {
+                $updates['approved_at'] = now();
+            }
+            if ($to === InvoiceStatus::Posted) {
+                $this->taxDocuments->snapshotInvoice($invoice);
+                $updates['posted_at'] = now();
+            }
 
-        $invoice->forceFill($updates)->save();
+            $invoice->forceFill($updates)->save();
 
-        if ($to === InvoiceStatus::Posted) {
-            $this->taxDocuments->postInvoice($invoice->refresh());
-        }
+            if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
+                $this->sourceRestoration->restore($invoice);
+            }
+            if ($to === InvoiceStatus::Posted) {
+                $this->taxDocuments->postInvoice($invoice->refresh());
+            }
 
-        return $invoice->refresh();
+            return $invoice->refresh();
+        });
     }
 
     public function assertEditable(Invoice $invoice): void

@@ -17,7 +17,6 @@ final class InvoiceLineResource extends ModuleResource
         return [
             'id' => (int) $this->getKey(),
             'line_number' => (int) $this->line_number,
-            'item_id' => $this->item_id,
             'item' => $this->whenLoaded(
                 'item',
                 fn () => $this->summary($this->item, ['code', 'name', 'description']),
@@ -25,7 +24,6 @@ final class InvoiceLineResource extends ModuleResource
             'description' => $this->description,
             'line_type' => $this->enumValue($this->line_type),
             'quantity' => (string) $this->quantity,
-            'uom_id' => $this->uom_id,
             'uom' => $this->whenLoaded(
                 'uom',
                 fn () => $this->summary($this->uom, ['code', 'name', 'symbol']),

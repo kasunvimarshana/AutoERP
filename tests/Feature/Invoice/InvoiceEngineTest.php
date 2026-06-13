@@ -224,6 +224,70 @@ final class InvoiceEngineTest extends TestCase
         ));
     }
 
+    public function test_cancelled_invoice_restores_source_quantity_and_adjustment_capacity(): void
+    {
+        $tenantId = $this->createTenant();
+        $creator = app(InvoiceCreationService::class);
+        $first = $creator->create($this->progressiveInvoiceData(
+            tenantId: $tenantId,
+            invoiceNumber: 'INV-CANCELLED-SOURCE',
+            invoiceQuantity: '40.000000',
+            expectedLineTotal: '40000.000000',
+        ));
+
+        app(InvoiceStatusService::class)->transition($first, InvoiceStatus::Cancelled);
+
+        $replacement = $creator->create($this->progressiveInvoiceData(
+            tenantId: $tenantId,
+            invoiceNumber: 'INV-REPLACEMENT-SOURCE',
+            invoiceQuantity: '100.000000',
+            expectedLineTotal: '100000.000000',
+        ));
+
+        $this->assertDatabaseHas('invoice_source_lines', [
+            'invoice_id' => $replacement->getKey(),
+            'previously_invoiced_quantity' => '0.000000',
+            'invoiced_quantity' => '100.000000',
+            'remaining_quantity' => '0.000000',
+        ]);
+        $this->assertDatabaseHas('invoice_adjustment_allocations', [
+            'invoice_id' => $replacement->getKey(),
+            'source_adjustment_id' => 7001,
+            'previously_allocated_amount' => '0.000000',
+            'allocated_amount' => '5000.000000',
+            'remaining_amount' => '0.000000',
+        ]);
+    }
+
+    public function test_it_prevents_cross_organization_sources(): void
+    {
+        $tenantId = $this->createTenant();
+        $organizationUnitId = $this->createOrganizationUnit($tenantId, 'INV-ORG-A');
+        $otherOrganizationUnitId = $this->createOrganizationUnit($tenantId, 'INV-ORG-B');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Invoice source organization unit must match invoice organization unit.',
+        );
+
+        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            invoiceNumber: 'INV-CROSS-ORG',
+            organizationUnitId: $organizationUnitId,
+            sources: [
+                new InvoiceSourceData(
+                    tenantId: $tenantId,
+                    sourceType: 'manual_source',
+                    sourceId: 1,
+                    organizationUnitId: $otherOrganizationUnitId,
+                ),
+            ],
+        ));
+    }
+
     private function progressiveInvoiceData(
         int $tenantId,
         string $invoiceNumber,
@@ -328,6 +392,22 @@ final class InvoiceEngineTest extends TestCase
             'status' => 'active',
             'is_active' => true,
             'is_isolated' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createOrganizationUnit(int $tenantId, string $name): int
+    {
+        return (int) DB::table('organization_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => $name,
+            'code' => $name,
+            'depth' => 0,
+            'is_active' => true,
+            '_lft' => 0,
+            '_rgt' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

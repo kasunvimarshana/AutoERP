@@ -33,8 +33,12 @@ export function SalesOrderLookupSelect(props: LookupProps) {
 export function SalesDeliveryLookupSelect(props: LookupProps) {
     return <LookupSelect label="Delivery" search={searchSalesDeliveries} placeholder="Search delivery number or customer..." {...props} />;
 }
-export function SalesInvoiceLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Customer invoice" search={searchCustomerInvoices} placeholder="Search invoice number..." {...props} />;
+export function SalesInvoiceLookupSelect({ partyId, ...props }: LookupProps & { partyId?: number | null }) {
+    const search = useCallback(
+        (query: string, signal: AbortSignal) => searchCustomerInvoices(query, signal, partyId),
+        [partyId],
+    );
+    return <LookupSelect label="Customer invoice" search={search} placeholder="Search invoice number..." {...props} />;
 }
 export function SalesWarehouseLocationLookupSelect({ warehouseId, ...props }: LookupProps & { warehouseId?: number | null }) {
     const search = useCallback(
@@ -44,8 +48,14 @@ export function SalesWarehouseLocationLookupSelect({ warehouseId, ...props }: Lo
     return <LookupSelect label="Location" search={search} placeholder="Search locations..." {...props} />;
 }
 
-async function searchCustomerInvoices(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await listInvoices({ search, invoice_type: 'sales', direction: 'outbound', per_page: 20 }, signal);
+async function searchCustomerInvoices(search: string, signal?: AbortSignal, partyId?: number | null): Promise<NamedResource[]> {
+    const response = await listInvoices({
+        search,
+        invoice_type: 'sales',
+        direction: 'outbound',
+        party_id: partyId ?? undefined,
+        per_page: 20,
+    }, signal);
     return response.data.map((invoice) => ({
         id: invoice.id,
         code: invoice.invoice_number,

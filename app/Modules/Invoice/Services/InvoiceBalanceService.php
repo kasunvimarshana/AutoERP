@@ -39,6 +39,8 @@ final class InvoiceBalanceService
             invoiceTotal: (string) $balance->invoice_total,
             paidAmount: (string) $balance->paid_amount,
             creditAmount: (string) $balance->credit_allocated_amount,
+            debitAmount: (string) $balance->debit_allocated_amount,
+            refundedAmount: (string) $balance->refunded_amount,
             remainingAmount: (string) $balance->remaining_amount,
             status: $balance->status instanceof InvoiceBalanceStatus
                 ? $balance->status

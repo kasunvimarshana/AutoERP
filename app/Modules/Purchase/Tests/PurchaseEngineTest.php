@@ -16,6 +16,8 @@ use Modules\Inventory\Enums\AdjustmentType as InventoryAdjustmentType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAvailabilityService;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
@@ -46,6 +48,7 @@ use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
+use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNote;
@@ -396,6 +399,131 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
     }
 
+    public function test_cancelled_purchase_invoice_restores_grn_and_order_invoiceable_quantity(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+
+        app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Cancelled);
+
+        $grn = $grn->refresh()->load('lines');
+        $order = $order->refresh()->load('lines');
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->status);
+        $this->assertSame('0.000000', (string) $grn->lines->first()->invoiced_quantity);
+        $this->assertSame('40.000000', (string) $grn->lines->first()->remaining_quantity);
+        $this->assertSame('0.000000', (string) $order->lines->first()->invoiced_quantity);
+        $this->assertSame('100.000000', (string) $order->lines->first()->remaining_invoiceable_quantity);
+        $this->assertSame(
+            'cancelled',
+            PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->value('status'),
+        );
+
+        $replacement = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-09',
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+        $this->assertSame('49200.000000', (string) $replacement->grand_total);
+    }
+
+    public function test_purchase_debit_note_supports_partial_and_full_invoice_allocation(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+        $statuses = app(InvoiceStatusService::class);
+        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+        $invoice = $statuses->transition($invoice, InvoiceStatus::Posted);
+
+        $debitNotes = app(PurchaseDebitNoteService::class);
+        $note = $debitNotes->create(new CreatePurchaseDebitNoteData(
+            tenantId: $tenantId,
+            debitNoteDate: '2026-06-09',
+            amount: '20.000000',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            sourceType: 'price_dispute',
+            reason: 'Price dispute',
+        ));
+        $note = $debitNotes->approve($note);
+        $note = $debitNotes->post($note);
+        $note = $debitNotes->allocate($note, $invoice, '8.000000');
+
+        $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
+        $this->assertSame('12.000000', (string) $note->remaining_amount);
+        $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        $note = $debitNotes->allocate($note, $invoice->refresh(), '12.000000');
+
+        $this->assertSame(PurchaseDebitNoteStatus::Allocated, $note->status);
+        $this->assertSame('0.000000', (string) $note->remaining_amount);
+        $this->assertSame('49180.000000', (string) $invoice->refresh()->balance_due);
+    }
+
+    public function test_purchase_invoice_source_requires_exact_organization_scope(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $organizationUnitId = $this->createOrganizationUnit($tenantId, 'PUR-ORG-A');
+        $otherOrganizationUnitId = $this->createOrganizationUnit($tenantId, 'PUR-ORG-B');
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $grn->organization_unit_id = $organizationUnitId;
+        $grn->save();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Purchase invoice source belongs to a different organization unit.',
+        );
+
+        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                organizationUnitId: $otherOrganizationUnitId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+    }
+
     public function test_purchase_return_from_grn_line_posts_inventory_and_creates_debit_note(): void
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
@@ -611,6 +739,22 @@ final class PurchaseEngineTest extends TestCase
             'status' => 'active',
             'is_active' => true,
             'is_isolated' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createOrganizationUnit(int $tenantId, string $name): int
+    {
+        return (int) DB::table('organization_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => $name,
+            'code' => $name,
+            'depth' => 0,
+            'is_active' => true,
+            '_lft' => 0,
+            '_rgt' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -318,6 +318,11 @@ export interface SalesCreditNotePayload {
     credit_note_number?: string;
 }
 
+export interface SalesCreditNoteAllocationPayload {
+    invoice_id: number;
+    amount: string;
+}
+
 export interface SalesLineSummary {
     id: number;
     sales_order_line_id?: number;
