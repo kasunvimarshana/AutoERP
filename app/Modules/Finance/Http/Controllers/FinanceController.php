@@ -18,6 +18,7 @@ use Modules\Finance\Http\Resources\AccountBalanceReportResource;
 use Modules\Finance\Http\Resources\FinanceAccountResource;
 use Modules\Finance\Http\Resources\JournalEntryResource;
 use Modules\Finance\Http\Resources\LedgerEntryResource;
+use Modules\Finance\Http\Resources\PostingProfileResource;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
@@ -27,7 +28,6 @@ use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
-use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\AccountBalanceService;
 use Modules\Finance\Services\AgingReportService;
@@ -39,6 +39,7 @@ use Modules\Finance\Services\CurrencyRevaluationService;
 use Modules\Finance\Services\FinanceStatementService;
 use Modules\Finance\Services\FinanceTaxReportService;
 use Modules\Finance\Services\FiscalPeriodService;
+use Modules\Finance\Services\GeneralLedgerReportService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
@@ -176,33 +177,20 @@ final class FinanceController
         ));
     }
 
-    public function ledger(ListFinanceRequest $request): AnonymousResourceCollection
+    public function ledger(ListFinanceRequest $request, GeneralLedgerReportService $service): AnonymousResourceCollection
     {
-        $query = $this->scope(FinanceLedgerEntry::query(), $request)
-            ->with(['account', 'journalEntry', 'journalLine', 'fiscalPeriod', 'dimension']);
-        if ($request->filled('account_id')) {
-            $query->where('account_id', (int) $request->input('account_id'));
-        }
-        if ($request->filled('date_from')) {
-            $query->whereDate('entry_date', '>=', $request->input('date_from'));
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('entry_date', '<=', $request->input('date_to'));
-        }
-        foreach (['source_module', 'source_type', 'source_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->input($filter));
-            }
-        }
-
         return LedgerEntryResource::collection(
-            $query->orderByDesc('entry_date')->orderByDesc('id')->paginate($request->perPage()),
+            $service->paginate(
+                $request->tenantId(),
+                $request->organizationUnitId(),
+                $this->filters($request, ['account_id', 'date_from', 'date_to', 'source_module', 'source_type', 'source_id']),
+                $request->perPage(),
+            ),
         );
     }
 
     public function accountBalance(ListFinanceRequest $request, int $account, AccountBalanceService $service): JsonResponse
     {
-        $this->scope(FinanceAccount::query(), $request)->findOrFail($account);
         $model = $this->scope(FinanceAccount::query(), $request)->findOrFail($account);
         [$dateFrom, $dateTo] = $this->reportDates($request);
 
@@ -405,7 +393,7 @@ final class FinanceController
 
     public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
     {
-        return JsonResource::collection(
+        return PostingProfileResource::collection(
             $this->scope(FinancePostingProfile::query(), $request)
                 ->with('rules.account')
                 ->orderBy('code')
@@ -416,8 +404,8 @@ final class FinanceController
     public function createPostingProfile(
         UpsertPostingProfileRequest $request,
         PostingProfileService $service,
-    ): JsonResponse {
-        return response()->json(['data' => $service->save(
+    ): PostingProfileResource {
+        return new PostingProfileResource($service->save(
             $request->tenantId(),
             $request->organizationUnitId(),
             (string) $request->input('code'),
@@ -425,17 +413,17 @@ final class FinanceController
             $request->filled('description') ? (string) $request->input('description') : null,
             $request->boolean('is_active', true),
             $request->input('rules'),
-        )]);
+        ));
     }
 
     public function updatePostingProfile(
         UpsertPostingProfileRequest $request,
         int $profile,
         PostingProfileService $service,
-    ): JsonResponse {
+    ): PostingProfileResource {
         $model = $this->scope(FinancePostingProfile::query(), $request)->findOrFail($profile);
 
-        return response()->json(['data' => $service->save(
+        return new PostingProfileResource($service->save(
             $request->tenantId(),
             $request->organizationUnitId(),
             (string) $request->input('code'),
@@ -444,7 +432,7 @@ final class FinanceController
             $request->boolean('is_active', true),
             $request->input('rules'),
             $model,
-        )]);
+        ));
     }
 
     public function fiscalYears(ListFinanceRequest $request): AnonymousResourceCollection
@@ -695,6 +683,23 @@ final class FinanceController
         if ($request->filled('date_to')) {
             $query->whereDate($column, '<=', $request->input('date_to'));
         }
+    }
+
+    /**
+     * @param  list<string>  $names
+     * @return array<string, mixed>
+     */
+    private function filters(ListFinanceRequest $request, array $names): array
+    {
+        $filters = [];
+
+        foreach ($names as $name) {
+            if ($request->filled($name)) {
+                $filters[$name] = $request->input($name);
+            }
+        }
+
+        return $filters;
     }
 
     /**

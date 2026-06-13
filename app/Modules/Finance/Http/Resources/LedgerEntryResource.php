@@ -22,9 +22,9 @@ final class LedgerEntryResource extends ModuleResource
             'source_id' => $this->source_id,
             'source_number' => $this->source_number,
             'source_date' => $this->source_date?->toDateString(),
-            'account' => $this->whenLoaded('account'),
+            'account' => FinanceAccountSummaryResource::make($this->whenLoaded('account')),
             'journal_entry' => $this->whenLoaded('journalEntry'),
-            'journal_line' => $this->whenLoaded('journalLine'),
+            'journal_line' => JournalLineResource::make($this->whenLoaded('journalLine')),
             'fiscal_period' => $this->whenLoaded('fiscalPeriod'),
             'dimension' => $this->whenLoaded('dimension'),
         ];

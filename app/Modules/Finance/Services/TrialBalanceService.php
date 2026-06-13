@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\TrialBalanceResult;
 use Modules\Finance\Models\FinanceAccount;
@@ -24,9 +25,11 @@ final class TrialBalanceService
         ?string $dateTo = null,
     ): TrialBalanceResult {
         if ($fiscalPeriodId !== null) {
-            $period = FinanceFiscalPeriod::query()
-                ->where('tenant_id', $tenantId)
-                ->findOrFail($fiscalPeriodId);
+            $periodQuery = FinanceFiscalPeriod::query()
+                ->where('tenant_id', $tenantId);
+            $this->scopeOrganization($periodQuery, $organizationUnitId);
+
+            $period = $periodQuery->findOrFail($fiscalPeriodId);
             $dateFrom = $period->start_date->toDateString();
             $dateTo = $period->end_date->toDateString();
         }
@@ -34,9 +37,7 @@ final class TrialBalanceService
         $query = FinanceAccount::query()
             ->where('tenant_id', $tenantId);
 
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+        $this->scopeOrganization($query, $organizationUnitId);
 
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
@@ -57,5 +58,12 @@ final class TrialBalanceService
             isBalanced: $this->math->compare($totalDebit, $totalCredit) === 0,
             accountBalances: $accountBalances,
         );
+    }
+
+    private function scopeOrganization(Builder $query, ?int $organizationUnitId): Builder
+    {
+        return $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
     }
 }

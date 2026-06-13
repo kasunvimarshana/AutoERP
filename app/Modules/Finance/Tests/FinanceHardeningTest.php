@@ -190,6 +190,39 @@ final class FinanceHardeningTest extends TestCase
         $this->assertSame('0.000000', $balanceSheet['difference']);
     }
 
+    public function test_trial_balance_fiscal_period_respects_organization_scope(): void
+    {
+        $tenantId = $this->createTenant();
+        $orgOne = $this->organizationUnit($tenantId, 'ORG-TB-A');
+        $orgTwo = $this->organizationUnit($tenantId, 'ORG-TB-B');
+        $yearTwo = (int) DB::table('finance_fiscal_years')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $orgTwo,
+            'name' => 'FY 2026 Org B',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $periodTwo = (int) DB::table('finance_fiscal_periods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $orgTwo,
+            'fiscal_year_id' => $yearTwo,
+            'name' => 'June 2026 Org B',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        app(TrialBalanceService::class)->calculate($tenantId, $orgOne, $periodTwo);
+    }
+
     /**
      * @return array{0: int, 1: FinanceAccount, 2: FinanceAccount}
      */
@@ -300,6 +333,18 @@ final class FinanceHardeningTest extends TestCase
             'status' => 'active',
             'is_active' => true,
             'is_isolated' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function organizationUnit(int $tenantId, string $code): int
+    {
+        return (int) DB::table('organization_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'Organization '.$code,
+            'code' => $code,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

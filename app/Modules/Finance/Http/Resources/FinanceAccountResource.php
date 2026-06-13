@@ -28,8 +28,8 @@ final class FinanceAccountResource extends ModuleResource
             'is_active' => (bool) $this->is_active,
             'account_type' => $this->whenLoaded('accountType'),
             'account_category' => $this->whenLoaded('accountCategory'),
-            'parent' => $this->whenLoaded('parent'),
-            'children' => $this->whenLoaded('children'),
+            'parent' => FinanceAccountSummaryResource::make($this->whenLoaded('parent')),
+            'children' => FinanceAccountSummaryResource::collection($this->whenLoaded('children')),
             'balances' => $this->whenLoaded('balances'),
             'can_edit' => true,
         ];

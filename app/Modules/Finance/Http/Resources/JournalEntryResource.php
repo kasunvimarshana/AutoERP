@@ -37,7 +37,7 @@ final class JournalEntryResource extends ModuleResource
             'reversed_at' => $this->reversed_at?->toIso8601String(),
             'fiscal_period' => $this->whenLoaded('fiscalPeriod'),
             'posting_profile' => $this->whenLoaded('postingProfile'),
-            'lines' => $this->whenLoaded('lines'),
+            'lines' => JournalLineResource::collection($this->whenLoaded('lines')),
             'ledger_entries' => LedgerEntryResource::collection($this->whenLoaded('ledgerEntries')),
             'reversal_of' => $this->whenLoaded('reversalOf'),
             'reversals' => $this->whenLoaded('reversals'),
