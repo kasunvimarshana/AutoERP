@@ -38,8 +38,10 @@ final class PurchaseInvoiceDtoFactory
 
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function prepare(CreatePurchaseInvoiceData $data): PreparedPurchaseInvoiceData
-    {
+    public function prepare(
+        CreatePurchaseInvoiceData $data,
+        bool $lockSources = false,
+    ): PreparedPurchaseInvoiceData {
         $sources = [];
         $sourceLines = [];
         $invoiceLines = [];
@@ -48,6 +50,8 @@ final class PurchaseInvoiceDtoFactory
         $lineQuantities = [];
         $lineNumber = 1;
         $goodsReceipts = collect();
+        $resolvedSupplierType = $data->supplierType;
+        $resolvedSupplierId = $data->supplierId;
 
         foreach ($data->sources as $source) {
             if (! $source instanceof PurchaseInvoiceSourceData) {
@@ -65,6 +69,9 @@ final class PurchaseInvoiceDtoFactory
                     $adjustments,
                     $sourceTotals,
                     $lineQuantities,
+                    $lockSources,
+                    $resolvedSupplierType,
+                    $resolvedSupplierId,
                 );
 
                 continue;
@@ -87,6 +94,9 @@ final class PurchaseInvoiceDtoFactory
                 $sourceTotals,
                 $lineQuantities,
                 $goodsReceipts,
+                $lockSources,
+                $resolvedSupplierType,
+                $resolvedSupplierId,
             );
         }
 
@@ -98,8 +108,8 @@ final class PurchaseInvoiceDtoFactory
                 invoiceDate: $data->invoiceDate,
                 organizationUnitId: $data->organizationUnitId,
                 invoiceNumber: $data->invoiceNumber,
-                partyType: $data->supplierType,
-                partyId: $data->supplierId,
+                partyType: $resolvedSupplierType,
+                partyId: $resolvedSupplierId,
                 dueDate: $data->dueDate,
                 currencyId: $data->currencyId,
                 exchangeRate: $data->exchangeRate,
@@ -127,14 +137,24 @@ final class PurchaseInvoiceDtoFactory
         array &$sourceTotals,
         array &$lineQuantities,
         Collection $goodsReceipts,
+        bool $lockSources,
+        ?string &$resolvedSupplierType,
+        ?int &$resolvedSupplierId,
     ): int {
         $grn = GoodsReceiptNote::query()
             ->with(['lines', 'adjustments'])
+            ->when($lockSources, fn ($query) => $query->lockForUpdate())
             ->findOrFail($source->sourceId);
         $this->assertSourceScope(
             (int) $grn->tenant_id,
             $grn->organization_unit_id,
             $data,
+        );
+        [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
+            $resolvedSupplierType,
+            $resolvedSupplierId,
+            $grn->supplier_type,
+            $grn->supplier_id,
         );
 
         $goodsReceipts->push($grn);
@@ -240,14 +260,24 @@ final class PurchaseInvoiceDtoFactory
         array &$adjustments,
         array &$sourceTotals,
         array &$lineQuantities,
+        bool $lockSources,
+        ?string &$resolvedSupplierType,
+        ?int &$resolvedSupplierId,
     ): int {
         $order = PurchaseOrder::query()
             ->with(['lines', 'adjustments'])
+            ->when($lockSources, fn ($query) => $query->lockForUpdate())
             ->findOrFail($source->sourceId);
         $this->assertSourceScope(
             (int) $order->tenant_id,
             $order->organization_unit_id,
             $data,
+        );
+        [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
+            $resolvedSupplierType,
+            $resolvedSupplierId,
+            $order->supplier_type,
+            $order->supplier_id,
         );
 
         $selectedTotal = '0.000000';
@@ -445,5 +475,32 @@ final class PurchaseInvoiceDtoFactory
             $amount,
             $this->math->div($selectedQuantity, $sourceQuantity, 12),
         );
+    }
+
+    /**
+     * @return array{0: string, 1: int}
+     */
+    private function resolveSupplier(
+        ?string $selectedType,
+        ?int $selectedId,
+        mixed $sourceType,
+        mixed $sourceId,
+    ): array {
+        $resolvedType = trim((string) $sourceType);
+        $resolvedId = is_numeric($sourceId) ? (int) $sourceId : null;
+
+        if ($resolvedType === '' || $resolvedId === null || $resolvedId < 1) {
+            throw new InvalidArgumentException('Purchase invoice source requires a supplier.');
+        }
+
+        if (($selectedType !== null && $selectedType !== $resolvedType)
+            || ($selectedId !== null && $selectedId !== $resolvedId)
+        ) {
+            throw new InvalidArgumentException(
+                'All purchase invoice sources must belong to the selected supplier.',
+            );
+        }
+
+        return [$resolvedType, $resolvedId];
     }
 }

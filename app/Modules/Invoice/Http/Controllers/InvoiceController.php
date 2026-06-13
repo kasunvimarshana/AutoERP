@@ -11,7 +11,10 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
 use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
+use Modules\Invoice\Http\Resources\InvoiceAdjustmentResource;
 use Modules\Invoice\Http\Resources\InvoiceResource;
+use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
+use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceCreationService;
@@ -21,7 +24,12 @@ final class InvoiceController
 {
     public function index(ListInvoiceRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(Invoice::query(), $request)->with(['balance', 'currency']);
+        $query = $this->scope(Invoice::query(), $request)->with([
+            'balance',
+            'currency',
+            'customer',
+            'supplier',
+        ]);
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
@@ -46,7 +54,8 @@ final class InvoiceController
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
         return new InvoiceResource($this->scope(Invoice::query(), $request)->with([
-            'currency', 'lines.item', 'lines.uom', 'sources', 'sourceLines', 'adjustments',
+            'currency', 'customer', 'supplier', 'lines.item', 'lines.uom', 'sources',
+            'sourceLines', 'adjustments.allocations',
             'adjustmentAllocations', 'balance', 'creditAllocations',
         ])->findOrFail($invoice));
     }
@@ -58,7 +67,9 @@ final class InvoiceController
 
     public function store(StoreInvoiceRequest $request, InvoiceCreationService $service): InvoiceResource
     {
-        return new InvoiceResource($service->create($request->toData()));
+        return new InvoiceResource(
+            $service->create($request->toData())->loadMissing(['currency', 'customer', 'supplier']),
+        );
     }
 
     public function approve(InvoiceActionRequest $request, int $invoice, InvoiceStatusService $service): InvoiceResource
@@ -96,15 +107,25 @@ final class InvoiceController
 
         return response()->json([
             'data' => [
-                'sources' => $model->sources()->get(),
-                'source_lines' => $model->sourceLines()->get(),
+                'sources' => InvoiceSourceResource::collection($model->sources()->get())
+                    ->resolve($request),
+                'source_lines' => InvoiceSourceLineResource::collection(
+                    $model->sourceLines()->get(),
+                )->resolve($request),
             ],
         ]);
     }
 
     public function adjustments(InvoiceActionRequest $request, int $invoice): JsonResponse
     {
-        return response()->json(['data' => $this->find($request, $invoice)->adjustments()->get()]);
+        $adjustments = $this->find($request, $invoice)
+            ->adjustments()
+            ->with('allocations')
+            ->get();
+
+        return response()->json([
+            'data' => InvoiceAdjustmentResource::collection($adjustments)->resolve($request),
+        ]);
     }
 
     private function find(InvoiceActionRequest $request, int $invoice): Invoice

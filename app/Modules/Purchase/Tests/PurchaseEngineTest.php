@@ -180,7 +180,7 @@ final class PurchaseEngineTest extends TestCase
             tenantId: $tenantId,
             invoiceDate: '2026-06-06',
             supplierType: 'supplier',
-            supplierId: 10,
+            supplierId: (int) $order->supplier_id,
             sources: [
                 new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grnOne->getKey()),
                 new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grnTwo->getKey()),
@@ -190,6 +190,36 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('123000.000000', (string) $invoice->grand_total);
         $this->assertCount(2, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->get());
         $this->assertCount(6, $invoice->adjustmentAllocations);
+    }
+
+    public function test_purchase_invoice_sources_must_match_the_selected_supplier(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $otherSupplierId = $this->createSupplier(
+            $tenantId,
+            'SUP-OTHER-'.Str::upper(Str::random(4)),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'All purchase invoice sources must belong to the selected supplier.',
+        );
+
+        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-06',
+                supplierType: 'supplier',
+                supplierId: $otherSupplierId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'purchase_order',
+                        (int) $order->getKey(),
+                    ),
+                ],
+            ),
+        );
     }
 
     public function test_one_grn_can_be_invoiced_by_many_supplier_invoices(): void

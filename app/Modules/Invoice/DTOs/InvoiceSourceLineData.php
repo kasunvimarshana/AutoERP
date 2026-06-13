@@ -18,7 +18,6 @@ final readonly class InvoiceSourceLineData
         public string $sourceLineTotal,
         public ?int $organizationUnitId = null,
         public string $previouslyInvoicedQuantity = '0.000000',
-        public ?string $remainingQuantity = null,
         public ?string $invoicedLineTotal = null,
     ) {}
 }

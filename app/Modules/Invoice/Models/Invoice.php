@@ -10,10 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
+use Modules\Customer\Models\Customer;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Supplier\Models\Supplier;
 use Modules\Tenant\Models\TenantModel;
 
 final class Invoice extends CoreModel
@@ -66,6 +68,16 @@ final class Invoice extends CoreModel
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'party_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'party_id');
     }
 
     public function lines(): HasMany

@@ -15,6 +15,13 @@ use Modules\Inventory\Enums\AdjustmentType;
 use Modules\Inventory\Models\InventoryAllocation;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAdjustmentService;
+use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
+use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
@@ -23,6 +30,7 @@ use Modules\Sales\DTOs\CreateSalesInvoiceData;
 use Modules\Sales\DTOs\CreateSalesOrderData;
 use Modules\Sales\DTOs\CreateSalesQuotationData;
 use Modules\Sales\DTOs\CreateSalesReturnData;
+use Modules\Sales\DTOs\SalesCreditNoteData;
 use Modules\Sales\DTOs\SalesDeliveryLineData;
 use Modules\Sales\DTOs\SalesHeaderAdjustmentData;
 use Modules\Sales\DTOs\SalesInvoiceSourceData;
@@ -32,6 +40,7 @@ use Modules\Sales\Enums\SalesAdjustmentCalculationBase;
 use Modules\Sales\Enums\SalesAdjustmentCalculationType;
 use Modules\Sales\Enums\SalesAdjustmentEffect;
 use Modules\Sales\Enums\SalesAdjustmentType;
+use Modules\Sales\Enums\SalesCreditNoteStatus;
 use Modules\Sales\Enums\SalesOrderStatus;
 use Modules\Sales\Enums\SalesQuotationStatus;
 use Modules\Sales\Enums\SalesReturnType;
@@ -42,6 +51,7 @@ use Modules\Sales\Models\SalesInvoiceLink;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesReturn;
 use Modules\Sales\Models\SalesStatusHistory;
+use Modules\Sales\Services\SalesCreditNoteService;
 use Modules\Sales\Services\SalesDeliveryService;
 use Modules\Sales\Services\SalesInvoiceIntegrationService;
 use Modules\Sales\Services\SalesOrderService;
@@ -415,6 +425,48 @@ final class SalesEngineTest extends TestCase
             warehouseId: $context['warehouse_id'],
             lines: [new SalesLineData($context['item_id'], '1.000000', '1.000000', uomId: $context['uom_id'])],
         ));
+    }
+
+    public function test_sales_credit_note_allocation_updates_invoice_balance(): void
+    {
+        $context = $this->context();
+        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $context['tenant_id'],
+            invoiceType: InvoiceType::Sales,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-11',
+            invoiceNumber: 'INV-CREDIT-ALLOCATION',
+            partyType: 'customer',
+            partyId: $context['customer_id'],
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Credit allocation invoice',
+                    quantity: '1.000000',
+                    unitPrice: '100.000000',
+                ),
+            ],
+        ));
+        $statuses = app(InvoiceStatusService::class);
+        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+        $invoice = $statuses->transition($invoice, InvoiceStatus::Posted);
+
+        $creditNotes = app(SalesCreditNoteService::class);
+        $note = $creditNotes->create(new SalesCreditNoteData(
+            tenantId: $context['tenant_id'],
+            creditNoteDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            amount: '40.000000',
+            reason: 'Customer allowance',
+        ));
+        $note->status = SalesCreditNoteStatus::Posted;
+        $note->save();
+
+        $allocated = $creditNotes->allocate($note, $invoice, '40.000000');
+
+        $this->assertSame(SalesCreditNoteStatus::Allocated, $allocated->status);
+        $this->assertSame('0.000000', (string) $allocated->remaining_amount);
+        $this->assertSame('60.000000', (string) $invoice->refresh()->balance_due);
     }
 
     public function test_over_quantities_and_missing_uom_conversion_are_rejected(): void

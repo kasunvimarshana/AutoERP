@@ -12,7 +12,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { humanize, readableRelation } from '@/shared/utils/object';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
 const tabs = [['summary', 'Summary'], ['balance', 'Balance'], ['sources', 'Sources'], ['lines', 'Lines'], ['adjustments', 'Adjustments']].map(([id, label]) => ({ id: id as Tab, label }));
@@ -36,15 +36,16 @@ export default function InvoiceDetailPage() {
                     {tabState.activeTab === 'summary' && <DetailGrid items={[
                         { label: 'Status', value: <StatusBadge status={value.status} /> },
                         { label: 'Party', value: readableRelation(value.party) },
-                        { label: 'Type', value: value.invoice_type },
-                        { label: 'Direction', value: value.direction },
+                        { label: 'Type', value: humanize(value.invoice_type) },
+                        { label: 'Direction', value: humanize(value.direction) },
+                        { label: 'Due date', value: formatDate(value.due_date) },
                         { label: 'Total', value: <MoneyDisplay value={value.grand_total} /> },
                         { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
                     ]} />}
-                    {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'line_total']} />}
-                    {tabState.activeTab === 'balance' && <AsyncRecord loading={balance.loading} error={balance.error} rows={balance.data ? [balance.data] : []} fields={['originalAmount', 'paidAmount', 'creditedAmount', 'remainingAmount', 'status']} />}
-                    {tabState.activeTab === 'adjustments' && <AsyncRecord loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} fields={['name', 'adjustment_type', 'effect', 'amount', 'allocated_amount']} />}
-                    {tabState.activeTab === 'sources' && <AsyncRecord loading={sources.loading} error={sources.error} rows={sources.data?.sources ?? []} fields={['source_type', 'source_id', 'source_number', 'source_date']} />}
+                    {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} />}
+                    {tabState.activeTab === 'balance' && <AsyncRecord loading={balance.loading} error={balance.error} rows={balance.data ? [balance.data] : []} fields={['invoiceTotal', 'paidAmount', 'creditAmount', 'remainingAmount', 'status']} />}
+                    {tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
+                    {tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
             </Panel>
         </>
@@ -55,4 +56,46 @@ function AsyncRecord({ loading, error, rows, fields }: { loading: boolean; error
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
     return <RecordTable rows={rows} fields={fields} />;
+}
+
+function SourceRecords({ loading, error, data }: {
+    loading: boolean;
+    error: import('@/shared/api/apiError').ApiError | null;
+    data: import('../invoiceTypes').InvoiceSourcesResult | null;
+}) {
+    if (loading) return <LoadingState />;
+    if (error) return <ErrorAlert error={error} />;
+    return (
+        <div className="space-y-6">
+            <section>
+                <h3 className="mb-2 font-semibold text-slate-900">Source documents</h3>
+                <RecordTable rows={data?.sources ?? []} fields={['source_type', 'source_document_number', 'source_document_date', 'source_subtotal', 'source_adjustment_total', 'source_grand_total', 'invoiced_amount']} />
+            </section>
+            <section>
+                <h3 className="mb-2 font-semibold text-slate-900">Source lines</h3>
+                <RecordTable rows={data?.source_lines ?? []} fields={['source_line_type', 'source_quantity', 'previously_invoiced_quantity', 'invoiced_quantity', 'remaining_quantity', 'invoiced_line_total']} />
+            </section>
+        </div>
+    );
+}
+
+function AdjustmentRecords({ loading, error, rows }: {
+    loading: boolean;
+    error: import('@/shared/api/apiError').ApiError | null;
+    rows: import('../invoiceTypes').InvoiceAdjustment[];
+}) {
+    if (loading) return <LoadingState />;
+    if (error) return <ErrorAlert error={error} />;
+    const allocations = rows.flatMap((row) => row.allocations ?? []);
+    return (
+        <div className="space-y-6">
+            <RecordTable rows={rows} fields={['name', 'adjustment_type', 'effect', 'calculation_type', 'rate', 'amount', 'allocation_method']} />
+            {allocations.length > 0 && (
+                <section>
+                    <h3 className="mb-2 font-semibold text-slate-900">Allocation trace</h3>
+                    <RecordTable rows={allocations} fields={['source_type', 'allocation_method', 'source_amount', 'previously_allocated_amount', 'allocated_amount', 'remaining_amount']} />
+                </section>
+            )}
+        </div>
+    );
 }

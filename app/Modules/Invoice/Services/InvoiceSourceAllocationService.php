@@ -48,9 +48,7 @@ final class InvoiceSourceAllocationService
                 'source_quantity' => $this->math->normalize($sourceLine->sourceQuantity),
                 'previously_invoiced_quantity' => $previouslyInvoiced,
                 'invoiced_quantity' => $this->math->normalize($sourceLine->invoicedQuantity),
-                'remaining_quantity' => $sourceLine->remainingQuantity !== null
-                    ? $this->math->normalize($sourceLine->remainingQuantity)
-                    : $remainingQuantity,
+                'remaining_quantity' => $remainingQuantity,
                 'source_unit_price' => $this->math->normalize($sourceLine->sourceUnitPrice),
                 'source_line_total' => $this->math->normalize($sourceLine->sourceLineTotal),
                 'invoiced_line_total' => $invoicedLineTotal,

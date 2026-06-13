@@ -155,6 +155,8 @@ final class CoreModulesApiTest extends TestCase
         $invoice = $this->postJson('/api/v1/invoices', $payload)
             ->assertSuccessful()
             ->assertJsonPath('data.grand_total', '120.000000')
+            ->assertJsonPath('data.balance.remaining_amount', '120.000000')
+            ->assertJsonPath('data.lines.0.line_total', '120.000000')
             ->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
@@ -163,6 +165,17 @@ final class CoreModulesApiTest extends TestCase
             ->assertSuccessful()->assertJsonPath('data.status', 'posted');
         $this->getJson('/api/v1/invoices/'.$invoice['id'].'/balance?'.http_build_query($scope))
             ->assertSuccessful()->assertJsonPath('data.remainingAmount', '120.000000');
+    }
+
+    public function test_invoice_request_validates_consumed_nested_fields(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $payload = $this->invoicePayload($tenantId, $organizationUnitId);
+        $payload['lines'][0]['metadata'] = 'not-an-array';
+
+        $this->postJson('/api/v1/invoices/preview', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.metadata');
     }
 
     public function test_payment_creation_and_invoice_allocation_api(): void

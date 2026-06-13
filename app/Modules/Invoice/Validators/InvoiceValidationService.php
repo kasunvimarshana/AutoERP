@@ -34,13 +34,28 @@ final class InvoiceValidationService
             throw new InvalidArgumentException('Invoice exchange rate must be greater than zero.');
         }
 
+        $lineNumbers = [];
+        $invoiceLineSources = [];
         foreach ($data->lines as $line) {
             if (! $line instanceof InvoiceLineData) {
                 throw new InvalidArgumentException('Invoice lines must be InvoiceLineData instances.');
             }
             $this->validateLine($line);
+
+            if (isset($lineNumbers[$line->lineNumber])) {
+                throw new InvalidArgumentException('Invoice line numbers must be unique.');
+            }
+            $lineNumbers[$line->lineNumber] = true;
+
+            if (($line->sourceLineType === null) !== ($line->sourceLineId === null)) {
+                throw new InvalidArgumentException('Invoice line source type and id must be provided together.');
+            }
+            if ($line->sourceLineType !== null && $line->sourceLineId !== null) {
+                $invoiceLineSources[$this->key($line->sourceLineType, $line->sourceLineId)] = true;
+            }
         }
 
+        $sourceKeys = [];
         foreach ($data->sources as $source) {
             if (! $source instanceof InvoiceSourceData) {
                 throw new InvalidArgumentException('Invoice sources must be InvoiceSourceData instances.');
@@ -49,8 +64,15 @@ final class InvoiceValidationService
             $this->assertNonNegative($source->sourceSubtotal, 'Source subtotal');
             $this->assertNonNegative($source->sourceGrandTotal, 'Source grand total');
             $this->assertNonNegative($source->invoicedAmount, 'Source invoiced amount');
+
+            $sourceKey = $this->key($source->sourceType, $source->sourceId);
+            if (isset($sourceKeys[$sourceKey])) {
+                throw new InvalidArgumentException('Invoice sources must be unique.');
+            }
+            $sourceKeys[$sourceKey] = true;
         }
 
+        $sourceLineKeys = [];
         foreach ($data->sourceLines as $sourceLine) {
             if (! $sourceLine instanceof InvoiceSourceLineData) {
                 throw new InvalidArgumentException('Invoice source lines must be InvoiceSourceLineData instances.');
@@ -60,6 +82,24 @@ final class InvoiceValidationService
             $this->assertNonNegative($sourceLine->previouslyInvoicedQuantity, 'Previously invoiced quantity');
             $this->assertNonNegative($sourceLine->invoicedQuantity, 'Invoiced quantity');
             $this->assertNonNegative($sourceLine->sourceLineTotal, 'Source line total');
+
+            if (! isset($sourceKeys[$this->key($sourceLine->sourceType, $sourceLine->sourceId)])) {
+                throw new InvalidArgumentException('Invoice source line must reference an invoice source.');
+            }
+
+            $sourceLineKey = $this->key($sourceLine->sourceLineType, $sourceLine->sourceLineId);
+            if (isset($sourceLineKeys[$sourceLineKey])) {
+                throw new InvalidArgumentException('Invoice source lines must be unique.');
+            }
+            $sourceLineKeys[$sourceLineKey] = true;
+        }
+
+        foreach (array_keys($invoiceLineSources) as $sourceLineKey) {
+            if (! isset($sourceLineKeys[$sourceLineKey])) {
+                throw new InvalidArgumentException(
+                    'Invoice line source must reference an invoice source line.',
+                );
+            }
         }
 
         foreach ($data->adjustments as $adjustment) {
@@ -88,6 +128,11 @@ final class InvoiceValidationService
 
         if ($line->lineTotal !== null) {
             $this->assertNonNegative($line->lineTotal, 'Invoice line total');
+            if ($this->math->compare($line->lineTotal, $this->expectedLineTotal($line)) !== 0) {
+                throw new InvalidArgumentException(
+                    'Invoice line total must match its quantity, price, discount, tax, and charge.',
+                );
+            }
         }
     }
 
@@ -132,5 +177,19 @@ final class InvoiceValidationService
         if ($this->math->isNegative($value)) {
             throw new InvalidArgumentException($label.' cannot be negative.');
         }
+    }
+
+    private function expectedLineTotal(InvoiceLineData $line): string
+    {
+        $total = $this->math->mul($line->quantity, $line->unitPrice);
+        $total = $this->math->sub($total, $line->discountAmount);
+        $total = $this->math->add($total, $line->taxAmount);
+
+        return $this->math->add($total, $line->chargeAmount);
+    }
+
+    private function key(string $type, int $id): string
+    {
+        return $type.':'.$id;
     }
 }

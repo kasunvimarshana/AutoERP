@@ -16,7 +16,10 @@ final class InvoiceCalculationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function calculate(CreateInvoiceData $data): InvoiceCalculationResult
+    /**
+     * @param  list<InvoiceAdjustmentData>|null  $adjustments
+     */
+    public function calculate(CreateInvoiceData $data, ?array $adjustments = null): InvoiceCalculationResult
     {
         $subtotal = '0.000000';
         $discountTotal = '0.000000';
@@ -36,7 +39,7 @@ final class InvoiceCalculationService
             $lineTotals[] = $lineTotal;
         }
 
-        foreach ($data->adjustments as $adjustment) {
+        foreach ($adjustments ?? $data->adjustments as $adjustment) {
             $amount = $this->math->normalize($adjustment->amount);
 
             if ($adjustment->adjustmentType === AdjustmentType::Discount

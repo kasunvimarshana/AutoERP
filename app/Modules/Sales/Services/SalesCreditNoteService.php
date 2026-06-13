@@ -57,25 +57,51 @@ final class SalesCreditNoteService
 
     public function allocate(SalesCreditNote $note, Invoice $invoice, string $amount): SalesCreditNote
     {
-        if ((int) $note->tenant_id !== (int) $invoice->tenant_id
-            || (int) $note->customer_id !== (int) $invoice->party_id
-            || $invoice->party_type !== 'customer') {
-            throw new InvalidArgumentException('Sales credit note and invoice scope or customer does not match.');
-        }
-        if ($this->math->compare($amount, (string) $note->remaining_amount) > 0) {
-            throw new InvalidArgumentException('Credit allocation cannot exceed sales credit note remaining amount.');
-        }
-
         return DB::transaction(function () use ($note, $invoice, $amount): SalesCreditNote {
-            $this->invoiceBalances->allocateCredit($invoice, 'sales_credit_note', (int) $note->getKey(), $amount);
-            $note->allocated_amount = $this->math->add((string) $note->allocated_amount, $amount);
-            $note->remaining_amount = $this->math->sub((string) $note->amount, (string) $note->allocated_amount);
-            $note->status = $this->math->isZero((string) $note->remaining_amount)
+            $lockedNote = SalesCreditNote::query()
+                ->lockForUpdate()
+                ->findOrFail($note->getKey());
+            $this->assertAllocationScope($lockedNote, $invoice);
+
+            if ($this->math->compare($amount, (string) $lockedNote->remaining_amount) > 0) {
+                throw new InvalidArgumentException(
+                    'Credit allocation cannot exceed sales credit note remaining amount.',
+                );
+            }
+
+            $this->invoiceBalances->allocateCredit(
+                $invoice,
+                'sales_credit_note',
+                (int) $lockedNote->getKey(),
+                $amount,
+            );
+            $lockedNote->allocated_amount = $this->math->add(
+                (string) $lockedNote->allocated_amount,
+                $amount,
+            );
+            $lockedNote->remaining_amount = $this->math->sub(
+                (string) $lockedNote->amount,
+                (string) $lockedNote->allocated_amount,
+            );
+            $lockedNote->status = $this->math->isZero((string) $lockedNote->remaining_amount)
                 ? SalesCreditNoteStatus::Allocated
                 : SalesCreditNoteStatus::Posted;
-            $note->save();
+            $lockedNote->save();
 
-            return $note->refresh();
+            return $lockedNote->refresh();
         });
+    }
+
+    private function assertAllocationScope(SalesCreditNote $note, Invoice $invoice): void
+    {
+        if ((int) $note->tenant_id !== (int) $invoice->tenant_id
+            || $note->organization_unit_id !== $invoice->organization_unit_id
+            || (int) $note->customer_id !== (int) $invoice->party_id
+            || $invoice->party_type !== 'customer'
+        ) {
+            throw new InvalidArgumentException(
+                'Sales credit note and invoice scope or customer does not match.',
+            );
+        }
     }
 }

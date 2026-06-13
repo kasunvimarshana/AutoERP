@@ -168,6 +168,62 @@ final class InvoiceEngineTest extends TestCase
         ));
     }
 
+    public function test_it_rejects_inconsistent_caller_supplied_line_totals(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Invoice line total must match its quantity, price, discount, tax, and charge.',
+        );
+
+        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $this->createTenant(),
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            invoiceNumber: 'INV-BAD-LINE-TOTAL',
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Inconsistent total',
+                    quantity: '2.000000',
+                    unitPrice: '50.000000',
+                    lineTotal: '99.000000',
+                ),
+            ],
+        ));
+    }
+
+    public function test_it_requires_source_lines_to_reference_declared_sources(): void
+    {
+        $tenantId = $this->createTenant();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Invoice source line must reference an invoice source.',
+        );
+
+        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Purchase,
+            direction: InvoiceDirection::Inbound,
+            invoiceDate: '2026-06-06',
+            invoiceNumber: 'INV-ORPHAN-SOURCE-LINE',
+            sourceLines: [
+                new InvoiceSourceLineData(
+                    tenantId: $tenantId,
+                    sourceType: 'purchase_order',
+                    sourceId: 100,
+                    sourceLineType: 'purchase_order_line',
+                    sourceLineId: 200,
+                    sourceQuantity: '1.000000',
+                    invoicedQuantity: '1.000000',
+                    sourceUnitPrice: '10.000000',
+                    sourceLineTotal: '10.000000',
+                ),
+            ],
+        ));
+    }
+
     private function progressiveInvoiceData(
         int $tenantId,
         string $invoiceNumber,

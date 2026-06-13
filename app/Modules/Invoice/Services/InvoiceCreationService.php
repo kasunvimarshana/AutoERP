@@ -7,12 +7,10 @@ namespace Modules\Invoice\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
-use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Models\InvoiceLine;
-use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Invoice\Validators\InvoiceValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -25,6 +23,7 @@ final class InvoiceCreationService
         private readonly InvoiceCalculationService $calculations,
         private readonly InvoiceSourceAllocationService $sourceAllocations,
         private readonly InvoiceAdjustmentAllocationService $adjustmentAllocations,
+        private readonly InvoiceLineService $lines,
         private readonly InvoiceSourceService $sources,
         private readonly InvoiceAdjustmentService $adjustments,
         private readonly InvoiceBalanceService $balances,
@@ -38,8 +37,10 @@ final class InvoiceCreationService
         return DB::transaction(function () use ($data): Invoice {
             $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data);
             $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
-            $calculationData = $this->withAllocatedAdjustments($data, $preparedAdjustments);
-            $calculation = $this->calculations->calculate($calculationData);
+            $calculation = $this->calculations->calculate(
+                $data,
+                $this->allocatedAdjustments($preparedAdjustments),
+            );
 
             $invoice = Invoice::query()->create([
                 'tenant_id' => $data->tenantId,
@@ -67,8 +68,7 @@ final class InvoiceCreationService
                 'created_by' => $data->createdBy,
             ]);
 
-            $lineIdsBySourceLine = $this->createLines($invoice, $data, $calculation);
-            $this->createSourceLines($invoice, $sourceLineRows, $lineIdsBySourceLine);
+            $this->lines->create($invoice, $data, $calculation, $sourceLineRows);
 
             $this->sources->createSources(
                 $invoice,
@@ -100,92 +100,21 @@ final class InvoiceCreationService
         $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data);
         $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
 
-        return $this->calculations->calculate($this->withAllocatedAdjustments($data, $preparedAdjustments));
+        return $this->calculations->calculate(
+            $data,
+            $this->allocatedAdjustments($preparedAdjustments),
+        );
     }
 
     /**
-     * @param  list<array{adjustment: object, allocation: array<string, mixed>|null}>  $preparedAdjustments
+     * @param  list<array{adjustment: InvoiceAdjustmentData, allocation: array<string, mixed>|null}>  $preparedAdjustments
+     * @return list<InvoiceAdjustmentData>
      */
-    private function withAllocatedAdjustments(CreateInvoiceData $data, array $preparedAdjustments): CreateInvoiceData
+    private function allocatedAdjustments(array $preparedAdjustments): array
     {
-        $adjustments = array_map(
-            static fn (array $prepared): object => $prepared['adjustment'],
+        return array_map(
+            static fn (array $prepared): InvoiceAdjustmentData => $prepared['adjustment'],
             $preparedAdjustments,
         );
-
-        return new CreateInvoiceData(
-            tenantId: $data->tenantId,
-            invoiceType: $data->invoiceType,
-            direction: $data->direction,
-            invoiceDate: $data->invoiceDate,
-            organizationUnitId: $data->organizationUnitId,
-            invoiceNumber: $data->invoiceNumber,
-            partyType: $data->partyType,
-            partyId: $data->partyId,
-            dueDate: $data->dueDate,
-            currencyId: $data->currencyId,
-            exchangeRate: $data->exchangeRate,
-            status: $data->status,
-            notes: $data->notes,
-            createdBy: $data->createdBy,
-            lines: $data->lines,
-            sources: $data->sources,
-            sourceLines: $data->sourceLines,
-            adjustments: $adjustments,
-        );
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function createLines(Invoice $invoice, CreateInvoiceData $data, InvoiceCalculationResult $calculation): array
-    {
-        $lineIdsBySourceLine = [];
-
-        foreach ($data->lines as $index => $line) {
-            /** @var InvoiceLineData $line */
-            $model = InvoiceLine::query()->create([
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'invoice_id' => $invoice->getKey(),
-                'line_number' => $line->lineNumber,
-                'item_id' => $line->itemId,
-                'description' => $line->description,
-                'line_type' => $line->lineType->value,
-                'quantity' => $this->math->normalize($line->quantity),
-                'uom_id' => $line->uomId,
-                'unit_price' => $this->math->normalize($line->unitPrice),
-                'discount_amount' => $this->math->normalize($line->discountAmount),
-                'tax_amount' => $this->math->normalize($line->taxAmount),
-                'charge_amount' => $this->math->normalize($line->chargeAmount),
-                'line_total' => $calculation->lineTotals[$index] ?? $this->calculations->lineTotal($line),
-                'source_line_type' => $line->sourceLineType,
-                'source_line_id' => $line->sourceLineId,
-                'metadata' => $line->metadata,
-            ]);
-
-            if ($line->sourceLineType !== null && $line->sourceLineId !== null) {
-                $lineIdsBySourceLine[$this->sourceAllocations->sourceLineKey($line->sourceLineType, $line->sourceLineId)] = (int) $model->getKey();
-            }
-        }
-
-        return $lineIdsBySourceLine;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $sourceLineRows
-     * @param  array<string, int>  $lineIdsBySourceLine
-     */
-    private function createSourceLines(Invoice $invoice, array $sourceLineRows, array $lineIdsBySourceLine): void
-    {
-        foreach ($sourceLineRows as $row) {
-            $invoiceLineKey = (string) $row['invoice_line_key'];
-            unset($row['invoice_line_key']);
-
-            InvoiceSourceLine::query()->create(array_merge($row, [
-                'invoice_id' => $invoice->getKey(),
-                'invoice_line_id' => $lineIdsBySourceLine[$invoiceLineKey] ?? null,
-            ]));
-        }
     }
 }

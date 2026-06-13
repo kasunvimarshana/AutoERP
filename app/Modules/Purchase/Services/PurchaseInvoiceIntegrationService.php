@@ -23,7 +23,7 @@ final class PurchaseInvoiceIntegrationService
     public function createSupplierInvoice(CreatePurchaseInvoiceData $data): Invoice
     {
         return DB::transaction(function () use ($data): Invoice {
-            $prepared = $this->invoiceData->prepare($data);
+            $prepared = $this->invoiceData->prepare($data, lockSources: true);
             $invoice = $this->invoices->create($prepared->invoiceData);
 
             $this->createPurchaseLinks($data, $prepared, $invoice);
