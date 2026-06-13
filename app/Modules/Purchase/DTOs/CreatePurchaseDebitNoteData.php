@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\DTOs;
 
-final readonly class PurchaseDebitNoteData
+final readonly class CreatePurchaseDebitNoteData
 {
     public function __construct(
         public int $tenantId,

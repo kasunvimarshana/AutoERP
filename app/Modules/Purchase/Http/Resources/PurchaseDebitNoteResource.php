@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
 
-final class PurchaseDebitNoteResource extends ModuleResource
+final class PurchaseDebitNoteResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
@@ -16,7 +15,7 @@ final class PurchaseDebitNoteResource extends ModuleResource
             'debit_note_number' => $this->debit_note_number,
             'debit_note_date' => $this->debit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
-            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'status_label' => $this->statusLabel($this->status),
             'supplier_type' => $this->supplier_type,
             'supplier_id' => $this->supplier_id,
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
@@ -33,11 +32,6 @@ final class PurchaseDebitNoteResource extends ModuleResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
-    }
-
-    private function enumValue(mixed $value): mixed
-    {
-        return $value instanceof \BackedEnum ? $value->value : $value;
     }
 
     private function sourceSummary(): ?array
@@ -61,25 +55,5 @@ final class PurchaseDebitNoteResource extends ModuleResource
             'number' => null,
             'date' => null,
         ];
-    }
-
-    private function summary(mixed $model, array $fields): ?array
-    {
-        if ($model === null) {
-            return null;
-        }
-
-        $data = ['id' => (int) $model->getKey()];
-        foreach ($fields as $field) {
-            if ($model->{$field} ?? null) {
-                $data[$field] = $model->{$field};
-            }
-        }
-
-        if (! isset($data['name']) && isset($data['display_name'])) {
-            $data['name'] = $data['display_name'];
-        }
-
-        return $data;
     }
 }

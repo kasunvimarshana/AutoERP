@@ -25,7 +25,7 @@ final class GoodsReceiptNoteService
         private readonly PurchaseValidationService $validator,
         private readonly PurchaseOrderCalculationService $calculator,
         private readonly PurchaseHeaderAdjustmentService $adjustments,
-        private readonly PurchaseOrderService $orders,
+        private readonly PurchaseOrderQuantityService $orderQuantities,
         private readonly PurchaseInventoryIntegrationService $inventory,
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
@@ -166,7 +166,7 @@ final class GoodsReceiptNoteService
                 $line->save();
 
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
-                    $this->orders->applyReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
+                    $this->orderQuantities->applyReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
                 }
             }
 
@@ -196,7 +196,7 @@ final class GoodsReceiptNoteService
 
                 $this->inventory->reverseReceipt($grn, $line, $reversedBy);
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
-                    $this->orders->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
+                    $this->orderQuantities->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
                 }
             }
 

@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\PurchaseReturnLineData;
 use Modules\Purchase\Enums\PurchaseReturnType;
 
-final class StorePurchaseReturnRequest extends TenantScopedRequest
+final class StorePurchaseReturnRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'return_date' => ['required', 'date'],
             'warehouse_id' => ['required', 'integer', 'min:1'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
@@ -38,7 +35,7 @@ final class StorePurchaseReturnRequest extends TenantScopedRequest
             'lines.*.uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.unit_price' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.cost_basis' => ['nullable', 'decimal:0,6', 'min:0'],
-        ];
+        ]);
     }
 
     public function toData(): CreatePurchaseReturnData

@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
 use Modules\Inventory\Enums\AdjustmentType;
 
-final class StorePurchaseInventoryAdjustmentRequest extends TenantScopedRequest
+final class StorePurchaseInventoryAdjustmentRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'adjustment_date' => ['required', 'date'],
             'adjustment_type' => ['required', 'in:increase,decrease,recount,damage,expiry,opening_balance'],
             'warehouse_id' => ['required', 'integer', 'min:1'],
@@ -30,7 +27,7 @@ final class StorePurchaseInventoryAdjustmentRequest extends TenantScopedRequest
             'lines.*.adjustment_quantity' => ['required', 'decimal:0,6'],
             'lines.*.unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.reason' => ['nullable', 'string'],
-        ];
+        ]);
     }
 
     public function toData(): StockAdjustmentData

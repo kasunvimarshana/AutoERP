@@ -7,7 +7,6 @@ namespace Modules\Purchase\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Tests\TestCase;
@@ -161,6 +160,25 @@ final class PurchaseOrderApiTest extends TestCase
         $this->patchJson('/api/v1/purchase/orders/'.$id.'/cancel', ['tenant_id' => $context['tenant_id']])
             ->assertUnprocessable()
             ->assertJsonPath('error.message', 'Purchase orders with received or invoiced quantities cannot be cancelled.');
+    }
+
+    public function test_purchase_order_resource_exposes_quantity_aggregates(): void
+    {
+        $context = $this->context();
+        $id = $this->postJson('/api/v1/purchase/orders', $this->payload($context))
+            ->json('data.id');
+        $order = PurchaseOrder::query()->with('lines')->findOrFail($id);
+        $service = app(PurchaseOrderService::class);
+        $service->approve($order);
+        $service->applyReceived($order->lines->first(), '1.000000');
+        $service->applyInvoiced($order->lines->first()->refresh(), '0.500000');
+        $service->applyReturned($order->lines->first()->refresh(), '0.250000');
+
+        $this->getJson('/api/v1/purchase/orders/'.$id.'?tenant_id='.$context['tenant_id'])
+            ->assertOk()
+            ->assertJsonPath('data.received_quantity', '1.000000')
+            ->assertJsonPath('data.invoiced_quantity', '0.500000')
+            ->assertJsonPath('data.returned_quantity', '0.250000');
     }
 
     public function test_tenant_isolation_is_enforced_for_references(): void

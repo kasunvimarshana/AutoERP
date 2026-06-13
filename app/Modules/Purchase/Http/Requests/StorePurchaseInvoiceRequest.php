@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 
-final class StorePurchaseInvoiceRequest extends TenantScopedRequest
+final class StorePurchaseInvoiceRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'invoice_date' => ['required', 'date'],
             'invoice_number' => ['nullable', 'string', 'max:100'],
             'supplier_type' => ['nullable', 'string', 'max:150'],
@@ -28,7 +25,7 @@ final class StorePurchaseInvoiceRequest extends TenantScopedRequest
             'sources.*.source_id' => ['required', 'integer', 'min:1'],
             'sources.*.line_quantities' => ['nullable', 'array'],
             'sources.*.line_quantities.*' => ['decimal:0,6', 'gt:0'],
-        ];
+        ]);
     }
 
     public function toData(): CreatePurchaseInvoiceData

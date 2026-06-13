@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
 
-final class GoodsReceiptNoteResource extends ModuleResource
+final class GoodsReceiptNoteResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
@@ -16,7 +15,7 @@ final class GoodsReceiptNoteResource extends ModuleResource
             'grn_number' => $this->grn_number,
             'received_date' => $this->received_date?->toDateString(),
             'status' => $this->enumValue($this->status),
-            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'status_label' => $this->statusLabel($this->status),
             'purchase_order' => $this->whenLoaded('purchaseOrder', fn () => $this->summary($this->purchaseOrder, ['purchase_order_number', 'status'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
@@ -49,26 +48,5 @@ final class GoodsReceiptNoteResource extends ModuleResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
-    }
-
-    private function enumValue(mixed $value): mixed
-    {
-        return $value instanceof \BackedEnum ? $value->value : $value;
-    }
-
-    private function summary(mixed $model, array $fields): ?array
-    {
-        if ($model === null) {
-            return null;
-        }
-
-        $data = ['id' => (int) $model->getKey()];
-        foreach ($fields as $field) {
-            if ($model->{$field} ?? null) {
-                $data[$field] = $this->enumValue($model->{$field});
-            }
-        }
-
-        return $data;
     }
 }

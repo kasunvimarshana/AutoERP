@@ -7,7 +7,7 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
-use Modules\Purchase\Http\Requests\ListPurchaseOrderRequest;
+use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseDebitNoteRequest;
 use Modules\Purchase\Http\Resources\PurchaseDebitNoteResource;
 use Modules\Purchase\Models\PurchaseDebitNote;
@@ -17,7 +17,7 @@ final class PurchaseDebitNoteController
 {
     use ScopesPurchaseRequests;
 
-    public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
+    public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
         return PurchaseDebitNoteResource::collection($this->scope(PurchaseDebitNote::query(), $request)
             ->with(['supplier', 'purchaseReturn'])
@@ -32,7 +32,7 @@ final class PurchaseDebitNoteController
             ->setStatusCode(201);
     }
 
-    public function show(ListPurchaseOrderRequest $request, int $debitNote): PurchaseDebitNoteResource
+    public function show(ListPurchaseDocumentRequest $request, int $debitNote): PurchaseDebitNoteResource
     {
         return new PurchaseDebitNoteResource($this->scope(PurchaseDebitNote::query(), $request)
             ->with(['supplier', 'purchaseReturn'])

@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
-use Modules\Purchase\Http\Requests\ListPurchaseOrderRequest;
+use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseReturnRequest;
 use Modules\Purchase\Http\Resources\PurchaseReturnResource;
@@ -20,7 +20,7 @@ final class PurchaseReturnController
 {
     use ScopesPurchaseRequests;
 
-    public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
+    public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
         return PurchaseReturnResource::collection($this->scope(PurchaseReturn::query(), $request)
             ->with($this->relations())
@@ -33,7 +33,7 @@ final class PurchaseReturnController
         return new PurchaseReturnResource($service->create($request->toData())->load($this->relations()));
     }
 
-    public function show(ListPurchaseOrderRequest $request, int $return): PurchaseReturnResource
+    public function show(ListPurchaseDocumentRequest $request, int $return): PurchaseReturnResource
     {
         return new PurchaseReturnResource($this->scope(PurchaseReturn::query(), $request)
             ->with($this->relations())

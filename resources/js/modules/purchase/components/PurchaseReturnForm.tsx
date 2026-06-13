@@ -8,16 +8,9 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createPurchaseReturn, getGoodsReceipt, getReturnableGoodsReceiptLines, type PurchaseReturnPayload, type ReturnableLine } from '../purchaseApi';
+import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { GoodsReceiptLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
 import { PurchaseReturnLineEditor, type EditableReturnLine } from './PurchaseReturnLineEditor';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function decimal(value: string | undefined): string {
-    return value && value.trim() !== '' ? value : '0.000000';
-}
 
 export function PurchaseReturnForm() {
     const navigate = useNavigate();
@@ -25,7 +18,7 @@ export function PurchaseReturnForm() {
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
-    const [returnDate, setReturnDate] = useState(today());
+    const [returnDate, setReturnDate] = useState(todayDate());
     const [reason, setReason] = useState('');
     const [lines, setLines] = useState<EditableReturnLine[]>([]);
     const [error, setError] = useState<ApiError | null>(null);
@@ -71,7 +64,7 @@ export function PurchaseReturnForm() {
         lines: lines.map((line) => ({
             source_line_type: line.source.source_line_type,
             source_line_id: line.source.source_line_id,
-            returned_quantity: decimal(line.returned_quantity),
+            returned_quantity: decimalOr(line.returned_quantity),
             reason: line.reason || undefined,
         })),
     });

@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-final class PurchaseHeaderAdjustmentResource extends JsonResource
+final class PurchaseHeaderAdjustmentResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
@@ -28,10 +27,5 @@ final class PurchaseHeaderAdjustmentResource extends JsonResource
             'sort_order' => (int) $this->sort_order,
             'description' => $this->description,
         ];
-    }
-
-    private function enumValue(mixed $value): mixed
-    {
-        return $value instanceof \BackedEnum ? $value->value : $value;
     }
 }

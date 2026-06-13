@@ -22,16 +22,21 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
+use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Services\PaymentAllocationService;
+use Modules\Payment\Services\PaymentCreationService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
-use Modules\Purchase\DTOs\PurchaseDebitNoteData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
@@ -231,6 +236,136 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(3, PurchaseHeaderAdjustment::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->count());
     }
 
+    public function test_partial_receipt_partial_invoice_and_supplier_payment_preparation_workflow(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $lineId = (int) $grn->lines->first()->getKey();
+
+        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                        [$lineId => '20.000000'],
+                    ),
+                ],
+            ),
+        );
+
+        $payment = app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
+            tenantId: $tenantId,
+            paymentDate: '2026-06-09',
+            amount: (string) $invoice->grand_total,
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            allocations: [
+                new PaymentAllocationData(
+                    (int) $invoice->getKey(),
+                    (string) $invoice->grand_total,
+                    '2026-06-09',
+                ),
+            ],
+        );
+
+        $this->assertSame(GoodsReceiptNoteStatus::PartiallyInvoiced, $grn->refresh()->status);
+        $this->assertSame(PurchaseOrderStatus::PartiallyInvoiced, $order->refresh()->status);
+        $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
+        $this->assertSame(PaymentDirection::Outbound, $payment->direction);
+        $this->assertSame((int) $invoice->getKey(), $payment->allocations[0]->invoiceId);
+        $this->assertSame((string) $invoice->grand_total, $payment->allocations[0]->allocatedAmount);
+    }
+
+    public function test_sequential_double_invoicing_is_prevented(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $lineId = (int) $grn->lines->first()->getKey();
+
+        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Purchase invoice quantity cannot exceed GRN remaining quantity.',
+        );
+
+        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-09',
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                        [$lineId => '1.000000'],
+                    ),
+                ],
+            ),
+        );
+    }
+
+    public function test_supplier_advance_can_be_allocated_after_purchase_invoice_creation(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $advance = app(PaymentCreationService::class)->create(new CreatePaymentData(
+            tenantId: $tenantId,
+            paymentType: PaymentType::Advance,
+            direction: PaymentDirection::Outbound,
+            paymentDate: '2026-06-05',
+            partyType: 'supplier',
+            partyId: $supplierId,
+            lines: [new PaymentLineData(amount: '60000.000000')],
+        ));
+
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                    ),
+                ],
+            ),
+        );
+
+        $advance = app(PaymentAllocationService::class)->allocate($advance, [
+            new PaymentAllocationData(
+                invoiceId: (int) $invoice->getKey(),
+                allocatedAmount: (string) $invoice->grand_total,
+                allocationDate: '2026-06-09',
+            ),
+        ]);
+
+        $this->assertSame(PaymentStatus::PartiallyAllocated, $advance->status);
+        $this->assertSame('49200.000000', (string) $advance->allocated_amount);
+        $this->assertSame('10800.000000', (string) $advance->unapplied_amount);
+        $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
+    }
+
     public function test_purchase_return_from_grn_line_posts_inventory_and_creates_debit_note(): void
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
@@ -286,7 +421,7 @@ final class PurchaseEngineTest extends TestCase
             $this->assertSame('Unreferenced supplier return requires approval.', $exception->getMessage());
         }
 
-        $note = app(PurchaseDebitNoteService::class)->create(new PurchaseDebitNoteData(
+        $note = app(PurchaseDebitNoteService::class)->create(new CreatePurchaseDebitNoteData(
             tenantId: $tenantId,
             debitNoteDate: '2026-06-06',
             amount: '20.000000',

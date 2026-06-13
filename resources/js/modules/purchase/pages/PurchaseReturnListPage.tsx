@@ -14,6 +14,7 @@ import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, listPurchaseReturns, postPurchaseReturn, type PurchaseReturn } from '../purchaseApi';
+import { purchaseReturnCapabilities } from '../purchaseCapabilities';
 
 export default function PurchaseReturnListPage() {
     const [page, setPage] = useState(1);
@@ -40,7 +41,10 @@ export default function PurchaseReturnListPage() {
         { key: 'type', header: 'Type', render: (row) => row.return_type?.replaceAll('_', ' ') ?? '-' },
         { key: 'total', header: 'Total', render: (row) => formatMoney(row.grand_total) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: 'Actions', render: (row) => <div className="flex gap-2"><Link to={`/purchase/returns/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>{row.status === 'draft' && <Button type="button" variant="secondary" onClick={() => run(row, 'approve')}>Approve</Button>}{(row.status === 'draft' || row.status === 'approved') && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{row.status !== 'posted' && row.status !== 'cancelled' && <Button type="button" variant="ghost" onClick={() => run(row, 'cancel')}>Cancel</Button>}</div> },
+        { key: 'actions', header: 'Actions', render: (row) => {
+            const capabilities = purchaseReturnCapabilities(row.status);
+            return <div className="flex gap-2"><Link to={`/purchase/returns/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>{capabilities.canApprove && <Button type="button" variant="secondary" onClick={() => run(row, 'approve')}>Approve</Button>}{capabilities.canPost && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{capabilities.canCancel && <Button type="button" variant="ghost" onClick={() => run(row, 'cancel')}>Cancel</Button>}</div>;
+        } },
     ];
     return (
         <div className="space-y-5">

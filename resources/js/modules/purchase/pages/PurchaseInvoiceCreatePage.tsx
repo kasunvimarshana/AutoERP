@@ -11,40 +11,24 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createPurchaseInvoice, getGoodsReceipt, getInvoiceablePurchaseOrderLines, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
+import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, GoodsReceiptLookupSelect, PurchaseOrderLookupSelect, SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseInvoicePreview } from '../components/PurchaseInvoicePreview';
-
-type SourceType = 'goods_receipt_note' | 'purchase_order';
-
-interface InvoiceLine {
-    sourceType: SourceType;
-    sourceId: number;
-    sourceLabel: string;
-    lineId: number;
-    itemName: string;
-    sourceQty: string;
-    previouslyInvoiced: string;
-    remainingQty: string;
-    quantity: string;
-}
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function decimal(value: string | undefined, fallback = '0.000000'): string {
-    return value && value.trim() !== '' ? value : fallback;
-}
+import {
+    PurchaseInvoiceLineTable,
+    type EditablePurchaseInvoiceLine,
+    type PurchaseInvoiceSourceType,
+} from '../components/PurchaseInvoiceLineTable';
 
 export default function PurchaseInvoiceCreatePage() {
     const navigate = useNavigate();
-    const [sourceType, setSourceType] = useState<SourceType>('goods_receipt_note');
+    const [sourceType, setSourceType] = useState<PurchaseInvoiceSourceType>('goods_receipt_note');
     const [source, setSource] = useState<NamedResource | null>(null);
-    const [sources, setSources] = useState<Array<{ type: SourceType; id: number; label: string }>>([]);
-    const [lines, setLines] = useState<InvoiceLine[]>([]);
+    const [sources, setSources] = useState<Array<{ type: PurchaseInvoiceSourceType; id: number; label: string }>>([]);
+    const [lines, setLines] = useState<EditablePurchaseInvoiceLine[]>([]);
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [invoiceDate, setInvoiceDate] = useState(today());
+    const [invoiceDate, setInvoiceDate] = useState(todayDate());
     const [dueDate, setDueDate] = useState('');
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
@@ -105,12 +89,12 @@ export default function PurchaseInvoiceCreatePage() {
         supplier_id: supplier?.id,
         due_date: dueDate || undefined,
         currency_id: currency?.id,
-        exchange_rate: decimal(exchangeRate, '1.000000'),
+        exchange_rate: decimalOr(exchangeRate, '1.000000'),
         notes: notes || undefined,
         sources: sources.map((item) => ({
             source_type: item.type,
             source_id: item.id,
-            line_quantities: Object.fromEntries(lines.filter((line) => line.sourceType === item.type && line.sourceId === item.id && line.quantity !== '').map((line) => [line.lineId, decimal(line.quantity)])),
+            line_quantities: Object.fromEntries(lines.filter((line) => line.sourceType === item.type && line.sourceId === item.id && line.quantity !== '').map((line) => [line.lineId, decimalOr(line.quantity)])),
         })),
     });
 
@@ -142,31 +126,21 @@ export default function PurchaseInvoiceCreatePage() {
             </Panel>
             <Panel title="Sources">
                 <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
-                    <Select label="Source type" value={sourceType} options={[{ value: 'goods_receipt_note', label: 'GRN' }, { value: 'purchase_order', label: 'PO' }]} onChange={(event) => { setSourceType(event.target.value as SourceType); setSource(null); }} />
+                    <Select label="Source type" value={sourceType} options={[{ value: 'goods_receipt_note', label: 'GRN' }, { value: 'purchase_order', label: 'PO' }]} onChange={(event) => { setSourceType(event.target.value as PurchaseInvoiceSourceType); setSource(null); }} />
                     {sourceType === 'goods_receipt_note' ? <GoodsReceiptLookupSelect value={source} onChange={setSource} /> : <PurchaseOrderLookupSelect value={source} onChange={setSource} />}
                     <Button type="button" variant="secondary" loading={busy} onClick={addSource}>Add source</Button>
                 </div>
                 {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}</span>)}</div>}
             </Panel>
             <Panel title="Invoiceable lines">
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                            <tr>{['Source', 'Item', 'Source qty', 'Previously invoiced', 'Remaining', 'Invoice qty'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {lines.map((line, index) => <tr key={`${line.sourceType}-${line.lineId}`}>
-                                <td className="px-4 py-3">{line.sourceLabel}</td>
-                                <td className="px-4 py-3">{line.itemName}</td>
-                                <td className="px-4 py-3 tabular-nums">{line.sourceQty}</td>
-                                <td className="px-4 py-3 tabular-nums">{line.previouslyInvoiced}</td>
-                                <td className="px-4 py-3 tabular-nums">{line.remainingQty}</td>
-                                <td className="min-w-44 px-4 py-3"><DecimalInput value={line.quantity} error={errorFor(`sources.${index}.line_quantities.${line.lineId}`)} onChange={(event) => setLines(lines.map((current, currentIndex) => currentIndex === index ? { ...current, quantity: event.target.value } : current))} /></td>
-                            </tr>)}
-                        </tbody>
-                    </table>
-                    {lines.length === 0 && <div className="px-4 py-10 text-center text-sm text-slate-500">Add one or more GRN/PO sources.</div>}
-                </div>
+                <PurchaseInvoiceLineTable
+                    lines={lines}
+                    sourceIndex={(line) => sources.findIndex((sourceItem) => (
+                        sourceItem.type === line.sourceType && sourceItem.id === line.sourceId
+                    ))}
+                    onChange={setLines}
+                    errorFor={errorFor}
+                />
             </Panel>
             <Panel title="Notes">
                 <Textarea label="Notes" value={notes} error={errorFor('notes')} onChange={(event) => setNotes(event.target.value)} />

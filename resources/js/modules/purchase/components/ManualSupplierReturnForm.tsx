@@ -9,15 +9,8 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createManualSupplierReturn, type PurchaseReturnPayload } from '../purchaseApi';
+import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { ItemLookupSelect, SupplierLookupSelect, UomLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function decimal(value: string | undefined): string {
-    return value && value.trim() !== '' ? value : '0.000000';
-}
 
 export function ManualSupplierReturnForm() {
     const navigate = useNavigate();
@@ -26,7 +19,7 @@ export function ManualSupplierReturnForm() {
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [item, setItem] = useState<NamedResource | null>(null);
     const [uom, setUom] = useState<NamedResource | null>(null);
-    const [returnDate, setReturnDate] = useState(today());
+    const [returnDate, setReturnDate] = useState(todayDate());
     const [quantity, setQuantity] = useState('1.000000');
     const [costBasis, setCostBasis] = useState('0.000000');
     const [reason, setReason] = useState('');
@@ -46,15 +39,15 @@ export function ManualSupplierReturnForm() {
         source_type: 'manual_supplier_return',
         approval_required: true,
         affects_supplier_balance: affectsSupplierBalance,
-        cost_basis: decimal(costBasis),
+        cost_basis: decimalOr(costBasis),
         lines: [{
             source_line_type: 'manual_supplier_return',
             source_line_id: 0,
             item_id: item?.id,
             uom_id: uom?.id,
-            returned_quantity: decimal(quantity),
-            unit_price: decimal(costBasis),
-            cost_basis: decimal(costBasis),
+            returned_quantity: decimalOr(quantity),
+            unit_price: decimalOr(costBasis),
+            cost_basis: decimalOr(costBasis),
             reason,
         }],
     });

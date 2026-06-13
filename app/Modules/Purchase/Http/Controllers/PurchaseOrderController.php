@@ -7,15 +7,15 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
-use Modules\Purchase\Http\Requests\ListPurchaseOrderRequest;
+use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchase\Http\Resources\PurchaseOrderLineResource;
 use Modules\Purchase\Http\Resources\PurchaseOrderResource;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Services\PurchaseOrderQuantityService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
 use Modules\Supplier\Models\Supplier;
@@ -25,12 +25,15 @@ final class PurchaseOrderController
 {
     use ScopesPurchaseRequests;
 
-    public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
+    public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(PurchaseOrder::query(), $request)->with([
             'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
             'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
-        ]);
+        ])
+            ->withSum('lines as received_quantity', 'received_quantity')
+            ->withSum('lines as invoiced_quantity', 'invoiced_quantity')
+            ->withSum('lines as returned_quantity', 'returned_quantity');
 
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
@@ -67,13 +70,17 @@ final class PurchaseOrderController
             ->setStatusCode(201);
     }
 
-    public function show(ListPurchaseOrderRequest $request, int $order): PurchaseOrderResource
+    public function show(ListPurchaseDocumentRequest $request, int $order): PurchaseOrderResource
     {
         return new PurchaseOrderResource($this->scope(PurchaseOrder::query(), $request)
             ->with([
                 'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy', 'closedBy',
                 'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
-            ])->findOrFail($order));
+            ])
+            ->withSum('lines as received_quantity', 'received_quantity')
+            ->withSum('lines as invoiced_quantity', 'invoiced_quantity')
+            ->withSum('lines as returned_quantity', 'returned_quantity')
+            ->findOrFail($order));
     }
 
     public function update(UpdatePurchaseOrderRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
@@ -108,31 +115,35 @@ final class PurchaseOrderController
         return new PurchaseOrderResource($service->close($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
-    public function receivableLines(ListPurchaseOrderRequest $request, int $order, DecimalMath $math): JsonResponse
-    {
+    public function receivableLines(
+        ListPurchaseDocumentRequest $request,
+        int $order,
+        PurchaseOrderQuantityService $quantities,
+    ): JsonResponse {
         $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
 
         return response()->json(['data' => $model->lines
-            ->filter(fn ($line): bool => $math->compare((string) $line->remaining_receivable_quantity, '0.000000') > 0)
+            ->filter(fn ($line): bool => $quantities->isReceivable($line))
             ->values()
             ->map(fn ($line): array => (new PurchaseOrderLineResource($line))->resolve($request))
             ->all()]);
     }
 
-    public function invoiceableLines(ListPurchaseOrderRequest $request, int $order, DecimalMath $math): JsonResponse
-    {
+    public function invoiceableLines(
+        ListPurchaseDocumentRequest $request,
+        int $order,
+        PurchaseOrderQuantityService $quantities,
+    ): JsonResponse {
         $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
 
-        return response()->json(['data' => $model->lines->filter(function ($line) use ($math): bool {
-            $basis = $math->compare((string) $line->received_quantity, '0.000000') > 0
-                ? (string) $line->received_quantity
-                : (string) $line->ordered_quantity;
-
-            return $math->compare($math->sub($basis, (string) $line->invoiced_quantity), '0.000000') > 0;
-        })->values()->map(fn ($line): array => (new PurchaseOrderLineResource($line))->resolve($request))->all()]);
+        return response()->json(['data' => $model->lines
+            ->filter(fn ($line): bool => $quantities->isInvoiceable($line))
+            ->values()
+            ->map(fn ($line): array => (new PurchaseOrderLineResource($line))->resolve($request))
+            ->all()]);
     }
 
-    public function supplierItemMappings(ListPurchaseOrderRequest $request, int $supplier): AnonymousResourceCollection
+    public function supplierItemMappings(ListPurchaseDocumentRequest $request, int $supplier): AnonymousResourceCollection
     {
         $supplierModel = $this->scope(Supplier::query(), $request)->findOrFail($supplier);
 

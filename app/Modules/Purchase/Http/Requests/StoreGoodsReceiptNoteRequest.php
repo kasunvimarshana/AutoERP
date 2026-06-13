@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 
-final class StoreGoodsReceiptNoteRequest extends TenantScopedRequest
+final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'received_date' => ['required', 'date'],
             'warehouse_id' => ['required', 'integer', 'min:1'],
             'purchase_order_id' => ['nullable', 'integer', 'min:1'],
@@ -33,7 +30,7 @@ final class StoreGoodsReceiptNoteRequest extends TenantScopedRequest
             'lines.*.uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.ordered_uom_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.rejected_quantity' => ['nullable', 'decimal:0,6', 'min:0'],
-        ];
+        ]);
     }
 
     public function toData(): CreateGoodsReceiptNoteData
@@ -68,15 +65,5 @@ final class StoreGoodsReceiptNoteRequest extends TenantScopedRequest
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
             ), $this->input('lines')),
         );
-    }
-
-    private function intOrNull(string $key): ?int
-    {
-        return $this->filled($key) ? (int) $this->input($key) : null;
-    }
-
-    private function stringOrNull(string $key): ?string
-    {
-        return $this->filled($key) ? (string) $this->input($key) : null;
     }
 }

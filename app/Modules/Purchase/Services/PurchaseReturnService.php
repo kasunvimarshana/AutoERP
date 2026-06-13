@@ -6,16 +6,16 @@ namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
+use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
-use Modules\Purchase\DTOs\PurchaseDebitNoteData;
 use Modules\Purchase\DTOs\PurchasePostingResult;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
-use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxReturnAllocationService;
 
@@ -28,7 +28,7 @@ final class PurchaseReturnService
         private readonly PurchaseReturnAdjustmentService $adjustments,
         private readonly PurchaseDebitNoteService $debitNotes,
         private readonly PurchaseNumberService $numbers,
-        private readonly PurchaseOrderService $orders,
+        private readonly PurchaseOrderQuantityService $orderQuantities,
         private readonly TaxReturnAllocationService $taxReturns,
     ) {}
 
@@ -105,6 +105,7 @@ final class PurchaseReturnService
                         'line_total' => $lineTotal,
                         'reason' => $lineData->reason ?? $data->reason,
                     ]);
+
                     continue;
                 }
 
@@ -190,14 +191,14 @@ final class PurchaseReturnService
                     $sourceLine->save();
                     $this->refreshGrnReturnStatus($sourceLine);
                     if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine) {
-                        $this->orders->applyReturned($sourceLine->purchaseOrderLine, (string) $line->returned_quantity);
+                        $this->orderQuantities->applyReturned($sourceLine->purchaseOrderLine, (string) $line->returned_quantity);
                     }
                 }
             }
 
             $debitNote = null;
             if ((bool) $return->affects_supplier_balance && ! $this->math->isZero((string) $return->grand_total)) {
-                $debitNote = $this->debitNotes->create(new PurchaseDebitNoteData(
+                $debitNote = $this->debitNotes->create(new CreatePurchaseDebitNoteData(
                     tenantId: (int) $return->tenant_id,
                     debitNoteDate: $return->return_date->toDateString(),
                     amount: (string) $return->grand_total,

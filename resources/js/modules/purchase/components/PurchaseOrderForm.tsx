@@ -11,7 +11,8 @@ import type { NamedResource } from '@/shared/types/common';
 import { addDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { PurchaseOrder, PurchaseOrderPayload } from '../purchaseApi';
 import { createPurchaseOrder, updatePurchaseOrder } from '../purchaseApi';
-import { PurchaseHeaderAdjustmentEditor, emptyHeaderAdjustment, type EditableHeaderAdjustment } from './PurchaseHeaderAdjustmentEditor';
+import { decimalOr, todayDate } from '../purchaseFormUtils';
+import { PurchaseHeaderAdjustmentEditor, type EditableHeaderAdjustment } from './PurchaseHeaderAdjustmentEditor';
 import { PurchaseOrderLineEditor, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderSummaryPanel';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
@@ -21,14 +22,6 @@ interface HeaderState {
     expected_delivery_date: string;
     exchange_rate: string;
     notes: string;
-}
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function normalizeDecimal(value: string | undefined, fallback = '0.000000'): string {
-    return value && value.trim() !== '' ? value : fallback;
 }
 
 function resourceOrNull(resource: NamedResource | null | undefined): NamedResource | null {
@@ -103,7 +96,7 @@ function calculatePreview(lines: EditablePurchaseLine[], adjustments: EditableHe
 export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const navigate = useNavigate();
     const [header, setHeader] = useState<HeaderState>({
-        purchase_order_date: order?.purchase_order_date ?? today(),
+        purchase_order_date: order?.purchase_order_date ?? todayDate(),
         expected_delivery_date: order?.expected_delivery_date ?? '',
         exchange_rate: order?.exchange_rate ?? '1.000000',
         notes: order?.notes ?? '',
@@ -127,23 +120,23 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         warehouse_location_id: warehouseLocation?.id,
         currency_id: currency?.id,
         expected_delivery_date: header.expected_delivery_date || undefined,
-        exchange_rate: normalizeDecimal(header.exchange_rate, '1.000000'),
+        exchange_rate: decimalOr(header.exchange_rate, '1.000000'),
         notes: header.notes || undefined,
         lines: lines.map((line) => ({
             item_id: line.item?.id ?? 0,
             uom_id: line.uom?.id ?? 0,
             description: line.description || undefined,
-            ordered_quantity: normalizeDecimal(line.ordered_quantity),
-            unit_price: normalizeDecimal(line.unit_price),
+            ordered_quantity: decimalOr(line.ordered_quantity),
+            unit_price: decimalOr(line.unit_price),
             discount_calculation_type: line.discount_calculation_type,
-            discount_rate: normalizeDecimal(line.discount_rate),
-            discount_amount: normalizeDecimal(line.discount_amount),
+            discount_rate: decimalOr(line.discount_rate),
+            discount_amount: decimalOr(line.discount_amount),
             tax_calculation_type: line.tax_calculation_type,
-            tax_rate: normalizeDecimal(line.tax_rate),
-            tax_amount: normalizeDecimal(line.tax_amount),
+            tax_rate: decimalOr(line.tax_rate),
+            tax_amount: decimalOr(line.tax_amount),
             charge_calculation_type: line.charge_calculation_type,
-            charge_rate: normalizeDecimal(line.charge_rate),
-            charge_amount: normalizeDecimal(line.charge_amount),
+            charge_rate: decimalOr(line.charge_rate),
+            charge_amount: decimalOr(line.charge_amount),
         })),
         adjustments: adjustments.map((adjustment, index) => ({
             name: adjustment.name,
@@ -151,8 +144,8 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
             effect: adjustment.effect,
             calculation_type: adjustment.calculation_type,
             calculation_base: adjustment.calculation_base,
-            rate: normalizeDecimal(adjustment.rate),
-            amount: normalizeDecimal(adjustment.amount),
+            rate: decimalOr(adjustment.rate),
+            amount: decimalOr(adjustment.amount),
             allocation_method: adjustment.allocation_method,
             sort_order: index,
             description: adjustment.description || undefined,

@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\Purchase\DTOs\PurchaseDebitNoteData;
+use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 
-final class StorePurchaseDebitNoteRequest extends TenantScopedRequest
+final class StorePurchaseDebitNoteRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'debit_note_date' => ['required', 'date'],
             'debit_note_number' => ['nullable', 'string', 'max:100'],
             'supplier_type' => ['nullable', 'string', 'max:150'],
@@ -22,12 +19,12 @@ final class StorePurchaseDebitNoteRequest extends TenantScopedRequest
             'reason' => ['required', 'string'],
             'source_type' => ['nullable', 'string', 'max:100'],
             'source_id' => ['nullable', 'integer', 'min:1'],
-        ];
+        ]);
     }
 
-    public function toData(): PurchaseDebitNoteData
+    public function toData(): CreatePurchaseDebitNoteData
     {
-        return new PurchaseDebitNoteData(
+        return new CreatePurchaseDebitNoteData(
             tenantId: $this->tenantId(),
             debitNoteDate: (string) $this->input('debit_note_date'),
             amount: (string) $this->input('amount'),

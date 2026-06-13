@@ -18,6 +18,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import { SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseOrderStatusBadge } from '../components/PurchaseOrderStatusBadge';
+import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 
 const statuses = [
     'draft',
@@ -76,15 +77,18 @@ export default function PurchaseOrderListPage() {
         {
             key: 'actions',
             header: 'Actions',
-            render: (row) => (
-                <div className="flex flex-wrap gap-2">
-                    <Link to={`/purchase/orders/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>
-                    {row.status === 'draft' && <Link to={`/purchase/orders/${row.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
-                    {row.status === 'draft' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
-                    {(row.status === 'draft' || row.status === 'approved') && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
-                    {row.status === 'approved' && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
-                </div>
-            ),
+            render: (row) => {
+                const capabilities = purchaseOrderCapabilities(row.status);
+                return (
+                    <div className="flex flex-wrap gap-2">
+                        <Link to={`/purchase/orders/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>
+                        {capabilities.canEdit && <Link to={`/purchase/orders/${row.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+                        {capabilities.canApprove && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
+                        {capabilities.canCancel && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
+                        {capabilities.canClose && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
+                    </div>
+                );
+            },
         },
     ];
 

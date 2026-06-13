@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
-use Modules\Purchase\Http\Requests\ListPurchaseOrderRequest;
+use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
@@ -20,7 +20,7 @@ final class GoodsReceiptNoteController
 {
     use ScopesPurchaseRequests;
 
-    public function index(ListPurchaseOrderRequest $request): AnonymousResourceCollection
+    public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
         return GoodsReceiptNoteResource::collection($this->scope(GoodsReceiptNote::query(), $request)
             ->with($this->relations())
@@ -33,7 +33,7 @@ final class GoodsReceiptNoteController
         return new GoodsReceiptNoteResource($service->create($request->toData())->load($this->relations()));
     }
 
-    public function show(ListPurchaseOrderRequest $request, int $grn): GoodsReceiptNoteResource
+    public function show(ListPurchaseDocumentRequest $request, int $grn): GoodsReceiptNoteResource
     {
         return new GoodsReceiptNoteResource($this->scope(GoodsReceiptNote::query(), $request)
             ->with($this->relations())
@@ -51,7 +51,7 @@ final class GoodsReceiptNoteController
         return new GoodsReceiptNoteResource($service->reverse($this->scope(GoodsReceiptNote::query(), $request)->findOrFail($grn), $request->currentUserId()));
     }
 
-    public function returnableLines(ListPurchaseOrderRequest $request, int $grn, DecimalMath $math): JsonResponse
+    public function returnableLines(ListPurchaseDocumentRequest $request, int $grn, DecimalMath $math): JsonResponse
     {
         $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($grn);
 

@@ -3,7 +3,6 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { listUoms, searchCurrencies, searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import type { NamedResource } from '@/shared/types/common';
-import { listInvoices } from '@/modules/invoice/invoiceApi';
 import { searchGoodsReceipts, searchPurchaseOrders } from '../purchaseApi';
 
 interface LookupProps {
@@ -58,17 +57,4 @@ export function PurchaseOrderLookupSelect(props: LookupProps) {
 
 export function GoodsReceiptLookupSelect(props: LookupProps) {
     return <LookupSelect label="Goods receipt" search={searchGoodsReceipts} placeholder="Search GRN number or supplier..." {...props} />;
-}
-
-export function InvoiceLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Supplier invoice" search={searchInvoices} placeholder="Search invoice number..." {...props} />;
-}
-
-async function searchInvoices(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await listInvoices({ search, invoice_type: 'purchase', direction: 'inbound', per_page: 20 }, signal);
-    return response.data.map((invoice) => ({
-        id: invoice.id,
-        code: invoice.invoice_number,
-        name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
-    }));
 }

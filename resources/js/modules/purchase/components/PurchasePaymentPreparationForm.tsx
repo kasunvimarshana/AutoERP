@@ -8,11 +8,8 @@ import { Panel } from '@/shared/components/Panel';
 import type { NamedResource } from '@/shared/types/common';
 import { listInvoices, type Invoice } from '@/modules/invoice/invoiceApi';
 import { preparePurchasePayment } from '../purchaseApi';
+import { todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, SupplierLookupSelect } from './PurchaseLookups';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
 
 function balanceOf(invoice: Invoice): string {
     return String(invoice.balance_due ?? invoice.balance?.balance_due ?? invoice.grand_total ?? '0.000000');
@@ -21,7 +18,7 @@ function balanceOf(invoice: Invoice): string {
 export function PurchasePaymentPreparationForm() {
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [paymentDate, setPaymentDate] = useState(today());
+    const [paymentDate, setPaymentDate] = useState(todayDate());
     const [referenceNumber, setReferenceNumber] = useState('');
     const [amount, setAmount] = useState('0.000000');
     const [invoices, setInvoices] = useState<Invoice[]>([]);

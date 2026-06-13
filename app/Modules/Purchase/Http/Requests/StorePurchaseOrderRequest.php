@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Requests;
 
 use Illuminate\Validation\Rule;
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
@@ -15,13 +14,11 @@ use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 
-class StorePurchaseOrderRequest extends TenantScopedRequest
+class StorePurchaseOrderRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        return array_merge($this->scopeRules(), [
             'purchase_order_date' => ['required', 'date'],
             'purchase_order_number' => ['nullable', 'string', 'max:100'],
             'supplier_type' => ['nullable', 'string', 'max:150'],
@@ -62,7 +59,7 @@ class StorePurchaseOrderRequest extends TenantScopedRequest
             'adjustments.*.is_allocatable' => ['nullable', 'boolean'],
             'adjustments.*.sort_order' => ['nullable', 'integer'],
             'adjustments.*.description' => ['nullable', 'string'],
-        ];
+        ]);
     }
 
     public function toData(): CreatePurchaseOrderData
@@ -114,15 +111,5 @@ class StorePurchaseOrderRequest extends TenantScopedRequest
                 description: $row['description'] ?? null,
             ), $this->input('adjustments', [])),
         );
-    }
-
-    private function intOrNull(string $key): ?int
-    {
-        return $this->filled($key) ? (int) $this->input($key) : null;
-    }
-
-    private function stringOrNull(string $key): ?string
-    {
-        return $this->filled($key) ? (string) $this->input($key) : null;
     }
 }

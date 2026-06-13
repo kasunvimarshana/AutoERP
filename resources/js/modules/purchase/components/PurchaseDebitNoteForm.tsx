@@ -9,16 +9,13 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createPurchaseDebitNote } from '../purchaseApi';
+import { todayDate } from '../purchaseFormUtils';
 import { SupplierLookupSelect } from './PurchaseLookups';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
 
 export function PurchaseDebitNoteForm() {
     const navigate = useNavigate();
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
-    const [debitNoteDate, setDebitNoteDate] = useState(today());
+    const [debitNoteDate, setDebitNoteDate] = useState(todayDate());
     const [amount, setAmount] = useState('0.000000');
     const [reason, setReason] = useState('');
     const [error, setError] = useState<ApiError | null>(null);

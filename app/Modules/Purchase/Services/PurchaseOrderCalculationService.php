@@ -68,31 +68,14 @@ final class PurchaseOrderCalculationService
 
     public function calculate(array $lineData, array $adjustments = []): PurchaseCalculationResult
     {
-        $subtotal = '0.000000';
-        $discountTotal = '0.000000';
-        $taxTotal = '0.000000';
-        $chargeTotal = '0.000000';
+        $lines = $this->aggregateLines($lineData);
+        $subtotal = $lines['subtotal'];
+        $discountTotal = $lines['discount_total'];
+        $taxTotal = $lines['tax_total'];
+        $chargeTotal = $lines['charge_total'];
         $adjustmentTotal = '0.000000';
         $headerIncreaseTotal = '0.000000';
         $headerDecreaseTotal = '0.000000';
-        $lineTotals = [];
-        $subtotalAfterLineDiscount = '0.000000';
-        $subtotalAfterLineAdjustments = '0.000000';
-
-        foreach ($lineData as $line) {
-            $amounts = $this->lineAmounts($line);
-            $base = $amounts['subtotal'];
-            $lineTotals[] = $amounts['total'];
-            if ($this->math->isNegative($lineTotals[array_key_last($lineTotals)])) {
-                throw new \InvalidArgumentException('Purchase line total cannot be negative.');
-            }
-            $subtotal = $this->math->add($subtotal, $base);
-            $discountTotal = $this->math->add($discountTotal, $amounts['discount']);
-            $taxTotal = $this->math->add($taxTotal, $amounts['tax']);
-            $chargeTotal = $this->math->add($chargeTotal, $amounts['charge']);
-            $subtotalAfterLineDiscount = $this->math->add($subtotalAfterLineDiscount, $this->math->sub($base, $amounts['discount']));
-            $subtotalAfterLineAdjustments = $this->math->add($subtotalAfterLineAdjustments, $amounts['total']);
-        }
 
         foreach ($adjustments as $adjustment) {
             if (! $adjustment instanceof PurchaseHeaderAdjustmentData) {
@@ -102,8 +85,8 @@ final class PurchaseOrderCalculationService
             $amount = $this->headerAdjustmentAmount(
                 $adjustment,
                 $subtotal,
-                $subtotalAfterLineDiscount,
-                $subtotalAfterLineAdjustments,
+                $lines['subtotal_after_discount'],
+                $lines['subtotal_after_adjustments'],
             );
             if ($adjustment->adjustmentType === PurchaseAdjustmentType::Discount
                 || $adjustment->adjustmentType === PurchaseAdjustmentType::CreditNote
@@ -130,7 +113,7 @@ final class PurchaseOrderCalculationService
             }
         }
 
-        $grandTotal = $this->math->sum($lineTotals);
+        $grandTotal = $this->math->sum($lines['line_totals']);
         $grandTotal = $this->math->add($grandTotal, $adjustmentTotal);
         if ($this->math->isNegative($grandTotal)) {
             throw new \InvalidArgumentException('Purchase order total cannot be negative.');
@@ -143,7 +126,7 @@ final class PurchaseOrderCalculationService
             $chargeTotal,
             $adjustmentTotal,
             $grandTotal,
-            $lineTotals,
+            $lines['line_totals'],
             $headerIncreaseTotal,
             $headerDecreaseTotal,
         );
@@ -188,25 +171,64 @@ final class PurchaseOrderCalculationService
      */
     public function headerAdjustmentAmounts(array $lineData, array $adjustments): array
     {
-        $subtotal = '0.000000';
-        $subtotalAfterLineDiscount = '0.000000';
-        $subtotalAfterLineAdjustments = '0.000000';
-
-        foreach ($lineData as $line) {
-            $amounts = $this->lineAmounts($line);
-            $subtotal = $this->math->add($subtotal, $amounts['subtotal']);
-            $subtotalAfterLineDiscount = $this->math->add($subtotalAfterLineDiscount, $this->math->sub($amounts['subtotal'], $amounts['discount']));
-            $subtotalAfterLineAdjustments = $this->math->add($subtotalAfterLineAdjustments, $amounts['total']);
-        }
+        $lines = $this->aggregateLines($lineData);
 
         return array_map(
             fn (PurchaseHeaderAdjustmentData $adjustment): string => $this->headerAdjustmentAmount(
                 $adjustment,
-                $subtotal,
-                $subtotalAfterLineDiscount,
-                $subtotalAfterLineAdjustments,
+                $lines['subtotal'],
+                $lines['subtotal_after_discount'],
+                $lines['subtotal_after_adjustments'],
             ),
             $adjustments,
         );
+    }
+
+    /**
+     * @param  list<object>  $lineData
+     * @return array{
+     *     subtotal: string,
+     *     discount_total: string,
+     *     tax_total: string,
+     *     charge_total: string,
+     *     subtotal_after_discount: string,
+     *     subtotal_after_adjustments: string,
+     *     line_totals: list<string>
+     * }
+     */
+    private function aggregateLines(array $lineData): array
+    {
+        $totals = [
+            'subtotal' => '0.000000',
+            'discount_total' => '0.000000',
+            'tax_total' => '0.000000',
+            'charge_total' => '0.000000',
+            'subtotal_after_discount' => '0.000000',
+            'subtotal_after_adjustments' => '0.000000',
+            'line_totals' => [],
+        ];
+
+        foreach ($lineData as $line) {
+            $amounts = $this->lineAmounts($line);
+            if ($this->math->isNegative($amounts['total'])) {
+                throw new \InvalidArgumentException('Purchase line total cannot be negative.');
+            }
+
+            $totals['line_totals'][] = $amounts['total'];
+            $totals['subtotal'] = $this->math->add($totals['subtotal'], $amounts['subtotal']);
+            $totals['discount_total'] = $this->math->add($totals['discount_total'], $amounts['discount']);
+            $totals['tax_total'] = $this->math->add($totals['tax_total'], $amounts['tax']);
+            $totals['charge_total'] = $this->math->add($totals['charge_total'], $amounts['charge']);
+            $totals['subtotal_after_discount'] = $this->math->add(
+                $totals['subtotal_after_discount'],
+                $this->math->sub($amounts['subtotal'], $amounts['discount']),
+            );
+            $totals['subtotal_after_adjustments'] = $this->math->add(
+                $totals['subtotal_after_adjustments'],
+                $amounts['total'],
+            );
+        }
+
+        return $totals;
     }
 }

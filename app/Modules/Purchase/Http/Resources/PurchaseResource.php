@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Purchase\Http\Resources;
+
+use Modules\Core\Http\Resources\ModuleResource;
+
+abstract class PurchaseResource extends ModuleResource
+{
+    protected function enumValue(mixed $value): mixed
+    {
+        return $value instanceof \BackedEnum ? $value->value : $value;
+    }
+
+    protected function statusLabel(mixed $status): string
+    {
+        return str((string) $this->enumValue($status))
+            ->replace('_', ' ')
+            ->title()
+            ->toString();
+    }
+
+    /**
+     * @param  list<string>  $fields
+     * @return array<string, mixed>|null
+     */
+    protected function summary(mixed $model, array $fields): ?array
+    {
+        if ($model === null) {
+            return null;
+        }
+
+        $data = ['id' => (int) $model->getKey()];
+        foreach ($fields as $field) {
+            if ($model->{$field} ?? null) {
+                $data[$field] = $this->enumValue($model->{$field});
+            }
+        }
+
+        if (! isset($data['name']) && isset($data['display_name'])) {
+            $data['name'] = $data['display_name'];
+        }
+
+        return $data;
+    }
+}

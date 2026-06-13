@@ -6,19 +6,20 @@ namespace Modules\Purchase\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Purchase\DTOs\PurchaseDebitNoteData;
+use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Models\PurchaseDebitNote;
+use Modules\Purchase\Validators\PurchaseValidationService;
 
 final class PurchaseDebitNoteService
 {
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseNumberService $numbers,
-        private readonly \Modules\Purchase\Validators\PurchaseValidationService $validator,
+        private readonly PurchaseValidationService $validator,
     ) {}
 
-    public function create(PurchaseDebitNoteData $data): PurchaseDebitNote
+    public function create(CreatePurchaseDebitNoteData $data): PurchaseDebitNote
     {
         $amount = $this->math->normalize($data->amount);
         if ($this->math->isZero($amount) || $this->math->isNegative($amount)) {

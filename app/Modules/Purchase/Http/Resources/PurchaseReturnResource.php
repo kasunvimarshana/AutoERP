@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
 
-final class PurchaseReturnResource extends ModuleResource
+final class PurchaseReturnResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
@@ -20,7 +19,7 @@ final class PurchaseReturnResource extends ModuleResource
             'source_id' => $this->source_id,
             'source' => $this->sourceSummary(),
             'status' => $this->enumValue($this->status),
-            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'status_label' => $this->statusLabel($this->status),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
             'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),
@@ -61,31 +60,6 @@ final class PurchaseReturnResource extends ModuleResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
-    }
-
-    private function enumValue(mixed $value): mixed
-    {
-        return $value instanceof \BackedEnum ? $value->value : $value;
-    }
-
-    private function summary(mixed $model, array $fields): ?array
-    {
-        if ($model === null) {
-            return null;
-        }
-
-        $data = ['id' => (int) $model->getKey()];
-        foreach ($fields as $field) {
-            if ($model->{$field} ?? null) {
-                $data[$field] = $this->enumValue($model->{$field});
-            }
-        }
-
-        if (! isset($data['name']) && isset($data['display_name'])) {
-            $data['name'] = $data['display_name'];
-        }
-
-        return $data;
     }
 
     private function sourceSummary(): ?array

@@ -9,17 +9,14 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createPurchaseInventoryAdjustmentRequest } from '../purchaseApi';
+import { todayDate } from '../purchaseFormUtils';
 import { ItemLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
 
 export function PurchaseInventoryAdjustmentRequestForm() {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [item, setItem] = useState<NamedResource | null>(null);
-    const [date, setDate] = useState(today());
+    const [date, setDate] = useState(todayDate());
     const [adjustmentType, setAdjustmentType] = useState('decrease');
     const [systemQuantity, setSystemQuantity] = useState('0.000000');
     const [countedQuantity, setCountedQuantity] = useState('0.000000');

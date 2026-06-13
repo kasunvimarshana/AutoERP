@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-final class PurchaseOrderLineResource extends JsonResource
+final class PurchaseOrderLineResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
@@ -47,28 +46,7 @@ final class PurchaseOrderLineResource extends JsonResource
             'charge_amount' => (string) $this->charge_amount,
             'line_total' => (string) $this->line_total,
             'status' => $this->enumValue($this->status),
-            'status_label' => str((string) $this->enumValue($this->status))->replace('_', ' ')->title()->toString(),
+            'status_label' => $this->statusLabel($this->status),
         ];
-    }
-
-    private function enumValue(mixed $value): mixed
-    {
-        return $value instanceof \BackedEnum ? $value->value : $value;
-    }
-
-    private function summary(mixed $model, array $fields): ?array
-    {
-        if ($model === null) {
-            return null;
-        }
-
-        $data = ['id' => (int) $model->getKey()];
-        foreach ($fields as $field) {
-            if ($model->{$field} ?? null) {
-                $data[$field] = $model->{$field};
-            }
-        }
-
-        return $data;
     }
 }

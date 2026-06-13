@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
-import type { PurchaseOrder, PurchaseOrderStatus } from '../purchaseApi';
-
-const readOnlyStatuses: Array<PurchaseOrderStatus | undefined> = ['closed', 'cancelled', 'received', 'invoiced', 'partially_invoiced'];
+import type { PurchaseOrder } from '../purchaseApi';
+import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 
 export function PurchaseOrderActions({ order, busy, onApprove, onCancel, onClose, onDelete }: {
     order: PurchaseOrder;
@@ -12,12 +11,7 @@ export function PurchaseOrderActions({ order, busy, onApprove, onCancel, onClose
     onClose?: () => void;
     onDelete?: () => void;
 }) {
-    const status = order.status;
-    const canEdit = status === 'draft';
-    const canApprove = status === 'draft';
-    const canCancel = status === 'draft' || status === 'approved';
-    const canClose = status === 'approved';
-    const isReadOnly = readOnlyStatuses.includes(status);
+    const { canEdit, canApprove, canCancel, canClose, isReadOnly } = purchaseOrderCapabilities(order.status);
 
     return (
         <div className="flex flex-wrap justify-end gap-2">

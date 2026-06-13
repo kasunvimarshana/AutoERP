@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
@@ -43,6 +43,9 @@ final class PurchaseOrder extends CoreModel
             'header_increase_total' => 'decimal:6',
             'header_decrease_total' => 'decimal:6',
             'grand_total' => 'decimal:6',
+            'received_quantity' => 'decimal:6',
+            'invoiced_quantity' => 'decimal:6',
+            'returned_quantity' => 'decimal:6',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
             'closed_at' => 'datetime',

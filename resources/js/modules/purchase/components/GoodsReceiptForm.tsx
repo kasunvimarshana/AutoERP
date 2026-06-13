@@ -8,16 +8,9 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createGoodsReceipt, getPurchaseOrder, getReceivablePurchaseOrderLines, type GoodsReceiptPayload, type PurchaseOrder, type PurchaseOrderLine } from '../purchaseApi';
+import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { PurchaseOrderLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
 import { GoodsReceiptLineEditor, type EditableGoodsReceiptLine } from './GoodsReceiptLineEditor';
-
-function today(): string {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function decimal(value: string | undefined, fallback = '0.000000'): string {
-    return value && value.trim() !== '' ? value : fallback;
-}
 
 function orderLabel(order: PurchaseOrder): NamedResource {
     return {
@@ -37,7 +30,7 @@ export function GoodsReceiptForm() {
     const [purchaseOrder, setPurchaseOrder] = useState<NamedResource | null>(null);
     const [sourceOrder, setSourceOrder] = useState<PurchaseOrder | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
-    const [receivedDate, setReceivedDate] = useState(today());
+    const [receivedDate, setReceivedDate] = useState(todayDate());
     const [notes, setNotes] = useState('');
     const [lines, setLines] = useState<EditableGoodsReceiptLine[]>([]);
     const [loadingLines, setLoadingLines] = useState(false);
@@ -91,10 +84,10 @@ export function GoodsReceiptForm() {
             ordered_uom_id: line.source.uom?.id ?? line.source.uom_id ?? undefined,
             purchase_order_line_id: line.source.id,
             ordered_quantity: line.source.ordered_quantity,
-            received_quantity: decimal(line.received_quantity),
-            accepted_quantity: decimal(line.accepted_quantity),
-            rejected_quantity: decimal(line.rejected_quantity),
-            unit_price: decimal(line.source.unit_price),
+            received_quantity: decimalOr(line.received_quantity),
+            accepted_quantity: decimalOr(line.accepted_quantity),
+            rejected_quantity: decimalOr(line.rejected_quantity),
+            unit_price: decimalOr(line.source.unit_price),
         })),
     });
 
