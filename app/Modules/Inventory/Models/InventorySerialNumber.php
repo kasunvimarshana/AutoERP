@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\SerialStatus;
@@ -60,5 +61,10 @@ final class InventorySerialNumber extends CoreModel
     public function warehouseLocation(): BelongsTo
     {
         return $this->belongsTo(WarehouseLocationModel::class, 'warehouse_location_id');
+    }
+
+    public function movements(): HasMany
+    {
+        return $this->hasMany(InventoryMovement::class, 'serial_number_id');
     }
 }

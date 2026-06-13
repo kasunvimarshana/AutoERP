@@ -35,7 +35,8 @@ final class StockAdjustmentService
             throw new InvalidArgumentException('Inventory adjustment requires at least one line.');
         }
 
-        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        $this->validator->location($warehouse, $data->warehouseLocationId);
 
         return DB::transaction(function () use ($data): InventoryAdjustment {
             $adjustment = InventoryAdjustment::query()->create([
@@ -173,8 +174,14 @@ final class StockAdjustmentService
         }
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
-        $this->validator->batch($item, $data->batchId);
-        $this->validator->serial($item, $data->serialNumberId, ltrim($quantity, '-'));
+        $this->validator->batch($item, $data->batchId, $data->itemVariantId);
+        $this->validator->serial(
+            $item,
+            $data->serialNumberId,
+            ltrim($quantity, '-'),
+            $data->itemVariantId,
+            $data->batchId,
+        );
 
         return InventoryAdjustmentLine::query()->create([
             'tenant_id' => $adjustment->tenant_id,

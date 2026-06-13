@@ -9,6 +9,9 @@ use Modules\Inventory\DTOs\AllocationData;
 use Modules\Inventory\DTOs\AllocationPlanData;
 use Modules\Inventory\DTOs\AllocationPlanLineData;
 use Modules\Inventory\Enums\AllocationMethod;
+use Modules\Inventory\Enums\BatchStatus;
+use Modules\Inventory\Enums\InventoryDirection;
+use Modules\Inventory\Enums\InventoryStatus;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Models\InventorySerialNumber;
 use Modules\Inventory\Models\InventoryStockBalance;
@@ -32,7 +35,20 @@ final class SerialAllocationStrategy extends AbstractAllocationStrategy
             ->where('item_id', $data->itemId)
             ->where('item_variant_id', $data->itemVariantId)
             ->where('warehouse_id', $data->warehouseId)
-            ->where('status', SerialStatus::Available->value);
+            ->where('status', SerialStatus::Available->value)
+            ->whereHas('movements', fn ($movements) => $movements
+                ->where('status', InventoryStatus::Posted->value)
+                ->where('direction', InventoryDirection::In->value))
+            ->where(function ($query): void {
+                $query->whereNull('batch_id')
+                    ->orWhereHas('batch', function ($batch): void {
+                        $batch->where('status', BatchStatus::Active->value)
+                            ->where(function ($expiry): void {
+                                $expiry->whereNull('expiry_date')
+                                    ->orWhereDate('expiry_date', '>=', now()->toDateString());
+                            });
+                    });
+            });
         if ($data->warehouseLocationId !== null) {
             $query->where('warehouse_location_id', $data->warehouseLocationId);
         }

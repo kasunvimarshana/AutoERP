@@ -13,8 +13,8 @@ use Modules\Inventory\DTOs\StockPostingResult;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
-use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\InventoryStatus;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Models\InventoryAllocation;
 use Modules\Inventory\Models\InventoryAllocationIssue;
@@ -55,8 +55,14 @@ final class StockMovementService
         $this->validator->variant($item, $data->itemVariantId);
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
         $this->validator->location($warehouse, $data->warehouseLocationId);
-        $this->validator->batch($item, $data->batchId);
-        $this->validator->serial($item, $data->serialNumberId, $quantity);
+        $this->validator->batch($item, $data->batchId, $data->itemVariantId);
+        $this->validator->serial(
+            $item,
+            $data->serialNumberId,
+            $quantity,
+            $data->itemVariantId,
+            $data->batchId,
+        );
 
         return InventoryMovement::query()->create([
             'tenant_id' => $data->tenantId,
@@ -185,10 +191,10 @@ final class StockMovementService
                 unitCost: $reversalUnitCost,
                 sourceType: 'inventory_movement',
                 sourceId: (int) $movement->getKey(),
-            description: 'Reversal of '.$movement->movement_number,
-            fromState: $movement->to_state,
-            toState: InventoryStockState::Reversed,
-        ));
+                description: 'Reversal of '.$movement->movement_number,
+                fromState: $movement->to_state,
+                toState: InventoryStockState::Reversed,
+            ));
             $reversal->reversal_of_id = $movement->getKey();
             $reversal->save();
             $reversal = $this->post($reversal, $reversedBy);
@@ -276,7 +282,20 @@ final class StockMovementService
         }
 
         $serial = InventorySerialNumber::query()->lockForUpdate()->findOrFail($movement->serial_number_id);
+        $latestMovement = InventoryMovement::query()
+            ->where('serial_number_id', $serial->getKey())
+            ->where('id', '!=', $movement->getKey())
+            ->where('status', InventoryStatus::Posted->value)
+            ->latest('id')
+            ->first();
+
         if ($movement->direction === InventoryDirection::In) {
+            if ($serial->status === SerialStatus::Reserved
+                || ($serial->status === SerialStatus::Available
+                    && $latestMovement?->direction === InventoryDirection::In)) {
+                throw new InvalidArgumentException('Inventory serial number is already available in stock.');
+            }
+
             $serial->status = SerialStatus::Available;
             $serial->warehouse_id = $movement->warehouse_id;
             $serial->warehouse_location_id = $movement->warehouse_location_id;
@@ -284,6 +303,15 @@ final class StockMovementService
         } else {
             if (! in_array($serial->status, [SerialStatus::Available, SerialStatus::Reserved], true)) {
                 throw new InvalidArgumentException('Inventory serial number is not available for issue.');
+            }
+            if (! $latestMovement instanceof InventoryMovement
+                || $latestMovement->direction !== InventoryDirection::In) {
+                throw new InvalidArgumentException('Inventory serial number has no available receipt to issue.');
+            }
+            if ((int) $serial->warehouse_id !== (int) $movement->warehouse_id
+                || $serial->warehouse_location_id !== $movement->warehouse_location_id
+                || $serial->batch_id !== $movement->batch_id) {
+                throw new InvalidArgumentException('Inventory serial number does not match the issue stock location.');
             }
             $serial->status = $movement->reversal_of_id === null ? SerialStatus::Issued : SerialStatus::Returned;
         }

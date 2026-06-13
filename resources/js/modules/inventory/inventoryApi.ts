@@ -1,92 +1,33 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type {
+    AllocationPayload,
+    CostAdjustmentPayload,
+    InventoryAvailability,
+    InventoryRecord,
+    ReservationPayload,
+    StockBalance,
+    StockCountPayload,
+    TransferPayload,
+} from './inventoryTypes';
 
-export interface StockBalance extends Record<string, unknown> {
-    id: number;
-    item?: { id: number; name: string; code?: string };
-    warehouse?: { id: number; name: string; code?: string };
-    warehouse_location?: { id: number; name: string; code?: string };
-    batch?: { id: number; batch_number?: string; lot_number?: string };
-    quantity_on_hand?: string;
-    quantity_reserved?: string;
-    quantity_allocated?: string;
-    quantity_available?: string;
-    quantity_in_transit?: string;
-    quantity_damaged?: string;
-    quantity_quarantine?: string;
-    quantity_expired?: string;
-    quantity_scrapped?: string;
-    total_value?: string;
-}
-
-export type InventoryRecord = Record<string, unknown> & { id: number; status?: string };
-
-export interface ReservationPayload {
-    reservation_date: string;
-    item_id: number;
-    warehouse_id: number;
-    quantity_reserved: string;
-    warehouse_location_id?: number;
-    batch_id?: number;
-    uom_id?: number;
-    source_type?: string;
-    source_id?: number;
-    source_line_type?: string;
-    source_line_id?: number;
-    notes?: string;
-}
-
-export interface AllocationPayload {
-    allocation_date: string;
-    item_id: number;
-    warehouse_id: number;
-    quantity_allocated: string;
-    reservation_id?: number;
-    warehouse_location_id?: number;
-    batch_id?: number;
-    serial_number_id?: number;
-    uom_id?: number;
-    source_type?: string;
-    source_id?: number;
-    source_line_type?: string;
-    source_line_id?: number;
-    notes?: string;
-}
-
-export interface TransferPayload {
-    transfer_date: string;
-    from_warehouse_id: number;
-    to_warehouse_id: number;
-    from_warehouse_location_id?: number;
-    to_warehouse_location_id?: number;
-    reason?: string;
-    notes?: string;
-    lines: Array<{ item_id: number; quantity: string; unit_cost?: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number; uom_id?: number }>;
-}
-
-export interface StockCountPayload {
-    count_date: string;
-    count_type?: 'stock_count' | 'cycle_count';
-    warehouse_id: number;
-    warehouse_location_id?: number;
-    reason?: string;
-    notes?: string;
-    lines: Array<{ item_id: number; counted_quantity: string; system_quantity?: string; unit_cost?: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number; uom_id?: number; notes?: string }>;
-}
-
-export interface CostAdjustmentPayload {
-    adjustment_date: string;
-    reason?: string;
-    notes?: string;
-    lines: Array<{ valuation_layer_id: number; adjustment_amount: string; reason?: string }>;
-}
+export type {
+    AllocationPayload,
+    CostAdjustmentPayload,
+    InventoryAvailability,
+    InventoryRecord,
+    ReservationPayload,
+    StockBalance,
+    StockCountPayload,
+    TransferPayload,
+} from './inventoryTypes';
 
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<StockBalance>>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 
 export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<ApiResource<Record<string, unknown>>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
+    apiClient.get<ApiResource<InventoryAvailability>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
 
 export const listReservations = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/reservations`, { params, signal }).then((response) => response.data);

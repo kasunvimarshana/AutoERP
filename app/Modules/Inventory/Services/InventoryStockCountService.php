@@ -75,8 +75,14 @@ final class InventoryStockCountService
 
                 $this->validator->assertStockable($item);
                 $this->validator->variant($item, $line->itemVariantId);
-                $this->validator->batch($item, $line->batchId);
-                $this->validator->serial($item, $line->serialNumberId, $countedQuantity);
+                $this->validator->batch($item, $line->batchId, $line->itemVariantId);
+                $this->validator->serial(
+                    $item,
+                    $line->serialNumberId,
+                    $countedQuantity,
+                    $line->itemVariantId,
+                    $line->batchId,
+                );
                 $this->validator->assertNonNegative($countedQuantity, 'Inventory counted quantity cannot be negative.');
 
                 $balance = $this->balances->getOrCreate(new StockBalanceData(

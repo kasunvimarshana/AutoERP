@@ -45,6 +45,7 @@ use Modules\Inventory\Services\SerialTrackingService;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAllocationService;
 use Modules\Inventory\Services\StockAvailabilityService;
+use Modules\Inventory\Services\StockBalanceService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Inventory\Services\StockReservationService;
 use Modules\Inventory\Services\StockTransferService;
@@ -55,6 +56,7 @@ use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemCategory;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Reporting\Services\ReportDefinitionRegistry;
 use Modules\Warehouse\Models\WarehouseModel;
 use Tests\TestCase;
 
@@ -670,6 +672,153 @@ final class InventoryEngineTest extends TestCase
         $this->receipt($tenantId, $otherWarehouseId, $stockItem, '1.000000', '1.000000');
     }
 
+    public function test_availability_reads_do_not_create_balances_and_scrapped_stock_is_unavailable(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $data = new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId);
+
+        $availability = app(StockAvailabilityService::class)->availability($data);
+
+        $this->assertSame('0.000000', $availability->quantityOnHand);
+        $this->assertDatabaseCount('inventory_stock_balances', 0);
+
+        $this->receipt($tenantId, $warehouseId, $item, '10.000000', '2.000000');
+        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $balance->quantity_scrapped = '2.000000';
+        app(StockBalanceService::class)->recalculateAvailable($balance);
+        $balance->save();
+
+        $this->assertSame('8.000000', app(StockAvailabilityService::class)->availability($data)->quantityAvailable);
+    }
+
+    public function test_serial_movements_require_a_receipt_and_matching_stock_location(): void
+    {
+        $tenantId = $this->createTenant();
+        $firstWarehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL-A');
+        $secondWarehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL-B');
+        $item = $this->createItem($tenantId, 'SERIAL-LOCATION', TrackingType::Serial);
+        $unreceived = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-UNRECEIVED');
+        $received = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-RECEIVED');
+        $other = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-OTHER');
+        $this->receipt($tenantId, $firstWarehouseId, $item, '1.000000', '5.000000', serialId: (int) $received->getKey());
+        $this->receipt($tenantId, $secondWarehouseId, $item, '1.000000', '5.000000', serialId: (int) $other->getKey());
+
+        try {
+            app(StockMovementService::class)->record(new StockMovementData(
+                $tenantId,
+                '2026-06-06',
+                InventoryMovementType::Issue,
+                InventoryDirection::Out,
+                (int) $item->getKey(),
+                $firstWarehouseId,
+                '1.000000',
+                serialNumberId: (int) $unreceived->getKey(),
+            ));
+            $this->fail('Expected an unreceived serial issue to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Inventory serial number has no available receipt to issue.', $exception->getMessage());
+        }
+
+        try {
+            $this->receipt($tenantId, $secondWarehouseId, $item, '1.000000', '5.000000', serialId: (int) $received->getKey());
+            $this->fail('Expected a duplicate serial receipt to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Inventory serial number is already available in stock.', $exception->getMessage());
+        }
+
+        try {
+            app(StockMovementService::class)->record(new StockMovementData(
+                $tenantId,
+                '2026-06-06',
+                InventoryMovementType::Issue,
+                InventoryDirection::Out,
+                (int) $item->getKey(),
+                $secondWarehouseId,
+                '1.000000',
+                serialNumberId: (int) $received->getKey(),
+            ));
+            $this->fail('Expected a serial issue from the wrong warehouse to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Inventory serial number does not match the issue stock location.', $exception->getMessage());
+        }
+
+        $this->assertSame('1.000000', app(StockAvailabilityService::class)->availability(
+            new StockBalanceData($tenantId, (int) $item->getKey(), $firstWarehouseId),
+        )->quantityAvailable);
+        $this->assertSame('1.000000', app(StockAvailabilityService::class)->availability(
+            new StockBalanceData($tenantId, (int) $item->getKey(), $secondWarehouseId),
+        )->quantityAvailable);
+    }
+
+    public function test_serial_allocation_excludes_expired_batches(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL-EXPIRY');
+        $item = $this->createItem($tenantId, 'SERIAL-EXPIRY', TrackingType::Serial);
+        $batch = app(BatchTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SER-EXP');
+        $batch->expiry_date = '2027-12-31';
+        $batch->save();
+        $serial = app(SerialTrackingService::class)->create(
+            $tenantId,
+            (int) $item->getKey(),
+            'SN-EXP',
+            batchId: (int) $batch->getKey(),
+        );
+        $this->receipt(
+            $tenantId,
+            $warehouseId,
+            $item,
+            '1.000000',
+            '5.000000',
+            (int) $batch->getKey(),
+            (int) $serial->getKey(),
+        );
+        $batch->expiry_date = '2020-01-01';
+        $batch->save();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('No available serial number matches the allocation request.');
+
+        app(StockAllocationService::class)->allocate(new AllocationData(
+            $tenantId,
+            '2026-06-06',
+            (int) $item->getKey(),
+            $warehouseId,
+            '1.000000',
+        ));
+    }
+
+    public function test_adjustment_rejects_a_location_from_another_warehouse(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-ADJ-A');
+        $otherWarehouseId = $this->createWarehouse($tenantId, 'WH-ADJ-B');
+        $otherLocationId = $this->createWarehouseLocation($tenantId, $otherWarehouseId, 'BIN-B');
+        $item = $this->createItem($tenantId, 'ADJ-LOCATION');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Warehouse location must belong to the warehouse.');
+
+        app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+            tenantId: $tenantId,
+            adjustmentDate: '2026-06-06',
+            adjustmentType: AdjustmentType::Increase,
+            warehouseId: $warehouseId,
+            warehouseLocationId: $otherLocationId,
+            lines: [
+                new StockAdjustmentLineData((int) $item->getKey(), '0.000000', '1.000000', '1.000000'),
+            ],
+        ));
+    }
+
+    public function test_inventory_movement_report_searches_real_columns(): void
+    {
+        $report = app(ReportDefinitionRegistry::class)->get('inventory.stock-movement');
+
+        $this->assertContains('movement_number', $report->search);
+        $this->assertNotContains('reference_number', $report->search);
+    }
+
     private function stockContext(): array
     {
         $tenantId = $this->createTenant();
@@ -748,6 +897,22 @@ final class InventoryEngineTest extends TestCase
             'type' => 'standard',
             'is_active' => true,
             'is_default' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createWarehouseLocation(int $tenantId, int $warehouseId, string $code): int
+    {
+        return (int) DB::table('warehouse_locations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouseId,
+            'name' => 'Location '.$code,
+            'code' => $code,
+            'type' => 'bin',
+            'is_active' => true,
+            'is_pickable' => true,
+            'is_receivable' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

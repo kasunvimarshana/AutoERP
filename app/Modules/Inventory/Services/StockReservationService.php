@@ -38,7 +38,7 @@ final class StockReservationService
         $this->validator->variant($item, $data->itemVariantId);
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
         $this->validator->location($warehouse, $data->warehouseLocationId);
-        $this->validator->batch($item, $data->batchId);
+        $this->validator->batch($item, $data->batchId, $data->itemVariantId);
 
         return DB::transaction(function () use ($data, $quantity, $item): InventoryReservation {
             $balance = $this->balances->getOrCreateForUpdate($this->balanceData($data));

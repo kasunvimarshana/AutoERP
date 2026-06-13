@@ -361,13 +361,17 @@ final class InventoryAllocationService
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
         $this->validator->location($warehouse, $data->warehouseLocationId);
         if ($data->batchId !== null) {
-            $this->validator->batch($item, $data->batchId);
+            $this->validator->batch($item, $data->batchId, $data->itemVariantId);
         }
         if ($data->serialNumberId !== null) {
-            $this->validator->serial($item, $data->serialNumberId, $quantity);
+            $this->validator->serial(
+                $item,
+                $data->serialNumberId,
+                $quantity,
+                $data->itemVariantId,
+                $data->batchId,
+            );
         }
-
-        return;
     }
 
     private function lockReservation(AllocationData $data, string $quantity): ?InventoryReservation

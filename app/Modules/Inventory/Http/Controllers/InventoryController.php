@@ -254,14 +254,16 @@ final class InventoryController
 
     public function batches(InventoryLookupRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(InventoryBatch::query(), $request);
+        $query = $this->scope(InventoryBatch::query(), $request)
+            ->with(['item', 'variant']);
 
         return InventoryBatchResource::collection($this->filterTracking($query, $request, 'batch_number')->paginate($request->perPage()));
     }
 
     public function serials(InventoryLookupRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(InventorySerialNumber::query(), $request);
+        $query = $this->scope(InventorySerialNumber::query(), $request)
+            ->with(['item', 'variant', 'batch', 'warehouse', 'warehouseLocation']);
 
         return InventorySerialNumberResource::collection($this->filterTracking($query, $request, 'serial_number')->paginate($request->perPage()));
     }

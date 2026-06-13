@@ -14,6 +14,11 @@ final class StockBalanceService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
+    public function find(StockBalanceData $data): ?InventoryStockBalance
+    {
+        return $this->balanceQuery($data)->first();
+    }
+
     public function getOrCreate(StockBalanceData $data): InventoryStockBalance
     {
         /** @var InventoryStockBalance $balance */
@@ -198,6 +203,7 @@ final class StockBalanceService
             (string) ($balance->quantity_damaged ?? '0.000000'),
             (string) ($balance->quantity_quarantine ?? '0.000000'),
             (string) ($balance->quantity_expired ?? '0.000000'),
+            (string) ($balance->quantity_scrapped ?? '0.000000'),
         ]);
         $balance->quantity_available = $this->math->sub((string) $balance->quantity_on_hand, $unavailable);
         if (! $this->allowsNegativeStock() && $this->math->isNegative((string) $balance->quantity_available)) {

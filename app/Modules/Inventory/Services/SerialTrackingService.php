@@ -25,7 +25,7 @@ final class SerialTrackingService
     ): InventorySerialNumber {
         $item = $this->validator->item($tenantId, $organizationUnitId, $itemId);
         $this->validator->variant($item, $itemVariantId);
-        $this->validator->batch($item, $batchId);
+        $this->validator->batch($item, $batchId, $itemVariantId);
         if ($warehouseId !== null) {
             $warehouse = $this->validator->warehouse($tenantId, $organizationUnitId, $warehouseId);
             $this->validator->location($warehouse, $warehouseLocationId);

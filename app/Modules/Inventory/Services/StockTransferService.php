@@ -13,8 +13,8 @@ use Modules\Inventory\DTOs\StockTransferData;
 use Modules\Inventory\DTOs\StockTransferLineData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
-use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\InventoryStatus;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\TransferStatus;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryStockBalance;
@@ -276,8 +276,14 @@ final class StockTransferService
         }
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
-        $this->validator->batch($item, $data->batchId);
-        $this->validator->serial($item, $data->serialNumberId, $quantity);
+        $this->validator->batch($item, $data->batchId, $data->itemVariantId);
+        $this->validator->serial(
+            $item,
+            $data->serialNumberId,
+            $quantity,
+            $data->itemVariantId,
+            $data->batchId,
+        );
 
         return InventoryTransferLine::query()->create([
             'tenant_id' => $transfer->tenant_id,

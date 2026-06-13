@@ -99,7 +99,7 @@ final class InventoryValidationService
         return $location;
     }
 
-    public function batch(Item $item, ?int $batchId): ?InventoryBatch
+    public function batch(Item $item, ?int $batchId, ?int $itemVariantId = null): ?InventoryBatch
     {
         $tracking = $item->tracking_type instanceof TrackingType ? $item->tracking_type : TrackingType::from((string) $item->tracking_type);
         if (in_array($tracking, [TrackingType::Batch, TrackingType::Lot], true) && $batchId === null) {
@@ -115,6 +115,9 @@ final class InventoryValidationService
             || (int) $batch->item_id !== (int) $item->getKey()) {
             throw new InvalidArgumentException('Inventory batch must belong to the item.');
         }
+        if ($batch->item_variant_id !== $itemVariantId) {
+            throw new InvalidArgumentException('Inventory batch must match the item variant.');
+        }
 
         if ($batch->status !== BatchStatus::Active) {
             throw new InvalidArgumentException('Only active inventory batches can be used.');
@@ -126,8 +129,13 @@ final class InventoryValidationService
         return $batch;
     }
 
-    public function serial(Item $item, ?int $serialId, string $quantity): ?InventorySerialNumber
-    {
+    public function serial(
+        Item $item,
+        ?int $serialId,
+        string $quantity,
+        ?int $itemVariantId = null,
+        ?int $batchId = null,
+    ): ?InventorySerialNumber {
         $tracking = $item->tracking_type instanceof TrackingType ? $item->tracking_type : TrackingType::from((string) $item->tracking_type);
         if ($tracking === TrackingType::Serial) {
             if ($serialId === null) {
@@ -147,6 +155,15 @@ final class InventoryValidationService
         if ((int) $serial->tenant_id !== (int) $item->tenant_id
             || (int) $serial->item_id !== (int) $item->getKey()) {
             throw new InvalidArgumentException('Inventory serial number must belong to the item.');
+        }
+        if ($serial->item_variant_id !== $itemVariantId) {
+            throw new InvalidArgumentException('Inventory serial number must match the item variant.');
+        }
+        if ($serial->batch_id !== $batchId) {
+            throw new InvalidArgumentException('Inventory serial number must match the inventory batch.');
+        }
+        if ($serial->batch_id !== null) {
+            $this->batch($item, (int) $serial->batch_id, $itemVariantId);
         }
 
         if ($serial->status === SerialStatus::Blocked || $serial->status === SerialStatus::Damaged) {

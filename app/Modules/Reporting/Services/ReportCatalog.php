@@ -155,7 +155,7 @@ final class ReportCatalog
                 $this->col('movement_date', 'Date', format: 'date', sort: 'movement_date'), $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'),
                 $this->col('movement_type', 'Type', format: 'enum', sort: 'movement_type'), $this->col('direction', 'Direction', format: 'enum', sort: 'direction'),
                 $this->qty('quantity', 'Quantity'), $this->col('uom', 'UOM', 'baseUom.code'), $this->money('total_cost', 'Cost'), $this->col('source_type', 'Source', sort: 'source_type'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'source_type', 'reference_number'], ['item', 'baseUom', 'warehouse'], 'movement_date'),
+            ], ['movement_number', 'item.code', 'item.name', 'warehouse.name', 'source_type'], ['item', 'baseUom', 'warehouse'], 'movement_date'),
             $this->inventory('inventory.batch-lot', 'Batch/Lot', InventoryBatch::class, [
                 $this->col('batch_number', 'Batch', sort: 'batch_number'), $this->itemCol(), $this->col('manufacture_date', 'Manufactured', format: 'date', sort: 'manufacture_date'),
                 $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
