@@ -5,34 +5,23 @@ declare(strict_types=1);
 namespace Modules\Payment\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\Payment\DTOs\PaymentAllocationData;
+use Modules\Payment\Http\Requests\Concerns\BuildsPaymentAllocations;
 
 final class AllocatePaymentRequest extends TenantScopedRequest
 {
+    use BuildsPaymentAllocations;
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'allocations' => ['required', 'array', 'min:1'],
-            'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
-            'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
-            'allocations.*.allocation_date' => ['required', 'date'],
-            'allocations.*.allow_overpayment' => ['nullable', 'boolean'],
-            'allocations.*.allocation_method' => ['nullable', 'string', 'in:manual,specific_invoice,fifo'],
-            'allocations.*.metadata' => ['nullable', 'array'],
+            ...$this->paymentAllocationRules(['required', 'array', 'min:1']),
         ];
     }
 
     public function toData(): array
     {
-        return array_map(static fn (array $row): PaymentAllocationData => new PaymentAllocationData(
-            invoiceId: (int) $row['invoice_id'],
-            allocatedAmount: (string) $row['allocated_amount'],
-            allocationDate: (string) $row['allocation_date'],
-            allowOverpayment: (bool) ($row['allow_overpayment'] ?? false),
-            allocationMethod: (string) ($row['allocation_method'] ?? 'specific_invoice'),
-            metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
-        ), $this->input('allocations'));
+        return $this->paymentAllocationData();
     }
 }

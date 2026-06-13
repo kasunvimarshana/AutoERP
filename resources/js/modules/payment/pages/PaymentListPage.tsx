@@ -12,7 +12,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { humanize, readableRelation } from '@/shared/utils/object';
 import { Button } from '@/shared/components/Button';
 
 export default function PaymentListPage() {
@@ -24,7 +24,7 @@ export default function PaymentListPage() {
         { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? 'Payment'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
-        { key: 'type', header: 'Type', render: (row) => `${row.payment_type ?? '-'} / ${row.direction ?? '-'}` },
+        { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },
         { key: 'total', header: 'Amount', render: (row) => <MoneyDisplay value={row.total_amount} /> },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
     ];

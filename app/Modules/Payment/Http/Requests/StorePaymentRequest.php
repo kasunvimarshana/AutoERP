@@ -7,13 +7,15 @@ namespace Modules\Payment\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Payment\DTOs\CreatePaymentData;
-use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\Http\Requests\Concerns\BuildsPaymentAllocations;
 
 final class StorePaymentRequest extends TenantScopedRequest
 {
+    use BuildsPaymentAllocations;
+
     public function rules(): array
     {
         return [
@@ -44,21 +46,8 @@ final class StorePaymentRequest extends TenantScopedRequest
             'amount_in_words' => ['nullable', 'string', 'max:2000'],
             'notes' => ['nullable', 'string'],
             'metadata' => ['nullable', 'array'],
-            'lines' => ['required', 'array', 'min:1'],
-            'lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'lines.*.reference_number' => ['nullable', 'string', 'max:150'],
-            'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
-            'lines.*.cleared_amount' => ['nullable', 'decimal:0,6', 'min:0'],
-            'lines.*.status' => ['nullable', 'string', 'max:50'],
-            'lines.*.notes' => ['nullable', 'string'],
-            'lines.*.metadata' => ['nullable', 'array'],
-            'allocations' => ['nullable', 'array'],
-            'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
-            'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
-            'allocations.*.allocation_date' => ['required', 'date'],
-            'allocations.*.allow_overpayment' => ['nullable', 'boolean'],
-            'allocations.*.allocation_method' => ['nullable', 'string', 'in:manual,specific_invoice,fifo'],
-            'allocations.*.metadata' => ['nullable', 'array'],
+            ...$this->paymentLineRules(),
+            ...$this->paymentAllocationRules(['nullable', 'array']),
         ];
     }
 
@@ -86,25 +75,43 @@ final class StorePaymentRequest extends TenantScopedRequest
             amountInWords: $this->stringOrNull('amount_in_words'),
             notes: $this->stringOrNull('notes'),
             createdBy: $this->currentUserId(),
-            lines: array_map(static fn (array $row): PaymentLineData => new PaymentLineData(
-                amount: (string) $row['amount'],
-                paymentMethodId: isset($row['payment_method_id']) ? (int) $row['payment_method_id'] : null,
-                referenceNumber: $row['reference_number'] ?? null,
-                clearedAmount: (string) ($row['cleared_amount'] ?? '0.000000'),
-                status: (string) ($row['status'] ?? 'pending'),
-                notes: $row['notes'] ?? null,
-                metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
-            ), $this->input('lines')),
-            allocations: array_map(static fn (array $row): PaymentAllocationData => new PaymentAllocationData(
-                invoiceId: (int) $row['invoice_id'],
-                allocatedAmount: (string) $row['allocated_amount'],
-                allocationDate: (string) $row['allocation_date'],
-                allowOverpayment: (bool) ($row['allow_overpayment'] ?? false),
-                allocationMethod: (string) ($row['allocation_method'] ?? 'specific_invoice'),
-                metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
-            ), $this->input('allocations', [])),
+            lines: $this->paymentLineData(),
+            allocations: $this->paymentAllocationData(),
             metadata: $this->input('metadata'),
         );
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function paymentLineRules(): array
+    {
+        return [
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.reference_number' => ['nullable', 'string', 'max:150'],
+            'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
+            'lines.*.cleared_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.status' => ['nullable', 'string', 'max:50'],
+            'lines.*.notes' => ['nullable', 'string'],
+            'lines.*.metadata' => ['nullable', 'array'],
+        ];
+    }
+
+    /**
+     * @return list<PaymentLineData>
+     */
+    private function paymentLineData(): array
+    {
+        return array_map(static fn (array $row): PaymentLineData => new PaymentLineData(
+            amount: (string) $row['amount'],
+            paymentMethodId: isset($row['payment_method_id']) ? (int) $row['payment_method_id'] : null,
+            referenceNumber: $row['reference_number'] ?? null,
+            clearedAmount: (string) ($row['cleared_amount'] ?? '0.000000'),
+            status: (string) ($row['status'] ?? 'pending'),
+            notes: $row['notes'] ?? null,
+            metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
+        ), $this->input('lines'));
     }
 
     private function intOrNull(string $key): ?int

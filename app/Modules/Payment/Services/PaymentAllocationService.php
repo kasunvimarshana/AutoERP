@@ -20,9 +20,8 @@ final class PaymentAllocationService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentCalculationService $calculations,
         private readonly PaymentStatusService $statuses,
-        private readonly PaymentUnappliedBalanceService $unappliedBalances,
+        private readonly PaymentBalanceSynchronizer $balances,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
     ) {}
@@ -131,25 +130,7 @@ final class PaymentAllocationService
 
     public function syncPaymentAmounts(Payment $payment): Payment
     {
-        $calculation = $this->calculations->recalculate($payment);
-
-        $payment->forceFill([
-            'total_amount' => $calculation->totalAmount,
-            'allocated_amount' => $calculation->allocatedAmount,
-            'unapplied_amount' => $calculation->unappliedAmount,
-            'refunded_amount' => $calculation->refundedAmount,
-        ])->save();
-
-        $payment = $this->statuses->applyCalculatedStatus(
-            $payment->refresh(),
-            $calculation->totalAmount,
-            $calculation->allocatedAmount,
-            $calculation->refundedAmount,
-            reason: 'Payment allocation recalculated.',
-        );
-        $this->unappliedBalances->sync($payment);
-
-        return $payment->refresh();
+        return $this->balances->sync($payment, 'Payment allocation recalculated.');
     }
 
     private function availableAmount(Payment $payment): string

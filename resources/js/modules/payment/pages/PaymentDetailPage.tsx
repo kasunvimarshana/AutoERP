@@ -14,7 +14,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { humanize, readableRelation } from '@/shared/utils/object';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -58,6 +58,7 @@ export default function PaymentDetailPage() {
     const canReverse = !['reversed', 'cancelled', 'void'].includes(String(value.status));
 
     async function submitRefund() {
+        if (busy) return;
         setBusy(true);
         setActionError(null);
         try {
@@ -80,6 +81,7 @@ export default function PaymentDetailPage() {
     }
 
     async function submitReversal() {
+        if (busy) return;
         setBusy(true);
         setActionError(null);
         try {
@@ -112,14 +114,14 @@ export default function PaymentDetailPage() {
                     {tabState.activeTab === 'summary' && <DetailGrid items={[
                         { label: 'Status', value: <StatusBadge status={value.status} /> },
                         { label: 'Party', value: readableRelation(value.party) },
-                        { label: 'Type', value: value.payment_type },
-                        { label: 'Direction', value: value.direction },
+                        { label: 'Type', value: humanize(value.payment_type) },
+                        { label: 'Direction', value: humanize(value.direction) },
                         { label: 'Total', value: <MoneyDisplay value={value.total_amount} /> },
                         { label: 'Allocated', value: <MoneyDisplay value={value.allocated_amount} /> },
                         { label: 'Unapplied', value: <MoneyDisplay value={value.unapplied_amount} /> },
                         { label: 'Refunded', value: <MoneyDisplay value={value.refunded_amount} /> },
-                        { label: 'Source', value: value.source_type ?? '-' },
-                        { label: 'Allocation', value: value.allocation_status ?? '-' },
+                        { label: 'Source', value: humanize(value.source_type) },
+                        { label: 'Allocation', value: humanize(value.allocation_status) },
                         { label: 'Read only', value: readOnly ? 'Yes' : 'No' },
                         ...(isCheque ? [
                             { label: 'Payee', value: value.payee_name ?? '-' },

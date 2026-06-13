@@ -18,9 +18,8 @@ final class PaymentRefundService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentCalculationService $calculations,
         private readonly PaymentStatusService $statuses,
-        private readonly PaymentUnappliedBalanceService $unappliedBalances,
+        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function refund(PaymentRefundData $data): PaymentRefund
@@ -68,32 +67,9 @@ final class PaymentRefundService
                 'metadata' => $data->metadata,
             ]);
 
-            $this->syncPayment($payment->refresh());
+            $this->balances->sync($payment->refresh(), 'Payment refund recalculated.');
 
             return $refund->refresh();
         });
-    }
-
-    private function syncPayment(Payment $payment): Payment
-    {
-        $calculation = $this->calculations->recalculate($payment);
-
-        $payment->forceFill([
-            'total_amount' => $calculation->totalAmount,
-            'allocated_amount' => $calculation->allocatedAmount,
-            'unapplied_amount' => $calculation->unappliedAmount,
-            'refunded_amount' => $calculation->refundedAmount,
-        ])->save();
-
-        $payment = $this->statuses->applyCalculatedStatus(
-            $payment->refresh(),
-            $calculation->totalAmount,
-            $calculation->allocatedAmount,
-            $calculation->refundedAmount,
-            reason: 'Payment refund recalculated.',
-        );
-        $this->unappliedBalances->sync($payment);
-
-        return $payment->refresh();
     }
 }
