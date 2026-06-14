@@ -18,9 +18,9 @@ return new class extends Migration
             $table->date('count_date');
             $table->string('count_type', 30)->default('stock_count');
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
             $table->string('status', 30)->default('draft');
-            $table->foreignId('inventory_adjustment_id')->nullable()->constrained('inventory_adjustments')->nullOnDelete();
+            $table->foreignId('inventory_adjustment_id')->nullable()->constrained('inventory_adjustments')->restrictOnDelete();
             $table->text('reason')->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();

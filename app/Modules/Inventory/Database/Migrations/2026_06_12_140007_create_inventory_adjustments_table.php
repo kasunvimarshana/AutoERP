@@ -18,7 +18,7 @@ return new class extends Migration
             $table->date('adjustment_date');
             $table->string('adjustment_type', 40);
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
             $table->string('status', 30)->default('draft');
             $table->text('reason')->nullable();
             $table->text('notes')->nullable();

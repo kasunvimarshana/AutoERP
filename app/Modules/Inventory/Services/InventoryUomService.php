@@ -6,6 +6,7 @@ namespace Modules\Inventory\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\DTOs\InventoryUomBasis;
 use Modules\Inventory\Validators\InventoryValidationService;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemBaseUomConversionService;
@@ -19,9 +20,6 @@ final class InventoryUomService
         private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
-    /**
-     * @return array{quantity: string, unit_cost: string, factor: string, base_uom_id: int}
-     */
     public function basis(
         int $tenantId,
         ?int $organizationUnitId,
@@ -29,21 +27,39 @@ final class InventoryUomService
         ?int $uomId,
         string $quantity,
         string $unitCost = '0.000000',
-    ): array {
+    ): InventoryUomBasis {
+        $enteredQuantity = $this->math->normalize($quantity);
+        $enteredUnitCost = $this->math->normalize($unitCost);
         $resolvedUomId = $uomId ?? (int) ($item->base_uom_id ?: 0);
         if ($resolvedUomId <= 0) {
-            throw new InvalidArgumentException('Inventory UOM is required when the item has no base UOM.');
+            return new InventoryUomBasis(
+                enteredQuantity: $enteredQuantity,
+                enteredUnitCost: $enteredUnitCost,
+                enteredUomId: null,
+                baseQuantity: $enteredQuantity,
+                baseUnitCost: $enteredUnitCost,
+                conversionFactor: '1.000000',
+                baseUomId: null,
+            );
         }
 
         $this->assertUom($tenantId, $organizationUnitId, $resolvedUomId);
-        $basis = $this->baseUomConversions->convertOperationalBasis($item, $resolvedUomId, $quantity, $unitCost);
+        $basis = $this->baseUomConversions->convertOperationalBasis(
+            $item,
+            $resolvedUomId,
+            $enteredQuantity,
+            $enteredUnitCost,
+        );
 
-        return [
-            'quantity' => $this->math->normalize($basis['quantity']),
-            'unit_cost' => $this->math->normalize($basis['unit_cost']),
-            'factor' => $this->math->normalize($basis['factor']),
-            'base_uom_id' => (int) ($item->refresh()->base_uom_id ?: $resolvedUomId),
-        ];
+        return new InventoryUomBasis(
+            enteredQuantity: $enteredQuantity,
+            enteredUnitCost: $enteredUnitCost,
+            enteredUomId: $resolvedUomId,
+            baseQuantity: $this->math->normalize($basis['quantity']),
+            baseUnitCost: $this->math->normalize($basis['unit_cost']),
+            conversionFactor: $this->math->normalize($basis['factor']),
+            baseUomId: (int) ($item->refresh()->base_uom_id ?: $resolvedUomId),
+        );
     }
 
     public function quantity(
@@ -53,7 +69,7 @@ final class InventoryUomService
         ?int $uomId,
         string $quantity,
     ): string {
-        return $this->basis($tenantId, $organizationUnitId, $item, $uomId, $quantity)['quantity'];
+        return $this->basis($tenantId, $organizationUnitId, $item, $uomId, $quantity)->baseQuantity;
     }
 
     private function assertUom(int $tenantId, ?int $organizationUnitId, int $uomId): void

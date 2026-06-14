@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
-use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Enums\InventoryStatus;
+use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -36,11 +36,15 @@ final class InventoryMovement extends CoreModel
             'direction' => InventoryDirection::class,
             'item_id' => 'integer',
             'base_uom_id' => 'integer',
+            'entered_uom_id' => 'integer',
             'item_variant_id' => 'integer',
             'warehouse_id' => 'integer',
             'warehouse_location_id' => 'integer',
             'batch_id' => 'integer',
             'serial_number_id' => 'integer',
+            'entered_quantity' => 'decimal:6',
+            'entered_unit_cost' => 'decimal:6',
+            'conversion_factor' => 'decimal:6',
             'quantity' => 'decimal:6',
             'unit_cost' => 'decimal:6',
             'total_cost' => 'decimal:6',
@@ -65,6 +69,11 @@ final class InventoryMovement extends CoreModel
     public function baseUom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
+    }
+
+    public function enteredUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'entered_uom_id');
     }
 
     public function variant(): BelongsTo

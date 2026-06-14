@@ -14,8 +14,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
             $table->string('batch_number', 120);
             $table->string('lot_number', 120)->nullable();
             $table->date('manufacture_date')->nullable();

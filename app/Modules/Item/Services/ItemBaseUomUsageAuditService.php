@@ -27,6 +27,7 @@ final class ItemBaseUomUsageAuditService
                 'valuation_layers' => $this->count('inventory_valuation_layers', $item),
                 'adjustments' => $this->count('inventory_adjustment_lines', $item),
                 'transfers' => $this->count('inventory_transfer_lines', $item),
+                'stock_counts' => $this->count('inventory_stock_count_lines', $item),
                 'batches' => $this->count('inventory_batches', $item),
                 'serial_numbers' => $this->count('inventory_serial_numbers', $item),
             ],
@@ -138,8 +139,16 @@ final class ItemBaseUomUsageAuditService
                 ->join('inventory_transfers as parents', 'parents.id', '=', 'lines.inventory_transfer_id'),
             $item,
             'lines',
-                )->whereIn('parents.status', ['pending', 'draft', 'approved', 'dispatched', 'in_transit'])->count();
+        )->whereIn('parents.status', ['pending', 'draft', 'approved', 'dispatched', 'in_transit'])->count();
         $this->addBlocker($blockers, 'open_transfers', 'Open inventory transfers must be completed or cancelled before conversion.', $unsafeTransfers);
+
+        $unsafeStockCounts = $this->scopedJoin(
+            DB::table('inventory_stock_count_lines as lines')
+                ->join('inventory_stock_counts as parents', 'parents.id', '=', 'lines.inventory_stock_count_id'),
+            $item,
+            'lines',
+        )->whereIn('parents.status', ['draft', 'approved'])->count();
+        $this->addBlocker($blockers, 'open_stock_counts', 'Open inventory stock counts must be posted or cancelled before conversion.', $unsafeStockCounts);
 
         $unsafePurchaseOrders = $this->scopedJoin(
             DB::table('purchase_order_lines as lines')
@@ -248,17 +257,45 @@ final class ItemBaseUomUsageAuditService
         $this->addBlocker($blockers, 'implicit_supplier_uom', 'Active supplier item mappings without an explicit purchase UOM must be updated before conversion.', $implicitSupplierMappings);
 
         $invalidBalances = $this->scoped(DB::table('inventory_stock_balances'), $item)
-            ->get(['quantity_on_hand', 'quantity_reserved', 'quantity_allocated', 'quantity_available'])
+            ->get([
+                'quantity_on_hand',
+                'quantity_reserved',
+                'quantity_allocated',
+                'quantity_available',
+                'quantity_returned',
+                'quantity_damaged',
+                'quantity_quarantine',
+                'quantity_expired',
+                'quantity_scrapped',
+            ])
             ->filter(function ($row): bool {
-                foreach (['quantity_on_hand', 'quantity_reserved', 'quantity_allocated', 'quantity_available'] as $column) {
+                foreach ([
+                    'quantity_on_hand',
+                    'quantity_reserved',
+                    'quantity_allocated',
+                    'quantity_available',
+                    'quantity_returned',
+                    'quantity_damaged',
+                    'quantity_quarantine',
+                    'quantity_expired',
+                    'quantity_scrapped',
+                ] as $column) {
                     if ($this->math->isNegative((string) $row->{$column})) {
                         return true;
                     }
                 }
 
                 $expected = $this->math->sub(
-                    $this->math->sub((string) $row->quantity_on_hand, (string) $row->quantity_reserved),
-                    (string) $row->quantity_allocated,
+                    (string) $row->quantity_on_hand,
+                    $this->math->sum([
+                        (string) $row->quantity_reserved,
+                        (string) $row->quantity_allocated,
+                        (string) $row->quantity_returned,
+                        (string) $row->quantity_damaged,
+                        (string) $row->quantity_quarantine,
+                        (string) $row->quantity_expired,
+                        (string) $row->quantity_scrapped,
+                    ]),
                 );
 
                 return $this->math->compare($expected, (string) $row->quantity_available) !== 0;

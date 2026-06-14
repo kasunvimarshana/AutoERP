@@ -30,31 +30,39 @@ final class StockReservationService
         $quantity = $this->math->normalize($data->quantityReserved);
         $this->validator->assertPositiveQuantity($quantity);
         $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $data->itemId);
-        if ($data->uomId !== null) {
-            $quantity = $this->uoms->quantity($data->tenantId, $data->organizationUnitId, $item, $data->uomId, $quantity);
-            $item = $item->refresh();
-        }
+        $basis = $this->uoms->basis(
+            $data->tenantId,
+            $data->organizationUnitId,
+            $item,
+            $data->uomId,
+            $quantity,
+        );
+        $quantity = $basis->baseQuantity;
+        $item = $item->refresh();
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
         $this->validator->location($warehouse, $data->warehouseLocationId);
         $this->validator->batch($item, $data->batchId, $data->itemVariantId);
 
-        return DB::transaction(function () use ($data, $quantity, $item): InventoryReservation {
+        return DB::transaction(function () use ($basis, $data, $quantity): InventoryReservation {
             $balance = $this->balances->getOrCreateForUpdate($this->balanceData($data));
             $this->balances->reserve($balance, $quantity);
 
             $reservation = InventoryReservation::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
-                'reservation_number' => $data->reservationNumber ?? $this->numbers->next($data->tenantId, 'RES', 'inventory_reservations', 'reservation_number'),
+                'reservation_number' => $data->reservationNumber ?? $this->numbers->next($data->tenantId, 'RES'),
                 'reservation_date' => $data->reservationDate,
                 'item_id' => $data->itemId,
-                'base_uom_id' => $item->base_uom_id,
+                'base_uom_id' => $basis->baseUomId,
+                'entered_uom_id' => $basis->enteredUomId,
                 'item_variant_id' => $data->itemVariantId,
                 'warehouse_id' => $data->warehouseId,
                 'warehouse_location_id' => $data->warehouseLocationId,
                 'batch_id' => $data->batchId,
+                'entered_quantity' => $basis->enteredQuantity,
+                'conversion_factor' => $basis->conversionFactor,
                 'quantity_reserved' => $quantity,
                 'quantity_remaining' => $quantity,
                 'source_type' => $data->sourceType,

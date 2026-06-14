@@ -28,12 +28,18 @@ final class InventoryCostAdjustmentService
         if ($data->lines === []) {
             throw new InvalidArgumentException('Inventory cost adjustment requires at least one line.');
         }
+        if (count(array_unique(array_map(
+            static fn ($line): int => $line->valuationLayerId,
+            $data->lines,
+        ))) !== count($data->lines)) {
+            throw new InvalidArgumentException('Inventory cost adjustment contains duplicate valuation layers.');
+        }
 
         return DB::transaction(function () use ($data): InventoryCostAdjustment {
             $adjustment = InventoryCostAdjustment::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
-                'adjustment_number' => $data->adjustmentNumber ?? $this->numbers->next($data->tenantId, 'CADJ', 'inventory_cost_adjustments', 'adjustment_number'),
+                'adjustment_number' => $data->adjustmentNumber ?? $this->numbers->next($data->tenantId, 'CADJ'),
                 'adjustment_date' => $data->adjustmentDate,
                 'status' => CostAdjustmentStatus::Draft,
                 'reason' => $data->reason,

@@ -3,6 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
     AllocationPayload,
+    AdjustmentPayload,
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryRecord,
@@ -14,6 +15,7 @@ import type {
 
 export type {
     AllocationPayload,
+    AdjustmentPayload,
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryRecord,
@@ -49,6 +51,15 @@ export const issueAllocation = (id: number, quantity?: string) =>
 
 export const releaseAllocation = (id: number, quantity?: string) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/allocations/${id}/release`, quantity ? { quantity } : {}).then((response) => response.data.data);
+
+export const listAdjustments = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/adjustments`, { params, signal }).then((response) => response.data);
+
+export const createAdjustment = (payload: AdjustmentPayload) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments`, payload).then((response) => response.data.data);
+
+export const postAdjustment = (id: number) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/post`, {}).then((response) => response.data.data);
 
 export const listTransfers = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/transfers`, { params, signal }).then((response) => response.data);

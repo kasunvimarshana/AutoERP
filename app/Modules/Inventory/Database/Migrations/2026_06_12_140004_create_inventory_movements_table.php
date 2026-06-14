@@ -19,12 +19,16 @@ return new class extends Migration
             $table->string('movement_type', 40);
             $table->string('direction', 20);
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
-            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('entered_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->nullOnDelete();
-            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->nullOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->restrictOnDelete();
+            $table->decimal('entered_quantity', 20, 6);
+            $table->decimal('entered_unit_cost', 20, 6)->default('0.000000');
+            $table->decimal('conversion_factor', 20, 6)->default('1.000000');
             $table->decimal('quantity', 20, 6);
             $table->decimal('unit_cost', 20, 6)->default('0.000000');
             $table->decimal('total_cost', 20, 6)->default('0.000000');
@@ -43,7 +47,7 @@ return new class extends Migration
             $table->timestamp('posted_at')->nullable();
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->timestamp('reversed_at')->nullable();
-            $table->foreignId('reversal_of_id')->nullable()->constrained('inventory_movements')->nullOnDelete();
+            $table->foreignId('reversal_of_id')->nullable()->constrained('inventory_movements')->restrictOnDelete();
             $table->timestamps();
             $table->softDeletes();
 

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Core\Services\DecimalMath;
 use Tests\TestCase;
 
 final class ItemBaseUomTest extends TestCase
@@ -95,6 +96,7 @@ final class ItemBaseUomTest extends TestCase
 
         $this->assertDatabaseHas('inventory_stock_balances', [
             'id' => $balanceId,
+            'base_uom_id' => $newUomId,
             'quantity_on_hand' => '1.234567',
             'quantity_available' => '1.234567',
             'average_cost' => '25.000000',
@@ -135,7 +137,10 @@ final class ItemBaseUomTest extends TestCase
             'reservation_date' => now()->toDateString(),
             'item_id' => $itemId,
             'base_uom_id' => null,
+            'entered_uom_id' => null,
             'warehouse_id' => $warehouseId,
+            'entered_quantity' => '2.000000',
+            'conversion_factor' => '1.000000',
             'quantity_reserved' => '2.000000',
             'quantity_allocated' => '0.000000',
             'quantity_released' => '0.000000',
@@ -176,7 +181,10 @@ final class ItemBaseUomTest extends TestCase
             'reservation_date' => now()->toDateString(),
             'item_id' => $itemId,
             'base_uom_id' => $oldUomId,
+            'entered_uom_id' => $oldUomId,
             'warehouse_id' => $warehouseId,
+            'entered_quantity' => '2.000000',
+            'conversion_factor' => '1.000000',
             'quantity_reserved' => '2.000000',
             'quantity_allocated' => '0.000000',
             'quantity_released' => '0.000000',
@@ -191,7 +199,10 @@ final class ItemBaseUomTest extends TestCase
             'allocation_date' => now()->toDateString(),
             'item_id' => $itemId,
             'base_uom_id' => $oldUomId,
+            'entered_uom_id' => $oldUomId,
             'warehouse_id' => $warehouseId,
+            'entered_quantity' => '1.000000',
+            'conversion_factor' => '1.000000',
             'quantity_allocated' => '1.000000',
             'quantity_issued' => '0.000000',
             'quantity_released' => '0.000000',
@@ -220,6 +231,48 @@ final class ItemBaseUomTest extends TestCase
             'quantity_allocated' => '0.500000',
             'quantity_remaining' => '0.500000',
         ]);
+    }
+
+    public function test_conversion_blocks_open_stock_count_snapshot(): void
+    {
+        $context = $this->context('UOM-COUNT');
+        $oldUomId = $this->uom($context, 'PCS');
+        $newUomId = $this->uom($context, 'BOX');
+        $itemId = $this->item($context, $oldUomId, 'COUNT');
+        $warehouseId = $this->warehouse($context);
+        $this->stock($context, $itemId, $warehouseId, '10.000000');
+        $countId = DB::table('inventory_stock_counts')->insertGetId([
+            ...$this->scope($context),
+            'count_number' => 'CNT-UOM',
+            'count_date' => now()->toDateString(),
+            'count_type' => 'stock_count',
+            'warehouse_id' => $warehouseId,
+            'status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('inventory_stock_count_lines')->insert([
+            ...$this->scope($context),
+            'inventory_stock_count_id' => $countId,
+            'item_id' => $itemId,
+            'base_uom_id' => $oldUomId,
+            'entered_uom_id' => $oldUomId,
+            'entered_counted_quantity' => '10.000000',
+            'conversion_factor' => '1.000000',
+            'system_quantity' => '10.000000',
+            'counted_quantity' => '10.000000',
+            'variance_quantity' => '0.000000',
+            'unit_cost' => '1.000000',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->auth($context)->postJson("/api/v1/items/{$itemId}/base-uom/preview-change", [
+            'new_base_uom_id' => $newUomId,
+            'conversion_factor' => '0.100000',
+        ])->assertOk()
+            ->assertJsonPath('data.is_valid', false)
+            ->assertJsonFragment(['code' => 'open_stock_counts']);
     }
 
     public function test_historical_document_lines_remain_unchanged_after_conversion(): void
@@ -423,14 +476,27 @@ final class ItemBaseUomTest extends TestCase
         ?string $totalValue = null,
         string $reserved = '0.000000',
     ): int {
+        $baseUomId = (int) DB::table('items')->where('id', $itemId)->value('base_uom_id');
+        $dimensionKey = hash('sha256', implode(':', [
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            $itemId,
+            'null',
+            $warehouseId,
+            'null',
+            'null',
+        ]));
+
         return (int) DB::table('inventory_stock_balances')->insertGetId([
             ...$this->scope($context),
             'item_id' => $itemId,
+            'base_uom_id' => $baseUomId,
             'warehouse_id' => $warehouseId,
+            'dimension_key' => $dimensionKey,
             'quantity_on_hand' => $quantity,
             'quantity_reserved' => $reserved,
             'quantity_allocated' => '0.000000',
-            'quantity_available' => app(\Modules\Core\Services\DecimalMath::class)->sub($quantity, $reserved),
+            'quantity_available' => app(DecimalMath::class)->sub($quantity, $reserved),
             'average_cost' => $averageCost,
             'total_value' => $totalValue ?? $quantity,
             'created_at' => now(),

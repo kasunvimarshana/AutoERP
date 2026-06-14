@@ -14,13 +14,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('allocation_id')->constrained('inventory_allocations')->cascadeOnDelete();
-            $table->foreignId('allocation_line_id')->constrained('inventory_allocation_lines')->cascadeOnDelete();
+            $table->foreignId('allocation_id')->constrained('inventory_allocations')->restrictOnDelete();
+            $table->foreignId('allocation_line_id')->constrained('inventory_allocation_lines')->restrictOnDelete();
             $table->foreignId('movement_id')->constrained('inventory_movements')->restrictOnDelete();
             $table->decimal('quantity_issued', 20, 6);
             $table->decimal('unit_cost', 20, 6);
             $table->decimal('total_cost', 20, 6);
-            $table->foreignId('reversal_movement_id')->nullable()->constrained('inventory_movements')->nullOnDelete();
+            $table->foreignId('reversal_movement_id')->nullable()->constrained('inventory_movements')->restrictOnDelete();
             $table->timestamp('reversed_at')->nullable();
             $table->timestamps();
 

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreign('inventory_cost_adjustment_id', 'inventory_cost_adj_lines_header_fk')
                 ->references('id')
                 ->on('inventory_cost_adjustments')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreignId('valuation_layer_id')->constrained('inventory_valuation_layers')->restrictOnDelete();
             $table->decimal('adjustment_amount', 20, 6);
             $table->decimal('remaining_quantity', 20, 6)->default('0.000000');

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('quantity_consumed', 20, 6);
             $table->decimal('unit_cost', 20, 6);
             $table->decimal('total_cost', 20, 6);
-            $table->foreignId('reversed_by_movement_id')->nullable()->constrained('inventory_movements')->nullOnDelete();
+            $table->foreignId('reversed_by_movement_id')->nullable()->constrained('inventory_movements')->restrictOnDelete();
             $table->timestamp('reversed_at')->nullable();
             $table->timestamps();
 

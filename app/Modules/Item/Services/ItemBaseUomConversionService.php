@@ -70,6 +70,7 @@ final class ItemBaseUomConversionService
 
                 $balances = $this->scope(InventoryStockBalance::query(), $lockedItem)->lockForUpdate()->get();
                 foreach ($balances as $balance) {
+                    $balance->base_uom_id = $newBaseUomId;
                     foreach ([
                         'quantity_on_hand',
                         'quantity_reserved',
@@ -94,6 +95,10 @@ final class ItemBaseUomConversionService
                     ->get();
                 foreach ($reservations as $reservation) {
                     $reservation->base_uom_id = $newBaseUomId;
+                    $reservation->conversion_factor = $this->math->mul(
+                        (string) $reservation->conversion_factor,
+                        $factor,
+                    );
                     foreach (['quantity_reserved', 'quantity_allocated', 'quantity_released', 'quantity_remaining'] as $column) {
                         $reservation->{$column} = $this->math->mul((string) $reservation->{$column}, $factor);
                     }
@@ -106,6 +111,10 @@ final class ItemBaseUomConversionService
                     ->get();
                 foreach ($allocations as $allocation) {
                     $allocation->base_uom_id = $newBaseUomId;
+                    $allocation->conversion_factor = $this->math->mul(
+                        (string) $allocation->conversion_factor,
+                        $factor,
+                    );
                     foreach (['quantity_allocated', 'quantity_issued', 'quantity_reversed', 'quantity_released', 'quantity_remaining'] as $column) {
                         $allocation->{$column} = $this->math->mul((string) $allocation->{$column}, $factor);
                     }

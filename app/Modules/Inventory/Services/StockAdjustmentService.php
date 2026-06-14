@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
+use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Inventory\Enums\InventoryDirection;
@@ -27,6 +28,7 @@ final class StockAdjustmentService
         private readonly InventoryNumberService $numbers,
         private readonly StockMovementService $movements,
         private readonly InventoryUomService $uoms,
+        private readonly StockBalanceService $balances,
     ) {}
 
     public function create(StockAdjustmentData $data): InventoryAdjustment
@@ -34,6 +36,7 @@ final class StockAdjustmentService
         if ($data->lines === []) {
             throw new InvalidArgumentException('Inventory adjustment requires at least one line.');
         }
+        $this->assertUniqueLines($data->lines);
 
         $warehouse = $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
         $this->validator->location($warehouse, $data->warehouseLocationId);
@@ -42,7 +45,7 @@ final class StockAdjustmentService
             $adjustment = InventoryAdjustment::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
-                'adjustment_number' => $data->adjustmentNumber ?? $this->numbers->next($data->tenantId, 'ADJ', 'inventory_adjustments', 'adjustment_number'),
+                'adjustment_number' => $data->adjustmentNumber ?? $this->numbers->next($data->tenantId, 'ADJ'),
                 'adjustment_date' => $data->adjustmentDate,
                 'adjustment_type' => $data->adjustmentType,
                 'warehouse_id' => $data->warehouseId,
@@ -89,11 +92,56 @@ final class StockAdjustmentService
                 throw new InvalidArgumentException('Only draft or approved inventory adjustments can be posted.');
             }
 
+            $systemQuantities = [];
             foreach ($adjustment->lines as $line) {
                 if ($this->math->isZero((string) $line->adjustment_quantity)) {
                     continue;
                 }
 
+                $dimensionKey = implode(':', [
+                    $line->item_id,
+                    $line->item_variant_id ?? 'null',
+                    $adjustment->warehouse_id,
+                    $adjustment->warehouse_location_id ?? 'null',
+                    $line->batch_id ?? 'null',
+                ]);
+                if (isset($systemQuantities[$dimensionKey])) {
+                    if ($this->math->compare(
+                        $systemQuantities[$dimensionKey],
+                        (string) $line->system_quantity,
+                    ) !== 0) {
+                        throw new InvalidArgumentException(
+                            'Inventory adjustment lines for the same stock balance must use one system quantity.',
+                        );
+                    }
+
+                    continue;
+                }
+
+                $balance = $this->balances->getOrCreateForUpdate(new StockBalanceData(
+                    tenantId: (int) $adjustment->tenant_id,
+                    itemId: (int) $line->item_id,
+                    warehouseId: (int) $adjustment->warehouse_id,
+                    organizationUnitId: $adjustment->organization_unit_id,
+                    itemVariantId: $line->item_variant_id,
+                    warehouseLocationId: $adjustment->warehouse_location_id,
+                    batchId: $line->batch_id,
+                ));
+                if ($this->math->compare(
+                    (string) $balance->quantity_on_hand,
+                    (string) $line->system_quantity,
+                ) !== 0) {
+                    throw new InvalidArgumentException(
+                        'Inventory stock changed after the adjustment was created. Create a new adjustment before posting.',
+                    );
+                }
+                $systemQuantities[$dimensionKey] = (string) $line->system_quantity;
+            }
+
+            foreach ($adjustment->lines as $line) {
+                if ($this->math->isZero((string) $line->adjustment_quantity)) {
+                    continue;
+                }
                 $direction = $this->math->isNegative((string) $line->adjustment_quantity) ? InventoryDirection::Out : InventoryDirection::In;
                 $quantity = ltrim((string) $line->adjustment_quantity, '-');
 
@@ -156,22 +204,35 @@ final class StockAdjustmentService
 
     private function createLine(InventoryAdjustment $adjustment, StockAdjustmentLineData $data): InventoryAdjustmentLine
     {
-        $this->validator->assertNonNegative($data->systemQuantity, 'Inventory adjustment system quantity cannot be negative.');
-        $this->validator->assertNonNegative($data->countedQuantity, 'Inventory adjustment counted quantity cannot be negative.');
-        $this->validator->assertNonNegative($data->unitCost, 'Inventory adjustment unit cost cannot be negative.');
-        $item = $this->validator->item((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $data->itemId);
-        $systemQuantity = $this->math->normalize($data->systemQuantity);
-        $countedQuantity = $this->math->normalize($data->countedQuantity);
-        $quantity = $this->math->normalize($data->adjustmentQuantity);
-        $unitCost = $this->math->normalize($data->unitCost);
-        if ($data->uomId !== null) {
-            $systemQuantity = $this->uoms->quantity((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $systemQuantity);
-            $countedQuantity = $this->uoms->quantity((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $countedQuantity);
-            $basis = $this->uoms->basis((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $item, $data->uomId, $quantity, $unitCost);
-            $quantity = $basis['quantity'];
-            $unitCost = $basis['unit_cost'];
-            $item = $item->refresh();
+        $enteredSystemQuantity = $this->math->normalize($data->systemQuantity);
+        $enteredCountedQuantity = $this->math->normalize($data->countedQuantity);
+        $enteredAdjustmentQuantity = $this->math->normalize($data->adjustmentQuantity);
+        $enteredUnitCost = $this->math->normalize($data->unitCost);
+        $this->validator->assertNonNegative($enteredSystemQuantity, 'Inventory adjustment system quantity cannot be negative.');
+        $this->validator->assertNonNegative($enteredCountedQuantity, 'Inventory adjustment counted quantity cannot be negative.');
+        $this->validator->assertNonNegative($enteredUnitCost, 'Inventory adjustment unit cost cannot be negative.');
+        if ($this->math->compare(
+            $enteredAdjustmentQuantity,
+            $this->math->sub($enteredCountedQuantity, $enteredSystemQuantity),
+        ) !== 0) {
+            throw new InvalidArgumentException(
+                'Inventory adjustment quantity must equal counted quantity minus system quantity.',
+            );
         }
+        $item = $this->validator->item((int) $adjustment->tenant_id, $adjustment->organization_unit_id, $data->itemId);
+        $basis = $this->uoms->basis(
+            (int) $adjustment->tenant_id,
+            $adjustment->organization_unit_id,
+            $item,
+            $data->uomId,
+            $enteredAdjustmentQuantity,
+            $enteredUnitCost,
+        );
+        $systemQuantity = $this->math->mul($enteredSystemQuantity, $basis->conversionFactor);
+        $countedQuantity = $this->math->mul($enteredCountedQuantity, $basis->conversionFactor);
+        $quantity = $basis->baseQuantity;
+        $unitCost = $basis->baseUnitCost;
+        $item = $item->refresh();
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $this->validator->batch($item, $data->batchId, $data->itemVariantId);
@@ -188,9 +249,16 @@ final class StockAdjustmentService
             'organization_unit_id' => $adjustment->organization_unit_id,
             'inventory_adjustment_id' => $adjustment->getKey(),
             'item_id' => $data->itemId,
+            'base_uom_id' => $basis->baseUomId,
+            'entered_uom_id' => $basis->enteredUomId,
             'item_variant_id' => $data->itemVariantId,
             'batch_id' => $data->batchId,
             'serial_number_id' => $data->serialNumberId,
+            'entered_system_quantity' => $enteredSystemQuantity,
+            'entered_counted_quantity' => $enteredCountedQuantity,
+            'entered_adjustment_quantity' => $enteredAdjustmentQuantity,
+            'entered_unit_cost' => $enteredUnitCost,
+            'conversion_factor' => $basis->conversionFactor,
             'system_quantity' => $systemQuantity,
             'counted_quantity' => $countedQuantity,
             'adjustment_quantity' => $quantity,
@@ -198,5 +266,25 @@ final class StockAdjustmentService
             'total_cost' => $this->math->mul(ltrim($quantity, '-'), $unitCost),
             'reason' => $data->reason,
         ]);
+    }
+
+    /**
+     * @param  list<StockAdjustmentLineData>  $lines
+     */
+    private function assertUniqueLines(array $lines): void
+    {
+        $seen = [];
+        foreach ($lines as $line) {
+            $key = implode(':', [
+                $line->itemId,
+                $line->itemVariantId ?? 'null',
+                $line->batchId ?? 'null',
+                $line->serialNumberId ?? 'null',
+            ]);
+            if (isset($seen[$key])) {
+                throw new InvalidArgumentException('Inventory adjustment contains duplicate stock dimension lines.');
+            }
+            $seen[$key] = true;
+        }
     }
 }

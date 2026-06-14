@@ -20,6 +20,8 @@ final readonly class StockAvailabilityResult
         public string $quantityExpired = '0.000000',
         public string $quantityScrapped = '0.000000',
         public string $quantityTotal = '0.000000',
+        public string $quantityBasis = 'base',
+        public ?int $baseUomId = null,
         public ?int $itemVariantId = null,
         public ?int $warehouseLocationId = null,
         public ?int $batchId = null,

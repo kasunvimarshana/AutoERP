@@ -38,6 +38,7 @@ final class StockTransferService
         if ($data->lines === []) {
             throw new InvalidArgumentException('Inventory transfer requires at least one line.');
         }
+        $this->assertUniqueLines($data->lines);
 
         if ($data->fromWarehouseId === $data->toWarehouseId && $data->fromWarehouseLocationId === $data->toWarehouseLocationId) {
             throw new InvalidArgumentException('Inventory transfer source and destination cannot be the same.');
@@ -52,7 +53,7 @@ final class StockTransferService
             $transfer = InventoryTransfer::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
-                'transfer_number' => $data->transferNumber ?? $this->numbers->next($data->tenantId, 'TRF', 'inventory_transfers', 'transfer_number'),
+                'transfer_number' => $data->transferNumber ?? $this->numbers->next($data->tenantId, 'TRF'),
                 'transfer_date' => $data->transferDate,
                 'from_warehouse_id' => $data->fromWarehouseId,
                 'from_warehouse_location_id' => $data->fromWarehouseLocationId,
@@ -263,17 +264,22 @@ final class StockTransferService
 
     private function createLine(InventoryTransfer $transfer, StockTransferLineData $data): InventoryTransferLine
     {
-        $quantity = $this->math->normalize($data->quantity);
-        $unitCost = $this->math->normalize($data->unitCost);
-        $this->validator->assertPositiveQuantity($quantity);
-        $this->validator->assertNonNegative($unitCost, 'Inventory transfer unit cost cannot be negative.');
+        $enteredQuantity = $this->math->normalize($data->quantity);
+        $enteredUnitCost = $this->math->normalize($data->unitCost);
+        $this->validator->assertPositiveQuantity($enteredQuantity);
+        $this->validator->assertNonNegative($enteredUnitCost, 'Inventory transfer unit cost cannot be negative.');
         $item = $this->validator->item((int) $transfer->tenant_id, $transfer->organization_unit_id, $data->itemId);
-        if ($data->uomId !== null) {
-            $basis = $this->uoms->basis((int) $transfer->tenant_id, $transfer->organization_unit_id, $item, $data->uomId, $quantity, $unitCost);
-            $quantity = $basis['quantity'];
-            $unitCost = $basis['unit_cost'];
-            $item = $item->refresh();
-        }
+        $basis = $this->uoms->basis(
+            (int) $transfer->tenant_id,
+            $transfer->organization_unit_id,
+            $item,
+            $data->uomId,
+            $enteredQuantity,
+            $enteredUnitCost,
+        );
+        $quantity = $basis->baseQuantity;
+        $unitCost = $basis->baseUnitCost;
+        $item = $item->refresh();
         $this->validator->assertStockable($item);
         $this->validator->variant($item, $data->itemVariantId);
         $this->validator->batch($item, $data->batchId, $data->itemVariantId);
@@ -290,12 +296,37 @@ final class StockTransferService
             'organization_unit_id' => $transfer->organization_unit_id,
             'inventory_transfer_id' => $transfer->getKey(),
             'item_id' => $data->itemId,
+            'base_uom_id' => $basis->baseUomId,
+            'entered_uom_id' => $basis->enteredUomId,
             'item_variant_id' => $data->itemVariantId,
             'batch_id' => $data->batchId,
             'serial_number_id' => $data->serialNumberId,
+            'entered_quantity' => $basis->enteredQuantity,
+            'entered_unit_cost' => $basis->enteredUnitCost,
+            'conversion_factor' => $basis->conversionFactor,
             'quantity' => $quantity,
             'unit_cost' => $unitCost,
             'total_cost' => $this->math->mul($quantity, $unitCost),
         ]);
+    }
+
+    /**
+     * @param  list<StockTransferLineData>  $lines
+     */
+    private function assertUniqueLines(array $lines): void
+    {
+        $seen = [];
+        foreach ($lines as $line) {
+            $key = implode(':', [
+                $line->itemId,
+                $line->itemVariantId ?? 'null',
+                $line->batchId ?? 'null',
+                $line->serialNumberId ?? 'null',
+            ]);
+            if (isset($seen[$key])) {
+                throw new InvalidArgumentException('Inventory transfer contains duplicate stock dimension lines.');
+            }
+            $seen[$key] = true;
+        }
     }
 }

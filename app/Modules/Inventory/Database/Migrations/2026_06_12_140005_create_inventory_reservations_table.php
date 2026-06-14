@@ -17,11 +17,14 @@ return new class extends Migration
             $table->string('reservation_number', 80);
             $table->date('reservation_date');
             $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
-            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('entered_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->nullOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->decimal('entered_quantity', 20, 6);
+            $table->decimal('conversion_factor', 20, 6)->default('1.000000');
             $table->decimal('quantity_reserved', 20, 6);
             $table->decimal('quantity_allocated', 20, 6)->default('0.000000');
             $table->decimal('quantity_released', 20, 6)->default('0.000000');

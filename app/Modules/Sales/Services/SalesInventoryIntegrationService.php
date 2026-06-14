@@ -35,20 +35,12 @@ final class SalesInventoryIntegrationService
             return null;
         }
 
-        $item = Item::query()->findOrFail($line->item_id);
-        $quantity = $this->baseUomConversions->convertOperationalBasis(
-            $item,
-            (int) ($line->uom_id ?: $item->base_uom_id),
-            (string) $line->delivered_quantity,
-            (string) $line->unit_price,
-        )['quantity'];
-
         return $this->inventory->allocate(new AllocationData(
             tenantId: (int) $delivery->tenant_id,
             allocationDate: $delivery->delivery_date->toDateString(),
             itemId: (int) $line->item_id,
             warehouseId: (int) $delivery->warehouse_id,
-            quantityAllocated: $quantity,
+            quantityAllocated: (string) $line->delivered_quantity,
             organizationUnitId: $delivery->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $delivery->warehouse_location_id,
@@ -57,6 +49,7 @@ final class SalesInventoryIntegrationService
             sourceLineType: 'sales_delivery_line',
             sourceLineId: (int) $line->getKey(),
             notes: 'Sales delivery '.$delivery->delivery_number,
+            uomId: $line->uom_id,
         ));
     }
 
@@ -121,12 +114,9 @@ final class SalesInventoryIntegrationService
         }
 
         $item = Item::query()->findOrFail($line->item_id);
-        $basis = $this->baseUomConversions->convertOperationalBasis(
-            $item,
-            (int) ($line->uom_id ?: $item->base_uom_id),
-            (string) $line->returned_quantity,
-            $unitCost,
-        );
+        $uomId = (int) ($line->uom_id ?: $item->base_uom_id);
+        $factor = $this->baseUomConversions->factorToCurrentBase($item, $uomId);
+        $enteredUnitCost = $this->math->mul($unitCost, $factor);
 
         return $this->inventory->receive(new StockMovementData(
             tenantId: (int) $return->tenant_id,
@@ -135,16 +125,17 @@ final class SalesInventoryIntegrationService
             direction: InventoryDirection::In,
             itemId: (int) $line->item_id,
             warehouseId: (int) $return->warehouse_id,
-            quantity: $basis['quantity'],
+            quantity: (string) $line->returned_quantity,
             organizationUnitId: $return->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $return->warehouse_location_id,
-            unitCost: $basis['unit_cost'],
+            unitCost: $enteredUnitCost,
             sourceType: 'sales_return',
             sourceId: (int) $return->getKey(),
             sourceLineType: 'sales_return_line',
             sourceLineId: (int) $line->getKey(),
             description: 'Sales return '.$return->return_number.' ('.$line->condition_status.')',
+            uomId: $uomId,
         ), $userId);
     }
 

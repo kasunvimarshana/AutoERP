@@ -10,6 +10,8 @@ export interface StockBalance extends Record<string, unknown> {
     warehouse?: InventoryRelation;
     warehouse_location?: InventoryRelation;
     batch?: InventoryRelation & { batch_number?: string; lot_number?: string };
+    base_uom?: InventoryRelation;
+    quantity_basis?: 'base';
     quantity_on_hand?: string;
     quantity_reserved?: string;
     quantity_allocated?: string;
@@ -36,6 +38,8 @@ export interface InventoryAvailability extends Record<string, unknown> {
     quantityExpired: string;
     quantityScrapped: string;
     quantityTotal: string;
+    quantityBasis: 'base';
+    baseUomId?: number | null;
 }
 
 export type InventoryRecord = Record<string, unknown> & { id: number; status?: string };
@@ -116,4 +120,25 @@ export interface CostAdjustmentPayload {
     reason?: string;
     notes?: string;
     lines: Array<{ valuation_layer_id: number; adjustment_amount: string; reason?: string }>;
+}
+
+export interface AdjustmentPayload {
+    adjustment_date: string;
+    adjustment_type: 'opening_balance' | 'increase' | 'decrease' | 'recount' | 'damage' | 'expiry';
+    warehouse_id: number;
+    warehouse_location_id?: number;
+    reason?: string;
+    notes?: string;
+    lines: Array<{
+        item_id: number;
+        system_quantity: string;
+        counted_quantity: string;
+        adjustment_quantity: string;
+        unit_cost?: string;
+        item_variant_id?: number;
+        batch_id?: number;
+        serial_number_id?: number;
+        uom_id?: number;
+        reason?: string;
+    }>;
 }

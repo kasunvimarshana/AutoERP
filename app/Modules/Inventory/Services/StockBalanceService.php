@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\StockBalanceData;
@@ -21,18 +22,23 @@ final class StockBalanceService
 
     public function getOrCreate(StockBalanceData $data): InventoryStockBalance
     {
-        /** @var InventoryStockBalance $balance */
-        $balance = InventoryStockBalance::query()->firstOrCreate(
-            [
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'item_id' => $data->itemId,
-                'item_variant_id' => $data->itemVariantId,
-                'warehouse_id' => $data->warehouseId,
-                'warehouse_location_id' => $data->warehouseLocationId,
-                'batch_id' => $data->batchId,
-            ],
-            [
+        return DB::transaction(fn (): InventoryStockBalance => $this->getOrCreateForUpdate($data));
+    }
+
+    public function getOrCreateForUpdate(StockBalanceData $data): InventoryStockBalance
+    {
+        $item = Item::query()
+            ->where('tenant_id', $data->tenantId)
+            ->whereKey($data->itemId)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $balance = $this->balanceQuery($data)->lockForUpdate()->first();
+        if (! $balance instanceof InventoryStockBalance) {
+            InventoryStockBalance::query()->create([
+                ...$this->dimensionAttributes($data),
+                'base_uom_id' => $item->base_uom_id,
+                'dimension_key' => $this->dimensionKey($data),
                 'quantity_on_hand' => '0.000000',
                 'quantity_reserved' => '0.000000',
                 'quantity_allocated' => '0.000000',
@@ -45,23 +51,7 @@ final class StockBalanceService
                 'quantity_scrapped' => '0.000000',
                 'average_cost' => '0.000000',
                 'total_value' => '0.000000',
-            ],
-        );
-
-        return $balance;
-    }
-
-    public function getOrCreateForUpdate(StockBalanceData $data): InventoryStockBalance
-    {
-        Item::query()
-            ->where('tenant_id', $data->tenantId)
-            ->whereKey($data->itemId)
-            ->lockForUpdate()
-            ->firstOrFail();
-
-        $balance = $this->balanceQuery($data)->lockForUpdate()->first();
-        if (! $balance instanceof InventoryStockBalance) {
-            $this->getOrCreate($data);
+            ]);
             $balance = $this->balanceQuery($data)->lockForUpdate()->firstOrFail();
         }
 
@@ -177,6 +167,7 @@ final class StockBalanceService
     public function increaseInTransit(InventoryStockBalance $balance, string $quantity): InventoryStockBalance
     {
         $balance->quantity_in_transit = $this->math->add((string) ($balance->quantity_in_transit ?? '0.000000'), $quantity);
+        $this->assertReconciled($balance);
         $balance->save();
 
         return $balance->refresh();
@@ -189,6 +180,7 @@ final class StockBalanceService
         }
 
         $balance->quantity_in_transit = $this->math->sub((string) ($balance->quantity_in_transit ?? '0.000000'), $quantity);
+        $this->assertReconciled($balance);
         $balance->save();
 
         return $balance->refresh();
@@ -208,6 +200,43 @@ final class StockBalanceService
         $balance->quantity_available = $this->math->sub((string) $balance->quantity_on_hand, $unavailable);
         if (! $this->allowsNegativeStock() && $this->math->isNegative((string) $balance->quantity_available)) {
             throw new InvalidArgumentException('Inventory available quantity cannot become negative.');
+        }
+
+        $this->assertReconciled($balance);
+    }
+
+    public function assertReconciled(InventoryStockBalance $balance): void
+    {
+        foreach ([
+            'quantity_reserved',
+            'quantity_allocated',
+            'quantity_returned',
+            'quantity_in_transit',
+            'quantity_damaged',
+            'quantity_quarantine',
+            'quantity_expired',
+            'quantity_scrapped',
+            'total_value',
+        ] as $column) {
+            if ($this->math->isNegative((string) ($balance->{$column} ?? '0.000000'))) {
+                throw new InvalidArgumentException("Inventory balance {$column} cannot be negative.");
+            }
+        }
+
+        $expectedAvailable = $this->math->sub(
+            (string) $balance->quantity_on_hand,
+            $this->math->sum([
+                (string) $balance->quantity_reserved,
+                (string) $balance->quantity_allocated,
+                (string) ($balance->quantity_returned ?? '0.000000'),
+                (string) ($balance->quantity_damaged ?? '0.000000'),
+                (string) ($balance->quantity_quarantine ?? '0.000000'),
+                (string) ($balance->quantity_expired ?? '0.000000'),
+                (string) ($balance->quantity_scrapped ?? '0.000000'),
+            ]),
+        );
+        if ($this->math->compare($expectedAvailable, (string) $balance->quantity_available) !== 0) {
+            throw new InvalidArgumentException('Inventory available quantity is not reconciled to its stock states.');
         }
     }
 
@@ -232,5 +261,29 @@ final class StockBalanceService
         }
 
         return $query;
+    }
+
+    /**
+     * @return array<string, int|null>
+     */
+    private function dimensionAttributes(StockBalanceData $data): array
+    {
+        return [
+            'tenant_id' => $data->tenantId,
+            'organization_unit_id' => $data->organizationUnitId,
+            'item_id' => $data->itemId,
+            'item_variant_id' => $data->itemVariantId,
+            'warehouse_id' => $data->warehouseId,
+            'warehouse_location_id' => $data->warehouseLocationId,
+            'batch_id' => $data->batchId,
+        ];
+    }
+
+    private function dimensionKey(StockBalanceData $data): string
+    {
+        return hash('sha256', implode(':', array_map(
+            static fn (?int $value): string => $value === null ? 'null' : (string) $value,
+            array_values($this->dimensionAttributes($data)),
+        )));
     }
 }

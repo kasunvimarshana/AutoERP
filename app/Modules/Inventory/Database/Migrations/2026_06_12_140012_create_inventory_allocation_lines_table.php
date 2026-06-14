@@ -14,10 +14,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('allocation_id')->constrained('inventory_allocations')->cascadeOnDelete();
+            $table->foreignId('allocation_id')->constrained('inventory_allocations')->restrictOnDelete();
             $table->foreignId('stock_balance_id')->constrained('inventory_stock_balances')->restrictOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->nullOnDelete();
-            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->restrictOnDelete();
             $table->decimal('quantity_allocated', 20, 6);
             $table->decimal('quantity_issued', 20, 6)->default('0.000000');
             $table->decimal('quantity_reversed', 20, 6)->default('0.000000');

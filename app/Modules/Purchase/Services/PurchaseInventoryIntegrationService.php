@@ -11,7 +11,6 @@ use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\InventoryFacade;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
-use Modules\Item\Services\ItemBaseUomConversionService;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseReturn;
@@ -21,7 +20,6 @@ final class PurchaseInventoryIntegrationService
 {
     public function __construct(
         private readonly InventoryFacade $inventory,
-        private readonly ItemBaseUomConversionService $baseUomConversions,
     ) {}
 
     public function receipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
@@ -30,8 +28,6 @@ final class PurchaseInventoryIntegrationService
             return null;
         }
 
-        $basis = $this->basis((int) $line->item_id, $line->uom_id ?? $line->base_uom_id, (string) $line->accepted_quantity, (string) $line->unit_price);
-
         return $this->inventory->receive(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
             movementDate: $grn->received_date->toDateString(),
@@ -39,16 +35,17 @@ final class PurchaseInventoryIntegrationService
             direction: InventoryDirection::In,
             itemId: (int) $line->item_id,
             warehouseId: (int) $grn->warehouse_id,
-            quantity: $basis['quantity'],
+            quantity: (string) $line->accepted_quantity,
             organizationUnitId: $grn->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $grn->warehouse_location_id,
-            unitCost: $basis['unit_cost'],
+            unitCost: (string) $line->unit_price,
             sourceType: 'goods_receipt_note',
             sourceId: (int) $grn->getKey(),
             sourceLineType: 'goods_receipt_note_line',
             sourceLineId: (int) $line->getKey(),
             description: 'GRN '.$grn->grn_number,
+            uomId: $line->uom_id ?? $line->base_uom_id,
         ), $postedBy);
     }
 
@@ -58,8 +55,6 @@ final class PurchaseInventoryIntegrationService
             return null;
         }
 
-        $basis = $this->basis((int) $line->item_id, $line->uom_id, (string) $line->returned_quantity, (string) $line->unit_price);
-
         return $this->inventory->issue(new StockMovementData(
             tenantId: (int) $return->tenant_id,
             movementDate: $return->return_date->toDateString(),
@@ -67,16 +62,17 @@ final class PurchaseInventoryIntegrationService
             direction: InventoryDirection::Out,
             itemId: (int) $line->item_id,
             warehouseId: (int) $return->warehouse_id,
-            quantity: $basis['quantity'],
+            quantity: (string) $line->returned_quantity,
             organizationUnitId: $return->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $return->warehouse_location_id,
-            unitCost: $basis['unit_cost'],
+            unitCost: (string) $line->unit_price,
             sourceType: 'purchase_return',
             sourceId: (int) $return->getKey(),
             sourceLineType: 'purchase_return_line',
             sourceLineId: (int) $line->getKey(),
             description: 'Purchase return '.$return->return_number,
+            uomId: $line->uom_id,
         ), $postedBy);
     }
 
@@ -91,8 +87,6 @@ final class PurchaseInventoryIntegrationService
             return $this->inventory->reverse($line->inventoryMovement, $postedBy);
         }
 
-        $basis = $this->basis((int) $line->item_id, $line->uom_id ?? $line->base_uom_id, (string) $line->accepted_quantity, (string) $line->unit_price);
-
         return $this->inventory->issue(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
             movementDate: now()->toDateString(),
@@ -100,16 +94,17 @@ final class PurchaseInventoryIntegrationService
             direction: InventoryDirection::Out,
             itemId: (int) $line->item_id,
             warehouseId: (int) $grn->warehouse_id,
-            quantity: $basis['quantity'],
+            quantity: (string) $line->accepted_quantity,
             organizationUnitId: $grn->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $grn->warehouse_location_id,
-            unitCost: $basis['unit_cost'],
+            unitCost: (string) $line->unit_price,
             sourceType: 'goods_receipt_note_reversal',
             sourceId: (int) $grn->getKey(),
             sourceLineType: 'goods_receipt_note_line',
             sourceLineId: (int) $line->getKey(),
             description: 'GRN reversal '.$grn->grn_number,
+            uomId: $line->uom_id ?? $line->base_uom_id,
         ), $postedBy);
     }
 
@@ -119,20 +114,5 @@ final class PurchaseInventoryIntegrationService
 
         return (bool) $item->is_stockable
             && ! in_array($item->item_type, [ItemType::Service, ItemType::Labour, ItemType::NonStock], true);
-    }
-
-    /**
-     * @return array{quantity: string, unit_cost: string, factor: string}
-     */
-    private function basis(int $itemId, ?int $uomId, string $quantity, string $unitCost): array
-    {
-        $item = Item::query()->findOrFail($itemId);
-
-        return $this->baseUomConversions->convertOperationalBasis(
-            $item,
-            $uomId ?? (int) $item->base_uom_id,
-            $quantity,
-            $unitCost,
-        );
     }
 }

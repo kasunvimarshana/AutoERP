@@ -141,6 +141,79 @@ final class SalesEngineTest extends TestCase
         $this->assertSame('75.000000', (string) $order->refresh()->delivered_total);
     }
 
+    public function test_non_base_uom_sales_return_restores_base_cost_once(): void
+    {
+        $context = $this->context();
+        $boxUomId = $this->createUom($context['tenant_id'], 'BOX-'.Str::upper(Str::random(4)), false);
+        DB::table('item_units')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'item_id' => $context['item_id'],
+            'uom_id' => $boxUomId,
+            'unit_role' => 'sales',
+            'conversion_factor' => '12.000000',
+            'is_default' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('uom_conversions')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'row_version' => 1,
+            'from_uom_id' => $boxUomId,
+            'to_uom_id' => $context['uom_id'],
+            'conversion_factor' => '12.000000',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedStock($context, '24.000000');
+        $order = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '120.000000', uomId: $boxUomId),
+        ]);
+        app(SalesOrderService::class)->approve($order);
+
+        $delivery = app(SalesDeliveryService::class)->create(new CreateSalesDeliveryData(
+            tenantId: $context['tenant_id'],
+            deliveryDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            warehouseId: $context['warehouse_id'],
+            salesOrderId: (int) $order->getKey(),
+            lines: [new SalesDeliveryLineData(
+                itemId: $context['item_id'],
+                deliveredQuantity: '2.000000',
+                unitPrice: '120.000000',
+                salesOrderLineId: (int) $order->lines->first()->getKey(),
+                uomId: $boxUomId,
+            )],
+        ));
+        $delivery = app(SalesDeliveryService::class)->post($delivery)->refresh()->load('lines');
+        $return = app(SalesReturnService::class)->create(new CreateSalesReturnData(
+            tenantId: $context['tenant_id'],
+            returnDate: '2026-06-11',
+            customerId: $context['customer_id'],
+            returnType: SalesReturnType::ReferencedCustomerReturn,
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesReturnLineData(
+                returnedQuantity: '1.000000',
+                sourceLineType: 'sales_delivery_line',
+                sourceLineId: (int) $delivery->lines->first()->getKey(),
+            )],
+        ));
+        app(SalesReturnService::class)->post($return);
+
+        $movement = InventoryMovement::query()
+            ->where('source_type', 'sales_return')
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertSame($boxUomId, $movement->entered_uom_id);
+        $this->assertSame('1.000000', (string) $movement->entered_quantity);
+        $this->assertSame('12.000000', (string) $movement->conversion_factor);
+        $this->assertSame('48.000000', (string) $movement->entered_unit_cost);
+        $this->assertSame('12.000000', (string) $movement->quantity);
+        $this->assertSame('4.000000', (string) $movement->unit_cost);
+        $this->assertSame('48.000000', (string) $movement->total_cost);
+    }
+
     public function test_many_deliveries_create_partial_and_followup_customer_invoices(): void
     {
         $context = $this->context();

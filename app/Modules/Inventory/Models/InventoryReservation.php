@@ -11,9 +11,9 @@ use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\ReservationStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
-use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InventoryReservation extends CoreModel
 {
@@ -31,10 +31,13 @@ final class InventoryReservation extends CoreModel
             'reservation_date' => 'date',
             'item_id' => 'integer',
             'base_uom_id' => 'integer',
+            'entered_uom_id' => 'integer',
             'item_variant_id' => 'integer',
             'warehouse_id' => 'integer',
             'warehouse_location_id' => 'integer',
             'batch_id' => 'integer',
+            'entered_quantity' => 'decimal:6',
+            'conversion_factor' => 'decimal:6',
             'quantity_reserved' => 'decimal:6',
             'quantity_allocated' => 'decimal:6',
             'quantity_released' => 'decimal:6',
@@ -54,6 +57,11 @@ final class InventoryReservation extends CoreModel
     public function baseUom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
+    }
+
+    public function enteredUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'entered_uom_id');
     }
 
     public function variant(): BelongsTo

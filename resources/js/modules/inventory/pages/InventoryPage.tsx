@@ -5,6 +5,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import {
     listAllocations,
+    listAdjustments,
     listBatches,
     listCostAdjustments,
     listReservations,
@@ -18,6 +19,7 @@ import {
 import { AvailabilityTab, DashboardTab } from '../components/InventoryOverview';
 import {
     AllocationsTab,
+    AdjustmentsTab,
     CountsTab,
     ReservationsTab,
     TransfersTab,
@@ -29,13 +31,14 @@ import {
     TrackingTab,
 } from '../components/InventoryReferenceTabs';
 
-type Tab = 'dashboard' | 'availability' | 'reservations' | 'allocations' | 'transfers' | 'counts' | 'costing' | 'tracking' | 'audit' | 'reports';
+type Tab = 'dashboard' | 'availability' | 'reservations' | 'allocations' | 'adjustments' | 'transfers' | 'counts' | 'costing' | 'tracking' | 'audit' | 'reports';
 
 const tabs = [
     { id: 'dashboard' as Tab, label: 'Dashboard' },
     { id: 'availability' as Tab, label: 'Availability' },
     { id: 'reservations' as Tab, label: 'Reservations' },
     { id: 'allocations' as Tab, label: 'Allocations' },
+    { id: 'adjustments' as Tab, label: 'Adjustments' },
     { id: 'transfers' as Tab, label: 'Transfers' },
     { id: 'counts' as Tab, label: 'Stock counts' },
     { id: 'costing' as Tab, label: 'Costing' },
@@ -58,6 +61,7 @@ export default function InventoryPage() {
         ['reservations', 'allocations'].includes(tab),
     );
     const allocations = useApi((signal) => listAllocations({ per_page: 25 }, signal), [], tab === 'allocations');
+    const adjustments = useApi((signal) => listAdjustments({ per_page: 25 }, signal), [], tab === 'adjustments');
     const transfers = useApi((signal) => listTransfers({ per_page: 25 }, signal), [], tab === 'transfers');
     const counts = useApi((signal) => listStockCounts({ per_page: 25 }, signal), [], tab === 'counts');
     const valuationLayers = useApi(
@@ -82,6 +86,7 @@ export default function InventoryPage() {
         balances.reload();
         reservations.reload();
         allocations.reload();
+        adjustments.reload();
         transfers.reload();
         counts.reload();
         valuationLayers.reload();
@@ -121,6 +126,14 @@ export default function InventoryPage() {
                         reservations={reservations.data?.data ?? []}
                         loading={allocations.loading}
                         error={allocations.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'adjustments' && (
+                    <AdjustmentsTab
+                        data={adjustments.data?.data ?? []}
+                        loading={adjustments.loading}
+                        error={adjustments.error}
                         reload={reloadInventory}
                     />
                 )}

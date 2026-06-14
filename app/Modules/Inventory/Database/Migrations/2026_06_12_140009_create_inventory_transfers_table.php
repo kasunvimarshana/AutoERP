@@ -17,9 +17,9 @@ return new class extends Migration
             $table->string('transfer_number', 80);
             $table->date('transfer_date');
             $table->foreignId('from_warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('from_warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('from_warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
             $table->foreignId('to_warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('to_warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('to_warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
             $table->string('status', 30)->default('draft');
             $table->text('reason')->nullable();
             $table->text('notes')->nullable();

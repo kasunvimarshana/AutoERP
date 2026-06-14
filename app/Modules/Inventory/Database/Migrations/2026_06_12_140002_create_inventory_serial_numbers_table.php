@@ -14,12 +14,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
             $table->string('serial_number', 160);
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->nullOnDelete();
-            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->restrictOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
             $table->string('status', 30)->default('available');
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();

@@ -100,6 +100,10 @@ export function sumDecimals(values: string[]) {
     }, zeroDecimal);
 }
 
+export function subtractDecimals(left: string, right: string) {
+    return scaledIntToDecimal(decimalToScaledInt(left) - decimalToScaledInt(right));
+}
+
 export async function runFormAction(
     event: FormEvent,
     setBusy: (value: boolean) => void,
@@ -152,4 +156,11 @@ function decimalToScaledInt(value: string) {
     const [whole = '0', fraction = ''] = unsigned.split('.');
 
     return sign * (BigInt(whole || '0') * 1_000_000n + BigInt(fraction.padEnd(6, '0').slice(0, 6) || '0'));
+}
+
+function scaledIntToDecimal(value: bigint) {
+    const sign = value < 0n ? '-' : '';
+    const absolute = value < 0n ? -value : value;
+
+    return `${sign}${absolute / 1_000_000n}.${String(absolute % 1_000_000n).padStart(6, '0')}`;
 }

@@ -29,6 +29,9 @@ final class InventoryAvailabilityService
         }
 
         $balance = $this->balances->find($data);
+        if ($balance !== null) {
+            $this->balances->assertReconciled($balance);
+        }
         $quantityOnHand = (string) ($balance?->quantity_on_hand ?? '0.000000');
         $quantityInTransit = (string) ($balance?->quantity_in_transit ?? '0.000000');
 
@@ -46,6 +49,7 @@ final class InventoryAvailabilityService
             quantityExpired: (string) ($balance?->quantity_expired ?? '0.000000'),
             quantityScrapped: (string) ($balance?->quantity_scrapped ?? '0.000000'),
             quantityTotal: $this->math->add($quantityOnHand, $quantityInTransit),
+            baseUomId: $balance?->base_uom_id ?? $item->base_uom_id,
             itemVariantId: $data->itemVariantId,
             warehouseLocationId: $data->warehouseLocationId,
             batchId: $data->batchId,
