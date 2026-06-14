@@ -36,9 +36,13 @@ final class RentalAgreementResource extends RentalResource
                 ? null
                 : (new RentalRateSnapshotResource($this->rateSnapshot))->resolve($request)),
             'vehicles' => $this->whenLoaded('vehicles', fn () => RentalAgreementVehicleResource::collection($this->vehicles)->resolve($request), []),
-            'usage_logs' => $this->whenLoaded('usageLogs', fn () => RentalUsageLogResource::collection($this->usageLogs)->resolve($request), []),
+            'usage_logs' => $this->whenLoaded('operationalUsageLogs', fn () => RentalUsageLogResource::collection($this->operationalUsageLogs)->resolve($request), []),
             'expenses' => $this->whenLoaded('expenses', fn () => RentalExpenseResource::collection($this->expenses)->resolve($request), []),
             'charges' => $this->whenLoaded('charges', fn () => RentalChargeResource::collection($this->charges)->resolve($request), []),
+            'vehicle_links' => [
+                ...$this->whenLoaded('inboundVehicleLinks', fn () => RentalAgreementVehicleLinkResource::collection($this->inboundVehicleLinks)->resolve($request), []),
+                ...$this->whenLoaded('outboundVehicleLinks', fn () => RentalAgreementVehicleLinkResource::collection($this->outboundVehicleLinks)->resolve($request), []),
+            ],
             'invoice_links' => $this->whenLoaded('invoiceLinks', fn () => RentalInvoiceLinkResource::collection($this->invoiceLinks)->resolve($request), []),
             'payment_links' => $this->whenLoaded('paymentLinks', fn () => RentalPaymentLinkResource::collection($this->paymentLinks)->resolve($request), []),
             'created_at' => $this->created_at?->toISOString(),

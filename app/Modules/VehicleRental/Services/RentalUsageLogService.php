@@ -11,16 +11,22 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Models\HrEmployee;
+use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\DTOs\RentalUsageLogData;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
+use Modules\VehicleRental\Models\RentalStatusHistory;
 use Modules\VehicleRental\Models\RentalUsageLog;
 
 final class RentalUsageLogService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly RentalUsageContextService $contexts,
+    ) {}
 
     public function create(RentalAgreement $agreement, RentalUsageLogData $data): RentalUsageLog
     {
@@ -32,18 +38,22 @@ final class RentalUsageLogService
         }
 
         return DB::transaction(function () use ($agreement, $data): RentalUsageLog {
-            $allocation = $agreement->vehicles()->findOrFail($data->agreementVehicleId);
-            $this->validate($agreement, $allocation, $data);
-            $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
-            $previous = RentalUsageLog::query()
-                ->where('agreement_vehicle_id', $allocation->getKey())
-                ->where('status', '!=', RentalUsageLogStatus::Rejected->value)
-                ->orderByDesc('usage_date')
-                ->orderByDesc('id')
+            $agreement = RentalAgreement::query()
+                ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
+                ->with('rateSnapshot')
                 ->lockForUpdate()
-                ->first();
-            $cumulative = $this->math->add((string) ($previous?->cumulative_km ?? '0.000000'), $distance);
+                ->findOrFail($agreement->getKey());
+            $allocation = $agreement->vehicles()->with('pickupInspection')->lockForUpdate()
+                ->findOrFail($data->agreementVehicleId);
+            $this->validate($agreement, $allocation, $data);
 
+            $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
+            $fingerprint = hash('sha256', implode('|', [
+                (string) $agreement->tenant_id,
+                (string) $allocation->vehicle_id,
+                $data->usageDate,
+                $data->startTime ?? 'all-day',
+            ]));
             $log = RentalUsageLog::query()->create([
                 'tenant_id' => $agreement->tenant_id,
                 'organization_unit_id' => $agreement->organization_unit_id,
@@ -54,51 +64,167 @@ final class RentalUsageLogService
                 'usage_date' => $data->usageDate,
                 'start_time' => $data->startTime,
                 'end_time' => $data->endTime,
+                'working_minutes' => $this->workingMinutes($data),
                 'start_odometer' => $this->math->normalize($data->startOdometer),
                 'end_odometer' => $this->math->normalize($data->endOdometer),
                 'distance_km' => $distance,
-                'cumulative_km' => $cumulative,
-                'comparative_km' => $data->comparativeKm === null ? null : $this->math->normalize($data->comparativeKm),
+                'cumulative_km' => null,
+                'comparative_km' => $data->comparativeKm === null
+                    ? null
+                    : $this->math->normalize($data->comparativeKm),
+                'usage_fingerprint' => $fingerprint,
+                'odometer_variance_reason' => $data->odometerVarianceReason,
                 'trip_from' => $data->tripFrom,
                 'trip_to' => $data->tripTo,
                 'trip_purpose' => $data->tripPurpose,
-                'status' => $data->status->value,
-                'approved_by' => $data->status === RentalUsageLogStatus::Approved ? $data->approvedBy : null,
-                'approved_at' => $data->status === RentalUsageLogStatus::Approved ? now() : null,
+                'status' => RentalUsageLogStatus::Draft->value,
                 'remarks' => $data->remarks,
+                'created_by' => $data->createdBy,
+                'updated_by' => $data->createdBy,
             ]);
+            $this->contexts->attach(
+                $log,
+                $agreement,
+                $allocation,
+                $data->usageDate,
+                $data->startTime,
+            );
+            $this->recordStatus($log, null, RentalUsageLogStatus::Draft, $data->createdBy);
 
-            return $log->load(['vehicle', 'driver', 'events']);
+            return $log->load([
+                'vehicle.make',
+                'vehicle.model',
+                'driver',
+                'events',
+                'contexts.agreement.customer',
+                'contexts.agreement.supplier',
+                'contexts.rateSnapshot',
+            ]);
         });
     }
 
     public function changeStatus(
         RentalUsageLog $log,
         RentalUsageLogStatus $status,
-        ?int $approvedBy = null,
+        ?int $changedBy = null,
+        ?string $reason = null,
+        bool $allowMileageVariance = false,
     ): RentalUsageLog {
         $allowed = [
-            'draft' => ['submitted', 'approved', 'rejected'],
+            'draft' => ['submitted'],
             'submitted' => ['approved', 'rejected'],
             'approved' => [],
             'rejected' => ['draft'],
         ];
-        $old = $log->status;
-        if ($old === $status) {
-            return $log;
-        }
-        if (! in_array($status->value, $allowed[$old->value] ?? [], true)) {
+
+        return DB::transaction(function () use (
+            $log,
+            $status,
+            $changedBy,
+            $reason,
+            $allowMileageVariance,
+            $allowed,
+        ): RentalUsageLog {
+            $log = RentalUsageLog::query()
+                ->with(['events', 'agreementVehicle.pickupInspection', 'contexts'])
+                ->lockForUpdate()
+                ->findOrFail($log->getKey());
+            $old = $log->status;
+            if ($old === $status) {
+                return $log;
+            }
+            if (! in_array($status->value, $allowed[$old->value] ?? [], true)) {
+                throw new InvalidArgumentException(
+                    "Invalid usage log status transition from {$old->value} to {$status->value}.",
+                );
+            }
+
+            $updates = ['status' => $status->value, 'updated_by' => $changedBy];
+            if ($status === RentalUsageLogStatus::Submitted) {
+                $this->validateClassifiedTime($log);
+                $updates['submitted_by'] = $changedBy;
+                $updates['submitted_at'] = now();
+            }
+            if ($status === RentalUsageLogStatus::Approved) {
+                $cumulative = $this->approveMileage($log, $allowMileageVariance, $reason);
+                $updates['cumulative_km'] = $cumulative;
+                $updates['approved_by'] = $changedBy;
+                $updates['approved_at'] = now();
+                $updates['rejected_by'] = null;
+                $updates['rejected_at'] = null;
+            }
+            if ($status === RentalUsageLogStatus::Rejected) {
+                $updates['cumulative_km'] = null;
+                $updates['rejected_by'] = $changedBy;
+                $updates['rejected_at'] = now();
+            }
+            if ($status === RentalUsageLogStatus::Draft) {
+                $updates['submitted_by'] = null;
+                $updates['submitted_at'] = null;
+                $updates['rejected_by'] = null;
+                $updates['rejected_at'] = null;
+            }
+
+            $log->forceFill($updates)->save();
+            $this->recordStatus($log, $old, $status, $changedBy, $reason);
+
+            return $log->refresh()->load(['events', 'contexts.agreement', 'contexts.rateSnapshot']);
+        });
+    }
+
+    private function approveMileage(
+        RentalUsageLog $log,
+        bool $allowMileageVariance,
+        ?string $reason,
+    ): string {
+        $vehicle = Vehicle::query()->whereKey($log->vehicle_id)->lockForUpdate()->firstOrFail();
+        $laterApproved = RentalUsageLog::query()
+            ->where('vehicle_id', $log->vehicle_id)
+            ->where('status', RentalUsageLogStatus::Approved->value)
+            ->where(function (Builder $query) use ($log): void {
+                $query->whereDate('usage_date', '>', $log->usage_date->toDateString())
+                    ->orWhere(function (Builder $sameDate) use ($log): void {
+                        $sameDate->whereDate('usage_date', $log->usage_date->toDateString())
+                            ->where('id', '>', $log->getKey());
+                    });
+            })
+            ->lockForUpdate()
+            ->exists();
+        if ($laterApproved) {
             throw new InvalidArgumentException(
-                "Invalid usage log status transition from {$old->value} to {$status->value}.",
+                'Running charts must be approved in vehicle mileage order; a later row is already approved.',
             );
         }
-        $log->forceFill([
-            'status' => $status->value,
-            'approved_by' => $status === RentalUsageLogStatus::Approved ? $approvedBy : null,
-            'approved_at' => $status === RentalUsageLogStatus::Approved ? now() : null,
-        ])->save();
 
-        return $log->refresh();
+        $previous = RentalUsageLog::query()
+            ->where('vehicle_id', $log->vehicle_id)
+            ->where('status', RentalUsageLogStatus::Approved->value)
+            ->whereKeyNot($log->getKey())
+            ->orderByDesc('usage_date')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+        $expectedStart = (string) ($previous?->end_odometer
+            ?? $log->agreementVehicle?->pickupInspection?->odometer
+            ?? $log->agreementVehicle?->start_odometer
+            ?? '0.000000');
+        if ($this->math->compare((string) $log->start_odometer, $expectedStart) !== 0) {
+            if (! $allowMileageVariance || trim((string) $reason) === '') {
+                throw new InvalidArgumentException(
+                    "Running chart start odometer must equal the previous approved finish odometer ({$expectedStart}).",
+                );
+            }
+            $log->odometer_variance_reason = $reason;
+        }
+        if ($this->math->compare((string) $log->end_odometer, (string) $vehicle->odometer_reading) > 0) {
+            $vehicle->odometer_reading = $this->math->normalize((string) $log->end_odometer);
+            $vehicle->save();
+        }
+
+        return $this->math->add(
+            (string) ($previous?->cumulative_km ?? '0.000000'),
+            (string) $log->distance_km,
+        );
     }
 
     private function validate(
@@ -112,26 +238,14 @@ final class RentalUsageLogService
         if ($this->math->compare($data->startOdometer, (string) $allocation->start_odometer) < 0) {
             throw new InvalidArgumentException('Usage start odometer cannot be below the vehicle pickup odometer.');
         }
-        if (! $allocation->pickupInspection()->exists()) {
+        if ($allocation->pickupInspection === null) {
             throw new InvalidArgumentException('Pickup inspection is required before recording vehicle usage.');
         }
         $date = CarbonImmutable::parse($data->usageDate);
         if ($date->startOfDay()->lessThan($allocation->allocated_from->startOfDay())
-            || ($allocation->allocated_to !== null && $date->startOfDay()->greaterThan($allocation->allocated_to->startOfDay()))) {
+            || ($allocation->allocated_to !== null
+                && $date->startOfDay()->greaterThan($allocation->allocated_to->startOfDay()))) {
             throw new InvalidArgumentException('Usage date must fall within the vehicle allocation period.');
-        }
-        $duplicate = RentalUsageLog::query()
-            ->where('agreement_vehicle_id', $allocation->getKey())
-            ->whereDate('usage_date', $data->usageDate)
-            ->where(function (Builder $query) use ($data): void {
-                $data->startTime === null
-                    ? $query->whereNull('start_time')
-                    : $query->where('start_time', $data->startTime);
-            })
-            ->where('status', '!=', RentalUsageLogStatus::Rejected->value)
-            ->exists();
-        if ($duplicate) {
-            throw new InvalidArgumentException('A usage log already exists for this vehicle, date, and start time.');
         }
         if (($data->startTime === null) !== ($data->endTime === null)) {
             throw new InvalidArgumentException('Usage start time and end time must be provided together.');
@@ -150,5 +264,59 @@ final class RentalUsageLogService
                 throw new InvalidArgumentException('Only active employees can be assigned as rental drivers.');
             }
         }
+    }
+
+    private function workingMinutes(RentalUsageLogData $data): int
+    {
+        if ($data->startTime === null || $data->endTime === null) {
+            return 0;
+        }
+        $start = CarbonImmutable::parse($data->usageDate.' '.$data->startTime);
+        $end = CarbonImmutable::parse($data->usageDate.' '.$data->endTime);
+        if ($end->lessThan($start)) {
+            $end = $end->addDay();
+        }
+
+        return intdiv($end->getTimestamp() - $start->getTimestamp(), 60);
+    }
+
+    private function validateClassifiedTime(RentalUsageLog $log): void
+    {
+        $classified = $log->events
+            ->whereIn('event_type', [
+                RentalUsageEventType::Overtime,
+                RentalUsageEventType::DoubleOvertime,
+            ])
+            ->pluck('quantity')
+            ->map(fn ($quantity): string => (string) $quantity)
+            ->all();
+        $classifiedHours = $this->math->sum($classified);
+        $workingHours = $this->math->div((string) $log->working_minutes, '60.000000');
+        if ($this->math->compare($classifiedHours, $workingHours) > 0) {
+            throw new InvalidArgumentException(
+                'Overtime and double-overtime quantities cannot exceed total working hours.',
+            );
+        }
+    }
+
+    private function recordStatus(
+        RentalUsageLog $log,
+        ?RentalUsageLogStatus $old,
+        RentalUsageLogStatus $new,
+        ?int $changedBy,
+        ?string $reason = null,
+    ): void {
+        RentalStatusHistory::query()->create([
+            'tenant_id' => $log->tenant_id,
+            'organization_unit_id' => $log->organization_unit_id,
+            'agreement_id' => $log->agreement_id,
+            'usage_log_id' => $log->getKey(),
+            'entity_type' => 'usage_log',
+            'old_status' => $old?->value,
+            'new_status' => $new->value,
+            'reason' => $reason,
+            'changed_by' => $changedBy,
+            'changed_at' => now(),
+        ]);
     }
 }

@@ -15,11 +15,21 @@ import { useApi } from '@/shared/hooks/useApi';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import { changeRentalExpenseStatus, createRentalExpense, getRentalAgreement, listRentalExpenses } from '../vehicleRentalApi';
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 export default function RentalExpensePage() {
     const agreementId = Number(useParams().id);
     const agreement = useApi((signal) => getRentalAgreement(agreementId, signal), [agreementId]);
     const expenses = useApi((signal) => listRentalExpenses(agreementId, signal), [agreementId]);
-    const [form, setForm] = useState({ expense_type: 'fuel', amount: '', is_billable: true, receipt_no: '', reference_no: '', description: '', status: 'draft' });
+    const [form, setForm] = useState({
+        expense_type: 'fuel',
+        expense_date: today(),
+        amount: '',
+        financial_treatment: 'company_borne',
+        receipt_no: '',
+        reference_no: '',
+        description: '',
+    });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     if (agreement.loading) return <LoadingState />;
@@ -62,11 +72,19 @@ export default function RentalExpensePage() {
                         }
                     }}>
                         <Select label="Expense type" value={form.expense_type} options={['fuel', 'toll', 'parking', 'allowance', 'repair', 'other'].map((value) => ({ value, label: value }))} onChange={(event) => setForm({ ...form, expense_type: event.target.value })} />
+                        <Input label="Expense date" type="date" value={form.expense_date} onChange={(event) => setForm({ ...form, expense_date: event.target.value })} />
                         <DecimalInput label="Amount" value={form.amount} error={fieldError(error, 'amount')} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
+                        <Select label="Financial treatment" value={form.financial_treatment} options={[
+                            { value: 'company_borne', label: 'Company borne' },
+                            ...(agreement.data.direction === 'outbound' ? [{ value: 'customer_billable', label: 'Customer billable' }] : []),
+                            ...(agreement.data.direction === 'inbound' ? [
+                                { value: 'owner_payable', label: 'Owner / supplier payable' },
+                                { value: 'supplier_recoverable', label: 'Supplier recoverable' },
+                            ] : []),
+                            { value: 'employee_reimbursable', label: 'Employee reimbursable' },
+                        ]} onChange={(event) => setForm({ ...form, financial_treatment: event.target.value })} />
                         <Input label="Receipt no." value={form.receipt_no} onChange={(event) => setForm({ ...form, receipt_no: event.target.value })} />
                         <Input label="Reference no." value={form.reference_no} onChange={(event) => setForm({ ...form, reference_no: event.target.value })} />
-                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={form.is_billable} onChange={(event) => setForm({ ...form, is_billable: event.target.checked })} /> Bill to rental party</label>
-                        <Select label="Initial status" value={form.status} options={[{ value: 'draft', label: 'Draft' }, { value: 'approved', label: 'Approved' }]} onChange={(event) => setForm({ ...form, status: event.target.value })} />
                         <div className="md:col-span-2"><Textarea label="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div>
                         <div className="md:col-span-2 xl:col-span-4 flex justify-end"><Button type="submit" loading={busy}>Add expense</Button></div>
                     </form>
@@ -75,7 +93,7 @@ export default function RentalExpensePage() {
                     { key: 'type', header: 'Type', render: (row) => row.expense_type },
                     { key: 'description', header: 'Description', render: (row) => row.description ?? '-' },
                     { key: 'reference', header: 'Receipt / reference', render: (row) => `${row.receipt_no ?? '-'} / ${row.reference_no ?? '-'}` },
-                    { key: 'billable', header: 'Billable', render: (row) => row.is_billable ? 'Yes' : 'No' },
+                    { key: 'treatment', header: 'Treatment', render: (row) => row.financial_treatment.replaceAll('_', ' ') },
                     { key: 'amount', header: 'Amount', render: (row) => row.amount },
                     { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
                     { key: 'actions', header: '', render: (row) => row.status === 'draft' ? <div className="flex gap-2"><Button type="button" loading={busy} onClick={() => changeStatus(row.id, 'approve')}>Approve</Button><Button type="button" variant="danger" loading={busy} onClick={() => changeStatus(row.id, 'reject')}>Reject</Button></div> : null },

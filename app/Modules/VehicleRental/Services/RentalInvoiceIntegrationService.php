@@ -32,6 +32,7 @@ use Modules\VehicleRental\Models\RentalInvoiceLink;
 final class RentalInvoiceIntegrationService
 {
     private const AGREEMENT_SOURCE = 'VehicleRentalAgreement';
+
     private const CHARGE_SOURCE = 'RentalCharge';
 
     public function __construct(
@@ -68,7 +69,7 @@ final class RentalInvoiceIntegrationService
     }
 
     /**
-     * @param array<int, string> $chargeQuantities
+     * @param  array<int, string>  $chargeQuantities
      */
     public function preview(
         RentalAgreement $agreement,
@@ -82,7 +83,7 @@ final class RentalInvoiceIntegrationService
     }
 
     /**
-     * @param array<int, string> $chargeQuantities
+     * @param  array<int, string>  $chargeQuantities
      */
     public function create(
         RentalAgreement $agreement,
@@ -142,7 +143,7 @@ final class RentalInvoiceIntegrationService
     }
 
     /**
-     * @param array<int, string> $chargeQuantities
+     * @param  array<int, string>  $chargeQuantities
      */
     private function toInvoiceData(
         RentalAgreement $agreement,

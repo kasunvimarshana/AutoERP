@@ -15,6 +15,7 @@ final class RentalActionRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'reason' => ['nullable', 'string'],
             'replace' => ['nullable', 'boolean'],
+            'mileage_override' => ['nullable', 'boolean'],
         ];
     }
 }

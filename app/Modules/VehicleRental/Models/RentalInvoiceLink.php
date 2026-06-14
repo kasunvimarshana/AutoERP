@@ -30,8 +30,23 @@ final class RentalInvoiceLink extends CoreModel
         ];
     }
 
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
-    public function charge(): BelongsTo { return $this->belongsTo(RentalCharge::class, 'charge_id'); }
-    public function invoice(): BelongsTo { return $this->belongsTo(Invoice::class, 'invoice_id'); }
-    public function invoiceLine(): BelongsTo { return $this->belongsTo(InvoiceLine::class, 'invoice_line_id'); }
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function charge(): BelongsTo
+    {
+        return $this->belongsTo(RentalCharge::class, 'charge_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
+    public function invoiceLine(): BelongsTo
+    {
+        return $this->belongsTo(InvoiceLine::class, 'invoice_line_id');
+    }
 }

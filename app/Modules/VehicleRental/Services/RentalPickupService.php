@@ -12,6 +12,7 @@ use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalPickupInspection;
+use Modules\VehicleRental\Models\RentalUsageContext;
 
 final class RentalPickupService
 {
@@ -37,6 +38,18 @@ final class RentalPickupService
         }
 
         return DB::transaction(function () use ($agreement, $allocation, $data): RentalPickupInspection {
+            $allocation = RentalAgreementVehicle::query()->lockForUpdate()->findOrFail($allocation->getKey());
+            $existing = RentalPickupInspection::query()
+                ->where('agreement_vehicle_id', $allocation->getKey())
+                ->lockForUpdate()
+                ->first();
+            if ($existing !== null && RentalUsageContext::query()
+                ->where('agreement_vehicle_id', $allocation->getKey())
+                ->exists()) {
+                throw new InvalidArgumentException(
+                    'Pickup inspection cannot be changed after running-chart usage has been recorded.',
+                );
+            }
             $inspection = RentalPickupInspection::query()->updateOrCreate(
                 ['agreement_vehicle_id' => $allocation->getKey()],
                 [

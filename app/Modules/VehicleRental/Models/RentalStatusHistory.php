@@ -21,11 +21,36 @@ final class RentalStatusHistory extends CoreModel
             'organization_unit_id' => 'integer',
             'reservation_id' => 'integer',
             'agreement_id' => 'integer',
+            'usage_log_id' => 'integer',
+            'expense_id' => 'integer',
+            'charge_id' => 'integer',
             'changed_by' => 'integer',
             'changed_at' => 'datetime',
         ];
     }
 
-    public function reservation(): BelongsTo { return $this->belongsTo(RentalReservation::class, 'reservation_id'); }
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
+    public function reservation(): BelongsTo
+    {
+        return $this->belongsTo(RentalReservation::class, 'reservation_id');
+    }
+
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function usageLog(): BelongsTo
+    {
+        return $this->belongsTo(RentalUsageLog::class, 'usage_log_id');
+    }
+
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(RentalExpense::class, 'expense_id');
+    }
+
+    public function charge(): BelongsTo
+    {
+        return $this->belongsTo(RentalCharge::class, 'charge_id');
+    }
 }

@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
+use Modules\VehicleRental\Enums\RentalExpenseFinancialTreatment;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
@@ -24,15 +25,32 @@ final class RentalExpense extends CoreModel
             'agreement_id' => 'integer',
             'usage_log_id' => 'integer',
             'expense_type' => RentalExpenseType::class,
+            'expense_date' => 'date',
+            'currency_id' => 'integer',
             'amount' => 'decimal:6',
+            'tax_group_id' => 'integer',
+            'tax_amount' => 'decimal:6',
+            'financial_treatment' => RentalExpenseFinancialTreatment::class,
             'is_billable' => 'boolean',
+            'is_recoverable' => 'boolean',
+            'is_reimbursable' => 'boolean',
+            'responsible_party_id' => 'integer',
             'attachments' => 'array',
             'status' => RentalExpenseStatus::class,
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
         ];
     }
 
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
-    public function usageLog(): BelongsTo { return $this->belongsTo(RentalUsageLog::class, 'usage_log_id'); }
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function usageLog(): BelongsTo
+    {
+        return $this->belongsTo(RentalUsageLog::class, 'usage_log_id');
+    }
 }

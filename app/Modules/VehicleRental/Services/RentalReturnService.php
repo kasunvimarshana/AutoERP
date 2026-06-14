@@ -12,9 +12,12 @@ use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\VehicleRental\DTOs\RentalInspectionData;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAgreementVehicleStatus;
+use Modules\VehicleRental\Enums\RentalChargeInvoiceStatus;
+use Modules\VehicleRental\Enums\RentalChargeStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalReturnInspection;
+use Modules\VehicleRental\Models\RentalUsageLog;
 
 final class RentalReturnService
 {
@@ -49,6 +52,36 @@ final class RentalReturnService
         }
 
         return DB::transaction(function () use ($agreement, $allocation, $data): RentalReturnInspection {
+            $allocation = RentalAgreementVehicle::query()->lockForUpdate()->findOrFail($allocation->getKey());
+            $existing = RentalReturnInspection::query()
+                ->where('agreement_vehicle_id', $allocation->getKey())
+                ->lockForUpdate()
+                ->first();
+            if ($existing !== null && $agreement->charges()
+                ->where(function ($query): void {
+                    $query->where('status', RentalChargeStatus::Approved->value)
+                        ->orWhere('invoice_status', '!=', RentalChargeInvoiceStatus::NotInvoiced->value);
+                })
+                ->exists()) {
+                throw new InvalidArgumentException(
+                    'Return inspection cannot be changed after rental charges are approved or financially processed.',
+                );
+            }
+            $lastApprovedUsage = RentalUsageLog::query()
+                ->where('vehicle_id', $allocation->vehicle_id)
+                ->where('status', 'approved')
+                ->whereHas('contexts', fn ($query) => $query
+                    ->where('agreement_vehicle_id', $allocation->getKey()))
+                ->latest('usage_date')
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
+            if ($lastApprovedUsage !== null
+                && $this->math->compare($data->odometer, (string) $lastApprovedUsage->end_odometer) < 0) {
+                throw new InvalidArgumentException(
+                    'Return odometer cannot be below the last approved running-chart finish odometer.',
+                );
+            }
             $inspection = RentalReturnInspection::query()->updateOrCreate(
                 ['agreement_vehicle_id' => $allocation->getKey()],
                 [
@@ -79,12 +112,20 @@ final class RentalReturnService
                 $vehicle->save();
             }
             if ($vehicle->status === VehicleStatus::Rented) {
-                $this->vehicleStatuses->changeTo(
-                    $vehicle,
-                    VehicleStatus::Active,
-                    $data->inspectedBy,
-                    'Returned from rental agreement '.$agreement->agreement_number,
-                );
+                $hasOtherActiveAllocation = RentalAgreementVehicle::query()
+                    ->where('vehicle_id', $vehicle->getKey())
+                    ->whereKeyNot($allocation->getKey())
+                    ->where('status', RentalAgreementVehicleStatus::Active->value)
+                    ->whereHas('agreement', fn ($query) => $query->where('status', RentalAgreementStatus::Active->value))
+                    ->exists();
+                if (! $hasOtherActiveAllocation) {
+                    $this->vehicleStatuses->changeTo(
+                        $vehicle,
+                        VehicleStatus::Active,
+                        $data->inspectedBy,
+                        'Returned from rental agreement '.$agreement->agreement_number,
+                    );
+                }
             }
             if ($agreement->actual_end_at === null
                 || $agreement->actual_end_at->lessThan($inspection->inspected_at)) {

@@ -50,6 +50,7 @@ final class RentalReservationService
                     $data->vehicleId,
                     $data->startAt,
                     $data->expectedEndAt,
+                    direction: $data->direction,
                 );
             }
 
@@ -95,6 +96,7 @@ final class RentalReservationService
                     $data->startAt,
                     $data->expectedEndAt,
                     excludeReservationId: (int) $reservation->getKey(),
+                    direction: $data->direction,
                 );
             }
 
@@ -130,19 +132,20 @@ final class RentalReservationService
                 "Invalid rental reservation status transition from {$old->value} to {$status->value}.",
             );
         }
-        if ($status === RentalReservationStatus::Confirmed && $reservation->vehicle_id !== null) {
-            $this->availability->assertAvailable(
-                (int) $reservation->tenant_id,
-                $reservation->organization_unit_id,
-                (int) $reservation->vehicle_id,
-                $reservation->start_at->toDateTimeString(),
-                $reservation->expected_end_at->toDateTimeString(),
-                excludeReservationId: (int) $reservation->getKey(),
-            );
-        }
 
         return DB::transaction(function () use ($reservation, $status, $old, $changedBy, $reason): RentalReservation {
             $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            if ($status === RentalReservationStatus::Confirmed && $reservation->vehicle_id !== null) {
+                $this->availability->assertAvailable(
+                    (int) $reservation->tenant_id,
+                    $reservation->organization_unit_id,
+                    (int) $reservation->vehicle_id,
+                    $reservation->start_at->toDateTimeString(),
+                    $reservation->expected_end_at->toDateTimeString(),
+                    excludeReservationId: (int) $reservation->getKey(),
+                    direction: $reservation->direction,
+                );
+            }
             $reservation->forceFill(['status' => $status->value, 'updated_by' => $changedBy])->save();
             $this->recordStatus($reservation, $old, $status, $changedBy, $reason);
 
@@ -151,7 +154,7 @@ final class RentalReservationService
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function paginate(
         int $tenantId,

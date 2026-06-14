@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementVehicleController;
+use Modules\VehicleRental\Http\Controllers\RentalAgreementVehicleLinkController;
 use Modules\VehicleRental\Http\Controllers\RentalAvailabilityController;
 use Modules\VehicleRental\Http\Controllers\RentalChargeController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
@@ -12,6 +13,7 @@ use Modules\VehicleRental\Http\Controllers\RentalInspectionController;
 use Modules\VehicleRental\Http\Controllers\RentalInvoiceController;
 use Modules\VehicleRental\Http\Controllers\RentalPaymentController;
 use Modules\VehicleRental\Http\Controllers\RentalReservationController;
+use Modules\VehicleRental\Http\Controllers\RentalRunningChartController;
 use Modules\VehicleRental\Http\Controllers\RentalUsageController;
 
 $middleware = [
@@ -24,6 +26,11 @@ $middleware = [
 
 Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.vehicle-rental.')->group(function (): void {
     Route::get('availability', [RentalAvailabilityController::class, 'index'])->name('availability.index');
+    Route::get('running-chart/agreements', [RentalRunningChartController::class, 'agreements'])->name('running-chart.agreements');
+    Route::get('running-chart/context', [RentalRunningChartController::class, 'context'])->name('running-chart.context');
+    Route::post('agreement-vehicle-links', [RentalAgreementVehicleLinkController::class, 'store'])->name('agreement-vehicle-links.store');
+    Route::patch('agreement-vehicle-links/{link}/cancel', [RentalAgreementVehicleLinkController::class, 'cancel'])
+        ->whereNumber('link')->name('agreement-vehicle-links.cancel');
 
     Route::get('reservations', [RentalReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations', [RentalReservationController::class, 'store'])->name('reservations.store');
@@ -53,6 +60,9 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::get('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'index'])->whereNumber('agreement')->name('usage.index');
     Route::post('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('agreement')->name('usage.store');
     Route::post('agreements/{agreement}/usage-logs/{usageLog}/events', [RentalUsageController::class, 'storeEvent'])->whereNumber(['agreement', 'usageLog'])->name('usage.events.store');
+    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/submit', [RentalUsageController::class, 'submit'])->whereNumber(['agreement', 'usageLog'])->name('usage.submit');
+    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/approve', [RentalUsageController::class, 'approve'])->whereNumber(['agreement', 'usageLog'])->name('usage.approve');
+    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/reject', [RentalUsageController::class, 'reject'])->whereNumber(['agreement', 'usageLog'])->name('usage.reject');
 
     Route::get('agreements/{agreement}/expenses', [RentalExpenseController::class, 'index'])->whereNumber('agreement')->name('expenses.index');
     Route::post('agreements/{agreement}/expenses', [RentalExpenseController::class, 'store'])->whereNumber('agreement')->name('expenses.store');
@@ -60,6 +70,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::patch('agreements/{agreement}/expenses/{expense}/reject', [RentalExpenseController::class, 'reject'])->whereNumber(['agreement', 'expense'])->name('expenses.reject');
 
     Route::get('agreements/{agreement}/charges', [RentalChargeController::class, 'index'])->whereNumber('agreement')->name('charges.index');
+    Route::post('agreements/{agreement}/charges/preview', [RentalChargeController::class, 'preview'])->whereNumber('agreement')->name('charges.preview');
     Route::post('agreements/{agreement}/charges/generate', [RentalChargeController::class, 'generate'])->whereNumber('agreement')->name('charges.generate');
     Route::patch('agreements/{agreement}/charges/approve', [RentalChargeController::class, 'approveAll'])->whereNumber('agreement')->name('charges.approve');
 

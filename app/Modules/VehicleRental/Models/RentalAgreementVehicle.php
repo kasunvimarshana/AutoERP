@@ -26,6 +26,7 @@ final class RentalAgreementVehicle extends CoreModel
             'organization_unit_id' => 'integer',
             'agreement_id' => 'integer',
             'vehicle_id' => 'integer',
+            'replaces_agreement_vehicle_id' => 'integer',
             'owner_party_type' => RentalPartyType::class,
             'owner_party_id' => 'integer',
             'allocated_from' => 'datetime',
@@ -33,6 +34,8 @@ final class RentalAgreementVehicle extends CoreModel
             'start_odometer' => 'decimal:6',
             'end_odometer' => 'decimal:6',
             'status' => RentalAgreementVehicleStatus::class,
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
         ];
     }
 
@@ -44,6 +47,16 @@ final class RentalAgreementVehicle extends CoreModel
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
+
+    public function replacedAllocation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaces_agreement_vehicle_id');
+    }
+
+    public function replacementAllocations(): HasMany
+    {
+        return $this->hasMany(self::class, 'replaces_agreement_vehicle_id');
     }
 
     public function pickupInspection(): HasOne
@@ -59,5 +72,15 @@ final class RentalAgreementVehicle extends CoreModel
     public function usageLogs(): HasMany
     {
         return $this->hasMany(RentalUsageLog::class, 'agreement_vehicle_id');
+    }
+
+    public function inboundLinks(): HasMany
+    {
+        return $this->hasMany(RentalAgreementVehicleLink::class, 'inbound_agreement_vehicle_id');
+    }
+
+    public function outboundLinks(): HasMany
+    {
+        return $this->hasMany(RentalAgreementVehicleLink::class, 'outbound_agreement_vehicle_id');
     }
 }

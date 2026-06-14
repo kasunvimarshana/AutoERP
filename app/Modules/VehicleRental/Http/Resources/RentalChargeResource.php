@@ -13,6 +13,7 @@ final class RentalChargeResource extends RentalResource
         return [
             'id' => (int) $this->getKey(),
             'charge_calculation_id' => $this->charge_calculation_id,
+            'financial_side' => $this->enum($this->financial_side),
             'charge_type' => $this->charge_type,
             'description' => $this->description,
             'quantity' => (string) $this->quantity,
@@ -20,6 +21,8 @@ final class RentalChargeResource extends RentalResource
             'amount' => (string) $this->amount,
             'discount_amount' => (string) $this->discount_amount,
             'tax_amount' => (string) $this->tax_amount,
+            'withholding_amount' => (string) $this->withholding_amount,
+            'tax_group_id' => $this->tax_group_id,
             'total_amount' => (string) $this->total_amount,
             'invoice_status' => $this->enum($this->invoice_status),
             'status' => $this->enum($this->status),

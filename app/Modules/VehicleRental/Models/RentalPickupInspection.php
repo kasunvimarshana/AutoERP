@@ -31,7 +31,18 @@ final class RentalPickupInspection extends CoreModel
         ];
     }
 
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
-    public function agreementVehicle(): BelongsTo { return $this->belongsTo(RentalAgreementVehicle::class, 'agreement_vehicle_id'); }
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function agreementVehicle(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreementVehicle::class, 'agreement_vehicle_id');
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
 }

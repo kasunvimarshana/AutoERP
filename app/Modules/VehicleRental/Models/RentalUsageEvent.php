@@ -21,14 +21,14 @@ final class RentalUsageEvent extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'usage_log_id' => 'integer',
-            'agreement_id' => 'integer',
             'event_type' => RentalUsageEventType::class,
             'quantity' => 'decimal:6',
-            'rate_snapshot' => 'decimal:6',
-            'amount' => 'decimal:6',
+            'created_by' => 'integer',
         ];
     }
 
-    public function usageLog(): BelongsTo { return $this->belongsTo(RentalUsageLog::class, 'usage_log_id'); }
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
+    public function usageLog(): BelongsTo
+    {
+        return $this->belongsTo(RentalUsageLog::class, 'usage_log_id');
+    }
 }

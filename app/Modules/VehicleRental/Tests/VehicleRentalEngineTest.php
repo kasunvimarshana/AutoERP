@@ -12,6 +12,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Reporting\Services\ReportCatalog;
+use Modules\Reporting\Services\ReportQueryBuilder;
 use Modules\VehicleRental\DTOs\RentalAgreementData;
 use Modules\VehicleRental\DTOs\RentalAgreementVehicleData;
 use Modules\VehicleRental\DTOs\RentalExpenseData;
@@ -23,6 +24,7 @@ use Modules\VehicleRental\DTOs\RentalUsageLogData;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
+use Modules\VehicleRental\Enums\RentalExpenseFinancialTreatment;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RentalPartyType;
@@ -32,8 +34,8 @@ use Modules\VehicleRental\Enums\RentalType;
 use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
+use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalInvoiceLink;
-use Modules\VehicleRental\Models\RentalPaymentLink;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\RentalAgreementVehicleService;
 use Modules\VehicleRental\Services\RentalAvailabilityService;
@@ -152,19 +154,24 @@ final class VehicleRentalEngineTest extends TestCase
             endTime: '18:00',
             tripFrom: 'Colombo',
             tripTo: 'Galle',
-            status: RentalUsageLogStatus::Approved,
         ));
         $event = app(RentalUsageEventService::class)->create($usage, new RentalUsageEventData(
             RentalUsageEventType::Overtime,
             '2.000000',
         ));
+        app(RentalUsageLogService::class)->changeStatus($usage, RentalUsageLogStatus::Submitted);
+        $usage = app(RentalUsageLogService::class)->changeStatus(
+            $usage->refresh(),
+            RentalUsageLogStatus::Approved,
+        );
         $expense = app(RentalExpenseService::class)->create($agreement, new RentalExpenseData(
             RentalExpenseType::Fuel,
+            '2026-06-02',
             '30.000000',
-            true,
+            RentalExpenseFinancialTreatment::CustomerBillable,
             (int) $usage->getKey(),
-            status: RentalExpenseStatus::Approved,
         ));
+        app(RentalExpenseService::class)->changeStatus($expense, RentalExpenseStatus::Approved);
         $return = app(RentalReturnService::class)->save($agreement, $allocation->refresh(), new RentalInspectionData(
             inspectedAt: '2026-06-03 08:00:00',
             odometer: '1100.000000',
@@ -174,18 +181,28 @@ final class VehicleRentalEngineTest extends TestCase
             isDamageBillable: true,
         ));
         app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Returned);
-        $charges = app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
+        $calculator = app(RentalChargeCalculationService::class);
+        $preview = $calculator->preview($agreement->refresh());
+
+        $this->assertSame('390.000000', app(DecimalMath::class)->sum(
+            $preview->pluck('total_amount')->map(fn ($value): string => (string) $value)->all(),
+        ));
+        $this->assertDatabaseCount('rental_charge_calculations', 0);
+        $this->assertDatabaseCount('rental_charges', 0);
+        $this->assertSame(RentalExpenseStatus::Approved, $expense->refresh()->status);
+
+        $charges = $calculator->calculate($agreement->refresh());
 
         $this->assertSame('100.000000', (string) $usage->distance_km);
         $this->assertSame('100.000000', (string) $usage->cumulative_km);
-        $this->assertSame('20.000000', (string) $event->amount);
+        $this->assertSame('2.000000', (string) $event->quantity);
         $this->assertSame('1100.000000', (string) $return->odometer);
         $this->assertSame(RentalExpenseStatus::Charged, $expense->refresh()->status);
         $this->assertSame(
-            ['base_rental', 'damage', 'extra_hour', 'extra_km', 'fuel', 'overtime'],
+            ['base_rental', 'damage', 'extra_km', 'fuel', 'overtime'],
             $charges->pluck('charge_type')->sort()->values()->all(),
         );
-        $this->assertSame('400.000000', app(DecimalMath::class)->sum(
+        $this->assertSame('390.000000', app(DecimalMath::class)->sum(
             $charges->pluck('total_amount')->map(fn ($value): string => (string) $value)->all(),
         ));
         $this->assertSame($charges->count(), $agreement->chargeCalculations()->count());
@@ -322,7 +339,8 @@ final class VehicleRentalEngineTest extends TestCase
 
     public function test_reporting_catalog_contains_all_vehicle_rental_reports(): void
     {
-        $keys = collect(app(ReportCatalog::class)->index())
+        $catalog = app(ReportCatalog::class);
+        $keys = collect($catalog->index())
             ->where('group', 'Vehicle Rental')
             ->pluck('key')
             ->sort()
@@ -332,23 +350,52 @@ final class VehicleRentalEngineTest extends TestCase
         $this->assertSame([
             'vehicle-rental.active-rentals',
             'vehicle-rental.agreement-register',
+            'vehicle-rental.allocation-history',
             'vehicle-rental.charges',
+            'vehicle-rental.customer-ageing',
             'vehicle-rental.customer-outstanding',
+            'vehicle-rental.day-night-out-summary',
             'vehicle-rental.deposit-liability',
+            'vehicle-rental.deposit-refund',
+            'vehicle-rental.document-expiry',
+            'vehicle-rental.expense-recovery',
             'vehicle-rental.fleet-availability',
             'vehicle-rental.inbound-cost',
+            'vehicle-rental.mileage-summary',
             'vehicle-rental.overdue-rentals',
+            'vehicle-rental.overtime-summary',
             'vehicle-rental.owner-payable',
+            'vehicle-rental.owner-payable-ageing',
+            'vehicle-rental.partially-invoiced',
+            'vehicle-rental.payment-allocation',
             'vehicle-rental.profitability',
             'vehicle-rental.revenue',
             'vehicle-rental.revenue-licence-expiry',
             'vehicle-rental.running-chart',
+            'vehicle-rental.running-chart-customer',
+            'vehicle-rental.running-chart-monthly',
+            'vehicle-rental.running-chart-owner',
+            'vehicle-rental.tax-withholding-traceability',
+            'vehicle-rental.uninvoiced-revenue',
+            'vehicle-rental.unprocessed-payable-cost',
             'vehicle-rental.usage-summary',
             'vehicle-rental.vehicle-utilization',
         ], $keys);
+
+        $context = $this->context();
+        $queries = app(ReportQueryBuilder::class);
+        foreach ($keys as $key) {
+            $rows = $queries->query(
+                $catalog->get($key),
+                $context['tenant_id'],
+                $context['organization_unit_id'],
+                [],
+            )->limit(1)->get();
+            $this->assertLessThanOrEqual(1, $rows->count(), $key);
+        }
     }
 
-    /** @return array{0: RentalAgreement, 1: \Modules\VehicleRental\Models\RentalAgreementVehicle} */
+    /** @return array{0: RentalAgreement, 1: RentalAgreementVehicle} */
     private function activeAgreement(array $context, string $number = 'AGR-LIFECYCLE'): array
     {
         $agreement = $this->agreement($context, RentalAgreementDirection::Outbound, $number);
@@ -494,8 +541,7 @@ final class VehicleRentalEngineTest extends TestCase
         string $code,
         int $organizationUnitId,
         string $odometer = '1000.000000',
-    ): int
-    {
+    ): int {
         return (int) DB::table('vehicles')->insertGetId([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,

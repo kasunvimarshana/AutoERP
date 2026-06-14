@@ -229,6 +229,7 @@ export function AppRouter() {
                     <Route path="/vehicle-rental/reservations" element={<RentalReservationListPage />} />
                     <Route path="/vehicle-rental/reservations/create" element={<RentalReservationCreatePage />} />
                     <Route path="/vehicle-rental/agreements" element={<RentalAgreementListPage />} />
+                    <Route path="/vehicle-rental/running-chart" element={<UsageLogPage />} />
                     <Route path="/vehicle-rental/agreements/create" element={<RentalAgreementCreatePage />} />
                     <Route path="/vehicle-rental/availability" element={<VehicleAvailabilityPage />} />
                     <Route path="/vehicle-rental/reports" element={<RentalReportsPage />} />

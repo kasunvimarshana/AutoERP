@@ -16,6 +16,9 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('reservation_id')->nullable()->constrained('rental_reservations')->cascadeOnDelete();
             $table->foreignId('agreement_id')->nullable()->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->cascadeOnDelete();
+            $table->foreignId('expense_id')->nullable()->constrained('rental_expenses')->cascadeOnDelete();
+            $table->foreignId('charge_id')->nullable()->constrained('rental_charges')->cascadeOnDelete();
             $table->string('entity_type', 20);
             $table->string('old_status', 30)->nullable();
             $table->string('new_status', 30);
@@ -27,6 +30,9 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_status_histories_tenant_org_idx');
             $table->index(['reservation_id', 'changed_at'], 'rental_status_histories_reservation_idx');
             $table->index(['agreement_id', 'changed_at'], 'rental_status_histories_agreement_idx');
+            $table->index(['usage_log_id', 'changed_at'], 'rental_status_histories_usage_idx');
+            $table->index(['expense_id', 'changed_at'], 'rental_status_histories_expense_idx');
+            $table->index(['charge_id', 'changed_at'], 'rental_status_histories_charge_idx');
         });
     }
 

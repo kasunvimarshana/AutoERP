@@ -12,7 +12,7 @@ use Modules\VehicleRental\Enums\RentalType;
 final readonly class RentalAgreementData
 {
     /**
-     * @param array<string, mixed>|null $termsSnapshot
+     * @param  array<string, mixed>|null  $termsSnapshot
      */
     public function __construct(
         public int $tenantId,

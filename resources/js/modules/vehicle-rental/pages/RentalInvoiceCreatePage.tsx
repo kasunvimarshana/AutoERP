@@ -48,7 +48,7 @@ export default function RentalInvoiceCreatePage() {
 
     return (
         <>
-            <ContentHeader title={`Rental invoice / ${agreement.data.agreement_number}`} description={`Creates an ${agreement.data.direction} rental invoice through the existing Invoice module.`} />
+            <ContentHeader title={`${agreement.data.direction === 'outbound' ? 'Customer rental invoice' : 'Supplier rental payable'} / ${agreement.data.agreement_number}`} description={`Creates an ${agreement.data.direction} document through the existing Invoice module.`} />
             <ErrorAlert error={error ?? agreement.error ?? charges.error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <DataTable rows={charges.data ?? []} rowKey={(row) => row.id} columns={[
@@ -92,7 +92,7 @@ export default function RentalInvoiceCreatePage() {
                                 } finally {
                                     setBusy(false);
                                 }
-                            }}>Create invoice</Button>
+                            }}>{agreement.data.direction === 'outbound' ? 'Create customer invoice' : 'Create supplier payable'}</Button>
                         </div>
                         {preview && <DetailGrid items={[
                             { label: 'Subtotal', value: preview.subtotal },

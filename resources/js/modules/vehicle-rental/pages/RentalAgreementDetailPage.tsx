@@ -159,7 +159,7 @@ export default function RentalAgreementDetailPage() {
                     </Panel>
                     <Panel title="Workspaces">
                         <div className="grid gap-2">
-                            <Link to={`/vehicle-rental/agreements/${agreement.id}/usage`}><Button type="button" variant="secondary" className="w-full">Running chart</Button></Link>
+                            <Link to={`/vehicle-rental/agreements/${agreement.id}/usage`}><Button type="button" variant="secondary" className="w-full">Open in common running chart</Button></Link>
                             <Link to={`/vehicle-rental/agreements/${agreement.id}/expenses`}><Button type="button" variant="secondary" className="w-full">Expenses</Button></Link>
                             <Link to={`/vehicle-rental/agreements/${agreement.id}/charges`}><Button type="button" variant="secondary" className="w-full">Charge preview</Button></Link>
                             {['returned', 'completed'].includes(agreement.status) && <Link to={`/vehicle-rental/agreements/${agreement.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>}

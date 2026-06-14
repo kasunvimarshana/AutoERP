@@ -28,6 +28,7 @@ use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateSnapshot;
+use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RentalStatusHistory;
 use RuntimeException;
@@ -142,6 +143,7 @@ final class RentalAgreementService
                         ($allocation->allocated_to ?? $agreement->expected_end_at)->toDateTimeString(),
                         excludeAgreementId: (int) $agreement->getKey(),
                         excludeReservationId: $agreement->reservation_id,
+                        direction: $agreement->direction,
                     );
                     if ($allocation->vehicle?->status === VehicleStatus::Active) {
                         $this->vehicleStatuses->changeTo(
@@ -188,12 +190,26 @@ final class RentalAgreementService
             if ($status === RentalAgreementStatus::Cancelled) {
                 foreach ($agreement->vehicles as $allocation) {
                     if (in_array($allocation->vehicle?->status, [VehicleStatus::Reserved, VehicleStatus::Rented], true)) {
-                        $this->vehicleStatuses->changeTo(
-                            $allocation->vehicle,
-                            VehicleStatus::Active,
-                            $changedBy,
-                            'Rental agreement '.$agreement->agreement_number.' cancelled',
-                        );
+                        $hasOtherBlockingAllocation = RentalAgreementVehicle::query()
+                            ->where('vehicle_id', $allocation->vehicle_id)
+                            ->where('agreement_id', '!=', $agreement->getKey())
+                            ->whereNotIn('status', [
+                                RentalAgreementVehicleStatus::Replaced->value,
+                                RentalAgreementVehicleStatus::Returned->value,
+                            ])
+                            ->whereHas('agreement', fn (Builder $query) => $query->whereIn('status', [
+                                RentalAgreementStatus::Confirmed->value,
+                                RentalAgreementStatus::Active->value,
+                            ]))
+                            ->exists();
+                        if (! $hasOtherBlockingAllocation) {
+                            $this->vehicleStatuses->changeTo(
+                                $allocation->vehicle,
+                                VehicleStatus::Active,
+                                $changedBy,
+                                'Rental agreement '.$agreement->agreement_number.' cancelled',
+                            );
+                        }
                     }
                 }
             }
@@ -208,7 +224,7 @@ final class RentalAgreementService
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function paginate(
         int $tenantId,
@@ -263,10 +279,21 @@ final class RentalAgreementService
             'vehicles.vehicle.model',
             'vehicles.pickupInspection',
             'vehicles.returnInspection',
-            'usageLogs.driver',
-            'usageLogs.events',
+            'operationalUsageLogs.driver',
+            'operationalUsageLogs.events',
+            'operationalUsageLogs.contexts.agreement.customer',
+            'operationalUsageLogs.contexts.agreement.supplier',
+            'operationalUsageLogs.contexts.rateSnapshot',
             'expenses',
             'charges',
+            'inboundVehicleLinks.inboundAgreement.supplier',
+            'inboundVehicleLinks.outboundAgreement.customer',
+            'inboundVehicleLinks.vehicle.make',
+            'inboundVehicleLinks.vehicle.model',
+            'outboundVehicleLinks.inboundAgreement.supplier',
+            'outboundVehicleLinks.outboundAgreement.customer',
+            'outboundVehicleLinks.vehicle.make',
+            'outboundVehicleLinks.vehicle.model',
             'invoiceLinks.invoice.balance',
             'paymentLinks.payment',
             'paymentLinks.invoice',

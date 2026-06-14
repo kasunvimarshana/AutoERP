@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use Modules\VehicleRental\Enums\RentalChargeInvoiceStatus;
 use Modules\VehicleRental\Enums\RentalChargeStatus;
+use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
 final class RentalCharge extends CoreModel
@@ -24,18 +25,32 @@ final class RentalCharge extends CoreModel
             'organization_unit_id' => 'integer',
             'agreement_id' => 'integer',
             'charge_calculation_id' => 'integer',
+            'financial_side' => RentalFinancialSide::class,
             'quantity' => 'decimal:6',
             'rate' => 'decimal:6',
             'amount' => 'decimal:6',
             'discount_amount' => 'decimal:6',
             'tax_amount' => 'decimal:6',
+            'withholding_amount' => 'decimal:6',
+            'tax_group_id' => 'integer',
             'total_amount' => 'decimal:6',
             'invoice_status' => RentalChargeInvoiceStatus::class,
             'status' => RentalChargeStatus::class,
         ];
     }
 
-    public function agreement(): BelongsTo { return $this->belongsTo(RentalAgreement::class, 'agreement_id'); }
-    public function calculation(): BelongsTo { return $this->belongsTo(RentalChargeCalculation::class, 'charge_calculation_id'); }
-    public function invoiceLinks(): HasMany { return $this->hasMany(RentalInvoiceLink::class, 'charge_id'); }
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function calculation(): BelongsTo
+    {
+        return $this->belongsTo(RentalChargeCalculation::class, 'charge_calculation_id');
+    }
+
+    public function invoiceLinks(): HasMany
+    {
+        return $this->hasMany(RentalInvoiceLink::class, 'charge_id');
+    }
 }

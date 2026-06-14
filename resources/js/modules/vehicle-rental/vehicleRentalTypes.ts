@@ -69,9 +69,21 @@ export interface RentalUsageEvent {
     id: number;
     event_type: string;
     quantity: string;
-    rate_snapshot: string;
-    amount: string;
     remarks?: string | null;
+}
+
+export interface RentalUsageContext {
+    id: number;
+    agreement_id: number;
+    agreement_vehicle_id: number;
+    agreement_vehicle_link_id?: number | null;
+    agreement_number?: string | null;
+    agreement_direction: RentalDirection;
+    financial_side: 'revenue' | 'cost';
+    party_type: RentalPartyType;
+    party_id: number;
+    party?: NamedResource | null;
+    rate_snapshot?: RentalRateSnapshot | null;
 }
 
 export interface RentalUsageLog {
@@ -84,10 +96,11 @@ export interface RentalUsageLog {
     usage_date: string;
     start_time?: string | null;
     end_time?: string | null;
+    working_minutes: number;
     start_odometer: string;
     end_odometer: string;
     distance_km: string;
-    cumulative_km: string;
+    cumulative_km?: string | null;
     comparative_km?: string | null;
     trip_from?: string | null;
     trip_to?: string | null;
@@ -95,14 +108,23 @@ export interface RentalUsageLog {
     status: 'draft' | 'submitted' | 'approved' | 'rejected';
     remarks?: string | null;
     events: RentalUsageEvent[];
+    contexts: RentalUsageContext[];
 }
 
 export interface RentalExpense {
     id: number;
     usage_log_id?: number | null;
     expense_type: string;
+    expense_date: string;
+    currency_id?: number | null;
     amount: string;
+    tax_group_id?: number | null;
+    tax_amount: string;
+    financial_treatment: 'company_borne' | 'customer_billable' | 'supplier_recoverable' | 'employee_reimbursable' | 'owner_payable';
     is_billable: boolean;
+    is_recoverable: boolean;
+    is_reimbursable: boolean;
+    charge_generation_status: string;
     receipt_no?: string | null;
     reference_no?: string | null;
     description?: string | null;
@@ -111,6 +133,7 @@ export interface RentalExpense {
 
 export interface RentalCharge {
     id: number;
+    financial_side: 'revenue' | 'cost';
     charge_type: string;
     description: string;
     quantity: string;
@@ -118,6 +141,8 @@ export interface RentalCharge {
     amount: string;
     discount_amount: string;
     tax_amount: string;
+    withholding_amount: string;
+    tax_group_id?: number | null;
     total_amount: string;
     invoice_status: 'not_invoiced' | 'partially_invoiced' | 'invoiced';
     status: 'draft' | 'approved' | 'cancelled';
@@ -188,6 +213,71 @@ export interface RentalAgreement {
     charges: RentalCharge[];
     invoice_links: RentalInvoiceLink[];
     payment_links: RentalPaymentLink[];
+    vehicle_links: RentalAgreementVehicleLink[];
+}
+
+export interface RentalAgreementVehicleLink {
+    id: number;
+    vehicle_id: number;
+    inbound_agreement_id: number;
+    inbound_agreement_vehicle_id: number;
+    outbound_agreement_id: number;
+    outbound_agreement_vehicle_id: number;
+    effective_from: string;
+    effective_to: string;
+    status: 'active' | 'cancelled';
+    remarks?: string | null;
+}
+
+export interface RunningChartAgreementOption {
+    agreement_id: number;
+    agreement_vehicle_id: number;
+    agreement_number: string;
+    direction: RentalDirection;
+    party_type: RentalPartyType;
+    party_id: number;
+    party_name?: string | null;
+    vehicle_id: number;
+    vehicle_registration?: string | null;
+    rental_type: RentalType;
+    billing_cycle: string;
+    start_at: string;
+    expected_end_at: string;
+    allocation_from: string;
+    allocation_to?: string | null;
+    status: RentalAgreementStatus;
+    counterpart_agreement_id?: number | null;
+    counterpart_agreement_number?: string | null;
+    counterpart_direction?: RentalDirection | null;
+}
+
+export interface RunningChartResolvedContext {
+    agreement_id: number;
+    agreement_vehicle_id: number;
+    agreement_number: string;
+    direction: RentalDirection;
+    financial_side: 'revenue' | 'cost';
+    party_type: RentalPartyType;
+    party_id: number;
+    party_name?: string | null;
+    billing_cycle: string;
+    currency_id?: number | null;
+    rate_snapshot: RentalRateSnapshot;
+}
+
+export interface RunningChartContext {
+    vehicle_id: number;
+    vehicle?: {
+        id: number;
+        vehicle_number: string;
+        registration_number?: string | null;
+        odometer_reading: string;
+    } | null;
+    selected_agreement_id: number;
+    agreement_vehicle_link_id?: number | null;
+    last_valid_finish_odometer: string;
+    approved_cumulative_mileage: string;
+    contexts: RunningChartResolvedContext[];
 }
 
 export interface RentalAvailabilityRow {

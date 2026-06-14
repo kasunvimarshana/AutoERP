@@ -24,10 +24,11 @@ final class RentalUsageLogResource extends RentalResource
             'usage_date' => $this->usage_date?->toDateString(),
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
+            'working_minutes' => (int) $this->working_minutes,
             'start_odometer' => (string) $this->start_odometer,
             'end_odometer' => (string) $this->end_odometer,
             'distance_km' => (string) $this->distance_km,
-            'cumulative_km' => (string) $this->cumulative_km,
+            'cumulative_km' => $this->cumulative_km === null ? null : (string) $this->cumulative_km,
             'comparative_km' => $this->comparative_km === null ? null : (string) $this->comparative_km,
             'trip_from' => $this->trip_from,
             'trip_to' => $this->trip_to,
@@ -37,6 +38,7 @@ final class RentalUsageLogResource extends RentalResource
             'approved_at' => $this->approved_at?->toISOString(),
             'remarks' => $this->remarks,
             'events' => $this->whenLoaded('events', fn () => RentalUsageEventResource::collection($this->events)->resolve($request), []),
+            'contexts' => $this->whenLoaded('contexts', fn () => RentalUsageContextResource::collection($this->contexts)->resolve($request), []),
         ];
     }
 }

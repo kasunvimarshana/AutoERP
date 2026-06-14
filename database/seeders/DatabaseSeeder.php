@@ -19,6 +19,7 @@ use Modules\Tenant\Database\Seeders\TenantSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
 use Modules\User\Database\Seeders\UserSeeder;
 use Modules\Vehicle\Database\Seeders\VehicleSeeder;
+use Modules\VehicleRental\Database\Seeders\VehicleRentalSeeder;
 use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
 
 class DatabaseSeeder extends Seeder
@@ -46,6 +47,7 @@ class DatabaseSeeder extends Seeder
             SupplierSeeder::class,
             CustomerSeeder::class,
             VehicleSeeder::class,
+            VehicleRentalSeeder::class,
             HrSeeder::class,
         ]);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -88,9 +89,37 @@ final class RentalAgreement extends CoreModel
         return $this->hasMany(RentalUsageLog::class, 'agreement_id')->orderBy('usage_date');
     }
 
-    public function usageEvents(): HasMany
+    public function operationalUsageLogs(): BelongsToMany
     {
-        return $this->hasMany(RentalUsageEvent::class, 'agreement_id');
+        return $this->belongsToMany(
+            RentalUsageLog::class,
+            'rental_usage_contexts',
+            'agreement_id',
+            'usage_log_id',
+        )->withPivot([
+            'agreement_vehicle_id',
+            'agreement_vehicle_link_id',
+            'rate_snapshot_id',
+            'agreement_direction',
+            'financial_side',
+            'party_type',
+            'party_id',
+        ])->withTimestamps()->orderBy('usage_date');
+    }
+
+    public function usageContexts(): HasMany
+    {
+        return $this->hasMany(RentalUsageContext::class, 'agreement_id');
+    }
+
+    public function inboundVehicleLinks(): HasMany
+    {
+        return $this->hasMany(RentalAgreementVehicleLink::class, 'inbound_agreement_id');
+    }
+
+    public function outboundVehicleLinks(): HasMany
+    {
+        return $this->hasMany(RentalAgreementVehicleLink::class, 'outbound_agreement_id');
     }
 
     public function expenses(): HasMany

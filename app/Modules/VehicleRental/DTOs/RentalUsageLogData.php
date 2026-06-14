@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\DTOs;
 
-use Modules\VehicleRental\Enums\RentalUsageLogStatus;
-
 final readonly class RentalUsageLogData
 {
     public function __construct(
@@ -20,8 +18,8 @@ final readonly class RentalUsageLogData
         public ?string $tripFrom = null,
         public ?string $tripTo = null,
         public ?string $tripPurpose = null,
-        public RentalUsageLogStatus $status = RentalUsageLogStatus::Draft,
+        public ?string $odometerVarianceReason = null,
         public ?string $remarks = null,
-        public ?int $approvedBy = null,
+        public ?int $createdBy = null,
     ) {}
 }

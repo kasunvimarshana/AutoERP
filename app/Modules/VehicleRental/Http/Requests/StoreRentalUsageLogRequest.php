@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Requests;
 
-use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\DTOs\RentalUsageLogData;
-use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 
 final class StoreRentalUsageLogRequest extends TenantScopedRequest
 {
@@ -27,7 +25,7 @@ final class StoreRentalUsageLogRequest extends TenantScopedRequest
             'trip_from' => ['nullable', 'string', 'max:255'],
             'trip_to' => ['nullable', 'string', 'max:255'],
             'trip_purpose' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', Rule::enum(RentalUsageLogStatus::class)],
+            'odometer_variance_reason' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string'],
         ];
     }
@@ -46,9 +44,11 @@ final class StoreRentalUsageLogRequest extends TenantScopedRequest
             tripFrom: $this->filled('trip_from') ? (string) $this->input('trip_from') : null,
             tripTo: $this->filled('trip_to') ? (string) $this->input('trip_to') : null,
             tripPurpose: $this->filled('trip_purpose') ? (string) $this->input('trip_purpose') : null,
-            status: RentalUsageLogStatus::from((string) $this->input('status', 'draft')),
+            odometerVarianceReason: $this->filled('odometer_variance_reason')
+                ? (string) $this->input('odometer_variance_reason')
+                : null,
             remarks: $this->filled('remarks') ? (string) $this->input('remarks') : null,
-            approvedBy: $this->currentUserId(),
+            createdBy: $this->currentUserId(),
         );
     }
 }

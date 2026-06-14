@@ -38,6 +38,7 @@ final class StoreRentalAgreementVehicleRequest extends TenantScopedRequest
                 : null,
             ownerPartyId: $this->filled('owner_party_id') ? (int) $this->input('owner_party_id') : null,
             remarks: $this->filled('remarks') ? (string) $this->input('remarks') : null,
+            createdBy: $this->currentUserId(),
         );
     }
 }

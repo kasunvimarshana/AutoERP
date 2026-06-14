@@ -15,8 +15,6 @@ final class RentalUsageEventResource extends RentalResource
             'usage_log_id' => (int) $this->usage_log_id,
             'event_type' => $this->enum($this->event_type),
             'quantity' => (string) $this->quantity,
-            'rate_snapshot' => (string) $this->rate_snapshot,
-            'amount' => (string) $this->amount,
             'remarks' => $this->remarks,
         ];
     }

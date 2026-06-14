@@ -12,6 +12,7 @@ use Modules\VehicleRental\Http\Requests\RentalActionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalExpenseRequest;
 use Modules\VehicleRental\Http\Resources\RentalExpenseResource;
 use Modules\VehicleRental\Services\RentalExpenseService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalExpenseController extends RentalController
 {
@@ -38,13 +39,20 @@ final class RentalExpenseController extends RentalController
         int $agreement,
         int $expense,
         RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalExpenseResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::APPROVE_EXPENSES,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalExpenseResource($service->changeStatus(
             $this->expense($model, $expense),
             RentalExpenseStatus::Approved,
             $request->currentUserId(),
+            $request->input('reason'),
         ));
     }
 
@@ -53,13 +61,20 @@ final class RentalExpenseController extends RentalController
         int $agreement,
         int $expense,
         RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalExpenseResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::APPROVE_EXPENSES,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalExpenseResource($service->changeStatus(
             $this->expense($model, $expense),
             RentalExpenseStatus::Rejected,
             $request->currentUserId(),
+            $request->input('reason'),
         ));
     }
 }

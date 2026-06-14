@@ -58,6 +58,7 @@ final class RentalAgreementVehicleService
                 $data->allocatedTo ?? $agreement->expected_end_at->toDateTimeString(),
                 excludeAgreementId: (int) $agreement->getKey(),
                 excludeReservationId: $agreement->reservation_id,
+                direction: $agreement->direction,
             );
             if ($this->math->isNegative($data->startOdometer)) {
                 throw new InvalidArgumentException('Allocation start odometer cannot be negative.');
@@ -69,6 +70,7 @@ final class RentalAgreementVehicleService
                 'organization_unit_id' => $agreement->organization_unit_id,
                 'agreement_id' => $agreement->getKey(),
                 'vehicle_id' => $vehicle->getKey(),
+                'replaces_agreement_vehicle_id' => $data->replacesAgreementVehicleId,
                 'owner_party_type' => $data->ownerPartyType?->value,
                 'owner_party_id' => $data->ownerPartyId,
                 'allocated_from' => $data->allocatedFrom,
@@ -76,6 +78,8 @@ final class RentalAgreementVehicleService
                 'start_odometer' => $this->math->normalize($data->startOdometer),
                 'status' => RentalAgreementVehicleStatus::Allocated->value,
                 'remarks' => $data->remarks,
+                'created_by' => $data->createdBy,
+                'updated_by' => $data->createdBy,
             ]);
 
             if ($agreement->status === RentalAgreementStatus::Confirmed
@@ -120,7 +124,17 @@ final class RentalAgreementVehicleService
                 );
             }
 
-            $new = $this->createAllocation($agreement, $replacement);
+            $new = $this->createAllocation($agreement, new RentalAgreementVehicleData(
+                vehicleId: $replacement->vehicleId,
+                allocatedFrom: $replacement->allocatedFrom,
+                startOdometer: $replacement->startOdometer,
+                allocatedTo: $replacement->allocatedTo,
+                ownerPartyType: $replacement->ownerPartyType,
+                ownerPartyId: $replacement->ownerPartyId,
+                remarks: $replacement->remarks,
+                createdBy: $replacement->createdBy,
+                replacesAgreementVehicleId: (int) $current->getKey(),
+            ));
             if ($agreement->status === RentalAgreementStatus::Active) {
                 $this->vehicleStatuses->changeTo(
                     $new->vehicle,

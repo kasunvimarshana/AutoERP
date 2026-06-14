@@ -18,7 +18,6 @@ final class StoreRentalUsageEventRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'event_type' => ['required', Rule::enum(RentalUsageEventType::class)],
             'quantity' => ['required', 'decimal:0,6', 'gt:0'],
-            'rate' => ['nullable', 'decimal:0,6', 'min:0'],
             'remarks' => ['nullable', 'string'],
         ];
     }
@@ -28,8 +27,8 @@ final class StoreRentalUsageEventRequest extends TenantScopedRequest
         return new RentalUsageEventData(
             eventType: RentalUsageEventType::from((string) $this->input('event_type')),
             quantity: (string) $this->input('quantity'),
-            rate: $this->filled('rate') ? (string) $this->input('rate') : null,
             remarks: $this->filled('remarks') ? (string) $this->input('remarks') : null,
+            createdBy: $this->currentUserId(),
         );
     }
 }

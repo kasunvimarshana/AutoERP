@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Http\Requests\VehicleAvailabilityRequest;
 use Modules\VehicleRental\Services\RentalAvailabilityService;
 
@@ -41,6 +42,9 @@ final class RentalAvailabilityController
                 (string) $request->input('end_at'),
                 $request->filled('exclude_agreement_id') ? (int) $request->input('exclude_agreement_id') : null,
                 $request->filled('exclude_reservation_id') ? (int) $request->input('exclude_reservation_id') : null,
+                $request->filled('direction')
+                    ? RentalAgreementDirection::from((string) $request->input('direction'))
+                    : null,
             );
             $vehicle = $result['vehicle']->loadMissing(['make', 'model']);
             $rows[] = [

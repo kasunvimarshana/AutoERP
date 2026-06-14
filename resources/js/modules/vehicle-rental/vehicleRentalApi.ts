@@ -13,6 +13,8 @@ import type {
     RentalReservationCollection,
     RentalUsageEvent,
     RentalUsageLog,
+    RunningChartAgreementOption,
+    RunningChartContext,
 } from './vehicleRentalTypes';
 
 const endpoint = '/api/v1/vehicle-rental';
@@ -52,6 +54,20 @@ export const createRentalUsageLog = async (agreementId: number, payload: Record<
     (await apiClient.post<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs`, payload)).data.data;
 export const createRentalUsageEvent = async (agreementId: number, usageLogId: number, payload: Record<string, unknown>): Promise<RentalUsageEvent> =>
     (await apiClient.post<ApiResource<RentalUsageEvent>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events`, payload)).data.data;
+export const changeRentalUsageStatus = async (agreementId: number, usageLogId: number, status: 'submit' | 'approve' | 'reject', reason?: string): Promise<RentalUsageLog> =>
+    (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/${status}`, { reason })).data.data;
+export const listRunningChartAgreements = async (search = '', signal?: AbortSignal): Promise<RunningChartAgreementOption[]> =>
+    (await apiClient.get<ApiResource<RunningChartAgreementOption[]>>(`${endpoint}/running-chart/agreements`, { params: { search: search || undefined }, signal })).data.data;
+export const getRunningChartContext = async (params: {
+    agreement_id: number;
+    agreement_vehicle_id: number;
+    usage_date: string;
+    start_time?: string;
+}, signal?: AbortSignal): Promise<RunningChartContext> =>
+    (await apiClient.get<ApiResource<RunningChartContext>>(`${endpoint}/running-chart/context`, { params, signal })).data.data;
+export const createRentalAgreementVehicleLink = async (payload: Record<string, unknown>): Promise<void> => {
+    await apiClient.post(`${endpoint}/agreement-vehicle-links`, payload);
+};
 
 export const listRentalExpenses = async (agreementId: number, signal?: AbortSignal): Promise<RentalExpense[]> =>
     (await apiClient.get<ApiResource<RentalExpense[]>>(`${endpoint}/agreements/${agreementId}/expenses`, { signal })).data.data;
@@ -62,6 +78,8 @@ export const changeRentalExpenseStatus = async (agreementId: number, expenseId: 
 
 export const listRentalCharges = async (agreementId: number, signal?: AbortSignal): Promise<RentalCharge[]> =>
     (await apiClient.get<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges`, { signal })).data.data;
+export const previewRentalCharges = async (agreementId: number): Promise<RentalCharge[]> =>
+    (await apiClient.post<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges/preview`)).data.data;
 export const generateRentalCharges = async (agreementId: number, replace = false): Promise<RentalCharge[]> =>
     (await apiClient.post<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges/generate`, { replace })).data.data;
 export const approveRentalCharges = async (agreementId: number): Promise<RentalCharge[]> =>

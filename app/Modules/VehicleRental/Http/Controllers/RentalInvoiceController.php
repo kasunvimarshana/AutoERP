@@ -9,6 +9,7 @@ use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalInvoiceRequest;
 use Modules\VehicleRental\Http\Resources\RentalChargeResource;
 use Modules\VehicleRental\Services\RentalInvoiceIntegrationService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalInvoiceController extends RentalController
 {
@@ -28,7 +29,14 @@ final class RentalInvoiceController extends RentalController
         RentalInvoiceRequest $request,
         int $agreement,
         RentalInvoiceIntegrationService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::CREATE_FINANCIAL_DOCUMENTS,
+        );
+
         return response()->json(['data' => $service->preview(
             $this->agreement($request, $agreement),
             (string) $request->input('invoice_date'),
@@ -41,7 +49,13 @@ final class RentalInvoiceController extends RentalController
         RentalInvoiceRequest $request,
         int $agreement,
         RentalInvoiceIntegrationService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::CREATE_FINANCIAL_DOCUMENTS,
+        );
         $invoice = $service->create(
             $this->agreement($request, $agreement),
             (string) $request->input('invoice_date'),

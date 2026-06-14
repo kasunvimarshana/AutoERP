@@ -35,7 +35,10 @@ abstract class RentalController
 
     protected function usageLog(RentalAgreement $agreement, int $id): RentalUsageLog
     {
-        return $agreement->usageLogs()->findOrFail($id);
+        return RentalUsageLog::query()
+            ->whereKey($id)
+            ->whereHas('contexts', fn ($query) => $query->where('agreement_id', $agreement->getKey()))
+            ->firstOrFail();
     }
 
     protected function expense(RentalAgreement $agreement, int $id): RentalExpense

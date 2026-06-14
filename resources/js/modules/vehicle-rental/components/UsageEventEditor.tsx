@@ -16,7 +16,7 @@ export function UsageEventEditor({ agreementId, usageLogId, onSaved }: {
     usageLogId: number;
     onSaved: (event: RentalUsageEvent) => void;
 }) {
-    const [form, setForm] = useState({ event_type: 'extra_km', quantity: '1.000000', rate: '', remarks: '' });
+    const [form, setForm] = useState({ event_type: 'overtime', quantity: '1.000000', remarks: '' });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
@@ -30,7 +30,6 @@ export function UsageEventEditor({ agreementId, usageLogId, onSaved }: {
                 try {
                     const saved = await createRentalUsageEvent(agreementId, usageLogId, {
                         ...form,
-                        rate: form.rate || undefined,
                         remarks: form.remarks || undefined,
                     });
                     onSaved(saved);
@@ -43,7 +42,6 @@ export function UsageEventEditor({ agreementId, usageLogId, onSaved }: {
             }}>
                 <Select label="Event type" value={form.event_type} options={eventTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, event_type: event.target.value })} />
                 <DecimalInput label="Quantity" value={form.quantity} error={fieldError(error, 'quantity')} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
-                <DecimalInput label="Rate override" value={form.rate} error={fieldError(error, 'rate')} onChange={(event) => setForm({ ...form, rate: event.target.value })} />
                 <div className="flex items-end"><Button type="submit" loading={busy}>Add event</Button></div>
                 <div className="md:col-span-2 xl:col-span-2"><Textarea label="Remarks" value={form.remarks} onChange={(event) => setForm({ ...form, remarks: event.target.value })} /></div>
             </form>

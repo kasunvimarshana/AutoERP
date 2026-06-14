@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
             $table->foreignId('charge_calculation_id')->nullable()->constrained('rental_charge_calculations')->nullOnDelete();
+            $table->string('financial_side', 20);
             $table->string('charge_type', 30);
             $table->text('description');
             $table->decimal('quantity', 20, 6);
@@ -23,6 +24,8 @@ return new class extends Migration
             $table->decimal('amount', 20, 6);
             $table->decimal('discount_amount', 20, 6)->default('0.000000');
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
+            $table->decimal('withholding_amount', 20, 6)->default('0.000000');
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
             $table->decimal('total_amount', 20, 6);
             $table->string('invoice_status', 30)->default('not_invoiced');
             $table->string('status', 20)->default('draft');
@@ -31,6 +34,7 @@ return new class extends Migration
             $table->unique('charge_calculation_id', 'rental_charges_calculation_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_charges_tenant_org_idx');
             $table->index(['agreement_id', 'status', 'invoice_status'], 'rental_charges_agreement_status_idx');
+            $table->index(['financial_side', 'status'], 'rental_charges_side_status_idx');
         });
     }
 

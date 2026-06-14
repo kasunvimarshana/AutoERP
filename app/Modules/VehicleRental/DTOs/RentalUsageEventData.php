@@ -11,7 +11,7 @@ final readonly class RentalUsageEventData
     public function __construct(
         public RentalUsageEventType $eventType,
         public string $quantity,
-        public ?string $rate = null,
         public ?string $remarks = null,
+        public ?int $createdBy = null,
     ) {}
 }

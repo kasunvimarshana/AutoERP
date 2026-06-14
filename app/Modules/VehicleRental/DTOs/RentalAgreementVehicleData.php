@@ -16,5 +16,7 @@ final readonly class RentalAgreementVehicleData
         public ?RentalPartyType $ownerPartyType = null,
         public ?int $ownerPartyId = null,
         public ?string $remarks = null,
+        public ?int $createdBy = null,
+        public ?int $replacesAgreementVehicleId = null,
     ) {}
 }

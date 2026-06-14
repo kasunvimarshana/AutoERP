@@ -7,7 +7,7 @@ namespace Modules\VehicleRental\DTOs;
 final readonly class RentalInspectionData
 {
     /**
-     * @param list<string>|null $attachments
+     * @param  list<string>|null  $attachments
      */
     public function __construct(
         public string $inspectedAt,

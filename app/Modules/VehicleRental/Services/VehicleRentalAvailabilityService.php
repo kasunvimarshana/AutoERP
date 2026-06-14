@@ -6,9 +6,11 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAgreementVehicleStatus;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
@@ -30,6 +32,7 @@ class VehicleRentalAvailabilityService
         string $endAt,
         ?int $excludeAgreementId = null,
         ?int $excludeReservationId = null,
+        ?RentalAgreementDirection $direction = null,
     ): array {
         [$start, $end] = $this->period($startAt, $endAt);
         $vehicle = Vehicle::query()
@@ -40,6 +43,7 @@ class VehicleRentalAvailabilityService
                     $query->orWhere('organization_unit_id', $organizationUnitId);
                 }
             })
+            ->when(DB::transactionLevel() > 0, fn (Builder $query) => $query->lockForUpdate())
             ->findOrFail($vehicleId);
 
         $reasons = [];
@@ -66,10 +70,13 @@ class VehicleRentalAvailabilityService
             ->when($excludeAgreementId !== null, fn (Builder $query) => $query->where('agreement_id', '!=', $excludeAgreementId))
             ->where('allocated_from', '<', $end)
             ->where(fn (Builder $query) => $query->whereNull('allocated_to')->orWhere('allocated_to', '>', $start))
-            ->whereHas('agreement', fn (Builder $query) => $query->whereIn('status', [
-                RentalAgreementStatus::Confirmed->value,
-                RentalAgreementStatus::Active->value,
-            ]))
+            ->whereHas('agreement', fn (Builder $query) => $query
+                ->whereIn('status', [
+                    RentalAgreementStatus::Confirmed->value,
+                    RentalAgreementStatus::Active->value,
+                ])
+                ->when($direction !== null, fn (Builder $agreementQuery) => $agreementQuery
+                    ->where('direction', $direction->value)))
             ->exists();
         if ($allocationExists) {
             $reasons[] = 'Vehicle is already allocated to an overlapping rental agreement.';
@@ -122,6 +129,7 @@ class VehicleRentalAvailabilityService
         string $endAt,
         ?int $excludeAgreementId = null,
         ?int $excludeReservationId = null,
+        ?RentalAgreementDirection $direction = null,
     ): Vehicle {
         $result = $this->check(
             $tenantId,
@@ -131,6 +139,7 @@ class VehicleRentalAvailabilityService
             $endAt,
             $excludeAgreementId,
             $excludeReservationId,
+            $direction,
         );
         if (! $result['available']) {
             throw new InvalidArgumentException(implode(' ', $result['reasons']));
