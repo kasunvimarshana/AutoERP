@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use Modules\VehicleRental\Enums\RentalExpenseFinancialTreatment;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
@@ -30,6 +31,7 @@ final class RentalExpense extends CoreModel
             'amount' => 'decimal:6',
             'tax_group_id' => 'integer',
             'tax_amount' => 'decimal:6',
+            'withholding_amount' => 'decimal:6',
             'financial_treatment' => RentalExpenseFinancialTreatment::class,
             'is_billable' => 'boolean',
             'is_recoverable' => 'boolean',
@@ -37,6 +39,8 @@ final class RentalExpense extends CoreModel
             'responsible_party_id' => 'integer',
             'attachments' => 'array',
             'status' => RentalExpenseStatus::class,
+            'submitted_by' => 'integer',
+            'submitted_at' => 'datetime',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
             'created_by' => 'integer',
@@ -52,5 +56,10 @@ final class RentalExpense extends CoreModel
     public function usageLog(): BelongsTo
     {
         return $this->belongsTo(RentalUsageLog::class, 'usage_log_id');
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(RentalStatusHistory::class, 'expense_id')->latest('changed_at');
     }
 }

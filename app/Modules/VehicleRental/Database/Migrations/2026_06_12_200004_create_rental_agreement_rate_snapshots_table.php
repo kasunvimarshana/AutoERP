@@ -12,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('rental_agreement_rate_snapshots', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->decimal('base_rate', 20, 6)->default('0.000000');
             $table->string('rate_unit', 20);
             $table->decimal('allowed_hours', 20, 6)->default('0.000000');

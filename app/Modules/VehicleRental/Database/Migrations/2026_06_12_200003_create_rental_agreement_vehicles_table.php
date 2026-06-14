@@ -12,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('rental_agreement_vehicles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
             $table->foreignId('replaces_agreement_vehicle_id')->nullable()
                 ->constrained('rental_agreement_vehicles')->restrictOnDelete();

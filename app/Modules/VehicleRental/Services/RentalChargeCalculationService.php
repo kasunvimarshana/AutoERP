@@ -29,8 +29,6 @@ use Modules\VehicleRental\Models\RentalUsageEvent;
 
 final class RentalChargeCalculationService
 {
-    private const VERSION = 2;
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalChargeService $charges,
@@ -58,13 +56,30 @@ final class RentalChargeCalculationService
             if ($agreement->rateSnapshot === null) {
                 throw new InvalidArgumentException('Agreement rate snapshot is missing.');
             }
-            $this->prepareRegeneration($agreement, $replace);
+            $this->assertCalculable($agreement);
+            $this->lockCalculationInputs($agreement);
+            $agreement->load([
+                'rateSnapshot',
+                'operationalUsageLogs.events',
+                'operationalUsageLogs.contexts',
+                'usageContexts',
+                'expenses',
+                'returnInspections',
+                'charges',
+            ]);
+            $version = max(
+                1,
+                ((int) $agreement->chargeCalculations()->max('calculation_version')) + 1,
+            );
+            $superseded = $this->prepareRegeneration($agreement, $replace);
 
             $calculations = collect();
-            foreach ($this->calculationRows($agreement) as $row) {
+            foreach ($this->calculationRows($agreement, $version) as $row) {
                 if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
                     continue;
                 }
+                $sourceKey = $this->sourceKey($row);
+                $row['supersedes_calculation_id'] = $superseded[$sourceKey] ?? null;
                 $calculations->push(RentalChargeCalculation::query()->create($row));
             }
             $created = $this->charges->createFromCalculations($agreement, $calculations);
@@ -102,7 +117,11 @@ final class RentalChargeCalculationService
         }
 
         $calculations = collect();
-        foreach ($this->calculationRows($agreement) as $index => $row) {
+        $version = max(
+            1,
+            ((int) $agreement->chargeCalculations()->max('calculation_version')) + 1,
+        );
+        foreach ($this->calculationRows($agreement, $version) as $index => $row) {
             if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
                 continue;
             }
@@ -129,7 +148,7 @@ final class RentalChargeCalculationService
     /**
      * @return list<array<string, mixed>>
      */
-    private function calculationRows(RentalAgreement $agreement): array
+    private function calculationRows(RentalAgreement $agreement, int $version): array
     {
         $rows = [];
         $baseQuantity = $this->baseQuantity($agreement);
@@ -147,19 +166,23 @@ final class RentalChargeCalculationService
             $agreement->rateSnapshot->rate_unit->value,
             'base_rate',
             'Base rental charge',
+            $version,
         );
-        $this->appendDerivedUsage($rows, $agreement);
-        $this->appendUsageEvents($rows, $agreement);
-        $this->appendExpenses($rows, $agreement);
-        $this->appendDamages($rows, $agreement);
+        $this->appendDerivedUsage($rows, $agreement, $version);
+        $this->appendUsageEvents($rows, $agreement, $version);
+        $this->appendExpenses($rows, $agreement, $version);
+        $this->appendDamages($rows, $agreement, $version);
 
         return $rows;
     }
 
-    private function prepareRegeneration(RentalAgreement $agreement, bool $replace): void
+    /**
+     * @return array<string, int>
+     */
+    private function prepareRegeneration(RentalAgreement $agreement, bool $replace): array
     {
         if (! $agreement->chargeCalculations()->exists()) {
-            return;
+            return [];
         }
         if (! $replace) {
             throw new InvalidArgumentException('Rental charges have already been generated for this agreement.');
@@ -172,20 +195,29 @@ final class RentalChargeCalculationService
         if ($protected) {
             throw new InvalidArgumentException('Approved or invoiced rental charges cannot be regenerated.');
         }
-        $agreement->charges()->delete();
-        $agreement->chargeCalculations()->delete();
-        $agreement->expenses()
-            ->where('status', RentalExpenseStatus::Charged->value)
-            ->update([
-                'status' => RentalExpenseStatus::Approved->value,
-                'charge_generation_status' => 'not_generated',
-            ]);
+        $previous = $agreement->chargeCalculations()
+            ->where('status', 'draft')
+            ->lockForUpdate()
+            ->get();
+        $agreement->charges()
+            ->where('status', RentalChargeStatus::Draft->value)
+            ->lockForUpdate()
+            ->update(['status' => RentalChargeStatus::Cancelled->value]);
+        $agreement->chargeCalculations()
+            ->where('status', 'draft')
+            ->update(['status' => 'superseded']);
+
+        return $previous->mapWithKeys(
+            fn (RentalChargeCalculation $calculation): array => [
+                $this->sourceKey($calculation->getAttributes()) => (int) $calculation->getKey(),
+            ],
+        )->all();
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendDerivedUsage(array &$rows, RentalAgreement $agreement): void
+    private function appendDerivedUsage(array &$rows, RentalAgreement $agreement, int $version): void
     {
         $approved = $agreement->operationalUsageLogs->where('status', RentalUsageLogStatus::Approved);
         $distance = $this->math->sum(
@@ -206,6 +238,7 @@ final class RentalChargeCalculationService
             'km',
             'distance_above_allowance',
             'Extra mileage above the agreement allowance',
+            $version,
         );
 
         $workingHours = $this->math->div(
@@ -240,13 +273,14 @@ final class RentalChargeCalculationService
             'hour',
             'extra_hours_excluding_overtime',
             'Extra hours above allowance after overtime classification',
+            $version,
         );
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendUsageEvents(array &$rows, RentalAgreement $agreement): void
+    private function appendUsageEvents(array &$rows, RentalAgreement $agreement, int $version): void
     {
         foreach ($agreement->operationalUsageLogs->where('status', RentalUsageLogStatus::Approved) as $log) {
             $context = $log->contexts->firstWhere('agreement_id', $agreement->getKey());
@@ -281,6 +315,7 @@ final class RentalChargeCalculationService
                         ? 'weekend_unless_holiday'
                         : 'additive_operational_event',
                     $event->remarks ?? str($event->event_type->value)->replace('_', ' ')->title()->toString(),
+                    $version,
                 );
             }
         }
@@ -289,10 +324,13 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendExpenses(array &$rows, RentalAgreement $agreement): void
+    private function appendExpenses(array &$rows, RentalAgreement $agreement, int $version): void
     {
         foreach ($agreement->expenses->filter(
-            fn (RentalExpense $expense): bool => $expense->status === RentalExpenseStatus::Approved
+            fn (RentalExpense $expense): bool => in_array($expense->status, [
+                RentalExpenseStatus::Approved,
+                RentalExpenseStatus::Charged,
+            ], true)
                 && in_array(
                     $expense->financial_treatment->value,
                     $this->chargeableTreatments($agreement),
@@ -316,6 +354,7 @@ final class RentalChargeCalculationService
                 'expense',
                 'approved_expense_financial_treatment',
                 $expense->description ?? str($expense->expense_type->value)->title()->append(' expense')->toString(),
+                $version,
             );
         }
     }
@@ -323,7 +362,7 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendDamages(array &$rows, RentalAgreement $agreement): void
+    private function appendDamages(array &$rows, RentalAgreement $agreement, int $version): void
     {
         if ($agreement->direction !== RentalAgreementDirection::Outbound) {
             return;
@@ -347,6 +386,7 @@ final class RentalChargeCalculationService
                 'damage',
                 'approved_return_damage',
                 $inspection->damage_notes ?? 'Rental vehicle damage charge',
+                $version,
             );
         }
     }
@@ -467,6 +507,7 @@ final class RentalChargeCalculationService
         ?string $unit,
         string $appliedRule,
         string $description,
+        int $version,
     ): void {
         $measuredQuantity = $this->math->normalize($measuredQuantity);
         $allowedQuantity = $this->math->normalize($allowedQuantity);
@@ -475,11 +516,14 @@ final class RentalChargeCalculationService
         $side = RentalFinancialSide::fromDirection($agreement->direction);
         $fingerprint = hash('sha256', implode('|', [
             (string) $agreement->tenant_id,
+            (string) ($context?->getKey() ?? 'agreement'),
             (string) $agreement->getKey(),
+            (string) $agreement->rateSnapshot?->getKey(),
+            $side->value,
             $sourceType,
             (string) $sourceId,
             $type->value,
-            (string) self::VERSION,
+            (string) $version,
         ]));
         $rows[] = [
             'tenant_id' => $agreement->tenant_id,
@@ -503,11 +547,40 @@ final class RentalChargeCalculationService
             'rate' => $rate,
             'multiplier' => '1.000000',
             'amount' => $this->math->mul($chargeableQuantity, $rate),
+            'tax_amount' => '0.000000',
+            'withholding_amount' => '0.000000',
+            'total_amount' => $this->math->mul($chargeableQuantity, $rate),
             'applied_rule' => $appliedRule,
-            'calculation_version' => self::VERSION,
+            'calculation_version' => $version,
             'status' => 'draft',
             'fingerprint' => $fingerprint,
             'description' => $description,
         ];
+    }
+
+    private function lockCalculationInputs(RentalAgreement $agreement): void
+    {
+        $agreement->rateSnapshot()->lockForUpdate()->firstOrFail();
+        $usageLogIds = $agreement->usageContexts()->lockForUpdate()->pluck('usage_log_id');
+        if ($usageLogIds->isNotEmpty()) {
+            DB::table('rental_usage_logs')->whereIn('id', $usageLogIds)->lockForUpdate()->get();
+            DB::table('rental_usage_events')->whereIn('usage_log_id', $usageLogIds)->lockForUpdate()->get();
+        }
+        $agreement->expenses()->lockForUpdate()->get();
+        $agreement->returnInspections()->lockForUpdate()->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function sourceKey(array $row): string
+    {
+        return implode('|', [
+            (string) $row['source_type'],
+            (string) $row['source_id'],
+            $row['calculation_type'] instanceof RentalChargeCalculationType
+                ? $row['calculation_type']->value
+                : (string) $row['calculation_type'],
+        ]);
     }
 }

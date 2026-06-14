@@ -12,20 +12,25 @@ return new class extends Migration
     {
         Schema::create('rental_agreement_vehicle_links', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
-            $table->foreignId('inbound_agreement_id')->constrained('rental_agreements')->restrictOnDelete();
-            $table->foreignId('inbound_agreement_vehicle_id')->constrained('rental_agreement_vehicles')->restrictOnDelete();
-            $table->foreignId('outbound_agreement_id')->constrained('rental_agreements')->restrictOnDelete();
-            $table->foreignId('outbound_agreement_vehicle_id')->constrained('rental_agreement_vehicles')->restrictOnDelete();
+            $table->unsignedBigInteger('tenant_id');
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->unsignedBigInteger('vehicle_id');
+            $table->unsignedBigInteger('inbound_agreement_id');
+            $table->unsignedBigInteger('inbound_agreement_vehicle_id');
+            $table->unsignedBigInteger('outbound_agreement_id');
+            $table->unsignedBigInteger('outbound_agreement_vehicle_id');
             $table->dateTime('effective_from');
             $table->dateTime('effective_to');
-            $table->string('status', 20)->default('active');
+            $table->string('status', 20)->default('draft');
             $table->text('remarks')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->unsignedBigInteger('superseded_by_link_id')->nullable();
             $table->timestamps();
 
             $table->unique([
@@ -37,11 +42,39 @@ return new class extends Migration
             $table->index(['vehicle_id', 'effective_from', 'effective_to'], 'rental_agreement_vehicle_links_vehicle_period_idx');
             $table->index(['inbound_agreement_id', 'status'], 'rental_agreement_vehicle_links_inbound_idx');
             $table->index(['outbound_agreement_id', 'status'], 'rental_agreement_vehicle_links_outbound_idx');
+            $table->foreign('tenant_id', 'ravl_tenant_fk')
+                ->references('id')->on('tenants')->restrictOnDelete();
+            $table->foreign('organization_unit_id', 'ravl_org_fk')
+                ->references('id')->on('organization_units')->restrictOnDelete();
+            $table->foreign('vehicle_id', 'ravl_vehicle_fk')
+                ->references('id')->on('vehicles')->restrictOnDelete();
+            $table->foreign('inbound_agreement_id', 'ravl_in_agreement_fk')
+                ->references('id')->on('rental_agreements')->restrictOnDelete();
+            $table->foreign('inbound_agreement_vehicle_id', 'ravl_in_allocation_fk')
+                ->references('id')->on('rental_agreement_vehicles')->restrictOnDelete();
+            $table->foreign('outbound_agreement_id', 'ravl_out_agreement_fk')
+                ->references('id')->on('rental_agreements')->restrictOnDelete();
+            $table->foreign('outbound_agreement_vehicle_id', 'ravl_out_allocation_fk')
+                ->references('id')->on('rental_agreement_vehicles')->restrictOnDelete();
+            $table->foreign('superseded_by_link_id', 'rental_agreement_vehicle_links_superseded_fk')
+                ->references('id')
+                ->on('rental_agreement_vehicle_links')
+                ->restrictOnDelete();
+        });
+
+        Schema::table('rental_status_histories', function (Blueprint $table): void {
+            $table->foreign('agreement_vehicle_link_id', 'rsh_vehicle_link_fk')
+                ->references('id')
+                ->on('rental_agreement_vehicle_links')
+                ->nullOnDelete();
         });
     }
 
     public function down(): void
     {
+        Schema::table('rental_status_histories', function (Blueprint $table): void {
+            $table->dropForeign('rsh_vehicle_link_fk');
+        });
         Schema::dropIfExists('rental_agreement_vehicle_links');
     }
 };

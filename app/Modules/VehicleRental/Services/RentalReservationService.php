@@ -78,15 +78,17 @@ final class RentalReservationService
 
     public function update(RentalReservation $reservation, RentalReservationData $data): RentalReservation
     {
-        if (! in_array($reservation->status, [RentalReservationStatus::Draft, RentalReservationStatus::Pending], true)) {
-            throw new InvalidArgumentException('Only draft or pending reservations can be edited.');
-        }
-        if ((int) $reservation->tenant_id !== $data->tenantId
-            || $reservation->organization_unit_id !== $data->organizationUnitId) {
-            throw new InvalidArgumentException('Reservation scope cannot be changed.');
-        }
-
         return DB::transaction(function () use ($reservation, $data): RentalReservation {
+            $reservation = RentalReservation::query()
+                ->forContext($data->tenantId, $data->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($reservation->getKey());
+            if (! in_array($reservation->status, [
+                RentalReservationStatus::Draft,
+                RentalReservationStatus::Pending,
+            ], true)) {
+                throw new InvalidArgumentException('Only draft or pending reservations can be edited.');
+            }
             $this->validate($data);
             if ($data->vehicleId !== null) {
                 $this->availability->assertAvailable(
@@ -123,18 +125,17 @@ final class RentalReservationService
         ?int $changedBy = null,
         ?string $reason = null,
     ): RentalReservation {
-        $old = $reservation->status;
-        if ($old === $status) {
-            return $reservation;
-        }
-        if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
-            throw new InvalidArgumentException(
-                "Invalid rental reservation status transition from {$old->value} to {$status->value}.",
-            );
-        }
-
-        return DB::transaction(function () use ($reservation, $status, $old, $changedBy, $reason): RentalReservation {
+        return DB::transaction(function () use ($reservation, $status, $changedBy, $reason): RentalReservation {
             $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            $old = $reservation->status;
+            if ($old === $status) {
+                return $reservation;
+            }
+            if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
+                throw new InvalidArgumentException(
+                    "Invalid rental reservation status transition from {$old->value} to {$status->value}.",
+                );
+            }
             if ($status === RentalReservationStatus::Confirmed && $reservation->vehicle_id !== null) {
                 $this->availability->assertAvailable(
                     (int) $reservation->tenant_id,
@@ -267,6 +268,7 @@ final class RentalReservationService
             'organization_unit_id' => $reservation->organization_unit_id,
             'reservation_id' => $reservation->getKey(),
             'entity_type' => 'reservation',
+            'subject_id' => $reservation->getKey(),
             'old_status' => $old?->value,
             'new_status' => $new->value,
             'reason' => $reason,

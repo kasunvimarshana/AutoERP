@@ -6,6 +6,9 @@ namespace Modules\VehicleRental\Enums;
 
 enum RentalAgreementVehicleLinkStatus: string
 {
-    case Active = 'active';
+    case Draft = 'draft';
+    case Submitted = 'submitted';
+    case Approved = 'approved';
     case Cancelled = 'cancelled';
+    case Superseded = 'superseded';
 }

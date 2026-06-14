@@ -27,7 +27,14 @@ final class RentalExpenseController extends RentalController
         StoreRentalExpenseRequest $request,
         int $agreement,
         RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_EXPENSES,
+        );
+
         return (new RentalExpenseResource($service->create(
             $this->agreement($request, $agreement),
             $request->toData(),
@@ -51,6 +58,28 @@ final class RentalExpenseController extends RentalController
         return new RentalExpenseResource($service->changeStatus(
             $this->expense($model, $expense),
             RentalExpenseStatus::Approved,
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
+    }
+
+    public function submit(
+        RentalActionRequest $request,
+        int $agreement,
+        int $expense,
+        RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalExpenseResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_EXPENSES,
+        );
+        $model = $this->agreement($request, $agreement);
+
+        return new RentalExpenseResource($service->changeStatus(
+            $this->expense($model, $expense),
+            RentalExpenseStatus::Submitted,
             $request->currentUserId(),
             $request->input('reason'),
         ));

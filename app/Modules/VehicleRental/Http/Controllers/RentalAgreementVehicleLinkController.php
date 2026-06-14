@@ -53,4 +53,49 @@ final class RentalAgreementVehicleLinkController
             $request->input('reason'),
         ));
     }
+
+    public function submit(
+        RentalActionRequest $request,
+        int $link,
+        RentalAgreementVehicleLinkService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalAgreementVehicleLinkResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_LINKS,
+        );
+
+        return new RentalAgreementVehicleLinkResource($service->submit(
+            $this->link($request, $link),
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
+    }
+
+    public function approve(
+        RentalActionRequest $request,
+        int $link,
+        RentalAgreementVehicleLinkService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalAgreementVehicleLinkResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::APPROVE_LINKS,
+        );
+
+        return new RentalAgreementVehicleLinkResource($service->approve(
+            $this->link($request, $link),
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
+    }
+
+    private function link(RentalActionRequest $request, int $link): RentalAgreementVehicleLink
+    {
+        return RentalAgreementVehicleLink::query()
+            ->forContext($request->tenantId(), $request->organizationUnitId())
+            ->findOrFail($link);
+    }
 }

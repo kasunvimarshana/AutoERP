@@ -28,6 +28,7 @@ final class ListRentalRequest extends TenantScopedRequest
             'direction' => ['nullable', Rule::enum(RentalAgreementDirection::class)],
             'party_type' => ['nullable', Rule::enum(RentalPartyType::class)],
             'party_id' => ['nullable', 'integer', 'min:1'],
+            'agreement_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'rental_type' => ['nullable', Rule::enum(RentalType::class)],
             'billing_cycle' => ['nullable', Rule::enum(RentalBillingCycle::class)],

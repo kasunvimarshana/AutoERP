@@ -10,6 +10,7 @@ use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAgreementVehicleRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementVehicleResource;
 use Modules\VehicleRental\Services\RentalAgreementVehicleService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalAgreementVehicleController extends RentalController
 {
@@ -26,7 +27,14 @@ final class RentalAgreementVehicleController extends RentalController
         StoreRentalAgreementVehicleRequest $request,
         int $agreement,
         RentalAgreementVehicleService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_ALLOCATIONS,
+        );
+
         return (new RentalAgreementVehicleResource($service->allocate(
             $this->agreement($request, $agreement),
             $request->toData(),
@@ -38,7 +46,13 @@ final class RentalAgreementVehicleController extends RentalController
         int $agreement,
         int $allocation,
         RentalAgreementVehicleService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalAgreementVehicleResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_ALLOCATIONS,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalAgreementVehicleResource($service->replace(

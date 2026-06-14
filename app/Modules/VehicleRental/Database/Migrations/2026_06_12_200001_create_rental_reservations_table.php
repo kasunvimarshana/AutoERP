@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('rental_reservations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
             $table->string('reservation_number', 100);
             $table->string('direction', 20);
             $table->string('party_type', 20);

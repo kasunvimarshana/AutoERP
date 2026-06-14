@@ -8,6 +8,7 @@ use Modules\VehicleRental\Http\Requests\StoreRentalInspectionRequest;
 use Modules\VehicleRental\Http\Resources\RentalInspectionResource;
 use Modules\VehicleRental\Services\RentalPickupService;
 use Modules\VehicleRental\Services\RentalReturnService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalInspectionController extends RentalController
 {
@@ -16,7 +17,13 @@ final class RentalInspectionController extends RentalController
         int $agreement,
         int $allocation,
         RentalPickupService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalInspectionResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_INSPECTIONS,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalInspectionResource($service->save(
@@ -31,7 +38,13 @@ final class RentalInspectionController extends RentalController
         int $agreement,
         int $allocation,
         RentalReturnService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalInspectionResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_INSPECTIONS,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalInspectionResource($service->save(

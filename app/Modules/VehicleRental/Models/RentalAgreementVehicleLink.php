@@ -31,8 +31,13 @@ final class RentalAgreementVehicleLink extends CoreModel
             'effective_to' => 'datetime',
             'status' => RentalAgreementVehicleLinkStatus::class,
             'created_by' => 'integer',
+            'submitted_by' => 'integer',
+            'submitted_at' => 'datetime',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
+            'cancelled_by' => 'integer',
+            'cancelled_at' => 'datetime',
+            'superseded_by_link_id' => 'integer',
         ];
     }
 
@@ -64,5 +69,10 @@ final class RentalAgreementVehicleLink extends CoreModel
     public function usageContexts(): HasMany
     {
         return $this->hasMany(RentalUsageContext::class, 'agreement_vehicle_link_id');
+    }
+
+    public function supersededBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'superseded_by_link_id');
     }
 }

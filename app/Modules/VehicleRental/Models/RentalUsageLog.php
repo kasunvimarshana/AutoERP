@@ -28,6 +28,8 @@ final class RentalUsageLog extends CoreModel
             'vehicle_id' => 'integer',
             'driver_id' => 'integer',
             'usage_date' => 'date',
+            'effective_at' => 'datetime',
+            'operational_sequence' => 'integer',
             'working_minutes' => 'integer',
             'start_odometer' => 'decimal:6',
             'end_odometer' => 'decimal:6',

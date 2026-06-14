@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -6,26 +6,33 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
-import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
 import { createRentalUsageLog } from '../vehicleRentalApi';
 import type { RentalUsageLog } from '../vehicleRentalTypes';
 
-const today = () => new Date().toISOString().slice(0, 10);
-
-export function UsageLogEditor({ agreementId, agreementVehicleId, startOdometer, onContextChange, onSaved }: {
+export function UsageLogEditor({
+    agreementId,
+    agreementVehicleId,
+    startOdometer,
+    initialUsageDate,
+    initialStartTime,
+    onContextChange,
+    onSaved,
+}: {
     agreementId: number;
     agreementVehicleId: number;
     startOdometer: string;
+    initialUsageDate: string;
+    initialStartTime: string;
     onContextChange: (usageDate: string, startTime: string) => void;
     onSaved: (log: RentalUsageLog) => void;
 }) {
     const [driver, setDriver] = useState<EmployeeSummary | null>(null);
     const [form, setForm] = useState({
-        usage_date: today(),
-        start_time: '',
+        usage_date: initialUsageDate,
+        start_time: initialStartTime,
         end_time: '',
         start_odometer: startOdometer,
         end_odometer: '',
@@ -38,6 +45,30 @@ export function UsageLogEditor({ agreementId, agreementVehicleId, startOdometer,
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const searchDriver = useCallback((query: string, signal: AbortSignal) => searchEmployees(query, signal), []);
+    const dirty = Boolean(
+        form.end_odometer
+        || form.comparative_km
+        || form.trip_from
+        || form.trip_to
+        || form.trip_purpose
+        || form.remarks
+        || driver,
+    );
+
+    useEffect(() => {
+        if (!form.end_odometer) {
+            setForm((current) => ({ ...current, start_odometer: startOdometer }));
+        }
+    }, [form.end_odometer, startOdometer]);
+
+    useEffect(() => {
+        if (!dirty) return;
+        const warn = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [dirty]);
 
     return (
         <Panel title="New running chart row">

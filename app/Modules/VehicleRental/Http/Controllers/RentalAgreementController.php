@@ -14,9 +14,14 @@ use Modules\VehicleRental\Http\Resources\RentalAgreementResource;
 use Modules\VehicleRental\Http\Resources\RentalStatusHistoryResource;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\RentalInvoiceIntegrationService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalAgreementController extends RentalController
 {
+    public function __construct(
+        private readonly VehicleRentalAuthorizationService $authorization,
+    ) {}
+
     public function index(ListRentalRequest $request, RentalAgreementService $service): AnonymousResourceCollection
     {
         return RentalAgreementResource::collection($service->paginate(
@@ -29,6 +34,12 @@ final class RentalAgreementController extends RentalController
 
     public function store(StoreRentalAgreementRequest $request, RentalAgreementService $service): JsonResponse
     {
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_AGREEMENTS,
+        );
+
         return (new RentalAgreementResource($service->create($request->toData())))
             ->response()->setStatusCode(201);
     }
@@ -83,6 +94,12 @@ final class RentalAgreementController extends RentalController
         RentalAgreementStatus $status,
         RentalAgreementService $service,
     ): RentalAgreementResource {
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_AGREEMENTS,
+        );
+
         return new RentalAgreementResource($service->changeStatus(
             $this->agreement($request, $agreement),
             $status,

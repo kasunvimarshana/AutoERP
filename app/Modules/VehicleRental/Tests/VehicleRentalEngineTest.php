@@ -35,6 +35,7 @@ use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
+use Modules\VehicleRental\Models\RentalChargeCalculation;
 use Modules\VehicleRental\Models\RentalInvoiceLink;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\RentalAgreementVehicleService;
@@ -171,6 +172,7 @@ final class VehicleRentalEngineTest extends TestCase
             RentalExpenseFinancialTreatment::CustomerBillable,
             (int) $usage->getKey(),
         ));
+        app(RentalExpenseService::class)->changeStatus($expense, RentalExpenseStatus::Submitted);
         app(RentalExpenseService::class)->changeStatus($expense, RentalExpenseStatus::Approved);
         $return = app(RentalReturnService::class)->save($agreement, $allocation->refresh(), new RentalInspectionData(
             inspectedAt: '2026-06-03 08:00:00',
@@ -222,8 +224,16 @@ final class VehicleRentalEngineTest extends TestCase
         ));
         app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Returned);
         $charges = app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
-        app(RentalChargeService::class)->approveAgreementCharges($agreement->refresh());
         $base = $charges->firstWhere('charge_type', 'base_rental');
+        $base->forceFill([
+            'withholding_amount' => '20.000000',
+            'total_amount' => '180.000000',
+        ])->save();
+        $base->calculation->forceFill([
+            'withholding_amount' => '20.000000',
+            'total_amount' => '180.000000',
+        ])->save();
+        app(RentalChargeService::class)->approveAgreementCharges($agreement->refresh());
         $invoices = app(RentalInvoiceIntegrationService::class);
 
         $preview = $invoices->preview($agreement->refresh(), '2026-06-03', [
@@ -237,13 +247,20 @@ final class VehicleRentalEngineTest extends TestCase
             (int) $base->getKey() => '1.000000',
         ]);
 
-        $this->assertSame('100.000000', $preview->grandTotal);
-        $this->assertSame('100.000000', (string) $first->grand_total);
+        $this->assertSame('90.000000', $preview->grandTotal);
+        $this->assertSame('90.000000', (string) $first->grand_total);
         $this->assertSame('1.000000', (string) $remaining->invoiced_quantity);
         $this->assertSame('1.000000', (string) $remaining->remaining_invoice_quantity);
-        $this->assertSame('100.000000', (string) $second->grand_total);
+        $this->assertSame('90.000000', (string) $second->grand_total);
         $this->assertSame(2, RentalInvoiceLink::query()->where('charge_id', $base->getKey())->count());
         $this->assertSame(2, InvoiceSourceLine::query()->where('source_line_id', $base->getKey())->count());
+        $this->assertDatabaseHas('invoice_adjustments', [
+            'invoice_id' => $first->getKey(),
+            'adjustment_type' => 'withholding',
+            'effect' => 'decrease',
+            'amount' => '10.000000',
+            'is_system_generated' => true,
+        ]);
 
         $payment = app(RentalPaymentIntegrationService::class)->create(
             $agreement->refresh(),
@@ -253,7 +270,7 @@ final class VehicleRentalEngineTest extends TestCase
             (int) $first->getKey(),
         );
         $this->assertSame('40.000000', (string) $payment->total_amount);
-        $this->assertSame('60.000000', (string) $first->refresh()->balance_due);
+        $this->assertSame('50.000000', (string) $first->refresh()->balance_due);
         $this->assertDatabaseHas('rental_payment_links', [
             'agreement_id' => $agreement->getKey(),
             'payment_id' => $payment->getKey(),
@@ -266,6 +283,91 @@ final class VehicleRentalEngineTest extends TestCase
         $invoices->create($agreement->refresh(), '2026-06-03', [
             (int) $base->getKey() => '1.000000',
         ]);
+    }
+
+    public function test_regeneration_supersedes_draft_calculations_without_deleting_history(): void
+    {
+        $context = $this->context();
+        [$agreement, $allocation] = $this->activeAgreement($context, 'AGR-REGENERATE');
+        app(RentalReturnService::class)->save($agreement, $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2026-06-03 08:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Returned);
+        $service = app(RentalChargeCalculationService::class);
+        $firstCharges = $service->calculate($agreement->refresh());
+        $firstCalculation = RentalChargeCalculation::query()->firstOrFail();
+
+        $secondCharges = $service->calculate($agreement->refresh(), true);
+        $secondCalculation = RentalChargeCalculation::query()
+            ->where('calculation_version', 2)
+            ->firstOrFail();
+
+        $this->assertSame('superseded', $firstCalculation->refresh()->status);
+        $this->assertSame('cancelled', $firstCharges->sole()->refresh()->status->value);
+        $this->assertSame((int) $firstCalculation->getKey(), (int) $secondCalculation->supersedes_calculation_id);
+        $this->assertSame('draft', $secondCalculation->status);
+        $this->assertSame('draft', $secondCharges->sole()->status->value);
+        $this->assertDatabaseCount('rental_charge_calculations', 2);
+        $this->assertDatabaseCount('rental_charges', 2);
+    }
+
+    public function test_expense_treatments_are_scoped_idempotent_and_require_submission_before_approval(): void
+    {
+        $context = $this->context();
+        [$agreement] = $this->activeAgreement($context, 'AGR-EXPENSE-TREATMENTS');
+        $service = app(RentalExpenseService::class);
+        $customer = $service->create($agreement, new RentalExpenseData(
+            RentalExpenseType::Fuel,
+            '2026-06-02',
+            '30.000000',
+            RentalExpenseFinancialTreatment::CustomerBillable,
+            receiptNo: 'REC-CUSTOMER',
+        ));
+        $duplicate = $service->create($agreement, new RentalExpenseData(
+            RentalExpenseType::Fuel,
+            '2026-06-02',
+            '30.000000',
+            RentalExpenseFinancialTreatment::CustomerBillable,
+            receiptNo: 'REC-CUSTOMER',
+        ));
+        $supplier = $service->create($agreement, new RentalExpenseData(
+            RentalExpenseType::Toll,
+            '2026-06-02',
+            '15.000000',
+            RentalExpenseFinancialTreatment::SupplierRecoverable,
+            responsiblePartyId: $context['supplier_id'],
+            receiptNo: 'REC-SUPPLIER',
+        ));
+        $employee = $service->create($agreement, new RentalExpenseData(
+            RentalExpenseType::Parking,
+            '2026-06-02',
+            '10.000000',
+            RentalExpenseFinancialTreatment::EmployeeReimbursable,
+            responsiblePartyId: $context['employee_id'],
+            receiptNo: 'REC-EMPLOYEE',
+        ));
+
+        $this->assertSame((int) $customer->getKey(), (int) $duplicate->getKey());
+        $this->assertSame('customer', $customer->responsible_party_type);
+        $this->assertSame($context['customer_id'], (int) $customer->responsible_party_id);
+        $this->assertSame('supplier', $supplier->responsible_party_type);
+        $this->assertSame($context['supplier_id'], (int) $supplier->responsible_party_id);
+        $this->assertSame('employee', $employee->responsible_party_type);
+        $this->assertSame($context['employee_id'], (int) $employee->responsible_party_id);
+        $this->assertDatabaseCount('rental_expenses', 3);
+
+        try {
+            $service->changeStatus($customer, RentalExpenseStatus::Approved);
+            $this->fail('Draft expenses must not be approved directly.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('draft to approved', $exception->getMessage());
+        }
+        $submitted = $service->changeStatus($customer->refresh(), RentalExpenseStatus::Submitted, 10);
+        $approved = $service->changeStatus($submitted->refresh(), RentalExpenseStatus::Approved, 11);
+        $this->assertNotNull($submitted->submitted_at);
+        $this->assertNotNull($approved->approved_at);
+        $this->assertSame(3, $approved->statusHistories()->count());
     }
 
     public function test_active_agreement_vehicle_replacement_requires_a_new_pickup_before_usage(): void

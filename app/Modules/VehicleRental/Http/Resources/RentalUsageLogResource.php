@@ -22,6 +22,8 @@ final class RentalUsageLogResource extends RentalResource
                 'name' => $this->driver->display_name,
             ]),
             'usage_date' => $this->usage_date?->toDateString(),
+            'effective_at' => $this->effective_at?->toISOString(),
+            'operational_sequence' => (int) $this->operational_sequence,
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
             'working_minutes' => (int) $this->working_minutes,

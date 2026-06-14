@@ -42,8 +42,13 @@ final class RentalAgreementVehicleLinkResource extends RentalResource
             'effective_to' => $this->effective_to?->toISOString(),
             'status' => $this->enum($this->status),
             'remarks' => $this->remarks,
+            'submitted_by' => $this->submitted_by,
+            'submitted_at' => $this->submitted_at?->toISOString(),
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
+            'cancelled_by' => $this->cancelled_by,
+            'cancelled_at' => $this->cancelled_at?->toISOString(),
+            'superseded_by_link_id' => $this->superseded_by_link_id,
         ];
     }
 }

@@ -13,9 +13,14 @@ use Modules\VehicleRental\Http\Requests\StoreRentalReservationRequest;
 use Modules\VehicleRental\Http\Resources\RentalReservationResource;
 use Modules\VehicleRental\Http\Resources\RentalStatusHistoryResource;
 use Modules\VehicleRental\Services\RentalReservationService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalReservationController extends RentalController
 {
+    public function __construct(
+        private readonly VehicleRentalAuthorizationService $authorization,
+    ) {}
+
     public function index(ListRentalRequest $request, RentalReservationService $service): AnonymousResourceCollection
     {
         return RentalReservationResource::collection($service->paginate(
@@ -28,6 +33,8 @@ final class RentalReservationController extends RentalController
 
     public function store(StoreRentalReservationRequest $request, RentalReservationService $service): JsonResponse
     {
+        $this->assertManage($request);
+
         return (new RentalReservationResource($service->create($request->toData())))
             ->response()->setStatusCode(201);
     }
@@ -43,6 +50,8 @@ final class RentalReservationController extends RentalController
         int $reservation,
         RentalReservationService $service,
     ): RentalReservationResource {
+        $this->assertManage($request);
+
         return new RentalReservationResource($service->update(
             $this->reservation($request, $reservation),
             $request->toData(),
@@ -86,11 +95,22 @@ final class RentalReservationController extends RentalController
         RentalReservationStatus $status,
         RentalReservationService $service,
     ): RentalReservationResource {
+        $this->assertManage($request);
+
         return new RentalReservationResource($service->changeStatus(
             $this->reservation($request, $reservation),
             $status,
             $request->currentUserId(),
             $request->input('reason'),
         ));
+    }
+
+    private function assertManage(ListRentalRequest|RentalActionRequest|StoreRentalReservationRequest $request): void
+    {
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::MANAGE_RESERVATIONS,
+        );
     }
 }

@@ -45,14 +45,29 @@ final class RentalUsageLogService
                 ->findOrFail($agreement->getKey());
             $allocation = $agreement->vehicles()->with('pickupInspection')->lockForUpdate()
                 ->findOrFail($data->agreementVehicleId);
+            Vehicle::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->whereKey($allocation->vehicle_id)
+                ->lockForUpdate()
+                ->firstOrFail();
             $this->validate($agreement, $allocation, $data);
 
             $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
+            $effectiveAt = CarbonImmutable::parse(
+                $data->usageDate.' '.($data->startTime ?? '00:00:00'),
+            );
+            $operationalSequence = ((int) RentalUsageLog::query()
+                ->where('vehicle_id', $allocation->vehicle_id)
+                ->where('effective_at', $effectiveAt)
+                ->max('operational_sequence')) + 1;
             $fingerprint = hash('sha256', implode('|', [
                 (string) $agreement->tenant_id,
                 (string) $allocation->vehicle_id,
                 $data->usageDate,
-                $data->startTime ?? 'all-day',
+                $data->startTime ?? '00:00',
+                $data->endTime ?? '00:00',
+                $this->math->normalize($data->startOdometer),
+                $this->math->normalize($data->endOdometer),
             ]));
             $log = RentalUsageLog::query()->create([
                 'tenant_id' => $agreement->tenant_id,
@@ -62,6 +77,8 @@ final class RentalUsageLogService
                 'vehicle_id' => $allocation->vehicle_id,
                 'driver_id' => $data->driverId,
                 'usage_date' => $data->usageDate,
+                'effective_at' => $effectiveAt,
+                'operational_sequence' => $operationalSequence,
                 'start_time' => $data->startTime,
                 'end_time' => $data->endTime,
                 'working_minutes' => $this->workingMinutes($data),
@@ -177,39 +194,40 @@ final class RentalUsageLogService
         bool $allowMileageVariance,
         ?string $reason,
     ): string {
-        $vehicle = Vehicle::query()->whereKey($log->vehicle_id)->lockForUpdate()->firstOrFail();
-        $laterApproved = RentalUsageLog::query()
-            ->where('vehicle_id', $log->vehicle_id)
-            ->where('status', RentalUsageLogStatus::Approved->value)
-            ->where(function (Builder $query) use ($log): void {
-                $query->whereDate('usage_date', '>', $log->usage_date->toDateString())
-                    ->orWhere(function (Builder $sameDate) use ($log): void {
-                        $sameDate->whereDate('usage_date', $log->usage_date->toDateString())
-                            ->where('id', '>', $log->getKey());
-                    });
-            })
+        $vehicle = Vehicle::query()
+            ->where('tenant_id', $log->tenant_id)
+            ->whereKey($log->vehicle_id)
             ->lockForUpdate()
-            ->exists();
-        if ($laterApproved) {
-            throw new InvalidArgumentException(
-                'Running charts must be approved in vehicle mileage order; a later row is already approved.',
-            );
-        }
-
-        $previous = RentalUsageLog::query()
+            ->firstOrFail();
+        $approved = RentalUsageLog::query()
             ->where('vehicle_id', $log->vehicle_id)
             ->where('status', RentalUsageLogStatus::Approved->value)
             ->whereKeyNot($log->getKey())
-            ->orderByDesc('usage_date')
-            ->orderByDesc('id')
+            ->orderBy('effective_at')
+            ->orderBy('operational_sequence')
+            ->orderBy('id')
             ->lockForUpdate()
-            ->first();
+            ->get();
+        $previous = $approved
+            ->filter(fn (RentalUsageLog $row): bool => $this->compareMileageOrder($row, $log) < 0)
+            ->last();
+        $next = $approved
+            ->first(fn (RentalUsageLog $row): bool => $this->compareMileageOrder($row, $log) > 0);
         $expectedStart = (string) ($previous?->end_odometer
             ?? $log->agreementVehicle?->pickupInspection?->odometer
             ?? $log->agreementVehicle?->start_odometer
             ?? '0.000000');
-        if ($this->math->compare((string) $log->start_odometer, $expectedStart) !== 0) {
+        $startMismatch = $this->math->compare((string) $log->start_odometer, $expectedStart) !== 0;
+        $nextMismatch = $next !== null
+            && $this->math->compare((string) $log->end_odometer, (string) $next->start_odometer) !== 0;
+        if ($startMismatch || $nextMismatch) {
             if (! $allowMileageVariance || trim((string) $reason) === '') {
+                if ($nextMismatch) {
+                    throw new InvalidArgumentException(
+                        'Running chart finish odometer must equal the next approved start odometer '
+                        ."({$next->start_odometer}).",
+                    );
+                }
                 throw new InvalidArgumentException(
                     "Running chart start odometer must equal the previous approved finish odometer ({$expectedStart}).",
                 );
@@ -221,10 +239,21 @@ final class RentalUsageLogService
             $vehicle->save();
         }
 
-        return $this->math->add(
+        $cumulative = $this->math->add(
             (string) ($previous?->cumulative_km ?? '0.000000'),
             (string) $log->distance_km,
         );
+        $running = $cumulative;
+        foreach ($approved->filter(
+            fn (RentalUsageLog $row): bool => $this->compareMileageOrder($row, $log) > 0,
+        ) as $later) {
+            $running = $this->math->add($running, (string) $later->distance_km);
+            if ($this->math->compare((string) $later->cumulative_km, $running) !== 0) {
+                $later->forceFill(['cumulative_km' => $running])->save();
+            }
+        }
+
+        return $cumulative;
     }
 
     private function validate(
@@ -312,11 +341,23 @@ final class RentalUsageLogService
             'agreement_id' => $log->agreement_id,
             'usage_log_id' => $log->getKey(),
             'entity_type' => 'usage_log',
+            'subject_id' => $log->getKey(),
             'old_status' => $old?->value,
             'new_status' => $new->value,
             'reason' => $reason,
             'changed_by' => $changedBy,
             'changed_at' => now(),
         ]);
+    }
+
+    private function compareMileageOrder(RentalUsageLog $left, RentalUsageLog $right): int
+    {
+        $effective = $left->effective_at->getTimestamp() <=> $right->effective_at->getTimestamp();
+        if ($effective !== 0) {
+            return $effective;
+        }
+        $sequence = ((int) $left->operational_sequence) <=> ((int) $right->operational_sequence);
+
+        return $sequence !== 0 ? $sequence : ((int) $left->getKey() <=> (int) $right->getKey());
     }
 }

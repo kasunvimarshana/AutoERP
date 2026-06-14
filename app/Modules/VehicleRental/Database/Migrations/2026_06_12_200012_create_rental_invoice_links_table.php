@@ -12,12 +12,12 @@ return new class extends Migration
     {
         Schema::create('rental_invoice_links', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('charge_id')->constrained('rental_charges')->restrictOnDelete();
             $table->foreignId('invoice_id')->constrained('invoices')->restrictOnDelete();
-            $table->foreignId('invoice_line_id')->nullable()->constrained('invoice_lines')->nullOnDelete();
+            $table->foreignId('invoice_line_id')->nullable()->constrained('invoice_lines')->restrictOnDelete();
             $table->decimal('invoiced_quantity', 20, 6);
             $table->decimal('invoiced_amount', 20, 6);
             $table->string('status', 20)->default('active');

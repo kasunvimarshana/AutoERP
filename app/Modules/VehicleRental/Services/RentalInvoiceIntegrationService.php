@@ -9,10 +9,14 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
+use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -106,6 +110,18 @@ final class RentalInvoiceIntegrationService
             $createdBy,
         ): Invoice {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $chargeIds = $agreement->charges()
+                ->where('status', RentalChargeStatus::Approved->value)
+                ->lockForUpdate()
+                ->pluck('id');
+            if ($chargeIds->isNotEmpty()) {
+                InvoiceSourceLine::query()
+                    ->where('tenant_id', $agreement->tenant_id)
+                    ->where('source_line_type', self::CHARGE_SOURCE)
+                    ->whereIn('source_line_id', $chargeIds)
+                    ->lockForUpdate()
+                    ->get();
+            }
             $data = $this->toInvoiceData(
                 $agreement,
                 $invoiceDate,
@@ -171,6 +187,7 @@ final class RentalInvoiceIntegrationService
         $invoiceLines = [];
         $sourceLines = [];
         $selectedTotal = '0.000000';
+        $selectedWithholding = '0.000000';
         $lineNumber = 1;
         $selectionProvided = $chargeQuantities !== [];
         foreach ($charges as $charge) {
@@ -191,11 +208,16 @@ final class RentalInvoiceIntegrationService
             $ratio = $this->math->div($quantity, (string) $charge->quantity, 12);
             $discount = $this->math->mul((string) $charge->discount_amount, $ratio);
             $tax = $this->math->mul((string) $charge->tax_amount, $ratio);
+            $withholding = $this->math->mul((string) $charge->withholding_amount, $ratio);
             $lineTotal = $this->math->add(
                 $this->math->sub($this->math->mul($quantity, (string) $charge->rate), $discount),
                 $tax,
             );
-            $selectedTotal = $this->math->add($selectedTotal, $lineTotal);
+            $selectedTotal = $this->math->add(
+                $selectedTotal,
+                $this->math->sub($lineTotal, $withholding),
+            );
+            $selectedWithholding = $this->math->add($selectedWithholding, $withholding);
             $invoiced = $this->invoicedQuantity((int) $agreement->tenant_id, (int) $charge->getKey());
 
             $invoiceLines[] = new InvoiceLineData(
@@ -262,6 +284,19 @@ final class RentalInvoiceIntegrationService
                 invoicedAmount: $selectedTotal,
             )],
             sourceLines: $sourceLines,
+            adjustments: $this->math->isZero($selectedWithholding) ? [] : [
+                new InvoiceAdjustmentData(
+                    name: 'Rental withholding',
+                    adjustmentType: AdjustmentType::Withholding,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: $selectedWithholding,
+                    sourceType: self::AGREEMENT_SOURCE,
+                    sourceId: (int) $agreement->getKey(),
+                    allocationMethod: AllocationMethod::Manual,
+                    isSystemGenerated: true,
+                    description: 'Withholding retained from approved rental calculations.',
+                ),
+            ],
         );
     }
 

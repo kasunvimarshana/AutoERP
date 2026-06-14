@@ -47,8 +47,8 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleDocument;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
-use Modules\VehicleRental\Models\RentalAgreementVehicleLink;
 use Modules\VehicleRental\Models\RentalCharge;
+use Modules\VehicleRental\Models\RentalChargeCalculation;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalPaymentLink;
 use Modules\VehicleRental\Models\RentalUsageContext;
@@ -574,7 +574,9 @@ final class ReportCatalog
                 filters: [$this->filter('event_type', 'Overtime Type', 'event_type')],
                 dateColumn: 'usageLog.usage_date',
                 defaultSort: 'id',
-                scope: static fn ($query) => $query->whereIn('event_type', ['overtime', 'double_overtime']),
+                scope: static fn ($query) => $query
+                    ->whereIn('event_type', ['overtime', 'double_overtime'])
+                    ->whereHas('usageLog', fn ($usage) => $usage->where('status', 'approved')),
             ),
             new ReportDefinition(
                 key: 'vehicle-rental.day-night-out-summary',
@@ -593,7 +595,9 @@ final class ReportCatalog
                 filters: [$this->filter('event_type', 'Event', 'event_type')],
                 dateColumn: 'usageLog.usage_date',
                 defaultSort: 'id',
-                scope: static fn ($query) => $query->whereIn('event_type', ['day_out', 'night_out']),
+                scope: static fn ($query) => $query
+                    ->whereIn('event_type', ['day_out', 'night_out'])
+                    ->whereHas('usageLog', fn ($usage) => $usage->where('status', 'approved')),
             ),
             $this->definition('vehicle-rental.charges', 'Rental Charge Report', 'Vehicle Rental', RentalCharge::class, [
                 $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
@@ -612,52 +616,58 @@ final class ReportCatalog
                 key: 'vehicle-rental.profitability',
                 title: 'Rental Profitability Report',
                 group: 'Vehicle Rental',
-                model: RentalAgreementVehicleLink::class,
+                model: RentalChargeCalculation::class,
                 columns: [
-                    $this->col('effective_from', 'From', format: 'datetime', sort: 'effective_from'),
-                    $this->col('effective_to', 'To', format: 'datetime', sort: 'effective_to'),
-                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('outbound_agreement', 'Customer Agreement', 'outboundAgreement.agreement_number'),
-                    $this->col('inbound_agreement', 'Owner Agreement', 'inboundAgreement.agreement_number'),
+                    $this->col('calculated_at', 'Calculated', 'created_at', 'datetime', 'created_at'),
+                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
+                    $this->col('usage_date', 'Usage Date', 'usageLog.usage_date', 'date'),
+                    $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
+                    $this->col('financial_side', 'Financial Side', format: 'enum', sort: 'financial_side'),
+                    $this->col('metric', 'Metric', 'calculation_type', 'enum', 'calculation_type'),
+                    $this->col('applied_rule', 'Applied Rule', sort: 'applied_rule'),
                     new ReportColumn(
                         key: 'revenue',
                         label: 'Revenue',
                         format: 'money',
                         summarize: true,
-                        value: fn (RentalAgreementVehicleLink $link): string => $this->approvedRentalChargeTotal(
-                            $link->outboundAgreement,
-                        ),
+                        value: static fn (RentalChargeCalculation $calculation): string => $calculation
+                            ->financial_side->value === 'revenue'
+                                ? (string) $calculation->total_amount
+                                : '0.000000',
                     ),
                     new ReportColumn(
                         key: 'cost',
                         label: 'Direct Cost',
                         format: 'money',
                         summarize: true,
-                        value: fn (RentalAgreementVehicleLink $link): string => $this->math->add(
-                            $this->approvedRentalChargeTotal($link->inboundAgreement),
-                            $this->companyBorneRentalExpenseTotal($link->outboundAgreement),
-                        ),
+                        value: static fn (RentalChargeCalculation $calculation): string => $calculation
+                            ->financial_side->value === 'cost'
+                                ? (string) $calculation->total_amount
+                                : '0.000000',
                     ),
                     new ReportColumn(
                         key: 'profit',
                         label: 'Profit',
                         format: 'money',
                         summarize: true,
-                        value: fn (RentalAgreementVehicleLink $link): string => $this->math->sub(
-                            $this->approvedRentalChargeTotal($link->outboundAgreement),
-                            $this->math->add(
-                                $this->approvedRentalChargeTotal($link->inboundAgreement),
-                                $this->companyBorneRentalExpenseTotal($link->outboundAgreement),
-                            ),
-                        ),
+                        value: fn (RentalChargeCalculation $calculation): string => $calculation
+                            ->financial_side->value === 'revenue'
+                                ? (string) $calculation->total_amount
+                                : $this->math->sub('0.000000', (string) $calculation->total_amount),
                     ),
                     $this->col('status', 'Status', format: 'enum', sort: 'status'),
                 ],
-                search: ['outboundAgreement.agreement_number', 'inboundAgreement.agreement_number', 'vehicle.registration_number'],
-                relations: ['vehicle', 'outboundAgreement.charges', 'outboundAgreement.expenses', 'inboundAgreement.charges'],
-                filters: [$this->filter('status', 'Status', 'status')],
-                dateColumn: 'effective_from',
-                defaultSort: 'effective_from',
+                search: ['agreement.agreement_number', 'usageLog.vehicle.registration_number', 'description', 'applied_rule'],
+                relations: ['agreement', 'usageLog.vehicle', 'charge'],
+                filters: [$this->filter('financial_side', 'Financial Side', 'financial_side')],
+                dateColumn: 'created_at',
+                defaultSort: 'created_at',
+                constraints: ['status' => 'approved'],
+                scope: static fn ($query) => $query->whereHas(
+                    'charge',
+                    fn ($charge) => $charge->where('status', 'approved'),
+                ),
+                description: 'Approved charge calculation lines. Approved revenue less approved cost is rental margin.',
                 orientation: 'landscape',
             ),
             new ReportDefinition(
@@ -985,28 +995,6 @@ final class ReportCatalog
                     ->where('invoice_type', 'rental')
                     ->where('direction', $direction)
                     ->whereNotIn('status', ['cancelled', 'void'])),
-        );
-    }
-
-    private function approvedRentalChargeTotal(RentalAgreement $agreement): string
-    {
-        return $this->math->sum(
-            $agreement->charges
-                ->filter(fn (RentalCharge $charge): bool => $charge->status->value === 'approved')
-                ->pluck('total_amount')
-                ->map(fn ($value): string => (string) $value)
-                ->all(),
-        );
-    }
-
-    private function companyBorneRentalExpenseTotal(RentalAgreement $agreement): string
-    {
-        return $this->math->sum(
-            $agreement->expenses
-                ->filter(fn ($expense): bool => $expense->financial_treatment->value === 'company_borne')
-                ->pluck('amount')
-                ->map(fn ($value): string => (string) $value)
-                ->all(),
         );
     }
 

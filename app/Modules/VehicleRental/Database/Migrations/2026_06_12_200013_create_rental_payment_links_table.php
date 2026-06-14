@@ -12,11 +12,11 @@ return new class extends Migration
     {
         Schema::create('rental_payment_links', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('payment_id')->constrained('payments')->restrictOnDelete();
-            $table->foreignId('invoice_id')->nullable()->constrained('invoices')->nullOnDelete();
+            $table->foreignId('invoice_id')->nullable()->constrained('invoices')->restrictOnDelete();
             $table->string('link_type', 20);
             $table->decimal('amount', 20, 6);
             $table->string('status', 20)->default('active');

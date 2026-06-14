@@ -8,13 +8,17 @@ import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import { UsageEventEditor } from '../components/UsageEventEditor';
 import { UsageLogEditor } from '../components/UsageLogEditor';
 import {
+    changeRentalAgreementVehicleLinkStatus,
     changeRentalUsageStatus,
     createRentalAgreementVehicleLink,
     getRunningChartContext,
@@ -28,18 +32,33 @@ const optionKey = (option: RunningChartAgreementOption) => `${option.agreement_i
 
 export default function UsageLogPage() {
     const routeAgreementId = Number(useParams().id) || null;
-    const options = useApi((signal) => listRunningChartAgreements('', signal), []);
-    const [selectedKey, setSelectedKey] = useState('');
+    const auth = useAuth();
+    const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search);
+    const [page, setPage] = useState(1);
+    const [restrictAgreementId, setRestrictAgreementId] = useState(routeAgreementId);
+    const [selectedOption, setSelectedOption] = useState<RunningChartAgreementOption | null>(null);
     const [usageDate, setUsageDate] = useState(today());
     const [startTime, setStartTime] = useState('');
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [counterpartSearch, setCounterpartSearch] = useState('');
+    const debouncedCounterpartSearch = useDebounce(counterpartSearch);
+    const [counterpartPage, setCounterpartPage] = useState(1);
     const [counterpartKey, setCounterpartKey] = useState('');
     const [linkPeriod, setLinkPeriod] = useState({ effective_from: '', effective_to: '' });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const selectedOption = useMemo(
-        () => options.data?.find((row) => optionKey(row) === selectedKey) ?? null,
-        [options.data, selectedKey],
+
+    const options = useApi(
+        (signal) => listRunningChartAgreements({
+            search: debouncedSearch || undefined,
+            agreement_id: restrictAgreementId ?? undefined,
+            page,
+            per_page: 25,
+        }, signal),
+        [debouncedSearch, restrictAgreementId, page],
+        true,
+        true,
     );
     const context = useApi(
         (signal) => getRunningChartContext({
@@ -50,35 +69,66 @@ export default function UsageLogPage() {
         }, signal),
         [selectedOption?.agreement_id, selectedOption?.agreement_vehicle_id, usageDate, startTime],
         Boolean(selectedOption),
+        true,
     );
     const logs = useApi(
         (signal) => listRentalUsageLogs(selectedOption!.agreement_id, signal),
         [selectedOption?.agreement_id],
         Boolean(selectedOption),
+        true,
+    );
+    const counterpartDirection = selectedOption?.direction === 'outbound' ? 'inbound' : 'outbound';
+    const counterparts = useApi(
+        (signal) => listRunningChartAgreements({
+            search: debouncedCounterpartSearch || undefined,
+            vehicle_id: selectedOption?.vehicle_id,
+            direction: counterpartDirection,
+            page: counterpartPage,
+            per_page: 25,
+        }, signal),
+        [debouncedCounterpartSearch, selectedOption?.vehicle_id, counterpartDirection, counterpartPage],
+        Boolean(selectedOption && !context.data?.agreement_vehicle_link),
+        true,
     );
 
     useEffect(() => {
-        if (!options.data || selectedKey) return;
-        const initial = options.data.find((row) => row.agreement_id === routeAgreementId) ?? options.data[0];
-        if (!initial) return;
-        setSelectedKey(optionKey(initial));
+        if (selectedOption || !options.data?.data.length) return;
+        const initial = options.data.data.find((row) => row.agreement_id === routeAgreementId)
+            ?? options.data.data[0];
+        setSelectedOption(initial);
         setUsageDate(dateInsideOption(initial));
-    }, [options.data, routeAgreementId, selectedKey]);
+    }, [options.data, routeAgreementId, selectedOption]);
 
     useEffect(() => {
         setSelectedId(null);
         setCounterpartKey('');
+        setCounterpartSearch('');
+        setCounterpartPage(1);
         setLinkPeriod({ effective_from: '', effective_to: '' });
-    }, [selectedKey]);
+        setError(null);
+    }, [selectedOption?.agreement_id, selectedOption?.agreement_vehicle_id, usageDate, startTime]);
 
+    const optionRows = useMemo(() => {
+        const rows = options.data?.data ?? [];
+        if (!selectedOption || rows.some((row) => optionKey(row) === optionKey(selectedOption))) {
+            return rows;
+        }
+        return [selectedOption, ...rows];
+    }, [options.data, selectedOption]);
+    const counterpartRows = counterparts.data?.data ?? [];
+    const selectedCounterpart = counterpartRows.find((row) => optionKey(row) === counterpartKey) ?? null;
     const rows = logs.data ?? [];
     const selected = rows.find((row) => row.id === selectedId) ?? null;
-    const counterpartOptions = (options.data ?? []).filter((row) =>
-        selectedOption
-        && row.vehicle_id === selectedOption.vehicle_id
-        && row.direction !== selectedOption.direction
-        && row.agreement_id !== selectedOption.agreement_id,
-    );
+    const openLink = context.data?.agreement_vehicle_link ?? null;
+    const superAdmin = auth.user?.roles?.includes('Super Admin');
+    const canManageLinks = superAdmin
+        || auth.user?.permissions?.includes('vehicle-rental.links.manage');
+    const canApproveLinks = superAdmin
+        || auth.user?.permissions?.includes('vehicle-rental.links.approve');
+    const canRecordUsage = superAdmin
+        || auth.user?.permissions?.includes('vehicle-rental.usage.record');
+    const canApproveUsage = superAdmin
+        || auth.user?.permissions?.includes('vehicle-rental.usage.approve');
 
     const changeStatus = async (row: RentalUsageLog, status: 'submit' | 'approve' | 'reject') => {
         if (!selectedOption || busy) return;
@@ -94,33 +144,53 @@ export default function UsageLogPage() {
         }
     };
 
+    const changeLinkStatus = async (status: 'submit' | 'approve') => {
+        if (!openLink || busy) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await changeRentalAgreementVehicleLinkStatus(openLink.id, status);
+            context.reload();
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
     return (
         <>
-            <ContentHeader title="Running chart workspace" description="One operational entry can resolve an outbound revenue context, an inbound cost context, or both." />
-            <ErrorAlert error={error ?? options.error ?? context.error ?? logs.error} />
+            <ContentHeader title="Running chart workspace" description="One physical entry resolves its applicable revenue, cost, or standalone agreement context." />
+            <ErrorAlert error={error ?? options.error ?? context.error ?? logs.error ?? counterparts.error} />
             <div className="space-y-5">
                 <Panel title="Agreement context">
-                    {options.loading ? <LoadingState /> : <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <Input
+                            label="Search agreements, parties, or vehicles"
+                            value={search}
+                            onChange={(event) => {
+                                setSearch(event.target.value);
+                                setRestrictAgreementId(null);
+                                setPage(1);
+                            }}
+                        />
                         <Select
                             label="Agreement and vehicle"
-                            value={selectedKey}
-                            options={(options.data ?? []).map((row) => ({
+                            value={selectedOption ? optionKey(selectedOption) : ''}
+                            options={optionRows.map((row) => ({
                                 value: optionKey(row),
                                 label: `${row.agreement_number} / ${row.direction} / ${row.party_name ?? row.party_type} / ${row.vehicle_registration ?? row.vehicle_id}`,
                             }))}
                             onChange={(event) => {
-                                const next = options.data?.find((row) => optionKey(row) === event.target.value);
-                                setSelectedKey(event.target.value);
+                                const next = optionRows.find((row) => optionKey(row) === event.target.value) ?? null;
+                                setSelectedOption(next);
                                 if (next) setUsageDate(dateInsideOption(next));
                                 setStartTime('');
                             }}
                         />
-                        {selectedOption && <div className="flex items-end pb-2 text-sm font-semibold text-slate-600">
-                            {selectedOption.counterpart_agreement_number
-                                ? `Linked to ${selectedOption.counterpart_agreement_number}`
-                                : 'Single-side context'}
-                        </div>}
-                    </div>}
+                    </div>
+                    {options.loading && <LoadingState />}
+                    <Pagination meta={options.data?.meta} onPageChange={setPage} />
                     {selectedOption && <div className="mt-4">
                         <DetailGrid items={[
                             { label: 'Direction', value: selectedOption.direction },
@@ -133,24 +203,48 @@ export default function UsageLogPage() {
                     </div>}
                 </Panel>
 
-                {selectedOption && !selectedOption.counterpart_agreement_id && counterpartOptions.length > 0 && (
+                {selectedOption && openLink && (
+                    <Panel title="Allocation link lifecycle">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="font-semibold">Link #{openLink.id}</p>
+                                <p className="text-sm text-slate-600">
+                                    {openLink.effective_from} to {openLink.effective_to}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <RentalStatusBadge status={openLink.status} />
+                                {openLink.status === 'draft' && canManageLinks && (
+                                    <Button type="button" loading={busy} onClick={() => void changeLinkStatus('submit')}>
+                                        Submit link
+                                    </Button>
+                                )}
+                                {openLink.status === 'submitted' && canApproveLinks && (
+                                    <Button type="button" loading={busy} onClick={() => void changeLinkStatus('approve')}>
+                                        Approve link
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </Panel>
+                )}
+
+                {selectedOption && context.data && !openLink && canManageLinks && (
                     <Panel title="Link inbound and outbound allocations">
                         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={async (event) => {
                             event.preventDefault();
-                            const counterpart = counterpartOptions.find((row) => optionKey(row) === counterpartKey);
-                            if (!counterpart) return;
+                            if (!selectedCounterpart) return;
                             setBusy(true);
                             setError(null);
                             try {
-                                const inbound = selectedOption.direction === 'inbound' ? selectedOption : counterpart;
-                                const outbound = selectedOption.direction === 'outbound' ? selectedOption : counterpart;
+                                const inbound = selectedOption.direction === 'inbound' ? selectedOption : selectedCounterpart;
+                                const outbound = selectedOption.direction === 'outbound' ? selectedOption : selectedCounterpart;
                                 await createRentalAgreementVehicleLink({
                                     inbound_agreement_vehicle_id: inbound.agreement_vehicle_id,
                                     outbound_agreement_vehicle_id: outbound.agreement_vehicle_id,
                                     effective_from: linkPeriod.effective_from,
                                     effective_to: linkPeriod.effective_to,
                                 });
-                                options.reload();
                                 context.reload();
                             } catch (requestError) {
                                 setError(toApiError(requestError));
@@ -158,19 +252,36 @@ export default function UsageLogPage() {
                                 setBusy(false);
                             }
                         }}>
-                            <Select label="Counterpart agreement" value={counterpartKey} options={counterpartOptions.map((row) => ({
-                                value: optionKey(row),
-                                label: `${row.agreement_number} / ${row.direction} / ${row.party_name ?? row.party_type}`,
-                            }))} onChange={(event) => {
-                                const counterpart = counterpartOptions.find((row) => optionKey(row) === event.target.value);
-                                setCounterpartKey(event.target.value);
-                                if (counterpart) {
-                                    setLinkPeriod(overlapPeriod(selectedOption, counterpart));
-                                }
-                            }} />
+                            <Input
+                                label="Search counterpart"
+                                value={counterpartSearch}
+                                onChange={(event) => {
+                                    setCounterpartSearch(event.target.value);
+                                    setCounterpartPage(1);
+                                    setCounterpartKey('');
+                                }}
+                            />
+                            <Select
+                                label="Counterpart agreement"
+                                value={counterpartKey}
+                                options={counterpartRows.map((row) => ({
+                                    value: optionKey(row),
+                                    label: `${row.agreement_number} / ${row.direction} / ${row.party_name ?? row.party_type}`,
+                                }))}
+                                onChange={(event) => {
+                                    const counterpart = counterpartRows.find((row) => optionKey(row) === event.target.value);
+                                    setCounterpartKey(event.target.value);
+                                    if (counterpart) setLinkPeriod(overlapPeriod(selectedOption, counterpart));
+                                }}
+                            />
                             <Input label="Effective from" type="datetime-local" value={linkPeriod.effective_from} onChange={(event) => setLinkPeriod({ ...linkPeriod, effective_from: event.target.value })} />
                             <Input label="Effective to" type="datetime-local" value={linkPeriod.effective_to} onChange={(event) => setLinkPeriod({ ...linkPeriod, effective_to: event.target.value })} />
-                            <div className="flex items-end"><Button type="submit" loading={busy} disabled={!counterpartKey}>Create audited link</Button></div>
+                            <div className="md:col-span-2 xl:col-span-4">
+                                <Pagination meta={counterparts.data?.meta} onPageChange={setCounterpartPage} />
+                            </div>
+                            <div className="md:col-span-2 xl:col-span-4 flex justify-end">
+                                <Button type="submit" loading={busy} disabled={!selectedCounterpart}>Create draft link</Button>
+                            </div>
                         </form>
                     </Panel>
                 )}
@@ -198,12 +309,14 @@ export default function UsageLogPage() {
                     </Panel>
                 )}
 
-                {selectedOption && context.data && (
+                {selectedOption && context.data && canRecordUsage && (
                     <UsageLogEditor
-                        key={selectedKey}
+                        key={optionKey(selectedOption)}
                         agreementId={selectedOption.agreement_id}
                         agreementVehicleId={selectedOption.agreement_vehicle_id}
                         startOdometer={context.data.last_valid_finish_odometer}
+                        initialUsageDate={usageDate}
+                        initialStartTime={startTime}
                         onContextChange={(date, time) => {
                             setUsageDate(date);
                             setStartTime(time);
@@ -224,14 +337,14 @@ export default function UsageLogPage() {
                     { key: 'contexts', header: 'Financial contexts', render: (row) => row.contexts.map((item) => item.financial_side).join(' + ') },
                     { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
                     { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap gap-2">
-                        {row.status === 'draft' && <Button type="button" variant="secondary" loading={busy} onClick={() => setSelectedId(row.id)}>Events ({row.events.length})</Button>}
-                        {row.status === 'draft' && <Button type="button" loading={busy} onClick={() => changeStatus(row, 'submit')}>Submit</Button>}
-                        {row.status === 'submitted' && <Button type="button" loading={busy} onClick={() => changeStatus(row, 'approve')}>Approve</Button>}
-                        {row.status === 'submitted' && <Button type="button" variant="danger" loading={busy} onClick={() => changeStatus(row, 'reject')}>Reject</Button>}
+                        {row.status === 'draft' && canRecordUsage && <Button type="button" variant="secondary" loading={busy} onClick={() => setSelectedId(row.id)}>Events ({row.events.length})</Button>}
+                        {row.status === 'draft' && canRecordUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'submit')}>Submit</Button>}
+                        {row.status === 'submitted' && canApproveUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'approve')}>Approve</Button>}
+                        {row.status === 'submitted' && canApproveUsage && <Button type="button" variant="danger" loading={busy} onClick={() => void changeStatus(row, 'reject')}>Reject</Button>}
                     </div> },
                 ]} />)}
 
-                {selectedOption && selected?.status === 'draft' && <>
+                {selectedOption && selected?.status === 'draft' && canRecordUsage && <>
                     <UsageEventEditor agreementId={selectedOption.agreement_id} usageLogId={selected.id} onSaved={() => logs.reload()} />
                     <Panel title={`Operational events / ${selected.usage_date}`}>
                         <DataTable rows={selected.events} rowKey={(row) => row.id} columns={[

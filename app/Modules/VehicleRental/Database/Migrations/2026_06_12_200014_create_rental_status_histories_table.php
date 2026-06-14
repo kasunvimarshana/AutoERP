@@ -12,14 +12,16 @@ return new class extends Migration
     {
         Schema::create('rental_status_histories', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('reservation_id')->nullable()->constrained('rental_reservations')->cascadeOnDelete();
-            $table->foreignId('agreement_id')->nullable()->constrained('rental_agreements')->cascadeOnDelete();
-            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->cascadeOnDelete();
-            $table->foreignId('expense_id')->nullable()->constrained('rental_expenses')->cascadeOnDelete();
-            $table->foreignId('charge_id')->nullable()->constrained('rental_charges')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('reservation_id')->nullable()->constrained('rental_reservations')->nullOnDelete();
+            $table->foreignId('agreement_id')->nullable()->constrained('rental_agreements')->nullOnDelete();
+            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->nullOnDelete();
+            $table->foreignId('expense_id')->nullable()->constrained('rental_expenses')->nullOnDelete();
+            $table->foreignId('charge_id')->nullable()->constrained('rental_charges')->nullOnDelete();
+            $table->unsignedBigInteger('agreement_vehicle_link_id')->nullable();
             $table->string('entity_type', 20);
+            $table->unsignedBigInteger('subject_id')->nullable();
             $table->string('old_status', 30)->nullable();
             $table->string('new_status', 30);
             $table->text('reason')->nullable();
@@ -33,6 +35,8 @@ return new class extends Migration
             $table->index(['usage_log_id', 'changed_at'], 'rental_status_histories_usage_idx');
             $table->index(['expense_id', 'changed_at'], 'rental_status_histories_expense_idx');
             $table->index(['charge_id', 'changed_at'], 'rental_status_histories_charge_idx');
+            $table->index(['agreement_vehicle_link_id', 'changed_at'], 'rental_status_histories_vehicle_link_idx');
+            $table->index(['entity_type', 'subject_id', 'changed_at'], 'rental_status_histories_subject_idx');
         });
     }
 

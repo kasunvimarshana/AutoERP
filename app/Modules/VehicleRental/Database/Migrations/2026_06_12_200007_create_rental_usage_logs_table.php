@@ -12,13 +12,15 @@ return new class extends Migration
     {
         Schema::create('rental_usage_logs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
-            $table->foreignId('agreement_vehicle_id')->constrained('rental_agreement_vehicles')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
+            $table->foreignId('agreement_vehicle_id')->constrained('rental_agreement_vehicles')->restrictOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
             $table->foreignId('driver_id')->nullable()->constrained('hr_employees')->nullOnDelete();
             $table->date('usage_date');
+            $table->dateTime('effective_at')->nullable();
+            $table->unsignedInteger('operational_sequence')->default(1);
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
             $table->unsignedInteger('working_minutes')->default(0);
@@ -49,6 +51,10 @@ return new class extends Migration
             $table->index(['agreement_id', 'usage_date'], 'rental_usage_logs_agreement_date_idx');
             $table->index(['agreement_vehicle_id', 'usage_date'], 'rental_usage_logs_vehicle_date_idx');
             $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_physical_vehicle_idx');
+            $table->index(
+                ['vehicle_id', 'status', 'effective_at', 'operational_sequence', 'id'],
+                'rental_usage_logs_mileage_chain_idx',
+            );
             $table->index(['driver_id', 'usage_date'], 'rental_usage_logs_driver_date_idx');
         });
     }

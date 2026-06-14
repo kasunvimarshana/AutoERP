@@ -41,7 +41,14 @@ final class RentalUsageController extends RentalController
         StoreRentalUsageLogRequest $request,
         int $agreement,
         RentalUsageLogService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+
         return (new RentalUsageLogResource($service->create(
             $this->agreement($request, $agreement),
             $request->toData(),
@@ -55,6 +62,11 @@ final class RentalUsageController extends RentalController
         RentalUsageEventService $service,
         VehicleRentalAuthorizationService $authorization,
     ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
         $model = $this->agreement($request, $agreement);
         $data = $request->toData();
         if ($data->eventType === RentalUsageEventType::Holiday) {
@@ -79,7 +91,13 @@ final class RentalUsageController extends RentalController
         int $agreement,
         int $usageLog,
         RentalUsageLogService $service,
+        VehicleRentalAuthorizationService $authorization,
     ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
         $model = $this->agreement($request, $agreement);
 
         return new RentalUsageLogResource($service->changeStatus(

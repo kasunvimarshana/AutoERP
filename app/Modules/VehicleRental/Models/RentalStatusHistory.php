@@ -24,6 +24,8 @@ final class RentalStatusHistory extends CoreModel
             'usage_log_id' => 'integer',
             'expense_id' => 'integer',
             'charge_id' => 'integer',
+            'agreement_vehicle_link_id' => 'integer',
+            'subject_id' => 'integer',
             'changed_by' => 'integer',
             'changed_at' => 'datetime',
         ];
@@ -52,5 +54,10 @@ final class RentalStatusHistory extends CoreModel
     public function charge(): BelongsTo
     {
         return $this->belongsTo(RentalCharge::class, 'charge_id');
+    }
+
+    public function agreementVehicleLink(): BelongsTo
+    {
+        return $this->belongsTo(RentalAgreementVehicleLink::class, 'agreement_vehicle_link_id');
     }
 }

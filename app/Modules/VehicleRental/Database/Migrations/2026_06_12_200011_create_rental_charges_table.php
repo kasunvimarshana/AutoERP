@@ -12,10 +12,10 @@ return new class extends Migration
     {
         Schema::create('rental_charges', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
-            $table->foreignId('charge_calculation_id')->nullable()->constrained('rental_charge_calculations')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
+            $table->foreignId('charge_calculation_id')->nullable()->constrained('rental_charge_calculations')->restrictOnDelete();
             $table->string('financial_side', 20);
             $table->string('charge_type', 30);
             $table->text('description');

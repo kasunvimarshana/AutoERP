@@ -120,15 +120,18 @@ export interface RentalExpense {
     amount: string;
     tax_group_id?: number | null;
     tax_amount: string;
+    withholding_amount: string;
     financial_treatment: 'company_borne' | 'customer_billable' | 'supplier_recoverable' | 'employee_reimbursable' | 'owner_payable';
     is_billable: boolean;
     is_recoverable: boolean;
     is_reimbursable: boolean;
+    responsible_party_type?: string | null;
+    responsible_party_id?: number | null;
     charge_generation_status: string;
     receipt_no?: string | null;
     reference_no?: string | null;
     description?: string | null;
-    status: 'draft' | 'approved' | 'rejected' | 'charged';
+    status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'charged';
 }
 
 export interface RentalCharge {
@@ -225,7 +228,7 @@ export interface RentalAgreementVehicleLink {
     outbound_agreement_vehicle_id: number;
     effective_from: string;
     effective_to: string;
-    status: 'active' | 'cancelled';
+    status: 'draft' | 'submitted' | 'approved' | 'cancelled' | 'superseded';
     remarks?: string | null;
 }
 
@@ -246,9 +249,6 @@ export interface RunningChartAgreementOption {
     allocation_from: string;
     allocation_to?: string | null;
     status: RentalAgreementStatus;
-    counterpart_agreement_id?: number | null;
-    counterpart_agreement_number?: string | null;
-    counterpart_direction?: RentalDirection | null;
 }
 
 export interface RunningChartResolvedContext {
@@ -275,6 +275,7 @@ export interface RunningChartContext {
     } | null;
     selected_agreement_id: number;
     agreement_vehicle_link_id?: number | null;
+    agreement_vehicle_link?: RentalAgreementVehicleLink | null;
     last_valid_finish_odometer: string;
     approved_cumulative_mileage: string;
     contexts: RunningChartResolvedContext[];
@@ -297,3 +298,4 @@ export interface RentalInvoicePreview {
 
 export type RentalAgreementCollection = ApiCollection<RentalAgreement>;
 export type RentalReservationCollection = ApiCollection<RentalReservation>;
+export type RunningChartAgreementCollection = ApiCollection<RunningChartAgreementOption>;

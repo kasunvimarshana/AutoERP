@@ -29,6 +29,10 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::get('running-chart/agreements', [RentalRunningChartController::class, 'agreements'])->name('running-chart.agreements');
     Route::get('running-chart/context', [RentalRunningChartController::class, 'context'])->name('running-chart.context');
     Route::post('agreement-vehicle-links', [RentalAgreementVehicleLinkController::class, 'store'])->name('agreement-vehicle-links.store');
+    Route::patch('agreement-vehicle-links/{link}/submit', [RentalAgreementVehicleLinkController::class, 'submit'])
+        ->whereNumber('link')->name('agreement-vehicle-links.submit');
+    Route::patch('agreement-vehicle-links/{link}/approve', [RentalAgreementVehicleLinkController::class, 'approve'])
+        ->whereNumber('link')->name('agreement-vehicle-links.approve');
     Route::patch('agreement-vehicle-links/{link}/cancel', [RentalAgreementVehicleLinkController::class, 'cancel'])
         ->whereNumber('link')->name('agreement-vehicle-links.cancel');
 
@@ -66,6 +70,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
 
     Route::get('agreements/{agreement}/expenses', [RentalExpenseController::class, 'index'])->whereNumber('agreement')->name('expenses.index');
     Route::post('agreements/{agreement}/expenses', [RentalExpenseController::class, 'store'])->whereNumber('agreement')->name('expenses.store');
+    Route::patch('agreements/{agreement}/expenses/{expense}/submit', [RentalExpenseController::class, 'submit'])->whereNumber(['agreement', 'expense'])->name('expenses.submit');
     Route::patch('agreements/{agreement}/expenses/{expense}/approve', [RentalExpenseController::class, 'approve'])->whereNumber(['agreement', 'expense'])->name('expenses.approve');
     Route::patch('agreements/{agreement}/expenses/{expense}/reject', [RentalExpenseController::class, 'reject'])->whereNumber(['agreement', 'expense'])->name('expenses.reject');
 

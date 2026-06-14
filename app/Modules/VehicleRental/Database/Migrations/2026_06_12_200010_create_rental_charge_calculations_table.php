@@ -12,13 +12,13 @@ return new class extends Migration
     {
         Schema::create('rental_charge_calculations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
-            $table->foreignId('agreement_vehicle_id')->nullable()->constrained('rental_agreement_vehicles')->nullOnDelete();
-            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
+            $table->foreignId('agreement_vehicle_id')->nullable()->constrained('rental_agreement_vehicles')->restrictOnDelete();
+            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->restrictOnDelete();
             $table->unsignedBigInteger('usage_context_id')->nullable();
-            $table->foreignId('rate_snapshot_id')->nullable()->constrained('rental_agreement_rate_snapshots')->nullOnDelete();
+            $table->foreignId('rate_snapshot_id')->nullable()->constrained('rental_agreement_rate_snapshots')->restrictOnDelete();
             $table->string('agreement_direction', 20);
             $table->string('financial_side', 20);
             $table->string('party_type', 20);
@@ -33,20 +33,28 @@ return new class extends Migration
             $table->decimal('rate', 20, 6);
             $table->decimal('multiplier', 20, 6)->default('1.000000');
             $table->decimal('amount', 20, 6);
+            $table->decimal('tax_amount', 20, 6)->default('0.000000');
+            $table->decimal('withholding_amount', 20, 6)->default('0.000000');
+            $table->decimal('total_amount', 20, 6)->default('0.000000');
             $table->string('applied_rule', 100);
             $table->unsignedInteger('calculation_version')->default(1);
+            $table->unsignedBigInteger('supersedes_calculation_id')->nullable();
             $table->string('status', 20)->default('draft');
             $table->string('fingerprint', 64);
             $table->text('description')->nullable();
             $table->timestamps();
 
             $table->unique(
-                ['agreement_id', 'source_type', 'source_id', 'calculation_type'],
-                'rental_charge_calculations_source_uk',
+                ['agreement_id', 'source_type', 'source_id', 'calculation_type', 'calculation_version'],
+                'rental_charge_calculations_source_version_uk',
             );
             $table->unique(['tenant_id', 'fingerprint'], 'rental_charge_calculations_fingerprint_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_charge_calculations_tenant_org_idx');
             $table->index(['usage_log_id', 'financial_side'], 'rental_charge_calculations_usage_side_idx');
+            $table->foreign('supersedes_calculation_id', 'rental_charge_calculations_supersedes_fk')
+                ->references('id')
+                ->on('rental_charge_calculations')
+                ->restrictOnDelete();
         });
     }
 

@@ -12,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('rental_usage_events', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('usage_log_id')->constrained('rental_usage_logs')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('usage_log_id')->constrained('rental_usage_logs')->restrictOnDelete();
             $table->string('event_type', 30);
             $table->decimal('quantity', 20, 6);
             $table->text('remarks')->nullable();

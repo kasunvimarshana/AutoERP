@@ -99,6 +99,14 @@ final class RentalChargeService
                 $this->math->add((string) $calculation->amount, $taxAmount),
                 $withholdingAmount,
             );
+            $calculation->forceFill([
+                'tax_amount' => $taxAmount,
+                'withholding_amount' => $withholdingAmount,
+                'total_amount' => $total,
+            ]);
+            if ($persist) {
+                $calculation->save();
+            }
 
             $attributes = [
                 'tenant_id' => $agreement->tenant_id,
@@ -139,12 +147,14 @@ final class RentalChargeService
     ): RentalCharge {
         return DB::transaction(function () use ($charge, $changedBy, $reason): RentalCharge {
             $charge = RentalCharge::query()->lockForUpdate()->findOrFail($charge->getKey());
+            $charge->calculation()->lockForUpdate()->firstOrFail();
             if ($charge->status !== RentalChargeStatus::Draft) {
                 throw new InvalidArgumentException('Only draft rental charges can be approved.');
             }
             $old = $charge->status;
             $charge->status = RentalChargeStatus::Approved;
             $charge->save();
+            $charge->calculation?->forceFill(['status' => 'approved'])->save();
             $this->recordStatus($charge, $old, RentalChargeStatus::Approved, $changedBy, $reason);
 
             return $charge->refresh();
@@ -165,10 +175,15 @@ final class RentalChargeService
                 ->where('status', RentalChargeStatus::Draft->value)
                 ->lockForUpdate()
                 ->get();
+            RentalChargeCalculation::query()
+                ->whereIn('id', $charges->pluck('charge_calculation_id'))
+                ->lockForUpdate()
+                ->get();
             foreach ($charges as $charge) {
                 $old = $charge->status;
                 $charge->status = RentalChargeStatus::Approved;
                 $charge->save();
+                $charge->calculation?->forceFill(['status' => 'approved'])->save();
                 $this->recordStatus($charge, $old, RentalChargeStatus::Approved, $changedBy, $reason);
             }
 
@@ -183,12 +198,14 @@ final class RentalChargeService
     ): RentalCharge {
         return DB::transaction(function () use ($charge, $changedBy, $reason): RentalCharge {
             $charge = RentalCharge::query()->lockForUpdate()->findOrFail($charge->getKey());
+            $charge->calculation()->lockForUpdate()->firstOrFail();
             if ($charge->invoice_status !== RentalChargeInvoiceStatus::NotInvoiced) {
                 throw new InvalidArgumentException('Invoiced rental charges cannot be cancelled.');
             }
             $old = $charge->status;
             $charge->status = RentalChargeStatus::Cancelled;
             $charge->save();
+            $charge->calculation?->forceFill(['status' => 'cancelled'])->save();
             $this->recordStatus($charge, $old, RentalChargeStatus::Cancelled, $changedBy, $reason);
 
             return $charge->refresh();
@@ -208,6 +225,7 @@ final class RentalChargeService
             'agreement_id' => $charge->agreement_id,
             'charge_id' => $charge->getKey(),
             'entity_type' => 'charge',
+            'subject_id' => $charge->getKey(),
             'old_status' => $old->value,
             'new_status' => $new->value,
             'reason' => $reason,

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\DTOs;
 
 use Modules\VehicleRental\Enums\RentalExpenseFinancialTreatment;
-use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 
 final readonly class RentalExpenseData
@@ -21,11 +20,11 @@ final readonly class RentalExpenseData
         public ?int $usageLogId = null,
         public ?int $currencyId = null,
         public ?int $taxGroupId = null,
+        public ?int $responsiblePartyId = null,
         public ?string $receiptNo = null,
         public ?string $referenceNo = null,
         public ?string $description = null,
         public ?array $attachments = null,
-        public RentalExpenseStatus $status = RentalExpenseStatus::Draft,
         public ?int $createdBy = null,
     ) {}
 }

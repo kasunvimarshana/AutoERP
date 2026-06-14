@@ -27,28 +27,33 @@ final class RentalAgreementVehicleService
         private readonly DecimalMath $math,
         private readonly RentalAvailabilityService $availability,
         private readonly VehicleStatusService $vehicleStatuses,
+        private readonly RentalAgreementVehicleLinkService $vehicleLinks,
     ) {}
 
     public function allocate(
         RentalAgreement $agreement,
         RentalAgreementVehicleData $data,
     ): RentalAgreementVehicle {
-        if (! in_array($agreement->status, [
-            RentalAgreementStatus::Draft,
-            RentalAgreementStatus::Confirmed,
-        ], true)) {
-            throw new InvalidArgumentException('Vehicles can only be allocated to draft or confirmed agreements.');
-        }
-
         return $this->createAllocation($agreement, $data);
     }
 
     private function createAllocation(
         RentalAgreement $agreement,
         RentalAgreementVehicleData $data,
+        bool $allowActiveReplacement = false,
     ): RentalAgreementVehicle {
-        return DB::transaction(function () use ($agreement, $data): RentalAgreementVehicle {
+        return DB::transaction(function () use ($agreement, $data, $allowActiveReplacement): RentalAgreementVehicle {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $allowedStatuses = [
+                RentalAgreementStatus::Draft,
+                RentalAgreementStatus::Confirmed,
+            ];
+            if ($allowActiveReplacement) {
+                $allowedStatuses[] = RentalAgreementStatus::Active;
+            }
+            if (! in_array($agreement->status, $allowedStatuses, true)) {
+                throw new InvalidArgumentException('Vehicles can only be allocated to draft or confirmed agreements.');
+            }
             $this->validatePeriod($agreement, $data);
             $vehicle = $this->availability->assertAvailable(
                 (int) $agreement->tenant_id,
@@ -110,7 +115,27 @@ final class RentalAgreementVehicleService
         }
 
         return DB::transaction(function () use ($agreement, $current, $replacement): RentalAgreementVehicle {
-            $current = RentalAgreementVehicle::query()->lockForUpdate()->findOrFail($current->getKey());
+            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $current = RentalAgreementVehicle::query()
+                ->with('vehicle')
+                ->lockForUpdate()
+                ->findOrFail($current->getKey());
+            $replacementAt = CarbonImmutable::parse($replacement->allocatedFrom);
+            if ($replacementAt->lessThanOrEqualTo($current->allocated_from)) {
+                throw new InvalidArgumentException('Replacement must occur after the current allocation starts.');
+            }
+            if ($current->usageLogs()
+                ->where('effective_at', '>=', $replacementAt)
+                ->exists()) {
+                throw new InvalidArgumentException(
+                    'Vehicle replacement cannot precede an existing running chart for the current allocation.',
+                );
+            }
+            $this->vehicleLinks->supersedeForReplacement(
+                $current,
+                $replacementAt,
+                $replacement->createdBy,
+            );
             $current->forceFill([
                 'allocated_to' => $replacement->allocatedFrom,
                 'status' => RentalAgreementVehicleStatus::Replaced->value,
@@ -134,7 +159,7 @@ final class RentalAgreementVehicleService
                 remarks: $replacement->remarks,
                 createdBy: $replacement->createdBy,
                 replacesAgreementVehicleId: (int) $current->getKey(),
-            ));
+            ), true);
             if ($agreement->status === RentalAgreementStatus::Active) {
                 $this->vehicleStatuses->changeTo(
                     $new->vehicle,

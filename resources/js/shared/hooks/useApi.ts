@@ -11,6 +11,7 @@ export function useApi<T>(
     request: (signal: AbortSignal) => Promise<T>,
     dependencies: DependencyList,
     enabled = true,
+    clearOnLoad = false,
 ) {
     const requestRef = useRef(request);
     requestRef.current = request;
@@ -21,12 +22,20 @@ export function useApi<T>(
 
     useEffect(() => {
         if (!enabled) {
-            setState((current) => ({ ...current, loading: false }));
+            setState((current) => ({
+                data: clearOnLoad ? null : current.data,
+                error: null,
+                loading: false,
+            }));
             return;
         }
 
         const controller = new AbortController();
-        setState((current) => ({ ...current, loading: true, error: null }));
+        setState((current) => ({
+            data: clearOnLoad ? null : current.data,
+            loading: true,
+            error: null,
+        }));
         void (async () => {
             try {
                 const data = await requestRef.current(controller.signal);
@@ -47,7 +56,7 @@ export function useApi<T>(
         return () => controller.abort();
         // Dependencies are deliberately supplied by each caller.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [...dependencies, enabled, version]);
+    }, [...dependencies, enabled, clearOnLoad, version]);
 
     return { ...state, reload, setData: (data: T) => setState({ data, error: null, loading: false }) };
 }

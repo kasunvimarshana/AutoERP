@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
@@ -83,7 +84,7 @@ final class RentalUsageContextService
         $links = RentalAgreementVehicleLink::query()
             ->forContext((int) $selectedAgreement->tenant_id, $selectedAgreement->organization_unit_id)
             ->where('vehicle_id', $selectedAllocation->vehicle_id)
-            ->where('status', RentalAgreementVehicleLinkStatus::Active->value)
+            ->where('status', RentalAgreementVehicleLinkStatus::Approved->value)
             ->when(
                 $startTime === null,
                 fn ($query) => $query
@@ -97,6 +98,15 @@ final class RentalUsageContextService
                 $query->where('inbound_agreement_vehicle_id', $selectedAllocation->getKey())
                     ->orWhere('outbound_agreement_vehicle_id', $selectedAllocation->getKey());
             })
+            ->where(function ($query) use ($selectedAgreement, $selectedAllocation): void {
+                if ($selectedAgreement->direction === RentalAgreementDirection::Inbound) {
+                    $query->where('inbound_agreement_id', $selectedAgreement->getKey())
+                        ->where('inbound_agreement_vehicle_id', $selectedAllocation->getKey());
+                } else {
+                    $query->where('outbound_agreement_id', $selectedAgreement->getKey())
+                        ->where('outbound_agreement_vehicle_id', $selectedAllocation->getKey());
+                }
+            })
             ->with([
                 'inboundAgreement.rateSnapshot',
                 'inboundAgreement.supplier',
@@ -105,7 +115,7 @@ final class RentalUsageContextService
                 'outboundAgreement.customer',
                 'outboundAllocation',
             ])
-            ->lockForUpdate()
+            ->when(DB::transactionLevel() > 0, fn ($query) => $query->lockForUpdate())
             ->get();
 
         if ($links->count() > 1) {

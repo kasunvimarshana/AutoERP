@@ -41,7 +41,11 @@ final class RentalChargeCalculation extends CoreModel
             'rate' => 'decimal:6',
             'multiplier' => 'decimal:6',
             'amount' => 'decimal:6',
+            'tax_amount' => 'decimal:6',
+            'withholding_amount' => 'decimal:6',
+            'total_amount' => 'decimal:6',
             'calculation_version' => 'integer',
+            'supersedes_calculation_id' => 'integer',
         ];
     }
 
@@ -68,5 +72,10 @@ final class RentalChargeCalculation extends CoreModel
     public function charge(): HasOne
     {
         return $this->hasOne(RentalCharge::class, 'charge_calculation_id');
+    }
+
+    public function supersededCalculation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_calculation_id');
     }
 }

@@ -23,12 +23,14 @@ use Modules\VehicleRental\DTOs\RentalAgreementVehicleData;
 use Modules\VehicleRental\DTOs\RentalRateSnapshotData;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalAgreementVehicleLinkStatus;
 use Modules\VehicleRental\Enums\RentalAgreementVehicleStatus;
 use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateSnapshot;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
+use Modules\VehicleRental\Models\RentalAgreementVehicleLink;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RentalStatusHistory;
 use RuntimeException;
@@ -103,6 +105,7 @@ final class RentalAgreementService
                     'organization_unit_id' => $reservation->organization_unit_id,
                     'reservation_id' => $reservation->getKey(),
                     'entity_type' => 'reservation',
+                    'subject_id' => $reservation->getKey(),
                     'old_status' => $old->value,
                     'new_status' => RentalReservationStatus::Converted->value,
                     'changed_by' => $data->createdBy,
@@ -120,19 +123,22 @@ final class RentalAgreementService
         ?int $changedBy = null,
         ?string $reason = null,
     ): RentalAgreement {
-        $old = $agreement->status;
-        if ($old === $status) {
-            return $agreement;
-        }
-        if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
-            throw new InvalidArgumentException(
-                "Invalid rental agreement status transition from {$old->value} to {$status->value}.",
-            );
-        }
-
-        return DB::transaction(function () use ($agreement, $status, $old, $changedBy, $reason): RentalAgreement {
+        return DB::transaction(function () use ($agreement, $status, $changedBy, $reason): RentalAgreement {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
-            $agreement->load('vehicles.vehicle', 'vehicles.pickupInspection', 'vehicles.returnInspection');
+            $old = $agreement->status;
+            if ($old === $status) {
+                return $agreement;
+            }
+            if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
+                throw new InvalidArgumentException(
+                    "Invalid rental agreement status transition from {$old->value} to {$status->value}.",
+                );
+            }
+            $allocations = $agreement->vehicles()
+                ->with(['vehicle', 'pickupInspection', 'returnInspection'])
+                ->lockForUpdate()
+                ->get();
+            $agreement->setRelation('vehicles', $allocations);
             if ($status === RentalAgreementStatus::Confirmed) {
                 foreach ($agreement->vehicles as $allocation) {
                     $this->availability->assertAvailable(
@@ -167,6 +173,7 @@ final class RentalAgreementService
                     throw new InvalidArgumentException('Pickup inspection is required for every active rental vehicle.');
                 }
                 foreach ($activeAllocations as $allocation) {
+                    $this->assertOppositeAllocationIsLinked($agreement, $allocation);
                     if ($allocation->vehicle?->status === VehicleStatus::Reserved) {
                         $this->vehicleStatuses->changeTo(
                             $allocation->vehicle,
@@ -188,6 +195,16 @@ final class RentalAgreementService
                 $agreement->actual_end_at ??= now();
             }
             if ($status === RentalAgreementStatus::Cancelled) {
+                if ($agreement->operationalUsageLogs()
+                    ->where('status', 'approved')
+                    ->exists()
+                    || $agreement->charges()->where('status', 'approved')->exists()
+                    || $agreement->invoiceLinks()->exists()
+                    || $agreement->paymentLinks()->exists()) {
+                    throw new InvalidArgumentException(
+                        'A financially or operationally approved agreement cannot be cancelled; use reversal or correction.',
+                    );
+                }
                 foreach ($agreement->vehicles as $allocation) {
                     if (in_array($allocation->vehicle?->status, [VehicleStatus::Reserved, VehicleStatus::Rented], true)) {
                         $hasOtherBlockingAllocation = RentalAgreementVehicle::query()
@@ -447,11 +464,67 @@ final class RentalAgreementService
             'organization_unit_id' => $agreement->organization_unit_id,
             'agreement_id' => $agreement->getKey(),
             'entity_type' => 'agreement',
+            'subject_id' => $agreement->getKey(),
             'old_status' => $old?->value,
             'new_status' => $new->value,
             'reason' => $reason,
             'changed_by' => $changedBy,
             'changed_at' => now(),
         ]);
+    }
+
+    private function assertOppositeAllocationIsLinked(
+        RentalAgreement $agreement,
+        RentalAgreementVehicle $allocation,
+    ): void {
+        $oppositeDirection = $agreement->direction === RentalAgreementDirection::Outbound
+            ? RentalAgreementDirection::Inbound
+            : RentalAgreementDirection::Outbound;
+        $allocationEnd = $allocation->allocated_to ?? $agreement->expected_end_at;
+        $oppositeAllocations = RentalAgreementVehicle::query()
+            ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
+            ->where('vehicle_id', $allocation->vehicle_id)
+            ->whereKeyNot($allocation->getKey())
+            ->where('allocated_from', '<', $allocationEnd)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('allocated_to')
+                ->orWhere('allocated_to', '>', $allocation->allocated_from))
+            ->whereHas('agreement', fn (Builder $query) => $query
+                ->where('direction', $oppositeDirection->value)
+                ->whereIn('status', [
+                    RentalAgreementStatus::Confirmed->value,
+                    RentalAgreementStatus::Active->value,
+                ]))
+            ->with('agreement')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($oppositeAllocations as $opposite) {
+            $from = $allocation->allocated_from->greaterThan($opposite->allocated_from)
+                ? $allocation->allocated_from
+                : $opposite->allocated_from;
+            $oppositeEnd = $opposite->allocated_to ?? $opposite->agreement?->expected_end_at;
+            $to = $allocationEnd->lessThan($oppositeEnd) ? $allocationEnd : $oppositeEnd;
+            $inboundId = $agreement->direction === RentalAgreementDirection::Inbound
+                ? $allocation->getKey()
+                : $opposite->getKey();
+            $outboundId = $agreement->direction === RentalAgreementDirection::Outbound
+                ? $allocation->getKey()
+                : $opposite->getKey();
+            $linked = RentalAgreementVehicleLink::query()
+                ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
+                ->where('inbound_agreement_vehicle_id', $inboundId)
+                ->where('outbound_agreement_vehicle_id', $outboundId)
+                ->where('status', RentalAgreementVehicleLinkStatus::Approved->value)
+                ->where('effective_from', '<=', $from)
+                ->where('effective_to', '>=', $to)
+                ->lockForUpdate()
+                ->exists();
+            if (! $linked) {
+                throw new InvalidArgumentException(
+                    'An overlapping opposite-direction allocation must have an approved allocation link before activation.',
+                );
+            }
+        }
     }
 }
