@@ -44,6 +44,9 @@ final class TaxDocumentIntegrationService
                 quantity: (string) $line->quantity,
                 unitPrice: (string) $line->unit_price,
                 itemId: $line->item_id !== null ? (int) $line->item_id : null,
+                taxGroupId: is_array($line->metadata) && is_numeric($line->metadata['tax_group_id'] ?? null)
+                    ? (int) $line->metadata['tax_group_id']
+                    : null,
                 discountBeforeTax: (string) $line->discount_amount,
                 chargeAfterTax: (string) $line->charge_amount,
             );

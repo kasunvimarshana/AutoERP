@@ -16,6 +16,7 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
         items: [
             { to: '/dashboard', label: 'Task center', match: ['/dashboard'] },
             { to: '/vehicle-service/jobs', label: 'Vehicle service workspace', match: ['/vehicle-service'] },
+            { to: '/vehicle-rental/agreements', label: 'Vehicle rental workspace', match: ['/vehicle-rental'] },
             { to: '/purchase/orders', label: 'Purchase workflow', match: ['/purchase'] },
             { to: '/sales/orders', label: 'Sales workflow', match: ['/sales'] },
         ],

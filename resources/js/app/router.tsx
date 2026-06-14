@@ -100,6 +100,19 @@ const VehicleServiceJobEditPage = lazy(() => import('@/modules/vehicle-service/p
 const VehicleServiceJobDetailPage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceJobDetailPage'));
 const VehicleServiceInvoiceCreatePage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServiceInvoiceCreatePage'));
 const VehicleServicePaymentPreparePage = lazy(() => import('@/modules/vehicle-service/pages/VehicleServicePaymentPreparePage'));
+const RentalReservationListPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalReservationListPage'));
+const RentalReservationCreatePage = lazy(() => import('@/modules/vehicle-rental/pages/RentalReservationCreatePage'));
+const RentalAgreementListPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalAgreementListPage'));
+const RentalAgreementCreatePage = lazy(() => import('@/modules/vehicle-rental/pages/RentalAgreementCreatePage'));
+const RentalAgreementDetailPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalAgreementDetailPage'));
+const VehicleAvailabilityPage = lazy(() => import('@/modules/vehicle-rental/pages/VehicleAvailabilityPage'));
+const PickupInspectionPage = lazy(() => import('@/modules/vehicle-rental/pages/PickupInspectionPage'));
+const ReturnInspectionPage = lazy(() => import('@/modules/vehicle-rental/pages/ReturnInspectionPage'));
+const UsageLogPage = lazy(() => import('@/modules/vehicle-rental/pages/UsageLogPage'));
+const RentalExpensePage = lazy(() => import('@/modules/vehicle-rental/pages/RentalExpensePage'));
+const RentalChargePreviewPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalChargePreviewPage'));
+const RentalInvoiceCreatePage = lazy(() => import('@/modules/vehicle-rental/pages/RentalInvoiceCreatePage'));
+const RentalReportsPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalReportsPage'));
 const NotFoundPage = lazy(() => import('@/modules/not-found/NotFoundPage'));
 
 export function AppRouter() {
@@ -213,6 +226,19 @@ export function AppRouter() {
                     <Route path="/vehicle-service/jobs/:id/invoice" element={<VehicleServiceInvoiceCreatePage />} />
                     <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
                     <Route path="/vehicle-service/jobs/:id" element={<VehicleServiceJobDetailPage />} />
+                    <Route path="/vehicle-rental/reservations" element={<RentalReservationListPage />} />
+                    <Route path="/vehicle-rental/reservations/create" element={<RentalReservationCreatePage />} />
+                    <Route path="/vehicle-rental/agreements" element={<RentalAgreementListPage />} />
+                    <Route path="/vehicle-rental/agreements/create" element={<RentalAgreementCreatePage />} />
+                    <Route path="/vehicle-rental/availability" element={<VehicleAvailabilityPage />} />
+                    <Route path="/vehicle-rental/reports" element={<RentalReportsPage />} />
+                    <Route path="/vehicle-rental/agreements/:id/vehicles/:allocationId/pickup" element={<PickupInspectionPage />} />
+                    <Route path="/vehicle-rental/agreements/:id/vehicles/:allocationId/return" element={<ReturnInspectionPage />} />
+                    <Route path="/vehicle-rental/agreements/:id/usage" element={<UsageLogPage />} />
+                    <Route path="/vehicle-rental/agreements/:id/expenses" element={<RentalExpensePage />} />
+                    <Route path="/vehicle-rental/agreements/:id/charges" element={<RentalChargePreviewPage />} />
+                    <Route path="/vehicle-rental/agreements/:id/invoice" element={<RentalInvoiceCreatePage />} />
+                    <Route path="/vehicle-rental/agreements/:id" element={<RentalAgreementDetailPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Route>
             </Route>
