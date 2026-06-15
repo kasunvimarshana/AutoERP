@@ -206,6 +206,38 @@ final class AuthFoundationTest extends TestCase
             ->assertJsonPath('organization_unit.name', 'Head Office');
     }
 
+    public function test_me_endpoint_returns_tenant_features_and_enabled_modules_for_navigation(): void
+    {
+        $context = $this->createAuthContext();
+        $planId = (int) DB::table('tenant_plans')->insertGetId([
+            'name' => 'Operations Plan',
+            'slug' => 'operations-plan-'.Str::lower(Str::random(5)),
+            'features' => json_encode(['sales' => true, 'vehicle-rental' => false], JSON_THROW_ON_ERROR),
+            'limits' => json_encode([], JSON_THROW_ON_ERROR),
+            'billing_interval' => 'month',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('tenants')->where('id', $context['tenant_id'])->update([
+            'tenant_plan_id' => $planId,
+            'metadata' => json_encode(['enabled_modules' => ['sales', 'inventory']], JSON_THROW_ON_ERROR),
+        ]);
+        DB::table('organization_units')->where('id', $context['organization_unit_id'])->update([
+            'metadata' => json_encode(['enabled_modules' => ['sales']], JSON_THROW_ON_ERROR),
+        ]);
+        $session = $this->login($context);
+
+        $this->withAuthHeaders($session['token'], $context)
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('tenant.features.sales', true)
+            ->assertJsonPath('tenant.features.vehicle-rental', false)
+            ->assertJsonPath('tenant.enabled_modules.0', 'sales')
+            ->assertJsonPath('tenant.enabled_modules.1', 'inventory')
+            ->assertJsonPath('organization_unit.enabled_modules.0', 'sales');
+    }
+
     public function test_logout_invalidates_current_token(): void
     {
         $context = $this->createAuthContext();

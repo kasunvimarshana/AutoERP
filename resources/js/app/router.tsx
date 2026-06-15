@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
+const WorkspaceOverviewPage = lazy(() => import('./navigation/WorkspaceOverviewPage'));
 const UomListPage = lazy(() => import('@/modules/uom/UomListPage'));
 const UomCreatePage = lazy(() => import('@/modules/uom/UomCreatePage'));
 const UomEditPage = lazy(() => import('@/modules/uom/UomEditPage'));
@@ -125,6 +126,12 @@ export function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/sales" element={<WorkspaceOverviewPage itemId="sales" title="Sales" />} />
+                    <Route path="/purchase" element={<WorkspaceOverviewPage itemId="purchase" title="Purchase" />} />
+                    <Route path="/vehicle-service" element={<WorkspaceOverviewPage itemId="vehicle-service" title="Vehicle Service" />} />
+                    <Route path="/vehicle-rental" element={<WorkspaceOverviewPage itemId="vehicle-rental" title="Vehicle Rental" />} />
+                    <Route path="/hr" element={<WorkspaceOverviewPage itemId="hr" title="HR" />} />
+                    <Route path="/finance" element={<WorkspaceOverviewPage itemId="finance" title="Finance" />} />
                     <Route path="/uoms" element={<UomListPage />} />
                     <Route path="/uoms/create" element={<UomCreatePage />} />
                     <Route path="/uoms/:id/edit" element={<UomEditPage />} />

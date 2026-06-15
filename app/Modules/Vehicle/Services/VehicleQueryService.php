@@ -6,6 +6,8 @@ namespace Modules\Vehicle\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 
@@ -13,7 +15,10 @@ final class VehicleQueryService
 {
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
-        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['make', 'model', 'type', 'category', 'customer']);
+        $query = $this->baseQuery($tenantId, $organizationUnitId)->with([
+            'make', 'model', 'type', 'category', 'customer',
+            'currentOwnership.customer', 'currentOwnership.supplier',
+        ]);
         $this->applyCriteria($query, $criteria);
         $sort = in_array(($criteria['sort'] ?? null), ['vehicle_number', 'code', 'registration_number', 'status', 'created_at'], true) ? (string) $criteria['sort'] : 'vehicle_number';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
@@ -39,7 +44,7 @@ final class VehicleQueryService
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Vehicle
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->with(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer'])
+            ->with(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer', 'currentOwnership.supplier'])
             ->findOrFail($id);
     }
 
@@ -68,7 +73,9 @@ final class VehicleQueryService
                     ->orWhere('registration_number', 'like', "%{$search}%")
                     ->orWhere('chassis_number', 'like', "%{$search}%")
                     ->orWhere('engine_number', 'like', "%{$search}%")
-                    ->orWhere('vin_number', 'like', "%{$search}%");
+                    ->orWhere('vin_number', 'like', "%{$search}%")
+                    ->orWhereHas('currentOwnership.customer', fn (Builder $owner): Builder => $owner->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('currentOwnership.supplier', fn (Builder $owner): Builder => $owner->where('name', 'like', "%{$search}%"));
             });
         }
         foreach (['status', 'vehicle_make_id', 'vehicle_model_id', 'vehicle_type_id', 'vehicle_category_id', 'customer_id'] as $filter) {
@@ -81,6 +88,50 @@ final class VehicleQueryService
         }
         if (! empty($criteria['available_for_rental'])) {
             $query->where('status', VehicleStatus::Active->value);
+        }
+        $this->applyOwnershipScope($query, (string) ($criteria['scope'] ?? 'all'));
+        if (! empty($criteria['owner_type']) || ! empty($criteria['owner_id'])) {
+            $query->whereHas('currentOwnership', function (Builder $ownership) use ($criteria): void {
+                if (! empty($criteria['owner_type'])) {
+                    $ownership->where('owner_type', $criteria['owner_type']);
+                }
+                if (! empty($criteria['owner_id'])) {
+                    $ownership->where('owner_id', $criteria['owner_id']);
+                }
+            });
+        }
+    }
+
+    private function applyOwnershipScope(Builder $query, string $scope): void
+    {
+        if ($scope === 'fleet') {
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->where(function (Builder $fleet): void {
+                    $fleet->where('ownership_type', VehicleOwnershipType::Leased->value)
+                        ->orWhere(function (Builder $company): void {
+                            $company->whereIn('ownership_type', [
+                                VehicleOwnershipType::Owned->value,
+                                VehicleOwnershipType::CompanyOwned->value,
+                            ])->where('owner_type', VehicleOwnerType::Company->value);
+                        });
+                }));
+        } elseif ($scope === 'customer') {
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->where(function (Builder $customer): void {
+                    $customer->where('owner_type', VehicleOwnerType::Customer->value)
+                        ->orWhere('ownership_type', VehicleOwnershipType::CustomerOwned->value);
+                }));
+        } elseif ($scope === 'supplier_owner') {
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->where(function (Builder $supplier): void {
+                    $supplier->whereIn('owner_type', [
+                        VehicleOwnerType::Supplier->value,
+                        VehicleOwnerType::ThirdParty->value,
+                    ])->orWhereIn('ownership_type', [
+                        VehicleOwnershipType::Rented->value,
+                        VehicleOwnershipType::ThirdParty->value,
+                    ]);
+                }));
         }
     }
 }

@@ -509,6 +509,37 @@ final class PaymentEngineTest extends TestCase
         $this->assertSame('AUTH-77', $cardLine->metadata['authorization_code']);
     }
 
+    public function test_payment_api_filters_contextual_rental_settlements_by_source_type(): void
+    {
+        $this->withoutMiddleware();
+        $tenantId = $this->createTenant();
+        app(PaymentCreationService::class)->create(new CreatePaymentData(
+            tenantId: $tenantId,
+            paymentType: PaymentType::RentalReceipt,
+            direction: PaymentDirection::Inbound,
+            paymentDate: '2026-06-06',
+            paymentNumber: 'PAY-RENTAL-CONTEXT',
+            sourceType: 'VehicleRentalAgreement',
+            sourceId: 41,
+            lines: [new PaymentLineData(amount: '100.000000')],
+        ));
+        app(PaymentCreationService::class)->create(new CreatePaymentData(
+            tenantId: $tenantId,
+            paymentType: PaymentType::CustomerReceipt,
+            direction: PaymentDirection::Inbound,
+            paymentDate: '2026-06-06',
+            paymentNumber: 'PAY-SALES-CONTEXT',
+            sourceType: 'SalesOrder',
+            sourceId: 42,
+            lines: [new PaymentLineData(amount: '100.000000')],
+        ));
+
+        $this->getJson("/api/v1/payments?tenant_id={$tenantId}&source_type=VehicleRentalAgreement")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.payment_number', 'PAY-RENTAL-CONTEXT');
+    }
+
     private function createPostedInvoice(
         int $tenantId,
         string $invoiceNumber,

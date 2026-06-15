@@ -9,11 +9,14 @@ export interface AuthUser {
 export interface AuthTenant {
     id: number | string;
     name: string | null;
+    features?: Record<string, boolean> | string[];
+    enabled_modules?: string[];
 }
 
 export interface AuthOrganizationUnit {
     id: number | string;
     name: string | null;
+    enabled_modules?: string[];
 }
 
 export interface AuthSession {

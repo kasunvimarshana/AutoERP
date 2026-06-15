@@ -20,7 +20,7 @@ final class VehicleRelationQueryService
 
     public function ownerships(Vehicle $vehicle, int $perPage): LengthAwarePaginator
     {
-        return $vehicle->ownerships()->with('customer')->orderByDesc('is_current')->orderByDesc('started_at')->paginate($perPage);
+        return $vehicle->ownerships()->with(['customer', 'supplier'])->orderByDesc('is_current')->orderByDesc('started_at')->paginate($perPage);
     }
 
     public function attributes(Vehicle $vehicle, int $perPage): LengthAwarePaginator
@@ -33,9 +33,20 @@ final class VehicleRelationQueryService
         return $vehicle->statusHistories()->orderByDesc('changed_at')->orderByDesc('id')->paginate($perPage);
     }
 
-    public function document(Vehicle $vehicle, int $id): VehicleDocument { return $this->relation($vehicle, VehicleDocument::class, $id); }
-    public function ownership(Vehicle $vehicle, int $id): VehicleOwnership { return $this->relation($vehicle, VehicleOwnership::class, $id); }
-    public function attribute(Vehicle $vehicle, int $id): VehicleAttribute { return $this->relation($vehicle, VehicleAttribute::class, $id); }
+    public function document(Vehicle $vehicle, int $id): VehicleDocument
+    {
+        return $this->relation($vehicle, VehicleDocument::class, $id);
+    }
+
+    public function ownership(Vehicle $vehicle, int $id): VehicleOwnership
+    {
+        return $this->relation($vehicle, VehicleOwnership::class, $id);
+    }
+
+    public function attribute(Vehicle $vehicle, int $id): VehicleAttribute
+    {
+        return $this->relation($vehicle, VehicleAttribute::class, $id);
+    }
 
     private function relation(Vehicle $vehicle, string $model, int $id): Model
     {

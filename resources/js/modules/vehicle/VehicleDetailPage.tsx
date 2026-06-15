@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
@@ -21,6 +21,7 @@ type DetailTab = 'summary' | 'ownership' | 'documents' | 'attributes' | 'history
 
 export default function VehicleDetailPage() {
     const { id } = useParams();
+    const location = useLocation();
     const vehicleId = Number(id);
     const result = useApi((signal) => getVehicle(vehicleId, signal), [vehicleId], Number.isFinite(vehicleId));
     const tab = useOnDemandTab<DetailTab>('summary');
@@ -31,7 +32,7 @@ export default function VehicleDetailPage() {
 
     return (
         <div>
-            <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<Link to={`/vehicles/${vehicle.id}/edit`}><Button>Edit</Button></Link>} />
+            <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<Link to={`/vehicles/${vehicle.id}/edit${location.search}`}><Button>Edit</Button></Link>} />
             <ErrorAlert error={result.error} />
             <EntityDetailLayout actions={
                 <>

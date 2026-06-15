@@ -5,6 +5,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "test:navigation": "node --test --experimental-strip-types resources/js/app/navigation/navigationUtils.test.ts",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {

@@ -19,6 +19,7 @@ use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentRefundService;
@@ -37,7 +38,7 @@ final class PaymentController
                 ->where('payment_number', 'like', "%{$search}%")
                 ->orWhere('reference_number', 'like', "%{$search}%"));
         }
-        foreach (['payment_type', 'direction', 'status', 'party_id'] as $filter) {
+        foreach (['payment_type', 'direction', 'status', 'party_id', 'source_type'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
@@ -61,8 +62,7 @@ final class PaymentController
         ListPaymentRequest $request,
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
-    ): PaymentResource
-    {
+    ): PaymentResource {
         $row = $this->scope(Payment::query(), $request)
             ->with([
                 'currency', 'lines.paymentMethod', 'allocations',
@@ -117,8 +117,7 @@ final class PaymentController
         PaymentActionRequest $request,
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $allocations = $this->find($request, $payment)->allocations()->get();
         $this->attachInvoiceReferences($allocations, $invoices);
 
@@ -168,7 +167,7 @@ final class PaymentController
     }
 
     /**
-     * @param  Collection<int, \Modules\Payment\Models\PaymentAllocation>  $allocations
+     * @param  Collection<int, PaymentAllocation>  $allocations
      */
     private function attachInvoiceReferences(
         Collection $allocations,

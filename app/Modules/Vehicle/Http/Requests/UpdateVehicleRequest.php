@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\Enums\VehicleFuelType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
 
 final class UpdateVehicleRequest extends TenantScopedRequest
@@ -23,7 +24,7 @@ final class UpdateVehicleRequest extends TenantScopedRequest
             'vehicle_type_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_category_id' => ['nullable', 'integer', 'min:1'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
-            'current_owner_type' => ['nullable', 'string', 'max:100'],
+            'current_owner_type' => ['nullable', Rule::enum(VehicleOwnerType::class)],
             'current_owner_id' => ['nullable', 'integer', 'min:1'],
             'registration_number' => ['nullable', 'string', 'max:100'],
             'chassis_number' => ['nullable', 'string', 'max:150'],
@@ -72,6 +73,13 @@ final class UpdateVehicleRequest extends TenantScopedRequest
         );
     }
 
-    private function stringOrNull(string $key): ?string { return $this->filled($key) ? (string) $this->input($key) : null; }
-    private function integerOrNull(string $key): ?int { return $this->filled($key) ? (int) $this->input($key) : null; }
+    private function stringOrNull(string $key): ?string
+    {
+        return $this->filled($key) ? (string) $this->input($key) : null;
+    }
+
+    private function integerOrNull(string $key): ?int
+    {
+        return $this->filled($key) ? (int) $this->input($key) : null;
+    }
 }

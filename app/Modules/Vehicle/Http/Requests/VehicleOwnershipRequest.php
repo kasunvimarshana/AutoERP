@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\DTOs\VehicleOwnershipData;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 
 abstract class VehicleOwnershipRequest extends TenantScopedRequest
 {
@@ -16,7 +17,7 @@ abstract class VehicleOwnershipRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'owner_type' => ['nullable', 'string', 'max:100'],
+            'owner_type' => ['nullable', Rule::enum(VehicleOwnerType::class)],
             'owner_id' => ['nullable', 'integer', 'min:1'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'ownership_type' => ['required', Rule::enum(VehicleOwnershipType::class)],

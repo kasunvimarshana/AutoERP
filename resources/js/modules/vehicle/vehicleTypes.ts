@@ -4,6 +4,8 @@ export type VehicleStatus = 'active' | 'inactive' | 'under_service' | 'rented' |
 export type VehicleDocumentStatus = 'active' | 'expired' | 'revoked' | 'pending';
 export type VehicleDocumentType = 'registration' | 'insurance' | 'emission_test' | 'revenue_license' | 'fitness_certificate' | 'lease_document' | 'ownership_document' | 'warranty' | 'other';
 export type VehicleOwnershipType = 'owned' | 'customer_owned' | 'leased' | 'rented' | 'company_owned' | 'third_party';
+export type VehicleOwnerType = 'company' | 'customer' | 'supplier' | 'third_party';
+export type VehicleScope = 'all' | 'fleet' | 'customer' | 'supplier_owner';
 export type VehicleAttributeDataType = 'text' | 'number' | 'date' | 'boolean' | 'decimal';
 
 export interface VehicleMake extends NamedResource {
@@ -45,6 +47,7 @@ export interface VehicleSummary {
     type?: NamedResource | null;
     category?: NamedResource | null;
     customer?: NamedResource | null;
+    current_ownership?: VehicleOwnership | null;
     status: VehicleStatus;
     odometer_reading: string;
     odometer_unit?: string | null;
@@ -53,7 +56,7 @@ export interface VehicleSummary {
 }
 
 export interface Vehicle extends VehicleSummary {
-    current_owner_type?: string | null;
+    current_owner_type?: VehicleOwnerType | null;
     current_owner_id?: number | null;
     manufacture_year?: number | null;
     registration_date?: string | null;
@@ -120,8 +123,9 @@ export type VehicleDocumentPayload = Omit<VehicleDocument, 'id'>;
 
 export interface VehicleOwnership {
     id: number;
-    owner_type?: string | null;
+    owner_type?: VehicleOwnerType | null;
     owner_id?: number | null;
+    owner?: NamedResource | null;
     customer?: NamedResource | null;
     ownership_type: VehicleOwnershipType;
     started_at: string;
@@ -131,7 +135,7 @@ export interface VehicleOwnership {
 }
 
 export interface VehicleOwnershipPayload {
-    owner_type?: string | null;
+    owner_type?: VehicleOwnerType | null;
     owner_id?: number | null;
     customer_id?: number | null;
     ownership_type: VehicleOwnershipType;

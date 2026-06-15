@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { getPayment, getPaymentAllocations, getPaymentUnappliedBalance, refundPayment, reversePayment } from '../paymentApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useApi } from '@/shared/hooks/useApi';
@@ -36,6 +36,7 @@ function today(): string {
 
 export default function PaymentDetailPage() {
     const id = Number(useParams().id);
+    const location = useLocation();
     const tabState = useOnDemandTab<Tab>('summary');
     const payment = useApi((signal) => getPayment(id, signal), [id]);
     const allocations = useApi((signal) => getPaymentAllocations(id, signal), [id], tabState.openedTabs.has('allocations'));
@@ -105,7 +106,7 @@ export default function PaymentDetailPage() {
             <ContentHeader
                 title={value.payment_number ?? 'Payment'}
                 description={formatDate(value.payment_date)}
-                actions={isCheque ? <Link to={`/payments/${id}/cheque-print`}><Button>Print cheque</Button></Link> : undefined}
+                actions={isCheque ? <Link to={`/payments/${id}/cheque-print${location.search}`}><Button>Print cheque</Button></Link> : undefined}
             />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
