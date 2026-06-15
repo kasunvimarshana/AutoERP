@@ -23,6 +23,18 @@ return new class extends Migration
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
             $table->decimal('withholding_amount', 20, 6)->default('0.000000');
+            $table->decimal('original_net_amount', 20, 6)->default('0.000000');
+            $table->foreignId('original_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
+            $table->decimal('original_tax_amount', 20, 6)->default('0.000000');
+            $table->decimal('original_gross_amount', 20, 6)->default('0.000000');
+            $table->decimal('original_withholding_amount', 20, 6)->default('0.000000');
+            $table->decimal('recoverable_input_tax_amount', 20, 6)->default('0.000000');
+            $table->decimal('recovery_base_amount', 20, 6)->default('0.000000');
+            $table->foreignId('recovery_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
+            $table->decimal('recovery_tax_amount', 20, 6)->default('0.000000');
+            $table->decimal('recovery_withholding_amount', 20, 6)->default('0.000000');
+            $table->decimal('markup_amount', 20, 6)->default('0.000000');
+            $table->unsignedBigInteger('generated_charge_id')->nullable();
             $table->string('financial_treatment', 30);
             $table->boolean('is_billable')->default(false);
             $table->boolean('is_recoverable')->default(false);
@@ -40,6 +52,8 @@ return new class extends Migration
             $table->timestamp('submitted_at')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('rejected_by')->nullable();
+            $table->timestamp('rejected_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();

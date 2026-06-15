@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\DTOs;
 
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
 use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalType;
@@ -29,6 +30,10 @@ final readonly class RentalAgreementData
         public ?string $agreementNumber = null,
         public ?int $reservationId = null,
         public ?int $currencyId = null,
+        public RentalBillingBasis $billingBasis = RentalBillingBasis::ContractualPeriod,
+        public string $prorationRule = 'exact_day_count',
+        public string $billingTimezone = 'UTC',
+        public ?int $billingPeriodDays = null,
         public ?array $termsSnapshot = null,
         public ?string $remarks = null,
         public ?int $createdBy = null,

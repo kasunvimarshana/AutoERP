@@ -14,6 +14,7 @@ use Modules\Customer\Models\Customer;
 use Modules\Supplier\Models\Supplier;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
 use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalType;
@@ -37,6 +38,8 @@ final class RentalAgreement extends CoreModel
             'party_id' => 'integer',
             'rental_type' => RentalType::class,
             'billing_cycle' => RentalBillingCycle::class,
+            'billing_basis' => RentalBillingBasis::class,
+            'billing_period_days' => 'integer',
             'agreement_date' => 'date',
             'start_at' => 'datetime',
             'expected_end_at' => 'datetime',
@@ -125,6 +128,16 @@ final class RentalAgreement extends CoreModel
     public function expenses(): HasMany
     {
         return $this->hasMany(RentalExpense::class, 'agreement_id');
+    }
+
+    public function billingPeriods(): HasMany
+    {
+        return $this->hasMany(RentalBillingPeriod::class, 'agreement_id');
+    }
+
+    public function chargeRuns(): HasMany
+    {
+        return $this->hasMany(RentalChargeRun::class, 'agreement_id');
     }
 
     public function chargeCalculations(): HasMany

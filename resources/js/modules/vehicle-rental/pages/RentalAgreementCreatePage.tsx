@@ -40,6 +40,10 @@ export default function RentalAgreementCreatePage() {
         party_type: 'customer' as RentalPartyType,
         rental_type: 'daily' as RentalType,
         billing_cycle: 'final',
+        billing_basis: 'contractual_period',
+        proration_rule: 'exact_day_count',
+        billing_timezone: 'UTC',
+        billing_period_days: '',
         agreement_date: today(),
         start_at: localDateTime(),
         expected_end_at: localDateTime(1),
@@ -76,6 +80,7 @@ export default function RentalAgreementCreatePage() {
                 try {
                     const saved = await createRentalAgreement({
                         ...form,
+                        billing_period_days: form.billing_period_days || undefined,
                         reservation_id: reservationId || undefined,
                         party_id: party?.id,
                         rate_snapshot: rate,
@@ -99,7 +104,11 @@ export default function RentalAgreementCreatePage() {
                         {form.direction === 'inbound' && <Select label="Party type" value={form.party_type} disabled={Boolean(reservationId)} options={[{ value: 'supplier', label: 'Supplier' }, { value: 'owner', label: 'Owner' }]} onChange={(event) => { setParty(null); setForm({ ...form, party_type: event.target.value as RentalPartyType }); }} />}
                         <RentalPartySelect partyType={form.party_type} value={party} onChange={setParty} error={fieldError(error, 'party_id')} />
                         <Select label="Rental type" value={form.rental_type} options={['hourly', 'daily', 'weekly', 'monthly', 'lease', 'subscription', 'with_driver', 'without_driver'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, rental_type: event.target.value as RentalType })} />
-                        <Select label="Billing cycle" value={form.billing_cycle} options={['per_trip', 'daily', 'weekly', 'monthly', 'final'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, billing_cycle: event.target.value })} />
+                        <Select label="Billing cycle" value={form.billing_cycle} options={['hourly', 'per_trip', 'daily', 'weekly', 'monthly', 'anniversary_cycle', 'fixed_period', 'final'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, billing_cycle: event.target.value })} />
+                        <Select label="Billing basis" value={form.billing_basis} options={['contractual_period', 'calendar_month', 'anniversary_month', 'fixed_30_day', 'exact_day_count'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, billing_basis: event.target.value })} />
+                        <Select label="Proration" value={form.proration_rule} options={['exact_day_count', 'calendar_day', 'contractual_period'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, proration_rule: event.target.value })} />
+                        <Input label="Billing time zone" value={form.billing_timezone} error={fieldError(error, 'billing_timezone')} onChange={(event) => setForm({ ...form, billing_timezone: event.target.value })} />
+                        {form.billing_cycle === 'fixed_period' && <Input label="Billing period days" type="number" value={form.billing_period_days} error={fieldError(error, 'billing_period_days')} onChange={(event) => setForm({ ...form, billing_period_days: event.target.value })} />}
                         <Input label="Agreement date" type="date" value={form.agreement_date} error={fieldError(error, 'agreement_date')} onChange={(event) => setForm({ ...form, agreement_date: event.target.value })} />
                         <Input label="Start" type="datetime-local" value={form.start_at} error={fieldError(error, 'start_at')} onChange={(event) => setForm({ ...form, start_at: event.target.value })} />
                         <Input label="Expected end" type="datetime-local" value={form.expected_end_at} error={fieldError(error, 'expected_end_at')} onChange={(event) => setForm({ ...form, expected_end_at: event.target.value })} />

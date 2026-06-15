@@ -5,6 +5,8 @@ export type RentalDirection = 'outbound' | 'inbound';
 export type RentalPartyType = 'customer' | 'supplier' | 'owner';
 export type RentalType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'lease' | 'subscription' | 'with_driver' | 'without_driver';
 export type RentalAgreementStatus = 'draft' | 'confirmed' | 'active' | 'returned' | 'completed' | 'cancelled';
+export type RentalBillingCycle = 'hourly' | 'per_trip' | 'daily' | 'weekly' | 'monthly' | 'anniversary_cycle' | 'fixed_period' | 'final';
+export type RentalBillingBasis = 'calendar_month' | 'anniversary_month' | 'fixed_30_day' | 'exact_day_count' | 'contractual_period';
 
 export interface RentalVehicleSummary extends NamedResource {
     registration_number?: string | null;
@@ -121,6 +123,18 @@ export interface RentalExpense {
     tax_group_id?: number | null;
     tax_amount: string;
     withholding_amount: string;
+    original_net_amount: string;
+    original_tax_group_id?: number | null;
+    original_tax_amount: string;
+    original_gross_amount: string;
+    original_withholding_amount: string;
+    recoverable_input_tax_amount: string;
+    recovery_base_amount: string;
+    recovery_tax_group_id?: number | null;
+    recovery_tax_amount: string;
+    recovery_withholding_amount: string;
+    markup_amount: string;
+    generated_charge_id?: number | null;
     financial_treatment: 'company_borne' | 'customer_billable' | 'supplier_recoverable' | 'employee_reimbursable' | 'owner_payable';
     is_billable: boolean;
     is_recoverable: boolean;
@@ -136,6 +150,12 @@ export interface RentalExpense {
 
 export interface RentalCharge {
     id: number;
+    billing_period_id?: number | null;
+    charge_run_id?: number | null;
+    billing_period_start?: string | null;
+    billing_period_end?: string | null;
+    billing_cycle_key?: string | null;
+    period_sequence?: number | null;
     financial_side: 'revenue' | 'cost';
     charge_type: string;
     description: string;
@@ -201,7 +221,11 @@ export interface RentalAgreement {
     party_id: number;
     party?: NamedResource | null;
     rental_type: RentalType;
-    billing_cycle: 'per_trip' | 'daily' | 'weekly' | 'monthly' | 'final';
+    billing_cycle: RentalBillingCycle;
+    billing_basis: RentalBillingBasis;
+    proration_rule: string;
+    billing_timezone: string;
+    billing_period_days?: number | null;
     agreement_date: string;
     start_at: string;
     expected_end_at: string;

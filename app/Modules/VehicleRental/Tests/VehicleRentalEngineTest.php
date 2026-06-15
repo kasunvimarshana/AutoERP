@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ use Modules\VehicleRental\DTOs\RentalUsageEventData;
 use Modules\VehicleRental\DTOs\RentalUsageLogData;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
 use Modules\VehicleRental\Enums\RentalExpenseFinancialTreatment;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
@@ -37,6 +39,7 @@ use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalChargeCalculation;
 use Modules\VehicleRental\Models\RentalInvoiceLink;
+use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\RentalAgreementVehicleService;
 use Modules\VehicleRental\Services\RentalAvailabilityService;
@@ -312,6 +315,231 @@ final class VehicleRentalEngineTest extends TestCase
         $this->assertDatabaseCount('rental_charges', 2);
     }
 
+    public function test_daily_billing_periods_reset_allowances_and_active_agreements_can_invoice(): void
+    {
+        $context = $this->context();
+        $agreement = app(RentalAgreementService::class)->create(new RentalAgreementData(
+            tenantId: $context['tenant_id'],
+            direction: RentalAgreementDirection::Outbound,
+            partyType: RentalPartyType::Customer,
+            partyId: $context['customer_id'],
+            rentalType: RentalType::Daily,
+            billingCycle: RentalBillingCycle::Daily,
+            agreementDate: '2026-06-01',
+            startAt: '2026-06-01 08:00:00',
+            expectedEndAt: '2026-06-04 08:00:00',
+            rateSnapshot: new RentalRateSnapshotData(
+                baseRate: '100.000000',
+                rateUnit: RentalRateUnit::Day,
+                allowedKm: '50.000000',
+                extraKmRate: '2.000000',
+            ),
+            organizationUnitId: $context['organization_unit_id'],
+            agreementNumber: 'AGR-DAILY-PERIODS',
+        ));
+        $allocation = app(RentalAgreementVehicleService::class)->allocate($agreement, new RentalAgreementVehicleData(
+            vehicleId: $context['vehicle_id'],
+            allocatedFrom: '2026-06-01 08:00:00',
+            allocatedTo: '2026-06-04 08:00:00',
+            startOdometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement, RentalAgreementStatus::Confirmed);
+        app(RentalPickupService::class)->save($agreement->refresh(), $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2026-06-01 08:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Active);
+
+        $first = $this->approveUsage(app(RentalUsageLogService::class), $agreement->refresh(), $allocation->refresh(), '09:00', '1000.000000', '1100.000000', '2026-06-01');
+        $second = $this->approveUsage(app(RentalUsageLogService::class), $agreement->refresh(), $allocation->refresh(), '09:00', '1100.000000', '1200.000000', '2026-06-02');
+
+        $charges = app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
+        app(RentalChargeService::class)->approveAgreementCharges($agreement->refresh());
+        $invoice = app(RentalInvoiceIntegrationService::class)->create($agreement->refresh(), '2026-06-04');
+
+        $this->assertSame('100.000000', (string) $first->distance_km);
+        $this->assertSame('100.000000', (string) $second->distance_km);
+        $this->assertSame(3, DB::table('rental_billing_periods')->where('agreement_id', $agreement->getKey())->count());
+        $this->assertSame(3, DB::table('rental_charge_runs')->where('agreement_id', $agreement->getKey())->count());
+        $this->assertSame('500.000000', app(DecimalMath::class)->sum(
+            $charges->pluck('total_amount')->map(fn ($value): string => (string) $value)->all(),
+        ));
+        $this->assertSame('500.000000', (string) $invoice->grand_total);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('already been generated');
+        app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
+    }
+
+    public function test_anniversary_month_billing_handles_leap_year_end_of_month(): void
+    {
+        $context = $this->context();
+        $agreement = app(RentalAgreementService::class)->create(new RentalAgreementData(
+            tenantId: $context['tenant_id'],
+            direction: RentalAgreementDirection::Outbound,
+            partyType: RentalPartyType::Customer,
+            partyId: $context['customer_id'],
+            rentalType: RentalType::Monthly,
+            billingCycle: RentalBillingCycle::Monthly,
+            agreementDate: '2028-01-31',
+            startAt: '2028-01-31 08:00:00',
+            expectedEndAt: '2028-03-31 08:00:00',
+            rateSnapshot: new RentalRateSnapshotData(
+                baseRate: '100.000000',
+                rateUnit: RentalRateUnit::Month,
+            ),
+            organizationUnitId: $context['organization_unit_id'],
+            agreementNumber: 'AGR-LEAP-MONTH',
+            billingBasis: RentalBillingBasis::AnniversaryMonth,
+        ));
+        $allocation = app(RentalAgreementVehicleService::class)->allocate($agreement, new RentalAgreementVehicleData(
+            vehicleId: $context['vehicle_id'],
+            allocatedFrom: '2028-01-31 08:00:00',
+            allocatedTo: '2028-03-31 08:00:00',
+            startOdometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement, RentalAgreementStatus::Confirmed);
+        app(RentalPickupService::class)->save($agreement->refresh(), $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2028-01-31 08:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Active);
+        app(RentalReturnService::class)->save($agreement->refresh(), $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2028-03-31 08:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Returned);
+
+        $charges = app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
+
+        $this->assertSame(['2028-02-29 08:00:00', '2028-03-31 08:00:00'], DB::table('rental_billing_periods')
+            ->where('agreement_id', $agreement->getKey())
+            ->orderBy('period_sequence')
+            ->pluck('period_end')
+            ->all());
+        $this->assertSame('200.000000', app(DecimalMath::class)->sum(
+            $charges->pluck('total_amount')->map(fn ($value): string => (string) $value)->all(),
+        ));
+    }
+
+    public function test_calendar_month_billing_prorates_partial_first_and_final_periods(): void
+    {
+        $context = $this->context();
+        $agreement = app(RentalAgreementService::class)->create(new RentalAgreementData(
+            tenantId: $context['tenant_id'],
+            direction: RentalAgreementDirection::Outbound,
+            partyType: RentalPartyType::Customer,
+            partyId: $context['customer_id'],
+            rentalType: RentalType::Monthly,
+            billingCycle: RentalBillingCycle::Monthly,
+            agreementDate: '2028-01-16',
+            startAt: '2028-01-16 00:00:00',
+            expectedEndAt: '2028-03-10 00:00:00',
+            rateSnapshot: new RentalRateSnapshotData(
+                baseRate: '100.000000',
+                rateUnit: RentalRateUnit::Month,
+            ),
+            organizationUnitId: $context['organization_unit_id'],
+            agreementNumber: 'AGR-CALENDAR-PRORATE',
+            billingBasis: RentalBillingBasis::CalendarMonth,
+        ));
+        $allocation = app(RentalAgreementVehicleService::class)->allocate($agreement, new RentalAgreementVehicleData(
+            vehicleId: $context['vehicle_id'],
+            allocatedFrom: '2028-01-16 00:00:00',
+            allocatedTo: '2028-03-10 00:00:00',
+            startOdometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement, RentalAgreementStatus::Confirmed);
+        app(RentalPickupService::class)->save($agreement->refresh(), $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2028-01-16 00:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Active);
+        app(RentalReturnService::class)->save($agreement->refresh(), $allocation->refresh(), new RentalInspectionData(
+            inspectedAt: '2028-03-10 00:00:00',
+            odometer: '1000.000000',
+        ));
+        app(RentalAgreementService::class)->changeStatus($agreement->refresh(), RentalAgreementStatus::Returned);
+
+        $charges = app(RentalChargeCalculationService::class)->calculate($agreement->refresh());
+
+        $this->assertSame(['2028-02-01 00:00:00', '2028-03-01 00:00:00', '2028-03-10 00:00:00'], DB::table('rental_billing_periods')
+            ->where('agreement_id', $agreement->getKey())
+            ->orderBy('period_sequence')
+            ->pluck('period_end')
+            ->all());
+        $this->assertSame(['0.516129', '1.000000', '0.290322'], $agreement->chargeCalculations()
+            ->where('calculation_type', 'base_rental')
+            ->orderBy('period_sequence')
+            ->pluck('chargeable_quantity')
+            ->map(fn ($value): string => (string) $value)
+            ->all());
+        $this->assertSame('180.645100', app(DecimalMath::class)->sum(
+            $charges->pluck('total_amount')->map(fn ($value): string => (string) $value)->all(),
+        ));
+    }
+
+    public function test_draft_usage_events_and_expenses_can_be_corrected_and_deleted_only_before_approval(): void
+    {
+        $context = $this->context();
+        [$agreement, $allocation] = $this->activeAgreement($context, 'AGR-DRAFT-CORRECTION');
+        $usageService = app(RentalUsageLogService::class);
+        $eventService = app(RentalUsageEventService::class);
+        $expenseService = app(RentalExpenseService::class);
+
+        $usage = $usageService->create($agreement, new RentalUsageLogData(
+            agreementVehicleId: (int) $allocation->getKey(),
+            usageDate: '2026-06-02',
+            startOdometer: '1000.000000',
+            endOdometer: '1010.000000',
+            startTime: '09:00',
+            endTime: '10:00',
+        ));
+        $event = $eventService->create($usage, new RentalUsageEventData(RentalUsageEventType::Overtime, '1.000000'));
+        $event = $eventService->update($event, new RentalUsageEventData(RentalUsageEventType::Waiting, '2.000000'));
+        $usage = $usageService->update($usage, new RentalUsageLogData(
+            agreementVehicleId: (int) $allocation->getKey(),
+            usageDate: '2026-06-02',
+            startOdometer: '1000.000000',
+            endOdometer: '1020.000000',
+            startTime: '09:00',
+            endTime: '11:00',
+        ));
+        $eventService->delete($event);
+        $usageService->delete($usage);
+
+        $expense = $expenseService->create($agreement, new RentalExpenseData(
+            RentalExpenseType::Fuel,
+            '2026-06-02',
+            '30.000000',
+            RentalExpenseFinancialTreatment::CustomerBillable,
+            originalTaxAmount: '3.000000',
+            recoveryBaseAmount: '35.000000',
+            recoveryTaxAmount: '4.000000',
+        ));
+        $expense = $expenseService->update($expense, new RentalExpenseData(
+            RentalExpenseType::Fuel,
+            '2026-06-02',
+            '40.000000',
+            RentalExpenseFinancialTreatment::CustomerBillable,
+            originalTaxAmount: '5.000000',
+            recoveryBaseAmount: '45.000000',
+            recoveryTaxAmount: '6.000000',
+        ));
+        $expenseService->delete($expense);
+
+        $approved = $this->approveUsage($usageService, $agreement->refresh(), $allocation->refresh(), '09:00', '1000.000000', '1010.000000');
+        $this->expectException(InvalidArgumentException::class);
+        $usageService->update($approved, new RentalUsageLogData(
+            agreementVehicleId: (int) $allocation->getKey(),
+            usageDate: '2026-06-02',
+            startOdometer: '1000.000000',
+            endOdometer: '1020.000000',
+            startTime: '09:00',
+            endTime: '11:00',
+        ));
+    }
+
     public function test_expense_treatments_are_scoped_idempotent_and_require_submission_before_approval(): void
     {
         $context = $this->context();
@@ -495,6 +723,28 @@ final class VehicleRentalEngineTest extends TestCase
             )->limit(1)->get();
             $this->assertLessThanOrEqual(1, $rows->count(), $key);
         }
+    }
+
+    private function approveUsage(
+        RentalUsageLogService $service,
+        RentalAgreement $agreement,
+        RentalAgreementVehicle $allocation,
+        string $startTime,
+        string $startOdometer,
+        string $endOdometer,
+        string $usageDate = '2026-06-02',
+    ): RentalUsageLog {
+        $usage = $service->create($agreement->refresh(), new RentalUsageLogData(
+            agreementVehicleId: (int) $allocation->getKey(),
+            usageDate: $usageDate,
+            startOdometer: $startOdometer,
+            endOdometer: $endOdometer,
+            startTime: $startTime,
+            endTime: CarbonImmutable::parse($usageDate.' '.$startTime)->addHour()->format('H:i'),
+        ));
+        $service->changeStatus($usage, RentalUsageLogStatus::Submitted);
+
+        return $service->changeStatus($usage->refresh(), RentalUsageLogStatus::Approved);
     }
 
     /** @return array{0: RentalAgreement, 1: RentalAgreementVehicle} */

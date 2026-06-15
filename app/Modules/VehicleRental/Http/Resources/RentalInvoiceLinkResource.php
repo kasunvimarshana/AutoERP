@@ -14,6 +14,8 @@ final class RentalInvoiceLinkResource extends RentalResource
 
         return [
             'id' => (int) $this->getKey(),
+            'billing_period_id' => $this->billing_period_id,
+            'charge_run_id' => $this->charge_run_id,
             'charge_id' => (int) $this->charge_id,
             'invoice_id' => (int) $this->invoice_id,
             'invoice_number' => $this->invoice?->invoice_number,

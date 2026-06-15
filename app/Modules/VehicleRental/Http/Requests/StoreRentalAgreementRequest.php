@@ -9,6 +9,7 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\DTOs\RentalAgreementData;
 use Modules\VehicleRental\DTOs\RentalRateSnapshotData;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
 use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalRateUnit;
@@ -30,6 +31,10 @@ final class StoreRentalAgreementRequest extends TenantScopedRequest
             'party_id' => ['required', 'integer', 'min:1'],
             'rental_type' => ['required', Rule::enum(RentalType::class)],
             'billing_cycle' => ['required', Rule::enum(RentalBillingCycle::class)],
+            'billing_basis' => ['nullable', Rule::enum(RentalBillingBasis::class)],
+            'proration_rule' => ['nullable', Rule::in(['exact_day_count', 'calendar_day', 'contractual_period'])],
+            'billing_timezone' => ['nullable', 'timezone'],
+            'billing_period_days' => ['nullable', 'integer', 'between:1,366'],
             'agreement_date' => ['required', 'date'],
             'start_at' => ['required', 'date'],
             'expected_end_at' => ['required', 'date', 'after:start_at'],
@@ -70,6 +75,9 @@ final class StoreRentalAgreementRequest extends TenantScopedRequest
             partyId: (int) $this->input('party_id'),
             rentalType: RentalType::from((string) $this->input('rental_type')),
             billingCycle: RentalBillingCycle::from((string) $this->input('billing_cycle')),
+            billingBasis: RentalBillingBasis::from((string) $this->input('billing_basis', 'contractual_period')),
+            prorationRule: (string) $this->input('proration_rule', 'exact_day_count'),
+            billingTimezone: (string) $this->input('billing_timezone', 'UTC'),
             agreementDate: (string) $this->input('agreement_date'),
             startAt: (string) $this->input('start_at'),
             expectedEndAt: (string) $this->input('expected_end_at'),
@@ -98,6 +106,7 @@ final class StoreRentalAgreementRequest extends TenantScopedRequest
             agreementNumber: $this->stringOrNull('agreement_number'),
             reservationId: $this->intOrNull('reservation_id'),
             currencyId: $this->intOrNull('currency_id'),
+            billingPeriodDays: $this->intOrNull('billing_period_days'),
             termsSnapshot: $this->input('terms_snapshot'),
             remarks: $this->stringOrNull('remarks'),
             createdBy: $this->currentUserId(),

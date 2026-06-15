@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementDirection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalChargeCalculationType;
 use Modules\VehicleRental\Enums\RentalChargeInvoiceStatus;
 use Modules\VehicleRental\Enums\RentalChargeStatus;
@@ -21,8 +23,10 @@ use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
+use Modules\VehicleRental\Models\RentalBillingPeriod;
 use Modules\VehicleRental\Models\RentalCharge;
 use Modules\VehicleRental\Models\RentalChargeCalculation;
+use Modules\VehicleRental\Models\RentalChargeRun;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalUsageContext;
 use Modules\VehicleRental\Models\RentalUsageEvent;
@@ -32,6 +36,7 @@ final class RentalChargeCalculationService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalChargeService $charges,
+        private readonly RentalBillingPeriodService $billingPeriods,
     ) {}
 
     /**
@@ -62,35 +67,46 @@ final class RentalChargeCalculationService
                 'rateSnapshot',
                 'operationalUsageLogs.events',
                 'operationalUsageLogs.contexts',
-                'usageContexts',
+                'usageContexts.usageLog',
                 'expenses',
                 'returnInspections',
                 'charges',
             ]);
-            $version = max(
-                1,
-                ((int) $agreement->chargeCalculations()->max('calculation_version')) + 1,
-            );
-            $superseded = $this->prepareRegeneration($agreement, $replace);
+            $created = collect();
+            $periods = $this->billingPeriods->eligiblePeriods($agreement);
+            if ($periods->isEmpty()) {
+                throw new InvalidArgumentException('No closed billing periods are eligible for rental charge calculation.');
+            }
+            foreach ($periods as $period) {
+                $billingPeriod = $this->billingPeriods->persist($agreement, $period);
+                $run = $this->prepareChargeRun($agreement, $billingPeriod, $period, $replace);
+                $superseded = $this->prepareRegeneration($agreement, $billingPeriod, $run, $replace);
+                $calculations = collect();
+                foreach ($this->calculationRows($agreement, $period, $billingPeriod, $run) as $row) {
+                    if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
+                        continue;
+                    }
+                    $sourceKey = $this->sourceKey($row);
+                    $row['supersedes_calculation_id'] = $superseded[$sourceKey] ?? null;
+                    $calculations->push(RentalChargeCalculation::query()->create($row));
+                }
+                if ($calculations->isEmpty()) {
+                    $run->forceFill([
+                        'calculation_status' => 'empty',
+                        'calculated_at' => now(),
+                    ])->save();
 
-            $calculations = collect();
-            foreach ($this->calculationRows($agreement, $version) as $row) {
-                if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
                     continue;
                 }
-                $sourceKey = $this->sourceKey($row);
-                $row['supersedes_calculation_id'] = $superseded[$sourceKey] ?? null;
-                $calculations->push(RentalChargeCalculation::query()->create($row));
+                $charges = $this->charges->createFromCalculations($agreement, $calculations);
+                $this->markExpensesCharged($agreement, $calculations);
+                $this->updateRunTotals($run, $charges);
+                $created = $created->merge($charges);
             }
-            $created = $this->charges->createFromCalculations($agreement, $calculations);
-            $agreement->expenses()
-                ->where('status', RentalExpenseStatus::Approved->value)
-                ->whereIn('financial_treatment', $this->chargeableTreatments($agreement))
-                ->update([
-                    'status' => RentalExpenseStatus::Charged->value,
-                    'charge_generation_status' => 'generated',
-                    'updated_at' => now(),
-                ]);
+
+            if ($created->isEmpty()) {
+                throw new InvalidArgumentException('No rental charge calculations were produced.');
+            }
 
             return $created;
         });
@@ -107,7 +123,7 @@ final class RentalChargeCalculationService
                 'rateSnapshot',
                 'operationalUsageLogs.events',
                 'operationalUsageLogs.contexts',
-                'usageContexts',
+                'usageContexts.usageLog',
                 'expenses',
                 'returnInspections',
             ])
@@ -117,18 +133,31 @@ final class RentalChargeCalculationService
         }
 
         $calculations = collect();
-        $version = max(
-            1,
-            ((int) $agreement->chargeCalculations()->max('calculation_version')) + 1,
-        );
-        foreach ($this->calculationRows($agreement, $version) as $index => $row) {
-            if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
-                continue;
+        $index = 0;
+        foreach ($this->billingPeriods->eligiblePeriods($agreement) as $period) {
+            $billingPeriod = new RentalBillingPeriod;
+            $billingPeriod->forceFill([
+                'id' => -((int) $period['sequence']),
+                'period_start' => $period['start'],
+                'period_end' => $period['end'],
+                'billing_cycle_key' => $period['key'],
+                'period_sequence' => $period['sequence'],
+            ]);
+            $run = new RentalChargeRun;
+            $run->forceFill([
+                'id' => -((int) $period['sequence']),
+                'billing_period_id' => $billingPeriod->getKey(),
+                'run_version' => 1,
+            ]);
+            foreach ($this->calculationRows($agreement, $period, $billingPeriod, $run) as $row) {
+                if ($this->math->isZero($row['chargeable_quantity']) || $this->math->isZero($row['amount'])) {
+                    continue;
+                }
+                $calculation = new RentalChargeCalculation;
+                $calculation->forceFill($row);
+                $calculation->setAttribute('id', -(++$index));
+                $calculations->push($calculation);
             }
-            $calculation = new RentalChargeCalculation;
-            $calculation->forceFill($row);
-            $calculation->setAttribute('id', -($index + 1));
-            $calculations->push($calculation);
         }
 
         return $this->charges->previewFromCalculations($agreement, $calculations);
@@ -148,13 +177,22 @@ final class RentalChargeCalculationService
     /**
      * @return list<array<string, mixed>>
      */
-    private function calculationRows(RentalAgreement $agreement, int $version): array
-    {
+    private function calculationRows(
+        RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+    ): array {
         $rows = [];
-        $baseQuantity = $this->baseQuantity($agreement);
+        $version = (int) $run->run_version;
+        $periodLogs = $this->periodUsageLogs($agreement, $period);
+        $baseQuantity = $this->baseQuantity($agreement, $period, $periodLogs);
         $this->append(
             $rows,
             $agreement,
+            $period,
+            $billingPeriod,
+            $run,
             null,
             'rental_agreement',
             (int) $agreement->getKey(),
@@ -168,10 +206,10 @@ final class RentalChargeCalculationService
             'Base rental charge',
             $version,
         );
-        $this->appendDerivedUsage($rows, $agreement, $version);
-        $this->appendUsageEvents($rows, $agreement, $version);
-        $this->appendExpenses($rows, $agreement, $version);
-        $this->appendDamages($rows, $agreement, $version);
+        $this->appendDerivedUsage($rows, $agreement, $period, $billingPeriod, $run, $periodLogs, $version);
+        $this->appendUsageEvents($rows, $agreement, $period, $billingPeriod, $run, $periodLogs, $version);
+        $this->appendExpenses($rows, $agreement, $period, $billingPeriod, $run, $version);
+        $this->appendDamages($rows, $agreement, $period, $billingPeriod, $run, $version);
 
         return $rows;
     }
@@ -179,33 +217,56 @@ final class RentalChargeCalculationService
     /**
      * @return array<string, int>
      */
-    private function prepareRegeneration(RentalAgreement $agreement, bool $replace): array
-    {
-        if (! $agreement->chargeCalculations()->exists()) {
+    private function prepareRegeneration(
+        RentalAgreement $agreement,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+        bool $replace,
+    ): array {
+        $previousRuns = $agreement->chargeRuns()
+            ->where('billing_period_id', $billingPeriod->getKey())
+            ->where('financial_side', RentalFinancialSide::fromDirection($agreement->direction)->value)
+            ->where('rate_snapshot_id', $agreement->rateSnapshot?->getKey())
+            ->whereKeyNot($run->getKey())
+            ->lockForUpdate()
+            ->get();
+        if ($previousRuns->isEmpty()) {
             return [];
         }
         if (! $replace) {
-            throw new InvalidArgumentException('Rental charges have already been generated for this agreement.');
+            throw new InvalidArgumentException('Rental charges have already been generated for this billing period.');
         }
-        $protected = $agreement->charges()
+        $protected = RentalCharge::query()
+            ->whereIn('charge_run_id', $previousRuns->pluck('id'))
             ->where(function ($query): void {
                 $query->where('status', RentalChargeStatus::Approved->value)
                     ->orWhere('invoice_status', '!=', RentalChargeInvoiceStatus::NotInvoiced->value);
-            })->exists();
+            })
+            ->exists();
         if ($protected) {
             throw new InvalidArgumentException('Approved or invoiced rental charges cannot be regenerated.');
         }
-        $previous = $agreement->chargeCalculations()
+        $previous = RentalChargeCalculation::query()
+            ->whereIn('charge_run_id', $previousRuns->pluck('id'))
             ->where('status', 'draft')
             ->lockForUpdate()
             ->get();
-        $agreement->charges()
+        RentalCharge::query()
+            ->whereIn('charge_run_id', $previousRuns->pluck('id'))
             ->where('status', RentalChargeStatus::Draft->value)
             ->lockForUpdate()
             ->update(['status' => RentalChargeStatus::Cancelled->value]);
-        $agreement->chargeCalculations()
+        RentalChargeCalculation::query()
+            ->whereIn('charge_run_id', $previousRuns->pluck('id'))
             ->where('status', 'draft')
             ->update(['status' => 'superseded']);
+        RentalChargeRun::query()
+            ->whereIn('id', $previousRuns->pluck('id'))
+            ->update([
+                'calculation_status' => 'superseded',
+                'approval_status' => 'cancelled',
+                'updated_at' => now(),
+            ]);
 
         return $previous->mapWithKeys(
             fn (RentalChargeCalculation $calculation): array => [
@@ -217,9 +278,15 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendDerivedUsage(array &$rows, RentalAgreement $agreement, int $version): void
-    {
-        $approved = $agreement->operationalUsageLogs->where('status', RentalUsageLogStatus::Approved);
+    private function appendDerivedUsage(
+        array &$rows,
+        RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+        Collection $approved,
+        int $version,
+    ): void {
         $distance = $this->math->sum(
             $approved->pluck('distance_km')->map(fn ($value): string => (string) $value)->all(),
         );
@@ -227,6 +294,9 @@ final class RentalChargeCalculationService
         $this->append(
             $rows,
             $agreement,
+            $period,
+            $billingPeriod,
+            $run,
             null,
             'rental_agreement',
             (int) $agreement->getKey(),
@@ -262,6 +332,9 @@ final class RentalChargeCalculationService
         $this->append(
             $rows,
             $agreement,
+            $period,
+            $billingPeriod,
+            $run,
             null,
             'rental_agreement',
             (int) $agreement->getKey(),
@@ -280,9 +353,16 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendUsageEvents(array &$rows, RentalAgreement $agreement, int $version): void
-    {
-        foreach ($agreement->operationalUsageLogs->where('status', RentalUsageLogStatus::Approved) as $log) {
+    private function appendUsageEvents(
+        array &$rows,
+        RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+        Collection $logs,
+        int $version,
+    ): void {
+        foreach ($logs as $log) {
             $context = $log->contexts->firstWhere('agreement_id', $agreement->getKey());
             if (! $context instanceof RentalUsageContext) {
                 throw new InvalidArgumentException('Approved usage is missing its agreement calculation context.');
@@ -302,6 +382,9 @@ final class RentalChargeCalculationService
                 $this->append(
                     $rows,
                     $agreement,
+                    $period,
+                    $billingPeriod,
+                    $run,
                     $context,
                     'rental_usage_event',
                     (int) $event->getKey(),
@@ -324,13 +407,22 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendExpenses(array &$rows, RentalAgreement $agreement, int $version): void
-    {
+    private function appendExpenses(
+        array &$rows,
+        RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+        int $version,
+    ): void {
+        $start = CarbonImmutable::parse($period['start']);
+        $end = CarbonImmutable::parse($period['end']);
         foreach ($agreement->expenses->filter(
-            fn (RentalExpense $expense): bool => in_array($expense->status, [
-                RentalExpenseStatus::Approved,
-                RentalExpenseStatus::Charged,
-            ], true)
+            fn (RentalExpense $expense): bool => $this->expenseBelongsToPeriod($expense, $agreement, $start, $end)
+                && in_array($expense->status, [
+                    RentalExpenseStatus::Approved,
+                    RentalExpenseStatus::Charged,
+                ], true)
                 && in_array(
                     $expense->financial_treatment->value,
                     $this->chargeableTreatments($agreement),
@@ -340,9 +432,16 @@ final class RentalChargeCalculationService
             $context = $expense->usage_log_id === null
                 ? null
                 : $agreement->usageContexts->firstWhere('usage_log_id', $expense->usage_log_id);
+            $rate = (string) $expense->recovery_base_amount;
+            if ($this->math->isZero($rate)) {
+                $rate = (string) $expense->amount;
+            }
             $this->append(
                 $rows,
                 $agreement,
+                $period,
+                $billingPeriod,
+                $run,
                 $context instanceof RentalUsageContext ? $context : null,
                 'rental_expense',
                 (int) $expense->getKey(),
@@ -350,11 +449,12 @@ final class RentalChargeCalculationService
                 '1.000000',
                 '0.000000',
                 '1.000000',
-                (string) $expense->amount,
+                $rate,
                 'expense',
                 'approved_expense_financial_treatment',
                 $expense->description ?? str($expense->expense_type->value)->title()->append(' expense')->toString(),
                 $version,
+                $expense->recovery_tax_group_id,
             );
         }
     }
@@ -362,19 +462,35 @@ final class RentalChargeCalculationService
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function appendDamages(array &$rows, RentalAgreement $agreement, int $version): void
-    {
+    private function appendDamages(
+        array &$rows,
+        RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
+        int $version,
+    ): void {
         if ($agreement->direction !== RentalAgreementDirection::Outbound) {
             return;
         }
+        $start = CarbonImmutable::parse($period['start']);
+        $end = CarbonImmutable::parse($period['end']);
+        $isFinal = (bool) $period['is_final'];
         foreach ($agreement->returnInspections as $inspection) {
+            $outside = $inspection->inspected_at->lessThan($start)
+                || ($inspection->inspected_at->greaterThanOrEqualTo($end)
+                    && ! ($isFinal && $inspection->inspected_at->equalTo($end)));
             if (! $inspection->is_damage_billable
-                || $this->math->compare((string) $inspection->damage_amount, '0.000000') <= 0) {
+                || $this->math->compare((string) $inspection->damage_amount, '0.000000') <= 0
+                || $outside) {
                 continue;
             }
             $this->append(
                 $rows,
                 $agreement,
+                $period,
+                $billingPeriod,
+                $run,
                 null,
                 'rental_return_inspection',
                 (int) $inspection->getKey(),
@@ -391,26 +507,81 @@ final class RentalChargeCalculationService
         }
     }
 
-    private function baseQuantity(RentalAgreement $agreement): string
+    private function baseQuantity(RentalAgreement $agreement, array $period, Collection $periodLogs): string
     {
-        $end = $agreement->actual_end_at ?? $agreement->expected_end_at;
-        $seconds = max(1, $end->getTimestamp() - $agreement->start_at->getTimestamp());
+        $start = CarbonImmutable::parse($period['start']);
+        $end = CarbonImmutable::parse($period['end']);
+        $seconds = max(1, $end->getTimestamp() - $start->getTimestamp());
 
         return match ($agreement->rateSnapshot->rate_unit) {
             RentalRateUnit::Trip => '1.000000',
-            RentalRateUnit::Km => $this->math->sum($agreement->operationalUsageLogs
-                ->where('status', RentalUsageLogStatus::Approved)
+            RentalRateUnit::Km => $this->math->sum($periodLogs
                 ->pluck('distance_km')->map(fn ($value): string => (string) $value)->all()),
             RentalRateUnit::Hour => $this->ceilingUnits($seconds, 3600),
             RentalRateUnit::Day => $this->ceilingUnits($seconds, 86400),
             RentalRateUnit::Week => $this->ceilingUnits($seconds, 604800),
-            RentalRateUnit::Month => $this->ceilingUnits($seconds, 2592000),
+            RentalRateUnit::Month => $this->monthQuantity($agreement, $start, $end),
         };
     }
 
     private function ceilingUnits(int $seconds, int $unitSeconds): string
     {
         return $this->math->normalize((string) max(1, intdiv($seconds + $unitSeconds - 1, $unitSeconds)));
+    }
+
+    private function monthQuantity(RentalAgreement $agreement, CarbonImmutable $start, CarbonImmutable $end): string
+    {
+        $total = '0.000000';
+        $cursor = $start;
+        while ($cursor->lessThan($end)) {
+            [$denominatorStart, $denominatorEnd] = $this->monthlyDenominator($agreement, $cursor);
+            $segmentEnd = $denominatorEnd->lessThan($end) ? $denominatorEnd : $end;
+            $total = $this->math->add(
+                $total,
+                $this->durationRatio($cursor, $segmentEnd, $denominatorStart, $denominatorEnd),
+            );
+            $cursor = $segmentEnd;
+        }
+
+        return $this->math->isZero($total) ? '1.000000' : $total;
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function monthlyDenominator(RentalAgreement $agreement, CarbonImmutable $cursor): array
+    {
+        return match ($agreement->billing_basis) {
+            RentalBillingBasis::CalendarMonth => [
+                $cursor->startOfMonth()->startOfDay(),
+                $cursor->startOfMonth()->startOfDay()->addMonthNoOverflow(),
+            ],
+            RentalBillingBasis::FixedThirtyDay => [$cursor, $cursor->addDays(30)],
+            default => [$cursor, $this->anniversaryBoundary($agreement, $cursor)],
+        };
+    }
+
+    private function anniversaryBoundary(RentalAgreement $agreement, CarbonImmutable $cursor): CarbonImmutable
+    {
+        $anchor = CarbonImmutable::parse($agreement->start_at);
+        $anchorDay = (int) $anchor->day;
+        $anchorIsEndOfMonth = $anchorDay === (int) $anchor->daysInMonth;
+        $next = $cursor->addMonthNoOverflow();
+        $day = $anchorIsEndOfMonth ? (int) $next->daysInMonth : min($anchorDay, (int) $next->daysInMonth);
+
+        return $next->setDay($day);
+    }
+
+    private function durationRatio(
+        CarbonImmutable $numeratorStart,
+        CarbonImmutable $numeratorEnd,
+        CarbonImmutable $denominatorStart,
+        CarbonImmutable $denominatorEnd,
+    ): string {
+        $numerator = max(0, $numeratorEnd->getTimestamp() - $numeratorStart->getTimestamp());
+        $denominator = max(1, $denominatorEnd->getTimestamp() - $denominatorStart->getTimestamp());
+
+        return $this->math->div((string) $numerator, (string) $denominator);
     }
 
     private function eventCalculationType(RentalUsageEvent $event): RentalChargeCalculationType
@@ -490,12 +661,135 @@ final class RentalChargeCalculationService
         return $this->math->isNegative($result) ? '0.000000' : $result;
     }
 
+    private function prepareChargeRun(
+        RentalAgreement $agreement,
+        RentalBillingPeriod $billingPeriod,
+        array $period,
+        bool $replace,
+    ): RentalChargeRun {
+        $side = RentalFinancialSide::fromDirection($agreement->direction);
+        $existing = $agreement->chargeRuns()
+            ->where('billing_period_id', $billingPeriod->getKey())
+            ->where('financial_side', $side->value)
+            ->where('rate_snapshot_id', $agreement->rateSnapshot?->getKey())
+            ->lockForUpdate()
+            ->get();
+        $active = $existing->whereNotIn('calculation_status', ['superseded', 'cancelled']);
+        if ($active->isNotEmpty() && ! $replace) {
+            throw new InvalidArgumentException('Rental charges have already been generated for this billing period.');
+        }
+        $version = ((int) $existing->max('run_version')) + 1;
+        $fingerprint = hash('sha256', implode('|', [
+            (string) $agreement->tenant_id,
+            (string) $agreement->getKey(),
+            $side->value,
+            (string) $agreement->rateSnapshot?->getKey(),
+            (string) $billingPeriod->getKey(),
+            (string) $version,
+        ]));
+
+        return RentalChargeRun::query()->create([
+            'tenant_id' => $agreement->tenant_id,
+            'organization_unit_id' => $agreement->organization_unit_id,
+            'billing_period_id' => $billingPeriod->getKey(),
+            'agreement_id' => $agreement->getKey(),
+            'rate_snapshot_id' => $agreement->rateSnapshot?->getKey(),
+            'agreement_direction' => $agreement->direction->value,
+            'financial_side' => $side->value,
+            'party_type' => $agreement->party_type->value,
+            'party_id' => $agreement->party_id,
+            'billing_period_start' => $period['start'],
+            'billing_period_end' => $period['end'],
+            'billing_cycle_key' => $period['key'],
+            'period_sequence' => $period['sequence'],
+            'run_version' => $version,
+            'calculation_status' => 'draft',
+            'approval_status' => 'pending',
+            'invoice_status' => RentalChargeInvoiceStatus::NotInvoiced->value,
+            'fingerprint' => $fingerprint,
+            'calculated_at' => now(),
+        ]);
+    }
+
+    private function updateRunTotals(RentalChargeRun $run, Collection $charges): void
+    {
+        $run->forceFill([
+            'calculation_status' => 'calculated',
+            'amount_total' => $this->math->sum($charges->pluck('amount')->map(fn ($value): string => (string) $value)->all()),
+            'tax_total' => $this->math->sum($charges->pluck('tax_amount')->map(fn ($value): string => (string) $value)->all()),
+            'withholding_total' => $this->math->sum($charges->pluck('withholding_amount')->map(fn ($value): string => (string) $value)->all()),
+            'grand_total' => $this->math->sum($charges->pluck('total_amount')->map(fn ($value): string => (string) $value)->all()),
+            'calculated_at' => now(),
+        ])->save();
+    }
+
+    private function markExpensesCharged(RentalAgreement $agreement, Collection $calculations): void
+    {
+        $expenseIds = $calculations
+            ->where('source_type', 'rental_expense')
+            ->pluck('source_id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+        if ($expenseIds->isEmpty()) {
+            return;
+        }
+        $agreement->expenses()
+            ->whereIn('id', $expenseIds)
+            ->where('status', RentalExpenseStatus::Approved->value)
+            ->whereIn('financial_treatment', $this->chargeableTreatments($agreement))
+            ->update([
+                'status' => RentalExpenseStatus::Charged->value,
+                'charge_generation_status' => 'generated',
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function periodUsageLogs(RentalAgreement $agreement, array $period): Collection
+    {
+        $start = CarbonImmutable::parse($period['start']);
+        $end = CarbonImmutable::parse($period['end']);
+
+        return $agreement->operationalUsageLogs
+            ->where('status', RentalUsageLogStatus::Approved)
+            ->filter(fn ($log): bool => $log->effective_at !== null
+                && $log->effective_at->greaterThanOrEqualTo($start)
+                && $log->effective_at->lessThan($end))
+            ->values();
+    }
+
+    private function expenseBelongsToPeriod(
+        RentalExpense $expense,
+        RentalAgreement $agreement,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): bool {
+        if ($expense->usage_log_id !== null) {
+            return $agreement->usageContexts
+                ->where('usage_log_id', $expense->usage_log_id)
+                ->contains(function (RentalUsageContext $context) use ($start, $end): bool {
+                    $log = $context->usageLog;
+
+                    return $log !== null
+                        && $log->effective_at !== null
+                        && $log->effective_at->greaterThanOrEqualTo($start)
+                        && $log->effective_at->lessThan($end);
+                });
+        }
+        $expenseDate = CarbonImmutable::parse($expense->expense_date)->startOfDay();
+
+        return $expenseDate->greaterThanOrEqualTo($start->startOfDay())
+            && $expenseDate->lessThan($end->startOfDay());
+    }
+
     /**
      * @param  list<array<string, mixed>>  $rows
      */
     private function append(
         array &$rows,
         RentalAgreement $agreement,
+        array $period,
+        RentalBillingPeriod $billingPeriod,
+        RentalChargeRun $run,
         ?RentalUsageContext $context,
         string $sourceType,
         int $sourceId,
@@ -508,6 +802,7 @@ final class RentalChargeCalculationService
         string $appliedRule,
         string $description,
         int $version,
+        ?int $taxGroupId = null,
     ): void {
         $measuredQuantity = $this->math->normalize($measuredQuantity);
         $allowedQuantity = $this->math->normalize($allowedQuantity);
@@ -516,6 +811,10 @@ final class RentalChargeCalculationService
         $side = RentalFinancialSide::fromDirection($agreement->direction);
         $fingerprint = hash('sha256', implode('|', [
             (string) $agreement->tenant_id,
+            (string) $run->getKey(),
+            (string) $billingPeriod->getKey(),
+            CarbonImmutable::parse($period['start'])->toDateTimeString(),
+            CarbonImmutable::parse($period['end'])->toDateTimeString(),
             (string) ($context?->getKey() ?? 'agreement'),
             (string) $agreement->getKey(),
             (string) $agreement->rateSnapshot?->getKey(),
@@ -528,6 +827,8 @@ final class RentalChargeCalculationService
         $rows[] = [
             'tenant_id' => $agreement->tenant_id,
             'organization_unit_id' => $agreement->organization_unit_id,
+            'billing_period_id' => $billingPeriod->getKey(),
+            'charge_run_id' => $run->getKey(),
             'agreement_id' => $agreement->getKey(),
             'agreement_vehicle_id' => $context?->agreement_vehicle_id,
             'usage_log_id' => $context?->usage_log_id,
@@ -537,6 +838,10 @@ final class RentalChargeCalculationService
             'financial_side' => $side->value,
             'party_type' => $agreement->party_type->value,
             'party_id' => $agreement->party_id,
+            'billing_period_start' => $period['start'],
+            'billing_period_end' => $period['end'],
+            'billing_cycle_key' => $period['key'],
+            'period_sequence' => $period['sequence'],
             'source_type' => $sourceType,
             'source_id' => $sourceId,
             'calculation_type' => $type->value,
@@ -547,6 +852,7 @@ final class RentalChargeCalculationService
             'rate' => $rate,
             'multiplier' => '1.000000',
             'amount' => $this->math->mul($chargeableQuantity, $rate),
+            'tax_group_id' => $taxGroupId ?? $agreement->rateSnapshot?->tax_profile_id,
             'tax_amount' => '0.000000',
             'withholding_amount' => '0.000000',
             'total_amount' => $this->math->mul($chargeableQuantity, $rate),
@@ -563,8 +869,18 @@ final class RentalChargeCalculationService
         $agreement->rateSnapshot()->lockForUpdate()->firstOrFail();
         $usageLogIds = $agreement->usageContexts()->lockForUpdate()->pluck('usage_log_id');
         if ($usageLogIds->isNotEmpty()) {
-            DB::table('rental_usage_logs')->whereIn('id', $usageLogIds)->lockForUpdate()->get();
-            DB::table('rental_usage_events')->whereIn('usage_log_id', $usageLogIds)->lockForUpdate()->get();
+            DB::table('rental_usage_logs')
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->whereIn('id', $usageLogIds)
+                ->lockForUpdate()
+                ->get();
+            DB::table('rental_usage_events')
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->whereIn('usage_log_id', $usageLogIds)
+                ->lockForUpdate()
+                ->get();
         }
         $agreement->expenses()->lockForUpdate()->get();
         $agreement->returnInspections()->lockForUpdate()->get();

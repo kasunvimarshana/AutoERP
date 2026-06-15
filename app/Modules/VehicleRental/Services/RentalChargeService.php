@@ -68,7 +68,7 @@ final class RentalChargeService
                 quantity: (string) $calculation->chargeable_quantity,
                 unitPrice: (string) $calculation->rate,
                 taxableAmount: (string) $calculation->amount,
-                taxGroupId: $agreement->rateSnapshot?->tax_profile_id,
+                taxGroupId: $calculation->tax_group_id ?? $agreement->rateSnapshot?->tax_profile_id,
             );
         }
         $tax = $this->taxes->calculate(new TaxCalculationData(
@@ -111,9 +111,15 @@ final class RentalChargeService
             $attributes = [
                 'tenant_id' => $agreement->tenant_id,
                 'organization_unit_id' => $agreement->organization_unit_id,
+                'billing_period_id' => $calculation->billing_period_id,
+                'charge_run_id' => $calculation->charge_run_id,
                 'agreement_id' => $agreement->getKey(),
                 'charge_calculation_id' => $persist ? $calculation->getKey() : null,
                 'financial_side' => $calculation->financial_side->value,
+                'billing_period_start' => $calculation->billing_period_start,
+                'billing_period_end' => $calculation->billing_period_end,
+                'billing_cycle_key' => $calculation->billing_cycle_key,
+                'period_sequence' => $calculation->period_sequence,
                 'charge_type' => $calculation->calculation_type->value,
                 'description' => $calculation->description ?? str($calculation->calculation_type->value)->replace('_', ' ')->title(),
                 'quantity' => $calculation->chargeable_quantity,
@@ -122,7 +128,7 @@ final class RentalChargeService
                 'discount_amount' => '0.000000',
                 'tax_amount' => $taxAmount,
                 'withholding_amount' => $withholdingAmount,
-                'tax_group_id' => $agreement->rateSnapshot?->tax_profile_id,
+                'tax_group_id' => $calculation->tax_group_id ?? $agreement->rateSnapshot?->tax_profile_id,
                 'total_amount' => $total,
                 'invoice_status' => RentalChargeInvoiceStatus::NotInvoiced->value,
                 'status' => RentalChargeStatus::Draft->value,
@@ -155,6 +161,11 @@ final class RentalChargeService
             $charge->status = RentalChargeStatus::Approved;
             $charge->save();
             $charge->calculation?->forceFill(['status' => 'approved'])->save();
+            $charge->chargeRun?->forceFill([
+                'approval_status' => 'approved',
+                'approved_by' => $changedBy,
+                'approved_at' => now(),
+            ])->save();
             $this->recordStatus($charge, $old, RentalChargeStatus::Approved, $changedBy, $reason);
 
             return $charge->refresh();
@@ -184,6 +195,11 @@ final class RentalChargeService
                 $charge->status = RentalChargeStatus::Approved;
                 $charge->save();
                 $charge->calculation?->forceFill(['status' => 'approved'])->save();
+                $charge->chargeRun?->forceFill([
+                    'approval_status' => 'approved',
+                    'approved_by' => $changedBy,
+                    'approved_at' => now(),
+                ])->save();
                 $this->recordStatus($charge, $old, RentalChargeStatus::Approved, $changedBy, $reason);
             }
 
@@ -206,6 +222,10 @@ final class RentalChargeService
             $charge->status = RentalChargeStatus::Cancelled;
             $charge->save();
             $charge->calculation?->forceFill(['status' => 'cancelled'])->save();
+            $charge->chargeRun?->forceFill([
+                'calculation_status' => 'cancelled',
+                'approval_status' => 'cancelled',
+            ])->save();
             $this->recordStatus($charge, $old, RentalChargeStatus::Cancelled, $changedBy, $reason);
 
             return $charge->refresh();

@@ -69,6 +69,7 @@ export default function RentalAgreementDetailPage() {
                             { label: 'Party', value: readableRelation(agreement.party) },
                             { label: 'Rental type', value: agreement.rental_type.replaceAll('_', ' ') },
                             { label: 'Billing cycle', value: agreement.billing_cycle.replaceAll('_', ' ') },
+                            { label: 'Billing basis', value: agreement.billing_basis.replaceAll('_', ' ') },
                             { label: 'Agreement date', value: formatDate(agreement.agreement_date) },
                             { label: 'Period', value: `${formatDate(agreement.start_at)} to ${formatDate(agreement.expected_end_at)}` },
                         ]} />
@@ -162,7 +163,7 @@ export default function RentalAgreementDetailPage() {
                             <Link to={`/vehicle-rental/agreements/${agreement.id}/usage`}><Button type="button" variant="secondary" className="w-full">Open in common running chart</Button></Link>
                             <Link to={`/vehicle-rental/agreements/${agreement.id}/expenses`}><Button type="button" variant="secondary" className="w-full">Expenses</Button></Link>
                             <Link to={`/vehicle-rental/agreements/${agreement.id}/charges`}><Button type="button" variant="secondary" className="w-full">Charge preview</Button></Link>
-                            {['returned', 'completed'].includes(agreement.status) && <Link to={`/vehicle-rental/agreements/${agreement.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>}
+                            <Link to={`/vehicle-rental/agreements/${agreement.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice / payable</Button></Link>
                         </div>
                     </Panel>
                     <Panel title="Prepare payment">

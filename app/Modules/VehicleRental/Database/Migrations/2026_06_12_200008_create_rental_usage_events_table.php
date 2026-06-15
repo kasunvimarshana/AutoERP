@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
 
-            $table->unique(['usage_log_id', 'event_type'], 'rental_usage_events_log_type_uk');
+            $table->index(['usage_log_id', 'event_type'], 'rental_usage_events_log_type_idx');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_usage_events_tenant_org_idx');
             $table->index(['event_type', 'created_at'], 'rental_usage_events_type_idx');
         });

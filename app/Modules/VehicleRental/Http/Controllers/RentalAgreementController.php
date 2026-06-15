@@ -13,7 +13,6 @@ use Modules\VehicleRental\Http\Requests\StoreRentalAgreementRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementResource;
 use Modules\VehicleRental\Http\Resources\RentalStatusHistoryResource;
 use Modules\VehicleRental\Services\RentalAgreementService;
-use Modules\VehicleRental\Services\RentalInvoiceIntegrationService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalAgreementController extends RentalController
@@ -48,12 +47,10 @@ final class RentalAgreementController extends RentalController
         ListRentalRequest $request,
         int $agreement,
         RentalAgreementService $service,
-        RentalInvoiceIntegrationService $invoices,
     ): RentalAgreementResource {
         $model = $this->agreement($request, $agreement)->load($service->relations());
-        $invoices->billableCharges($model);
 
-        return new RentalAgreementResource($model->refresh()->load($service->relations()));
+        return new RentalAgreementResource($model);
     }
 
     public function confirm(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource

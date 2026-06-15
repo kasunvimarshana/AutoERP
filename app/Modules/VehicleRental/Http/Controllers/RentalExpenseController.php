@@ -41,6 +41,44 @@ final class RentalExpenseController extends RentalController
         )))->response()->setStatusCode(201);
     }
 
+    public function update(
+        StoreRentalExpenseRequest $request,
+        int $agreement,
+        int $expense,
+        RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalExpenseResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_EXPENSES,
+        );
+        $model = $this->agreement($request, $agreement);
+
+        return new RentalExpenseResource($service->update(
+            $this->expense($model, $expense),
+            $request->toData(),
+        ));
+    }
+
+    public function destroy(
+        ListRentalRequest $request,
+        int $agreement,
+        int $expense,
+        RentalExpenseService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_EXPENSES,
+        );
+        $model = $this->agreement($request, $agreement);
+        $service->delete($this->expense($model, $expense));
+
+        return response()->json(null, 204);
+    }
+
     public function approve(
         RentalActionRequest $request,
         int $agreement,

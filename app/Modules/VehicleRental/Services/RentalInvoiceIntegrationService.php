@@ -51,22 +51,21 @@ final class RentalInvoiceIntegrationService
     {
         return $agreement->charges()
             ->where('status', RentalChargeStatus::Approved->value)
+            ->whereHas('chargeRun', fn ($query) => $query
+                ->where('approval_status', 'approved')
+                ->where('calculation_status', 'calculated'))
             ->get()
             ->each(function (RentalCharge $charge) use ($agreement): void {
-                $invoiced = $this->invoicedQuantity((int) $agreement->tenant_id, (int) $charge->getKey());
+                $invoiced = $this->invoicedQuantity(
+                    (int) $agreement->tenant_id,
+                    $agreement->organization_unit_id,
+                    (int) $charge->getKey(),
+                );
                 $remaining = $this->math->sub((string) $charge->quantity, $invoiced);
                 if ($this->math->isNegative($remaining)) {
                     $remaining = '0.000000';
                 }
-                $status = $this->math->isZero($remaining)
-                    ? RentalChargeInvoiceStatus::Invoiced
-                    : ($this->math->isZero($invoiced)
-                        ? RentalChargeInvoiceStatus::NotInvoiced
-                        : RentalChargeInvoiceStatus::PartiallyInvoiced);
-                if ($charge->invoice_status !== $status) {
-                    $charge->invoice_status = $status;
-                    $charge->save();
-                }
+                $charge->setAttribute('computed_invoice_status', $this->invoiceStatus($charge, $invoiced, $remaining)->value);
                 $charge->setAttribute('invoiced_quantity', $invoiced);
                 $charge->setAttribute('remaining_invoice_quantity', $remaining);
             });
@@ -140,9 +139,16 @@ final class RentalInvoiceIntegrationService
                 }
                 $sourceLine = $invoice->sourceLines
                     ->firstWhere('source_line_id', $invoiceLine->source_line_id);
+                $charge = RentalCharge::query()
+                    ->where('tenant_id', $agreement->tenant_id)
+                    ->where('organization_unit_id', $agreement->organization_unit_id)
+                    ->where('agreement_id', $agreement->getKey())
+                    ->findOrFail($invoiceLine->source_line_id);
                 RentalInvoiceLink::query()->create([
                     'tenant_id' => $agreement->tenant_id,
                     'organization_unit_id' => $agreement->organization_unit_id,
+                    'billing_period_id' => $charge->billing_period_id,
+                    'charge_run_id' => $charge->charge_run_id,
                     'agreement_id' => $agreement->getKey(),
                     'charge_id' => $invoiceLine->source_line_id,
                     'invoice_id' => $invoice->getKey(),
@@ -152,7 +158,7 @@ final class RentalInvoiceIntegrationService
                     'status' => 'active',
                 ]);
             }
-            $this->billableCharges($agreement);
+            $this->syncInvoiceStatuses($agreement);
 
             return $invoice;
         });
@@ -172,10 +178,11 @@ final class RentalInvoiceIntegrationService
         ?int $createdBy = null,
     ): CreateInvoiceData {
         if (! in_array($agreement->status, [
+            RentalAgreementStatus::Active,
             RentalAgreementStatus::Returned,
             RentalAgreementStatus::Completed,
         ], true)) {
-            throw new InvalidArgumentException('Only returned or completed rental agreements can be invoiced.');
+            throw new InvalidArgumentException('Only active, returned, or completed rental agreements can be invoiced.');
         }
         $agreement->loadMissing('rateSnapshot');
         $charges = $this->billableCharges($agreement);
@@ -218,7 +225,11 @@ final class RentalInvoiceIntegrationService
                 $this->math->sub($lineTotal, $withholding),
             );
             $selectedWithholding = $this->math->add($selectedWithholding, $withholding);
-            $invoiced = $this->invoicedQuantity((int) $agreement->tenant_id, (int) $charge->getKey());
+            $invoiced = $this->invoicedQuantity(
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+                (int) $charge->getKey(),
+            );
 
             $invoiceLines[] = new InvoiceLineData(
                 lineNumber: $lineNumber++,
@@ -231,7 +242,7 @@ final class RentalInvoiceIntegrationService
                 lineTotal: $lineTotal,
                 sourceLineType: self::CHARGE_SOURCE,
                 sourceLineId: (int) $charge->getKey(),
-                metadata: ['tax_group_id' => $agreement->rateSnapshot?->tax_profile_id],
+                metadata: ['tax_group_id' => $charge->tax_group_id],
             );
             $sourceLines[] = new InvoiceSourceLineData(
                 tenantId: (int) $agreement->tenant_id,
@@ -300,16 +311,66 @@ final class RentalInvoiceIntegrationService
         );
     }
 
-    private function invoicedQuantity(int $tenantId, int $chargeId): string
+    private function invoicedQuantity(int $tenantId, ?int $organizationUnitId, int $chargeId): string
     {
         return $this->math->normalize((string) InvoiceSourceLine::query()
             ->where('tenant_id', $tenantId)
             ->where('source_line_type', self::CHARGE_SOURCE)
             ->where('source_line_id', $chargeId)
-            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
-                InvoiceStatus::Cancelled->value,
-                InvoiceStatus::Void->value,
-            ]))
+            ->whereHas('invoice', fn ($query) => $query
+                ->where('tenant_id', $tenantId)
+                ->where('organization_unit_id', $organizationUnitId)
+                ->whereNotIn('status', [
+                    InvoiceStatus::Cancelled->value,
+                    InvoiceStatus::Void->value,
+                ]))
             ->sum('invoiced_quantity'));
+    }
+
+    private function invoiceStatus(RentalCharge $charge, string $invoiced, string $remaining): RentalChargeInvoiceStatus
+    {
+        return $this->math->isZero($remaining)
+            ? RentalChargeInvoiceStatus::Invoiced
+            : ($this->math->isZero($invoiced)
+                ? RentalChargeInvoiceStatus::NotInvoiced
+                : RentalChargeInvoiceStatus::PartiallyInvoiced);
+    }
+
+    private function syncInvoiceStatuses(RentalAgreement $agreement): void
+    {
+        $charges = $agreement->charges()
+            ->where('status', RentalChargeStatus::Approved->value)
+            ->lockForUpdate()
+            ->get();
+        foreach ($charges as $charge) {
+            $invoiced = $this->invoicedQuantity(
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+                (int) $charge->getKey(),
+            );
+            $remaining = $this->math->sub((string) $charge->quantity, $invoiced);
+            if ($this->math->isNegative($remaining)) {
+                $remaining = '0.000000';
+            }
+            $status = $this->invoiceStatus($charge, $invoiced, $remaining);
+            $charge->forceFill(['invoice_status' => $status->value])->save();
+        }
+        foreach ($agreement->chargeRuns()->lockForUpdate()->get() as $run) {
+            $runCharges = $charges->where('charge_run_id', $run->getKey());
+            if ($runCharges->isEmpty()) {
+                continue;
+            }
+            $statuses = $runCharges->pluck('invoice_status')->map(
+                fn ($status): string => $status instanceof RentalChargeInvoiceStatus ? $status->value : (string) $status,
+            );
+            $run->forceFill([
+                'invoice_status' => $statuses->every(fn (string $status): bool => $status === RentalChargeInvoiceStatus::Invoiced->value)
+                    ? RentalChargeInvoiceStatus::Invoiced->value
+                    : ($statuses->contains(RentalChargeInvoiceStatus::PartiallyInvoiced->value)
+                        || $statuses->contains(RentalChargeInvoiceStatus::Invoiced->value)
+                            ? RentalChargeInvoiceStatus::PartiallyInvoiced->value
+                            : RentalChargeInvoiceStatus::NotInvoiced->value),
+            ])->save();
+        }
     }
 }

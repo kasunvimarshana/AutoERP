@@ -23,9 +23,14 @@ final class RentalCharge extends CoreModel
         return [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'billing_period_id' => 'integer',
+            'charge_run_id' => 'integer',
             'agreement_id' => 'integer',
             'charge_calculation_id' => 'integer',
             'financial_side' => RentalFinancialSide::class,
+            'billing_period_start' => 'datetime',
+            'billing_period_end' => 'datetime',
+            'period_sequence' => 'integer',
             'quantity' => 'decimal:6',
             'rate' => 'decimal:6',
             'amount' => 'decimal:6',
@@ -42,6 +47,16 @@ final class RentalCharge extends CoreModel
     public function agreement(): BelongsTo
     {
         return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function billingPeriod(): BelongsTo
+    {
+        return $this->belongsTo(RentalBillingPeriod::class, 'billing_period_id');
+    }
+
+    public function chargeRun(): BelongsTo
+    {
+        return $this->belongsTo(RentalChargeRun::class, 'charge_run_id');
     }
 
     public function calculation(): BelongsTo

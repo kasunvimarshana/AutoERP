@@ -49,12 +49,13 @@ export default function RentalChargePreviewPage() {
                 <Button type="button" variant="secondary" loading={busy} onClick={() => action('generate')}>Generate</Button>
                 {!previewRows && rows.length > 0 && rows.every((row) => row.status === 'draft') && <Button type="button" variant="secondary" loading={busy} onClick={() => action('replace')}>Recalculate</Button>}
                 {!previewRows && rows.some((row) => row.status === 'draft') && <Button type="button" loading={busy} onClick={() => action('approve')}>Approve charges</Button>}
-                {!previewRows && rows.some((row) => row.status === 'approved') && ['returned', 'completed'].includes(agreement.data.status) && <Link to={`/vehicle-rental/agreements/${agreementId}/invoice`}><Button>{agreement.data.direction === 'outbound' ? 'Create customer invoice' : 'Create supplier payable'}</Button></Link>}
+                {!previewRows && rows.some((row) => row.status === 'approved' && row.invoice_status !== 'invoiced') && <Link to={`/vehicle-rental/agreements/${agreementId}/invoice`}><Button>{agreement.data.direction === 'outbound' ? 'Create customer invoice' : 'Create supplier payable'}</Button></Link>}
             </>} />
             <ErrorAlert error={error ?? charges.error} />
             <Panel title={previewRows ? 'Non-persistent preview' : 'Charge breakdown'}>
                 {charges.loading ? <LoadingState /> : <DataTable rows={rows} rowKey={(row) => row.id} columns={[
                     { key: 'type', header: 'Charge', render: (row) => row.charge_type.replaceAll('_', ' ') },
+                    { key: 'period', header: 'Period', render: (row) => row.billing_cycle_key ?? row.period_sequence ?? '-' },
                     { key: 'description', header: 'Description', render: (row) => row.description },
                     { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
                     { key: 'rate', header: 'Rate', render: (row) => <MoneyDisplay value={row.rate} /> },

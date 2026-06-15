@@ -21,6 +21,10 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id');
             $table->string('rental_type', 30);
             $table->string('billing_cycle', 20);
+            $table->string('billing_basis', 30)->default('contractual_period');
+            $table->string('proration_rule', 30)->default('exact_day_count');
+            $table->string('billing_timezone', 60)->default('UTC');
+            $table->unsignedSmallInteger('billing_period_days')->nullable();
             $table->date('agreement_date');
             $table->dateTime('start_at');
             $table->dateTime('expected_end_at');

@@ -52,7 +52,17 @@ final class RentalReturnService
         }
 
         return DB::transaction(function () use ($agreement, $allocation, $data): RentalReturnInspection {
+            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            if (! in_array($agreement->status, [
+                RentalAgreementStatus::Active,
+                RentalAgreementStatus::Returned,
+            ], true)) {
+                throw new InvalidArgumentException('Return inspection requires an active rental agreement.');
+            }
             $allocation = RentalAgreementVehicle::query()->lockForUpdate()->findOrFail($allocation->getKey());
+            if ((int) $allocation->agreement_id !== (int) $agreement->getKey()) {
+                throw new InvalidArgumentException('Return vehicle does not belong to the agreement.');
+            }
             $existing = RentalReturnInspection::query()
                 ->where('agreement_vehicle_id', $allocation->getKey())
                 ->lockForUpdate()

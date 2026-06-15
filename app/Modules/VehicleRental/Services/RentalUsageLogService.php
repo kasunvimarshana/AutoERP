@@ -43,6 +43,12 @@ final class RentalUsageLogService
                 ->with('rateSnapshot')
                 ->lockForUpdate()
                 ->findOrFail($agreement->getKey());
+            if (! in_array($agreement->status, [
+                RentalAgreementStatus::Active,
+                RentalAgreementStatus::Returned,
+            ], true)) {
+                throw new InvalidArgumentException('Usage logs require an active or returned agreement.');
+            }
             $allocation = $agreement->vehicles()->with('pickupInspection')->lockForUpdate()
                 ->findOrFail($data->agreementVehicleId);
             Vehicle::query()
@@ -117,6 +123,112 @@ final class RentalUsageLogService
                 'contexts.agreement.supplier',
                 'contexts.rateSnapshot',
             ]);
+        });
+    }
+
+    public function update(RentalUsageLog $log, RentalUsageLogData $data): RentalUsageLog
+    {
+        return DB::transaction(function () use ($log, $data): RentalUsageLog {
+            $log = RentalUsageLog::query()
+                ->with(['events', 'contexts'])
+                ->lockForUpdate()
+                ->findOrFail($log->getKey());
+            $this->assertEditable($log);
+            $agreement = RentalAgreement::query()
+                ->forContext((int) $log->tenant_id, $log->organization_unit_id)
+                ->with('rateSnapshot')
+                ->lockForUpdate()
+                ->findOrFail($log->agreement_id);
+            $allocation = $agreement->vehicles()->with('pickupInspection')->lockForUpdate()
+                ->findOrFail($data->agreementVehicleId);
+            Vehicle::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->whereKey($allocation->vehicle_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->validate($agreement, $allocation, $data);
+
+            $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
+            $effectiveAt = CarbonImmutable::parse(
+                $data->usageDate.' '.($data->startTime ?? '00:00:00'),
+            );
+            $fingerprint = hash('sha256', implode('|', [
+                (string) $agreement->tenant_id,
+                (string) $allocation->vehicle_id,
+                $data->usageDate,
+                $data->startTime ?? '00:00',
+                $data->endTime ?? '00:00',
+                $this->math->normalize($data->startOdometer),
+                $this->math->normalize($data->endOdometer),
+            ]));
+            $log->forceFill([
+                'agreement_id' => $agreement->getKey(),
+                'agreement_vehicle_id' => $allocation->getKey(),
+                'vehicle_id' => $allocation->vehicle_id,
+                'driver_id' => $data->driverId,
+                'usage_date' => $data->usageDate,
+                'effective_at' => $effectiveAt,
+                'start_time' => $data->startTime,
+                'end_time' => $data->endTime,
+                'working_minutes' => $this->workingMinutes($data),
+                'start_odometer' => $this->math->normalize($data->startOdometer),
+                'end_odometer' => $this->math->normalize($data->endOdometer),
+                'distance_km' => $distance,
+                'cumulative_km' => null,
+                'comparative_km' => $data->comparativeKm === null
+                    ? null
+                    : $this->math->normalize($data->comparativeKm),
+                'usage_fingerprint' => $fingerprint,
+                'odometer_variance_reason' => $data->odometerVarianceReason,
+                'trip_from' => $data->tripFrom,
+                'trip_to' => $data->tripTo,
+                'trip_purpose' => $data->tripPurpose,
+                'status' => RentalUsageLogStatus::Draft->value,
+                'submitted_by' => null,
+                'submitted_at' => null,
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'remarks' => $data->remarks,
+                'updated_by' => $data->createdBy,
+            ])->save();
+            $log->contexts()->lockForUpdate()->delete();
+            $this->contexts->attach(
+                $log,
+                $agreement,
+                $allocation,
+                $data->usageDate,
+                $data->startTime,
+            );
+
+            return $log->refresh()->load([
+                'vehicle.make',
+                'vehicle.model',
+                'driver',
+                'events',
+                'contexts.agreement.customer',
+                'contexts.agreement.supplier',
+                'contexts.rateSnapshot',
+            ]);
+        });
+    }
+
+    public function delete(RentalUsageLog $log): void
+    {
+        DB::transaction(function () use ($log): void {
+            $log = RentalUsageLog::query()
+                ->with(['events', 'expenses'])
+                ->lockForUpdate()
+                ->findOrFail($log->getKey());
+            $this->assertEditable($log);
+            foreach ($log->expenses as $expense) {
+                if (! in_array($expense->status->value, ['draft', 'rejected'], true)) {
+                    throw new InvalidArgumentException('Usage with submitted, approved, charged, or settled expenses cannot be deleted.');
+                }
+            }
+            $log->events()->lockForUpdate()->delete();
+            $log->expenses()->lockForUpdate()->delete();
+            $log->contexts()->lockForUpdate()->delete();
+            $log->delete();
         });
     }
 
@@ -256,6 +368,21 @@ final class RentalUsageLogService
         return $cumulative;
     }
 
+    private function assertEditable(RentalUsageLog $log): void
+    {
+        if (! in_array($log->status, [RentalUsageLogStatus::Draft, RentalUsageLogStatus::Rejected], true)) {
+            throw new InvalidArgumentException('Only draft or rejected running chart rows can be edited.');
+        }
+        if (DB::table('rental_charge_calculations')
+            ->where('tenant_id', $log->tenant_id)
+            ->where('organization_unit_id', $log->organization_unit_id)
+            ->where('usage_log_id', $log->getKey())
+            ->whereIn('status', ['draft', 'approved'])
+            ->exists()) {
+            throw new InvalidArgumentException('Charged running chart rows require a controlled correction or reversal.');
+        }
+    }
+
     private function validate(
         RentalAgreement $agreement,
         RentalAgreementVehicle $allocation,
@@ -273,7 +400,7 @@ final class RentalUsageLogService
         $date = CarbonImmutable::parse($data->usageDate);
         if ($date->startOfDay()->lessThan($allocation->allocated_from->startOfDay())
             || ($allocation->allocated_to !== null
-                && $date->startOfDay()->greaterThan($allocation->allocated_to->startOfDay()))) {
+                && ! $date->startOfDay()->lessThan($allocation->allocated_to))) {
             throw new InvalidArgumentException('Usage date must fall within the vehicle allocation period.');
         }
         if (($data->startTime === null) !== ($data->endTime === null)) {

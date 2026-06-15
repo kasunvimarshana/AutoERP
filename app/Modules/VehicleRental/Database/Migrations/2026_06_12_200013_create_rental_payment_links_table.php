@@ -25,6 +25,7 @@ return new class extends Migration
             $table->unique(['agreement_id', 'payment_id'], 'rental_payment_links_agreement_payment_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_payment_links_tenant_org_idx');
             $table->index(['agreement_id', 'link_type'], 'rental_payment_links_agreement_type_idx');
+            $table->index(['invoice_id', 'status'], 'rental_payment_links_invoice_status_idx');
         });
     }
 

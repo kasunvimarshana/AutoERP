@@ -19,7 +19,7 @@ import type { EmployeeSummary } from '@/modules/hr/hrTypes';
 import { searchSuppliers } from '@/modules/supplier/supplierApi';
 import type { SupplierSummary } from '@/modules/supplier/supplierTypes';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
-import { changeRentalExpenseStatus, createRentalExpense, getRentalAgreement, listRentalExpenses } from '../vehicleRentalApi';
+import { changeRentalExpenseStatus, createRentalExpense, deleteRentalExpense, getRentalAgreement, listRentalExpenses } from '../vehicleRentalApi';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -32,6 +32,13 @@ export default function RentalExpensePage() {
         expense_type: 'fuel',
         expense_date: today(),
         amount: '',
+        original_tax_amount: '0.000000',
+        original_withholding_amount: '0.000000',
+        recoverable_input_tax_amount: '0.000000',
+        recovery_base_amount: '',
+        recovery_tax_amount: '0.000000',
+        recovery_withholding_amount: '0.000000',
+        markup_amount: '0.000000',
         financial_treatment: 'company_borne',
         receipt_no: '',
         reference_no: '',
@@ -68,6 +75,18 @@ export default function RentalExpensePage() {
             setBusy(false);
         }
     };
+    const deleteExpense = async (expenseId: number) => {
+        setBusy(true);
+        setError(null);
+        try {
+            await deleteRentalExpense(agreementId, expenseId);
+            expenses.reload();
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
     return (
         <>
             <ContentHeader title={`Rental expenses / ${agreement.data.agreement_number}`} description="Fuel, toll, parking, allowance, repairs, and other direct rental costs." />
@@ -89,10 +108,11 @@ export default function RentalExpensePage() {
                                 receipt_no: form.receipt_no || undefined,
                                 reference_no: form.reference_no || undefined,
                                 description: form.description || undefined,
+                                recovery_base_amount: form.recovery_base_amount || undefined,
                             });
                             setEmployee(null);
                             setSupplier(null);
-                            setForm((current) => ({ ...current, amount: '', receipt_no: '', reference_no: '', description: '' }));
+                            setForm((current) => ({ ...current, amount: '', recovery_base_amount: '', receipt_no: '', reference_no: '', description: '' }));
                             expenses.reload();
                         } catch (requestError) {
                             setError(toApiError(requestError));
@@ -103,6 +123,12 @@ export default function RentalExpensePage() {
                         <Select label="Expense type" value={form.expense_type} options={['fuel', 'toll', 'parking', 'allowance', 'repair', 'other'].map((value) => ({ value, label: value }))} onChange={(event) => setForm({ ...form, expense_type: event.target.value })} />
                         <Input label="Expense date" type="date" value={form.expense_date} onChange={(event) => setForm({ ...form, expense_date: event.target.value })} />
                         <DecimalInput label="Amount" value={form.amount} error={fieldError(error, 'amount')} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
+                        <DecimalInput label="Receipt tax" value={form.original_tax_amount} error={fieldError(error, 'original_tax_amount')} onChange={(event) => setForm({ ...form, original_tax_amount: event.target.value })} />
+                        <DecimalInput label="Receipt withholding" value={form.original_withholding_amount} error={fieldError(error, 'original_withholding_amount')} onChange={(event) => setForm({ ...form, original_withholding_amount: event.target.value })} />
+                        <DecimalInput label="Recoverable input tax" value={form.recoverable_input_tax_amount} error={fieldError(error, 'recoverable_input_tax_amount')} onChange={(event) => setForm({ ...form, recoverable_input_tax_amount: event.target.value })} />
+                        <DecimalInput label="Recovery base" value={form.recovery_base_amount} error={fieldError(error, 'recovery_base_amount')} onChange={(event) => setForm({ ...form, recovery_base_amount: event.target.value })} />
+                        <DecimalInput label="Recovery tax" value={form.recovery_tax_amount} error={fieldError(error, 'recovery_tax_amount')} onChange={(event) => setForm({ ...form, recovery_tax_amount: event.target.value })} />
+                        <DecimalInput label="Recovery withholding" value={form.recovery_withholding_amount} error={fieldError(error, 'recovery_withholding_amount')} onChange={(event) => setForm({ ...form, recovery_withholding_amount: event.target.value })} />
                         <Select label="Financial treatment" value={form.financial_treatment} options={[
                             { value: 'company_borne', label: 'Company borne' },
                             ...(agreement.data.direction === 'outbound' ? [{ value: 'customer_billable', label: 'Customer billable' }] : []),
@@ -148,11 +174,13 @@ export default function RentalExpensePage() {
                     { key: 'reference', header: 'Receipt / reference', render: (row) => `${row.receipt_no ?? '-'} / ${row.reference_no ?? '-'}` },
                     { key: 'treatment', header: 'Treatment', render: (row) => row.financial_treatment.replaceAll('_', ' ') },
                     { key: 'amount', header: 'Amount', render: (row) => row.amount },
+                    { key: 'tax', header: 'Original / recovery tax', render: (row) => `${row.original_tax_amount} / ${row.recovery_tax_amount}` },
                     { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
                     { key: 'actions', header: '', render: (row) => <div className="flex gap-2">
                         {row.status === 'draft' && canRecord && <Button type="button" loading={busy} onClick={() => changeStatus(row.id, 'submit')}>Submit</Button>}
                         {row.status === 'submitted' && canApprove && <Button type="button" loading={busy} onClick={() => changeStatus(row.id, 'approve')}>Approve</Button>}
                         {row.status === 'submitted' && canApprove && <Button type="button" variant="danger" loading={busy} onClick={() => changeStatus(row.id, 'reject')}>Reject</Button>}
+                        {['draft', 'rejected'].includes(row.status) && canRecord && <Button type="button" variant="danger" loading={busy} onClick={() => deleteExpense(row.id)}>Delete</Button>}
                     </div> },
                 ]} />}
             </div>

@@ -63,13 +63,19 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
 
     Route::get('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'index'])->whereNumber('agreement')->name('usage.index');
     Route::post('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('agreement')->name('usage.store');
+    Route::put('agreements/{agreement}/usage-logs/{usageLog}', [RentalUsageController::class, 'update'])->whereNumber(['agreement', 'usageLog'])->name('usage.update');
+    Route::delete('agreements/{agreement}/usage-logs/{usageLog}', [RentalUsageController::class, 'destroy'])->whereNumber(['agreement', 'usageLog'])->name('usage.destroy');
     Route::post('agreements/{agreement}/usage-logs/{usageLog}/events', [RentalUsageController::class, 'storeEvent'])->whereNumber(['agreement', 'usageLog'])->name('usage.events.store');
+    Route::put('agreements/{agreement}/usage-logs/{usageLog}/events/{event}', [RentalUsageController::class, 'updateEvent'])->whereNumber(['agreement', 'usageLog', 'event'])->name('usage.events.update');
+    Route::delete('agreements/{agreement}/usage-logs/{usageLog}/events/{event}', [RentalUsageController::class, 'destroyEvent'])->whereNumber(['agreement', 'usageLog', 'event'])->name('usage.events.destroy');
     Route::patch('agreements/{agreement}/usage-logs/{usageLog}/submit', [RentalUsageController::class, 'submit'])->whereNumber(['agreement', 'usageLog'])->name('usage.submit');
     Route::patch('agreements/{agreement}/usage-logs/{usageLog}/approve', [RentalUsageController::class, 'approve'])->whereNumber(['agreement', 'usageLog'])->name('usage.approve');
     Route::patch('agreements/{agreement}/usage-logs/{usageLog}/reject', [RentalUsageController::class, 'reject'])->whereNumber(['agreement', 'usageLog'])->name('usage.reject');
 
     Route::get('agreements/{agreement}/expenses', [RentalExpenseController::class, 'index'])->whereNumber('agreement')->name('expenses.index');
     Route::post('agreements/{agreement}/expenses', [RentalExpenseController::class, 'store'])->whereNumber('agreement')->name('expenses.store');
+    Route::put('agreements/{agreement}/expenses/{expense}', [RentalExpenseController::class, 'update'])->whereNumber(['agreement', 'expense'])->name('expenses.update');
+    Route::delete('agreements/{agreement}/expenses/{expense}', [RentalExpenseController::class, 'destroy'])->whereNumber(['agreement', 'expense'])->name('expenses.destroy');
     Route::patch('agreements/{agreement}/expenses/{expense}/submit', [RentalExpenseController::class, 'submit'])->whereNumber(['agreement', 'expense'])->name('expenses.submit');
     Route::patch('agreements/{agreement}/expenses/{expense}/approve', [RentalExpenseController::class, 'approve'])->whereNumber(['agreement', 'expense'])->name('expenses.approve');
     Route::patch('agreements/{agreement}/expenses/{expense}/reject', [RentalExpenseController::class, 'reject'])->whereNumber(['agreement', 'expense'])->name('expenses.reject');

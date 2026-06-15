@@ -20,6 +20,18 @@ final class RentalExpenseResource extends RentalResource
             'tax_group_id' => $this->tax_group_id,
             'tax_amount' => (string) $this->tax_amount,
             'withholding_amount' => (string) $this->withholding_amount,
+            'original_net_amount' => (string) $this->original_net_amount,
+            'original_tax_group_id' => $this->original_tax_group_id,
+            'original_tax_amount' => (string) $this->original_tax_amount,
+            'original_gross_amount' => (string) $this->original_gross_amount,
+            'original_withholding_amount' => (string) $this->original_withholding_amount,
+            'recoverable_input_tax_amount' => (string) $this->recoverable_input_tax_amount,
+            'recovery_base_amount' => (string) $this->recovery_base_amount,
+            'recovery_tax_group_id' => $this->recovery_tax_group_id,
+            'recovery_tax_amount' => (string) $this->recovery_tax_amount,
+            'recovery_withholding_amount' => (string) $this->recovery_withholding_amount,
+            'markup_amount' => (string) $this->markup_amount,
+            'generated_charge_id' => $this->generated_charge_id,
             'financial_treatment' => $this->enum($this->financial_treatment),
             'is_billable' => (bool) $this->is_billable,
             'is_recoverable' => (bool) $this->is_recoverable,
@@ -36,6 +48,8 @@ final class RentalExpenseResource extends RentalResource
             'submitted_at' => $this->submitted_at?->toISOString(),
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
+            'rejected_by' => $this->rejected_by,
+            'rejected_at' => $this->rejected_at?->toISOString(),
         ];
     }
 }

@@ -38,7 +38,17 @@ final class RentalPickupService
         }
 
         return DB::transaction(function () use ($agreement, $allocation, $data): RentalPickupInspection {
+            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            if (! in_array($agreement->status, [
+                RentalAgreementStatus::Confirmed,
+                RentalAgreementStatus::Active,
+            ], true)) {
+                throw new InvalidArgumentException('Pickup inspection requires a confirmed or active agreement.');
+            }
             $allocation = RentalAgreementVehicle::query()->lockForUpdate()->findOrFail($allocation->getKey());
+            if ((int) $allocation->agreement_id !== (int) $agreement->getKey()) {
+                throw new InvalidArgumentException('Pickup vehicle does not belong to the agreement.');
+            }
             $existing = RentalPickupInspection::query()
                 ->where('agreement_vehicle_id', $allocation->getKey())
                 ->lockForUpdate()

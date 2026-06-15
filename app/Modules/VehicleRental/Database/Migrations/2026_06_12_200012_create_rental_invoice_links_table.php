@@ -14,6 +14,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('billing_period_id')->nullable()->constrained('rental_billing_periods')->restrictOnDelete();
+            $table->foreignId('charge_run_id')->nullable()->constrained('rental_charge_runs')->restrictOnDelete();
             $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('charge_id')->constrained('rental_charges')->restrictOnDelete();
             $table->foreignId('invoice_id')->constrained('invoices')->restrictOnDelete();
@@ -25,6 +27,7 @@ return new class extends Migration
 
             $table->unique(['charge_id', 'invoice_id'], 'rental_invoice_links_charge_invoice_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_invoice_links_tenant_org_idx');
+            $table->index(['charge_run_id', 'status'], 'rental_invoice_links_run_status_idx');
             $table->index(['agreement_id', 'invoice_id'], 'rental_invoice_links_agreement_invoice_idx');
         });
     }

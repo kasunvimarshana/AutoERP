@@ -36,8 +36,13 @@ abstract class RentalController
     protected function usageLog(RentalAgreement $agreement, int $id): RentalUsageLog
     {
         return RentalUsageLog::query()
+            ->where('tenant_id', $agreement->tenant_id)
+            ->where('organization_unit_id', $agreement->organization_unit_id)
             ->whereKey($id)
-            ->whereHas('contexts', fn ($query) => $query->where('agreement_id', $agreement->getKey()))
+            ->whereHas('contexts', fn ($query) => $query
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->where('agreement_id', $agreement->getKey()))
             ->firstOrFail();
     }
 

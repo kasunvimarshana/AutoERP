@@ -14,6 +14,7 @@ use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentCreationService;
@@ -153,19 +154,30 @@ final class RentalPaymentIntegrationService
                 $referenceNumber,
                 $createdBy,
             ));
-            $this->link($agreement, $payment, $linkType, $amount, $invoiceId);
+            $payment = Payment::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->lockForUpdate()
+                ->findOrFail($payment->getKey());
+            $this->linkInternal($agreement, $payment, $linkType, $amount, $invoiceId);
 
             return $payment;
         });
     }
 
-    public function link(
+    private function linkInternal(
         RentalAgreement $agreement,
         Payment $payment,
         string $linkType,
         string $amount,
         ?int $invoiceId = null,
     ): RentalPaymentLink {
+        if (! in_array($linkType, self::LINK_TYPES, true)) {
+            throw new InvalidArgumentException('Rental payment link type is invalid.');
+        }
+        if ($this->math->compare($amount, '0.000000') <= 0) {
+            throw new InvalidArgumentException('Rental payment link amount must be greater than zero.');
+        }
         if ((int) $payment->tenant_id !== (int) $agreement->tenant_id
             || $payment->organization_unit_id !== $agreement->organization_unit_id) {
             throw new InvalidArgumentException('Rental payment belongs to a different tenant or organization.');
@@ -173,6 +185,59 @@ final class RentalPaymentIntegrationService
         if ($payment->party_type !== $this->financialPartyType($agreement)
             || (int) $payment->party_id !== (int) $agreement->party_id) {
             throw new InvalidArgumentException('Rental payment party does not match the agreement.');
+        }
+        if ($payment->direction !== $this->paymentDirection($agreement, $linkType)
+            || $payment->payment_type !== $this->paymentType($agreement, $linkType)) {
+            throw new InvalidArgumentException('Rental payment direction or type does not match the link purpose.');
+        }
+        if (in_array($payment->status, [
+            PaymentStatus::Void,
+            PaymentStatus::Reversed,
+            PaymentStatus::Cancelled,
+        ], true)) {
+            throw new InvalidArgumentException('Void, reversed, or cancelled payments cannot be linked to a rental agreement.');
+        }
+        if ($this->math->compare($amount, (string) $payment->total_amount) > 0) {
+            throw new InvalidArgumentException('Rental payment link amount cannot exceed the payment amount.');
+        }
+        if (RentalPaymentLink::query()
+            ->where('tenant_id', $agreement->tenant_id)
+            ->where('organization_unit_id', $agreement->organization_unit_id)
+            ->where('agreement_id', $agreement->getKey())
+            ->where('payment_id', $payment->getKey())
+            ->where('link_type', $linkType)
+            ->where('status', 'active')
+            ->lockForUpdate()
+            ->exists()) {
+            throw new InvalidArgumentException('This rental payment is already linked for the same purpose.');
+        }
+        if ($invoiceId !== null) {
+            $invoice = Invoice::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->lockForUpdate()
+                ->findOrFail($invoiceId);
+            if (! $agreement->invoiceLinks()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->where('invoice_id', $invoiceId)
+                ->where('status', 'active')
+                ->exists()) {
+                throw new InvalidArgumentException('Payment invoice is not linked to this rental agreement.');
+            }
+            if ($payment->currency_id !== null
+                && $invoice->currency_id !== null
+                && (int) $payment->currency_id !== (int) $invoice->currency_id) {
+                throw new InvalidArgumentException('Rental payment currency must match the linked invoice currency.');
+            }
+            if ($linkType === 'settlement') {
+                $balance = $this->invoiceBalances->validatePayableState($invoiceId);
+                if ($this->math->compare($amount, $balance->remainingAmount) > 0) {
+                    throw new InvalidArgumentException('Settlement amount cannot exceed the rental invoice balance.');
+                }
+            }
+        } elseif ($linkType === 'settlement') {
+            throw new InvalidArgumentException('Settlement payments require a linked rental invoice.');
         }
 
         return RentalPaymentLink::query()->create([

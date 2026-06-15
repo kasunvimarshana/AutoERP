@@ -116,6 +116,12 @@ final class RentalAgreementVehicleService
 
         return DB::transaction(function () use ($agreement, $current, $replacement): RentalAgreementVehicle {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            if (! in_array($agreement->status, [
+                RentalAgreementStatus::Confirmed,
+                RentalAgreementStatus::Active,
+            ], true)) {
+                throw new InvalidArgumentException('Vehicle replacement requires a confirmed or active agreement.');
+            }
             $current = RentalAgreementVehicle::query()
                 ->with('vehicle')
                 ->lockForUpdate()

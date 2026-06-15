@@ -49,17 +49,7 @@ final class RentalExpenseService
             $this->validateTreatment($agreement, $data);
             $this->validateConfiguration($agreement, $data);
             if ($data->usageLogId !== null) {
-                $usageLog = RentalUsageLog::query()
-                    ->whereKey($data->usageLogId)
-                    ->whereHas('contexts', fn ($query) => $query
-                        ->where('agreement_id', $agreement->getKey()))
-                    ->lockForUpdate()
-                    ->first();
-                if ($usageLog === null) {
-                    throw new InvalidArgumentException(
-                        'Rental expense usage log does not belong to the agreement context.',
-                    );
-                }
+                $this->usageLogForAgreement($agreement, $data->usageLogId);
             }
             $fingerprint = hash('sha256', implode('|', [
                 (string) $agreement->tenant_id,
@@ -84,9 +74,7 @@ final class RentalExpenseService
                 'expense_date' => $data->expenseDate,
                 'currency_id' => $data->currencyId ?? $agreement->currency_id,
                 'amount' => $this->math->normalize($data->amount),
-                'tax_group_id' => $data->taxGroupId,
-                'tax_amount' => '0.000000',
-                'withholding_amount' => '0.000000',
+                ...$this->taxAttributes($data),
                 'financial_treatment' => $data->financialTreatment->value,
                 'is_billable' => $data->financialTreatment === RentalExpenseFinancialTreatment::CustomerBillable,
                 'is_recoverable' => $data->financialTreatment === RentalExpenseFinancialTreatment::SupplierRecoverable,
@@ -108,6 +96,72 @@ final class RentalExpenseService
             }
 
             return $expense;
+        });
+    }
+
+    public function update(RentalExpense $expense, RentalExpenseData $data): RentalExpense
+    {
+        if ($this->math->compare($data->amount, '0.000000') <= 0) {
+            throw new InvalidArgumentException('Rental expense amount must be greater than zero.');
+        }
+
+        return DB::transaction(function () use ($expense, $data): RentalExpense {
+            $expense = RentalExpense::query()->lockForUpdate()->findOrFail($expense->getKey());
+            if (! in_array($expense->status, [RentalExpenseStatus::Draft, RentalExpenseStatus::Rejected], true)) {
+                throw new InvalidArgumentException('Only draft or rejected rental expenses can be edited.');
+            }
+            $agreement = RentalAgreement::query()
+                ->forContext((int) $expense->tenant_id, $expense->organization_unit_id)
+                ->lockForUpdate()
+                ->findOrFail($expense->agreement_id);
+            $this->validateTreatment($agreement, $data);
+            $this->validateConfiguration($agreement, $data);
+            if ($data->usageLogId !== null) {
+                $this->usageLogForAgreement($agreement, $data->usageLogId);
+            }
+
+            $old = $expense->status;
+            $expense->forceFill([
+                'usage_log_id' => $data->usageLogId,
+                'expense_type' => $data->expenseType->value,
+                'expense_date' => $data->expenseDate,
+                'currency_id' => $data->currencyId ?? $agreement->currency_id,
+                'amount' => $this->math->normalize($data->amount),
+                ...$this->taxAttributes($data),
+                'financial_treatment' => $data->financialTreatment->value,
+                'is_billable' => $data->financialTreatment === RentalExpenseFinancialTreatment::CustomerBillable,
+                'is_recoverable' => $data->financialTreatment === RentalExpenseFinancialTreatment::SupplierRecoverable,
+                'is_reimbursable' => $data->financialTreatment === RentalExpenseFinancialTreatment::EmployeeReimbursable,
+                'responsible_party_type' => $this->responsiblePartyType($agreement, $data->financialTreatment),
+                'responsible_party_id' => $this->responsiblePartyId($agreement, $data),
+                'receipt_no' => $data->receiptNo,
+                'reference_no' => $data->referenceNo,
+                'description' => $data->description,
+                'attachments' => $data->attachments,
+                'status' => RentalExpenseStatus::Draft->value,
+                'charge_generation_status' => 'not_generated',
+                'submitted_by' => null,
+                'submitted_at' => null,
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'updated_by' => $data->createdBy,
+            ])->save();
+            if ($old !== RentalExpenseStatus::Draft) {
+                $this->recordStatus($expense, $old, RentalExpenseStatus::Draft, $data->createdBy, 'Expense corrected.');
+            }
+
+            return $expense->refresh();
+        });
+    }
+
+    public function delete(RentalExpense $expense): void
+    {
+        DB::transaction(function () use ($expense): void {
+            $expense = RentalExpense::query()->lockForUpdate()->findOrFail($expense->getKey());
+            if (! in_array($expense->status, [RentalExpenseStatus::Draft, RentalExpenseStatus::Rejected], true)) {
+                throw new InvalidArgumentException('Only draft or rejected rental expenses can be deleted.');
+            }
+            $expense->delete();
         });
     }
 
@@ -140,16 +194,22 @@ final class RentalExpenseService
                 'status' => $status->value,
                 'submitted_by' => $status === RentalExpenseStatus::Submitted
                     ? $approvedBy
-                    : $expense->submitted_by,
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->submitted_by),
                 'submitted_at' => $status === RentalExpenseStatus::Submitted
                     ? now()
-                    : $expense->submitted_at,
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->submitted_at),
                 'approved_by' => $status === RentalExpenseStatus::Approved
                     ? $approvedBy
-                    : $expense->approved_by,
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->approved_by),
                 'approved_at' => $status === RentalExpenseStatus::Approved
                     ? now()
-                    : $expense->approved_at,
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->approved_at),
+                'rejected_by' => $status === RentalExpenseStatus::Rejected
+                    ? $approvedBy
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->rejected_by),
+                'rejected_at' => $status === RentalExpenseStatus::Rejected
+                    ? now()
+                    : ($status === RentalExpenseStatus::Draft ? null : $expense->rejected_at),
                 'updated_by' => $approvedBy,
             ])->save();
             $this->recordStatus($expense, $old, $status, $approvedBy, $reason);
@@ -225,13 +285,73 @@ final class RentalExpenseService
                 ->where('is_active', true)
                 ->findOrFail($data->currencyId);
         }
-        if ($data->taxGroupId !== null) {
+        foreach (array_filter([
+            $data->taxGroupId,
+            $data->originalTaxGroupId,
+            $data->recoveryTaxGroupId,
+        ]) as $taxGroupId) {
             TaxGroup::query()
                 ->where('tenant_id', $agreement->tenant_id)
-                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->where(function ($query) use ($agreement): void {
+                    $query->whereNull('organization_unit_id');
+                    if ($agreement->organization_unit_id !== null) {
+                        $query->orWhere('organization_unit_id', $agreement->organization_unit_id);
+                    }
+                })
                 ->where('active', true)
-                ->findOrFail($data->taxGroupId);
+                ->findOrFail($taxGroupId);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function taxAttributes(RentalExpenseData $data): array
+    {
+        $originalNet = $this->math->normalize($data->originalNetAmount ?? $data->amount);
+        $originalTax = $this->math->normalize($data->originalTaxAmount);
+        $originalWithholding = $this->math->normalize($data->originalWithholdingAmount);
+        $originalGross = $this->math->normalize($data->originalGrossAmount ?? $data->amount);
+        $markup = $this->math->normalize($data->markupAmount);
+        $recoveryBase = $this->math->normalize($data->recoveryBaseAmount ?? $this->math->add($data->amount, $markup));
+
+        return [
+            'tax_group_id' => $data->originalTaxGroupId ?? $data->taxGroupId,
+            'tax_amount' => $originalTax,
+            'withholding_amount' => $originalWithholding,
+            'original_net_amount' => $originalNet,
+            'original_tax_group_id' => $data->originalTaxGroupId ?? $data->taxGroupId,
+            'original_tax_amount' => $originalTax,
+            'original_gross_amount' => $originalGross,
+            'original_withholding_amount' => $originalWithholding,
+            'recoverable_input_tax_amount' => $this->math->normalize($data->recoverableInputTaxAmount),
+            'recovery_base_amount' => $recoveryBase,
+            'recovery_tax_group_id' => $data->recoveryTaxGroupId,
+            'recovery_tax_amount' => $this->math->normalize($data->recoveryTaxAmount),
+            'recovery_withholding_amount' => $this->math->normalize($data->recoveryWithholdingAmount),
+            'markup_amount' => $markup,
+        ];
+    }
+
+    private function usageLogForAgreement(RentalAgreement $agreement, int $usageLogId): RentalUsageLog
+    {
+        $usageLog = RentalUsageLog::query()
+            ->where('tenant_id', $agreement->tenant_id)
+            ->where('organization_unit_id', $agreement->organization_unit_id)
+            ->whereKey($usageLogId)
+            ->whereHas('contexts', fn ($query) => $query
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('organization_unit_id', $agreement->organization_unit_id)
+                ->where('agreement_id', $agreement->getKey()))
+            ->lockForUpdate()
+            ->first();
+        if ($usageLog === null) {
+            throw new InvalidArgumentException(
+                'Rental expense usage log does not belong to the agreement context.',
+            );
+        }
+
+        return $usageLog;
     }
 
     private function responsiblePartyType(

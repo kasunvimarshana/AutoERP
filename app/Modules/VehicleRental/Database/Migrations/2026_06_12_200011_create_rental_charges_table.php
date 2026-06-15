@@ -14,9 +14,15 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->foreignId('billing_period_id')->constrained('rental_billing_periods')->restrictOnDelete();
+            $table->foreignId('charge_run_id')->constrained('rental_charge_runs')->restrictOnDelete();
             $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('charge_calculation_id')->nullable()->constrained('rental_charge_calculations')->restrictOnDelete();
             $table->string('financial_side', 20);
+            $table->dateTime('billing_period_start');
+            $table->dateTime('billing_period_end');
+            $table->string('billing_cycle_key', 100);
+            $table->unsignedInteger('period_sequence');
             $table->string('charge_type', 30);
             $table->text('description');
             $table->decimal('quantity', 20, 6);
@@ -33,6 +39,8 @@ return new class extends Migration
 
             $table->unique('charge_calculation_id', 'rental_charges_calculation_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'rental_charges_tenant_org_idx');
+            $table->index(['billing_period_id', 'financial_side'], 'rental_charges_period_side_idx');
+            $table->index(['charge_run_id', 'status'], 'rental_charges_run_status_idx');
             $table->index(['agreement_id', 'status', 'invoice_status'], 'rental_charges_agreement_status_idx');
             $table->index(['financial_side', 'status'], 'rental_charges_side_status_idx');
         });

@@ -88,11 +88,11 @@ final class RentalUsageContextService
             ->when(
                 $startTime === null,
                 fn ($query) => $query
-                    ->where('effective_from', '<=', $usageDay->endOfDay())
-                    ->where('effective_to', '>=', $usageDay),
+                    ->where('effective_from', '<', $usageDay->addDay())
+                    ->where('effective_to', '>', $usageDay),
                 fn ($query) => $query
                     ->where('effective_from', '<=', $at)
-                    ->where('effective_to', '>=', $at),
+                    ->where('effective_to', '>', $at),
             )
             ->where(function ($query) use ($selectedAllocation): void {
                 $query->where('inbound_agreement_vehicle_id', $selectedAllocation->getKey())
@@ -172,8 +172,8 @@ final class RentalUsageContextService
         $to = $allocation->allocated_to ?? $agreement->expected_end_at;
         $outside = $dateOnly
             ? $at->lessThan($allocation->allocated_from->startOfDay())
-                || $at->greaterThan($to->startOfDay())
-            : $at->lessThan($allocation->allocated_from) || $at->greaterThan($to);
+                || ! $at->lessThan($to)
+            : $at->lessThan($allocation->allocated_from) || ! $at->lessThan($to);
         if ($outside) {
             throw new InvalidArgumentException('Usage time must fall within every resolved vehicle allocation period.');
         }

@@ -146,7 +146,7 @@ final class RentalRunningChartController extends RentalController
                     ->orWhere('outbound_agreement_vehicle_id', $allocation->getKey());
             })
             ->where('effective_from', '<=', $effectiveAt)
-            ->where('effective_to', '>=', $effectiveAt)
+            ->where('effective_to', '>', $effectiveAt)
             ->with([
                 'vehicle.make',
                 'vehicle.model',

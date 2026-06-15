@@ -21,6 +21,8 @@ import {
     changeRentalAgreementVehicleLinkStatus,
     changeRentalUsageStatus,
     createRentalAgreementVehicleLink,
+    deleteRentalUsageEvent,
+    deleteRentalUsageLog,
     getRunningChartContext,
     listRentalUsageLogs,
     listRunningChartAgreements,
@@ -136,6 +138,35 @@ export default function UsageLogPage() {
         setError(null);
         try {
             await changeRentalUsageStatus(selectedOption.agreement_id, row.id, status);
+            logs.reload();
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deleteUsage = async (row: RentalUsageLog) => {
+        if (!selectedOption || busy) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await deleteRentalUsageLog(selectedOption.agreement_id, row.id);
+            setSelectedId(null);
+            logs.reload();
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deleteEvent = async (eventId: number) => {
+        if (!selectedOption || !selected || busy) return;
+        setBusy(true);
+        setError(null);
+        try {
+            await deleteRentalUsageEvent(selectedOption.agreement_id, selected.id, eventId);
             logs.reload();
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -337,20 +368,22 @@ export default function UsageLogPage() {
                     { key: 'contexts', header: 'Financial contexts', render: (row) => row.contexts.map((item) => item.financial_side).join(' + ') },
                     { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
                     { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap gap-2">
-                        {row.status === 'draft' && canRecordUsage && <Button type="button" variant="secondary" loading={busy} onClick={() => setSelectedId(row.id)}>Events ({row.events.length})</Button>}
+                        {['draft', 'rejected'].includes(row.status) && canRecordUsage && <Button type="button" variant="secondary" loading={busy} onClick={() => setSelectedId(row.id)}>Events ({row.events.length})</Button>}
                         {row.status === 'draft' && canRecordUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'submit')}>Submit</Button>}
+                        {['draft', 'rejected'].includes(row.status) && canRecordUsage && <Button type="button" variant="danger" loading={busy} onClick={() => void deleteUsage(row)}>Delete</Button>}
                         {row.status === 'submitted' && canApproveUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'approve')}>Approve</Button>}
                         {row.status === 'submitted' && canApproveUsage && <Button type="button" variant="danger" loading={busy} onClick={() => void changeStatus(row, 'reject')}>Reject</Button>}
                     </div> },
                 ]} />)}
 
-                {selectedOption && selected?.status === 'draft' && canRecordUsage && <>
+                {selectedOption && selected && ['draft', 'rejected'].includes(selected.status) && canRecordUsage && <>
                     <UsageEventEditor agreementId={selectedOption.agreement_id} usageLogId={selected.id} onSaved={() => logs.reload()} />
                     <Panel title={`Operational events / ${selected.usage_date}`}>
                         <DataTable rows={selected.events} rowKey={(row) => row.id} columns={[
                             { key: 'type', header: 'Type', render: (row) => row.event_type.replaceAll('_', ' ') },
                             { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
                             { key: 'remarks', header: 'Remarks', render: (row) => row.remarks ?? '-' },
+                            { key: 'actions', header: '', render: (row) => <Button type="button" variant="danger" loading={busy} onClick={() => void deleteEvent(row.id)}>Delete</Button> },
                         ]} />
                     </Panel>
                 </>}

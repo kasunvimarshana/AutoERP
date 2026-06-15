@@ -55,6 +55,44 @@ final class RentalUsageController extends RentalController
         )))->response()->setStatusCode(201);
     }
 
+    public function update(
+        StoreRentalUsageLogRequest $request,
+        int $agreement,
+        int $usageLog,
+        RentalUsageLogService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $model = $this->agreement($request, $agreement);
+
+        return new RentalUsageLogResource($service->update(
+            $this->usageLog($model, $usageLog),
+            $request->toData(),
+        ));
+    }
+
+    public function destroy(
+        ListRentalRequest $request,
+        int $agreement,
+        int $usageLog,
+        RentalUsageLogService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $model = $this->agreement($request, $agreement);
+        $service->delete($this->usageLog($model, $usageLog));
+
+        return response()->json(null, 204);
+    }
+
     public function storeEvent(
         StoreRentalUsageEventRequest $request,
         int $agreement,
@@ -84,6 +122,48 @@ final class RentalUsageController extends RentalController
             $this->usageLog($model, $usageLog),
             $data,
         )))->response()->setStatusCode(201);
+    }
+
+    public function updateEvent(
+        StoreRentalUsageEventRequest $request,
+        int $agreement,
+        int $usageLog,
+        int $event,
+        RentalUsageEventService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageEventResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $model = $this->agreement($request, $agreement);
+        $log = $this->usageLog($model, $usageLog);
+
+        return new RentalUsageEventResource($service->update(
+            $log->events()->findOrFail($event),
+            $request->toData(),
+        ));
+    }
+
+    public function destroyEvent(
+        ListRentalRequest $request,
+        int $agreement,
+        int $usageLog,
+        int $event,
+        RentalUsageEventService $service,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $model = $this->agreement($request, $agreement);
+        $log = $this->usageLog($model, $usageLog);
+        $service->delete($log->events()->findOrFail($event));
+
+        return response()->json(null, 204);
     }
 
     public function submit(

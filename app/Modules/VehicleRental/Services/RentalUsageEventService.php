@@ -25,12 +25,8 @@ final class RentalUsageEventService
 
         return DB::transaction(function () use ($log, $data): RentalUsageEvent {
             $log = RentalUsageLog::query()->lockForUpdate()->findOrFail($log->getKey());
-            if ($log->status !== RentalUsageLogStatus::Draft) {
-                throw new InvalidArgumentException('Usage events can only be changed while the running chart is draft.');
-            }
-            if ($data->eventType === RentalUsageEventType::Weekend && ! $log->usage_date->isWeekend()) {
-                throw new InvalidArgumentException('Weekend usage can only be classified on a weekend usage date.');
-            }
+            $this->assertEditable($log);
+            $this->validate($log, $data);
 
             return RentalUsageEvent::query()->create([
                 'tenant_id' => $log->tenant_id,
@@ -42,5 +38,50 @@ final class RentalUsageEventService
                 'created_by' => $data->createdBy,
             ]);
         });
+    }
+
+    public function update(RentalUsageEvent $event, RentalUsageEventData $data): RentalUsageEvent
+    {
+        if ($this->math->compare($data->quantity, '0.000000') <= 0) {
+            throw new InvalidArgumentException('Usage event quantity must be greater than zero.');
+        }
+
+        return DB::transaction(function () use ($event, $data): RentalUsageEvent {
+            $event = RentalUsageEvent::query()->with('usageLog')->lockForUpdate()->findOrFail($event->getKey());
+            $log = RentalUsageLog::query()->lockForUpdate()->findOrFail($event->usage_log_id);
+            $this->assertEditable($log);
+            $this->validate($log, $data);
+            $event->forceFill([
+                'event_type' => $data->eventType->value,
+                'quantity' => $this->math->normalize($data->quantity),
+                'remarks' => $data->remarks,
+            ])->save();
+
+            return $event->refresh();
+        });
+    }
+
+    public function delete(RentalUsageEvent $event): void
+    {
+        DB::transaction(function () use ($event): void {
+            $event = RentalUsageEvent::query()->lockForUpdate()->findOrFail($event->getKey());
+            $log = RentalUsageLog::query()->lockForUpdate()->findOrFail($event->usage_log_id);
+            $this->assertEditable($log);
+            $event->delete();
+        });
+    }
+
+    private function assertEditable(RentalUsageLog $log): void
+    {
+        if (! in_array($log->status, [RentalUsageLogStatus::Draft, RentalUsageLogStatus::Rejected], true)) {
+            throw new InvalidArgumentException('Usage events can only be changed while the running chart is draft or rejected.');
+        }
+    }
+
+    private function validate(RentalUsageLog $log, RentalUsageEventData $data): void
+    {
+        if ($data->eventType === RentalUsageEventType::Weekend && ! $log->usage_date->isWeekend()) {
+            throw new InvalidArgumentException('Weekend usage can only be classified on a weekend usage date.');
+        }
     }
 }

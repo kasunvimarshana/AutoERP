@@ -24,6 +24,8 @@ final class RentalChargeCalculation extends CoreModel
         return [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'billing_period_id' => 'integer',
+            'charge_run_id' => 'integer',
             'agreement_id' => 'integer',
             'agreement_vehicle_id' => 'integer',
             'usage_log_id' => 'integer',
@@ -33,6 +35,9 @@ final class RentalChargeCalculation extends CoreModel
             'financial_side' => RentalFinancialSide::class,
             'party_type' => RentalPartyType::class,
             'party_id' => 'integer',
+            'billing_period_start' => 'datetime',
+            'billing_period_end' => 'datetime',
+            'period_sequence' => 'integer',
             'source_id' => 'integer',
             'calculation_type' => RentalChargeCalculationType::class,
             'measured_quantity' => 'decimal:6',
@@ -41,6 +46,7 @@ final class RentalChargeCalculation extends CoreModel
             'rate' => 'decimal:6',
             'multiplier' => 'decimal:6',
             'amount' => 'decimal:6',
+            'tax_group_id' => 'integer',
             'tax_amount' => 'decimal:6',
             'withholding_amount' => 'decimal:6',
             'total_amount' => 'decimal:6',
@@ -52,6 +58,16 @@ final class RentalChargeCalculation extends CoreModel
     public function agreement(): BelongsTo
     {
         return $this->belongsTo(RentalAgreement::class, 'agreement_id');
+    }
+
+    public function billingPeriod(): BelongsTo
+    {
+        return $this->belongsTo(RentalBillingPeriod::class, 'billing_period_id');
+    }
+
+    public function chargeRun(): BelongsTo
+    {
+        return $this->belongsTo(RentalChargeRun::class, 'charge_run_id');
     }
 
     public function usageLog(): BelongsTo

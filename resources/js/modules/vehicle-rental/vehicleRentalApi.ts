@@ -53,8 +53,18 @@ export const listRentalUsageLogs = async (agreementId: number, signal?: AbortSig
     (await apiClient.get<ApiResource<RentalUsageLog[]>>(`${endpoint}/agreements/${agreementId}/usage-logs`, { signal })).data.data;
 export const createRentalUsageLog = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalUsageLog> =>
     (await apiClient.post<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs`, payload)).data.data;
+export const updateRentalUsageLog = async (agreementId: number, usageLogId: number, payload: Record<string, unknown>): Promise<RentalUsageLog> =>
+    (await apiClient.put<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}`, payload)).data.data;
+export const deleteRentalUsageLog = async (agreementId: number, usageLogId: number): Promise<void> => {
+    await apiClient.delete(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}`);
+};
 export const createRentalUsageEvent = async (agreementId: number, usageLogId: number, payload: Record<string, unknown>): Promise<RentalUsageEvent> =>
     (await apiClient.post<ApiResource<RentalUsageEvent>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events`, payload)).data.data;
+export const updateRentalUsageEvent = async (agreementId: number, usageLogId: number, eventId: number, payload: Record<string, unknown>): Promise<RentalUsageEvent> =>
+    (await apiClient.put<ApiResource<RentalUsageEvent>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events/${eventId}`, payload)).data.data;
+export const deleteRentalUsageEvent = async (agreementId: number, usageLogId: number, eventId: number): Promise<void> => {
+    await apiClient.delete(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events/${eventId}`);
+};
 export const changeRentalUsageStatus = async (agreementId: number, usageLogId: number, status: 'submit' | 'approve' | 'reject', reason?: string): Promise<RentalUsageLog> =>
     (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/${status}`, { reason })).data.data;
 export const listRunningChartAgreements = async (
@@ -88,6 +98,11 @@ export const listRentalExpenses = async (agreementId: number, signal?: AbortSign
     (await apiClient.get<ApiResource<RentalExpense[]>>(`${endpoint}/agreements/${agreementId}/expenses`, { signal })).data.data;
 export const createRentalExpense = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalExpense> =>
     (await apiClient.post<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses`, payload)).data.data;
+export const updateRentalExpense = async (agreementId: number, expenseId: number, payload: Record<string, unknown>): Promise<RentalExpense> =>
+    (await apiClient.put<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}`, payload)).data.data;
+export const deleteRentalExpense = async (agreementId: number, expenseId: number): Promise<void> => {
+    await apiClient.delete(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}`);
+};
 export const changeRentalExpenseStatus = async (agreementId: number, expenseId: number, status: 'submit' | 'approve' | 'reject'): Promise<RentalExpense> =>
     (await apiClient.patch<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}/${status}`)).data.data;
 
