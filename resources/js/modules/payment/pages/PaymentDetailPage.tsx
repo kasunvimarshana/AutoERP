@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getPayment, getPaymentAllocations, getPaymentUnappliedBalance, refundPayment, reversePayment } from '../paymentApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useApi } from '@/shared/hooks/useApi';
@@ -15,7 +15,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 
@@ -105,7 +105,7 @@ export default function PaymentDetailPage() {
             <ContentHeader
                 title={value.payment_number ?? 'Payment'}
                 description={formatDate(value.payment_date)}
-                actions={isCheque ? <Link to={`/payments/${id}/cheque-print`}><Button>Print cheque</Button></Link> : undefined}
+                actions={isCheque ? <LinkButton to={`/payments/${id}/cheque-print`}>Print cheque</LinkButton> : undefined}
             />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />

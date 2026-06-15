@@ -57,7 +57,11 @@ export default function PostingProfilePage() {
         setError(null);
         try {
             const payload = { ...form, rules: form.rules.filter((rule) => rule.line_key.trim() && rule.account_id) };
-            selected ? await updatePostingProfile(selected.id, payload) : await createPostingProfile(payload);
+            if (selected) {
+                await updatePostingProfile(selected.id, payload);
+            } else {
+                await createPostingProfile(payload);
+            }
             setSelected(null);
             setForm(emptyProfile);
             profiles.reload();

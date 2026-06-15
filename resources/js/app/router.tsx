@@ -5,6 +5,9 @@ import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
+const AccessOverviewPage = lazy(() => import('@/modules/access/AccessOverviewPage'));
+const AccessListPage = lazy(() => import('@/modules/access/AccessListPage'));
+const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'));
 const UomListPage = lazy(() => import('@/modules/uom/UomListPage'));
 const UomCreatePage = lazy(() => import('@/modules/uom/UomCreatePage'));
 const UomEditPage = lazy(() => import('@/modules/uom/UomEditPage'));
@@ -125,6 +128,11 @@ export function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/access/users" element={<AccessListPage kind="users" />} />
+                    <Route path="/access/roles" element={<AccessListPage kind="roles" />} />
+                    <Route path="/access/permissions" element={<AccessListPage kind="permissions" />} />
+                    <Route path="/administration/access" element={<AccessOverviewPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/uoms" element={<UomListPage />} />
                     <Route path="/uoms/create" element={<UomCreatePage />} />
                     <Route path="/uoms/:id/edit" element={<UomEditPage />} />

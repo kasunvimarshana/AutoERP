@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getAccount, getAccountBalance, listLedgerEntries } from '../financeApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -11,7 +11,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { readableRelation } from '@/shared/utils/object';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 
 type Tab = 'summary' | 'balance' | 'ledger' | 'children';
@@ -28,7 +28,7 @@ export default function FinanceAccountDetailPage() {
     const value = account.data;
     return (
         <>
-            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" actions={<Link to={`/finance/accounts/${id}/edit`}><Button type="button" variant="secondary">Edit account</Button></Link>} />
+            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" actions={<LinkButton to={`/finance/accounts/${id}/edit`} variant="secondary">Edit account</LinkButton>} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">

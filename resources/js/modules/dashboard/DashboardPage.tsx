@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 
@@ -62,7 +62,7 @@ export default function DashboardPage() {
             <ContentHeader
                 title="Task center"
                 description="Start from the work to be done, then move into the module only when the workflow needs it."
-                actions={<Link to="/vehicle-service/jobs/create"><Button>New service job</Button></Link>}
+                actions={<LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>}
             />
 
             <div className="grid gap-5 xl:grid-cols-[1fr_22rem]">

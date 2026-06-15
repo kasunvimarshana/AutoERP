@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -41,7 +41,7 @@ export default function UomDetailPage() {
 
     return (
         <>
-            <ContentHeader title={`${uom.code} - ${uom.name}`} description="Generic unit of measure detail." actions={<Link to={`/uoms/${uom.id}/edit`}><Button>Edit</Button></Link>} />
+            <ContentHeader title={`${uom.code} - ${uom.name}`} description="Generic unit of measure detail." actions={<LinkButton to={`/uoms/${uom.id}/edit`}>Edit</LinkButton>} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
                 <div className="p-5">

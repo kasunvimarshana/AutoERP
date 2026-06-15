@@ -62,6 +62,7 @@ final class AuthPayloadResource extends JsonResource
                 'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
+                'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
                 'session_id' => $payload['session']['id'] ?? null,
             ];
         }
@@ -75,6 +76,7 @@ final class AuthPayloadResource extends JsonResource
                 'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
+                'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
             ];
         }
 
@@ -140,6 +142,14 @@ final class AuthPayloadResource extends JsonResource
         }
 
         return array_values(array_unique($items));
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function nullableStringList(mixed $value): ?array
+    {
+        return is_array($value) ? $this->stringList($value) : null;
     }
 
     private function sanitize(mixed $value): mixed

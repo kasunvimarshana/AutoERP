@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
@@ -81,7 +81,7 @@ export default function FinanceJournalDetailPage() {
             title={journal.journal_number}
             description="Journal entry and immutable ledger impact."
             actions={<div className="flex flex-wrap gap-2">
-                {journal.can_edit && <Link to={`/finance/journals/${journal.id}/edit`}><Button type="button" variant="secondary">Edit draft</Button></Link>}
+                {journal.can_edit && <LinkButton to={`/finance/journals/${journal.id}/edit`} variant="secondary">Edit draft</LinkButton>}
                 {journal.can_post && <Button type="button" onClick={() => setAction('post')}>Post journal</Button>}
                 {journal.can_cancel && <Button type="button" variant="danger" onClick={() => setAction('cancel')}>Cancel draft</Button>}
                 {journal.can_reverse && <Button type="button" variant="danger" onClick={() => setShowReversal(true)}>Reverse</Button>}

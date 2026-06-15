@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useParams } from 'react-router-dom';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -31,11 +31,11 @@ export default function VehicleDetailPage() {
 
     return (
         <div>
-            <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<Link to={`/vehicles/${vehicle.id}/edit`}><Button>Edit</Button></Link>} />
+            <ContentHeader title={vehicle.vehicle_number} description={vehicle.registration_number ?? vehicle.code ?? undefined} actions={<LinkButton to={`/vehicles/${vehicle.id}/edit`}>Edit</LinkButton>} />
             <ErrorAlert error={result.error} />
             <EntityDetailLayout actions={
                 <>
-                    <Link to="/vehicle-service/jobs/create"><Button type="button" variant="secondary" className="w-full">Create service job</Button></Link>
+                    <LinkButton to="/vehicle-service/jobs/create" variant="secondary" className="w-full">Create service job</LinkButton>
                     <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('history')}>View status history</Button>
                     <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('documents')}>Review documents</Button>
                 </>

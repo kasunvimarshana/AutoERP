@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -61,7 +61,7 @@ export default function CustomerListPage() {
         catch (error) { setActionError(toApiError(error)); }
         finally { setSubmitting(false); }
     }
-    return <><ContentHeader title="Customers" description="Customer identity, compliance, status, and credit policy." actions={<Link to="/customers/create"><Button>New customer</Button></Link>} />
+    return <><ContentHeader title="Customers" description="Customer identity, compliance, status, and credit policy." actions={<LinkButton to="/customers/create">New customer</LinkButton>} />
         <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5"><Input type="search" label="Search" placeholder="Number, code, name, email, phone" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /><Select label="Customer type" value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} options={options(customerTypes)} /><Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} options={options(customerStatuses)} /><CustomerCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} /><Select label="Credit allowed" value={creditAllowed} onChange={(event) => { setCreditAllowed(event.target.value); setPage(1); }} options={[{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]} /></div>
         <ErrorAlert error={actionError ?? result.error} />{result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={result.data?.meta} onPageChange={setPage} />
         <Modal open={Boolean(statusCustomer)} title="Change customer status" onClose={() => !submitting && setStatusCustomer(null)}><div className="space-y-4"><ErrorAlert error={actionError} /><Select label="New status" value={nextStatus} onChange={(event) => setNextStatus(event.target.value)} options={options(customerStatuses)} /><Input label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setStatusCustomer(null)}>Cancel</Button><Button loading={submitting} onClick={() => void saveStatus()}>Change status</Button></div></div></Modal>

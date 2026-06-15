@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -68,7 +68,7 @@ export default function UomListPage() {
 
     return (
         <>
-            <ContentHeader title="Units of Measure" description="Generic unit definitions and categories." actions={<Link to="/uoms/create"><Button>New UOM</Button></Link>} />
+            <ContentHeader title="Units of Measure" description="Generic unit definitions and categories." actions={<LinkButton to="/uoms/create">New UOM</LinkButton>} />
             <div className="mb-4 grid gap-3 lg:grid-cols-4">
                 <Input type="search" placeholder="Search code, name, or symbol" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} options={uomTypes.map((value) => ({ value, label: value }))} placeholder="All types" />

@@ -67,7 +67,6 @@ export default function SalesDeliveryCreatePage() {
         const id = Number(params.get('order_id') ?? 0);
         if (id > 0) void loadOrder({ id, name: 'Loading sales order...' });
         // The query-string source is only applied when the create page opens.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const columns: DataColumn<DeliveryDraftLine>[] = [

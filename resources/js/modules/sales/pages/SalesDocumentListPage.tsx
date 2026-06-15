@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -99,8 +99,8 @@ export default function SalesDocumentListPage({ kind }: { kind: Kind }) {
             header: 'Actions',
             render: (row) => (
                 <div className="flex flex-wrap gap-2">
-                    <Link to={`/sales/${segment}/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>
-                    {row.status === 'draft' && <Link to={`/sales/${segment}/${row.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+                    <LinkButton to={`/sales/${segment}/${row.id}`} variant="ghost">View</LinkButton>
+                    {row.status === 'draft' && <LinkButton to={`/sales/${segment}/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
                     {kind === 'quotation' && row.status === 'draft' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'send')}>Send</Button>}
                     {kind === 'quotation' && row.status === 'sent' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'accept')}>Accept</Button>}
                     {kind === 'quotation' && row.status === 'sent' && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'reject')}>Reject</Button>}
@@ -119,7 +119,7 @@ export default function SalesDocumentListPage({ kind }: { kind: Kind }) {
             <ContentHeader
                 title={kind === 'quotation' ? 'Sales quotations' : 'Sales orders'}
                 description={kind === 'quotation' ? 'Quote, send, accept, and convert customer proposals.' : 'Approve and track customer demand through delivery and invoicing.'}
-                actions={<Link to={`/sales/${segment}/create`}><Button>New {kind}</Button></Link>}
+                actions={<LinkButton to={`/sales/${segment}/create`}>New {kind}</LinkButton>}
             />
             <div className="mb-4 grid gap-4 md:grid-cols-3">
                 <Input type="search" label="Search" value={search} placeholder="Document number or customer" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

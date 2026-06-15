@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -59,7 +59,7 @@ export default function ItemListPage() {
     }
 
     return <>
-        <ContentHeader title="Items" description="Service-first item master data with readable resources." actions={<Link to="/items/create"><Button>New item</Button></Link>} />
+        <ContentHeader title="Items" description="Service-first item master data with readable resources." actions={<LinkButton to="/items/create">New item</LinkButton>} />
         <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Input type="search" label="Search" placeholder="Code, name, SKU, barcode" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             <ItemCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} />

@@ -4,7 +4,7 @@ import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, listPurc
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -81,8 +81,8 @@ export default function PurchaseOrderListPage() {
                 const capabilities = purchaseOrderCapabilities(row.status);
                 return (
                     <div className="flex flex-wrap gap-2">
-                        <Link to={`/purchase/orders/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>
-                        {capabilities.canEdit && <Link to={`/purchase/orders/${row.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+                        <LinkButton to={`/purchase/orders/${row.id}`} variant="ghost">View</LinkButton>
+                        {capabilities.canEdit && <LinkButton to={`/purchase/orders/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
                         {capabilities.canApprove && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
                         {capabilities.canCancel && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
                         {capabilities.canClose && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
@@ -94,7 +94,7 @@ export default function PurchaseOrderListPage() {
 
     return (
         <>
-            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={<Link to="/purchase/orders/create"><Button>New purchase order</Button></Link>} />
+            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={<LinkButton to="/purchase/orders/create">New purchase order</LinkButton>} />
             <div className="mb-4 grid gap-4 lg:grid-cols-5">
                 <Input type="search" label="Search" placeholder="PO number or supplier" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

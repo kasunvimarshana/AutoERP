@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -66,7 +66,7 @@ export default function ChequeTemplateListPage() {
             <ContentHeader
                 title="Cheque templates"
                 description="Bank-specific cheque dimensions and millimeter alignment."
-                actions={<Link to="/payments/cheque-templates/create"><Button>New template</Button></Link>}
+                actions={<LinkButton to="/payments/cheque-templates/create">New template</LinkButton>}
             />
             <ErrorAlert error={actionError ?? templates.error} />
             {templates.loading

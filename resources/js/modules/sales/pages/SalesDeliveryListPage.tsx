@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -64,7 +64,7 @@ export default function SalesDeliveryListPage() {
 
     return (
         <>
-            <ContentHeader title="Sales deliveries" description="Dispatch approved order quantities and post Inventory issues for stockable items." actions={<Link to="/sales/deliveries/create"><Button>New delivery</Button></Link>} />
+            <ContentHeader title="Sales deliveries" description="Dispatch approved order quantities and post Inventory issues for stockable items." actions={<LinkButton to="/sales/deliveries/create">New delivery</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Input type="search" label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={['draft', 'posted', 'partially_returned', 'returned', 'partially_invoiced', 'invoiced', 'reversed'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

@@ -76,6 +76,24 @@ final class VehicleQueryService
                 $query->where($filter, $criteria[$filter]);
             }
         }
+        if (($criteria['ownership_scope'] ?? null) === 'customer') {
+            $query->where(function (Builder $scope): void {
+                $scope->whereNotNull('customer_id')
+                    ->orWhere('current_owner_type', 'Modules\\Customer\\Models\\Customer')
+                    ->orWhereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                        ->where('ownership_type', 'customer_owned'));
+            });
+        }
+        if (($criteria['ownership_scope'] ?? null) === 'supplier') {
+            $query->where(function (Builder $scope): void {
+                $scope->whereIn('current_owner_type', [
+                    'supplier',
+                    'owner',
+                    'Modules\\Supplier\\Models\\Supplier',
+                ])->orWhereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                    ->whereIn('ownership_type', ['leased', 'rented', 'third_party']));
+            });
+        }
         if (! empty($criteria['available_for_service'])) {
             $query->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value]);
         }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -29,7 +29,7 @@ export default function UomConversionListPage() {
 
     return (
         <>
-            <ContentHeader title="UOM Conversions" description="Generic conversion factors between units." actions={<Link to="/uom-conversions/create"><Button>New conversion</Button></Link>} />
+            <ContentHeader title="UOM Conversions" description="Generic conversion factors between units." actions={<LinkButton to="/uom-conversions/create">New conversion</LinkButton>} />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search UOM code, name, or symbol" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

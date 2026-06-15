@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useParams } from 'react-router-dom';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -35,13 +35,13 @@ export default function SupplierDetailPage() {
         <ContentHeader
             title={`${supplier.data.code} - ${supplier.data.name}`}
             description="Supplier master data and relation-aware CRUD."
-            actions={<Link to={`/suppliers/${supplierId}/edit`}><Button variant="secondary">Edit supplier</Button></Link>}
+            actions={<LinkButton to={`/suppliers/${supplierId}/edit`} variant="secondary">Edit supplier</LinkButton>}
         />
         <EntityDetailLayout actions={
             <>
-                <Link to="/purchase/orders/create"><Button type="button" variant="secondary" className="w-full">Create purchase order</Button></Link>
-                <Link to="/purchase/invoices/create"><Button type="button" variant="secondary" className="w-full">Create supplier invoice</Button></Link>
-                <Link to="/purchase/payments/prepare"><Button type="button" variant="secondary" className="w-full">Prepare payment</Button></Link>
+                <LinkButton to="/purchase/orders/create" variant="secondary" className="w-full">Create purchase order</LinkButton>
+                <LinkButton to="/purchase/invoices/create" variant="secondary" className="w-full">Create supplier invoice</LinkButton>
+                <LinkButton to="/purchase/payments/prepare" variant="secondary" className="w-full">Prepare payment</LinkButton>
             </>
         }>
             <Panel className="p-0">

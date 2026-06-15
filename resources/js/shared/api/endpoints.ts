@@ -1,5 +1,9 @@
 export const endpoints = {
     auth: '/api/v1/auth',
+    users: '/api/user/users',
+    roles: '/api/user/roles',
+    permissions: '/api/user/permissions',
+    configuration: '/api/v1/configuration/entries',
     customers: '/api/v1/customers',
     customerCategories: '/api/v1/customer-categories',
     vehicles: '/api/v1/vehicles',

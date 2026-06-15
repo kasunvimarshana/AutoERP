@@ -20,17 +20,18 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
 }) {
     if (rows.length === 0) {
         return (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-500">
-                {emptyMessage}
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-14 text-center">
+                <span className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">-</span>
+                <p className="text-sm font-medium text-slate-600">{emptyMessage}</p>
             </div>
         );
     }
 
     return (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-3 p-3 md:hidden">
                 {rows.map((row) => (
-                    <article key={rowKey(row)} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    <article key={rowKey(row)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 font-semibold text-slate-900">{mobileSummary ? mobileSummary(row) : columns[0]?.render(row)}</div>
                             {rowBadge?.(row)}
@@ -49,12 +50,12 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
             </div>
             <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <thead className="bg-slate-50/90 text-xs uppercase tracking-wide text-slate-500">
                         <tr>{columns.map((column) => <th key={column.key} className={`px-4 py-3 font-semibold ${column.className ?? ''}`}>{column.header}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((row) => (
-                            <tr key={rowKey(row)} className="hover:bg-slate-50/70">
+                            <tr key={rowKey(row)} className="transition-colors hover:bg-blue-50/40">
                                 {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 ${column.className ?? ''}`}>{column.render(row)}</td>)}
                             </tr>
                         ))}

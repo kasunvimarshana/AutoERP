@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -62,7 +62,7 @@ export default function SalesReturnListPage() {
 
     return (
         <>
-            <ContentHeader title="Sales returns" description="Referenced, manual, credit-only, inventory-only, warranty, exchange, damaged, and imported return workflows." actions={<Link to="/sales/returns/create"><Button>New return</Button></Link>} />
+            <ContentHeader title="Sales returns" description="Referenced, manual, credit-only, inventory-only, warranty, exchange, damaged, and imported return workflows." actions={<LinkButton to="/sales/returns/create">New return</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Input type="search" label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={['draft', 'approved', 'posted', 'cancelled', 'reversed'].map((value) => ({ value, label: value }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

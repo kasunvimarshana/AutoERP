@@ -53,9 +53,17 @@ export function clearStoredAuthSession(): void {
 }
 
 function setString(key: string, value: string | null): void {
-    value ? window.localStorage.setItem(key, value) : window.localStorage.removeItem(key);
+    if (value) {
+        window.localStorage.setItem(key, value);
+    } else {
+        window.localStorage.removeItem(key);
+    }
 }
 
 function setNumber(key: string, value: number | null): void {
-    value ? window.localStorage.setItem(key, String(value)) : window.localStorage.removeItem(key);
+    if (value) {
+        window.localStorage.setItem(key, String(value));
+    } else {
+        window.localStorage.removeItem(key);
+    }
 }

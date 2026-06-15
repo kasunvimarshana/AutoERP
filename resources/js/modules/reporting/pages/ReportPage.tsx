@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useParams } from 'react-router-dom';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { runReport } from '../reportingApi';
-import type { ReportDefinition, ReportParams, ReportResult } from '../reportingTypes';
+import type { ReportParams, ReportResult } from '../reportingTypes';
 import { ExportActions } from '../components/ExportActions';
 import { FilterPanel } from '../components/FilterPanel';
 import { ReportDataGrid } from '../components/ReportDataGrid';
@@ -60,7 +60,7 @@ export default function ReportPage() {
             <ContentHeader
                 title={report?.title ?? 'Report'}
                 description={report?.group}
-                actions={<Link to="/reports"><Button type="button" variant="secondary">All reports</Button></Link>}
+                actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} />
             {report && <div className="space-y-5">

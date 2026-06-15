@@ -26,6 +26,7 @@ export interface AuthSession {
     organization_unit: AuthOrganizationUnit | null;
     roles?: string[];
     permissions?: string[];
+    enabled_modules?: string[] | null;
 }
 
 export interface CurrentUserResponse {
@@ -34,6 +35,7 @@ export interface CurrentUserResponse {
     organization_unit: AuthOrganizationUnit | null;
     roles?: string[];
     permissions?: string[];
+    enabled_modules?: string[] | null;
 }
 
 export interface LoginPayload {

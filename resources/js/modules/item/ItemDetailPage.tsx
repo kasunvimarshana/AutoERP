@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -36,7 +36,7 @@ export default function ItemDetailPage() {
     if (!item.data) return <ErrorAlert error={item.error} />;
 
     return <>
-        <ContentHeader title={`${item.data.code} - ${item.data.name}`} description="Item master data and relation-aware CRUD." actions={<Link to={`/items/${itemId}/edit`}><Button variant="secondary">Edit item</Button></Link>} />
+        <ContentHeader title={`${item.data.code} - ${item.data.name}`} description="Item master data and relation-aware CRUD." actions={<LinkButton to={`/items/${itemId}/edit`} variant="secondary">Edit item</LinkButton>} />
         <Panel className="p-0">
             <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
             <div className="p-5">

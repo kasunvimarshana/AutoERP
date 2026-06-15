@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -41,12 +41,12 @@ export default function GoodsReceiptListPage() {
         { key: 'po', header: 'PO', render: (row) => row.purchase_order?.purchase_order_number ?? row.purchase_order?.name ?? '-' },
         { key: 'total', header: 'Total', render: (row) => formatMoney(row.grand_total) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: 'Actions', render: (row) => <div className="flex gap-2"><Link to={`/purchase/goods-receipts/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>{row.status === 'draft' && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{row.status === 'posted' && <Button type="button" variant="secondary" onClick={() => run(row, 'reverse')}>Reverse</Button>}</div> },
+        { key: 'actions', header: 'Actions', render: (row) => <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{row.status === 'draft' && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{row.status === 'posted' && <Button type="button" variant="secondary" onClick={() => run(row, 'reverse')}>Reverse</Button>}</div> },
     ];
 
     return (
         <div className="space-y-5">
-            <ContentHeader title="Goods receipts" actions={<Link to="/purchase/goods-receipts/create"><Button>New GRN</Button></Link>} />
+            <ContentHeader title="Goods receipts" actions={<LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton>} />
             <ErrorAlert error={result.error ?? actionError} />
             <div className="grid gap-3 md:grid-cols-3">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

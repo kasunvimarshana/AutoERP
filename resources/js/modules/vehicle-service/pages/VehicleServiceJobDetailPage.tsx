@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
@@ -64,7 +64,7 @@ export default function VehicleServiceJobDetailPage() {
 
     const headerActions = (
         <div className="flex flex-wrap gap-2">
-            {['draft', 'inspected', 'in_progress'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+            {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
             {job.status === 'draft' && <Button type="button" loading={busy} onClick={() => action('inspect')}>Mark inspected</Button>}
             {['draft', 'inspected'].includes(job.status) && <Button type="button" loading={busy} onClick={() => action('start')}>Start work</Button>}
             {job.status === 'in_progress' && <Button type="button" loading={busy} onClick={() => action('complete')}>Complete</Button>}
@@ -104,8 +104,8 @@ export default function VehicleServiceJobDetailPage() {
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
-                        {['completed', 'invoiced'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice</Button></Link>}
-                        {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button type="button" variant="secondary" className="w-full">Receive payment</Button></Link>}
+                        {['completed', 'invoiced'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary" className="w-full">Create invoice</LinkButton>}
+                        {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary" className="w-full">Receive payment</LinkButton>}
                     </>
                 }
             >

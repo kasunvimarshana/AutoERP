@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -26,11 +26,11 @@ export default function PurchaseDebitNoteListPage() {
         { key: 'amount', header: 'Amount', render: (row) => formatMoney(row.amount) },
         { key: 'remaining', header: 'Remaining', render: (row) => formatMoney(row.remaining_amount) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: 'Actions', render: (row) => <Link to={`/purchase/debit-notes/${row.id}`}><Button type="button" variant="ghost">View</Button></Link> },
+        { key: 'actions', header: 'Actions', render: (row) => <LinkButton to={`/purchase/debit-notes/${row.id}`} variant="ghost">View</LinkButton> },
     ];
     return (
         <div className="space-y-5">
-            <ContentHeader title="Purchase debit notes" actions={<Link to="/purchase/returns/create?tab=debit"><Button>New debit note</Button></Link>} />
+            <ContentHeader title="Purchase debit notes" actions={<LinkButton to="/purchase/returns/create?tab=debit">New debit note</LinkButton>} />
             <ErrorAlert error={result.error} />
             <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

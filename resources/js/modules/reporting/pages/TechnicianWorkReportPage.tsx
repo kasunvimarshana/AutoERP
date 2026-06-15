@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
@@ -161,7 +161,7 @@ export default function TechnicianWorkReportPage() {
             <ContentHeader
                 title="Technician Work"
                 description="Vehicle service labour assignments, commissions, supervisors, invoices and payments."
-                actions={<Link to="/reports"><Button type="button" variant="secondary">All reports</Button></Link>}
+                actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} title="Could not load technician work report" />
             <div className="space-y-5">

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -71,12 +71,12 @@ export default function EmployeeDetailPage() {
             <ContentHeader
                 title={employee.display_name}
                 description={`${employee.employee_number} / ${employee.designation?.name ?? 'No designation'}`}
-                actions={<Link to={`/hr/employees/${id}/edit`}><Button>Edit</Button></Link>}
+                actions={<LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton>}
             />
             <ErrorAlert error={error} />
             <EntityDetailLayout actions={
                 <>
-                    <Link to="/vehicle-service/jobs"><Button type="button" variant="secondary" className="w-full">Assign service job</Button></Link>
+                    <LinkButton to="/vehicle-service/jobs" variant="secondary" className="w-full">Assign service job</LinkButton>
                     <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('availability')}>Check availability</Button>
                     <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('licenses')}>Review licenses</Button>
                 </>

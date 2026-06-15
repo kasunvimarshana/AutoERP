@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -49,7 +49,7 @@ export default function RentalChargePreviewPage() {
                 <Button type="button" variant="secondary" loading={busy} onClick={() => action('generate')}>Generate</Button>
                 {!previewRows && rows.length > 0 && rows.every((row) => row.status === 'draft') && <Button type="button" variant="secondary" loading={busy} onClick={() => action('replace')}>Recalculate</Button>}
                 {!previewRows && rows.some((row) => row.status === 'draft') && <Button type="button" loading={busy} onClick={() => action('approve')}>Approve charges</Button>}
-                {!previewRows && rows.some((row) => row.status === 'approved' && row.invoice_status !== 'invoiced') && <Link to={`/vehicle-rental/agreements/${agreementId}/invoice`}><Button>{agreement.data.direction === 'outbound' ? 'Create customer invoice' : 'Create supplier payable'}</Button></Link>}
+                {!previewRows && rows.some((row) => row.status === 'approved' && row.invoice_status !== 'invoiced') && <LinkButton to={`/vehicle-rental/agreements/${agreementId}/invoice`}>{agreement.data.direction === 'outbound' ? 'Create customer invoice' : 'Create supplier payable'}</LinkButton>}
             </>} />
             <ErrorAlert error={error ?? charges.error} />
             <Panel title={previewRows ? 'Non-persistent preview' : 'Charge breakdown'}>

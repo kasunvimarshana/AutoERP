@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/apiClient';
-import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { ApiResource, ListParams } from '@/shared/types/api';
 import type {
     RentalAgreement,
     RentalAgreementCollection,

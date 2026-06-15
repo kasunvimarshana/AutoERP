@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
@@ -11,7 +11,7 @@ export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJ
         <div className="space-y-5">
             <div className="flex justify-end">
                 {outstanding.length > 0
-                    ? <Link to={`/vehicle-service/jobs/${job.id}/payment`}><Button>Receive payment</Button></Link>
+                    ? <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`}>Receive payment</LinkButton>
                     : <Button type="button" disabled>Receive payment</Button>}
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">

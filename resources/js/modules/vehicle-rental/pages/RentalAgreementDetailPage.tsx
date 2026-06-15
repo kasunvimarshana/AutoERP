@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -82,8 +82,8 @@ export default function RentalAgreementDetailPage() {
                             { key: 'odometer', header: 'Odometer', render: (row) => `${row.start_odometer} / ${row.end_odometer ?? '-'}` },
                             { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
                             { key: 'actions', header: '', render: (row) => <div className="flex gap-2">
-                                {!row.pickup_inspection && <Link to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/pickup`}><Button type="button" variant="secondary">Pickup</Button></Link>}
-                                {row.pickup_inspection && !row.return_inspection && <Link to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/return`}><Button type="button" variant="secondary">Return</Button></Link>}
+                                {!row.pickup_inspection && <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/pickup`} variant="secondary">Pickup</LinkButton>}
+                                {row.pickup_inspection && !row.return_inspection && <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/return`} variant="secondary">Return</LinkButton>}
                                 {agreement.status === 'active' && row.status === 'active' && <Button type="button" variant="secondary" onClick={() => {
                                     setReplaceAllocationId(row.id);
                                     setVehicle(null);
@@ -160,10 +160,10 @@ export default function RentalAgreementDetailPage() {
                     </Panel>
                     <Panel title="Workspaces">
                         <div className="grid gap-2">
-                            <Link to={`/vehicle-rental/agreements/${agreement.id}/usage`}><Button type="button" variant="secondary" className="w-full">Open in common running chart</Button></Link>
-                            <Link to={`/vehicle-rental/agreements/${agreement.id}/expenses`}><Button type="button" variant="secondary" className="w-full">Expenses</Button></Link>
-                            <Link to={`/vehicle-rental/agreements/${agreement.id}/charges`}><Button type="button" variant="secondary" className="w-full">Charge preview</Button></Link>
-                            <Link to={`/vehicle-rental/agreements/${agreement.id}/invoice`}><Button type="button" variant="secondary" className="w-full">Create invoice / payable</Button></Link>
+                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/usage`} variant="secondary" className="w-full">Open in common running chart</LinkButton>
+                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/expenses`} variant="secondary" className="w-full">Expenses</LinkButton>
+                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/charges`} variant="secondary" className="w-full">Charge preview</LinkButton>
+                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/invoice`} variant="secondary" className="w-full">Create invoice / payable</LinkButton>
                         </div>
                     </Panel>
                     <Panel title="Prepare payment">

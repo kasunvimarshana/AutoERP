@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { listPayments, type Payment } from '../paymentApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -13,13 +13,48 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
+
+const paymentViews = {
+    supplier: {
+        title: 'Supplier Payments',
+        description: 'Outbound payments prepared for supplier liabilities.',
+        params: { payment_type: 'supplier_payment', direction: 'outbound' },
+        action: { to: '/purchase/payments/prepare', label: 'Prepare supplier payment' },
+    },
+    customer: {
+        title: 'Customer Receipts',
+        description: 'Inbound receipts collected from sales customers.',
+        params: { payment_type: 'customer_receipt', direction: 'inbound' },
+        action: { to: '/sales/payments/prepare', label: 'Prepare customer receipt' },
+    },
+    service: {
+        title: 'Customer Receipts',
+        description: 'Receipts collected against vehicle service invoices.',
+        params: { payment_type: 'service_receipt', direction: 'inbound' },
+        action: { to: '/vehicle-service/jobs', label: 'Open service jobs' },
+    },
+    rental: {
+        title: 'Rental Settlements',
+        description: 'Receipts and settlements created from vehicle rental agreements.',
+        params: { payment_type: 'rental_receipt' },
+        action: { to: '/vehicle-rental/agreements', label: 'Open rental agreements' },
+    },
+} as const;
 
 export default function PaymentListPage() {
+    const [searchParams] = useSearchParams();
+    const viewKey = searchParams.get('view') as keyof typeof paymentViews | null;
+    const view = viewKey ? paymentViews[viewKey] : undefined;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
-    const result = useApi((signal) => listPayments({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
+    const result = useApi((signal) => listPayments({
+        search: debounced || undefined,
+        ...view?.params,
+        page,
+        per_page: 25,
+    }, signal), [debounced, page, viewKey]);
     const columns: DataColumn<Payment>[] = [
         { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? 'Payment'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
@@ -30,7 +65,13 @@ export default function PaymentListPage() {
     ];
     return (
         <>
-            <ContentHeader title="Payments" description="Payment activity with on-demand allocation data." actions={<Link to="/payments/create"><Button>New payment</Button></Link>} />
+            <ContentHeader
+                title={view?.title ?? 'Payments'}
+                description={view?.description ?? 'Payment activity with on-demand allocation data.'}
+                actions={view?.action
+                    ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton>
+                    : <LinkButton to="/payments/create">New payment</LinkButton>}
+            />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

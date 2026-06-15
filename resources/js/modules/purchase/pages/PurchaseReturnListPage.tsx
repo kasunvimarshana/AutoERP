@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -43,12 +43,12 @@ export default function PurchaseReturnListPage() {
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: 'Actions', render: (row) => {
             const capabilities = purchaseReturnCapabilities(row.status);
-            return <div className="flex gap-2"><Link to={`/purchase/returns/${row.id}`}><Button type="button" variant="ghost">View</Button></Link>{capabilities.canApprove && <Button type="button" variant="secondary" onClick={() => run(row, 'approve')}>Approve</Button>}{capabilities.canPost && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{capabilities.canCancel && <Button type="button" variant="ghost" onClick={() => run(row, 'cancel')}>Cancel</Button>}</div>;
+            return <div className="flex gap-2"><LinkButton to={`/purchase/returns/${row.id}`} variant="ghost">View</LinkButton>{capabilities.canApprove && <Button type="button" variant="secondary" onClick={() => run(row, 'approve')}>Approve</Button>}{capabilities.canPost && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{capabilities.canCancel && <Button type="button" variant="ghost" onClick={() => run(row, 'cancel')}>Cancel</Button>}</div>;
         } },
     ];
     return (
         <div className="space-y-5">
-            <ContentHeader title="Purchase returns" actions={<><Link to="/purchase/returns/create"><Button>New return</Button></Link><Link to="/purchase/manual-supplier-returns/create"><Button variant="secondary">Manual return</Button></Link></>} />
+            <ContentHeader title="Purchase returns" actions={<><LinkButton to="/purchase/returns/create">New return</LinkButton><LinkButton to="/purchase/manual-supplier-returns/create" variant="secondary">Manual return</LinkButton></>} />
             <ErrorAlert error={result.error ?? actionError} />
             <div className="grid gap-3 md:grid-cols-3">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

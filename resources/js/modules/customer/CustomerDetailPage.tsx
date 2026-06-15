@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useParams } from 'react-router-dom';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -34,13 +34,13 @@ export default function CustomerDetailPage() {
         <ContentHeader
             title={`${customer.data.code} - ${customer.data.name}`}
             description="Customer master data and relation-aware CRUD."
-            actions={<Link to={`/customers/${customerId}/edit`}><Button variant="secondary">Edit customer</Button></Link>}
+            actions={<LinkButton to={`/customers/${customerId}/edit`} variant="secondary">Edit customer</LinkButton>}
         />
         <EntityDetailLayout actions={
             <>
-                <Link to="/vehicle-service/jobs/create"><Button type="button" variant="secondary" className="w-full">Create service job</Button></Link>
-                <Link to="/invoices"><Button type="button" variant="secondary" className="w-full">View invoices</Button></Link>
-                <Link to="/payments"><Button type="button" variant="secondary" className="w-full">View payments</Button></Link>
+                <LinkButton to="/vehicle-service/jobs/create" variant="secondary" className="w-full">Create service job</LinkButton>
+                <LinkButton to="/invoices" variant="secondary" className="w-full">View invoices</LinkButton>
+                <LinkButton to="/payments" variant="secondary" className="w-full">View payments</LinkButton>
             </>
         }>
             <Panel className="p-0">

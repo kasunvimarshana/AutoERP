@@ -55,7 +55,6 @@ export function useApi<T>(
 
         return () => controller.abort();
         // Dependencies are deliberately supplied by each caller.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies, enabled, clearOnLoad, version]);
 
     return { ...state, reload, setData: (data: T) => setState({ data, error: null, loading: false }) };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -47,14 +47,14 @@ export default function RentalReservationListPage() {
         { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap gap-2">
             {row.status === 'draft' && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => action(row, 'pending')}>Submit</Button>}
             {row.status === 'pending' && <Button type="button" loading={busyId === row.id} onClick={() => action(row, 'confirm')}>Confirm</Button>}
-            {row.status === 'confirmed' && <Link to={`/vehicle-rental/agreements/create?reservation_id=${row.id}`}><Button type="button">Create agreement</Button></Link>}
+            {row.status === 'confirmed' && <LinkButton to={`/vehicle-rental/agreements/create?reservation_id=${row.id}`}>Create agreement</LinkButton>}
             {!['converted', 'cancelled'].includes(row.status) && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => action(row, 'cancel')}>Cancel</Button>}
         </div> },
     ];
 
     return (
         <>
-            <ContentHeader title="Rental reservations" description="Booking intent before a rental contract is confirmed." actions={<Link to="/vehicle-rental/reservations/create"><Button>New reservation</Button></Link>} />
+            <ContentHeader title="Rental reservations" description="Booking intent before a rental contract is confirmed." actions={<LinkButton to="/vehicle-rental/reservations/create">New reservation</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Input label="Search" type="search" value={search} placeholder="Reservation, party, or vehicle" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={['draft', 'pending', 'confirmed', 'converted', 'cancelled'].map((value) => ({ value, label: value }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

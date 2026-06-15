@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -25,7 +25,7 @@ export default function VehicleServiceInvoiceTab({ job }: { job: VehicleServiceJ
             <ErrorAlert error={result.error} />
             <div className="flex justify-end">
                 {['completed', 'invoiced'].includes(job.status) && (result.data ?? []).some((line) => line.invoice_state !== 'invoiced')
-                    ? <Link to={`/vehicle-service/jobs/${job.id}/invoice`}><Button>Create invoice</Button></Link>
+                    ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create invoice</LinkButton>
                     : <Button type="button" disabled>Create invoice</Button>}
             </div>
             {result.loading ? <LoadingState /> : <DataTable rows={result.data ?? []} columns={columns} rowKey={(line) => line.id} emptyMessage="No billable lines." />}

@@ -22,6 +22,9 @@ interface AuthContextValue {
     token: string | null;
     tenant: AuthTenant | null;
     organizationUnit: AuthOrganizationUnit | null;
+    roles: string[];
+    permissions: string[];
+    enabledModules: string[] | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (payload: LoginPayload) => Promise<void>;
@@ -42,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [organizationUnit, setOrganizationUnit] = useState<AuthOrganizationUnit | null>(
         stored.organizationUnitId ? { id: stored.organizationUnitId, name: null } : null,
     );
+    const [roles, setRoles] = useState<string[]>([]);
+    const [permissions, setPermissions] = useState<string[]>([]);
+    const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(Boolean(stored.accessToken));
     const authLoadId = useRef(0);
 
@@ -53,6 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setTenant(null);
         setOrganizationUnit(null);
+        setRoles([]);
+        setPermissions([]);
+        setEnabledModules(null);
         setIsLoading(false);
     }, []);
 
@@ -63,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: AuthUser;
         tenant: AuthTenant | null;
         organization_unit: AuthOrganizationUnit | null;
+        roles?: string[];
+        permissions?: string[];
+        enabled_modules?: string[] | null;
     }) => {
         if (next.token) {
             setToken(next.token);
@@ -71,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(next.user);
         setTenant(next.tenant);
         setOrganizationUnit(next.organization_unit);
+        setRoles(next.roles ?? next.user.roles ?? []);
+        setPermissions(next.permissions ?? next.user.permissions ?? []);
+        setEnabledModules(next.enabled_modules ?? null);
         storeAuthSession({
             accessToken: next.token ?? token,
             refreshToken: next.refresh_token ?? getStoredApiContext().refreshToken,
@@ -97,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user: current.user,
                 tenant: current.tenant,
                 organization_unit: current.organization_unit,
+                roles: current.roles,
+                permissions: current.permissions,
+                enabled_modules: current.enabled_modules,
             });
         } catch (error) {
             if (signal?.aborted) return;
@@ -121,6 +139,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 device_name: payload.device_name ?? window.navigator.userAgent.slice(0, 160),
             });
             applySession(session);
+            const current = await authApi.me();
+            applySession({
+                token: session.token,
+                refresh_token: session.refresh_token,
+                session_id: session.session_id,
+                user: current.user,
+                tenant: current.tenant,
+                organization_unit: current.organization_unit,
+                roles: current.roles,
+                permissions: current.permissions,
+                enabled_modules: current.enabled_modules,
+            });
         } finally {
             setIsLoading(false);
         }
@@ -166,12 +196,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         tenant,
         organizationUnit,
+        roles,
+        permissions,
+        enabledModules,
         isAuthenticated: Boolean(token && user),
         isLoading,
         login,
         logout,
         loadCurrentUser,
-    }), [isLoading, loadCurrentUser, login, logout, organizationUnit, tenant, token, user]);
+    }), [
+        enabledModules,
+        isLoading,
+        loadCurrentUser,
+        login,
+        logout,
+        organizationUnit,
+        permissions,
+        roles,
+        tenant,
+        token,
+        user,
+    ]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

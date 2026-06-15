@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, getPurchaseOrder } from '../purchaseApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -9,7 +9,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
@@ -98,10 +98,10 @@ export default function PurchaseOrderDetailPage() {
                 summary={sideSummary}
                 actions={
                     <>
-                        <Link to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Receive goods</Button></Link>
-                        <Link to={`/purchase/invoices/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Create supplier invoice</Button></Link>
-                        <Link to={`/purchase/payments/prepare?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Prepare payment</Button></Link>
-                        <Link to={`/purchase/returns/create?purchase_order_id=${order.id}`}><Button type="button" variant="secondary" className="w-full">Create return</Button></Link>
+                        <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Receive goods</LinkButton>
+                        <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create supplier invoice</LinkButton>
+                        <LinkButton to={`/purchase/payments/prepare?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Prepare payment</LinkButton>
+                        <LinkButton to={`/purchase/returns/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create return</LinkButton>
                     </>
                 }
             >

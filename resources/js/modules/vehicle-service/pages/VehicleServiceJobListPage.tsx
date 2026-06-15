@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -43,12 +43,12 @@ export default function VehicleServiceJobListPage() {
         { key: 'vehicle', header: 'Vehicle', render: (job) => readableRelation(job.vehicle) },
         { key: 'total', header: 'Total', render: (job) => <MoneyDisplay value={job.grand_total} /> },
         { key: 'status', header: 'Status', render: (job) => <VehicleServiceStatusBadge status={job.status} /> },
-        { key: 'actions', header: '', render: (job) => <div className="flex gap-2"><Link to={`/vehicle-service/jobs/${job.id}`}><Button type="button" variant="ghost">View</Button></Link>{['draft', 'inspected', 'in_progress'].includes(job.status) && <Link to={`/vehicle-service/jobs/${job.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}</div> },
+        { key: 'actions', header: '', render: (job) => <div className="flex gap-2"><LinkButton to={`/vehicle-service/jobs/${job.id}`} variant="ghost">View</LinkButton>{['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}</div> },
     ];
 
     return (
         <>
-            <ContentHeader title="Vehicle service jobs" description="Service workflow, mixed job lines, workforce, stock, invoicing, and payment preparation." actions={<Link to="/vehicle-service/jobs/create"><Button>New service job</Button></Link>} />
+            <ContentHeader title="Vehicle service jobs" description="Service workflow, mixed job lines, workforce, stock, invoicing, and payment preparation." actions={<LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input label="Search" type="search" placeholder="Job, customer, or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

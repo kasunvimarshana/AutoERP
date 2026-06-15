@@ -9,6 +9,7 @@ use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -19,6 +20,7 @@ final class GetCurrentAuthProfileService
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly TenantRepositoryInterface $tenants,
+        private readonly TenantPlanRepositoryInterface $tenantPlans,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
@@ -75,6 +77,7 @@ final class GetCurrentAuthProfileService
             'application_id' => $applicationId,
             'roles' => $roles,
             'permissions' => $permissions,
+            'enabled_modules' => $this->enabledModules($resolvedTenantId),
             'user' => [
                 'id' => $userId,
                 'tenant_id' => $resolvedTenantId,
@@ -152,6 +155,47 @@ final class GetCurrentAuthProfileService
             'id' => (int) $organizationUnit->id(),
             'name' => $this->nullableString($organizationUnit->get('name')),
         ];
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function enabledModules(?int $tenantId): ?array
+    {
+        if ($tenantId === null) {
+            return null;
+        }
+
+        $tenant = $this->tenants->findById($tenantId);
+        $planId = $tenant?->get('tenant_plan_id');
+        if (! is_numeric($planId) || (int) $planId < 1) {
+            return null;
+        }
+
+        $plan = $this->tenantPlans->findById((int) $planId);
+        $features = $plan?->get('features');
+        if (! is_array($features)) {
+            return null;
+        }
+
+        $configured = $features['enabled_modules'] ?? $features['modules'] ?? null;
+        if (! is_array($configured)) {
+            return null;
+        }
+
+        $modules = [];
+        foreach ($configured as $key => $value) {
+            if (is_int($key) && is_scalar($value)) {
+                $modules[] = strtolower(trim((string) $value));
+                continue;
+            }
+
+            if (is_string($key) && filter_var($value, FILTER_VALIDATE_BOOL)) {
+                $modules[] = strtolower(trim($key));
+            }
+        }
+
+        return array_values(array_unique(array_filter($modules)));
     }
 
     /**

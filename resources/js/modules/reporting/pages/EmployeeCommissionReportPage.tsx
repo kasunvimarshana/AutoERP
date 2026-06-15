@@ -8,7 +8,7 @@ import type { HrDepartment, HrDesignation } from '@/modules/hr/hrTypes';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Drawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -166,7 +166,7 @@ export default function EmployeeCommissionReportPage() {
             <ContentHeader
                 title="Employee Commission Report"
                 description="Vehicle service labour contribution and stored employee commission earnings."
-                actions={<Link to="/reports"><Button type="button" variant="secondary">All reports</Button></Link>}
+                actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} title="Could not load employee commission report" />
 
@@ -427,7 +427,7 @@ function EmployeeDrillDown({ row, group, onClose, onFocus }: {
                             <Detail label="Role" value={humanize(row.role_type)} />
                         </dl>
                         <div className="mt-4 flex gap-2">
-                            <Link to={`/hr/employees/${row.employee?.id}`}><Button type="button" variant="secondary">Employee record</Button></Link>
+                            <LinkButton to={`/hr/employees/${row.employee?.id}`} variant="secondary">Employee record</LinkButton>
                             <Button type="button" onClick={() => onFocus(row)}>Focus report</Button>
                         </div>
                     </Panel>

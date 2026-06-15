@@ -33,11 +33,12 @@ export default function RentalAgreementCreatePage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const reservationId = Number(searchParams.get('reservation_id')) || 0;
+    const requestedDirection = searchParams.get('direction') === 'inbound' ? 'inbound' : 'outbound';
     const reservation = useApi((signal) => reservationId ? getRentalReservation(reservationId, signal) : Promise.resolve(null), [reservationId]);
     const [party, setParty] = useState<NamedResource | null>(null);
     const [form, setForm] = useState({
-        direction: 'outbound' as RentalDirection,
-        party_type: 'customer' as RentalPartyType,
+        direction: requestedDirection as RentalDirection,
+        party_type: (requestedDirection === 'inbound' ? 'supplier' : 'customer') as RentalPartyType,
         rental_type: 'daily' as RentalType,
         billing_cycle: 'final',
         billing_basis: 'contractual_period',

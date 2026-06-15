@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import type { PurchaseOrder } from '../purchaseApi';
 import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 
@@ -15,7 +14,7 @@ export function PurchaseOrderActions({ order, busy, onApprove, onCancel, onClose
 
     return (
         <div className="flex flex-wrap justify-end gap-2">
-            {canEdit && <Link to={`/purchase/orders/${order.id}/edit`}><Button type="button" variant="secondary">Edit</Button></Link>}
+            {canEdit && <LinkButton to={`/purchase/orders/${order.id}/edit`} variant="secondary">Edit</LinkButton>}
             {canApprove && <Button type="button" loading={busy} onClick={onApprove}>Approve</Button>}
             {canClose && <Button type="button" variant="secondary" loading={busy} onClick={onClose}>Close</Button>}
             {canCancel && <Button type="button" variant="danger" loading={busy} onClick={onCancel}>Cancel</Button>}

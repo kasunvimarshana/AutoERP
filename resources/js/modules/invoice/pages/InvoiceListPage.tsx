@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { listInvoices, type Invoice } from '../invoiceApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -13,12 +13,54 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
+import { LinkButton } from '@/shared/components/Button';
+
+const invoiceViews = {
+    supplier: {
+        title: 'Supplier Invoices',
+        description: 'Purchase invoices payable to suppliers.',
+        params: { invoice_type: 'purchase', direction: 'inbound' },
+        action: { to: '/purchase/invoices/create', label: 'Create supplier invoice' },
+    },
+    customer: {
+        title: 'Customer Invoices',
+        description: 'Sales invoices issued to customers.',
+        params: { invoice_type: 'sales', direction: 'outbound' },
+        action: { to: '/sales/invoices/create', label: 'Create customer invoice' },
+    },
+    service: {
+        title: 'Service Invoices',
+        description: 'Customer invoices generated from completed vehicle service jobs.',
+        params: { invoice_type: 'service', direction: 'outbound' },
+        action: { to: '/vehicle-service/jobs', label: 'Open service jobs' },
+    },
+    'rental-payable': {
+        title: 'Owner / Supplier Payables',
+        description: 'Inbound rental payables from owner and supplier agreements.',
+        params: { invoice_type: 'rental', direction: 'inbound' },
+        action: { to: '/vehicle-rental/agreements?direction=inbound', label: 'Open owner agreements' },
+    },
+    'rental-customer': {
+        title: 'Customer Invoices',
+        description: 'Outbound invoices generated from customer rental agreements.',
+        params: { invoice_type: 'rental', direction: 'outbound' },
+        action: { to: '/vehicle-rental/agreements?direction=outbound', label: 'Open customer agreements' },
+    },
+} as const;
 
 export default function InvoiceListPage() {
+    const [searchParams] = useSearchParams();
+    const viewKey = searchParams.get('view') as keyof typeof invoiceViews | null;
+    const view = viewKey ? invoiceViews[viewKey] : undefined;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
-    const result = useApi((signal) => listInvoices({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
+    const result = useApi((signal) => listInvoices({
+        search: debounced || undefined,
+        ...view?.params,
+        page,
+        per_page: 25,
+    }, signal), [debounced, page, viewKey]);
     const columns: DataColumn<Invoice>[] = [
         { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
@@ -30,7 +72,11 @@ export default function InvoiceListPage() {
     ];
     return (
         <>
-            <ContentHeader title="Invoices" description="Invoice list and on-demand financial relations." />
+            <ContentHeader
+                title={view?.title ?? 'Invoices'}
+                description={view?.description ?? 'Invoice list and on-demand financial relations.'}
+                actions={view?.action ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton> : undefined}
+            />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search invoice number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

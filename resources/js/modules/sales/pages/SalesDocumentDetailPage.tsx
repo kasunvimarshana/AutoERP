@@ -1,11 +1,10 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { readableRelation } from '@/shared/utils/object';
 import { subtractDecimal } from '@/shared/utils/decimal';
@@ -58,8 +57,8 @@ export default function SalesDocumentDetailPage({ kind }: { kind: 'quotation' | 
                 description={`Backend workflow and totals. Current status: ${document.status?.replaceAll('_', ' ') ?? 'unknown'}.`}
                 actions={(
                     <div className="flex gap-2">
-                        {document.status === 'draft' && <Link to={`/sales/${segment}/${id}/edit`}><Button variant="secondary">Edit</Button></Link>}
-                        {order && <Link to={`/sales/deliveries?order_id=${id}`}><Button>Create delivery</Button></Link>}
+                        {document.status === 'draft' && <LinkButton to={`/sales/${segment}/${id}/edit`} variant="secondary">Edit</LinkButton>}
+                        {order && <LinkButton to={`/sales/deliveries?order_id=${id}`}>Create delivery</LinkButton>}
                         <Button variant="ghost" onClick={() => navigate(`/sales/${segment}`)}>Back</Button>
                     </div>
                 )}

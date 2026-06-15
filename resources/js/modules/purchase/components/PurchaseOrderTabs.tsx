@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+
+import { LinkButton } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
@@ -124,7 +124,7 @@ function RelatedDocuments({ order, type, title, createHref }: { order: PurchaseO
                     <h2 className="font-semibold text-slate-900">{title}</h2>
                     <p className="mt-1 text-sm text-slate-500">Related documents stay visible from the purchase order workspace.</p>
                 </div>
-                <Link to={createHref}><Button type="button" variant="secondary">Create</Button></Link>
+                <LinkButton to={createHref} variant="secondary">Create</LinkButton>
             </div>
             <DataTable rows={rows} columns={columns} rowKey={(row) => row.id ?? documentNumber(row, type)} emptyMessage={`No ${title.toLowerCase()} are linked to this purchase order yet.`} />
         </div>

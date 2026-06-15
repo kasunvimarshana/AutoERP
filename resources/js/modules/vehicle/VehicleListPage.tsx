@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -26,6 +26,14 @@ import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
 
 export default function VehicleListPage() {
+    const [searchParams] = useSearchParams();
+    const ownership = searchParams.get('ownership');
+    const title = ownership === 'supplier' ? 'Supplier Vehicles' : ownership === 'customer' ? 'Customer Vehicles' : 'Vehicles';
+    const description = ownership === 'supplier'
+        ? 'Vehicles supplied, leased, rented, or owned by external owners and suppliers.'
+        : ownership === 'customer'
+            ? 'Customer-owned vehicles available to service and related workflows.'
+            : 'Vehicle master data, ownership, documents, and attributes.';
     const [rows, setRows] = useState<VehicleSummary[]>([]);
     const [meta, setMeta] = useState<PaginationMeta | undefined>();
     const [search, setSearch] = useState('');
@@ -51,6 +59,7 @@ export default function VehicleListPage() {
             vehicle_type_id: type?.id,
             vehicle_category_id: category?.id,
             customer_id: customer?.id,
+            ownership_scope: ownership || undefined,
             page,
             per_page: 25,
         }, controller.signal)
@@ -66,7 +75,7 @@ export default function VehicleListPage() {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [category, customer, debouncedSearch, make, model, page, status, type]);
+    }, [category, customer, debouncedSearch, make, model, ownership, page, status, type]);
 
     const refreshStatus = (vehicle: VehicleSummary, active: boolean) => {
         setVehicleActive(vehicle.id, active)
@@ -76,7 +85,7 @@ export default function VehicleListPage() {
 
     return (
         <div>
-            <ContentHeader title="Vehicles" description="Vehicle master data, ownership, documents, and attributes." actions={<Link to="/vehicles/create"><Button>Create Vehicle</Button></Link>} />
+            <ContentHeader title={title} description={description} actions={<LinkButton to="/vehicles/create">New vehicle</LinkButton>} />
             <div className="mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Number, registration, chassis, engine, VIN" />
                 <Select label="Status" value={status} options={statuses.filter(Boolean).map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
@@ -98,7 +107,7 @@ export default function VehicleListPage() {
                             { key: 'type', header: 'Type', render: (row) => row.type?.name ?? '-' },
                             { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? '-' },
                             { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Link to={`/vehicles/${row.id}`}><Button variant="ghost">View</Button></Link><Link to={`/vehicles/${row.id}/edit`}><Button variant="ghost">Edit</Button></Link><Button variant="secondary" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></div> },
+                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><LinkButton to={`/vehicles/${row.id}`} variant="ghost">View</LinkButton><LinkButton to={`/vehicles/${row.id}/edit`} variant="ghost">Edit</LinkButton><Button variant="secondary" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></div> },
                         ]}
                     />
                     <Pagination meta={meta} onPageChange={setPage} />

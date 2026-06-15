@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -50,7 +50,7 @@ export default function GoodsReceiptDetailPage() {
             <ContentHeader
                 title={grn.grn_number ?? 'Goods receipt'}
                 description={formatDate(grn.received_date)}
-                actions={<>{grn.status === 'draft' && <Button onClick={() => run('post')}>Post</Button>}{grn.status === 'posted' && <Button variant="secondary" onClick={() => run('reverse')}>Reverse</Button>}<Link to="/purchase/invoices/create"><Button variant="secondary">Create invoice</Button></Link></>}
+                actions={<>{grn.status === 'draft' && <Button onClick={() => run('post')}>Post</Button>}{grn.status === 'posted' && <Button variant="secondary" onClick={() => run('reverse')}>Reverse</Button>}<LinkButton to="/purchase/invoices/create" variant="secondary">Create invoice</LinkButton></>}
             />
             <ErrorAlert error={result.error ?? actionError} />
             <Panel>
