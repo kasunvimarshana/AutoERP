@@ -6,6 +6,7 @@ namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -22,8 +23,15 @@ final class PaymentLine extends CoreModel
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
             'payment_method_id' => 'integer',
+            'internal_bank_account_id' => 'integer',
             'amount' => 'decimal:6',
             'cleared_amount' => 'decimal:6',
+            'instrument_date' => 'date',
+            'deposit_date' => 'date',
+            'realized_date' => 'date',
+            'clearing_date' => 'date',
+            'bounced_date' => 'date',
+            'returned_date' => 'date',
             'metadata' => 'array',
         ]);
     }
@@ -36,6 +44,11 @@ final class PaymentLine extends CoreModel
     public function paymentMethod(): BelongsTo
     {
         return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
+    }
+
+    public function internalBankAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinanceAccount::class, 'internal_bank_account_id');
     }
 
     public function tenant(): BelongsTo

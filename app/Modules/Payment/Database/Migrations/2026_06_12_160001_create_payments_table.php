@@ -29,7 +29,10 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id')->nullable();
             $table->string('source_type', 150)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
-            $table->string('allocation_status', 50)->default('unapplied');
+            $table->string('document_status', 50)->default('draft');
+            $table->string('allocation_status', 50)->default('unallocated');
+            $table->string('posting_status', 50)->default('not_posted');
+            $table->string('instrument_status', 50)->nullable();
             $table->date('payment_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
@@ -71,6 +74,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'payment_number'], 'payments_tenant_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'payments_tenant_org_idx');
             $table->index(['payment_type', 'direction', 'status'], 'payments_type_direction_status_idx');
+            $table->index(['document_status', 'allocation_status', 'posting_status'], 'payments_status_dimensions_idx');
             $table->index(['party_type', 'party_id'], 'payments_party_idx');
             $table->index(['source_type', 'source_id'], 'payments_source_idx');
             $table->index('cheque_number', 'payments_cheque_number_idx');

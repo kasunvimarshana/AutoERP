@@ -7,6 +7,9 @@ namespace Modules\Payment\Services;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Enums\PaymentAllocationState;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 
@@ -102,6 +105,19 @@ final class PaymentStatusService
         return PaymentStatus::FullyAllocated;
     }
 
+    public function allocationStateForAmounts(string $totalAmount, string $allocatedAmount): PaymentAllocationState
+    {
+        if ($this->math->isZero($allocatedAmount)) {
+            return PaymentAllocationState::Unallocated;
+        }
+
+        if ($this->math->compare($allocatedAmount, $totalAmount) < 0) {
+            return PaymentAllocationState::PartiallyAllocated;
+        }
+
+        return PaymentAllocationState::FullyAllocated;
+    }
+
     public function applyCalculatedStatus(
         Payment $payment,
         string $totalAmount,
@@ -109,8 +125,7 @@ final class PaymentStatusService
         string $refundedAmount = '0.000000',
         ?int $actorId = null,
         ?string $reason = null,
-    ): Payment
-    {
+    ): Payment {
         $from = $payment->status instanceof PaymentStatus
             ? $payment->status
             : PaymentStatus::from((string) $payment->status);
@@ -118,6 +133,9 @@ final class PaymentStatusService
 
         $payment->forceFill([
             'status' => $to->value,
+            'allocation_status' => $this->allocationStateForAmounts($totalAmount, $allocatedAmount)->value,
+            'document_status' => $this->documentStatusFor($to)->value,
+            'posting_status' => $this->postingStatusFor($to)->value,
             'posted_at' => $payment->posted_at ?? now(),
         ])->save();
 
@@ -135,7 +153,11 @@ final class PaymentStatusService
             : PaymentStatus::from((string) $payment->status);
         $this->assertCanTransition($from, $to);
 
-        $updates = ['status' => $to->value];
+        $updates = [
+            'status' => $to->value,
+            'document_status' => $this->documentStatusFor($to)->value,
+            'posting_status' => $this->postingStatusFor($to)->value,
+        ];
         if ($to === PaymentStatus::Approved) {
             $updates['approved_by'] = $actorId;
             $updates['approved_at'] = now();
@@ -196,5 +218,35 @@ final class PaymentStatusService
             'changed_at' => now(),
             'metadata' => $metadata,
         ]);
+    }
+
+    private function documentStatusFor(PaymentStatus $status): PaymentDocumentStatus
+    {
+        return match ($status) {
+            PaymentStatus::PendingApproval => PaymentDocumentStatus::Submitted,
+            PaymentStatus::Approved,
+            PaymentStatus::Posted,
+            PaymentStatus::PartiallyAllocated,
+            PaymentStatus::Allocated,
+            PaymentStatus::FullyAllocated,
+            PaymentStatus::Refunded => PaymentDocumentStatus::Approved,
+            PaymentStatus::Void,
+            PaymentStatus::Cancelled => PaymentDocumentStatus::Voided,
+            PaymentStatus::Reversed => PaymentDocumentStatus::Reversed,
+            default => PaymentDocumentStatus::Draft,
+        };
+    }
+
+    private function postingStatusFor(PaymentStatus $status): PaymentPostingStatus
+    {
+        return match ($status) {
+            PaymentStatus::Posted,
+            PaymentStatus::PartiallyAllocated,
+            PaymentStatus::Allocated,
+            PaymentStatus::FullyAllocated,
+            PaymentStatus::Refunded => PaymentPostingStatus::Posted,
+            PaymentStatus::Reversed => PaymentPostingStatus::Reversed,
+            default => PaymentPostingStatus::NotPosted,
+        };
     }
 }

@@ -132,6 +132,10 @@ final class PaymentValidationService
 
     private function lineBankAccountId(PaymentLineData $line, ?int $headerBankAccountId): ?int
     {
+        if ($line->internalBankAccountId !== null) {
+            return $line->internalBankAccountId;
+        }
+
         $metadataValue = is_array($line->metadata) ? ($line->metadata['bank_account_id'] ?? null) : null;
 
         return is_numeric($metadataValue) ? (int) $metadataValue : $headerBankAccountId;

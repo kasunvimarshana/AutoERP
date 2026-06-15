@@ -268,6 +268,8 @@ final class ReportCatalog
                 $this->money('credit_allocated_amount', 'Credits'), $this->money('remaining_amount', 'Remaining'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['invoice.invoice_number'], ['invoice']),
             $this->payment('payment.register', 'Payment Register', Payment::class, 'payment_date', 'payment_number', 'total_amount'),
+            $this->voucherPayment('voucher.receipts', 'Receipt Voucher Register', 'inbound'),
+            $this->voucherPayment('voucher.payments', 'Payment Voucher Register', 'outbound'),
             $this->definition('payment.allocation', 'Payment Allocation', 'Invoice & Payment', PaymentAllocation::class, [
                 $this->col('allocation_date', 'Date', format: 'date', sort: 'allocation_date'), $this->col('payment', 'Payment', 'payment.payment_number'),
                 $this->col('invoice', 'Invoice', 'invoice.invoice_number'), $this->money('invoice_total', 'Invoice Total'), $this->money('allocated_amount', 'Allocated'),
@@ -297,9 +299,15 @@ final class ReportCatalog
                 $this->col('payment', 'Payment', 'payment.payment_number'), $this->money('original_amount', 'Original'), $this->money('reversed_amount', 'Reversed'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reversal_number', 'payment.payment_number'], ['payment'], 'reversal_date'),
+            $this->voucherPaymentReversal('voucher.reversals.payment', 'Payment Reversal Voucher Register'),
             $this->paymentLineReport('payment.cheque-status', 'Cheque Status Report', ['cheque']),
-            $this->paymentLineReport('payment.bank-transfer', 'Bank Transfer Report', ['bank_transfer', 'bank', 'transfer']),
+            $this->paymentLineReport('payment.cheque-received', 'Cheque Received Register', ['cheque'], 'inbound'),
+            $this->paymentLineReport('payment.cheque-issued', 'Cheque Issued Register', ['cheque'], 'outbound'),
+            $this->paymentLineReport('payment.bank-transfer', 'Bank Transfer Report', ['bank_transfer', 'direct_debit']),
+            $this->paymentLineReport('payment.bank-receipts', 'Bank Receipt Register', ['bank_transfer', 'direct_debit'], 'inbound'),
+            $this->paymentLineReport('payment.bank-payments', 'Bank Payment Register', ['bank_transfer', 'direct_debit'], 'outbound'),
             $this->paymentLineReport('payment.cash-collection', 'Cash Collection Report', ['cash'], 'inbound'),
+            $this->paymentLineReport('payment.cash-payments', 'Cash Payment Register', ['cash'], 'outbound'),
 
             $this->definition('finance.account-balances', 'Account Balances', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('opening_debit', 'Opening Dr'),
@@ -312,6 +320,11 @@ final class ReportCatalog
                 $this->col('journal_type', 'Type', format: 'enum', sort: 'journal_type'), $this->col('source_module', 'Source Module', sort: 'source_module'),
                 $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('total_debit', 'Debit'), $this->money('total_credit', 'Credit'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['journal_number', 'description'], [], 'journal_date'),
+            $this->voucherJournal('voucher.journals', 'Journal Voucher Register', 'general'),
+            $this->voucherJournal('voucher.contra', 'Contra Voucher Register', 'contra'),
+            $this->voucherJournal('voucher.adjustments', 'Adjustment Voucher Register', 'adjustment'),
+            $this->voucherJournal('voucher.opening', 'Opening Voucher Register', 'opening'),
+            $this->voucherJournal('voucher.reversals.finance', 'Finance Reversal Voucher Register', 'reversal'),
             $this->definition('finance.ledger', 'Ledger', 'Finance', FinanceLedgerEntry::class, [
                 $this->col('entry_date', 'Date', format: 'date', sort: 'entry_date'), $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'),
                 $this->col('journal', 'Journal', 'journalEntry.journal_number'), $this->col('source_module', 'Source Module', sort: 'source_module'),
@@ -1150,6 +1163,98 @@ final class ReportCatalog
             defaultSort: $dateColumn,
             defaultDirection: 'desc',
             description: 'Payment module register with allocation and unapplied balance totals.',
+        );
+    }
+
+    private function voucherPayment(string $key, string $title, string $direction): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Vouchers',
+            model: Payment::class,
+            columns: [
+                $this->col('payment_date', 'Date', format: 'date', sort: 'payment_date'),
+                $this->col('payment_number', 'Voucher', sort: 'payment_number'),
+                $this->col('payee_name', 'Payer / Payee', sort: 'payee_name'),
+                $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
+                $this->col('source_type', 'Source', format: 'enum', sort: 'source_type'),
+                $this->money('total_amount', 'Amount'),
+                $this->money('allocated_amount', 'Allocated'),
+                $this->money('unapplied_amount', 'Unallocated'),
+                $this->col('document_status', 'Document', format: 'enum', sort: 'document_status'),
+                $this->col('allocation_status', 'Allocation', format: 'enum', sort: 'allocation_status'),
+                $this->col('posting_status', 'Posting', format: 'enum', sort: 'posting_status'),
+                $this->col('instrument_status', 'Instrument', format: 'enum', sort: 'instrument_status'),
+            ],
+            search: ['payment_number', 'payee_name', 'reference_number', 'source_type'],
+            filters: [
+                $this->filter('document_status', 'Document Status', 'document_status'),
+                $this->filter('allocation_status', 'Allocation Status', 'allocation_status'),
+                $this->filter('posting_status', 'Posting Status', 'posting_status'),
+                $this->filter('instrument_status', 'Instrument Status', 'instrument_status'),
+            ],
+            dateColumn: 'payment_date',
+            defaultSort: 'payment_date',
+            defaultDirection: 'desc',
+            scope: static fn ($query) => $query->where('direction', $direction),
+            description: 'Voucher presentation register backed by Payment source records.',
+            orientation: 'landscape',
+        );
+    }
+
+    private function voucherPaymentReversal(string $key, string $title): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Vouchers',
+            model: PaymentReversal::class,
+            columns: [
+                $this->col('reversal_date', 'Date', format: 'date', sort: 'reversal_date'),
+                $this->col('reversal_number', 'Voucher', sort: 'reversal_number'),
+                $this->col('payment', 'Original Payment', 'payment.payment_number'),
+                $this->money('original_amount', 'Original'),
+                $this->money('reversed_amount', 'Reversed'),
+                $this->col('reason', 'Reason', sort: 'reason'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['reversal_number', 'payment.payment_number', 'reason'],
+            relations: ['payment'],
+            filters: [$this->filter('status', 'Status', 'status')],
+            dateColumn: 'reversal_date',
+            defaultSort: 'reversal_date',
+            defaultDirection: 'desc',
+            description: 'Reversal vouchers backed by Payment reversal records.',
+            orientation: 'landscape',
+        );
+    }
+
+    private function voucherJournal(string $key, string $title, string $journalType): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Vouchers',
+            model: FinanceJournalEntry::class,
+            columns: [
+                $this->col('journal_date', 'Date', format: 'date', sort: 'journal_date'),
+                $this->col('journal_number', 'Voucher', sort: 'journal_number'),
+                $this->col('source_module', 'Source Module', sort: 'source_module'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'),
+                $this->col('description', 'Narration', sort: 'description'),
+                $this->money('total_debit', 'Debit'),
+                $this->money('total_credit', 'Credit'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['journal_number', 'source_number', 'description'],
+            filters: [$this->filter('status', 'Status', 'status')],
+            dateColumn: 'journal_date',
+            defaultSort: 'journal_date',
+            defaultDirection: 'desc',
+            scope: static fn ($query) => $query->where('journal_type', $journalType),
+            description: 'Voucher register backed by Finance journal source records.',
+            orientation: 'landscape',
         );
     }
 

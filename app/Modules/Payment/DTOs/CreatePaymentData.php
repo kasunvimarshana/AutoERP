@@ -25,7 +25,7 @@ final readonly class CreatePaymentData
         public ?int $partyId = null,
         public ?string $sourceType = null,
         public ?int $sourceId = null,
-        public string $allocationStatus = 'unapplied',
+        public string $allocationStatus = 'unallocated',
         public ?int $currencyId = null,
         public string $exchangeRate = '1.000000',
         public ?string $referenceNumber = null,

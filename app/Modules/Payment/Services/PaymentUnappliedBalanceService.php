@@ -108,6 +108,6 @@ final class PaymentUnappliedBalanceService
 
     private function allocationStatus(string $remainingAmount): string
     {
-        return $this->math->isZero($remainingAmount) ? 'fully_allocated' : 'unapplied';
+        return $this->math->isZero($remainingAmount) ? 'fully_allocated' : 'unallocated';
     }
 }

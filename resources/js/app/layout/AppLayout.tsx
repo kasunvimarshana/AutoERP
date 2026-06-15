@@ -57,6 +57,7 @@ const navigationSections: Array<{ title: string; items: NavigationItem[] }> = [
             { to: '/invoices', label: 'Invoices' },
             { to: '/payments/create', label: 'Payment entry' },
             { to: '/payments', label: 'Payments', exclude: ['/payments/create', '/payments/cheque-templates'] },
+            { to: '/vouchers', label: 'Vouchers' },
             { to: '/payments/cheque-templates', label: 'Cheque templates' },
             { to: '/finance/accounts', label: 'Chart of accounts' },
             { to: '/finance/journals', label: 'Journals' },

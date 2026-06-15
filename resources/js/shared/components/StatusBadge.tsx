@@ -1,7 +1,7 @@
 import { humanize } from '@/shared/utils/object';
 
 const positive = new Set(['active', 'approved', 'posted', 'paid', 'received', 'available', 'open']);
-const negative = new Set(['inactive', 'cancelled', 'void', 'reversed', 'blacklisted', 'closed']);
+const negative = new Set(['inactive', 'cancelled', 'void', 'voided', 'reversed', 'blacklisted', 'closed']);
 
 export function StatusBadge({ status }: { status?: string | null }) {
     const color = status && positive.has(status)

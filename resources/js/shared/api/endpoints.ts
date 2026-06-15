@@ -19,6 +19,7 @@ export const endpoints = {
     sales: '/api/v1/sales',
     invoices: '/api/v1/invoices',
     payments: '/api/v1/payments',
+    vouchers: '/api/v1/vouchers',
     finance: '/api/v1/finance',
     tax: '/api/v1/tax',
     reports: '/api/v1/reports',

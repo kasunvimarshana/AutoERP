@@ -21,16 +21,9 @@ return new class extends Migration
                 'cheque',
                 'bank_transfer',
                 'card',
-                'credit_note',
-                'advance',
-                'deposit',
-                'wallet',
-                'custom',
-                'bank',
-                'online',
-                'transfer',
                 'mobile_wallet',
-                'debit_note',
+                'digital_wallet',
+                'direct_debit',
                 'other',
             ]);
             $table->enum('direction_allowed', ['inbound', 'outbound', 'both'])->default('both');

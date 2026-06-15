@@ -57,6 +57,17 @@ export interface PaymentLinePayload {
     amount: string;
     cleared_amount?: string;
     status?: string;
+    instrument_direction?: 'received' | 'issued';
+    external_bank_name?: string;
+    external_bank_branch?: string;
+    instrument_number?: string;
+    instrument_date?: string;
+    deposit_date?: string;
+    realized_date?: string;
+    clearing_date?: string;
+    bounced_date?: string;
+    returned_date?: string;
+    cancellation_reason?: string;
     notes?: string;
     metadata?: Record<string, unknown>;
 }

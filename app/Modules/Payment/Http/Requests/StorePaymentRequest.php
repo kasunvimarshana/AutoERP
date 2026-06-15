@@ -64,7 +64,7 @@ final class StorePaymentRequest extends TenantScopedRequest
             partyId: $this->intOrNull('party_id'),
             sourceType: $this->stringOrNull('source_type'),
             sourceId: $this->intOrNull('source_id'),
-            allocationStatus: (string) $this->input('allocation_status', 'unapplied'),
+            allocationStatus: (string) $this->input('allocation_status', 'unallocated'),
             currencyId: $this->intOrNull('currency_id'),
             exchangeRate: (string) $this->input('exchange_rate', '1.000000'),
             referenceNumber: $this->stringOrNull('reference_number'),
@@ -93,6 +93,24 @@ final class StorePaymentRequest extends TenantScopedRequest
             'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.cleared_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.status' => ['nullable', 'string', 'max:50'],
+            'lines.*.internal_bank_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('finance_accounts', 'id')
+                    ->where('tenant_id', $this->tenantId())
+                    ->where('is_bank_account', true),
+            ],
+            'lines.*.instrument_direction' => ['nullable', Rule::in(['received', 'issued'])],
+            'lines.*.external_bank_name' => ['nullable', 'string', 'max:150'],
+            'lines.*.external_bank_branch' => ['nullable', 'string', 'max:150'],
+            'lines.*.instrument_number' => ['nullable', 'string', 'max:150'],
+            'lines.*.instrument_date' => ['nullable', 'date'],
+            'lines.*.deposit_date' => ['nullable', 'date'],
+            'lines.*.realized_date' => ['nullable', 'date'],
+            'lines.*.clearing_date' => ['nullable', 'date'],
+            'lines.*.bounced_date' => ['nullable', 'date'],
+            'lines.*.returned_date' => ['nullable', 'date'],
+            'lines.*.cancellation_reason' => ['nullable', 'string', 'max:1000'],
             'lines.*.notes' => ['nullable', 'string'],
             'lines.*.metadata' => ['nullable', 'array'],
         ];
@@ -111,6 +129,18 @@ final class StorePaymentRequest extends TenantScopedRequest
             status: (string) ($row['status'] ?? 'pending'),
             notes: $row['notes'] ?? null,
             metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
+            internalBankAccountId: isset($row['internal_bank_account_id']) ? (int) $row['internal_bank_account_id'] : null,
+            instrumentDirection: $row['instrument_direction'] ?? null,
+            externalBankName: $row['external_bank_name'] ?? null,
+            externalBankBranch: $row['external_bank_branch'] ?? null,
+            instrumentNumber: $row['instrument_number'] ?? null,
+            instrumentDate: $row['instrument_date'] ?? null,
+            depositDate: $row['deposit_date'] ?? null,
+            realizedDate: $row['realized_date'] ?? null,
+            clearingDate: $row['clearing_date'] ?? null,
+            bouncedDate: $row['bounced_date'] ?? null,
+            returnedDate: $row['returned_date'] ?? null,
+            cancellationReason: $row['cancellation_reason'] ?? null,
         ), $this->input('lines'));
     }
 

@@ -61,6 +61,8 @@ const PaymentDetailPage = lazy(() => import('@/modules/payment/pages/PaymentDeta
 const ChequeTemplateListPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateListPage'));
 const ChequeTemplateFormPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateFormPage'));
 const ChequePrintPreviewPage = lazy(() => import('@/modules/payment/cheque-print/ChequePrintPreviewPage'));
+const VoucherListPage = lazy(() => import('@/modules/voucher/pages/VoucherListPage'));
+const VoucherDetailPage = lazy(() => import('@/modules/voucher/pages/VoucherDetailPage'));
 const FinanceAccountsPage = lazy(() => import('@/modules/finance/pages/FinanceAccountsPage'));
 const FinanceAccountCreatePage = lazy(() => import('@/modules/finance/pages/FinanceAccountCreatePage'));
 const FinanceAccountEditPage = lazy(() => import('@/modules/finance/pages/FinanceAccountEditPage'));
@@ -187,6 +189,8 @@ export function AppRouter() {
                     <Route path="/payments/cheque-templates/:id/edit" element={<ChequeTemplateFormPage />} />
                     <Route path="/payments/:id/cheque-print" element={<ChequePrintPreviewPage />} />
                     <Route path="/payments/:id" element={<PaymentDetailPage />} />
+                    <Route path="/vouchers" element={<VoucherListPage />} />
+                    <Route path="/vouchers/:voucherType/:sourceId" element={<VoucherDetailPage />} />
                     <Route path="/finance/accounts" element={<FinanceAccountsPage />} />
                     <Route path="/finance/accounts/create" element={<FinanceAccountCreatePage />} />
                     <Route path="/finance/accounts/:id/edit" element={<FinanceAccountEditPage />} />

@@ -13,7 +13,11 @@ use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Tenant\Models\TenantModel;
@@ -37,6 +41,10 @@ final class Payment extends CoreModel
             'bank_account_id' => 'integer',
             'payment_type' => PaymentType::class,
             'direction' => PaymentDirection::class,
+            'document_status' => PaymentDocumentStatus::class,
+            'allocation_status' => PaymentAllocationState::class,
+            'posting_status' => PaymentPostingStatus::class,
+            'instrument_status' => PaymentInstrumentStatus::class,
             'status' => PaymentStatus::class,
             'payment_date' => 'date',
             'cheque_date' => 'date',
@@ -57,7 +65,7 @@ final class Payment extends CoreModel
 
     protected static function booted(): void
     {
-        static::deleting(function (Payment $payment): void {
+        self::deleting(function (Payment $payment): void {
             $status = $payment->status instanceof PaymentStatus
                 ? $payment->status
                 : PaymentStatus::from((string) $payment->status);

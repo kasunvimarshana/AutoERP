@@ -10,6 +10,10 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Enums\PaymentAllocationState;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Payment\Models\Payment;
@@ -21,6 +25,7 @@ final class PaymentReversalService
         private readonly DecimalMath $math,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
         private readonly PaymentStatusService $statuses,
+        private readonly PaymentReversalNumberService $numbers,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -58,7 +63,7 @@ final class PaymentReversalService
                 'tenant_id' => $payment->tenant_id,
                 'organization_unit_id' => $payment->organization_unit_id,
                 'payment_id' => $payment->getKey(),
-                'reversal_number' => $data->reversalNumber,
+                'reversal_number' => $this->numbers->resolve($data, $payment),
                 'reversal_date' => $data->reversalDate,
                 'reason' => $data->reason,
                 'reversed_by' => $data->reversedBy,
@@ -70,6 +75,10 @@ final class PaymentReversalService
 
             $payment->forceFill([
                 'status' => PaymentStatus::Reversed->value,
+                'document_status' => PaymentDocumentStatus::Reversed->value,
+                'allocation_status' => PaymentAllocationState::Unallocated->value,
+                'posting_status' => PaymentPostingStatus::Reversed->value,
+                'instrument_status' => PaymentInstrumentStatus::Reversed->value,
                 'allocated_amount' => '0.000000',
                 'unapplied_amount' => '0.000000',
                 'voided_by' => $data->reversedBy,
@@ -80,6 +89,7 @@ final class PaymentReversalService
 
             if ($payment->unappliedBalance !== null) {
                 $payment->unappliedBalance->forceFill([
+                    'allocation_status' => PaymentAllocationState::Unallocated->value,
                     'allocated_amount' => '0.000000',
                     'remaining_amount' => '0.000000',
                     'status' => UnappliedBalanceStatus::Cancelled->value,

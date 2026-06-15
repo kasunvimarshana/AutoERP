@@ -7,6 +7,7 @@ namespace Modules\Payment\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Tenant\Models\TenantModel;
 
@@ -24,6 +25,7 @@ final class PaymentUnappliedBalance extends CoreModel
             'payment_id' => 'integer',
             'party_id' => 'integer',
             'source_id' => 'integer',
+            'allocation_status' => PaymentAllocationState::class,
             'original_amount' => 'decimal:6',
             'allocated_amount' => 'decimal:6',
             'refunded_amount' => 'decimal:6',

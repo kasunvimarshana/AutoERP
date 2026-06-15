@@ -27,9 +27,9 @@ interface PaymentLineTableProps {
 
 function methodKind(method?: PaymentMethod): string {
     const type = method?.method_type ?? '';
-    if (['bank_transfer', 'bank', 'transfer'].includes(type)) return 'bank_transfer';
-    if (['wallet', 'mobile_wallet', 'online'].includes(type)) return 'wallet';
-    return type || 'custom';
+    if (['bank_transfer', 'direct_debit'].includes(type)) return 'bank_transfer';
+    if (['digital_wallet', 'mobile_wallet'].includes(type)) return 'wallet';
+    return type || 'other';
 }
 
 function methodLabel(method: PaymentMethod): string {

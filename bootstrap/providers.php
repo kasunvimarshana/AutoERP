@@ -26,6 +26,7 @@ use Modules\User\Providers\UserServiceProvider;
 use Modules\Vehicle\Providers\VehicleServiceProvider;
 use Modules\VehicleRental\Providers\VehicleRentalServiceProvider;
 use Modules\VehicleService\Providers\VehicleServiceServiceProvider;
+use Modules\Voucher\Providers\VoucherServiceProvider;
 use Modules\Warehouse\Providers\WarehouseServiceProvider;
 
 return [
@@ -40,6 +41,7 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
+    VoucherServiceProvider::class,
     ReportingServiceProvider::class,
     HrServiceProvider::class,
     ItemServiceProvider::class,

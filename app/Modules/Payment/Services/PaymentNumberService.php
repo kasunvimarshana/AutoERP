@@ -21,10 +21,14 @@ final class PaymentNumberService
         $result = $this->sequences->execute([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
-            'document_type' => 'payment_'.$data->paymentType->value,
+            'document_type' => $data->direction->value === 'inbound'
+                ? 'receipt_voucher'
+                : 'payment_voucher',
             'period_type' => 'yearly',
             'at_date' => $data->paymentDate,
-            'prefix' => strtoupper($data->paymentType->value).'-{PERIOD}-',
+            'prefix' => $data->direction->value === 'inbound'
+                ? 'RV-{PERIOD}-'
+                : 'PV-{PERIOD}-',
             'padding' => 6,
         ]);
 

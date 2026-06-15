@@ -7,6 +7,10 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -51,6 +55,9 @@ final class PaymentCreationService
                 'payee_name' => $data->payeeName,
                 'amount_in_words' => $data->amountInWords,
                 'status' => $data->status->value,
+                'document_status' => $this->documentStatusFor($data->status)->value,
+                'posting_status' => $this->postingStatusFor($data->status)->value,
+                'instrument_status' => $this->initialInstrumentStatus($data)->value,
                 'total_amount' => $calculation->totalAmount,
                 'allocated_amount' => $calculation->allocatedAmount,
                 'unapplied_amount' => $calculation->unappliedAmount,
@@ -71,6 +78,18 @@ final class PaymentCreationService
                     'amount' => $calculation->lineAmounts[$index],
                     'cleared_amount' => $this->math->normalize($line->clearedAmount),
                     'status' => $line->status,
+                    'internal_bank_account_id' => $line->internalBankAccountId,
+                    'instrument_direction' => $line->instrumentDirection,
+                    'external_bank_name' => $line->externalBankName,
+                    'external_bank_branch' => $line->externalBankBranch,
+                    'instrument_number' => $line->instrumentNumber,
+                    'instrument_date' => $line->instrumentDate,
+                    'deposit_date' => $line->depositDate,
+                    'realized_date' => $line->realizedDate,
+                    'clearing_date' => $line->clearingDate,
+                    'bounced_date' => $line->bouncedDate,
+                    'returned_date' => $line->returnedDate,
+                    'cancellation_reason' => $line->cancellationReason,
                     'notes' => $line->notes,
                     'metadata' => $line->metadata,
                 ]);
@@ -84,5 +103,46 @@ final class PaymentCreationService
 
             return $payment->load(['lines', 'allocations', 'unappliedBalance', 'refunds', 'reversals']);
         });
+    }
+
+    private function documentStatusFor(PaymentStatus $status): PaymentDocumentStatus
+    {
+        return match ($status) {
+            PaymentStatus::PendingApproval => PaymentDocumentStatus::Submitted,
+            PaymentStatus::Approved,
+            PaymentStatus::Posted,
+            PaymentStatus::PartiallyAllocated,
+            PaymentStatus::Allocated,
+            PaymentStatus::FullyAllocated,
+            PaymentStatus::Refunded => PaymentDocumentStatus::Approved,
+            PaymentStatus::Void,
+            PaymentStatus::Cancelled => PaymentDocumentStatus::Voided,
+            PaymentStatus::Reversed => PaymentDocumentStatus::Reversed,
+            default => PaymentDocumentStatus::Draft,
+        };
+    }
+
+    private function postingStatusFor(PaymentStatus $status): PaymentPostingStatus
+    {
+        return match ($status) {
+            PaymentStatus::Posted,
+            PaymentStatus::PartiallyAllocated,
+            PaymentStatus::Allocated,
+            PaymentStatus::FullyAllocated,
+            PaymentStatus::Refunded => PaymentPostingStatus::Posted,
+            PaymentStatus::Reversed => PaymentPostingStatus::Reversed,
+            default => PaymentPostingStatus::NotPosted,
+        };
+    }
+
+    private function initialInstrumentStatus(CreatePaymentData $data): PaymentInstrumentStatus
+    {
+        foreach ($data->lines as $line) {
+            if (! in_array(strtolower($line->status), ['pending', 'draft'], true)) {
+                return PaymentInstrumentStatus::tryFrom(strtolower($line->status)) ?? PaymentInstrumentStatus::Pending;
+            }
+        }
+
+        return PaymentInstrumentStatus::Pending;
     }
 }

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id')->nullable();
             $table->string('source_type', 150)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
-            $table->string('allocation_status', 50)->default('unapplied');
+            $table->string('allocation_status', 50)->default('unallocated');
             $table->decimal('original_amount', 20, 6);
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');

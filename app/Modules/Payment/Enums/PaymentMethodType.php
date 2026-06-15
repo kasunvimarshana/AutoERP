@@ -10,15 +10,8 @@ enum PaymentMethodType: string
     case Cheque = 'cheque';
     case BankTransfer = 'bank_transfer';
     case Card = 'card';
-    case CreditNote = 'credit_note';
-    case Advance = 'advance';
-    case Deposit = 'deposit';
-    case Wallet = 'wallet';
-    case Custom = 'custom';
-    case Bank = 'bank';
-    case Online = 'online';
-    case Transfer = 'transfer';
     case MobileWallet = 'mobile_wallet';
-    case DebitNote = 'debit_note';
+    case DigitalWallet = 'digital_wallet';
+    case DirectDebit = 'direct_debit';
     case Other = 'other';
 }

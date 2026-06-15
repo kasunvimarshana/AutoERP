@@ -7,6 +7,7 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
@@ -52,7 +53,12 @@ final class PaymentSettlementService
             $line->forceFill([
                 'status' => $toStatus,
                 'cleared_amount' => $this->clearedAmountForStatus($line, $toStatus),
+                ...$this->instrumentDatesForStatus($toStatus),
                 'metadata' => array_replace($line->metadata ?? [], $metadata ?? []),
+            ])->save();
+
+            $payment->forceFill([
+                'instrument_status' => $this->aggregateInstrumentStatus($payment),
             ])->save();
 
             return $line->refresh();
@@ -78,14 +84,13 @@ final class PaymentSettlementService
         return match ($value) {
             PaymentMethodType::Cheque->value => 'cheque',
             PaymentMethodType::BankTransfer->value,
-            PaymentMethodType::Bank->value,
-            PaymentMethodType::Transfer->value => 'bank_transfer',
+            PaymentMethodType::DirectDebit->value => 'bank_transfer',
             PaymentMethodType::Card->value => 'card',
             PaymentMethodType::Cash->value => 'cash',
-            PaymentMethodType::Wallet->value,
-            PaymentMethodType::MobileWallet->value,
-            PaymentMethodType::Online->value => 'wallet',
-            default => 'custom',
+            PaymentMethodType::DigitalWallet->value,
+            PaymentMethodType::MobileWallet->value => 'wallet',
+            PaymentMethodType::Other->value => 'other',
+            default => 'other',
         };
     }
 
@@ -112,7 +117,7 @@ final class PaymentSettlementService
                 'cancelled' => [],
                 'reversed' => [],
             ],
-            'custom' => $cashLike,
+            'other' => $cashLike,
             'cheque' => [
                 'pending' => ['issued', 'received', 'cancelled', 'reversed'],
                 'issued' => ['deposited', 'cancelled', 'reversed'],
@@ -155,5 +160,57 @@ final class PaymentSettlementService
         }
 
         return $this->math->normalize((string) $line->cleared_amount);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function instrumentDatesForStatus(string $status): array
+    {
+        $now = now()->toDateString();
+
+        return match ($status) {
+            'deposited' => ['deposit_date' => $now],
+            'cleared', 'settled' => ['clearing_date' => $now, 'realized_date' => $now],
+            'bounced' => ['bounced_date' => $now],
+            'returned' => ['returned_date' => $now],
+            default => [],
+        };
+    }
+
+    private function aggregateInstrumentStatus(Payment $payment): string
+    {
+        $statuses = $payment->lines()
+            ->pluck('status')
+            ->map(fn (mixed $status): string => strtolower((string) $status))
+            ->filter()
+            ->values()
+            ->all();
+
+        foreach ([
+            PaymentInstrumentStatus::Bounced->value,
+            PaymentInstrumentStatus::Returned->value,
+            PaymentInstrumentStatus::Failed->value,
+            PaymentInstrumentStatus::Cancelled->value,
+            PaymentInstrumentStatus::Deposited->value,
+            PaymentInstrumentStatus::Issued->value,
+            PaymentInstrumentStatus::Received->value,
+            PaymentInstrumentStatus::Initiated->value,
+            PaymentInstrumentStatus::Authorized->value,
+            PaymentInstrumentStatus::Captured->value,
+        ] as $priority) {
+            if (in_array($priority, $statuses, true)) {
+                return $priority;
+            }
+        }
+
+        if ($statuses !== [] && count(array_diff($statuses, [
+            PaymentInstrumentStatus::Cleared->value,
+            PaymentInstrumentStatus::Settled->value,
+        ])) === 0) {
+            return PaymentInstrumentStatus::Cleared->value;
+        }
+
+        return PaymentInstrumentStatus::Pending->value;
     }
 }

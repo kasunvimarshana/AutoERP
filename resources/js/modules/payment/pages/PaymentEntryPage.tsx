@@ -12,7 +12,7 @@ import type { NamedResource } from '@/shared/types/common';
 import { sumDecimals } from '@/shared/utils/decimal';
 import { CustomerLookupSelect } from '@/modules/sales/components/SalesLookups';
 import { SupplierLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
-import { createPayment, listPaymentMethods, type PaymentLinePayload } from '../paymentApi';
+import { createPayment, listPaymentMethods, type PaymentLinePayload, type PaymentMethod } from '../paymentApi';
 import { PaymentLineTable, type PaymentLineDraft } from '../components/PaymentLineTable';
 
 const typeOptions = [
@@ -34,6 +34,49 @@ function today(): string {
 
 function emptyLine(key: number): PaymentLineDraft {
     return { key, paymentMethodId: '', amount: '0.000000', reference: '', metadata: {} };
+}
+
+function methodKind(method?: PaymentMethod): string {
+    const type = method?.method_type ?? '';
+    if (['bank_transfer', 'direct_debit'].includes(type)) return 'bank_transfer';
+    if (['digital_wallet', 'mobile_wallet'].includes(type)) return 'wallet';
+    return type || 'other';
+}
+
+function linePayload(line: PaymentLineDraft, method?: PaymentMethod, direction?: string): PaymentLinePayload {
+    const metadata = Object.fromEntries(Object.entries(line.metadata).filter(([, value]) => value !== ''));
+    const kind = methodKind(method);
+    const payload: PaymentLinePayload = {
+        payment_method_id: line.paymentMethodId ? Number(line.paymentMethodId) : undefined,
+        amount: line.amount,
+        reference_number: line.reference || undefined,
+        instrument_direction: direction === 'outbound' ? 'issued' : 'received',
+        metadata,
+    };
+
+    if (kind === 'cheque') {
+        payload.instrument_number = line.metadata.cheque_number || undefined;
+        payload.instrument_date = line.metadata.cheque_date || undefined;
+        payload.deposit_date = line.metadata.value_date || undefined;
+        payload.external_bank_name = line.metadata.bank_account || undefined;
+    }
+    if (kind === 'bank_transfer') {
+        payload.instrument_number = line.metadata.transfer_reference || undefined;
+        payload.instrument_date = line.metadata.transfer_date || undefined;
+        payload.realized_date = line.metadata.settlement_date || undefined;
+        payload.external_bank_name = line.metadata.bank_account || undefined;
+    }
+    if (kind === 'card') {
+        payload.instrument_number = line.metadata.card_reference || line.metadata.authorization_code || undefined;
+        payload.external_bank_name = line.metadata.terminal || undefined;
+    }
+    if (kind === 'wallet') {
+        payload.instrument_number = line.metadata.wallet_reference || undefined;
+        payload.realized_date = line.metadata.settlement_date || undefined;
+        payload.external_bank_name = line.metadata.provider || undefined;
+    }
+
+    return payload;
 }
 
 export default function PaymentEntryPage() {
@@ -66,12 +109,11 @@ export default function PaymentEntryPage() {
         setBusy(true);
         setError(null);
         try {
-            const payloadLines: PaymentLinePayload[] = lines.map((line) => ({
-                payment_method_id: line.paymentMethodId ? Number(line.paymentMethodId) : undefined,
-                amount: line.amount,
-                reference_number: line.reference || undefined,
-                metadata: Object.fromEntries(Object.entries(line.metadata).filter(([, value]) => value !== '')),
-            }));
+            const payloadLines: PaymentLinePayload[] = lines.map((line) => linePayload(
+                line,
+                methodRows.find((method) => String(method.id) === line.paymentMethodId),
+                direction,
+            ));
             const payment = await createPayment({
                 payment_type: paymentType,
                 direction,

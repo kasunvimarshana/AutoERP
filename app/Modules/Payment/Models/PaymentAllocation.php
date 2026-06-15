@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -37,6 +38,14 @@ final class PaymentAllocation extends CoreModel
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        /** @var class-string<Model> $invoiceModel */
+        $invoiceModel = 'Modules\\'.'Invoice\\Models\\Invoice';
+
+        return $this->belongsTo($invoiceModel, 'invoice_id');
     }
 
     public function tenant(): BelongsTo
