@@ -12,6 +12,7 @@ import {
     subtractDecimal,
     sumDecimals,
 } from '@/shared/utils/decimal';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import type { SalesOrder, SalesQuotation } from '../salesTypes';
 
 export type EditableSalesLine = EditablePurchaseLine;
@@ -20,7 +21,7 @@ export type SalesDocumentTotals = PurchaseTotals;
 export type SalesDocument = SalesQuotation | SalesOrder;
 
 export function todayDate(): string {
-    return new Date().toISOString().slice(0, 10);
+    return businessDateInputValue();
 }
 
 export function asResource(value: NamedResource | null | undefined): NamedResource | null {

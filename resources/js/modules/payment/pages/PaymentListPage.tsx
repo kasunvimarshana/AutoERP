@@ -74,7 +74,7 @@ export default function PaymentListPage() {
             />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
-            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/payments/${row.id}`} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </>
     );

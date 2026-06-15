@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
@@ -12,6 +13,8 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
+import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
@@ -20,7 +23,7 @@ import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import { allocateRentalVehicle, changeRentalAgreementStatus, createRentalPayment, getRentalAgreement, prepareRentalPayment, replaceRentalVehicle } from '../vehicleRentalApi';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 
 export default function RentalAgreementDetailPage() {
     const id = Number(useParams().id);
@@ -50,16 +53,29 @@ export default function RentalAgreementDetailPage() {
         }
     };
     const invoiceOptions = Array.from(new Map(agreement.invoice_links.filter((link) => link.status === 'active').map((link) => [link.invoice_id, link])).values());
+    const nextAction = agreement.status === 'draft'
+        ? { label: 'Confirm agreement', action: 'confirm' as const }
+        : agreement.status === 'confirmed'
+            ? { label: 'Activate agreement', action: 'activate' as const }
+            : agreement.status === 'active'
+                ? { label: 'Mark returned', action: 'returned' as const }
+                : agreement.status === 'returned'
+                    ? { label: 'Complete agreement', action: 'complete' as const }
+                    : null;
 
     return (
         <>
-            <ContentHeader title={agreement.agreement_number} description={`${agreement.direction === 'outbound' ? 'Outbound rental' : 'Inbound hire-in'} / ${readableRelation(agreement.party)}`} actions={<>
-                {agreement.status === 'draft' && <Button type="button" loading={busy} onClick={() => doAction('confirm')}>Confirm</Button>}
-                {agreement.status === 'confirmed' && <Button type="button" loading={busy} onClick={() => doAction('activate')}>Activate</Button>}
-                {agreement.status === 'active' && <Button type="button" loading={busy} onClick={() => doAction('returned')}>Mark returned</Button>}
-                {agreement.status === 'returned' && <Button type="button" loading={busy} onClick={() => doAction('complete')}>Complete</Button>}
-                {!['completed', 'cancelled'].includes(agreement.status) && <Button type="button" variant="danger" loading={busy} onClick={() => doAction('cancel')}>Cancel</Button>}
-            </>} />
+            <ContentHeader title={agreement.agreement_number} description={`${agreement.direction === 'outbound' ? 'Outbound rental' : 'Inbound hire-in'} / ${readableRelation(agreement.party)}`} />
+            <WorkflowHeader
+                status={<RentalStatusBadge status={agreement.status} />}
+                nextAction={nextAction ? <Button type="button" loading={busy} onClick={() => doAction(nextAction.action)}>{nextAction.label}</Button> : undefined}
+                secondaryActions={!['completed', 'cancelled'].includes(agreement.status) ? (
+                    <ActionMenu>
+                        <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => doAction('cancel')}>Cancel agreement</Button>
+                    </ActionMenu>
+                ) : undefined}
+                blockedReason={agreement.status === 'cancelled' ? 'No further actions are available for a cancelled agreement.' : undefined}
+            />
             <ErrorAlert error={error ?? result.error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="space-y-5">

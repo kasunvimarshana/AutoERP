@@ -9,11 +9,12 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleOwnership, deleteVehicleOwnership, listVehicleOwnerships, updateVehicleOwnership } from '../vehicleApi';
 import type { VehicleOwnership, VehicleOwnershipPayload } from '../vehicleTypes';
 
 const ownershipTypes = ['owned', 'customer_owned', 'leased', 'rented', 'company_owned', 'third_party'];
-const emptyPayload: VehicleOwnershipPayload = { ownership_type: 'owned', started_at: new Date().toISOString().slice(0, 10), is_current: true, notes: '' };
+const emptyPayload: VehicleOwnershipPayload = { ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true, notes: '' };
 
 export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
     const [rows, setRows] = useState<VehicleOwnership[]>([]);

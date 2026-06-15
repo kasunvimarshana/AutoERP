@@ -12,6 +12,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
@@ -32,7 +33,7 @@ export default function SalesCreditNotePage() {
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [customer, setCustomer] = useState<NamedResource | null>(null);
-    const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+    const [date, setDate] = useState(businessDateInputValue());
     const [amount, setAmount] = useState('0.000000');
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);

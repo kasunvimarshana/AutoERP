@@ -1,7 +1,9 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
 import type { NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
 import type { AuthOrganizationUnit, AuthTenant, AuthUser } from '@/modules/auth/authTypes';
+import { useDialogAccessibility } from '@/shared/hooks/useDialogAccessibility';
 
 export function Sidebar({
     sections,
@@ -31,6 +33,8 @@ export function Sidebar({
     onToggleModule: (moduleId: string) => void;
 }) {
     const sidebarWidth = collapsed ? 'lg:w-20' : 'lg:w-72';
+    const sidebarRef = useRef<HTMLElement>(null);
+    useDialogAccessibility(mobileOpen, sidebarRef, onCloseMobile);
 
     return (
         <>
@@ -43,8 +47,10 @@ export function Sidebar({
                 />
             )}
             <aside
+                ref={sidebarRef}
                 id="app-sidebar"
-                className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-white ${sidebarWidth} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
+                tabIndex={mobileOpen ? -1 : undefined}
+                className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-white transition-transform ${sidebarWidth} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
                 aria-label="Application sidebar"
             >
                 <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 px-4">

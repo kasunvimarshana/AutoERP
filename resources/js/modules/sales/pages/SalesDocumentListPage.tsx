@@ -12,6 +12,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
 import type { ApiCollection } from '@/shared/types/api';
@@ -65,7 +66,7 @@ export default function SalesDocumentListPage({ kind }: { kind: Kind }) {
                 if (action === 'reject') await rejectSalesQuotation(row.id);
                 if (action === 'convert') {
                     const order = await convertSalesQuotation(row.id, {
-                        sales_order_date: new Date().toISOString().slice(0, 10),
+                        sales_order_date: businessDateInputValue(),
                     });
                     navigate(`/sales/orders/${order.id}`);
                     return;

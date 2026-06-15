@@ -216,6 +216,53 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_vehicle_api_exposes_secure_customer_and_supplier_filtered_views(): void
+    {
+        $this->withoutMiddleware();
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$make, $model] = $this->masterData($tenantId, $organizationUnitId);
+        $customer = $this->customer($tenantId, $organizationUnitId, 'FILTER-CUS');
+
+        app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-CUSTOMER',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+            customerId: (int) $customer->getKey(),
+        ));
+        app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-SUPPLIER',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+            currentOwnerType: 'supplier',
+        ));
+        app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-COMPANY',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+        ));
+
+        $scope = [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+        ];
+
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'customer']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-CUSTOMER');
+
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'supplier']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-SUPPLIER');
+    }
+
     public function test_master_data_api_and_validation_errors(): void
     {
         $this->withoutMiddleware();

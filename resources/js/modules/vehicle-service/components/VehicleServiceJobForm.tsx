@@ -11,10 +11,11 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 const decimal = (value: string, fallback = '0.000000') => value.trim() || fallback;
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {

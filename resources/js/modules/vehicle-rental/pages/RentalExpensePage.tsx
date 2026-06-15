@@ -12,6 +12,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { searchEmployees } from '@/modules/hr/hrApi';
@@ -21,7 +22,7 @@ import type { SupplierSummary } from '@/modules/supplier/supplierTypes';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import { changeRentalExpenseStatus, createRentalExpense, deleteRentalExpense, getRentalAgreement, listRentalExpenses } from '../vehicleRentalApi';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 
 export default function RentalExpensePage() {
     const agreementId = Number(useParams().id);

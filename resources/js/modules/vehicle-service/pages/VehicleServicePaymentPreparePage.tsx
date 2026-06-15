@@ -12,10 +12,11 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServicePayment, getVehicleServiceJob, prepareVehicleServicePayment } from '../vehicleServiceApi';
 import type { PreparedVehicleServicePayment, VehicleServicePaymentPayload } from '../vehicleServiceTypes';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 
 export default function VehicleServicePaymentPreparePage() {
     const jobId = Number(useParams().id);

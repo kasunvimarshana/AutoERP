@@ -35,6 +35,7 @@ export type NavigationModule =
 
 export interface NavigationAccessRule {
     requiresTenant?: boolean;
+    requiresOrganizationUnit?: boolean;
     modules?: NavigationModule[];
     permissions?: string[];
     permissionPrefixes?: string[];
@@ -71,6 +72,7 @@ export interface NavigationSection {
 
 export interface NavigationAccessContext {
     tenantId: number | string | null;
+    organizationUnitId?: number | string | null;
     roles: string[];
     permissions: string[];
     enabledModules: string[] | null;

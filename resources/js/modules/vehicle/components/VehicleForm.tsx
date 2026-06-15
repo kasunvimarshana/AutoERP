@@ -1,16 +1,20 @@
-import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { FormActions } from '@/shared/components/FormActions';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
-import { Tabs } from '@/shared/components/Tabs';
+import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { Textarea } from '@/shared/components/Textarea';
 import { LookupSelect } from '@/shared/components/LookupSelect';
+import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { VehicleCategorySelect } from './VehicleCategorySelect';
 import { VehicleMakeSelect } from './VehicleMakeSelect';
 import { VehicleModelSelect } from './VehicleModelSelect';
@@ -33,6 +37,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     enableRelations?: boolean;
     onSubmit: (payload: VehiclePayload, relations: { documents: VehicleDocumentPayload[]; ownerships: VehicleOwnershipPayload[]; attributes: VehicleAttributePayload[] }) => Promise<void>;
 }) {
+    const navigate = useNavigate();
     const [tab, setTab] = useState<FormTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(initial?.make as VehicleMake ?? null);
     const [model, setModel] = useState<VehicleModel | null>(initial?.model as VehicleModel ?? null);
@@ -61,7 +66,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     const [ownerships, setOwnerships] = useState<VehicleOwnershipPayload[]>([]);
     const [documents, setDocuments] = useState<VehicleDocumentPayload[]>([]);
     const [attributes, setAttributes] = useState<VehicleAttributePayload[]>([]);
-    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ ownership_type: 'owned', started_at: new Date().toISOString().slice(0, 10), is_current: true });
+    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true });
     const [documentDraft, setDocumentDraft] = useState<VehicleDocumentPayload>({ document_type: 'registration', status: 'pending', document_number: '' });
     const [attributeDraft, setAttributeDraft] = useState<VehicleAttributePayload>({ attribute_key: '', attribute_value: '', data_type: 'text', sort_order: 0 });
 
@@ -73,6 +78,9 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
         vehicle_category_id: category?.id ?? null,
         customer_id: customer?.id ?? null,
     }), [category, customer, make, model, payload, type]);
+    const formSnapshot = JSON.stringify({ finalPayload, documents, ownerships, attributes });
+    const initialSnapshot = useRef(formSnapshot);
+    const confirmDiscard = useUnsavedChanges(formSnapshot !== initialSnapshot.current && !submitting);
 
     const submit = async () => {
         await onSubmit(finalPayload, { documents, ownerships, attributes });
@@ -87,7 +95,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     return (
         <Panel>
             <ErrorAlert error={error} />
-            <Tabs<FormTab> active={tab} onChange={setTab} tabs={[
+            <Tabs<FormTab> id="vehicle-form" active={tab} onChange={setTab} tabs={[
                 { id: 'basic', label: 'Basic' },
                 { id: 'ownership', label: 'Ownership' },
                 { id: 'documents', label: 'Documents' },
@@ -96,8 +104,10 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
             ]} />
 
             <div className="mt-5 space-y-5">
-                {tab === 'basic' && (
-                    <div className="grid gap-4 md:grid-cols-3">
+                <TabPanel tabsId="vehicle-form" tabId="basic" active={tab}>
+                    <div className="space-y-5">
+                        <fieldset className="grid gap-4 md:grid-cols-3">
+                            <legend className="sr-only">Vehicle identity</legend>
                         <Input label="Vehicle Number" {...input('vehicle_number')} disabled={Boolean(initial)} />
                         <Input label="Code" {...input('code')} />
                         <Input label="Registration" {...input('registration_number')} />
@@ -107,22 +117,29 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         <VehicleCategorySelect value={category} onChange={setCategory} error={fieldError(error, 'vehicle_category_id')} />
                         <LookupSelect label="Customer" value={customer} onChange={setCustomer} search={lookupApi.customers} error={fieldError(error, 'customer_id')} />
                         <Select label="Status" options={statusOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('status')} />
-                        <Input label="Chassis" {...input('chassis_number')} />
-                        <Input label="Engine" {...input('engine_number')} />
-                        <Input label="VIN" {...input('vin_number')} />
-                        <Input label="Manufacture Year" type="number" {...input('manufacture_year')} />
-                        <Input label="Registration Date" type="date" {...input('registration_date')} />
-                        <Input label="Color" {...input('color')} />
-                        <Select label="Fuel" options={fuelOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('fuel_type')} />
-                        <Select label="Transmission" options={transmissionOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('transmission_type')} />
                         <DecimalInput label="Odometer" value={String(payload.odometer_reading ?? '')} onChange={(event) => setPayload({ ...payload, odometer_reading: event.target.value })} error={fieldError(error, 'odometer_reading')} />
-                        <Input label="Odometer Unit" {...input('odometer_unit')} />
-                        <Input label="Fuel Level" {...input('fuel_level')} />
-                        <div className="md:col-span-3"><Textarea label="Notes" {...input('notes')} /></div>
+                        </fieldset>
+                        <details className="rounded-lg border border-slate-200 bg-slate-50">
+                            <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">Additional identifiers and specifications</summary>
+                            <fieldset className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-3">
+                                <legend className="sr-only">Additional vehicle details</legend>
+                                <Input label="Chassis" {...input('chassis_number')} />
+                                <Input label="Engine" {...input('engine_number')} />
+                                <Input label="VIN" {...input('vin_number')} />
+                                <Input label="Manufacture Year" type="number" {...input('manufacture_year')} />
+                                <Input label="Registration Date" type="date" {...input('registration_date')} />
+                                <Input label="Color" {...input('color')} />
+                                <Select label="Fuel" options={fuelOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('fuel_type')} />
+                                <Select label="Transmission" options={transmissionOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('transmission_type')} />
+                                <Input label="Odometer Unit" {...input('odometer_unit')} />
+                                <Input label="Fuel Level" {...input('fuel_level')} />
+                                <div className="md:col-span-3"><Textarea label="Notes" {...input('notes')} /></div>
+                            </fieldset>
+                        </details>
                     </div>
-                )}
+                </TabPanel>
 
-                {tab === 'ownership' && (
+                <TabPanel tabsId="vehicle-form" tabId="ownership" active={tab}>
                     <RelationDraft disabled={!enableRelations} emptyMessage="Ownerships are saved from the detail page when editing.">
                         <div className="grid gap-3 md:grid-cols-3">
                             <Select label="Ownership" value={ownershipDraft.ownership_type} options={ownershipTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setOwnershipDraft({ ...ownershipDraft, ownership_type: event.target.value as VehicleOwnershipPayload['ownership_type'] })} />
@@ -131,14 +148,14 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         </div>
                         <Button type="button" onClick={() => {
                             setOwnerships([...ownerships, { ...ownershipDraft, customer_id: ownershipCustomer?.id ?? null }]);
-                            setOwnershipDraft({ ownership_type: 'owned', started_at: new Date().toISOString().slice(0, 10), is_current: true });
+                            setOwnershipDraft({ ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true });
                             setOwnershipCustomer(null);
                         }}>Add Ownership</Button>
                         <Count label="Ownerships" count={ownerships.length} />
                     </RelationDraft>
-                )}
+                </TabPanel>
 
-                {tab === 'documents' && (
+                <TabPanel tabsId="vehicle-form" tabId="documents" active={tab}>
                     <RelationDraft disabled={!enableRelations} emptyMessage="Documents are saved from the detail page when editing.">
                         <div className="grid gap-3 md:grid-cols-3">
                             <Select label="Type" value={documentDraft.document_type} options={documentTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setDocumentDraft({ ...documentDraft, document_type: event.target.value as VehicleDocumentPayload['document_type'] })} />
@@ -148,9 +165,9 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         <Button type="button" onClick={() => { setDocuments([...documents, documentDraft]); setDocumentDraft({ document_type: 'registration', status: 'pending', document_number: '' }); }}>Add Document</Button>
                         <Count label="Documents" count={documents.length} />
                     </RelationDraft>
-                )}
+                </TabPanel>
 
-                {tab === 'attributes' && (
+                <TabPanel tabsId="vehicle-form" tabId="attributes" active={tab}>
                     <RelationDraft disabled={!enableRelations} emptyMessage="Attributes are saved from the detail page when editing.">
                         <div className="grid gap-3 md:grid-cols-3">
                             <Input label="Key" value={attributeDraft.attribute_key} onChange={(event) => setAttributeDraft({ ...attributeDraft, attribute_key: event.target.value })} />
@@ -160,19 +177,20 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         <Button type="button" onClick={() => { setAttributes([...attributes, attributeDraft]); setAttributeDraft({ attribute_key: '', attribute_value: '', data_type: 'text', sort_order: attributes.length + 1 }); }}>Add Attribute</Button>
                         <Count label="Attributes" count={attributes.length} />
                     </RelationDraft>
-                )}
+                </TabPanel>
 
-                {tab === 'review' && (
+                <TabPanel tabsId="vehicle-form" tabId="review" active={tab}>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                         <p className="font-semibold text-slate-900">{finalPayload.vehicle_number || 'Auto-numbered vehicle'}</p>
                         <p>{make?.name ?? 'No make'} / {model?.name ?? 'No model'} / {finalPayload.registration_number || 'No registration'}</p>
                         <p className="mt-2">Relations queued: {ownerships.length} ownerships, {documents.length} documents, {attributes.length} attributes.</p>
                     </div>
-                )}
+                </TabPanel>
 
-                <div className="flex justify-end">
+                <FormActions>
+                    <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate(-1)}>Cancel</Button>
                     <Button type="button" loading={submitting} onClick={submit}>{initial ? 'Save Vehicle' : 'Create Vehicle'}</Button>
-                </div>
+                </FormActions>
             </div>
         </Panel>
     );

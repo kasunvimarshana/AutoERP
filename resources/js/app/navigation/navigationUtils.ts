@@ -14,19 +14,17 @@ export function normalizeAccessValue(value: string): string {
 export function canAccessNavigation(rule: NavigationAccessRule | undefined, context: NavigationAccessContext): boolean {
     if (!rule) return true;
     if (rule.requiresTenant && !context.tenantId) return false;
+    if (rule.requiresOrganizationUnit && !context.organizationUnitId) return false;
 
     if (rule.modules && context.enabledModules) {
         const enabled = new Set(context.enabledModules.map(normalizeModule));
-        if (!rule.modules.some((module) => enabled.has(normalizeModule(module)))) {
+        if (!rule.modules.every((module) => enabled.has(normalizeModule(module)))) {
             return false;
         }
     }
 
     const roles = context.roles.map(normalizeAccessValue);
     if (roles.includes('super admin')) return true;
-
-    const hasPermissionRule = Boolean(rule.permissions?.length || rule.permissionPrefixes?.length);
-    if (!hasPermissionRule || context.permissions.length === 0) return true;
 
     const permissions = context.permissions.map(normalizeAccessValue);
     const exactMatch = rule.permissions?.some((permission) => permissions.includes(normalizeAccessValue(permission)));
@@ -35,6 +33,11 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
         return permissions.some((permission) => permission.startsWith(normalizedPrefix));
     });
     const roleMatch = rule.roles?.some((role) => roles.includes(normalizeAccessValue(role)));
+    const hasPermissionRule = Boolean(rule.permissions?.length || rule.permissionPrefixes?.length);
+    const hasRoleRule = Boolean(rule.roles?.length);
+
+    if (!hasPermissionRule && !hasRoleRule) return true;
+    if (context.permissions.length === 0 && !hasRoleRule) return true;
 
     return Boolean(exactMatch || prefixMatch || roleMatch);
 }

@@ -10,6 +10,7 @@ import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import { sumDecimals } from '@/shared/utils/decimal';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { CustomerLookupSelect } from '@/modules/sales/components/SalesLookups';
 import { SupplierLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
 import { createPayment, listPaymentMethods, type PaymentLinePayload, type PaymentMethod } from '../paymentApi';
@@ -29,7 +30,7 @@ const directionOptions = [
 ];
 
 function today(): string {
-    return new Date().toISOString().slice(0, 10);
+    return businessDateInputValue();
 }
 
 function emptyLine(key: number): PaymentLineDraft {

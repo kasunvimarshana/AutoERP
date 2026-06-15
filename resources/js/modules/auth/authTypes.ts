@@ -9,11 +9,13 @@ export interface AuthUser {
 export interface AuthTenant {
     id: number | string;
     name: string | null;
+    timezone?: string | null;
 }
 
 export interface AuthOrganizationUnit {
     id: number | string;
     name: string | null;
+    timezone?: string | null;
 }
 
 export interface AuthSession {

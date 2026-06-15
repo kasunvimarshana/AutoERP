@@ -18,10 +18,11 @@ export function AppLayout() {
     const auth = useAuth();
     const visibleSections = useMemo(() => filterNavigation(navigationSections, {
         tenantId: auth.tenant?.id ?? null,
+        organizationUnitId: auth.organizationUnit?.id ?? null,
         roles: auth.roles,
         permissions: auth.permissions,
         enabledModules: auth.enabledModules,
-    }), [auth.enabledModules, auth.permissions, auth.roles, auth.tenant?.id]);
+    }), [auth.enabledModules, auth.organizationUnit?.id, auth.permissions, auth.roles, auth.tenant?.id]);
     const match = useMemo(
         () => findNavigationMatch(location.pathname, location.search, visibleSections),
         [location.pathname, location.search, visibleSections],
@@ -46,15 +47,6 @@ export function AppLayout() {
     useEffect(() => {
         window.localStorage.setItem('autoerp.sidebar.collapsed', String(collapsed));
     }, [collapsed]);
-
-    useEffect(() => {
-        if (!mobileOpen) return;
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = previousOverflow;
-        };
-    }, [mobileOpen]);
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900">

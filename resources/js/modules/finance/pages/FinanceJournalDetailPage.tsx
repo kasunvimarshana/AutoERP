@@ -12,6 +12,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { Textarea } from '@/shared/components/Textarea';
 import { formatDate } from '@/shared/utils/formatDate';
 import { cancelJournal, getJournal, postJournal, reverseJournal, type JournalEntry } from '../financeApi';
@@ -26,7 +27,7 @@ export default function FinanceJournalDetailPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [action, setAction] = useState<Action>(null);
     const [showReversal, setShowReversal] = useState(false);
-    const [reversalDate, setReversalDate] = useState(new Date().toISOString().slice(0, 10));
+    const [reversalDate, setReversalDate] = useState(businessDateInputValue());
     const [reversalReason, setReversalReason] = useState('');
 
     const load = useCallback(async (signal?: AbortSignal) => {

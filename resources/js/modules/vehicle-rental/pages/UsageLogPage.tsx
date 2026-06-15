@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
@@ -13,6 +14,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import { UsageEventEditor } from '../components/UsageEventEditor';
@@ -29,7 +31,7 @@ import {
 } from '../vehicleRentalApi';
 import type { RentalUsageLog, RunningChartAgreementOption } from '../vehicleRentalTypes';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 const optionKey = (option: RunningChartAgreementOption) => `${option.agreement_id}:${option.agreement_vehicle_id}`;
 
 export default function UsageLogPage() {
@@ -194,8 +196,8 @@ export default function UsageLogPage() {
             <ContentHeader title="Running chart workspace" description="One physical entry resolves its applicable revenue, cost, or standalone agreement context." />
             <ErrorAlert error={error ?? options.error ?? context.error ?? logs.error ?? counterparts.error} />
             <div className="space-y-5">
-                <Panel title="Agreement context">
-                    <div className="grid gap-4 lg:grid-cols-2">
+                <Panel title="1. Select agreement, vehicle, and time">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <Input
                             label="Search agreements, parties, or vehicles"
                             value={search}
@@ -219,6 +221,8 @@ export default function UsageLogPage() {
                                 setStartTime('');
                             }}
                         />
+                        <Input label="Usage date" type="date" value={usageDate} onChange={(event) => setUsageDate(event.target.value)} />
+                        <Input label="ON time" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
                     </div>
                     {options.loading && <LoadingState />}
                     <Pagination meta={options.data?.meta} onPageChange={setPage} />
@@ -318,7 +322,7 @@ export default function UsageLogPage() {
                 )}
 
                 {context.loading && selectedOption ? <LoadingState /> : context.data && (
-                    <Panel title="Resolved financial contexts">
+                    <Panel title="2. Authoritative agreement context">
                         <div className="grid gap-4 lg:grid-cols-2">
                             {context.data.contexts.map((row) => (
                                 <div key={row.agreement_id} className={`rounded-lg border p-4 ${row.financial_side === 'revenue' ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -348,10 +352,6 @@ export default function UsageLogPage() {
                         startOdometer={context.data.last_valid_finish_odometer}
                         initialUsageDate={usageDate}
                         initialStartTime={startTime}
-                        onContextChange={(date, time) => {
-                            setUsageDate(date);
-                            setStartTime(time);
-                        }}
                         onSaved={(log) => {
                             logs.reload();
                             setSelectedId(log.id);
@@ -359,7 +359,8 @@ export default function UsageLogPage() {
                     />
                 )}
 
-                {selectedOption && (logs.loading ? <LoadingState /> : <DataTable rows={rows} rowKey={(row) => row.id} columns={[
+                {selectedOption && <Panel title="4. Review saved running charts">
+                    {logs.loading ? <LoadingState /> : <DataTable rows={rows} rowKey={(row) => row.id} columns={[
                     { key: 'date', header: 'Date', render: (row) => row.usage_date },
                     { key: 'vehicle', header: 'Vehicle', render: (row) => row.vehicle?.registration_number ?? row.vehicle_id },
                     { key: 'time', header: 'ON / OFF', render: (row) => `${row.start_time ?? '-'} / ${row.end_time ?? '-'}` },
@@ -367,18 +368,23 @@ export default function UsageLogPage() {
                     { key: 'distance', header: 'Distance', render: (row) => row.distance_km },
                     { key: 'contexts', header: 'Financial contexts', render: (row) => row.contexts.map((item) => item.financial_side).join(' + ') },
                     { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
-                    { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap gap-2">
+                    { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap justify-end gap-2">
                         {['draft', 'rejected'].includes(row.status) && canRecordUsage && <Button type="button" variant="secondary" loading={busy} onClick={() => setSelectedId(row.id)}>Events ({row.events.length})</Button>}
                         {row.status === 'draft' && canRecordUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'submit')}>Submit</Button>}
-                        {['draft', 'rejected'].includes(row.status) && canRecordUsage && <Button type="button" variant="danger" loading={busy} onClick={() => void deleteUsage(row)}>Delete</Button>}
                         {row.status === 'submitted' && canApproveUsage && <Button type="button" loading={busy} onClick={() => void changeStatus(row, 'approve')}>Approve</Button>}
-                        {row.status === 'submitted' && canApproveUsage && <Button type="button" variant="danger" loading={busy} onClick={() => void changeStatus(row, 'reject')}>Reject</Button>}
+                        {((['draft', 'rejected'].includes(row.status) && canRecordUsage) || (row.status === 'submitted' && canApproveUsage)) && (
+                            <ActionMenu>
+                                {['draft', 'rejected'].includes(row.status) && canRecordUsage && <Button className="w-full justify-start" type="button" variant="ghost" loading={busy} onClick={() => void deleteUsage(row)}>Delete draft</Button>}
+                                {row.status === 'submitted' && canApproveUsage && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={() => void changeStatus(row, 'reject')}>Reject</Button>}
+                            </ActionMenu>
+                        )}
                     </div> },
-                ]} />)}
+                ]} />}
+                </Panel>}
 
                 {selectedOption && selected && ['draft', 'rejected'].includes(selected.status) && canRecordUsage && <>
                     <UsageEventEditor agreementId={selectedOption.agreement_id} usageLogId={selected.id} onSaved={() => logs.reload()} />
-                    <Panel title={`Operational events / ${selected.usage_date}`}>
+                    <Panel title={`5. Events and expenses / ${selected.usage_date}`}>
                         <DataTable rows={selected.events} rowKey={(row) => row.id} columns={[
                             { key: 'type', header: 'Type', render: (row) => row.event_type.replaceAll('_', ' ') },
                             { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },

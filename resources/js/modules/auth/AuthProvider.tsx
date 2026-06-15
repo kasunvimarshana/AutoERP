@@ -14,6 +14,7 @@ import {
     getStoredApiContext,
     storeAuthSession,
 } from '@/shared/api/authSessionStorage';
+import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import { authApi } from './authApi';
 import type { AuthOrganizationUnit, AuthTenant, AuthUser, LoginPayload } from './authTypes';
 
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoles([]);
         setPermissions([]);
         setEnabledModules(null);
+        configureBusinessTimeZone(null);
         setIsLoading(false);
     }, []);
 
@@ -86,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoles(next.roles ?? next.user.roles ?? []);
         setPermissions(next.permissions ?? next.user.permissions ?? []);
         setEnabledModules(next.enabled_modules ?? null);
+        configureBusinessTimeZone(next.organization_unit?.timezone ?? next.tenant?.timezone);
         storeAuthSession({
             accessToken: next.token ?? token,
             refreshToken: next.refresh_token ?? getStoredApiContext().refreshToken,

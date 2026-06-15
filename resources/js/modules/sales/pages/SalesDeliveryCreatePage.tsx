@@ -11,6 +11,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createSalesDelivery, getDeliverableSalesOrderLines, getSalesOrder, type SalesLineSummary } from '../salesApi';
 import type { SalesOrder } from '../salesTypes';
 import {
@@ -30,7 +31,7 @@ export default function SalesDeliveryCreatePage() {
     const [order, setOrder] = useState<SalesOrder | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [location, setLocation] = useState<NamedResource | null>(null);
-    const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+    const [date, setDate] = useState(businessDateInputValue());
     const [notes, setNotes] = useState('');
     const [lines, setLines] = useState<DeliveryDraftLine[]>([]);
     const [submitting, setSubmitting] = useState(false);

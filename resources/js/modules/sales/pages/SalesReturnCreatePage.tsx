@@ -12,6 +12,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createSalesReturn, getReturnableSalesDeliveryLines, type ReturnableSalesLine } from '../salesApi';
 import type { SalesReturnPayload, SalesReturnType } from '../salesTypes';
 import {
@@ -56,7 +57,7 @@ export default function SalesReturnCreatePage() {
     const [location, setLocation] = useState<NamedResource | null>(null);
     const [delivery, setDelivery] = useState<NamedResource | null>(null);
     const [replacementOrder, setReplacementOrder] = useState<NamedResource | null>(null);
-    const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+    const [date, setDate] = useState(businessDateInputValue());
     const [reason, setReason] = useState('');
     const [headerCostBasis, setHeaderCostBasis] = useState('0.000000');
     const [lines, setLines] = useState<ReturnLineDraft[]>([]);

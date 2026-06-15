@@ -12,6 +12,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     createSalesInvoice,
     getInvoiceableSalesOrderLines,
@@ -47,7 +48,7 @@ export default function SalesInvoiceCreatePage() {
     const [sourceType, setSourceType] = useState<'sales_delivery' | 'sales_order'>('sales_delivery');
     const [selectedSource, setSelectedSource] = useState<NamedResource | null>(null);
     const [sources, setSources] = useState<InvoiceSourceDraft[]>([]);
-    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
+    const [invoiceDate, setInvoiceDate] = useState(businessDateInputValue());
     const [dueDate, setDueDate] = useState('');
     const [notes, setNotes] = useState('');
     const [preview, setPreview] = useState<SalesInvoicePreview | null>(null);

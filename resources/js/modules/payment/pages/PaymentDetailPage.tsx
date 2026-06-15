@@ -12,6 +12,7 @@ import { RecordTable } from '@/shared/components/RecordTable';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
@@ -31,7 +32,7 @@ const tabs = [
 ];
 
 function today(): string {
-    return new Date().toISOString().slice(0, 10);
+    return businessDateInputValue();
 }
 
 export default function PaymentDetailPage() {

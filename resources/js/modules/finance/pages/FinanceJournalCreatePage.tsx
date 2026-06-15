@@ -6,11 +6,12 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { JournalForm } from '../components/JournalForm';
 import { createJournal, getFinanceLookups, type JournalPayload } from '../financeApi';
 
 const initial: JournalPayload = {
-    journal_date: new Date().toISOString().slice(0, 10),
+    journal_date: businessDateInputValue(),
     journal_type: 'general',
     exchange_rate: '1.000000',
     lines: [

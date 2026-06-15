@@ -86,20 +86,30 @@ function SettingForm({
     const [value, setValue] = useState('');
     const [valueType, setValueType] = useState('string');
     const [description, setDescription] = useState('');
+    const [valueError, setValueError] = useState('');
 
     return (
         <form className="space-y-4" onSubmit={(event) => {
             event.preventDefault();
-            void onSubmit({
-                key,
-                value: parseValue(value, valueType),
-                description: description || undefined,
-            });
+            try {
+                const parsedValue = parseValue(value, valueType);
+                setValueError('');
+                void onSubmit({
+                    key,
+                    value: parsedValue,
+                    description: description || undefined,
+                });
+            } catch {
+                setValueError(valueType === 'json' ? 'Enter valid JSON.' : 'Enter a valid value.');
+            }
         }}>
             <ErrorAlert error={error} />
             <Input label="Key" required value={key} placeholder="module.setting-name" onChange={(event) => setKey(event.target.value)} />
             <Select label="Value type" value={valueType} options={['string', 'number', 'boolean', 'json'].map((entry) => ({ value: entry, label: entry }))} onChange={(event) => setValueType(event.target.value)} />
-            <Textarea label="Value" required value={value} onChange={(event) => setValue(event.target.value)} />
+            <Textarea label="Value" required value={value} error={valueError || undefined} onChange={(event) => {
+                setValue(event.target.value);
+                setValueError('');
+            }} />
             <Textarea label="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
@@ -110,7 +120,11 @@ function SettingForm({
 }
 
 function parseValue(value: string, type: string): unknown {
-    if (type === 'number') return Number(value);
+    if (type === 'number') {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) throw new Error('Invalid number');
+        return parsed;
+    }
     if (type === 'boolean') return value.trim().toLowerCase() === 'true';
     if (type === 'json') return JSON.parse(value);
     return value;

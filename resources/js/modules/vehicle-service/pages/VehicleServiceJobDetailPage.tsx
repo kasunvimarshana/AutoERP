@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -9,7 +10,8 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
-import { Tabs } from '@/shared/components/Tabs';
+import { TabPanel, Tabs } from '@/shared/components/Tabs';
+import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { formatDate } from '@/shared/utils/formatDate';
@@ -62,16 +64,13 @@ export default function VehicleServiceJobDetailPage() {
         }
     };
 
-    const headerActions = (
-        <div className="flex flex-wrap gap-2">
-            {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
-            {job.status === 'draft' && <Button type="button" loading={busy} onClick={() => action('inspect')}>Mark inspected</Button>}
-            {['draft', 'inspected'].includes(job.status) && <Button type="button" loading={busy} onClick={() => action('start')}>Start work</Button>}
-            {job.status === 'in_progress' && <Button type="button" loading={busy} onClick={() => action('complete')}>Complete</Button>}
-            {!['paid', 'cancelled'].includes(job.status) && <Button type="button" variant="danger" loading={busy} onClick={() => action('cancel')}>Cancel</Button>}
-            {job.status === 'draft' && <Button type="button" variant="danger" loading={busy} onClick={() => action('delete')}>Delete</Button>}
-        </div>
-    );
+    const nextAction = job.status === 'draft'
+        ? { label: 'Mark inspected', action: 'inspect' as const }
+        : job.status === 'inspected'
+            ? { label: 'Start work', action: 'start' as const }
+            : job.status === 'in_progress'
+                ? { label: 'Complete job', action: 'complete' as const }
+                : null;
     const sideSummary = (
         <Panel className="rounded-lg">
             <div className="space-y-4">
@@ -95,7 +94,22 @@ export default function VehicleServiceJobDetailPage() {
 
     return (
         <>
-            <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} actions={headerActions} />
+            <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
+            <WorkflowHeader
+                status={<VehicleServiceStatusBadge status={job.status} />}
+                nextAction={nextAction ? <Button type="button" loading={busy} onClick={() => action(nextAction.action)}>{nextAction.label}</Button> : undefined}
+                historyAction={<Button type="button" variant="ghost" onClick={() => tabs.openTab('history')}>History</Button>}
+                secondaryActions={<>
+                    {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
+                    {!['paid', 'cancelled'].includes(job.status) && (
+                        <ActionMenu>
+                            <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('cancel')}>Cancel job</Button>
+                            {job.status === 'draft' && <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('delete')}>Delete draft</Button>}
+                        </ActionMenu>
+                    )}
+                </>}
+                blockedReason={job.status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
+            />
             <ErrorAlert error={actionError ?? result.error} />
             <EntityDetailLayout
                 summary={sideSummary}
@@ -110,7 +124,7 @@ export default function VehicleServiceJobDetailPage() {
                 }
             >
                 <Panel className="p-0">
-                    <Tabs tabs={[
+                    <Tabs id="service-job-tabs" tabs={[
                         { id: 'summary', label: 'Overview' },
                         { id: 'inspection', label: 'Inspection' },
                         { id: 'lines', label: 'Job lines' },
@@ -123,15 +137,15 @@ export default function VehicleServiceJobDetailPage() {
                     ]} active={tabs.activeTab} onChange={tabs.openTab} />
                     <div className="p-5">
                         <Suspense fallback={<LoadingState />}>
-                            {tabs.activeTab === 'summary' && <VehicleServiceSummaryPanel job={job} />}
-                            {tabs.openedTabs.has('inspection') && tabs.activeTab === 'inspection' && <InspectionTab jobId={job.id} />}
-                            {tabs.openedTabs.has('lines') && tabs.activeTab === 'lines' && <LinesTab jobId={job.id} />}
-                            {tabs.openedTabs.has('workforce') && tabs.activeTab === 'workforce' && <WorkforceTab jobId={job.id} />}
-                            {tabs.openedTabs.has('inventory') && tabs.activeTab === 'inventory' && <InventoryTab jobId={job.id} />}
-                            {tabs.openedTabs.has('invoice') && tabs.activeTab === 'invoice' && <InvoiceTab job={job} />}
-                            {tabs.openedTabs.has('payments') && tabs.activeTab === 'payments' && <PaymentTab job={job} />}
-                            {tabs.openedTabs.has('documents') && tabs.activeTab === 'documents' && <DocumentTab jobId={job.id} />}
-                            {tabs.openedTabs.has('history') && tabs.activeTab === 'history' && <StatusHistoryTab jobId={job.id} />}
+                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab}><VehicleServiceSummaryPanel job={job} /></TabPanel>
+                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab}><InspectionTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab}><WorkforceTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab}><InventoryTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab}><InvoiceTab job={job} /></TabPanel>}
+                            {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab}><PaymentTab job={job} /></TabPanel>}
+                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab}><DocumentTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab}><StatusHistoryTab jobId={job.id} /></TabPanel>}
                         </Suspense>
                     </div>
                 </Panel>

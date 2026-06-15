@@ -4,6 +4,10 @@ const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['a
     requiresTenant: true,
     modules,
 });
+const operationalAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
+    ...tenantAccess(modules),
+    requiresOrganizationUnit: true,
+});
 
 export const navigationSections: NavigationSection[] = [
     {
@@ -143,13 +147,13 @@ export const navigationSections: NavigationSection[] = [
                 type: 'module',
                 label: 'Purchase',
                 icon: 'purchase',
-                access: tenantAccess(['purchase']),
+                access: operationalAccess(['purchase']),
                 children: [
-                    { id: 'purchase-orders', type: 'link', label: 'Purchase Orders', to: '/purchase/orders', match: ['/purchase/orders'], access: tenantAccess(['purchase']) },
-                    { id: 'goods-receipts', type: 'link', label: 'Goods Receipts', to: '/purchase/goods-receipts', match: ['/purchase/goods-receipts'], access: tenantAccess(['purchase']) },
-                    { id: 'purchase-returns', type: 'link', label: 'Purchase Returns', to: '/purchase/returns', match: ['/purchase/returns', '/purchase/manual-supplier-returns'], access: tenantAccess(['purchase']) },
-                    { id: 'supplier-invoices', type: 'link', label: 'Supplier Invoices', to: '/invoices?view=supplier', match: ['/invoices'], access: tenantAccess(['invoice', 'purchase']) },
-                    { id: 'supplier-payments', type: 'link', label: 'Supplier Payments', to: '/payments?view=supplier', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: tenantAccess(['payment', 'purchase']) },
+                    { id: 'purchase-orders', type: 'link', label: 'Purchase Orders', to: '/purchase/orders', match: ['/purchase/orders'], access: operationalAccess(['purchase']) },
+                    { id: 'goods-receipts', type: 'link', label: 'Goods Receipts', to: '/purchase/goods-receipts', match: ['/purchase/goods-receipts'], access: operationalAccess(['purchase']) },
+                    { id: 'purchase-returns', type: 'link', label: 'Purchase Returns', to: '/purchase/returns', match: ['/purchase/returns', '/purchase/manual-supplier-returns'], access: operationalAccess(['purchase']) },
+                    { id: 'supplier-invoices', type: 'link', label: 'Supplier Invoices', to: '/invoices?view=supplier', match: ['/invoices'], access: operationalAccess(['invoice', 'purchase']) },
+                    { id: 'supplier-payments', type: 'link', label: 'Supplier Payments', to: '/payments?view=supplier', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'purchase']) },
                 ],
             },
             {
@@ -157,13 +161,13 @@ export const navigationSections: NavigationSection[] = [
                 type: 'module',
                 label: 'Sales',
                 icon: 'sales',
-                access: tenantAccess(['sales']),
+                access: operationalAccess(['sales']),
                 children: [
-                    { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders', match: ['/sales/orders'], access: tenantAccess(['sales']) },
-                    { id: 'goods-deliveries', type: 'link', label: 'Goods Deliveries', to: '/sales/deliveries', match: ['/sales/deliveries'], access: tenantAccess(['sales']) },
-                    { id: 'sales-returns', type: 'link', label: 'Sales Returns', to: '/sales/returns', match: ['/sales/returns'], access: tenantAccess(['sales']) },
-                    { id: 'customer-invoices', type: 'link', label: 'Customer Invoices', to: '/invoices?view=customer', match: ['/invoices'], access: tenantAccess(['invoice', 'sales']) },
-                    { id: 'customer-receipts', type: 'link', label: 'Customer Receipts', to: '/payments?view=customer', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: tenantAccess(['payment', 'sales']) },
+                    { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders', match: ['/sales/orders'], access: operationalAccess(['sales']) },
+                    { id: 'goods-deliveries', type: 'link', label: 'Goods Deliveries', to: '/sales/deliveries', match: ['/sales/deliveries'], access: operationalAccess(['sales']) },
+                    { id: 'sales-returns', type: 'link', label: 'Sales Returns', to: '/sales/returns', match: ['/sales/returns'], access: operationalAccess(['sales']) },
+                    { id: 'customer-invoices', type: 'link', label: 'Customer Invoices', to: '/invoices?view=customer', match: ['/invoices'], access: operationalAccess(['invoice', 'sales']) },
+                    { id: 'customer-receipts', type: 'link', label: 'Customer Receipts', to: '/payments?view=customer', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'sales']) },
                 ],
             },
             {
@@ -171,11 +175,11 @@ export const navigationSections: NavigationSection[] = [
                 type: 'module',
                 label: 'Vehicle Service',
                 icon: 'service',
-                access: tenantAccess(['vehicle-service']),
+                access: operationalAccess(['vehicle-service']),
                 children: [
-                    { id: 'service-jobs', type: 'link', label: 'Service Jobs', to: '/vehicle-service/jobs', match: ['/vehicle-service/jobs'], access: tenantAccess(['vehicle-service']) },
-                    { id: 'service-invoices', type: 'link', label: 'Service Invoices', to: '/invoices?view=service', match: ['/invoices'], access: tenantAccess(['invoice', 'vehicle-service']) },
-                    { id: 'service-receipts', type: 'link', label: 'Customer Receipts', to: '/payments?view=service', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: tenantAccess(['payment', 'vehicle-service']) },
+                    { id: 'service-jobs', type: 'link', label: 'Service Jobs', to: '/vehicle-service/jobs', match: ['/vehicle-service/jobs'], access: operationalAccess(['vehicle-service']) },
+                    { id: 'service-invoices', type: 'link', label: 'Service Invoices', to: '/invoices?view=service', match: ['/invoices'], access: operationalAccess(['invoice', 'vehicle-service']) },
+                    { id: 'service-receipts', type: 'link', label: 'Customer Receipts', to: '/payments?view=service', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'vehicle-service']) },
                 ],
             },
             {
@@ -184,15 +188,15 @@ export const navigationSections: NavigationSection[] = [
                 label: 'Vehicle Rental',
                 icon: 'rental',
                 access: {
-                    ...tenantAccess(['vehicle-rental']),
+                    ...operationalAccess(['vehicle-rental']),
                     permissionPrefixes: ['vehicle-rental.'],
                 },
                 children: [
-                    { id: 'owner-agreements', type: 'link', label: 'Owner / Supplier Agreements', to: '/vehicle-rental/agreements?direction=inbound', match: ['/vehicle-rental/agreements'], access: tenantAccess(['vehicle-rental']) },
-                    { id: 'customer-agreements', type: 'link', label: 'Customer Agreements', to: '/vehicle-rental/agreements?direction=outbound', match: ['/vehicle-rental/agreements'], access: tenantAccess(['vehicle-rental']) },
-                    { id: 'owner-payables', type: 'link', label: 'Owner / Supplier Payables', to: '/invoices?view=rental-payable', match: ['/invoices'], access: tenantAccess(['invoice', 'vehicle-rental']) },
-                    { id: 'rental-invoices', type: 'link', label: 'Customer Invoices', to: '/invoices?view=rental-customer', match: ['/invoices'], access: tenantAccess(['invoice', 'vehicle-rental']) },
-                    { id: 'rental-settlements', type: 'link', label: 'Settlements', to: '/payments?view=rental', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: tenantAccess(['payment', 'vehicle-rental']) },
+                    { id: 'owner-agreements', type: 'link', label: 'Owner / Supplier Agreements', to: '/vehicle-rental/agreements?direction=inbound', match: ['/vehicle-rental/agreements'], access: operationalAccess(['vehicle-rental']) },
+                    { id: 'customer-agreements', type: 'link', label: 'Customer Agreements', to: '/vehicle-rental/agreements?direction=outbound', match: ['/vehicle-rental/agreements'], access: operationalAccess(['vehicle-rental']) },
+                    { id: 'owner-payables', type: 'link', label: 'Owner / Supplier Payables', to: '/invoices?view=rental-payable', match: ['/invoices'], access: operationalAccess(['invoice', 'vehicle-rental']) },
+                    { id: 'rental-invoices', type: 'link', label: 'Customer Invoices', to: '/invoices?view=rental-customer', match: ['/invoices'], access: operationalAccess(['invoice', 'vehicle-rental']) },
+                    { id: 'rental-settlements', type: 'link', label: 'Settlements', to: '/payments?view=rental', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'vehicle-rental']) },
                 ],
             },
         ],

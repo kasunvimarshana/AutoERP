@@ -12,11 +12,12 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createVehicleServiceInvoice, getVehicleServiceJob, listBillableLines, previewVehicleServiceInvoice } from '../vehicleServiceApi';
 import type { VehicleServiceInvoicePreview } from '../vehicleServiceTypes';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = businessDateInputValue;
 
 export default function VehicleServiceInvoiceCreatePage() {
     const jobId = Number(useParams().id);

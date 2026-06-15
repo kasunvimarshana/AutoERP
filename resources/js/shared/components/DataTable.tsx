@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export interface DataColumn<T> {
     key: string;
@@ -8,7 +9,7 @@ export interface DataColumn<T> {
     mobile?: boolean;
 }
 
-export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge }: {
+export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref }: {
     rows: T[];
     columns: DataColumn<T>[];
     rowKey: (row: T) => string | number;
@@ -17,7 +18,16 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     mobileDetails?: (row: T) => ReactNode;
     mobileActions?: (row: T) => ReactNode;
     rowBadge?: (row: T) => ReactNode;
+    rowHref?: (row: T) => string;
 }) {
+    const navigate = useNavigate();
+    const openRow = (event: MouseEvent, row: T) => {
+        if (!rowHref || event.defaultPrevented) return;
+        const target = event.target;
+        if (target instanceof Element && target.closest('a, button, input, select, textarea, summary')) return;
+        navigate(rowHref(row));
+    };
+
     if (rows.length === 0) {
         return (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-14 text-center">
@@ -31,7 +41,7 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-3 p-3 md:hidden">
                 {rows.map((row) => (
-                    <article key={rowKey(row)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <article key={rowKey(row)} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowHref ? 'cursor-pointer' : ''}`} onClick={(event) => openRow(event, row)}>
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 font-semibold text-slate-900">{mobileSummary ? mobileSummary(row) : columns[0]?.render(row)}</div>
                             {rowBadge?.(row)}
@@ -55,7 +65,7 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((row) => (
-                            <tr key={rowKey(row)} className="transition-colors hover:bg-blue-50/40">
+                            <tr key={rowKey(row)} className={`transition-colors hover:bg-blue-50/40 ${rowHref ? 'cursor-pointer' : ''}`} onClick={(event) => openRow(event, row)}>
                                 {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 ${column.className ?? ''}`}>{column.render(row)}</td>)}
                             </tr>
                         ))}

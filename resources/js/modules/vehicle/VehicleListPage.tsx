@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
@@ -47,6 +48,8 @@ export default function VehicleListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
+    const detailQuery = ownership ? `?ownership=${ownership}` : '';
+    const hasFilters = Boolean(search || status || make || model || type || category || customer);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -95,19 +98,42 @@ export default function VehicleListPage() {
                 <VehicleCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} />
                 <LookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} search={lookupApi.customers} />
             </div>
+            {hasFilters && (
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                    <span>Filters applied</span>
+                    <Button variant="ghost" className="min-h-9 px-3 py-1.5" onClick={() => {
+                        setSearch('');
+                        setStatus('');
+                        setMake(null);
+                        setModel(null);
+                        setType(null);
+                        setCategory(null);
+                        setCustomer(null);
+                        setPage(1);
+                    }}>Clear filters</Button>
+                </div>
+            )}
             <ErrorAlert error={error} />
             {loading ? <LoadingState label="Loading vehicles..." /> : (
                 <>
                     <DataTable
                         rows={rows}
                         rowKey={(row) => row.id}
+                        rowHref={(row) => `/vehicles/${row.id}${detailQuery}`}
                         columns={[
                             { key: 'number', header: 'Vehicle', render: (row) => <div><p className="font-medium text-slate-900">{row.vehicle_number}</p><p className="text-xs text-slate-500">{row.registration_number ?? row.code ?? '-'}</p></div> },
                             { key: 'make', header: 'Make / Model', render: (row) => `${row.make?.name ?? '-'} / ${row.model?.name ?? '-'}` },
                             { key: 'type', header: 'Type', render: (row) => row.type?.name ?? '-' },
                             { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? '-' },
                             { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><LinkButton to={`/vehicles/${row.id}`} variant="ghost">View</LinkButton><LinkButton to={`/vehicles/${row.id}/edit`} variant="ghost">Edit</LinkButton><Button variant="secondary" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></div> },
+                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2">
+                                <LinkButton to={`/vehicles/${row.id}/edit${detailQuery}`} variant="secondary">Edit</LinkButton>
+                                <ActionMenu>
+                                    <Button className="w-full justify-start" variant="ghost" onClick={() => refreshStatus(row, row.status !== 'active')}>
+                                        {row.status === 'active' ? 'Deactivate' : 'Activate'}
+                                    </Button>
+                                </ActionMenu>
+                            </div> },
                         ]}
                     />
                     <Pagination meta={meta} onPageChange={setPage} />

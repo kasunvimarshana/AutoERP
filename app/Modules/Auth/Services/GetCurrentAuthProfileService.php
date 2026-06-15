@@ -8,8 +8,8 @@ use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
+use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -137,6 +137,7 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $tenant->id(),
             'name' => $this->nullableString($tenant->get('name')),
+            'timezone' => $this->timezoneFromMetadata($tenant->get('metadata')),
         ];
     }
 
@@ -154,7 +155,22 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $organizationUnit->id(),
             'name' => $this->nullableString($organizationUnit->get('name')),
+            'timezone' => $this->timezoneFromMetadata($organizationUnit->get('metadata')),
         ];
+    }
+
+    private function timezoneFromMetadata(mixed $metadata): ?string
+    {
+        if (! is_array($metadata)) {
+            return null;
+        }
+
+        $timezone = $metadata['business_timezone'] ?? $metadata['timezone'] ?? null;
+        if (! is_string($timezone) || ! in_array($timezone, timezone_identifiers_list(), true)) {
+            return null;
+        }
+
+        return $timezone;
     }
 
     /**
@@ -187,6 +203,7 @@ final class GetCurrentAuthProfileService
         foreach ($configured as $key => $value) {
             if (is_int($key) && is_scalar($value)) {
                 $modules[] = strtolower(trim((string) $value));
+
                 continue;
             }
 

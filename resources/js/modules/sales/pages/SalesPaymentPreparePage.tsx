@@ -8,6 +8,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import type { NamedResource } from '@/shared/types/common';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { prepareSalesPayment } from '../salesApi';
 import { CustomerLookupSelect, SalesInvoiceLookupSelect } from '../components/SalesLookups';
 
@@ -21,7 +22,7 @@ export default function SalesPaymentPreparePage() {
     const [invoice, setInvoice] = useState<NamedResource | null>(null);
     const [allocationAmount, setAllocationAmount] = useState('0.000000');
     const [allocations, setAllocations] = useState<AllocationDraft[]>([]);
-    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+    const [paymentDate, setPaymentDate] = useState(businessDateInputValue());
     const [amount, setAmount] = useState('0.000000');
     const [reference, setReference] = useState('');
     const [prepared, setPrepared] = useState<Record<string, unknown> | null>(null);

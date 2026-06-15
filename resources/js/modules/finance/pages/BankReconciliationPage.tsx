@@ -11,13 +11,14 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatDate } from '@/shared/utils/formatDate';
 import { completeBankReconciliation, createBankReconciliation, getBankReconciliation, getFinanceLookups, listBankReconciliations, listLedgerEntries, matchBankStatementLine, unmatchBankStatementLine, type BankReconciliation, type BankReconciliationPayload, type LedgerEntry } from '../financeApi';
 
 const initial: BankReconciliationPayload = {
     bank_account_id: null,
     statement_reference: '',
-    statement_date: new Date().toISOString().slice(0, 10),
+    statement_date: businessDateInputValue(),
     opening_balance: '0.000000',
     closing_balance: '0.000000',
     statement_lines: [{ debit: '0.000000', credit: '0.000000' }],
