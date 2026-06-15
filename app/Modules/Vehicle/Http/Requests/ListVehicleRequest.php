@@ -6,7 +6,6 @@ namespace Modules\Vehicle\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleStatus;
 
 final class ListVehicleRequest extends TenantScopedRequest
@@ -23,9 +22,6 @@ final class ListVehicleRequest extends TenantScopedRequest
             'vehicle_type_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_category_id' => ['nullable', 'integer', 'min:1'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
-            'scope' => ['nullable', Rule::in(['all', 'fleet', 'customer', 'supplier_owner'])],
-            'owner_type' => ['nullable', 'required_with:owner_id', Rule::enum(VehicleOwnerType::class)],
-            'owner_id' => ['nullable', 'integer', 'min:1'],
             'is_active' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['vehicle_number', 'code', 'registration_number', 'status', 'created_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],

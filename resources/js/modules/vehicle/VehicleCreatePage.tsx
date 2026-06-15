@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { createVehicle, createVehicleWithRelations } from './vehicleApi';
@@ -8,7 +8,6 @@ import type { VehicleAttributePayload, VehicleDocumentPayload, VehicleOwnershipP
 
 export default function VehicleCreatePage() {
     const navigate = useNavigate();
-    const location = useLocation();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
@@ -18,7 +17,7 @@ export default function VehicleCreatePage() {
         try {
             const hasRelations = relations.documents.length > 0 || relations.ownerships.length > 0 || relations.attributes.length > 0;
             const vehicle = hasRelations ? await createVehicleWithRelations({ vehicle: payload, ...relations }) : await createVehicle(payload);
-            navigate(`/vehicles/${vehicle.id}${location.search}`);
+            navigate(`/vehicles/${vehicle.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -11,7 +11,6 @@ import type { Vehicle, VehicleAttributePayload, VehicleDocumentPayload, VehicleO
 export default function VehicleEditPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
     const vehicleId = Number(id);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [loading, setLoading] = useState(true);
@@ -38,7 +37,7 @@ export default function VehicleEditPage() {
         setError(null);
         try {
             const updated = await updateVehicle(vehicleId, payload);
-            navigate(`/vehicles/${updated.id}${location.search}`);
+            navigate(`/vehicles/${updated.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

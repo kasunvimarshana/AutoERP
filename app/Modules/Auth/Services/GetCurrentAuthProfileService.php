@@ -8,7 +8,6 @@ use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
@@ -20,7 +19,6 @@ final class GetCurrentAuthProfileService
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantPlanRepositoryInterface $tenantPlans,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
@@ -133,49 +131,10 @@ final class GetCurrentAuthProfileService
             return ['id' => $tenantId, 'name' => null];
         }
 
-        $metadata = $this->arrayValue($tenant->get('metadata', []));
-        $planId = $this->toNullableInt($tenant->get('tenant_plan_id'));
-        $plan = $planId !== null ? $this->tenantPlans->findById($planId) : null;
-        $features = $plan?->get('features');
-
         return [
             'id' => (int) $tenant->id(),
             'name' => $this->nullableString($tenant->get('name')),
-            'features' => is_array($features) ? $features : [],
-            'enabled_modules' => $this->stringList($metadata['enabled_modules'] ?? []),
         ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function stringList(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        return array_values(array_filter(array_map(
-            static fn (mixed $item): string => is_scalar($item) ? trim((string) $item) : '',
-            $value,
-        )));
-    }
-
-    /**
-     * @return array<string,mixed>
-     */
-    private function arrayValue(mixed $value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-        if (! is_string($value) || trim($value) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($value, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 
     private function organizationUnitSummary(?int $organizationUnitId): ?array
@@ -192,9 +151,6 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $organizationUnit->id(),
             'name' => $this->nullableString($organizationUnit->get('name')),
-            'enabled_modules' => $this->stringList(
-                $this->arrayValue($organizationUnit->get('metadata'))['enabled_modules'] ?? [],
-            ),
         ];
     }
 

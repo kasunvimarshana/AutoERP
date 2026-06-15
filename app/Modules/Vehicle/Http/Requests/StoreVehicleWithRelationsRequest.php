@@ -11,7 +11,6 @@ use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Http\Requests\Concerns\MapsVehicleData;
 
 final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
@@ -34,7 +33,7 @@ final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
             'documents.*.status' => ['nullable', Rule::enum(VehicleDocumentStatus::class)],
             'documents.*.notes' => ['nullable', 'string'],
             'ownerships' => ['nullable', 'array'],
-            'ownerships.*.owner_type' => ['nullable', Rule::enum(VehicleOwnerType::class)],
+            'ownerships.*.owner_type' => ['nullable', 'string', 'max:100'],
             'ownerships.*.owner_id' => ['nullable', 'integer', 'min:1'],
             'ownerships.*.customer_id' => ['nullable', 'integer', 'min:1'],
             'ownerships.*.ownership_type' => ['required', Rule::enum(VehicleOwnershipType::class)],
@@ -53,7 +52,6 @@ final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
     public function toData(): CreateVehicleData
     {
         $validated = $this->validated();
-
         return $this->mapVehicleData((array) $validated['vehicle'], $validated);
     }
 }

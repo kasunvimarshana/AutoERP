@@ -58,8 +58,8 @@ final class AuthPayloadResource extends JsonResource
                 'refresh_token' => $payload['tokens']['refresh_token'] ?? null,
                 'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
                 'user' => $this->userSummary($userPayload),
-                'tenant' => $this->tenantSummary($payload['tenant'] ?? null),
-                'organization_unit' => $this->organizationUnitSummary($payload['organization_unit'] ?? null),
+                'tenant' => $this->relationSummary($payload['tenant'] ?? null),
+                'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
                 'session_id' => $payload['session']['id'] ?? null,
@@ -71,8 +71,8 @@ final class AuthPayloadResource extends JsonResource
 
             return [
                 'user' => $this->userSummary($userPayload),
-                'tenant' => $this->tenantSummary($payload['tenant'] ?? null),
-                'organization_unit' => $this->organizationUnitSummary($payload['organization_unit'] ?? null),
+                'tenant' => $this->relationSummary($payload['tenant'] ?? null),
+                'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
             ];
@@ -115,39 +115,6 @@ final class AuthPayloadResource extends JsonResource
             'id' => $relation['id'] ?? null,
             'code' => isset($relation['code']) ? (string) $relation['code'] : null,
             'name' => isset($relation['name']) ? (string) $relation['name'] : null,
-        ];
-    }
-
-    /**
-     * @return array{id:int|string|null,code:string|null,name:string|null,features:array<string,mixed>|list<mixed>,enabled_modules:list<string>}|null
-     */
-    private function tenantSummary(mixed $relation): ?array
-    {
-        $summary = $this->relationSummary($relation);
-        if ($summary === null || ! is_array($relation)) {
-            return null;
-        }
-
-        return [
-            ...$summary,
-            'features' => is_array($relation['features'] ?? null) ? $relation['features'] : [],
-            'enabled_modules' => $this->stringList($relation['enabled_modules'] ?? []),
-        ];
-    }
-
-    /**
-     * @return array{id:int|string|null,code:string|null,name:string|null,enabled_modules:list<string>}|null
-     */
-    private function organizationUnitSummary(mixed $relation): ?array
-    {
-        $summary = $this->relationSummary($relation);
-        if ($summary === null || ! is_array($relation)) {
-            return null;
-        }
-
-        return [
-            ...$summary,
-            'enabled_modules' => $this->stringList($relation['enabled_modules'] ?? []),
         ];
     }
 

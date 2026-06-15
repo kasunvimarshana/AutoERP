@@ -27,9 +27,6 @@ final class VehicleSummaryResource extends JsonResource
             'type' => $this->relationLoaded('type') ? $this->namedResource($this->type) : null,
             'category' => $this->relationLoaded('category') ? $this->namedResource($this->category) : null,
             'customer' => $this->relationLoaded('customer') ? $this->namedResource($this->customer, 'customer_number') : null,
-            'current_ownership' => $this->whenLoaded('currentOwnership', fn () => $this->currentOwnership
-                ? (new VehicleOwnershipResource($this->currentOwnership))->resolve($request)
-                : null),
             'status' => $this->enumValue($this->status),
             'odometer_reading' => (string) $this->odometer_reading,
             'odometer_unit' => $this->odometer_unit,

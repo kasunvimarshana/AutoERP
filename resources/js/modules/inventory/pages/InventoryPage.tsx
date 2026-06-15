@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
@@ -49,10 +48,7 @@ const tabs = [
 ];
 
 export default function InventoryPage() {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const requestedTab = searchParams.get('view');
-    const initialTab = tabs.some((item) => item.id === requestedTab) ? requestedTab as Tab : 'dashboard';
-    const [tab, setTab] = useState<Tab>(initialTab);
+    const [tab, setTab] = useState<Tab>('dashboard');
     const [page, setPage] = useState(1);
     const [itemFilter, setItemFilter] = useState<NamedResource | null>(null);
     const balances = useApi(
@@ -86,13 +82,6 @@ export default function InventoryPage() {
         ['dashboard', 'audit'].includes(tab),
     );
 
-    useEffect(() => {
-        const next = tabs.some((item) => item.id === requestedTab) ? requestedTab as Tab : 'dashboard';
-        setTab(next);
-        setPage(1);
-        setItemFilter(null);
-    }, [requestedTab]);
-
     const reloadInventory = () => {
         balances.reload();
         reservations.reload();
@@ -110,12 +99,7 @@ export default function InventoryPage() {
     return (
         <>
             <ContentHeader title="Inventory" description="Availability, reservations, allocations, transfers, counts, tracking, and reports." />
-            <Tabs tabs={tabs} active={tab} onChange={(next) => {
-                setTab(next);
-                setPage(1);
-                setItemFilter(null);
-                setSearchParams({ view: next });
-            }} />
+            <Tabs tabs={tabs} active={tab} onChange={setTab} />
             <div className="mt-5">
                 {tab === 'dashboard' && (
                     <DashboardTab

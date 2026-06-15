@@ -91,7 +91,7 @@ final class VehicleController
     {
         $model = $this->queries->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
 
-        return new VehicleResource($this->statuses->change($model, $request->toData())->load(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer', 'currentOwnership.supplier']));
+        return new VehicleResource($this->statuses->change($model, $request->toData())->load(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer']));
     }
 
     public function lookup(ListVehicleRequest $request, ?string $kind = null): AnonymousResourceCollection
@@ -113,7 +113,7 @@ final class VehicleController
             $model,
             $status,
             $request->currentUserId(),
-        )->load(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer', 'currentOwnership.supplier']));
+        )->load(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer']));
     }
 
     private function created(Vehicle $vehicle): JsonResponse

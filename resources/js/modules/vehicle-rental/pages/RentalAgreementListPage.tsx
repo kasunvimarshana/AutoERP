@@ -36,6 +36,9 @@ export default function RentalAgreementListPage() {
     return (
         <>
             <ContentHeader title="Rental agreements" description="Operational source documents for outbound rentals and inbound hire-in." actions={<>
+                <Link to="/vehicle-rental/reservations"><Button type="button" variant="secondary">Reservations</Button></Link>
+                <Link to="/vehicle-rental/availability"><Button type="button" variant="secondary">Availability</Button></Link>
+                <Link to="/vehicle-rental/reports"><Button type="button" variant="secondary">Reports</Button></Link>
                 <Link to="/vehicle-rental/agreements/create"><Button>New agreement</Button></Link>
             </>} />
             <div className="mb-4 grid gap-4 md:grid-cols-3">

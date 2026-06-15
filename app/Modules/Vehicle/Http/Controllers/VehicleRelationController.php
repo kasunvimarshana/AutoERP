@@ -6,7 +6,6 @@ namespace Modules\Vehicle\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\Http\Requests\ListVehicleRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleAttributeRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleDocumentRequest;
@@ -18,7 +17,6 @@ use Modules\Vehicle\Http\Resources\VehicleAttributeResource;
 use Modules\Vehicle\Http\Resources\VehicleDocumentResource;
 use Modules\Vehicle\Http\Resources\VehicleOwnershipResource;
 use Modules\Vehicle\Http\Resources\VehicleStatusHistoryResource;
-use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Services\VehicleAttributeService;
 use Modules\Vehicle\Services\VehicleDocumentService;
 use Modules\Vehicle\Services\VehicleOwnershipService;
@@ -48,7 +46,6 @@ final class VehicleRelationController
     public function updateDocument(UpdateVehicleDocumentRequest $request, int $vehicle, int $document): VehicleDocumentResource
     {
         $model = $this->vehicle($request, $vehicle);
-
         return new VehicleDocumentResource($this->documents->update($model, $this->relations->document($model, $document), $request->toData()));
     }
 
@@ -56,7 +53,6 @@ final class VehicleRelationController
     {
         $model = $this->vehicle($request, $vehicle);
         $this->documents->delete($model, $this->relations->document($model, $document));
-
         return response()->json(null, 204);
     }
 
@@ -70,20 +66,16 @@ final class VehicleRelationController
         return (new VehicleOwnershipResource($this->ownerships->assign($this->vehicle($request, $vehicle), $request->toData())))->response()->setStatusCode(201);
     }
 
-    public function updateOwnership(UpdateVehicleOwnershipRequest $request, int $vehicle, int $ownership): JsonResponse
+    public function updateOwnership(UpdateVehicleOwnershipRequest $request, int $vehicle, int $ownership): VehicleOwnershipResource
     {
         $model = $this->vehicle($request, $vehicle);
-
-        return (new VehicleOwnershipResource(
-            $this->ownerships->update($model, $this->relations->ownership($model, $ownership), $request->toData()),
-        ))->response()->setStatusCode(200);
+        return new VehicleOwnershipResource($this->ownerships->update($model, $this->relations->ownership($model, $ownership), $request->toData()));
     }
 
     public function destroyOwnership(ListVehicleRequest $request, int $vehicle, int $ownership): JsonResponse
     {
         $model = $this->vehicle($request, $vehicle);
         $this->ownerships->delete($model, $this->relations->ownership($model, $ownership));
-
         return response()->json(null, 204);
     }
 
@@ -100,7 +92,6 @@ final class VehicleRelationController
     public function updateAttribute(UpdateVehicleAttributeRequest $request, int $vehicle, int $attribute): VehicleAttributeResource
     {
         $model = $this->vehicle($request, $vehicle);
-
         return new VehicleAttributeResource($this->attributes->update($model, $this->relations->attribute($model, $attribute), $request->toData()));
     }
 
@@ -108,7 +99,6 @@ final class VehicleRelationController
     {
         $model = $this->vehicle($request, $vehicle);
         $this->attributes->delete($model, $this->relations->attribute($model, $attribute));
-
         return response()->json(null, 204);
     }
 
@@ -117,7 +107,7 @@ final class VehicleRelationController
         return VehicleStatusHistoryResource::collection($this->relations->statusHistory($this->vehicle($request, $vehicle), $request->perPage()));
     }
 
-    private function vehicle(TenantScopedRequest $request, int $vehicle): Vehicle
+    private function vehicle(ListVehicleRequest $request, int $vehicle)
     {
         return $this->vehicles->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
     }

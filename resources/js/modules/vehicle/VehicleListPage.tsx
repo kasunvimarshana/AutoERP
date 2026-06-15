@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -21,30 +21,11 @@ import { VehicleTypeSelect } from './components/VehicleTypeSelect';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
-import type { VehicleCategory, VehicleMake, VehicleModel, VehicleOwnerType, VehicleScope, VehicleType } from './vehicleTypes';
-import { Tabs } from '@/shared/components/Tabs';
-import { searchSuppliers } from '@/modules/supplier/supplierApi';
+import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './vehicleTypes';
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
-const scopes = [
-    { id: 'all' as VehicleScope, label: 'All Vehicles' },
-    { id: 'fleet' as VehicleScope, label: 'Fleet Vehicles' },
-    { id: 'customer' as VehicleScope, label: 'Customer Vehicles' },
-    { id: 'supplier_owner' as VehicleScope, label: 'Supplier / Owner Vehicles' },
-];
-const ownerTypes: Array<{ value: VehicleOwnerType | ''; label: string }> = [
-    { value: '', label: 'All owners' },
-    { value: 'company', label: 'Company' },
-    { value: 'customer', label: 'Customer' },
-    { value: 'supplier', label: 'Supplier' },
-    { value: 'third_party', label: 'Third party' },
-];
 
 export default function VehicleListPage() {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const requestedScope = searchParams.get('scope');
-    const scope = scopes.some((item) => item.id === requestedScope) ? requestedScope as VehicleScope : 'all';
-    const contextSearch = searchParams.toString() || `scope=${scope}`;
     const [rows, setRows] = useState<VehicleSummary[]>([]);
     const [meta, setMeta] = useState<PaginationMeta | undefined>();
     const [search, setSearch] = useState('');
@@ -53,8 +34,7 @@ export default function VehicleListPage() {
     const [model, setModel] = useState<VehicleModel | null>(null);
     const [type, setType] = useState<VehicleType | null>(null);
     const [category, setCategory] = useState<VehicleCategory | null>(null);
-    const [ownerType, setOwnerType] = useState<VehicleOwnerType | ''>('');
-    const [owner, setOwner] = useState<NamedResource | null>(null);
+    const [customer, setCustomer] = useState<NamedResource | null>(null);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
@@ -70,9 +50,7 @@ export default function VehicleListPage() {
             vehicle_model_id: model?.id,
             vehicle_type_id: type?.id,
             vehicle_category_id: category?.id,
-            scope,
-            owner_type: ownerType || undefined,
-            owner_id: owner?.id,
+            customer_id: customer?.id,
             page,
             per_page: 25,
         }, controller.signal)
@@ -88,13 +66,7 @@ export default function VehicleListPage() {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [category, debouncedSearch, make, model, owner, ownerType, page, scope, status, type]);
-
-    useEffect(() => {
-        setOwnerType(scope === 'customer' ? 'customer' : '');
-        setOwner(null);
-        setPage(1);
-    }, [scope]);
+    }, [category, customer, debouncedSearch, make, model, page, status, type]);
 
     const refreshStatus = (vehicle: VehicleSummary, active: boolean) => {
         setVehicleActive(vehicle.id, active)
@@ -104,18 +76,7 @@ export default function VehicleListPage() {
 
     return (
         <div>
-            <ContentHeader
-                title={scopes.find((item) => item.id === scope)?.label ?? 'Vehicles'}
-                description="One vehicle master with effective ownership history and server-side scope filters."
-                actions={<Link to={`/vehicles/create?${contextSearch}`}><Button>Create Vehicle</Button></Link>}
-            />
-            <div className="mb-5 overflow-x-auto">
-                <Tabs<VehicleScope>
-                    tabs={scopes}
-                    active={scope}
-                    onChange={(next) => setSearchParams({ scope: next })}
-                />
-            </div>
+            <ContentHeader title="Vehicles" description="Vehicle master data, ownership, documents, and attributes." actions={<Link to="/vehicles/create"><Button>Create Vehicle</Button></Link>} />
             <div className="mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Number, registration, chassis, engine, VIN" />
                 <Select label="Status" value={status} options={statuses.filter(Boolean).map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
@@ -123,24 +84,7 @@ export default function VehicleListPage() {
                 <VehicleModelSelect makeId={make?.id} value={model} onChange={(value) => { setModel(value); setPage(1); }} />
                 <VehicleTypeSelect value={type} onChange={(value) => { setType(value); setPage(1); }} />
                 <VehicleCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} />
-                <Select
-                    label="Owner Type"
-                    value={ownerType}
-                    options={ownerTypes}
-                    onChange={(event) => {
-                        setOwnerType(event.target.value as VehicleOwnerType | '');
-                        setOwner(null);
-                        setPage(1);
-                    }}
-                />
-                {ownerType !== '' && ownerType !== 'company' && (
-                    <LookupSelect
-                        label={ownerType === 'customer' ? 'Customer' : 'Supplier / Owner'}
-                        value={owner}
-                        onChange={(value) => { setOwner(value); setPage(1); }}
-                        search={ownerType === 'customer' ? lookupApi.customers : searchSuppliers}
-                    />
-                )}
+                <LookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} search={lookupApi.customers} />
             </div>
             <ErrorAlert error={error} />
             {loading ? <LoadingState label="Loading vehicles..." /> : (
@@ -152,11 +96,10 @@ export default function VehicleListPage() {
                             { key: 'number', header: 'Vehicle', render: (row) => <div><p className="font-medium text-slate-900">{row.vehicle_number}</p><p className="text-xs text-slate-500">{row.registration_number ?? row.code ?? '-'}</p></div> },
                             { key: 'make', header: 'Make / Model', render: (row) => `${row.make?.name ?? '-'} / ${row.model?.name ?? '-'}` },
                             { key: 'type', header: 'Type', render: (row) => row.type?.name ?? '-' },
-                            { key: 'owner', header: 'Owner', render: (row) => row.current_ownership?.owner?.name ?? '-' },
+                            { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? '-' },
                             { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Link to={`/vehicles/${row.id}?${contextSearch}`}><Button variant="ghost">View</Button></Link><Link to={`/vehicles/${row.id}/edit?${contextSearch}`}><Button variant="ghost">Edit</Button></Link><Button variant="secondary" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></div> },
+                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Link to={`/vehicles/${row.id}`}><Button variant="ghost">View</Button></Link><Link to={`/vehicles/${row.id}/edit`}><Button variant="ghost">Edit</Button></Link><Button variant="secondary" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></div> },
                         ]}
-                        emptyMessage={`No ${scopes.find((item) => item.id === scope)?.label.toLowerCase() ?? 'vehicles'} found.`}
                     />
                     <Pagination meta={meta} onPageChange={setPage} />
                 </>

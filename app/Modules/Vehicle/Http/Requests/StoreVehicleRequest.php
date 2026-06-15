@@ -8,7 +8,6 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Enums\VehicleFuelType;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
 use Modules\Vehicle\Http\Requests\Concerns\MapsVehicleData;
@@ -17,20 +16,12 @@ final class StoreVehicleRequest extends TenantScopedRequest
 {
     use MapsVehicleData;
 
-    public function rules(): array
-    {
-        return self::vehicleRules();
-    }
-
-    public function toData(): CreateVehicleData
-    {
-        return $this->mapVehicleData($this->validated());
-    }
+    public function rules(): array { return self::vehicleRules(); }
+    public function toData(): CreateVehicleData { return $this->mapVehicleData($this->validated()); }
 
     public static function vehicleRules(string $prefix = ''): array
     {
         $key = fn (string $name): string => $prefix.$name;
-
         return [
             $key('tenant_id') => $prefix === '' ? ['required', 'integer', 'min:1'] : ['prohibited'],
             $key('organization_unit_id') => $prefix === '' ? ['nullable', 'integer', 'min:1'] : ['prohibited'],
@@ -41,7 +32,7 @@ final class StoreVehicleRequest extends TenantScopedRequest
             $key('vehicle_type_id') => ['nullable', 'integer', 'min:1'],
             $key('vehicle_category_id') => ['nullable', 'integer', 'min:1'],
             $key('customer_id') => ['nullable', 'integer', 'min:1'],
-            $key('current_owner_type') => ['nullable', Rule::enum(VehicleOwnerType::class)],
+            $key('current_owner_type') => ['nullable', 'string', 'max:100'],
             $key('current_owner_id') => ['nullable', 'integer', 'min:1'],
             $key('registration_number') => ['nullable', 'string', 'max:100'],
             $key('chassis_number') => ['nullable', 'string', 'max:150'],

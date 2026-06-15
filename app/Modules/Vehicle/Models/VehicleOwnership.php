@@ -7,14 +7,11 @@ namespace Modules\Vehicle\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
-use Modules\Supplier\Models\Supplier;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 
 final class VehicleOwnership extends CoreModel
 {
     protected $table = 'vehicle_ownerships';
-
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -24,7 +21,6 @@ final class VehicleOwnership extends CoreModel
             'organization_unit_id' => 'integer',
             'vehicle_id' => 'integer',
             'owner_id' => 'integer',
-            'owner_type' => VehicleOwnerType::class,
             'customer_id' => 'integer',
             'ownership_type' => VehicleOwnershipType::class,
             'started_at' => 'datetime',
@@ -33,18 +29,6 @@ final class VehicleOwnership extends CoreModel
         ]);
     }
 
-    public function vehicle(): BelongsTo
-    {
-        return $this->belongsTo(Vehicle::class, 'vehicle_id');
-    }
-
-    public function customer(): BelongsTo
-    {
-        return $this->belongsTo(Customer::class, 'customer_id');
-    }
-
-    public function supplier(): BelongsTo
-    {
-        return $this->belongsTo(Supplier::class, 'owner_id');
-    }
+    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function customer(): BelongsTo { return $this->belongsTo(Customer::class, 'customer_id'); }
 }

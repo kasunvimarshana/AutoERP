@@ -12,7 +12,6 @@
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
         "moduleResolution": "Bundler",
-        "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
@@ -21,7 +20,7 @@
         "paths": {
             "@/*": ["resources/js/*"]
         },
-        "types": ["vite/client", "node"]
+        "types": ["vite/client"]
     },
     "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx", "vite.config.js"]
 }
