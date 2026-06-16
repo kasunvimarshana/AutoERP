@@ -99,7 +99,7 @@ final class ItemSeeder extends Seeder
         ItemBrand $brand,
     ): array {
         $definitions = [
-            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'batch', 'weighted_average'],
+            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'none', 'weighted_average'],
             'OIL-FILTER' => ['Oil Filter', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
             'BRAKE-PAD' => ['Brake Pad', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
             'LABOUR-SERVICE' => ['Labour Service', 'LABOUR', 'labour', 'HOUR', false, false, 'none', 'none'],
