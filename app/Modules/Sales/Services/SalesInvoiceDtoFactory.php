@@ -35,24 +35,24 @@ final class SalesInvoiceDtoFactory
         CreateSalesInvoiceData $data,
         bool $lockSources = false,
     ): PreparedSalesInvoiceData {
-        if ($data->sources === []) {
-            throw new InvalidArgumentException('Sales invoice requires at least one source.');
-        }
-
+        $invoiceLines = [];
         $sources = [];
         $sourceLines = [];
-        $invoiceLines = [];
-        $invoiceAdjustments = [];
         $sourceTotals = [];
         $lineQuantities = [];
         $deliveries = collect();
         $lineNumber = 1;
         $resolvedCustomerId = $data->customerId;
+        $adjustments = $this->assertInvoiceAdjustments($data->adjustments);
+        $directLines = $this->assertInvoiceLines($data->directLines);
+        $directLineOverrides = $this->indexDirectSourceLines($directLines);
+        $consumedDirectOverrides = [];
 
         foreach ($data->sources as $source) {
             if (! $source instanceof SalesInvoiceSourceData) {
                 throw new InvalidArgumentException('Sales invoice sources are invalid.');
             }
+
             if ($source->sourceType === 'sales_delivery') {
                 $delivery = SalesDelivery::query()
                     ->with(['lines.salesOrderLine', 'adjustments'])
@@ -62,6 +62,7 @@ final class SalesInvoiceDtoFactory
                 if (! in_array($delivery->status, [SalesDeliveryStatus::Posted, SalesDeliveryStatus::PartiallyInvoiced], true)) {
                     throw new InvalidArgumentException('Only posted sales deliveries can be invoiced.');
                 }
+
                 $resolvedCustomerId = $this->resolveCustomer($resolvedCustomerId, (int) $delivery->customer_id);
                 $deliveries->push($delivery);
                 $lineNumber = $this->appendDelivery(
@@ -72,9 +73,11 @@ final class SalesInvoiceDtoFactory
                     $sources,
                     $sourceLines,
                     $invoiceLines,
-                    $invoiceAdjustments,
+                    $adjustments,
                     $sourceTotals,
                     $lineQuantities,
+                    $directLineOverrides,
+                    $consumedDirectOverrides,
                 );
 
                 continue;
@@ -83,6 +86,7 @@ final class SalesInvoiceDtoFactory
             if ($source->sourceType !== 'sales_order') {
                 throw new InvalidArgumentException('Sales invoices require sales delivery or sales order sources.');
             }
+
             $order = SalesOrder::query()
                 ->with(['lines', 'adjustments'])
                 ->when($lockSources, fn ($query) => $query->lockForUpdate())
@@ -97,10 +101,24 @@ final class SalesInvoiceDtoFactory
                 $sources,
                 $sourceLines,
                 $invoiceLines,
-                $invoiceAdjustments,
+                $adjustments,
                 $sourceTotals,
                 $lineQuantities,
+                $directLineOverrides,
+                $consumedDirectOverrides,
             );
+        }
+
+        $lineNumber = $this->appendStandaloneDirectLines(
+            $directLines,
+            $lineNumber,
+            $invoiceLines,
+            $consumedDirectOverrides,
+        );
+
+        $unusedDirectSourceLines = array_diff_key($directLineOverrides, $consumedDirectOverrides);
+        if ($unusedDirectSourceLines !== []) {
+            throw new InvalidArgumentException('Sales invoice direct source lines must match the selected sales sources.');
         }
 
         if ($invoiceLines === []) {
@@ -120,12 +138,13 @@ final class SalesInvoiceDtoFactory
                 dueDate: $data->dueDate,
                 currencyId: $data->currencyId,
                 exchangeRate: $data->exchangeRate,
+                status: $data->status,
                 notes: $data->notes,
                 createdBy: $data->createdBy,
                 lines: $invoiceLines,
                 sources: $sources,
                 sourceLines: $sourceLines,
-                adjustments: $invoiceAdjustments,
+                adjustments: $adjustments,
             ),
             sourceTotals: $sourceTotals,
             lineQuantities: $lineQuantities,
@@ -144,10 +163,13 @@ final class SalesInvoiceDtoFactory
         array &$invoiceAdjustments,
         array &$sourceTotals,
         array &$lineQuantities,
+        array $directLineOverrides,
+        array &$consumedDirectOverrides,
     ): int {
         $selectedTotal = '0.000000';
         $sourceSubtotal = '0.000000';
         $completeSelection = true;
+
         foreach ($delivery->lines as $line) {
             $sourceSubtotal = $this->math->add($sourceSubtotal, $this->math->mul((string) $line->delivered_quantity, (string) $line->unit_price));
             $remaining = $this->math->sub((string) $line->delivered_quantity, (string) $line->invoiced_quantity);
@@ -165,24 +187,40 @@ final class SalesInvoiceDtoFactory
             if ($this->math->compare($quantity, $remaining) < 0) {
                 $completeSelection = false;
             }
+
             $lineTotal = $this->math->mul($quantity, (string) $line->unit_price);
             $selectedTotal = $this->math->add($selectedTotal, $lineTotal);
-            $lineQuantities['sales_delivery_line:'.$line->getKey()] = $quantity;
+            $sourceLineKey = 'sales_delivery_line:'.$line->getKey();
+            $lineQuantities[$sourceLineKey] = $quantity;
             $orderLine = $line->salesOrderLine;
-            $invoiceLines[] = new InvoiceLineData(
-                lineNumber: $lineNumber++,
-                description: $line->description ?? 'Sales item',
-                quantity: $quantity,
-                unitPrice: (string) $line->unit_price,
-                lineType: InvoiceLineType::Item,
-                itemId: (int) $line->item_id,
-                uomId: $line->uom_id,
-                discountAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->discount_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
-                taxAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->tax_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
-                chargeAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->charge_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
-                sourceLineType: 'sales_delivery_line',
-                sourceLineId: (int) $line->getKey(),
-            );
+
+            $invoiceLines[] = isset($directLineOverrides[$sourceLineKey])
+                ? $this->overrideLine(
+                    $directLineOverrides[$sourceLineKey],
+                    $lineNumber++,
+                    $quantity,
+                    (int) $line->item_id,
+                    $line->uom_id !== null ? (int) $line->uom_id : null,
+                )
+                : new InvoiceLineData(
+                    lineNumber: $lineNumber++,
+                    description: $line->description ?? 'Sales item',
+                    quantity: $quantity,
+                    unitPrice: (string) $line->unit_price,
+                    lineType: InvoiceLineType::Item,
+                    itemId: (int) $line->item_id,
+                    uomId: $line->uom_id,
+                    discountAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->discount_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
+                    taxAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->tax_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
+                    chargeAmount: $orderLine instanceof SalesOrderLine ? $this->proportional((string) $orderLine->charge_amount, $quantity, (string) $orderLine->ordered_quantity) : '0.000000',
+                    sourceLineType: 'sales_delivery_line',
+                    sourceLineId: (int) $line->getKey(),
+                );
+
+            if (isset($directLineOverrides[$sourceLineKey])) {
+                $consumedDirectOverrides[$sourceLineKey] = true;
+            }
+
             $sourceLines[] = new InvoiceSourceLineData(
                 tenantId: $data->tenantId,
                 sourceType: 'sales_delivery',
@@ -200,6 +238,7 @@ final class SalesInvoiceDtoFactory
                 previouslyInvoicedQuantity: (string) $line->invoiced_quantity,
             );
         }
+
         $adjustmentTotal = $this->appendAdjustments(
             $delivery->adjustments,
             'sales_delivery',
@@ -234,9 +273,12 @@ final class SalesInvoiceDtoFactory
         array &$invoiceAdjustments,
         array &$sourceTotals,
         array &$lineQuantities,
+        array $directLineOverrides,
+        array &$consumedDirectOverrides,
     ): int {
         $selectedTotal = '0.000000';
         $completeSelection = true;
+
         foreach ($order->lines as $line) {
             $basis = $this->math->compare((string) $line->delivered_quantity, '0.000000') > 0
                 ? (string) $line->delivered_quantity
@@ -256,22 +298,38 @@ final class SalesInvoiceDtoFactory
             if ($this->math->compare($quantity, $remaining) < 0) {
                 $completeSelection = false;
             }
+
             $selectedTotal = $this->math->add($selectedTotal, $this->math->mul($quantity, (string) $line->unit_price));
-            $lineQuantities['sales_order_line:'.$line->getKey()] = $quantity;
-            $invoiceLines[] = new InvoiceLineData(
-                lineNumber: $lineNumber++,
-                description: $line->description ?? 'Sales item',
-                quantity: $quantity,
-                unitPrice: (string) $line->unit_price,
-                lineType: InvoiceLineType::Item,
-                itemId: (int) $line->item_id,
-                uomId: $line->ordered_uom_id,
-                discountAmount: $this->proportional((string) $line->discount_amount, $quantity, (string) $line->ordered_quantity),
-                taxAmount: $this->proportional((string) $line->tax_amount, $quantity, (string) $line->ordered_quantity),
-                chargeAmount: $this->proportional((string) $line->charge_amount, $quantity, (string) $line->ordered_quantity),
-                sourceLineType: 'sales_order_line',
-                sourceLineId: (int) $line->getKey(),
-            );
+            $sourceLineKey = 'sales_order_line:'.$line->getKey();
+            $lineQuantities[$sourceLineKey] = $quantity;
+
+            $invoiceLines[] = isset($directLineOverrides[$sourceLineKey])
+                ? $this->overrideLine(
+                    $directLineOverrides[$sourceLineKey],
+                    $lineNumber++,
+                    $quantity,
+                    (int) $line->item_id,
+                    $line->ordered_uom_id !== null ? (int) $line->ordered_uom_id : null,
+                )
+                : new InvoiceLineData(
+                    lineNumber: $lineNumber++,
+                    description: $line->description ?? 'Sales item',
+                    quantity: $quantity,
+                    unitPrice: (string) $line->unit_price,
+                    lineType: InvoiceLineType::Item,
+                    itemId: (int) $line->item_id,
+                    uomId: $line->ordered_uom_id,
+                    discountAmount: $this->proportional((string) $line->discount_amount, $quantity, (string) $line->ordered_quantity),
+                    taxAmount: $this->proportional((string) $line->tax_amount, $quantity, (string) $line->ordered_quantity),
+                    chargeAmount: $this->proportional((string) $line->charge_amount, $quantity, (string) $line->ordered_quantity),
+                    sourceLineType: 'sales_order_line',
+                    sourceLineId: (int) $line->getKey(),
+                );
+
+            if (isset($directLineOverrides[$sourceLineKey])) {
+                $consumedDirectOverrides[$sourceLineKey] = true;
+            }
+
             $sourceLines[] = new InvoiceSourceLineData(
                 tenantId: $data->tenantId,
                 sourceType: 'sales_order',
@@ -286,6 +344,7 @@ final class SalesInvoiceDtoFactory
                 previouslyInvoicedQuantity: (string) $line->invoiced_quantity,
             );
         }
+
         $adjustmentTotal = $this->appendAdjustments(
             $order->adjustments,
             'sales_order',
@@ -307,6 +366,130 @@ final class SalesInvoiceDtoFactory
         );
 
         return $lineNumber;
+    }
+
+    /**
+     * @param  list<InvoiceLineData>  $directLines
+     * @param  array<string, true>  $consumedDirectOverrides
+     * @param  list<InvoiceLineData>  $invoiceLines
+     */
+    private function appendStandaloneDirectLines(
+        array $directLines,
+        int $lineNumber,
+        array &$invoiceLines,
+        array $consumedDirectOverrides,
+    ): int {
+        foreach ($directLines as $line) {
+            $sourceLineKey = $line->sourceLineType !== null && $line->sourceLineId !== null
+                ? $line->sourceLineType.':'.$line->sourceLineId
+                : null;
+            if ($sourceLineKey !== null && isset($consumedDirectOverrides[$sourceLineKey])) {
+                continue;
+            }
+            if ($sourceLineKey !== null) {
+                continue;
+            }
+
+            $invoiceLines[] = $this->cloneLine($line, $lineNumber++);
+        }
+
+        return $lineNumber;
+    }
+
+    /**
+     * @param  list<InvoiceAdjustmentData>  $adjustments
+     * @return list<InvoiceAdjustmentData>
+     */
+    private function assertInvoiceAdjustments(array $adjustments): array
+    {
+        foreach ($adjustments as $adjustment) {
+            if (! $adjustment instanceof InvoiceAdjustmentData) {
+                throw new InvalidArgumentException('Sales invoice adjustments are invalid.');
+            }
+        }
+
+        return $adjustments;
+    }
+
+    /**
+     * @param  list<InvoiceLineData>  $lines
+     * @return list<InvoiceLineData>
+     */
+    private function assertInvoiceLines(array $lines): array
+    {
+        foreach ($lines as $line) {
+            if (! $line instanceof InvoiceLineData) {
+                throw new InvalidArgumentException('Sales invoice direct lines are invalid.');
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  list<InvoiceLineData>  $lines
+     * @return array<string, InvoiceLineData>
+     */
+    private function indexDirectSourceLines(array $lines): array
+    {
+        $indexed = [];
+
+        foreach ($lines as $line) {
+            if (($line->sourceLineType === null) !== ($line->sourceLineId === null)) {
+                throw new InvalidArgumentException('Sales invoice direct source lines must provide source type and id together.');
+            }
+            if ($line->sourceLineType === null || $line->sourceLineId === null) {
+                continue;
+            }
+
+            $key = $line->sourceLineType.':'.$line->sourceLineId;
+            if (isset($indexed[$key])) {
+                throw new InvalidArgumentException('Sales invoice direct source lines must be unique.');
+            }
+            $indexed[$key] = $line;
+        }
+
+        return $indexed;
+    }
+
+    private function overrideLine(
+        InvoiceLineData $line,
+        int $lineNumber,
+        string $quantity,
+        int $itemId,
+        ?int $uomId,
+    ): InvoiceLineData {
+        if ($this->math->compare($line->quantity, $quantity) !== 0) {
+            throw new InvalidArgumentException('Sales invoice direct source line quantity must match the selected source quantity.');
+        }
+        if ($line->itemId !== null && $line->itemId !== $itemId) {
+            throw new InvalidArgumentException('Sales invoice direct source line item must match the selected source line item.');
+        }
+        if ($line->uomId !== null && $uomId !== null && $line->uomId !== $uomId) {
+            throw new InvalidArgumentException('Sales invoice direct source line UOM must match the selected source line UOM.');
+        }
+
+        return $this->cloneLine($line, $lineNumber);
+    }
+
+    private function cloneLine(InvoiceLineData $line, int $lineNumber): InvoiceLineData
+    {
+        return new InvoiceLineData(
+            lineNumber: $lineNumber,
+            description: $line->description,
+            quantity: $line->quantity,
+            unitPrice: $line->unitPrice,
+            lineType: $line->lineType,
+            itemId: $line->itemId,
+            uomId: $line->uomId,
+            discountAmount: $line->discountAmount,
+            taxAmount: $line->taxAmount,
+            chargeAmount: $line->chargeAmount,
+            lineTotal: $line->lineTotal,
+            sourceLineType: $line->sourceLineType,
+            sourceLineId: $line->sourceLineId,
+            metadata: $line->metadata,
+        );
     }
 
     private function appendAdjustments(

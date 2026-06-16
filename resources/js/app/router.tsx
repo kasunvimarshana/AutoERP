@@ -50,6 +50,7 @@ const PurchaseDebitNoteDetailPage = lazy(() => import('@/modules/purchase/pages/
 const SalesDocumentListPage = lazy(() => import('@/modules/sales/pages/SalesDocumentListPage'));
 const SalesDocumentFormPage = lazy(() => import('@/modules/sales/pages/SalesDocumentFormPage'));
 const SalesDocumentDetailPage = lazy(() => import('@/modules/sales/pages/SalesDocumentDetailPage'));
+const FastSalesPage = lazy(() => import('@/modules/sales/pages/FastSalesPage'));
 const SalesDeliveryListPage = lazy(() => import('@/modules/sales/pages/SalesDeliveryListPage'));
 const SalesDeliveryCreatePage = lazy(() => import('@/modules/sales/pages/SalesDeliveryCreatePage'));
 const SalesInvoiceCreatePage = lazy(() => import('@/modules/sales/pages/SalesInvoiceCreatePage'));
@@ -179,6 +180,7 @@ export function AppRouter() {
                     <Route path="/sales/quotations/create" element={<SalesDocumentFormPage kind="quotation" />} />
                     <Route path="/sales/quotations/:id/edit" element={<SalesDocumentFormPage kind="quotation" />} />
                     <Route path="/sales/quotations/:id" element={<SalesDocumentDetailPage kind="quotation" />} />
+                    <Route path="/sales/fast-sales" element={<FastSalesPage />} />
                     <Route path="/sales/orders" element={<SalesDocumentListPage kind="order" />} />
                     <Route path="/sales/orders/create" element={<SalesDocumentFormPage kind="order" />} />
                     <Route path="/sales/orders/:id/edit" element={<SalesDocumentFormPage kind="order" />} />

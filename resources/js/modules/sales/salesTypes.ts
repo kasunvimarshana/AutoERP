@@ -233,6 +233,140 @@ export interface SalesPaymentPayload {
     allocations?: Array<{ invoice_id: number; allocated_amount: string; allocation_date?: string }>;
 }
 
+export interface FastSalesOptionResource {
+    id: number;
+    code?: string | null;
+    name?: string | null;
+    symbol?: string | null;
+    is_default?: boolean;
+    is_cash_account?: boolean;
+    is_bank_account?: boolean;
+    method_type?: string;
+    requires_reference?: boolean;
+    requires_bank_account?: boolean;
+}
+
+export interface FastSalesContext {
+    defaults: {
+        transaction_date: string;
+        exchange_rate: string;
+    };
+    endpoints: Record<string, string>;
+    warehouses: FastSalesOptionResource[];
+    currencies: FastSalesOptionResource[];
+    payment_methods: FastSalesOptionResource[];
+    payment_accounts: FastSalesOptionResource[];
+    tax_groups: FastSalesOptionResource[];
+}
+
+export interface FastSalesPayload {
+    customer_id: number;
+    customer_reference?: string;
+    transaction_date: string;
+    warehouse_id?: number;
+    warehouse_location_id?: number;
+    currency_id?: number;
+    exchange_rate?: string;
+    payment_terms?: string;
+    due_date?: string;
+    notes?: string;
+    options: {
+        create_sales_order_only: boolean;
+        deliver_items_now: boolean;
+        create_customer_invoice_now: boolean;
+        record_customer_receipt_now: boolean;
+    };
+    lines: Array<{
+        item_id: number;
+        item_variant_id?: number;
+        description?: string;
+        uom_id?: number;
+        quantity: string;
+        unit_price?: string;
+        discount_amount?: string;
+        tax_group_id?: number;
+    }>;
+    payment?: {
+        amount?: string;
+        payment_method_id?: number;
+        destination_account_id?: number;
+        reference?: string;
+        cheque_number?: string;
+        cheque_date?: string;
+        card_reference?: string;
+        instrument_number?: string;
+        instrument_date?: string;
+        external_bank_name?: string;
+        external_bank_branch?: string;
+        lines?: Array<{
+            amount: string;
+            payment_method_id?: number;
+            destination_account_id?: number;
+            reference?: string;
+            instrument_number?: string;
+            instrument_date?: string;
+            external_bank_name?: string;
+            external_bank_branch?: string;
+        }>;
+    };
+}
+
+export interface FastSalesDocumentReference {
+    id: number;
+    number: string;
+    status?: string;
+    url: string;
+    total_debit?: string;
+    total_credit?: string;
+}
+
+export interface FastSalesLinePreview {
+    line_number: number;
+    item?: NamedResource | null;
+    uom?: NamedResource | null;
+    description?: string;
+    is_stock: boolean;
+    quantity: string;
+    base_quantity?: string;
+    available_quantity?: string | null;
+    available_base_quantity?: string | null;
+    unit_price: string;
+    discount_amount: string;
+    tax_amount: string;
+    withholding_amount: string;
+    line_total: string;
+}
+
+export interface FastSalesResult {
+    customer_reference?: string;
+    mode: string;
+    options: FastSalesPayload['options'];
+    customer?: NamedResource | null;
+    summary: {
+        subtotal: string;
+        discount_total: string;
+        tax_total: string;
+        withholding_total: string;
+        grand_total: string;
+        received_total: string;
+        balance_due: string;
+        revenue_total?: string;
+        stock_revenue_total?: string;
+        non_stock_revenue_total?: string;
+    };
+    lines: FastSalesLinePreview[];
+    documents: {
+        sales_order?: FastSalesDocumentReference | null;
+        goods_delivery?: FastSalesDocumentReference | null;
+        inventory_transaction?: FastSalesDocumentReference | null;
+        inventory_transactions?: FastSalesDocumentReference[];
+        customer_invoice?: FastSalesDocumentReference | null;
+        customer_receipt?: FastSalesDocumentReference | null;
+        finance_posting?: FastSalesDocumentReference | null;
+        finance_postings?: FastSalesDocumentReference[];
+    };
+}
+
 export interface SalesReturnLine {
     id?: number;
     source_line_type?: string | null;

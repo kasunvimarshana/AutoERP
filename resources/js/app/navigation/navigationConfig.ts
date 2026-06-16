@@ -164,6 +164,7 @@ export const navigationSections: NavigationSection[] = [
                 icon: 'sales',
                 access: operationalAccess(['sales']),
                 children: [
+                    { id: 'fast-sales', type: 'link', label: 'Fast Sales', to: '/sales/fast-sales', match: ['/sales/fast-sales'], access: operationalAccess(['sales']) },
                     { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders', match: ['/sales/orders'], access: operationalAccess(['sales']) },
                     { id: 'goods-deliveries', type: 'link', label: 'Goods Deliveries', to: '/sales/deliveries', match: ['/sales/deliveries'], access: operationalAccess(['sales']) },
                     { id: 'sales-returns', type: 'link', label: 'Sales Returns', to: '/sales/returns', match: ['/sales/returns'], access: operationalAccess(['sales']) },

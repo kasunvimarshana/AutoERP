@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Sales\DTOs;
 
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
+use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\InvoiceStatus;
+
+/**
+ * @param  list<SalesInvoiceSourceData>  $sources
+ * @param  list<InvoiceLineData>  $directLines
+ * @param  list<InvoiceAdjustmentData>  $adjustments
+ */
 final readonly class CreateSalesInvoiceData
 {
-    /**
-     * @param  list<SalesInvoiceSourceData>  $sources
-     */
     public function __construct(
         public int $tenantId,
         public string $invoiceDate,
@@ -21,5 +27,8 @@ final readonly class CreateSalesInvoiceData
         public ?string $notes = null,
         public ?int $createdBy = null,
         public array $sources = [],
+        public InvoiceStatus $status = InvoiceStatus::Draft,
+        public array $directLines = [],
+        public array $adjustments = [],
     ) {}
 }

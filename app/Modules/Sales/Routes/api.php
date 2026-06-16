@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Sales\Http\Controllers\FastSalesController;
 use Modules\Sales\Http\Controllers\SalesCreditNoteController;
 use Modules\Sales\Http\Controllers\SalesDeliveryController;
 use Modules\Sales\Http\Controllers\SalesIntegrationController;
@@ -19,6 +20,10 @@ $middleware = [
 ];
 
 Route::prefix('api/v1/sales')->middleware($middleware)->name('api.v1.sales.')->group(function (): void {
+    Route::get('fast-sales/context', [FastSalesController::class, 'context'])->name('fast-sales.context');
+    Route::post('fast-sales/preview', [FastSalesController::class, 'preview'])->name('fast-sales.preview');
+    Route::post('fast-sales', [FastSalesController::class, 'store'])->name('fast-sales.store');
+
     Route::get('quotations', [SalesQuotationController::class, 'index'])->name('quotations.index');
     Route::post('quotations', [SalesQuotationController::class, 'store'])->name('quotations.store');
     Route::get('quotations/{quotation}', [SalesQuotationController::class, 'show'])->whereNumber('quotation')->name('quotations.show');
