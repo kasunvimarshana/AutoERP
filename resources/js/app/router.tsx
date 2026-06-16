@@ -32,6 +32,7 @@ const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
 const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
 const ItemDetailPage = lazy(() => import('@/modules/item/ItemDetailPage'));
 const InventoryPage = lazy(() => import('@/modules/inventory/pages/InventoryPage'));
+const FastPurchasePage = lazy(() => import('@/modules/purchase/pages/FastPurchasePage'));
 const PurchaseOrderListPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderListPage'));
 const PurchaseOrderFormPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderFormPage'));
 const PurchaseOrderDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderDetailPage'));
@@ -158,6 +159,7 @@ export function AppRouter() {
                     <Route path="/items/:id/edit" element={<ItemEditPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
+                    <Route path="/purchase/fast-purchase" element={<FastPurchasePage />} />
                     <Route path="/purchase/orders" element={<PurchaseOrderListPage />} />
                     <Route path="/purchase/orders/create" element={<PurchaseOrderFormPage />} />
                     <Route path="/purchase/orders/:id/edit" element={<PurchaseOrderFormPage />} />

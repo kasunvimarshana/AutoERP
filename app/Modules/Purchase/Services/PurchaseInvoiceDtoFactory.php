@@ -45,7 +45,7 @@ final class PurchaseInvoiceDtoFactory
         $sources = [];
         $sourceLines = [];
         $invoiceLines = [];
-        $adjustments = [];
+        $adjustments = $this->assertInvoiceAdjustments($data->adjustments);
         $sourceTotals = [];
         $lineQuantities = [];
         $lineNumber = 1;
@@ -100,6 +100,8 @@ final class PurchaseInvoiceDtoFactory
             );
         }
 
+        $lineNumber = $this->appendDirectLines($data->directLines, $lineNumber, $invoiceLines);
+
         return new PreparedPurchaseInvoiceData(
             invoiceData: new CreateInvoiceData(
                 tenantId: $data->tenantId,
@@ -113,6 +115,7 @@ final class PurchaseInvoiceDtoFactory
                 dueDate: $data->dueDate,
                 currencyId: $data->currencyId,
                 exchangeRate: $data->exchangeRate,
+                status: $data->status,
                 notes: $data->notes,
                 createdBy: $data->createdBy,
                 lines: $invoiceLines,
@@ -248,6 +251,53 @@ final class PurchaseInvoiceDtoFactory
         );
 
         return $lineNumber;
+    }
+
+    /**
+     * @param  list<InvoiceLineData>  $directLines
+     * @param  list<InvoiceLineData>  $invoiceLines
+     */
+    private function appendDirectLines(array $directLines, int $lineNumber, array &$invoiceLines): int
+    {
+        foreach ($directLines as $line) {
+            if (! $line instanceof InvoiceLineData) {
+                throw new InvalidArgumentException('Purchase supplier invoice direct lines are invalid.');
+            }
+
+            $invoiceLines[] = new InvoiceLineData(
+                lineNumber: $lineNumber++,
+                description: $line->description,
+                quantity: $line->quantity,
+                unitPrice: $line->unitPrice,
+                lineType: $line->lineType,
+                itemId: $line->itemId,
+                uomId: $line->uomId,
+                discountAmount: $line->discountAmount,
+                taxAmount: $line->taxAmount,
+                chargeAmount: $line->chargeAmount,
+                lineTotal: $line->lineTotal,
+                sourceLineType: $line->sourceLineType,
+                sourceLineId: $line->sourceLineId,
+                metadata: $line->metadata,
+            );
+        }
+
+        return $lineNumber;
+    }
+
+    /**
+     * @param  list<InvoiceAdjustmentData>  $adjustments
+     * @return list<InvoiceAdjustmentData>
+     */
+    private function assertInvoiceAdjustments(array $adjustments): array
+    {
+        foreach ($adjustments as $adjustment) {
+            if (! $adjustment instanceof InvoiceAdjustmentData) {
+                throw new InvalidArgumentException('Purchase supplier invoice adjustments are invalid.');
+            }
+        }
+
+        return $adjustments;
     }
 
     private function appendPurchaseOrderSource(

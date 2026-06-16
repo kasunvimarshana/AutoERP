@@ -8,6 +8,7 @@ use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 
 final class PurchasePaymentIntegrationService
@@ -30,6 +31,11 @@ final class PurchasePaymentIntegrationService
         ?string $referenceNumber = null,
         array $lines = [],
         array $allocations = [],
+        PaymentStatus $status = PaymentStatus::Draft,
+        ?int $createdBy = null,
+        ?string $notes = null,
+        ?int $bankAccountId = null,
+        ?array $metadata = null,
     ): CreatePaymentData {
         return new CreatePaymentData(
             tenantId: $tenantId,
@@ -42,8 +48,13 @@ final class PurchasePaymentIntegrationService
             currencyId: $currencyId,
             exchangeRate: $exchangeRate,
             referenceNumber: $referenceNumber,
+            status: $status,
+            notes: $notes,
+            createdBy: $createdBy,
             lines: $lines === [] ? [new PaymentLineData($amount, referenceNumber: $referenceNumber)] : $lines,
             allocations: $allocations,
+            bankAccountId: $bankAccountId,
+            metadata: $metadata,
         );
     }
 }

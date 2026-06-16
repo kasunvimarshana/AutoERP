@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Purchase\Http\Controllers\FastPurchaseController;
 use Modules\Purchase\Http\Controllers\GoodsReceiptNoteController;
 use Modules\Purchase\Http\Controllers\PurchaseDebitNoteController;
 use Modules\Purchase\Http\Controllers\PurchaseIntegrationController;
@@ -18,6 +19,10 @@ $middleware = [
 ];
 
 Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase.')->group(function (): void {
+    Route::get('fast-purchases/context', [FastPurchaseController::class, 'context'])->name('fast-purchases.context');
+    Route::post('fast-purchases/preview', [FastPurchaseController::class, 'preview'])->name('fast-purchases.preview');
+    Route::post('fast-purchases', [FastPurchaseController::class, 'store'])->name('fast-purchases.store');
+
     Route::get('orders', [PurchaseOrderController::class, 'index'])->name('orders.index');
     Route::post('orders', [PurchaseOrderController::class, 'store'])->name('orders.store');
     Route::get('orders/{order}', [PurchaseOrderController::class, 'show'])->whereNumber('order')->name('orders.show');
