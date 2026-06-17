@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\Vehicle\DTOs\VehicleResultData;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Models\VehicleOwnership;
 
 final class VehicleLookupService
 {
@@ -16,8 +17,8 @@ final class VehicleLookupService
     public function vehiclesByCustomer(int $tenantId, int $customerId, ?int $organizationUnitId = null): Collection
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership->where('customer_id', $customerId))
-            ->with('currentOwnership.customer')
+            ->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_CUSTOMER, $customerId)
+            ->with('currentOwnerships.customerOwner')
             ->get();
     }
     public function vehiclesByRegistrationNumber(int $tenantId, string $registrationNumber, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->where('registration_number', $registrationNumber)->get(); }

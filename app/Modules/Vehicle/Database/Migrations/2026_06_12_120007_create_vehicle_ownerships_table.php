@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
             $table->string('owner_type')->nullable();
             $table->unsignedBigInteger('owner_id')->nullable();
-            $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->string('ownership_type');
             $table->timestamp('started_at');
             $table->timestamp('ended_at')->nullable();
@@ -27,9 +26,9 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_ownerships_tenant_org_idx');
             $table->index('vehicle_id', 'vehicle_ownerships_vehicle_idx');
-            $table->index('customer_id', 'vehicle_ownerships_customer_idx');
             $table->index(['owner_type', 'owner_id'], 'vehicle_ownerships_owner_idx');
             $table->index(['vehicle_id', 'is_current'], 'vehicle_ownerships_current_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'vehicle_id', 'owner_type', 'is_current'], 'vehicle_ownerships_current_owner_idx');
         });
     }
 

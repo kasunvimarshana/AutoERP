@@ -13,7 +13,6 @@ final readonly class VehicleOwnershipData
         public string $startedAt,
         public ?string $ownerType = null,
         public ?int $ownerId = null,
-        public ?int $customerId = null,
         public ?string $endedAt = null,
         public bool $isCurrent = true,
         public ?string $notes = null,

@@ -25,6 +25,8 @@ import type { NamedResource } from '@/shared/types/common';
 import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './vehicleTypes';
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
+const currentOwnerName = (row: VehicleSummary, ownerType = 'customer') =>
+    row.current_ownerships?.find((ownership) => ownership.owner_type === ownerType)?.owner?.name ?? '-';
 
 export default function VehicleListPage() {
     const [searchParams] = useSearchParams();
@@ -124,7 +126,7 @@ export default function VehicleListPage() {
                             { key: 'number', header: 'Vehicle', render: (row) => <div><p className="font-medium text-slate-900">{row.vehicle_number}</p><p className="text-xs text-slate-500">{row.registration_number ?? row.code ?? '-'}</p></div> },
                             { key: 'make', header: 'Make / Model', render: (row) => `${row.make?.name ?? '-'} / ${row.model?.name ?? '-'}` },
                             { key: 'type', header: 'Type', render: (row) => row.type?.name ?? '-' },
-                            { key: 'customer', header: 'Current Customer', render: (row) => row.current_ownership?.customer?.name ?? '-' },
+                            { key: 'customer', header: 'Current Customer', render: (row) => currentOwnerName(row) },
                             { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
                             { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2">
                                 <LinkButton to={`/vehicles/${row.id}/edit${detailQuery}`} variant="secondary">Edit</LinkButton>

@@ -19,7 +19,7 @@ import { VehicleCategorySelect } from './VehicleCategorySelect';
 import { VehicleMakeSelect } from './VehicleMakeSelect';
 import { VehicleModelSelect } from './VehicleModelSelect';
 import { VehicleTypeSelect } from './VehicleTypeSelect';
-import type { Vehicle, VehicleAttributePayload, VehicleCategory, VehicleDocumentPayload, VehicleMake, VehicleModel, VehicleOwnershipPayload, VehiclePayload, VehicleType } from '../vehicleTypes';
+import type { Vehicle, VehicleAttributePayload, VehicleCategory, VehicleDocumentPayload, VehicleMake, VehicleModel, VehicleOwnerType, VehicleOwnershipPayload, VehiclePayload, VehicleType } from '../vehicleTypes';
 
 type FormTab = 'basic' | 'ownership' | 'documents' | 'attributes' | 'review';
 
@@ -28,6 +28,7 @@ const fuelOptions = ['petrol', 'diesel', 'hybrid', 'electric', 'lpg', 'cng', 'ot
 const transmissionOptions = ['manual', 'automatic', 'semi_automatic', 'cvt', 'other'];
 const documentTypes = ['registration', 'insurance', 'emission_test', 'revenue_license', 'fitness_certificate', 'lease_document', 'ownership_document', 'warranty', 'other'];
 const ownershipTypes = ['owned', 'customer_owned', 'leased', 'rented', 'company_owned', 'third_party'];
+const ownerTypes: VehicleOwnerType[] = ['customer', 'supplier', 'company'];
 const dataTypes = ['text', 'number', 'date', 'boolean', 'decimal'];
 
 export function VehicleForm({ initial, submitting, error, enableRelations = false, onSubmit }: {
@@ -43,7 +44,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     const [model, setModel] = useState<VehicleModel | null>(initial?.model as VehicleModel ?? null);
     const [type, setType] = useState<VehicleType | null>(initial?.type as VehicleType ?? null);
     const [category, setCategory] = useState<VehicleCategory | null>(initial?.category as VehicleCategory ?? null);
-    const [ownershipCustomer, setOwnershipCustomer] = useState<NamedResource | null>(null);
+    const [ownershipOwner, setOwnershipOwner] = useState<NamedResource | null>(null);
     const [payload, setPayload] = useState<VehiclePayload>({
         vehicle_number: initial?.vehicle_number ?? '',
         code: initial?.code ?? '',
@@ -65,7 +66,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     const [ownerships, setOwnerships] = useState<VehicleOwnershipPayload[]>([]);
     const [documents, setDocuments] = useState<VehicleDocumentPayload[]>([]);
     const [attributes, setAttributes] = useState<VehicleAttributePayload[]>([]);
-    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
+    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ owner_type: 'customer', owner_id: null, ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
     const [documentDraft, setDocumentDraft] = useState<VehicleDocumentPayload>({ document_type: 'registration', status: 'pending', document_number: '' });
     const [attributeDraft, setAttributeDraft] = useState<VehicleAttributePayload>({ attribute_key: '', attribute_value: '', data_type: 'text', sort_order: 0 });
 
@@ -139,17 +140,29 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                 <TabPanel tabsId="vehicle-form" tabId="ownership" active={tab}>
                     <RelationDraft disabled={!enableRelations} emptyMessage="Ownerships are saved from the detail page when editing.">
                         <div className="grid gap-3 md:grid-cols-3">
+                            <Select label="Owner Type" value={ownershipDraft.owner_type} options={ownerTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => {
+                                const ownerType = event.target.value as VehicleOwnerType;
+                                setOwnershipOwner(null);
+                                setOwnershipDraft({
+                                    ...ownershipDraft,
+                                    owner_type: ownerType,
+                                    owner_id: null,
+                                    ownership_type: ownerType === 'customer' ? 'customer_owned' : ownerType === 'company' ? 'company_owned' : 'third_party',
+                                });
+                            }} />
                             <Select label="Ownership" value={ownershipDraft.ownership_type} options={ownershipTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setOwnershipDraft({ ...ownershipDraft, ownership_type: event.target.value as VehicleOwnershipPayload['ownership_type'] })} />
                             <Input label="Started" type="date" value={ownershipDraft.started_at} onChange={(event) => setOwnershipDraft({ ...ownershipDraft, started_at: event.target.value })} />
-                            <LookupSelect label="Customer" value={ownershipCustomer} onChange={setOwnershipCustomer} search={lookupApi.customers} error={fieldError(error, 'ownerships.0.customer_id')} />
+                            {ownershipDraft.owner_type !== 'company' && (
+                                <LookupSelect label={ownershipDraft.owner_type === 'customer' ? 'Customer' : 'Supplier'} value={ownershipOwner} onChange={setOwnershipOwner} search={ownershipDraft.owner_type === 'customer' ? lookupApi.customers : lookupApi.suppliers} error={fieldError(error, 'ownerships.0.owner_id')} />
+                            )}
                         </div>
                         <Button type="button" onClick={() => {
                             setOwnerships([...ownerships, {
                                 ...ownershipDraft,
-                                customer_id: ownershipDraft.ownership_type === 'customer_owned' ? ownershipCustomer?.id ?? null : null,
+                                owner_id: ownershipDraft.owner_type === 'company' ? null : ownershipOwner?.id ?? null,
                             }]);
-                            setOwnershipDraft({ ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
-                            setOwnershipCustomer(null);
+                            setOwnershipDraft({ owner_type: 'customer', owner_id: null, ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
+                            setOwnershipOwner(null);
                         }}>Add Ownership</Button>
                         <Count label="Ownerships" count={ownerships.length} />
                     </RelationDraft>

@@ -28,6 +28,7 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -711,7 +712,8 @@ final class VehicleServiceEngineTest extends TestCase
         DB::table('vehicle_ownerships')->insert([
             'tenant_id' => $tenantId,
             'vehicle_id' => $vehicleId,
-            'customer_id' => $customerId,
+            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
+            'owner_id' => $customerId,
             'ownership_type' => 'customer_owned',
             'started_at' => now(),
             'is_current' => true,

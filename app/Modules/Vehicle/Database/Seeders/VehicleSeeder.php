@@ -69,14 +69,13 @@ final class VehicleSeeder extends Seeder
                 VehicleOwnership::query()->updateOrCreate(
                     [
                         'vehicle_id' => $vehicle->getKey(),
-                        'customer_id' => $customer->getKey(),
+                        'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
+                        'owner_id' => $customer->getKey(),
                         'is_current' => true,
                     ],
                     [
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $organizationUnitId,
-                        'owner_type' => null,
-                        'owner_id' => null,
                         'ownership_type' => 'customer_owned',
                         'started_at' => '2026-01-01 00:00:00',
                         'ended_at' => null,

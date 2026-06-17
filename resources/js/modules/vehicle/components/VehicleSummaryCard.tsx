@@ -4,6 +4,8 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { Vehicle } from '../vehicleTypes';
 
 export function VehicleSummaryCard({ vehicle }: { vehicle: Vehicle }) {
+    const currentCustomer = vehicle.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner;
+
     return (
         <Panel title="Summary">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -19,7 +21,7 @@ export function VehicleSummaryCard({ vehicle }: { vehicle: Vehicle }) {
                     { label: 'Model', value: vehicle.model?.name ?? '-' },
                     { label: 'Type', value: vehicle.type?.name ?? '-' },
                     { label: 'Category', value: vehicle.category?.name ?? '-' },
-                    { label: 'Current Customer', value: vehicle.current_ownership?.customer?.name ?? '-' },
+                    { label: 'Current Customer', value: currentCustomer?.name ?? '-' },
                     { label: 'Odometer', value: `${vehicle.odometer_reading ?? '0.000000'} ${vehicle.odometer_unit ?? ''}`.trim() },
                     { label: 'Fuel', value: vehicle.fuel_type ?? '-' },
                     { label: 'Transmission', value: vehicle.transmission_type ?? '-' },

@@ -63,7 +63,7 @@ final class VehicleUpdateService
             if ($data->ownerships !== null) { $this->ownerships->replace($vehicle, $data->ownerships); }
             if ($data->attributes !== null) { $this->attributes->replace($vehicle, $data->attributes); }
 
-            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customer', 'currentOwnership.customer', 'attributes']);
+            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customerOwner', 'ownerships.supplierOwner', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner', 'attributes']);
         });
     }
 }

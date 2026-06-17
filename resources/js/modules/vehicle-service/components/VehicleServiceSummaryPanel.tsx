@@ -6,6 +6,8 @@ import type { VehicleServiceJob } from '../vehicleServiceTypes';
 import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
 export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) {
+    const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
+
     return (
         <div>
             <DetailGrid items={[
@@ -13,7 +15,7 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Customer', value: readableRelation(job.customer) },
                 { label: 'Vehicle', value: readableRelation(job.vehicle) },
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
-                { label: 'Registered owner', value: readableRelation(job.vehicle?.current_ownership?.customer ?? job.customer) },
+                { label: 'Registered owner', value: readableRelation(currentCustomerOwner) },
                 { label: 'Supervisor', value: readableRelation(job.supervisor) },
                 { label: 'Job date', value: formatDate(job.job_date) },
                 { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },

@@ -4,6 +4,7 @@ export type VehicleStatus = 'active' | 'inactive' | 'under_service' | 'rented' |
 export type VehicleDocumentStatus = 'active' | 'expired' | 'revoked' | 'pending';
 export type VehicleDocumentType = 'registration' | 'insurance' | 'emission_test' | 'revenue_license' | 'fitness_certificate' | 'lease_document' | 'ownership_document' | 'warranty' | 'other';
 export type VehicleOwnershipType = 'owned' | 'customer_owned' | 'leased' | 'rented' | 'company_owned' | 'third_party';
+export type VehicleOwnerType = 'customer' | 'supplier' | 'owner' | 'company';
 export type VehicleAttributeDataType = 'text' | 'number' | 'date' | 'boolean' | 'decimal';
 
 export interface VehicleMake extends NamedResource {
@@ -78,7 +79,7 @@ export interface VehicleSummary {
     model?: NamedResource | null;
     type?: NamedResource | null;
     category?: NamedResource | null;
-    current_ownership?: VehicleOwnership | null;
+    current_ownerships?: VehicleOwnership[];
     status: VehicleStatus;
     odometer_reading: string;
     odometer_unit?: string | null;
@@ -148,9 +149,9 @@ export type VehicleDocumentPayload = Omit<VehicleDocument, 'id'>;
 
 export interface VehicleOwnership {
     id: number;
-    owner_type?: string | null;
+    owner_type: VehicleOwnerType;
     owner_id?: number | null;
-    customer?: NamedResource | null;
+    owner?: NamedResource | null;
     ownership_type: VehicleOwnershipType;
     started_at: string;
     ended_at?: string | null;
@@ -159,9 +160,8 @@ export interface VehicleOwnership {
 }
 
 export interface VehicleOwnershipPayload {
-    owner_type?: string | null;
+    owner_type: VehicleOwnerType;
     owner_id?: number | null;
-    customer_id?: number | null;
     ownership_type: VehicleOwnershipType;
     started_at: string;
     ended_at?: string | null;

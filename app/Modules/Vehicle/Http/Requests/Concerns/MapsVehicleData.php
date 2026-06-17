@@ -69,9 +69,8 @@ trait MapsVehicleData
         return new VehicleOwnershipData(
             ownershipType: VehicleOwnershipType::from((string) $row['ownership_type']),
             startedAt: (string) $row['started_at'],
-            ownerType: $row['owner_type'] ?? null,
+            ownerType: (string) $row['owner_type'],
             ownerId: isset($row['owner_id']) ? (int) $row['owner_id'] : null,
-            customerId: isset($row['customer_id']) ? (int) $row['customer_id'] : null,
             endedAt: $row['ended_at'] ?? null,
             isCurrent: (bool) ($row['is_current'] ?? true),
             notes: $row['notes'] ?? null,

@@ -19,6 +19,7 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
@@ -563,7 +564,8 @@ final class TechnicianWorkReportTest extends TestCase
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'vehicle_id' => $vehicleId,
-            'customer_id' => $customerId,
+            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
+            'owner_id' => $customerId,
             'ownership_type' => 'customer_owned',
             'started_at' => now(),
             'is_current' => true,

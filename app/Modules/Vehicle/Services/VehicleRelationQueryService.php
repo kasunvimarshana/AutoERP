@@ -20,7 +20,7 @@ final class VehicleRelationQueryService
 
     public function ownerships(Vehicle $vehicle, int $perPage): LengthAwarePaginator
     {
-        return $vehicle->ownerships()->with('customer')->orderByDesc('is_current')->orderByDesc('started_at')->paginate($perPage);
+        return $vehicle->ownerships()->with(['customerOwner', 'supplierOwner'])->orderByDesc('is_current')->orderByDesc('started_at')->paginate($perPage);
     }
 
     public function attributes(Vehicle $vehicle, int $perPage): LengthAwarePaginator

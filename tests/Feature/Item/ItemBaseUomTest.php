@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Services\DecimalMath;
+use Modules\Vehicle\Models\VehicleOwnership;
 use Tests\TestCase;
 
 final class ItemBaseUomTest extends TestCase
@@ -438,7 +439,8 @@ final class ItemBaseUomTest extends TestCase
         DB::table('vehicle_ownerships')->insert([
             ...$this->scope($context),
             'vehicle_id' => $vehicleId,
-            'customer_id' => $customerId,
+            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
+            'owner_id' => $customerId,
             'ownership_type' => 'customer_owned',
             'started_at' => $now,
             'is_current' => true,

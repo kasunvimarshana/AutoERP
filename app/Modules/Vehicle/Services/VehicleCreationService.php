@@ -66,7 +66,7 @@ final class VehicleCreationService
             }
             $this->statuses->recordInitial($vehicle, $data->createdBy);
 
-            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customer', 'currentOwnership.customer', 'attributes', 'statusHistories']);
+            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customerOwner', 'ownerships.supplierOwner', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner', 'attributes', 'statusHistories']);
         });
     }
 }

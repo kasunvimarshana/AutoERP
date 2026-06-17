@@ -21,6 +21,7 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
 use Modules\Vehicle\Models\VehicleModel;
+use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\Vehicle\Models\VehicleType;
 
 final class VehicleValidationService
@@ -86,8 +87,8 @@ final class VehicleValidationService
             throw new InvalidArgumentException('Vehicle ownership start date cannot be after end date.');
         }
 
-        if (($data->ownerType === null) !== ($data->ownerId === null)) {
-            throw new InvalidArgumentException('Vehicle owner type and owner id must be provided together.');
+        if ($data->ownerType === null || ! in_array($data->ownerType, VehicleOwnership::SUPPORTED_OWNER_TYPES, true)) {
+            throw new InvalidArgumentException('Vehicle owner type is not supported.');
         }
 
         match ($data->ownershipType) {
@@ -99,28 +100,22 @@ final class VehicleValidationService
 
     private function assertCustomerOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
     {
-        if ($data->customerId === null) {
-            throw new InvalidArgumentException('Customer-owned vehicle ownership requires a customer.');
+        if ($data->ownerType !== VehicleOwnership::OWNER_TYPE_CUSTOMER || $data->ownerId === null) {
+            throw new InvalidArgumentException('Customer-owned vehicle ownership requires a customer owner.');
         }
-        if ($data->ownerType !== null || $data->ownerId !== null) {
-            throw new InvalidArgumentException('Customer-owned vehicle ownership cannot include an external owner.');
-        }
-        $this->assertCustomerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->customerId);
+        $this->assertCustomerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->ownerId);
     }
 
     private function assertCompanyOwnership(VehicleOwnershipData $data): void
     {
-        if ($data->customerId !== null || $data->ownerType !== null || $data->ownerId !== null) {
-            throw new InvalidArgumentException('Company-owned vehicle ownership cannot include a customer or external owner.');
+        if ($data->ownerType !== VehicleOwnership::OWNER_TYPE_COMPANY || $data->ownerId !== null) {
+            throw new InvalidArgumentException('Company-owned vehicle ownership must use the company owner type only.');
         }
     }
 
     private function assertExternalOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
     {
-        if ($data->customerId !== null) {
-            throw new InvalidArgumentException('External vehicle ownership cannot include a customer.');
-        }
-        if ($data->ownerType === null || $data->ownerId === null) {
+        if ($data->ownerId === null) {
             throw new InvalidArgumentException('External vehicle ownership requires an owner type and owner id.');
         }
         $this->assertOwnerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->ownerType, $data->ownerId);
@@ -192,7 +187,7 @@ final class VehicleValidationService
 
     private function assertOwnerUsable(int $tenantId, ?int $organizationUnitId, string $ownerType, int $ownerId): void
     {
-        if (! in_array($ownerType, ['supplier', 'owner', Supplier::class], true)) {
+        if (! in_array($ownerType, VehicleOwnership::SUPPLIER_OWNER_TYPES, true)) {
             throw new InvalidArgumentException('Vehicle owner type is not supported.');
         }
 

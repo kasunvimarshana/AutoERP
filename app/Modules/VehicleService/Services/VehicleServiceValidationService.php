@@ -12,6 +12,7 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Item\Enums\ItemType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
@@ -31,12 +32,13 @@ final class VehicleServiceValidationService
     public function vehicle(int $tenantId, ?int $organizationUnitId, int $vehicleId, int $customerId): Vehicle
     {
         /** @var Vehicle $vehicle */
-        $vehicle = $this->scoped(Vehicle::query()->with('currentOwnership.customer'), $tenantId, $organizationUnitId)->findOrFail($vehicleId);
+        $vehicle = $this->scoped(Vehicle::query()->with('currentOwnerships.customerOwner'), $tenantId, $organizationUnitId)->findOrFail($vehicleId);
         if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
             throw new InvalidArgumentException('Inactive or unavailable vehicles cannot be used for service jobs.');
         }
-        $currentOwnership = $vehicle->currentOwnership;
-        if ($currentOwnership?->customer_id !== null && (int) $currentOwnership->customer_id !== $customerId) {
+        $customerOwnership = $vehicle->currentOwnerships
+            ->first(fn (VehicleOwnership $ownership): bool => $ownership->owner_type === VehicleOwnership::OWNER_TYPE_CUSTOMER);
+        if ($customerOwnership !== null && (int) $customerOwnership->owner_id !== $customerId) {
             throw new InvalidArgumentException('Vehicle does not belong to the selected customer.');
         }
 

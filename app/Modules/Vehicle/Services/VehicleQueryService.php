@@ -8,12 +8,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Models\VehicleOwnership;
 
 final class VehicleQueryService
 {
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
-        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['make', 'model', 'type', 'category', 'currentOwnership.customer']);
+        $query = $this->baseQuery($tenantId, $organizationUnitId)
+            ->with(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner']);
         $this->applyCriteria($query, $criteria);
         $sort = in_array(($criteria['sort'] ?? null), ['vehicle_number', 'code', 'registration_number', 'status', 'created_at'], true) ? (string) $criteria['sort'] : 'vehicle_number';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
@@ -39,7 +41,7 @@ final class VehicleQueryService
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Vehicle
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->with(['make', 'model', 'type', 'category', 'currentOwnership.customer'])
+            ->with(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner'])
             ->findOrFail($id);
     }
 
@@ -77,25 +79,17 @@ final class VehicleQueryService
             }
         }
         if (! empty($criteria['customer_id'])) {
-            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership->where('customer_id', $criteria['customer_id']));
+            $query->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_CUSTOMER, (int) $criteria['customer_id']);
         }
         if (($criteria['ownership_scope'] ?? null) === 'customer') {
-            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
-                ->whereNotNull('customer_id')
-                ->orWhere('ownership_type', 'customer_owned'));
+            $query->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_CUSTOMER);
         }
         if (($criteria['ownership_scope'] ?? null) === 'supplier') {
-            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
-                ->whereIn('owner_type', [
-                    'supplier',
-                    'owner',
-                    'Modules\\Supplier\\Models\\Supplier',
-                ])
-                ->orWhereIn('ownership_type', ['leased', 'rented', 'third_party']));
+            $query->whereHas('currentOwnerships', fn (Builder $ownership): Builder => $ownership
+                ->whereIn('owner_type', VehicleOwnership::SUPPLIER_OWNER_TYPES));
         }
         if (($criteria['ownership_scope'] ?? null) === 'company') {
-            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
-                ->whereIn('ownership_type', ['owned', 'company_owned']));
+            $query->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_COMPANY);
         }
         if (! empty($criteria['available_for_service'])) {
             $query->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value]);

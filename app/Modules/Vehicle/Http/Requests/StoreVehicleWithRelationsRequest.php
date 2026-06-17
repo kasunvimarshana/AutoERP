@@ -12,6 +12,7 @@ use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Http\Requests\Concerns\MapsVehicleData;
+use Modules\Vehicle\Models\VehicleOwnership;
 
 final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
 {
@@ -33,9 +34,8 @@ final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
             'documents.*.status' => ['nullable', Rule::enum(VehicleDocumentStatus::class)],
             'documents.*.notes' => ['nullable', 'string'],
             'ownerships' => ['nullable', 'array'],
-            'ownerships.*.owner_type' => ['nullable', 'string', 'max:100'],
+            'ownerships.*.owner_type' => ['required', 'string', Rule::in(VehicleOwnership::SUPPORTED_OWNER_TYPES)],
             'ownerships.*.owner_id' => ['nullable', 'integer', 'min:1'],
-            'ownerships.*.customer_id' => ['nullable', 'integer', 'min:1'],
             'ownerships.*.ownership_type' => ['required', Rule::enum(VehicleOwnershipType::class)],
             'ownerships.*.started_at' => ['required', 'date'],
             'ownerships.*.ended_at' => ['nullable', 'date'],

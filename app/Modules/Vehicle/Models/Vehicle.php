@@ -7,7 +7,6 @@ namespace Modules\Vehicle\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -53,7 +52,7 @@ final class Vehicle extends CoreModel
     public function documents(): HasMany { return $this->hasMany(VehicleDocument::class, 'vehicle_id'); }
     public function statusHistories(): HasMany { return $this->hasMany(VehicleStatusHistory::class, 'vehicle_id'); }
     public function ownerships(): HasMany { return $this->hasMany(VehicleOwnership::class, 'vehicle_id'); }
-    public function currentOwnership(): HasOne { return $this->hasOne(VehicleOwnership::class, 'vehicle_id')->where('is_current', true); }
+    public function currentOwnerships(): HasMany { return $this->hasMany(VehicleOwnership::class, 'vehicle_id')->current(); }
     public function attributes(): HasMany { return $this->hasMany(VehicleAttribute::class, 'vehicle_id'); }
 
     public function scopeActive(Builder $query): Builder
@@ -66,6 +65,16 @@ final class Vehicle extends CoreModel
         $query->where('tenant_id', $tenantId);
         return $organizationUnitId === null ? $query : $query->where(function (Builder $scope) use ($organizationUnitId): void {
             $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
+        });
+    }
+
+    public function scopeWhereCurrentOwner(Builder $query, string $ownerType, ?int $ownerId = null): Builder
+    {
+        return $query->whereHas('currentOwnerships', function (Builder $ownership) use ($ownerType, $ownerId): void {
+            $ownership->where('owner_type', $ownerType);
+            if ($ownerId !== null) {
+                $ownership->where('owner_id', $ownerId);
+            }
         });
     }
 }

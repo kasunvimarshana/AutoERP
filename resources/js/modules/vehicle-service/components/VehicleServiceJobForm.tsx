@@ -18,6 +18,8 @@ import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from
 
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = '0.000000') => value.trim() || fallback;
+const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
+    vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner?.name ?? fallback?.name ?? '-';
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
@@ -114,7 +116,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
                         <VehicleContext label="Make" value={vehicle.make?.name ?? '-'} />
                         <VehicleContext label="Model" value={vehicle.model?.name ?? '-'} />
-                        <VehicleContext label="Owner" value={vehicle.current_ownership?.customer?.name ?? customer?.name ?? '-'} />
+                        <VehicleContext label="Owner" value={currentCustomerOwner(vehicle, customer)} />
                         <VehicleContext label="Odometer" value={`${vehicle.odometer_reading ?? '-'} ${vehicle.odometer_unit ?? ''}`.trim()} />
                     </div>
                 )}
