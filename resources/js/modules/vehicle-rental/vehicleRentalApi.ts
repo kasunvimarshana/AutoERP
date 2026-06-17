@@ -16,6 +16,8 @@ import type {
     RentalUsageLog,
     RunningChartAgreementCollection,
     RunningChartContext,
+    RunningChartPreview,
+    RunningChartTripPayload,
 } from './vehicleRentalTypes';
 
 const endpoint = '/api/v1/vehicle-rental';
@@ -76,12 +78,51 @@ export const listRunningChartAgreements = async (
         { params, signal },
     )).data;
 export const getRunningChartContext = async (params: {
-    agreement_id: number;
-    agreement_vehicle_id: number;
+    mode?: string;
+    agreement_id?: number;
+    agreement_vehicle_id?: number;
+    lessee_agreement_id?: number;
+    lessee_agreement_vehicle_id?: number;
+    lessor_agreement_id?: number;
+    lessor_agreement_vehicle_id?: number;
     usage_date: string;
     start_time?: string;
 }, signal?: AbortSignal): Promise<RunningChartContext> =>
     (await apiClient.get<ApiResource<RunningChartContext>>(`${endpoint}/running-chart/context`, { params, signal })).data.data;
+export const listRunningChartTrips = async (params: {
+    mode?: string;
+    agreement_id?: number;
+    agreement_vehicle_id?: number;
+    lessee_agreement_id?: number;
+    lessee_agreement_vehicle_id?: number;
+    lessor_agreement_id?: number;
+    lessor_agreement_vehicle_id?: number;
+    usage_date: string;
+}, signal?: AbortSignal): Promise<RentalUsageLog[]> =>
+    (await apiClient.get<ApiResource<RentalUsageLog[]>>(`${endpoint}/running-chart/trips`, { params, signal })).data.data;
+export const createRunningChartTrip = async (payload: RunningChartTripPayload): Promise<RentalUsageLog> =>
+    (await apiClient.post<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips`, payload)).data.data;
+export const updateRunningChartTrip = async (usageLogId: number, payload: RunningChartTripPayload): Promise<RentalUsageLog> =>
+    (await apiClient.put<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips/${usageLogId}`, payload)).data.data;
+export const deleteRunningChartTrip = async (usageLogId: number): Promise<void> => {
+    await apiClient.delete(`${endpoint}/running-chart/trips/${usageLogId}`);
+};
+export const changeRunningChartTripStatus = async (
+    usageLogId: number,
+    status: 'submit' | 'approve' | 'reject',
+    reason?: string,
+): Promise<RentalUsageLog> =>
+    (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips/${usageLogId}/${status}`, { reason })).data.data;
+export const previewRunningChart = async (payload: {
+    mode: string;
+    lessee_agreement_id?: number;
+    lessee_agreement_vehicle_id?: number;
+    lessor_agreement_id?: number;
+    lessor_agreement_vehicle_id?: number;
+    usage_date: string;
+    trips: RunningChartTripPayload[];
+}): Promise<RunningChartPreview> =>
+    (await apiClient.post<ApiResource<RunningChartPreview>>(`${endpoint}/running-chart/preview`, payload)).data.data;
 export const createRentalAgreementVehicleLink = async (payload: Record<string, unknown>): Promise<RentalAgreementVehicleLink> =>
     (await apiClient.post<ApiResource<RentalAgreementVehicleLink>>(`${endpoint}/agreement-vehicle-links`, payload)).data.data;
 export const changeRentalAgreementVehicleLinkStatus = async (

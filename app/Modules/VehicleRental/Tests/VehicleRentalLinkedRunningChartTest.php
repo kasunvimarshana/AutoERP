@@ -365,6 +365,229 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
         }
     }
 
+    public function test_explicit_daily_modes_share_the_same_log_service_without_context_duplication(): void
+    {
+        $context = $this->context();
+        [$outbound, $outboundAllocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Outbound,
+            'AGR-MODE-OUT',
+            '100.000000',
+            '10.000000',
+            '20.000000',
+            '30.000000',
+        );
+        [$inbound, $inboundAllocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Inbound,
+            'AGR-MODE-IN',
+            '50.000000',
+            '5.000000',
+            '10.000000',
+            '15.000000',
+            false,
+        );
+        $link = app(RentalAgreementVehicleLinkService::class)->create(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            new RentalAgreementVehicleLinkData(
+                inboundAgreementVehicleId: (int) $inboundAllocation->getKey(),
+                outboundAgreementVehicleId: (int) $outboundAllocation->getKey(),
+                effectiveFrom: '2026-06-01 08:00:00',
+                effectiveTo: '2026-06-03 08:00:00',
+            ),
+        );
+        app(RentalAgreementVehicleLinkService::class)->submit($link, null);
+        app(RentalAgreementVehicleLinkService::class)->approve($link->refresh(), null);
+        app(RentalAgreementService::class)->changeStatus($inbound->refresh(), RentalAgreementStatus::Active);
+        $service = app(RentalUsageLogService::class);
+
+        $lesseeOnly = $service->createForMode(
+            RentalUsageContextService::MODE_LESSEE,
+            $outbound->refresh(),
+            new RentalUsageLogData(
+                agreementVehicleId: (int) $outboundAllocation->getKey(),
+                usageDate: '2026-06-02',
+                startOdometer: '1000.000000',
+                endOdometer: '1010.000000',
+                startTime: '08:00',
+                endTime: '09:00',
+            ),
+        );
+        $lessorOnly = $service->createForMode(
+            RentalUsageContextService::MODE_LESSOR,
+            $inbound->refresh(),
+            new RentalUsageLogData(
+                agreementVehicleId: (int) $inboundAllocation->getKey(),
+                usageDate: '2026-06-02',
+                startOdometer: '1010.000000',
+                endOdometer: '1020.000000',
+                startTime: '10:00',
+                endTime: '11:00',
+            ),
+        );
+        $linked = $service->createForMode(
+            RentalUsageContextService::MODE_LINKED,
+            $outbound->refresh(),
+            new RentalUsageLogData(
+                agreementVehicleId: (int) $outboundAllocation->getKey(),
+                usageDate: '2026-06-02',
+                startOdometer: '1020.000000',
+                endOdometer: '1030.000000',
+                startTime: '12:00',
+                endTime: '13:00',
+            ),
+            $inbound->refresh(),
+            (int) $inboundAllocation->getKey(),
+        );
+
+        $this->assertDatabaseCount('rental_usage_logs', 3);
+        $this->assertCount(1, $lesseeOnly->contexts);
+        $this->assertSame('revenue', $lesseeOnly->contexts->sole()->financial_side->value);
+        $this->assertCount(1, $lessorOnly->contexts);
+        $this->assertSame('cost', $lessorOnly->contexts->sole()->financial_side->value);
+        $this->assertCount(2, $linked->contexts);
+        $this->assertSame(
+            ['cost', 'revenue'],
+            $linked->contexts()->orderBy('financial_side')->get()
+                ->map(fn ($usageContext): string => $usageContext->financial_side->value)
+                ->all(),
+        );
+    }
+
+    public function test_duplicate_daily_save_is_idempotent_and_overlapping_times_are_rejected(): void
+    {
+        $context = $this->context();
+        [$agreement, $allocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Outbound,
+            'AGR-DUPLICATE-OVERLAP',
+            '100.000000',
+            '10.000000',
+            '20.000000',
+            '30.000000',
+        );
+        $service = app(RentalUsageLogService::class);
+        $data = new RentalUsageLogData(
+            agreementVehicleId: (int) $allocation->getKey(),
+            usageDate: '2026-06-02',
+            startOdometer: '1000.000000',
+            endOdometer: '1010.000000',
+            startTime: '08:00',
+            endTime: '10:00',
+        );
+        $first = $service->createForMode(RentalUsageContextService::MODE_LESSEE, $agreement, $data);
+        $duplicate = $service->createForMode(RentalUsageContextService::MODE_LESSEE, $agreement->refresh(), $data);
+
+        $this->assertSame((int) $first->getKey(), (int) $duplicate->getKey());
+        $this->assertDatabaseCount('rental_usage_logs', 1);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('overlaps an existing running chart');
+        $service->createForMode(
+            RentalUsageContextService::MODE_LESSEE,
+            $agreement->refresh(),
+            new RentalUsageLogData(
+                agreementVehicleId: (int) $allocation->getKey(),
+                usageDate: '2026-06-02',
+                startOdometer: '1010.000000',
+                endOdometer: '1020.000000',
+                startTime: '09:30',
+                endTime: '11:00',
+            ),
+        );
+    }
+
+    public function test_no_usage_preview_does_not_persist_fake_daily_records(): void
+    {
+        $context = $this->context();
+        [$agreement, $allocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Outbound,
+            'AGR-NO-USAGE',
+            '100.000000',
+            '10.000000',
+            '20.000000',
+            '30.000000',
+        );
+        $resolved = app(RentalUsageContextService::class)->resolveForMode(
+            RentalUsageContextService::MODE_LESSEE,
+            $agreement,
+            $allocation,
+            '2026-06-02',
+        );
+        $preview = app(RentalChargeCalculationService::class)->previewRunningChart($resolved, []);
+
+        $this->assertSame('0.000000', $preview['daily_km']);
+        $this->assertSame('0.000000', $preview['customer_revenue']);
+        $this->assertDatabaseCount('rental_usage_logs', 0);
+        $this->assertDatabaseCount('rental_usage_contexts', 0);
+    }
+
+    public function test_running_chart_preview_is_non_persistent_and_uses_each_context_snapshot(): void
+    {
+        $context = $this->context();
+        [$outbound, $outboundAllocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Outbound,
+            'AGR-PREVIEW-OUT',
+            '100.000000',
+            '10.000000',
+            '20.000000',
+            '30.000000',
+        );
+        [$inbound, $inboundAllocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Inbound,
+            'AGR-PREVIEW-IN',
+            '50.000000',
+            '5.000000',
+            '10.000000',
+            '15.000000',
+            false,
+        );
+        $link = app(RentalAgreementVehicleLinkService::class)->create(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            new RentalAgreementVehicleLinkData(
+                inboundAgreementVehicleId: (int) $inboundAllocation->getKey(),
+                outboundAgreementVehicleId: (int) $outboundAllocation->getKey(),
+                effectiveFrom: '2026-06-01 08:00:00',
+                effectiveTo: '2026-06-03 08:00:00',
+            ),
+        );
+        app(RentalAgreementVehicleLinkService::class)->submit($link, null);
+        app(RentalAgreementVehicleLinkService::class)->approve($link->refresh(), null);
+        app(RentalAgreementService::class)->changeStatus($inbound->refresh(), RentalAgreementStatus::Active);
+        $resolved = app(RentalUsageContextService::class)->resolveForMode(
+            RentalUsageContextService::MODE_LINKED,
+            $outbound,
+            $outboundAllocation,
+            '2026-06-02',
+            '08:00',
+            $inbound->refresh(),
+            $inboundAllocation->refresh(),
+        );
+        $preview = app(RentalChargeCalculationService::class)->previewRunningChart($resolved, [[
+            'usage_date' => '2026-06-02',
+            'start_time' => '08:00',
+            'end_time' => '13:00',
+            'start_odometer' => '1000.000000',
+            'end_odometer' => '1100.000000',
+            'events' => [[
+                'event_type' => RentalUsageEventType::Overtime->value,
+                'quantity' => '2.000000',
+            ]],
+        ]]);
+
+        $this->assertSame('100.000000', $preview['daily_km']);
+        $this->assertSame('640.000000', $preview['customer_revenue']);
+        $this->assertSame('320.000000', $preview['owner_cost']);
+        $this->assertSame('320.000000', $preview['estimated_margin']);
+        $this->assertDatabaseCount('rental_charge_calculations', 0);
+        $this->assertDatabaseCount('rental_charges', 0);
+    }
+
     public function test_link_requires_submission_and_approval_before_it_can_add_a_counterpart_context(): void
     {
         $context = $this->context();
@@ -521,8 +744,8 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             usageDate: '2026-06-02',
             startOdometer: '1015.000000',
             endOdometer: '1020.000000',
-            startTime: '11:00',
-            endTime: '12:00',
+            startTime: '12:00',
+            endTime: '13:00',
         ));
         $service->changeStatus($later, RentalUsageLogStatus::Submitted);
         $later = $service->changeStatus(
@@ -535,7 +758,7 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             $service,
             $agreement,
             $allocation,
-            '10:00',
+            '10:15',
             '1010.000000',
             '1015.000000',
         );
@@ -547,10 +770,10 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
         $invalid = $service->create($agreement, new RentalUsageLogData(
             agreementVehicleId: (int) $allocation->getKey(),
             usageDate: '2026-06-02',
-            startOdometer: '1015.000000',
-            endOdometer: '1016.000000',
-            startTime: '10:30',
-            endTime: '10:45',
+            startOdometer: '1010.000000',
+            endOdometer: '1011.000000',
+            startTime: '10:00',
+            endTime: '10:10',
         ));
         $service->changeStatus($invalid, RentalUsageLogStatus::Submitted);
 

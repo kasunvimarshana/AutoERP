@@ -28,6 +28,19 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::get('availability', [RentalAvailabilityController::class, 'index'])->name('availability.index');
     Route::get('running-chart/agreements', [RentalRunningChartController::class, 'agreements'])->name('running-chart.agreements');
     Route::get('running-chart/context', [RentalRunningChartController::class, 'context'])->name('running-chart.context');
+    Route::get('running-chart/trips', [RentalRunningChartController::class, 'trips'])->name('running-chart.trips');
+    Route::post('running-chart/trips', [RentalRunningChartController::class, 'storeTrip'])->name('running-chart.trips.store');
+    Route::put('running-chart/trips/{usageLog}', [RentalRunningChartController::class, 'updateTrip'])
+        ->whereNumber('usageLog')->name('running-chart.trips.update');
+    Route::delete('running-chart/trips/{usageLog}', [RentalRunningChartController::class, 'destroyTrip'])
+        ->whereNumber('usageLog')->name('running-chart.trips.destroy');
+    Route::patch('running-chart/trips/{usageLog}/submit', [RentalRunningChartController::class, 'submitTrip'])
+        ->whereNumber('usageLog')->name('running-chart.trips.submit');
+    Route::patch('running-chart/trips/{usageLog}/approve', [RentalRunningChartController::class, 'approveTrip'])
+        ->whereNumber('usageLog')->name('running-chart.trips.approve');
+    Route::patch('running-chart/trips/{usageLog}/reject', [RentalRunningChartController::class, 'rejectTrip'])
+        ->whereNumber('usageLog')->name('running-chart.trips.reject');
+    Route::post('running-chart/preview', [RentalRunningChartController::class, 'preview'])->name('running-chart.preview');
     Route::post('agreement-vehicle-links', [RentalAgreementVehicleLinkController::class, 'store'])->name('agreement-vehicle-links.store');
     Route::patch('agreement-vehicle-links/{link}/submit', [RentalAgreementVehicleLinkController::class, 'submit'])
         ->whereNumber('link')->name('agreement-vehicle-links.submit');

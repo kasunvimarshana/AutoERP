@@ -290,6 +290,7 @@ export interface RunningChartResolvedContext {
 }
 
 export interface RunningChartContext {
+    mode?: RunningChartMode | null;
     vehicle_id: number;
     vehicle?: {
         id: number;
@@ -303,6 +304,47 @@ export interface RunningChartContext {
     last_valid_finish_odometer: string;
     approved_cumulative_mileage: string;
     contexts: RunningChartResolvedContext[];
+}
+
+export type RunningChartMode = 'lessee' | 'lessor' | 'linked';
+
+export interface RunningChartTripPayload {
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    mode: RunningChartMode;
+    lessee_agreement_id?: number;
+    lessee_agreement_vehicle_id?: number;
+    lessor_agreement_id?: number;
+    lessor_agreement_vehicle_id?: number;
+    usage_date: string;
+    driver_id?: number | null;
+    start_time: string;
+    end_time: string;
+    start_odometer: string;
+    end_odometer: string;
+    comparative_km?: string;
+    trip_from?: string;
+    trip_to?: string;
+    trip_purpose?: string;
+    remarks?: string;
+    events?: Array<{ event_type: string; quantity: string; remarks?: string | null }>;
+}
+
+export interface RunningChartPreview {
+    daily_km: string;
+    working_minutes: number;
+    working_hours: string;
+    overtime_hours: string;
+    customer_revenue: string;
+    owner_cost: string;
+    estimated_margin: string;
+    persistent: false;
+    contexts: Array<{
+        agreement_id: number;
+        financial_side: 'revenue' | 'cost';
+        estimated_total: string;
+        lines: Array<{ type: string; quantity: string; rate: string; unit?: string | null; amount: string }>;
+    }>;
 }
 
 export interface RentalAvailabilityRow {

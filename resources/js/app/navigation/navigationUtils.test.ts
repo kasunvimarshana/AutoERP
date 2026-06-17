@@ -83,6 +83,17 @@ describe('navigation access and matching', () => {
         expect(match?.item.id).toBe('owner-agreements');
     });
 
+    it('selects the requested running chart mode', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/running-chart',
+            '?mode=linked',
+            navigationSections,
+        );
+
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('linked-running-charts');
+    });
+
     it('keeps the requested business hierarchy and excludes action links', () => {
         const labels = navigationSections.map((section) => ({
             section: section.label ?? '',
@@ -103,10 +114,10 @@ describe('navigation access and matching', () => {
                 { label: 'Users', children: ['User List', 'Roles', 'Permissions'] },
             ] },
             { section: 'Operations', items: [
-                { label: 'Purchase', children: ['Purchase Orders', 'Goods Receipts', 'Purchase Returns', 'Supplier Invoices', 'Supplier Payments'] },
-                { label: 'Sales', children: ['Sales Orders', 'Goods Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
+                { label: 'Purchase', children: ['Fast Purchase', 'Purchase Orders', 'Goods Receipts', 'Purchase Returns', 'Supplier Invoices', 'Supplier Payments'] },
+                { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Goods Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Service', children: ['Service Jobs', 'Service Invoices', 'Customer Receipts'] },
-                { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
+                { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Lessee Running Charts - Customer', 'Lessor Running Charts - Owner / Supplier', 'Linked Running Charts - Customer + Owner', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
             ] },
             { section: 'Finance', items: [
                 { label: 'Invoices', children: [] },

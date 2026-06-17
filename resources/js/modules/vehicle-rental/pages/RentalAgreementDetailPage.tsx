@@ -176,7 +176,7 @@ export default function RentalAgreementDetailPage() {
                     </Panel>
                     <Panel title="Workspaces">
                         <div className="grid gap-2">
-                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/usage`} variant="secondary" className="w-full">Open in common running chart</LinkButton>
+                            <LinkButton to={`/vehicle-rental/running-chart?mode=${agreement.direction === 'outbound' ? 'lessee' : 'lessor'}&agreement_id=${agreement.id}`} variant="secondary" className="w-full">Open running chart</LinkButton>
                             <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/expenses`} variant="secondary" className="w-full">Expenses</LinkButton>
                             <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/charges`} variant="secondary" className="w-full">Charge preview</LinkButton>
                             <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/invoice`} variant="secondary" className="w-full">Create invoice / payable</LinkButton>

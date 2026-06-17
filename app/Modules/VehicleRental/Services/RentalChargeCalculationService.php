@@ -163,6 +163,143 @@ final class RentalChargeCalculationService
         return $this->charges->previewFromCalculations($agreement, $calculations);
     }
 
+    /**
+     * @param  array{contexts: list<array{agreement: RentalAgreement}>}  $resolved
+     * @param  list<array<string, mixed>>  $trips
+     * @return array<string, mixed>
+     */
+    public function previewRunningChart(array $resolved, array $trips): array
+    {
+        $distance = '0.000000';
+        $workingMinutes = 0;
+        $classifiedHours = '0.000000';
+        $eventQuantities = [];
+
+        foreach ($trips as $trip) {
+            $startOdometer = (string) ($trip['start_odometer'] ?? '0');
+            $endOdometer = (string) ($trip['end_odometer'] ?? '0');
+            if ($this->math->compare($endOdometer, $startOdometer) < 0) {
+                throw new InvalidArgumentException('Preview finish odometer must be greater than or equal to start odometer.');
+            }
+            $distance = $this->math->add($distance, $this->math->sub($endOdometer, $startOdometer));
+            $workingMinutes += $this->runningChartWorkingMinutes(
+                (string) ($trip['usage_date'] ?? now()->toDateString()),
+                isset($trip['start_time']) ? (string) $trip['start_time'] : null,
+                isset($trip['end_time']) ? (string) $trip['end_time'] : null,
+            );
+            foreach (($trip['events'] ?? []) as $event) {
+                $type = RentalUsageEventType::from((string) $event['event_type']);
+                $quantity = $this->math->normalize((string) $event['quantity']);
+                $eventQuantities[$type->value] = $this->math->add(
+                    $eventQuantities[$type->value] ?? '0.000000',
+                    $quantity,
+                );
+                if (in_array($type, [
+                    RentalUsageEventType::Overtime,
+                    RentalUsageEventType::DoubleOvertime,
+                ], true)) {
+                    $classifiedHours = $this->math->add($classifiedHours, $quantity);
+                }
+            }
+        }
+
+        $workingHours = $this->math->div((string) $workingMinutes, '60.000000');
+        $contextRows = [];
+        $revenue = '0.000000';
+        $cost = '0.000000';
+
+        foreach ($resolved['contexts'] as $context) {
+            $agreement = $context['agreement'];
+            $agreement->loadMissing('rateSnapshot');
+            if ($agreement->rateSnapshot === null) {
+                throw new InvalidArgumentException('Agreement rate snapshot is missing.');
+            }
+
+            $lines = [];
+            $baseQuantity = $this->runningChartBaseQuantity(
+                $agreement,
+                $distance,
+                $workingHours,
+                count($trips),
+            );
+            $this->appendPreviewLine(
+                $lines,
+                'base_rental',
+                $baseQuantity,
+                (string) $agreement->rateSnapshot->base_rate,
+                $agreement->rateSnapshot->rate_unit->value,
+            );
+
+            $extraKm = $this->positiveSub($distance, (string) $agreement->rateSnapshot->allowed_km);
+            $this->appendPreviewLine(
+                $lines,
+                'extra_km',
+                $extraKm,
+                (string) $agreement->rateSnapshot->extra_km_rate,
+                'km',
+            );
+
+            $hoursAfterAllowance = $this->positiveSub(
+                $workingHours,
+                (string) $agreement->rateSnapshot->allowed_hours,
+            );
+            $extraHours = $this->positiveSub($hoursAfterAllowance, $classifiedHours);
+            $this->appendPreviewLine(
+                $lines,
+                'extra_hour',
+                $extraHours,
+                (string) $agreement->rateSnapshot->extra_hour_rate,
+                'hour',
+            );
+
+            foreach ($eventQuantities as $eventType => $quantity) {
+                $type = RentalUsageEventType::from($eventType);
+                if (in_array($type, [
+                    RentalUsageEventType::ExtraHour,
+                    RentalUsageEventType::ExtraKm,
+                ], true)) {
+                    continue;
+                }
+                $this->appendPreviewLine(
+                    $lines,
+                    $this->eventCalculationTypeValue($type),
+                    $quantity,
+                    $this->eventRate($agreement, $type),
+                    $this->eventUnit($type),
+                );
+            }
+
+            $amount = $this->math->sum(array_map(
+                fn (array $line): string => (string) $line['amount'],
+                $lines,
+            ));
+            $side = RentalFinancialSide::fromDirection($agreement->direction)->value;
+            if ($side === RentalFinancialSide::Revenue->value) {
+                $revenue = $this->math->add($revenue, $amount);
+            } else {
+                $cost = $this->math->add($cost, $amount);
+            }
+            $contextRows[] = [
+                'agreement_id' => (int) $agreement->getKey(),
+                'financial_side' => $side,
+                'estimated_total' => $amount,
+                'lines' => $lines,
+            ];
+        }
+
+        return [
+            'daily_km' => $distance,
+            'working_minutes' => $workingMinutes,
+            'working_hours' => $workingHours,
+            'overtime_hours' => $classifiedHours,
+            'customer_revenue' => $revenue,
+            'owner_cost' => $cost,
+            'estimated_margin' => $this->math->sub($revenue, $cost),
+            'contexts' => $contextRows,
+            'persistent' => false,
+        ];
+    }
+
     private function assertCalculable(RentalAgreement $agreement): void
     {
         if (! in_array($agreement->status, [
@@ -582,6 +719,87 @@ final class RentalChargeCalculationService
         $denominator = max(1, $denominatorEnd->getTimestamp() - $denominatorStart->getTimestamp());
 
         return $this->math->div((string) $numerator, (string) $denominator);
+    }
+
+    private function runningChartWorkingMinutes(
+        string $usageDate,
+        ?string $startTime,
+        ?string $endTime,
+    ): int {
+        if ($startTime === null || $endTime === null) {
+            return 0;
+        }
+        $start = CarbonImmutable::parse($usageDate.' '.$startTime);
+        $end = CarbonImmutable::parse($usageDate.' '.$endTime);
+        if ($end->lessThan($start)) {
+            $end = $end->addDay();
+        }
+
+        return intdiv($end->getTimestamp() - $start->getTimestamp(), 60);
+    }
+
+    private function runningChartBaseQuantity(
+        RentalAgreement $agreement,
+        string $distance,
+        string $workingHours,
+        int $tripCount,
+    ): string {
+        if ($tripCount === 0) {
+            return '0.000000';
+        }
+
+        return match ($agreement->rateSnapshot->rate_unit) {
+            RentalRateUnit::Trip => $this->math->normalize((string) $tripCount),
+            RentalRateUnit::Km => $distance,
+            RentalRateUnit::Hour => $workingHours,
+            RentalRateUnit::Day,
+            RentalRateUnit::Week,
+            RentalRateUnit::Month => '1.000000',
+        };
+    }
+
+    /**
+     * @param  list<array<string, string>>  $lines
+     */
+    private function appendPreviewLine(
+        array &$lines,
+        string $type,
+        string $quantity,
+        string $rate,
+        ?string $unit,
+    ): void {
+        $quantity = $this->math->normalize($quantity);
+        $rate = $this->math->normalize($rate);
+        if ($this->math->isZero($quantity) || $this->math->isZero($rate)) {
+            return;
+        }
+
+        $lines[] = [
+            'type' => $type,
+            'quantity' => $quantity,
+            'rate' => $rate,
+            'unit' => $unit,
+            'amount' => $this->math->mul($quantity, $rate),
+        ];
+    }
+
+    private function eventCalculationTypeValue(RentalUsageEventType $type): string
+    {
+        return match ($type) {
+            RentalUsageEventType::ExtraHour => RentalChargeCalculationType::ExtraHour->value,
+            RentalUsageEventType::ExtraKm => RentalChargeCalculationType::ExtraKm->value,
+            RentalUsageEventType::Overtime => RentalChargeCalculationType::Overtime->value,
+            RentalUsageEventType::DoubleOvertime => RentalChargeCalculationType::DoubleOvertime->value,
+            RentalUsageEventType::NightShift => RentalChargeCalculationType::NightShift->value,
+            RentalUsageEventType::Weekend => RentalChargeCalculationType::Weekend->value,
+            RentalUsageEventType::Holiday => RentalChargeCalculationType::Holiday->value,
+            RentalUsageEventType::DayOut => RentalChargeCalculationType::DayOut->value,
+            RentalUsageEventType::NightOut => RentalChargeCalculationType::NightOut->value,
+            RentalUsageEventType::Driver => RentalChargeCalculationType::Driver->value,
+            RentalUsageEventType::Outstation => RentalChargeCalculationType::Outstation->value,
+            RentalUsageEventType::Waiting => RentalChargeCalculationType::Waiting->value,
+            RentalUsageEventType::Pass, RentalUsageEventType::Other => RentalChargeCalculationType::Other->value,
+        };
     }
 
     private function eventCalculationType(RentalUsageEvent $event): RentalChargeCalculationType

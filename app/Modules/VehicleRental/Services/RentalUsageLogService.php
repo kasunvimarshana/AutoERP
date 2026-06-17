@@ -30,6 +30,33 @@ final class RentalUsageLogService
 
     public function create(RentalAgreement $agreement, RentalUsageLogData $data): RentalUsageLog
     {
+        return $this->createWithMode(null, $agreement, $data);
+    }
+
+    public function createForMode(
+        string $mode,
+        RentalAgreement $agreement,
+        RentalUsageLogData $data,
+        ?RentalAgreement $counterpartAgreement = null,
+        ?int $counterpartAgreementVehicleId = null,
+    ): RentalUsageLog {
+        return $this->createWithMode(
+            $mode,
+            $agreement,
+            $data,
+            $counterpartAgreement,
+            $counterpartAgreementVehicleId,
+        );
+    }
+
+    private function createWithMode(
+        ?string $mode,
+        RentalAgreement $agreement,
+        RentalUsageLogData $data,
+        ?RentalAgreement $counterpartAgreement = null,
+        ?int $counterpartAgreementVehicleId = null,
+    ): RentalUsageLog
+    {
         if (! in_array($agreement->status, [
             RentalAgreementStatus::Active,
             RentalAgreementStatus::Returned,
@@ -37,7 +64,13 @@ final class RentalUsageLogService
             throw new InvalidArgumentException('Usage logs require an active or returned agreement.');
         }
 
-        return DB::transaction(function () use ($agreement, $data): RentalUsageLog {
+        return DB::transaction(function () use (
+            $agreement,
+            $data,
+            $mode,
+            $counterpartAgreement,
+            $counterpartAgreementVehicleId,
+        ): RentalUsageLog {
             $agreement = RentalAgreement::query()
                 ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
                 ->with('rateSnapshot')
@@ -57,6 +90,19 @@ final class RentalUsageLogService
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->validate($agreement, $allocation, $data);
+            $counterpart = $this->lockedCounterpart(
+                $agreement,
+                $counterpartAgreement,
+                $counterpartAgreementVehicleId,
+            );
+            $resolved = $this->resolveContexts(
+                $mode,
+                $agreement,
+                $allocation,
+                $data,
+                $counterpart['agreement'],
+                $counterpart['allocation'],
+            );
 
             $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
             $effectiveAt = CarbonImmutable::parse(
@@ -75,6 +121,31 @@ final class RentalUsageLogService
                 $this->math->normalize($data->startOdometer),
                 $this->math->normalize($data->endOdometer),
             ]));
+            $existing = RentalUsageLog::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('usage_fingerprint', $fingerprint)
+                ->lockForUpdate()
+                ->first();
+            if ($existing instanceof RentalUsageLog) {
+                $this->assertIdempotentCreate($existing, $agreement, $allocation, $resolved);
+
+                return $existing->load([
+                    'vehicle.make',
+                    'vehicle.model',
+                    'driver',
+                    'events',
+                    'contexts.agreement.customer',
+                    'contexts.agreement.supplier',
+                    'contexts.rateSnapshot',
+                ]);
+            }
+            $this->assertNoOverlappingUsage(
+                null,
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+                (int) $allocation->vehicle_id,
+                $data,
+            );
             $log = RentalUsageLog::query()->create([
                 'tenant_id' => $agreement->tenant_id,
                 'organization_unit_id' => $agreement->organization_unit_id,
@@ -105,13 +176,7 @@ final class RentalUsageLogService
                 'created_by' => $data->createdBy,
                 'updated_by' => $data->createdBy,
             ]);
-            $this->contexts->attach(
-                $log,
-                $agreement,
-                $allocation,
-                $data->usageDate,
-                $data->startTime,
-            );
+            $this->contexts->attachResolved($log, $resolved);
             $this->recordStatus($log, null, RentalUsageLogStatus::Draft, $data->createdBy);
 
             return $log->load([
@@ -128,17 +193,55 @@ final class RentalUsageLogService
 
     public function update(RentalUsageLog $log, RentalUsageLogData $data): RentalUsageLog
     {
-        return DB::transaction(function () use ($log, $data): RentalUsageLog {
+        return $this->updateWithMode($log, $data);
+    }
+
+    public function updateForMode(
+        string $mode,
+        RentalUsageLog $log,
+        RentalUsageLogData $data,
+        RentalAgreement $agreement,
+        ?RentalAgreement $counterpartAgreement = null,
+        ?int $counterpartAgreementVehicleId = null,
+    ): RentalUsageLog {
+        return $this->updateWithMode(
+            $log,
+            $data,
+            $mode,
+            $agreement,
+            $counterpartAgreement,
+            $counterpartAgreementVehicleId,
+        );
+    }
+
+    private function updateWithMode(
+        RentalUsageLog $log,
+        RentalUsageLogData $data,
+        ?string $mode = null,
+        ?RentalAgreement $selectedAgreement = null,
+        ?RentalAgreement $counterpartAgreement = null,
+        ?int $counterpartAgreementVehicleId = null,
+    ): RentalUsageLog
+    {
+        return DB::transaction(function () use (
+            $log,
+            $data,
+            $mode,
+            $selectedAgreement,
+            $counterpartAgreement,
+            $counterpartAgreementVehicleId,
+        ): RentalUsageLog {
             $log = RentalUsageLog::query()
                 ->with(['events', 'contexts'])
                 ->lockForUpdate()
                 ->findOrFail($log->getKey());
             $this->assertEditable($log);
+            $agreementId = $selectedAgreement?->getKey() ?? $log->agreement_id;
             $agreement = RentalAgreement::query()
                 ->forContext((int) $log->tenant_id, $log->organization_unit_id)
                 ->with('rateSnapshot')
                 ->lockForUpdate()
-                ->findOrFail($log->agreement_id);
+                ->findOrFail($agreementId);
             $allocation = $agreement->vehicles()->with('pickupInspection')->lockForUpdate()
                 ->findOrFail($data->agreementVehicleId);
             Vehicle::query()
@@ -147,6 +250,19 @@ final class RentalUsageLogService
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->validate($agreement, $allocation, $data);
+            $counterpart = $this->lockedCounterpart(
+                $agreement,
+                $counterpartAgreement,
+                $counterpartAgreementVehicleId,
+            );
+            $resolved = $this->resolveContexts(
+                $mode,
+                $agreement,
+                $allocation,
+                $data,
+                $counterpart['agreement'],
+                $counterpart['allocation'],
+            );
 
             $distance = $this->math->sub($data->endOdometer, $data->startOdometer);
             $effectiveAt = CarbonImmutable::parse(
@@ -161,6 +277,22 @@ final class RentalUsageLogService
                 $this->math->normalize($data->startOdometer),
                 $this->math->normalize($data->endOdometer),
             ]));
+            $duplicate = RentalUsageLog::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->where('usage_fingerprint', $fingerprint)
+                ->whereKeyNot($log->getKey())
+                ->lockForUpdate()
+                ->first();
+            if ($duplicate instanceof RentalUsageLog) {
+                throw new InvalidArgumentException('This physical vehicle usage has already been recorded.');
+            }
+            $this->assertNoOverlappingUsage(
+                $log,
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+                (int) $allocation->vehicle_id,
+                $data,
+            );
             $log->forceFill([
                 'agreement_id' => $agreement->getKey(),
                 'agreement_vehicle_id' => $allocation->getKey(),
@@ -192,13 +324,7 @@ final class RentalUsageLogService
                 'updated_by' => $data->createdBy,
             ])->save();
             $log->contexts()->lockForUpdate()->delete();
-            $this->contexts->attach(
-                $log,
-                $agreement,
-                $allocation,
-                $data->usageDate,
-                $data->startTime,
-            );
+            $this->contexts->attachResolved($log, $resolved);
 
             return $log->refresh()->load([
                 'vehicle.make',
@@ -270,11 +396,13 @@ final class RentalUsageLogService
 
             $updates = ['status' => $status->value, 'updated_by' => $changedBy];
             if ($status === RentalUsageLogStatus::Submitted) {
+                $this->assertNoOverlappingStoredUsage($log);
                 $this->validateClassifiedTime($log);
                 $updates['submitted_by'] = $changedBy;
                 $updates['submitted_at'] = now();
             }
             if ($status === RentalUsageLogStatus::Approved) {
+                $this->assertNoOverlappingStoredUsage($log);
                 $cumulative = $this->approveMileage($log, $allowMileageVariance, $reason);
                 $updates['cumulative_km'] = $cumulative;
                 $updates['approved_by'] = $changedBy;
@@ -368,6 +496,215 @@ final class RentalUsageLogService
         return $cumulative;
     }
 
+    /**
+     * @return array{agreement: RentalAgreement|null, allocation: RentalAgreementVehicle|null}
+     */
+    private function lockedCounterpart(
+        RentalAgreement $selectedAgreement,
+        ?RentalAgreement $counterpartAgreement,
+        ?int $counterpartAgreementVehicleId,
+    ): array {
+        if ($counterpartAgreement === null && $counterpartAgreementVehicleId === null) {
+            return ['agreement' => null, 'allocation' => null];
+        }
+        if ($counterpartAgreement === null || $counterpartAgreementVehicleId === null) {
+            throw new InvalidArgumentException('Linked running charts require both counterpart agreement and allocation.');
+        }
+
+        $agreement = RentalAgreement::query()
+            ->forContext((int) $selectedAgreement->tenant_id, $selectedAgreement->organization_unit_id)
+            ->with('rateSnapshot')
+            ->lockForUpdate()
+            ->findOrFail($counterpartAgreement->getKey());
+        $allocation = $agreement->vehicles()
+            ->with('pickupInspection')
+            ->lockForUpdate()
+            ->findOrFail($counterpartAgreementVehicleId);
+        Vehicle::query()
+            ->where('tenant_id', $agreement->tenant_id)
+            ->whereKey($allocation->vehicle_id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        return ['agreement' => $agreement, 'allocation' => $allocation];
+    }
+
+    /**
+     * @return array{
+     *   selected_agreement: RentalAgreement,
+     *   selected_allocation: RentalAgreementVehicle,
+     *   link: mixed,
+     *   contexts: list<array{agreement: RentalAgreement, allocation: RentalAgreementVehicle}>
+     * }
+     */
+    private function resolveContexts(
+        ?string $mode,
+        RentalAgreement $agreement,
+        RentalAgreementVehicle $allocation,
+        RentalUsageLogData $data,
+        ?RentalAgreement $counterpartAgreement,
+        ?RentalAgreementVehicle $counterpartAllocation,
+    ): array {
+        if ($mode === null) {
+            return $this->contexts->resolve($agreement, $allocation, $data->usageDate, $data->startTime);
+        }
+
+        return $this->contexts->resolveForMode(
+            $mode,
+            $agreement,
+            $allocation,
+            $data->usageDate,
+            $data->startTime,
+            $counterpartAgreement,
+            $counterpartAllocation,
+        );
+    }
+
+    /**
+     * @param  array{contexts: list<array{agreement: RentalAgreement, allocation: RentalAgreementVehicle}>}  $resolved
+     */
+    private function assertIdempotentCreate(
+        RentalUsageLog $existing,
+        RentalAgreement $agreement,
+        RentalAgreementVehicle $allocation,
+        array $resolved,
+    ): void {
+        $existingContextIds = $existing->contexts()
+            ->orderBy('agreement_id')
+            ->pluck('agreement_id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+        if ((int) $existing->agreement_id !== (int) $agreement->getKey()
+            || (int) $existing->agreement_vehicle_id !== (int) $allocation->getKey()
+            || $existingContextIds !== $this->resolvedAgreementIds($resolved)) {
+            throw new InvalidArgumentException('This physical vehicle usage has already been recorded.');
+        }
+    }
+
+    /**
+     * @param  array{contexts: list<array{agreement: RentalAgreement, allocation: RentalAgreementVehicle}>}  $resolved
+     * @return list<int>
+     */
+    private function resolvedAgreementIds(array $resolved): array
+    {
+        $ids = array_map(
+            fn (array $row): int => (int) $row['agreement']->getKey(),
+            $resolved['contexts'],
+        );
+        sort($ids);
+
+        return array_values($ids);
+    }
+
+    private function assertNoOverlappingStoredUsage(RentalUsageLog $log): void
+    {
+        $data = new RentalUsageLogData(
+            agreementVehicleId: (int) $log->agreement_vehicle_id,
+            usageDate: $log->usage_date->toDateString(),
+            startOdometer: (string) $log->start_odometer,
+            endOdometer: (string) $log->end_odometer,
+            driverId: $log->driver_id === null ? null : (int) $log->driver_id,
+            startTime: $log->start_time,
+            endTime: $log->end_time,
+        );
+        $this->assertNoOverlappingUsage(
+            $log,
+            (int) $log->tenant_id,
+            $log->organization_unit_id,
+            (int) $log->vehicle_id,
+            $data,
+        );
+    }
+
+    private function assertNoOverlappingUsage(
+        ?RentalUsageLog $current,
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $vehicleId,
+        RentalUsageLogData $data,
+    ): void {
+        $interval = $this->usageInterval($data);
+        if ($interval === null) {
+            return;
+        }
+        [$start, $end] = $interval;
+        if (! $end->greaterThan($start)) {
+            return;
+        }
+
+        $query = RentalUsageLog::query()
+            ->where('tenant_id', $tenantId)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->where('vehicle_id', $vehicleId)
+            ->whereIn('status', [
+                RentalUsageLogStatus::Draft->value,
+                RentalUsageLogStatus::Submitted->value,
+                RentalUsageLogStatus::Approved->value,
+            ])
+            ->whereBetween('effective_at', [$start->subDay(), $end->addDay()])
+            ->lockForUpdate();
+        if ($current instanceof RentalUsageLog) {
+            $query->whereKeyNot($current->getKey());
+        }
+
+        foreach ($query->get() as $existing) {
+            $existingInterval = $this->storedUsageInterval($existing);
+            if ($existingInterval === null) {
+                continue;
+            }
+            if ($this->intervalsOverlap($start, $end, $existingInterval[0], $existingInterval[1])) {
+                throw new InvalidArgumentException('Usage time overlaps an existing running chart for this vehicle.');
+            }
+        }
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    private function usageInterval(RentalUsageLogData $data): ?array
+    {
+        if ($data->startTime === null || $data->endTime === null) {
+            return null;
+        }
+        $start = CarbonImmutable::parse($data->usageDate.' '.$data->startTime);
+        $end = CarbonImmutable::parse($data->usageDate.' '.$data->endTime);
+        if ($end->lessThan($start)) {
+            $end = $end->addDay();
+        }
+
+        return [$start, $end];
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    private function storedUsageInterval(RentalUsageLog $log): ?array
+    {
+        if ($log->start_time === null || $log->end_time === null) {
+            return null;
+        }
+        $data = new RentalUsageLogData(
+            agreementVehicleId: (int) $log->agreement_vehicle_id,
+            usageDate: $log->usage_date->toDateString(),
+            startOdometer: (string) $log->start_odometer,
+            endOdometer: (string) $log->end_odometer,
+            startTime: $log->start_time,
+            endTime: $log->end_time,
+        );
+
+        return $this->usageInterval($data);
+    }
+
+    private function intervalsOverlap(
+        CarbonImmutable $leftStart,
+        CarbonImmutable $leftEnd,
+        CarbonImmutable $rightStart,
+        CarbonImmutable $rightEnd,
+    ): bool {
+        return $leftStart->lessThan($rightEnd) && $leftEnd->greaterThan($rightStart);
+    }
+
     private function assertEditable(RentalUsageLog $log): void
     {
         if (! in_array($log->status, [RentalUsageLogStatus::Draft, RentalUsageLogStatus::Rejected], true)) {
@@ -397,10 +734,18 @@ final class RentalUsageLogService
         if ($allocation->pickupInspection === null) {
             throw new InvalidArgumentException('Pickup inspection is required before recording vehicle usage.');
         }
+        $interval = $this->usageInterval($data);
+        $allocationEnd = $allocation->allocated_to ?? $agreement->expected_end_at;
+        if ($interval !== null) {
+            [$usageStart, $usageEnd] = $interval;
+            if ($usageStart->lessThan($allocation->allocated_from)
+                || $usageEnd->greaterThan($allocationEnd)) {
+                throw new InvalidArgumentException('Usage time must fall within the vehicle allocation period.');
+            }
+        }
         $date = CarbonImmutable::parse($data->usageDate);
-        if ($date->startOfDay()->lessThan($allocation->allocated_from->startOfDay())
-            || ($allocation->allocated_to !== null
-                && ! $date->startOfDay()->lessThan($allocation->allocated_to))) {
+        if ($interval === null && ($date->startOfDay()->lessThan($allocation->allocated_from->startOfDay())
+            || ! $date->startOfDay()->lessThan($allocationEnd))) {
             throw new InvalidArgumentException('Usage date must fall within the vehicle allocation period.');
         }
         if (($data->startTime === null) !== ($data->endTime === null)) {

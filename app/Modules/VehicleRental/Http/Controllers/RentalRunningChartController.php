@@ -7,25 +7,48 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
-use Modules\VehicleRental\Enums\RentalAgreementVehicleLinkStatus;
 use Modules\VehicleRental\Enums\RentalAgreementVehicleStatus;
 use Modules\VehicleRental\Enums\RentalPartyType;
+use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageLogStatus;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
+use Modules\VehicleRental\Http\Requests\RentalActionRequest;
+use Modules\VehicleRental\Http\Requests\RunningChartPreviewRequest;
 use Modules\VehicleRental\Http\Requests\RunningChartContextRequest;
+use Modules\VehicleRental\Http\Requests\StoreRunningChartTripRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementVehicleLinkResource;
 use Modules\VehicleRental\Http\Resources\RentalRateSnapshotResource;
+use Modules\VehicleRental\Http\Resources\RentalUsageLogResource;
 use Modules\VehicleRental\Models\RentalAgreementVehicle;
 use Modules\VehicleRental\Models\RentalAgreementVehicleLink;
 use Modules\VehicleRental\Models\RentalUsageLog;
+use Modules\VehicleRental\Services\RentalChargeCalculationService;
 use Modules\VehicleRental\Services\RentalUsageContextService;
+use Modules\VehicleRental\Services\RentalUsageEventService;
+use Modules\VehicleRental\Services\RentalUsageLogService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalRunningChartController extends RentalController
 {
     public function agreements(ListRentalRequest $request): JsonResponse
     {
         $search = trim((string) $request->input('search', ''));
+        $direction = $request->filled('direction') ? (string) $request->input('direction') : null;
+        $mode = $request->filled('mode') ? (string) $request->input('mode') : null;
+        $side = $request->filled('side') ? (string) $request->input('side') : null;
+        if ($direction === null) {
+            $direction = match (true) {
+                $mode === RentalUsageContextService::MODE_LESSEE => 'outbound',
+                $mode === RentalUsageContextService::MODE_LESSOR => 'inbound',
+                $mode === RentalUsageContextService::MODE_LINKED && $side === 'lessor' => 'inbound',
+                $mode === RentalUsageContextService::MODE_LINKED => 'outbound',
+                default => null,
+            };
+        }
         $allocations = RentalAgreementVehicle::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
             ->whereNotIn('status', [RentalAgreementVehicleStatus::Replaced->value])
@@ -37,9 +60,9 @@ final class RentalRunningChartController extends RentalController
                 ->where('agreement_id', (int) $request->input('agreement_id')))
             ->when($request->filled('vehicle_id'), fn (Builder $query) => $query
                 ->where('vehicle_id', (int) $request->input('vehicle_id')))
-            ->when($request->filled('direction'), fn (Builder $query) => $query
+            ->when($direction !== null, fn (Builder $query) => $query
                 ->whereHas('agreement', fn (Builder $agreement) => $agreement
-                    ->where('direction', (string) $request->input('direction'))))
+                    ->where('direction', $direction)))
             ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $scope) use ($search): void {
                 $scope->whereHas('agreement', fn (Builder $agreement) => $agreement
                     ->where('agreement_number', 'like', "%{$search}%")
@@ -112,15 +135,9 @@ final class RentalRunningChartController extends RentalController
         RunningChartContextRequest $request,
         RentalUsageContextService $service,
     ): JsonResponse {
-        $agreement = $this->agreement($request, (int) $request->input('agreement_id'))
-            ->load(['rateSnapshot', 'customer', 'supplier']);
-        $allocation = $this->allocation($agreement, (int) $request->input('agreement_vehicle_id'));
-        $resolved = $service->resolve(
-            $agreement,
-            $allocation,
-            (string) $request->input('usage_date'),
-            $request->filled('start_time') ? (string) $request->input('start_time') : null,
-        );
+        $resolved = $this->resolveRunningChart($request, $service);
+        $agreement = $resolved['selected_agreement'];
+        $allocation = $resolved['selected_allocation'];
         $effectiveAt = CarbonImmutable::parse(
             (string) $request->input('usage_date').' '.
             ($request->filled('start_time') ? (string) $request->input('start_time') : '00:00:00'),
@@ -133,33 +150,16 @@ final class RentalRunningChartController extends RentalController
             ->orderByDesc('operational_sequence')
             ->orderByDesc('id')
             ->first();
-        $openLinks = RentalAgreementVehicleLink::query()
-            ->forContext($request->tenantId(), $request->organizationUnitId())
-            ->where('vehicle_id', $allocation->vehicle_id)
-            ->whereIn('status', [
-                RentalAgreementVehicleLinkStatus::Draft->value,
-                RentalAgreementVehicleLinkStatus::Submitted->value,
-                RentalAgreementVehicleLinkStatus::Approved->value,
-            ])
-            ->where(function (Builder $query) use ($allocation): void {
-                $query->where('inbound_agreement_vehicle_id', $allocation->getKey())
-                    ->orWhere('outbound_agreement_vehicle_id', $allocation->getKey());
-            })
-            ->where('effective_from', '<=', $effectiveAt)
-            ->where('effective_to', '>', $effectiveAt)
-            ->with([
-                'vehicle.make',
-                'vehicle.model',
-                'inboundAgreement.supplier',
-                'outboundAgreement.customer',
-            ])
-            ->get();
-        if ($openLinks->count() > 1) {
-            abort(409, 'Multiple open allocation links require correction before this running chart can continue.');
-        }
-        $openLink = $openLinks->first();
+        $link = $resolved['link'];
+        $link?->loadMissing([
+            'vehicle.make',
+            'vehicle.model',
+            'inboundAgreement.supplier',
+            'outboundAgreement.customer',
+        ]);
 
         return response()->json(['data' => [
+            'mode' => $request->mode(),
             'vehicle_id' => (int) $allocation->vehicle_id,
             'vehicle' => $allocation->vehicle === null ? null : [
                 'id' => (int) $allocation->vehicle->getKey(),
@@ -169,9 +169,9 @@ final class RentalRunningChartController extends RentalController
             ],
             'selected_agreement_id' => (int) $agreement->getKey(),
             'agreement_vehicle_link_id' => $resolved['link']?->getKey(),
-            'agreement_vehicle_link' => $openLink === null
+            'agreement_vehicle_link' => $link === null
                 ? null
-                : (new RentalAgreementVehicleLinkResource($openLink))->resolve($request),
+                : (new RentalAgreementVehicleLinkResource($link))->resolve($request),
             'last_valid_finish_odometer' => (string) ($lastApproved?->end_odometer
                 ?? $allocation->pickupInspection?->odometer
                 ?? $allocation->start_odometer),
@@ -198,5 +198,322 @@ final class RentalRunningChartController extends RentalController
                 ];
             })->values()->all(),
         ]]);
+    }
+
+    public function trips(
+        RunningChartContextRequest $request,
+        RentalUsageContextService $service,
+    ): AnonymousResourceCollection {
+        $resolved = $this->resolveRunningChart($request, $service);
+        $agreementIds = collect($resolved['contexts'])
+            ->map(fn (array $context): int => (int) $context['agreement']->getKey())
+            ->values();
+
+        return RentalUsageLogResource::collection(
+            RentalUsageLog::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('organization_unit_id', $request->organizationUnitId())
+                ->where('vehicle_id', $resolved['selected_allocation']->vehicle_id)
+                ->whereDate('usage_date', (string) $request->input('usage_date'))
+                ->whereHas('contexts', fn (Builder $query) => $query
+                    ->whereIn('agreement_id', $agreementIds))
+                ->with([
+                    'vehicle.make',
+                    'vehicle.model',
+                    'driver',
+                    'events',
+                    'contexts.agreement.customer',
+                    'contexts.agreement.supplier',
+                    'contexts.rateSnapshot',
+                ])
+                ->orderBy('usage_date')
+                ->orderBy('effective_at')
+                ->orderBy('operational_sequence')
+                ->orderBy('id')
+                ->get()
+                ->filter(function (RentalUsageLog $log) use ($agreementIds): bool {
+                    $logAgreementIds = $log->contexts
+                        ->pluck('agreement_id')
+                        ->map(fn ($id): int => (int) $id)
+                        ->all();
+
+                    return $agreementIds->every(fn (int $id): bool => in_array($id, $logAgreementIds, true));
+                })
+                ->values(),
+        );
+    }
+
+    public function storeTrip(
+        StoreRunningChartTripRequest $request,
+        RentalUsageLogService $usageLogs,
+        RentalUsageEventService $events,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $this->assertEventPermissions($request, $request->eventData(), $authorization);
+
+        $log = DB::transaction(function () use ($request, $usageLogs, $events): RentalUsageLog {
+            $agreement = $this->agreement($request, $request->selectedAgreementId());
+            $counterpart = $request->counterpartAgreementId() === null
+                ? null
+                : $this->agreement($request, $request->counterpartAgreementId());
+            $log = $usageLogs->createForMode(
+                $request->mode(),
+                $agreement,
+                $request->toData(),
+                $counterpart,
+                $request->counterpartAgreementVehicleId(),
+            );
+            if ($log->wasRecentlyCreated) {
+                foreach ($request->eventData() as $eventData) {
+                    $events->create($log, $eventData);
+                }
+            }
+
+            return $this->runningChartLog($request, (int) $log->getKey());
+        });
+
+        return (new RentalUsageLogResource($log))->response()->setStatusCode(201);
+    }
+
+    public function updateTrip(
+        StoreRunningChartTripRequest $request,
+        int $usageLog,
+        RentalUsageLogService $usageLogs,
+        RentalUsageEventService $events,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $this->assertEventPermissions($request, $request->eventData(), $authorization);
+
+        $log = DB::transaction(function () use ($request, $usageLog, $usageLogs, $events): RentalUsageLog {
+            $agreement = $this->agreement($request, $request->selectedAgreementId());
+            $counterpart = $request->counterpartAgreementId() === null
+                ? null
+                : $this->agreement($request, $request->counterpartAgreementId());
+            $log = $usageLogs->updateForMode(
+                $request->mode(),
+                $this->runningChartLog($request, $usageLog),
+                $request->toData(),
+                $agreement,
+                $counterpart,
+                $request->counterpartAgreementVehicleId(),
+            );
+            foreach ($log->events()->lockForUpdate()->get() as $event) {
+                $events->delete($event);
+            }
+            foreach ($request->eventData() as $eventData) {
+                $events->create($log, $eventData);
+            }
+
+            return $this->runningChartLog($request, (int) $log->getKey());
+        });
+
+        return new RentalUsageLogResource($log);
+    }
+
+    public function destroyTrip(
+        ListRentalRequest $request,
+        int $usageLog,
+        RentalUsageLogService $usageLogs,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        $usageLogs->delete($this->runningChartLog($request, $usageLog));
+
+        return response()->json(null, 204);
+    }
+
+    public function submitTrip(
+        RentalActionRequest $request,
+        int $usageLog,
+        RentalUsageLogService $usageLogs,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+
+        return new RentalUsageLogResource($usageLogs->changeStatus(
+            $this->runningChartLog($request, $usageLog),
+            RentalUsageLogStatus::Submitted,
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
+    }
+
+    public function approveTrip(
+        RentalActionRequest $request,
+        int $usageLog,
+        RentalUsageLogService $usageLogs,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::APPROVE_USAGE,
+        );
+        $mileageOverride = $request->boolean('mileage_override');
+        if ($mileageOverride) {
+            $authorization->assert(
+                $request->currentUserId(),
+                $request->tenantId(),
+                VehicleRentalAuthorizationService::OVERRIDE_MILEAGE,
+            );
+            if (trim((string) $request->input('reason')) === '') {
+                abort(422, 'A reason is required for a mileage-chain override.');
+            }
+        }
+
+        return new RentalUsageLogResource($usageLogs->changeStatus(
+            $this->runningChartLog($request, $usageLog),
+            RentalUsageLogStatus::Approved,
+            $request->currentUserId(),
+            $request->input('reason'),
+            $mileageOverride,
+        ));
+    }
+
+    public function rejectTrip(
+        RentalActionRequest $request,
+        int $usageLog,
+        RentalUsageLogService $usageLogs,
+        VehicleRentalAuthorizationService $authorization,
+    ): RentalUsageLogResource {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::APPROVE_USAGE,
+        );
+
+        return new RentalUsageLogResource($usageLogs->changeStatus(
+            $this->runningChartLog($request, $usageLog),
+            RentalUsageLogStatus::Rejected,
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
+    }
+
+    public function preview(
+        RunningChartPreviewRequest $request,
+        RentalUsageContextService $contexts,
+        RentalChargeCalculationService $charges,
+        VehicleRentalAuthorizationService $authorization,
+    ): JsonResponse {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+
+        $agreement = $this->agreement($request, $request->selectedAgreementId());
+        $allocation = $this->allocation($agreement, $request->selectedAgreementVehicleId());
+        $counterpart = $request->counterpartAgreementId() === null
+            ? null
+            : $this->agreement($request, $request->counterpartAgreementId());
+        $counterpartAllocation = $counterpart === null || $request->counterpartAgreementVehicleId() === null
+            ? null
+            : $this->allocation($counterpart, $request->counterpartAgreementVehicleId());
+        $resolved = $contexts->resolveForMode(
+            $request->mode(),
+            $agreement,
+            $allocation,
+            (string) $request->input('usage_date'),
+            null,
+            $counterpart,
+            $counterpartAllocation,
+        );
+
+        return response()->json(['data' => $charges->previewRunningChart($resolved, $request->trips())]);
+    }
+
+    private function resolveRunningChart(
+        RunningChartContextRequest $request,
+        RentalUsageContextService $service,
+    ): array {
+        $agreement = $this->agreement($request, $request->selectedAgreementId())
+            ->load(['rateSnapshot', 'customer', 'supplier']);
+        $allocation = $this->allocation($agreement, $request->selectedAgreementVehicleId());
+        if ($request->mode() === null) {
+            return $service->resolve(
+                $agreement,
+                $allocation,
+                (string) $request->input('usage_date'),
+                $request->filled('start_time') ? (string) $request->input('start_time') : null,
+            );
+        }
+
+        $counterpart = $request->counterpartAgreementId() === null
+            ? null
+            : $this->agreement($request, $request->counterpartAgreementId())
+                ->load(['rateSnapshot', 'customer', 'supplier']);
+        $counterpartAllocation = $counterpart === null || $request->counterpartAgreementVehicleId() === null
+            ? null
+            : $this->allocation($counterpart, $request->counterpartAgreementVehicleId());
+
+        return $service->resolveForMode(
+            $request->mode(),
+            $agreement,
+            $allocation,
+            (string) $request->input('usage_date'),
+            $request->filled('start_time') ? (string) $request->input('start_time') : null,
+            $counterpart,
+            $counterpartAllocation,
+        );
+    }
+
+    private function runningChartLog(TenantScopedRequest $request, int $id): RentalUsageLog
+    {
+        return RentalUsageLog::query()
+            ->where('tenant_id', $request->tenantId())
+            ->where('organization_unit_id', $request->organizationUnitId())
+            ->whereKey($id)
+            ->with([
+                'vehicle.make',
+                'vehicle.model',
+                'driver',
+                'events',
+                'contexts.agreement.customer',
+                'contexts.agreement.supplier',
+                'contexts.rateSnapshot',
+            ])
+            ->firstOrFail();
+    }
+
+    /**
+     * @param  list<\Modules\VehicleRental\DTOs\RentalUsageEventData>  $events
+     */
+    private function assertEventPermissions(
+        StoreRunningChartTripRequest $request,
+        array $events,
+        VehicleRentalAuthorizationService $authorization,
+    ): void {
+        foreach ($events as $event) {
+            if ($event->eventType !== RentalUsageEventType::Holiday) {
+                continue;
+            }
+            $authorization->assert(
+                $request->currentUserId(),
+                $request->tenantId(),
+                VehicleRentalAuthorizationService::CLASSIFY_HOLIDAY,
+            );
+            if (trim((string) $event->remarks) === '') {
+                abort(422, 'Holiday usage classification requires a documented reason or calendar reference.');
+            }
+        }
     }
 }
