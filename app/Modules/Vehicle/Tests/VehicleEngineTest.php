@@ -196,6 +196,9 @@ final class VehicleEngineTest extends TestCase
     public function test_vehicle_api_crud_relations_lookup_and_readable_response(): void
     {
         $this->withoutMiddleware();
+        $authMock = $this->createMock(\Modules\Vehicle\Services\VehicleAuthorizationService::class);
+        $authMock->method('assert')->willReturn(null);
+        $this->app->instance(\Modules\Vehicle\Services\VehicleAuthorizationService::class, $authMock);
         [$tenantId, $organizationUnitId] = $this->scopeContext();
         [$make, $model, $type, $category] = $this->masterData($tenantId, $organizationUnitId);
         $customer = $this->customer($tenantId, $organizationUnitId, 'API-CUS');
@@ -246,6 +249,58 @@ final class VehicleEngineTest extends TestCase
         $this->getJson("/api/v1/vehicles/{$id}/status-history?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonCount(2, 'data');
+    }
+
+    public function test_vehicle_document_store_and_update_endpoints_do_not_throw_type_error(): void
+    {
+        $this->withoutMiddleware();
+        $authMock = $this->createMock(\Modules\Vehicle\Services\VehicleAuthorizationService::class);
+        $authMock->method('assert')->willReturn(null);
+        $this->app->instance(\Modules\Vehicle\Services\VehicleAuthorizationService::class, $authMock);
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$make, $model] = $this->masterData($tenantId, $organizationUnitId);
+
+        $vehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-DOC', (int) $make->getKey(), (int) $model->getKey());
+        $id = (int) $vehicle->getKey();
+
+        $uploaded = \Illuminate\Http\Testing\File::create('test.pdf', 1, 'application/pdf');
+
+        $create = $this->post("/api/v1/vehicles/{$id}/documents", [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'document_type' => 'insurance',
+            'file' => $uploaded,
+        ]);
+
+        $create->assertCreated();
+        $docId = (int) $create->json('data.id');
+
+        // metadata-only update should succeed without requiring a file
+        $this->putJson("/api/v1/vehicles/{$id}/documents/{$docId}", [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'notes' => 'Updated notes',
+        ])->assertOk()->assertJsonPath('data.notes', 'Updated notes');
+    }
+
+    public function test_vehicle_attribute_store_endpoint_does_not_throw_type_error(): void
+    {
+        $this->withoutMiddleware();
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$make, $model] = $this->masterData($tenantId, $organizationUnitId);
+
+        $vehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-ATTR', (int) $make->getKey(), (int) $model->getKey());
+        $id = (int) $vehicle->getKey();
+
+        $create = $this->postJson("/api/v1/vehicles/{$id}/attributes", [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'attribute_key' => 'load_capacity',
+            'attribute_value' => '1000',
+            'data_type' => 'number',
+        ]);
+
+        $create->assertCreated()->assertJsonPath('data.attribute_key', 'load_capacity');
     }
 
     public function test_vehicle_api_exposes_secure_customer_and_supplier_filtered_views(): void

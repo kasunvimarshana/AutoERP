@@ -10,6 +10,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleDocument;
 use Modules\Vehicle\Http\Requests\ListVehicleRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleAttributeRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleDocumentRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleOwnershipRequest;
@@ -175,7 +176,7 @@ final class VehicleRelationController
         ]);
     }
 
-    private function vehicle(ListVehicleRequest $request, int $vehicle): Vehicle
+    private function vehicle(TenantScopedRequest $request, int $vehicle): Vehicle
     {
         return $this->vehicles->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
     }
