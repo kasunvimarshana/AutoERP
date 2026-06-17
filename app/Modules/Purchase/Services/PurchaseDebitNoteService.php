@@ -7,6 +7,7 @@ namespace Modules\Purchase\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
@@ -91,7 +92,10 @@ final class PurchaseDebitNoteService
             $lockedNote = PurchaseDebitNote::query()
                 ->lockForUpdate()
                 ->findOrFail($note->getKey());
-            $this->assertAllocationScope($lockedNote, $invoice);
+            $lockedInvoice = Invoice::query()
+                ->lockForUpdate()
+                ->findOrFail($invoice->getKey());
+            $this->assertAllocationScope($lockedNote, $lockedInvoice);
             if (! in_array($lockedNote->status, [
                 PurchaseDebitNoteStatus::Posted,
                 PurchaseDebitNoteStatus::Allocated,
@@ -100,6 +104,9 @@ final class PurchaseDebitNoteService
                     'Only posted purchase debit notes can be allocated.',
                 );
             }
+            if ($this->math->compare($amount, '0.000000') <= 0) {
+                throw new InvalidArgumentException('Debit allocation amount must be greater than zero.');
+            }
             if ($this->math->compare($amount, (string) $lockedNote->remaining_amount) > 0) {
                 throw new InvalidArgumentException(
                     'Debit allocation cannot exceed purchase debit note remaining amount.',
@@ -107,7 +114,7 @@ final class PurchaseDebitNoteService
             }
 
             $this->invoiceBalances->allocateCredit(
-                $invoice,
+                $lockedInvoice,
                 'purchase_debit_note',
                 (int) $lockedNote->getKey(),
                 $amount,
@@ -131,14 +138,30 @@ final class PurchaseDebitNoteService
 
     private function assertAllocationScope(PurchaseDebitNote $note, Invoice $invoice): void
     {
+        $invoiceStatus = $invoice->status instanceof InvoiceStatus
+            ? $invoice->status
+            : InvoiceStatus::from((string) $invoice->status);
+        $noteOrganizationUnitId = $note->organization_unit_id === null
+            ? null
+            : (int) $note->organization_unit_id;
+        $invoiceOrganizationUnitId = $invoice->organization_unit_id === null
+            ? null
+            : (int) $invoice->organization_unit_id;
+
         if ((int) $note->tenant_id !== (int) $invoice->tenant_id
-            || $note->organization_unit_id !== $invoice->organization_unit_id
-            || (int) $note->supplier_id !== (int) $invoice->party_id
-            || $invoice->party_type !== 'supplier'
+            || $noteOrganizationUnitId !== $invoiceOrganizationUnitId
         ) {
-            throw new InvalidArgumentException(
-                'Purchase debit note and invoice scope or supplier does not match.',
-            );
+            throw new InvalidArgumentException('Purchase debit note and invoice scope does not match.');
+        }
+
+        if ((int) $note->supplier_id !== (int) $invoice->party_id
+            || (string) $invoice->party_type !== 'supplier'
+        ) {
+            throw new InvalidArgumentException('Purchase debit note and invoice supplier does not match.');
+        }
+
+        if (! in_array($invoiceStatus, [InvoiceStatus::Posted, InvoiceStatus::PartiallyPaid], true)) {
+            throw new InvalidArgumentException('Purchase debit notes can only be allocated to posted supplier invoices.');
         }
     }
 }

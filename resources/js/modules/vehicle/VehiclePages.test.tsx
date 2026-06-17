@@ -37,7 +37,13 @@ vi.mock('./vehicleApi', () => ({
 }));
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
-    useAuth: () => ({ permissions: ['vehicle.update'] }),
+    useAuth: () => ({
+        permissions: [
+            'vehicle.create',
+            'vehicle.update',
+            'vehicle.documents.download',
+        ],
+    }),
 }));
 
 const vehicle: Vehicle = {
@@ -61,7 +67,7 @@ describe('Vehicle route pages', () => {
         apiMocks.createVehicle.mockResolvedValue(vehicle);
         apiMocks.getVehicle.mockResolvedValue(vehicle);
         apiMocks.listVehicleDocuments.mockResolvedValue(collection([
-            { id: 1, document_type: 'registration', document_number: 'REG-1', issued_date: '2026-06-01', expiry_date: '2027-06-01', file_path: '/files/reg.pdf', status: 'active', notes: null },
+            { id: 1, document_type: 'registration', document_number: 'REG-1', issued_date: '2026-06-01', expiry_date: '2027-06-01', file_name: 'reg.pdf', has_file: true, status: 'active', notes: null },
         ]));
         apiMocks.listVehicleAttributes.mockResolvedValue(collection([{ id: 1, attribute_key: 'seat_count', attribute_value: '5', data_type: 'number', sort_order: 1 }]));
         apiMocks.listVehicleStatusHistory.mockResolvedValue(collection([]));
@@ -126,7 +132,8 @@ describe('Vehicle route pages', () => {
 
         await user.click(screen.getByRole('tab', { name: 'Documents' }));
         expect(await screen.findAllByText('REG-1')).not.toHaveLength(0);
-        expect(screen.getAllByText('Preview / download')).not.toHaveLength(0);
+        expect(screen.getAllByRole('button', { name: 'Preview' })).not.toHaveLength(0);
+        expect(screen.getAllByRole('button', { name: 'Download' })).not.toHaveLength(0);
         expect(screen.queryByRole('button', { name: 'Add Document' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     });

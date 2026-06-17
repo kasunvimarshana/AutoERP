@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
@@ -18,48 +19,61 @@ final class PurchaseOrderStatusService
 
     public function submit(PurchaseOrder $order, ?int $submittedBy = null): PurchaseOrder
     {
-        $this->transitions->assertPurchaseOrderTransition(
-            $order->status,
-            PurchaseOrderStatus::PendingApproval,
-        );
-        $order->status = PurchaseOrderStatus::PendingApproval;
-        $order->submitted_by = $submittedBy;
-        $order->submitted_at = now();
-        $order->save();
+        return DB::transaction(function () use ($order, $submittedBy): PurchaseOrder {
+            $locked = $this->lock($order);
+            $this->transitions->assertPurchaseOrderTransition(
+                $locked->status,
+                PurchaseOrderStatus::PendingApproval,
+            );
+            $locked->status = PurchaseOrderStatus::PendingApproval;
+            $locked->submitted_by = $submittedBy;
+            $locked->submitted_at = now();
+            $locked->save();
 
-        return $order;
+            return $locked;
+        });
     }
 
     public function approve(PurchaseOrder $order, ?int $approvedBy = null): PurchaseOrder
     {
-        $this->transitions->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Approved);
-        $order->status = PurchaseOrderStatus::Approved;
-        $order->approved_by = $approvedBy;
-        $order->approved_at = now();
-        $order->save();
+        return DB::transaction(function () use ($order, $approvedBy): PurchaseOrder {
+            $locked = $this->lock($order);
+            $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Approved);
+            $locked->status = PurchaseOrderStatus::Approved;
+            $locked->approved_by = $approvedBy;
+            $locked->approved_at = now();
+            $locked->save();
 
-        return $order;
+            return $locked;
+        });
     }
 
     public function cancel(PurchaseOrder $order): PurchaseOrder
     {
-        $this->assertCancellable($order);
-        $this->transitions->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Cancelled);
-        $order->status = PurchaseOrderStatus::Cancelled;
-        $order->save();
+        return DB::transaction(function () use ($order): PurchaseOrder {
+            $locked = $this->lock($order, ['lines']);
+            $this->assertCancellable($locked);
+            $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Cancelled);
+            $locked->status = PurchaseOrderStatus::Cancelled;
+            $locked->save();
 
-        return $order;
+            return $locked;
+        });
     }
 
     public function close(PurchaseOrder $order, ?int $closedBy = null): PurchaseOrder
     {
-        $this->transitions->assertPurchaseOrderTransition($order->status, PurchaseOrderStatus::Closed);
-        $order->status = PurchaseOrderStatus::Closed;
-        $order->closed_by = $closedBy;
-        $order->closed_at = now();
-        $order->save();
+        return DB::transaction(function () use ($order, $closedBy): PurchaseOrder {
+            $locked = $this->lock($order, ['lines']);
+            $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Closed);
+            $this->assertClosable($locked);
+            $locked->status = PurchaseOrderStatus::Closed;
+            $locked->closed_by = $closedBy;
+            $locked->closed_at = now();
+            $locked->save();
 
-        return $order;
+            return $locked;
+        });
     }
 
     private function assertCancellable(PurchaseOrder $order): void
@@ -73,5 +87,29 @@ final class PurchaseOrderStatusService
                 );
             }
         }
+    }
+
+    private function assertClosable(PurchaseOrder $order): void
+    {
+        $order->loadMissing('lines');
+        foreach ($order->lines as $line) {
+            if ($this->math->compare((string) $line->remaining_receivable_quantity, '0.000000') > 0) {
+                throw new InvalidArgumentException(
+                    'Purchase orders with remaining receivable quantities cannot be closed.',
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  list<string>  $relations
+     */
+    private function lock(PurchaseOrder $order, array $relations = []): PurchaseOrder
+    {
+        $locked = PurchaseOrder::query()
+            ->lockForUpdate()
+            ->findOrFail($order->getKey());
+
+        return $relations === [] ? $locked : $locked->load($relations);
     }
 }

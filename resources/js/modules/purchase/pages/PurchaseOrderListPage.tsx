@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, listPurchaseOrders, type PurchaseOrder } from '../purchaseApi';
+import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, listPurchaseOrders, submitPurchaseOrder, type PurchaseOrder } from '../purchaseApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -19,19 +20,18 @@ import type { NamedResource } from '@/shared/types/common';
 import { SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseOrderStatusBadge } from '../components/PurchaseOrderStatusBadge';
 import { purchaseOrderCapabilities } from '../purchaseCapabilities';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 const statuses = [
     'draft',
+    'pending_approval',
     'approved',
-    'partially_received',
-    'received',
-    'partially_invoiced',
-    'invoiced',
     'closed',
     'cancelled',
 ].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 export default function PurchaseOrderListPage() {
+    const auth = useAuth();
     const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState(searchParams.get('status') ?? '');
@@ -52,10 +52,12 @@ export default function PurchaseOrderListPage() {
         per_page: 25,
     }, signal), [debounced, status, supplier?.id, dateFrom, dateTo, page]);
 
-    const runAction = async (order: PurchaseOrder, action: 'approve' | 'cancel' | 'close') => {
+    const canCreate = hasPurchasePermission(auth.permissions, purchasePermissions.ordersCreate);
+    const runAction = async (order: PurchaseOrder, action: 'submit' | 'approve' | 'cancel' | 'close') => {
         setBusyId(order.id);
         setActionError(null);
         try {
+            if (action === 'submit') await submitPurchaseOrder(order.id);
             if (action === 'approve') await approvePurchaseOrder(order.id);
             if (action === 'cancel') await cancelPurchaseOrder(order.id);
             if (action === 'close') await closePurchaseOrder(order.id);
@@ -73,19 +75,22 @@ export default function PurchaseOrderListPage() {
         { key: 'supplier', header: 'Supplier', render: (row) => readableRelation(row.supplier) },
         { key: 'warehouse', header: 'Warehouse', render: (row) => readableRelation(row.warehouse) },
         { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total ?? row.subtotal} currency={row.currency?.code ?? undefined} /> },
-        { key: 'status', header: 'Status', render: (row) => <PurchaseOrderStatusBadge status={row.status} /> },
+        { key: 'workflow', header: 'Workflow', render: (row) => <PurchaseOrderStatusBadge status={row.workflow_status ?? row.status} /> },
+        { key: 'receipt', header: 'Receipt', render: (row) => row.receipt_status?.replaceAll('_', ' ') ?? '-' },
+        { key: 'invoice', header: 'Invoice', render: (row) => row.invoice_status?.replaceAll('_', ' ') ?? '-' },
         {
             key: 'actions',
             header: 'Actions',
             render: (row) => {
-                const capabilities = purchaseOrderCapabilities(row.status);
+                const capabilities = purchaseOrderCapabilities(row);
                 return (
                     <div className="flex flex-wrap gap-2">
                         <LinkButton to={`/purchase/orders/${row.id}`} variant="ghost">View</LinkButton>
-                        {capabilities.canEdit && <LinkButton to={`/purchase/orders/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
-                        {capabilities.canApprove && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
-                        {capabilities.canCancel && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
-                        {capabilities.canClose && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
+                        {capabilities.canEdit && hasPurchasePermission(auth.permissions, purchasePermissions.ordersUpdate) && <LinkButton to={`/purchase/orders/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
+                        {capabilities.canSubmit && hasPurchasePermission(auth.permissions, purchasePermissions.ordersSubmit) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'submit')}>Submit</Button>}
+                        {capabilities.canApprove && hasPurchasePermission(auth.permissions, purchasePermissions.ordersApprove) && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
+                        {capabilities.canCancel && hasPurchasePermission(auth.permissions, purchasePermissions.ordersCancel) && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
+                        {capabilities.canClose && hasPurchasePermission(auth.permissions, purchasePermissions.ordersClose) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
                     </div>
                 );
             },
@@ -94,7 +99,7 @@ export default function PurchaseOrderListPage() {
 
     return (
         <>
-            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={<LinkButton to="/purchase/orders/create">New purchase order</LinkButton>} />
+            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={canCreate ? <LinkButton to="/purchase/orders/create">New purchase order</LinkButton> : undefined} />
             <div className="mb-4 grid gap-4 lg:grid-cols-5">
                 <Input type="search" label="Search" placeholder="PO number or supplier" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

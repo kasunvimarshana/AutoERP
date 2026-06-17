@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, getPurchaseOrder } from '../purchaseApi';
+import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, getPurchaseOrder, submitPurchaseOrder } from '../purchaseApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { useApi } from '@/shared/hooks/useApi';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
@@ -17,19 +18,23 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { PurchaseOrderActions } from '../components/PurchaseOrderActions';
 import { PurchaseOrderStatusBadge } from '../components/PurchaseOrderStatusBadge';
 import { PurchaseOrderTabs } from '../components/PurchaseOrderTabs';
+import { purchaseOrderCapabilities } from '../purchaseCapabilities';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchaseOrderDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
+    const auth = useAuth();
     const result = useApi((signal) => getPurchaseOrder(id, signal), [id]);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
-    const run = async (action: 'approve' | 'cancel' | 'close' | 'delete') => {
+    const run = async (action: 'submit' | 'approve' | 'cancel' | 'close' | 'delete') => {
         if (!result.data) return;
         setBusy(true);
         setActionError(null);
         try {
+            if (action === 'submit') result.setData(await submitPurchaseOrder(result.data.id));
             if (action === 'approve') result.setData(await approvePurchaseOrder(result.data.id));
             if (action === 'cancel') result.setData(await cancelPurchaseOrder(result.data.id));
             if (action === 'close') result.setData(await closePurchaseOrder(result.data.id));
@@ -47,9 +52,13 @@ export default function PurchaseOrderDetailPage() {
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const order = result.data;
+    const capabilities = purchaseOrderCapabilities(order);
     const summary = (
         <DetailGrid items={[
-            { label: 'Status', value: <PurchaseOrderStatusBadge status={order.status} /> },
+            { label: 'Workflow', value: <PurchaseOrderStatusBadge status={order.workflow_status ?? order.status} /> },
+            { label: 'Receipt', value: order.receipt_status?.replaceAll('_', ' ') ?? '-' },
+            { label: 'Invoice', value: order.invoice_status?.replaceAll('_', ' ') ?? '-' },
+            { label: 'Return', value: order.return_status?.replaceAll('_', ' ') ?? '-' },
             { label: 'Supplier', value: readableRelation(order.supplier) },
             { label: 'Warehouse', value: readableRelation(order.warehouse) },
             { label: 'Location', value: readableRelation(order.warehouse_location) },
@@ -74,7 +83,7 @@ export default function PurchaseOrderDetailPage() {
             <div className="space-y-4">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-                    <div className="mt-2"><PurchaseOrderStatusBadge status={order.status} /></div>
+                    <div className="mt-2"><PurchaseOrderStatusBadge status={order.workflow_status ?? order.status} /></div>
                 </div>
                 <DetailGrid items={[
                     { label: 'Supplier', value: readableRelation(order.supplier) },
@@ -91,17 +100,26 @@ export default function PurchaseOrderDetailPage() {
             <ContentHeader
                 title={order.purchase_order_number ?? 'Purchase order'}
                 description={formatDate(order.purchase_order_date)}
-                actions={<PurchaseOrderActions order={order} busy={busy} onApprove={() => run('approve')} onCancel={() => run('cancel')} onClose={() => run('close')} onDelete={() => run('delete')} />}
+                actions={<PurchaseOrderActions
+                    order={order}
+                    busy={busy}
+                    canUpdate={hasPurchasePermission(auth.permissions, purchasePermissions.ordersUpdate)}
+                    onSubmit={hasPurchasePermission(auth.permissions, purchasePermissions.ordersSubmit) ? () => run('submit') : undefined}
+                    onApprove={hasPurchasePermission(auth.permissions, purchasePermissions.ordersApprove) ? () => run('approve') : undefined}
+                    onCancel={hasPurchasePermission(auth.permissions, purchasePermissions.ordersCancel) ? () => run('cancel') : undefined}
+                    onClose={hasPurchasePermission(auth.permissions, purchasePermissions.ordersClose) ? () => run('close') : undefined}
+                    onDelete={hasPurchasePermission(auth.permissions, purchasePermissions.ordersDelete) ? () => run('delete') : undefined}
+                />}
             />
             <ErrorAlert error={actionError ?? result.error} />
             <EntityDetailLayout
                 summary={sideSummary}
                 actions={
                     <>
-                        <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Receive goods</LinkButton>
-                        <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create supplier invoice</LinkButton>
-                        <LinkButton to={`/purchase/payments/prepare?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Prepare payment</LinkButton>
-                        <LinkButton to={`/purchase/returns/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create return</LinkButton>
+                        {capabilities.canReceive && hasPurchasePermission(auth.permissions, purchasePermissions.goodsReceiptsCreate) && <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Receive goods</LinkButton>}
+                        {capabilities.canInvoice && hasPurchasePermission(auth.permissions, purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create supplier invoice</LinkButton>}
+                        {hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute) && <LinkButton to={`/purchase/payments/prepare?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Prepare payment</LinkButton>}
+                        {capabilities.canReturn && hasPurchasePermission(auth.permissions, purchasePermissions.returnsCreate) && <LinkButton to={`/purchase/returns/create?purchase_order_id=${order.id}`} variant="secondary" className="w-full">Create return</LinkButton>}
                     </>
                 }
             >

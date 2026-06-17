@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use InvalidArgumentException;
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
-use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
@@ -72,7 +72,16 @@ final class PurchaseInvoiceQuantityUpdater
     {
         $line = GoodsReceiptNoteLine::query()
             ->with('purchaseOrderLine')
+            ->lockForUpdate()
             ->findOrFail($lineId);
+        $remainingInvoiceable = $this->math->sub(
+            (string) $line->accepted_quantity,
+            (string) $line->invoiced_quantity,
+        );
+        if ($this->math->compare($quantity, $remainingInvoiceable) > 0) {
+            throw new InvalidArgumentException('Purchase invoice quantity cannot exceed GRN remaining quantity.');
+        }
+
         $line->invoiced_quantity = $this->math->add(
             (string) $line->invoiced_quantity,
             $quantity,
@@ -94,10 +103,11 @@ final class PurchaseInvoiceQuantityUpdater
             ->with('purchaseOrderLine')
             ->lockForUpdate()
             ->findOrFail($lineId);
-        $line->invoiced_quantity = $this->subtractToZero(
-            (string) $line->invoiced_quantity,
-            $quantity,
-        );
+        if ($this->math->compare($quantity, (string) $line->invoiced_quantity) > 0) {
+            throw new InvalidArgumentException('Cannot reverse more invoiced quantity than currently applied.');
+        }
+
+        $line->invoiced_quantity = $this->math->sub((string) $line->invoiced_quantity, $quantity);
         $line->remaining_quantity = $this->math->sub(
             (string) $line->accepted_quantity,
             (string) $line->invoiced_quantity,
@@ -115,22 +125,7 @@ final class PurchaseInvoiceQuantityUpdater
      */
     private function refreshGoodsReceiptStatuses(Collection $goodsReceipts): void
     {
-        foreach ($goodsReceipts as $grn) {
-            $grn->load('lines');
-            $accepted = $this->math->sum($grn->lines->pluck('accepted_quantity')->all());
-            $invoiced = $this->math->sum($grn->lines->pluck('invoiced_quantity')->all());
-            $returned = $this->math->sum($grn->lines->pluck('returned_quantity')->all());
-
-            $grn->status = match (true) {
-                $this->math->compare($returned, $accepted) >= 0 => GoodsReceiptNoteStatus::Returned,
-                $this->math->compare($returned, '0.000000') > 0 => GoodsReceiptNoteStatus::PartiallyReturned,
-                $this->math->compare($invoiced, $accepted) >= 0 => GoodsReceiptNoteStatus::Invoiced,
-                $this->math->compare($invoiced, '0.000000') > 0 => GoodsReceiptNoteStatus::PartiallyInvoiced,
-                default => GoodsReceiptNoteStatus::Posted,
-            };
-
-            $grn->save();
-        }
+        $goodsReceipts->each->refresh();
     }
 
     private function goodsReceiptLineStatus(GoodsReceiptNoteLine $line): string
@@ -152,10 +147,4 @@ final class PurchaseInvoiceQuantityUpdater
         return 'posted';
     }
 
-    private function subtractToZero(string $current, string $quantity): string
-    {
-        $result = $this->math->sub($current, $quantity);
-
-        return $this->math->isNegative($result) ? '0.000000' : $result;
-    }
 }

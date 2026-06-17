@@ -1,6 +1,7 @@
 import type { NavigationSection } from './navigationTypes';
 import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 
 const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
     requiresTenant: true,
@@ -40,6 +41,23 @@ const vehicleRentalPermissions = [
     'vehicle-rental.charges.generate',
     'vehicle-rental.charges.approve',
     'vehicle-rental.financial.create',
+];
+
+const purchaseNavigationPermissions = [
+    purchasePermissions.fastPurchasesView,
+    purchasePermissions.fastPurchasesExecute,
+    purchasePermissions.ordersView,
+    purchasePermissions.ordersCreate,
+    purchasePermissions.goodsReceiptsView,
+    purchasePermissions.goodsReceiptsCreate,
+    purchasePermissions.supplierInvoicesView,
+    purchasePermissions.supplierInvoicesCreate,
+    purchasePermissions.paymentsView,
+    purchasePermissions.paymentsExecute,
+    purchasePermissions.returnsView,
+    purchasePermissions.returnsCreate,
+    purchasePermissions.debitNotesView,
+    purchasePermissions.debitNotesCreate,
 ];
 
 export const navigationSections: NavigationSection[] = [
@@ -251,14 +269,15 @@ export const navigationSections: NavigationSection[] = [
                 type: 'module',
                 label: 'Purchase',
                 icon: 'purchase',
-                access: operationalAccess(['purchase']),
+                access: { ...operationalAccess(['purchase']), permissions: purchaseNavigationPermissions },
                 children: [
-                    { id: 'fast-purchase', type: 'link', label: 'Fast Purchase', to: '/purchase/fast-purchase', match: ['/purchase/fast-purchase'], access: operationalAccess(['purchase']) },
-                    { id: 'purchase-orders', type: 'link', label: 'Purchase Orders', to: '/purchase/orders', match: ['/purchase/orders'], access: operationalAccess(['purchase']) },
-                    { id: 'goods-receipts', type: 'link', label: 'Goods Receipts', to: '/purchase/goods-receipts', match: ['/purchase/goods-receipts'], access: operationalAccess(['purchase']) },
-                    { id: 'purchase-returns', type: 'link', label: 'Purchase Returns', to: '/purchase/returns', match: ['/purchase/returns', '/purchase/manual-supplier-returns'], access: operationalAccess(['purchase']) },
-                    { id: 'supplier-invoices', type: 'link', label: 'Supplier Invoices', to: '/invoices?view=supplier', match: ['/invoices'], access: operationalAccess(['invoice', 'purchase']) },
-                    { id: 'supplier-payments', type: 'link', label: 'Supplier Payments', to: '/payments?view=supplier', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'purchase']) },
+                    { id: 'fast-purchase', type: 'link', label: 'Fast Purchase', to: '/purchase/fast-purchase', match: ['/purchase/fast-purchase'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.fastPurchasesView, purchasePermissions.fastPurchasesExecute] } },
+                    { id: 'purchase-orders', type: 'link', label: 'Purchase Orders', to: '/purchase/orders', match: ['/purchase/orders'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.ordersView, purchasePermissions.ordersCreate] } },
+                    { id: 'goods-receipts', type: 'link', label: 'Goods Receipts', to: '/purchase/goods-receipts', match: ['/purchase/goods-receipts'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.goodsReceiptsView, purchasePermissions.goodsReceiptsCreate] } },
+                    { id: 'supplier-invoices', type: 'link', label: 'Supplier Invoices', to: '/purchase/invoices/create', match: ['/purchase/invoices'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.supplierInvoicesView, purchasePermissions.supplierInvoicesCreate] } },
+                    { id: 'supplier-payments', type: 'link', label: 'Supplier Payments', to: '/purchase/payments/prepare', match: ['/purchase/payments'], access: { ...operationalAccess(['payment', 'purchase']), permissions: [purchasePermissions.paymentsView, purchasePermissions.paymentsExecute] } },
+                    { id: 'purchase-returns', type: 'link', label: 'Purchase Returns', to: '/purchase/returns', match: ['/purchase/returns', '/purchase/manual-supplier-returns'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.returnsView, purchasePermissions.returnsCreate] } },
+                    { id: 'purchase-debit-notes', type: 'link', label: 'Debit Notes', to: '/purchase/debit-notes', match: ['/purchase/debit-notes'], access: { ...operationalAccess(['purchase']), permissions: [purchasePermissions.debitNotesView, purchasePermissions.debitNotesCreate] } },
                 ],
             },
             {

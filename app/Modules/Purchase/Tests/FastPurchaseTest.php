@@ -412,7 +412,7 @@ final class FastPurchaseTest extends TestCase
             name: 'Fast '.$code,
             itemType: $type,
             trackingType: TrackingType::None,
-            costingMethod: CostingMethod::Fifo,
+            costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
             baseUomId: $uomId,
             isStockable: $stockable,
         ));

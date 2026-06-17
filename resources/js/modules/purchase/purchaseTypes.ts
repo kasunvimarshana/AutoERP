@@ -71,6 +71,21 @@ export interface PurchaseOrder {
     purchase_order_date?: string;
     expected_delivery_date?: string | null;
     status?: PurchaseOrderStatus;
+    workflow_status?: PurchaseOrderStatus;
+    receipt_status?: string;
+    invoice_status?: string;
+    return_status?: string;
+    capabilities?: {
+        can_edit?: boolean;
+        can_submit?: boolean;
+        can_approve?: boolean;
+        can_receive?: boolean;
+        can_invoice?: boolean;
+        can_return?: boolean;
+        can_close?: boolean;
+        can_cancel?: boolean;
+        can_delete?: boolean;
+    };
     supplier_id?: number | null;
     supplier?: NamedResource | null;
     warehouse_id?: number | null;

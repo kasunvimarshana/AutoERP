@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Resources;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Core\Http\Resources\ModuleResource;
 
 abstract class PurchaseResource extends ModuleResource
 {
+    private ?DecimalMath $decimalMath = null;
+
     protected function enumValue(mixed $value): mixed
     {
         return $value instanceof \BackedEnum ? $value->value : $value;
@@ -43,5 +46,20 @@ abstract class PurchaseResource extends ModuleResource
         }
 
         return $data;
+    }
+
+    protected function compare(string $left, string $right): int
+    {
+        return $this->math()->compare($left, $right);
+    }
+
+    protected function add(string $left, string $right): string
+    {
+        return $this->math()->add($left, $right);
+    }
+
+    private function math(): DecimalMath
+    {
+        return $this->decimalMath ??= new DecimalMath;
     }
 }

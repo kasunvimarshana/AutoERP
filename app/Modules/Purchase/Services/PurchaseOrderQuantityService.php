@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
-use Modules\Purchase\Enums\PurchaseOrderStatus;
-use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
 
 final class PurchaseOrderQuantityService
@@ -16,37 +15,42 @@ final class PurchaseOrderQuantityService
 
     public function applyReceived(PurchaseOrderLine $line, string $quantity): void
     {
+        $line = $this->lockLine($line);
         $line->received_quantity = $this->math->add((string) $line->received_quantity, $quantity);
         $remaining = $this->math->sub((string) $line->ordered_quantity, (string) $line->received_quantity);
         $remaining = $this->math->sub($remaining, (string) $line->cancelled_quantity);
+        $this->assertNonNegative($remaining, 'Purchase order receivable quantity cannot be negative.');
         $line->remaining_quantity = $remaining;
         $line->remaining_receivable_quantity = $remaining;
         $line->remaining_invoiceable_quantity = $this->math->sub(
-            (string) $line->received_quantity,
+            $this->math->sub((string) $line->ordered_quantity, (string) $line->cancelled_quantity),
             (string) $line->invoiced_quantity,
         );
+        $this->assertNonNegative((string) $line->remaining_invoiceable_quantity, 'Purchase order invoiceable quantity cannot be negative.');
         $line->remaining_returnable_quantity = $this->math->sub(
             (string) $line->received_quantity,
             (string) $line->returned_quantity,
         );
+        $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
         $line->status = $this->math->isZero($remaining)
             ? PurchaseOrderLineStatus::Received
             : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
-
-        $this->refreshOrderStatus($line->order);
     }
 
     public function applyInvoiced(PurchaseOrderLine $line, string $quantity): void
     {
+        $line = $this->lockLine($line);
         $line->invoiced_quantity = $this->math->add((string) $line->invoiced_quantity, $quantity);
-        $invoiceableBasis = $this->math->compare((string) $line->received_quantity, '0.000000') > 0
-            ? (string) $line->received_quantity
-            : (string) $line->ordered_quantity;
         $line->remaining_invoiceable_quantity = $this->math->sub(
-            $invoiceableBasis,
+            (string) $line->ordered_quantity,
             (string) $line->invoiced_quantity,
         );
+        $line->remaining_invoiceable_quantity = $this->math->sub(
+            (string) $line->remaining_invoiceable_quantity,
+            (string) $line->cancelled_quantity,
+        );
+        $this->assertNonNegative((string) $line->remaining_invoiceable_quantity, 'Purchase order invoiceable quantity cannot be negative.');
 
         if ($this->math->compare((string) $line->invoiced_quantity, (string) $line->ordered_quantity) >= 0) {
             $line->status = PurchaseOrderLineStatus::Invoiced;
@@ -55,67 +59,68 @@ final class PurchaseOrderQuantityService
         }
 
         $line->save();
-        $this->refreshOrderStatus($line->order);
     }
 
     public function reverseInvoiced(PurchaseOrderLine $line, string $quantity): void
     {
-        $line->invoiced_quantity = $this->subtractToZero(
-            (string) $line->invoiced_quantity,
-            $quantity,
-        );
-        $invoiceableBasis = $this->math->compare(
-            (string) $line->received_quantity,
-            '0.000000',
-        ) > 0
-            ? (string) $line->received_quantity
-            : (string) $line->ordered_quantity;
+        $line = $this->lockLine($line);
+        if ($this->math->compare($quantity, (string) $line->invoiced_quantity) > 0) {
+            throw new InvalidArgumentException('Cannot reverse more invoiced quantity than currently applied.');
+        }
+
+        $line->invoiced_quantity = $this->math->sub((string) $line->invoiced_quantity, $quantity);
         $line->remaining_invoiceable_quantity = $this->math->sub(
-            $invoiceableBasis,
+            (string) $line->ordered_quantity,
             (string) $line->invoiced_quantity,
+        );
+        $line->remaining_invoiceable_quantity = $this->math->sub(
+            (string) $line->remaining_invoiceable_quantity,
+            (string) $line->cancelled_quantity,
         );
         $line->status = $this->lineStatus($line);
         $line->save();
-
-        $this->refreshOrderStatus($line->order);
     }
 
     public function applyReturned(PurchaseOrderLine $line, string $quantity): void
     {
+        $line = $this->lockLine($line);
         $line->returned_quantity = $this->math->add((string) $line->returned_quantity, $quantity);
         $line->remaining_returnable_quantity = $this->math->sub(
             (string) $line->received_quantity,
             (string) $line->returned_quantity,
         );
+        $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
         $line->save();
-
-        $this->refreshOrderStatus($line->order);
     }
 
     public function reverseReceived(PurchaseOrderLine $line, string $quantity): void
     {
-        $line->received_quantity = $this->math->sub((string) $line->received_quantity, $quantity);
-        if ($this->math->isNegative((string) $line->received_quantity)) {
-            $line->received_quantity = '0.000000';
+        $line = $this->lockLine($line);
+        if ($this->math->compare($quantity, (string) $line->received_quantity) > 0) {
+            throw new InvalidArgumentException('Cannot reverse more received quantity than currently applied.');
         }
 
+        $line->received_quantity = $this->math->sub((string) $line->received_quantity, $quantity);
+
         $remaining = $this->math->sub((string) $line->ordered_quantity, (string) $line->received_quantity);
+        $remaining = $this->math->sub($remaining, (string) $line->cancelled_quantity);
+        $this->assertNonNegative($remaining, 'Purchase order receivable quantity cannot be negative.');
         $line->remaining_quantity = $remaining;
         $line->remaining_receivable_quantity = $remaining;
         $line->remaining_invoiceable_quantity = $this->math->sub(
-            (string) $line->received_quantity,
+            $this->math->sub((string) $line->ordered_quantity, (string) $line->cancelled_quantity),
             (string) $line->invoiced_quantity,
         );
+        $this->assertNonNegative((string) $line->remaining_invoiceable_quantity, 'Purchase order invoiceable quantity cannot be negative.');
         $line->remaining_returnable_quantity = $this->math->sub(
             (string) $line->received_quantity,
             (string) $line->returned_quantity,
         );
+        $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
         $line->status = $this->math->isZero((string) $line->received_quantity)
             ? PurchaseOrderLineStatus::Open
             : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
-
-        $this->refreshOrderStatus($line->order);
     }
 
     public function isReceivable(PurchaseOrderLine $line): bool
@@ -128,9 +133,7 @@ final class PurchaseOrderQuantityService
 
     public function isInvoiceable(PurchaseOrderLine $line): bool
     {
-        $basis = $this->math->compare((string) $line->received_quantity, '0.000000') > 0
-            ? (string) $line->received_quantity
-            : (string) $line->ordered_quantity;
+        $basis = $this->math->sub((string) $line->ordered_quantity, (string) $line->cancelled_quantity);
 
         return $this->math->compare(
             $this->math->sub($basis, (string) $line->invoiced_quantity),
@@ -161,39 +164,15 @@ final class PurchaseOrderQuantityService
         return PurchaseOrderLineStatus::Open;
     }
 
-    private function subtractToZero(string $current, string $quantity): string
+    private function assertNonNegative(string $quantity, string $message): void
     {
-        $result = $this->math->sub($current, $quantity);
-
-        return $this->math->isNegative($result) ? '0.000000' : $result;
+        if ($this->math->isNegative($quantity)) {
+            throw new InvalidArgumentException($message);
+        }
     }
 
-    private function refreshOrderStatus(?PurchaseOrder $order): void
+    private function lockLine(PurchaseOrderLine $line): PurchaseOrderLine
     {
-        if (! $order instanceof PurchaseOrder) {
-            return;
-        }
-
-        $order->load('lines');
-        $ordered = $this->math->sum($order->lines->pluck('ordered_quantity')->all());
-        $received = $this->math->sum($order->lines->pluck('received_quantity')->all());
-        $invoiced = $this->math->sum($order->lines->pluck('invoiced_quantity')->all());
-        $returned = $this->math->sum($order->lines->pluck('returned_quantity')->all());
-
-        if ($this->math->compare($returned, $ordered) >= 0) {
-            $order->status = PurchaseOrderStatus::Returned;
-        } elseif ($this->math->compare($returned, '0.000000') > 0) {
-            $order->status = PurchaseOrderStatus::PartiallyReturned;
-        } elseif ($this->math->compare($invoiced, $ordered) >= 0) {
-            $order->status = PurchaseOrderStatus::Invoiced;
-        } elseif ($this->math->compare($invoiced, '0.000000') > 0) {
-            $order->status = PurchaseOrderStatus::PartiallyInvoiced;
-        } elseif ($this->math->compare($received, $ordered) >= 0) {
-            $order->status = PurchaseOrderStatus::Received;
-        } elseif ($this->math->compare($received, '0.000000') > 0) {
-            $order->status = PurchaseOrderStatus::PartiallyReceived;
-        }
-
-        $order->save();
+        return PurchaseOrderLine::query()->lockForUpdate()->findOrFail($line->getKey());
     }
 }

@@ -11,13 +11,18 @@ use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Purchase\Http\Requests\PreparePurchasePaymentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInventoryAdjustmentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInvoiceRequest;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
 
 final class PurchaseIntegrationController
 {
+    public function __construct(private readonly PurchaseAuthorizationService $authorization) {}
+
     public function createInventoryAdjustmentRequest(StorePurchaseInventoryAdjustmentRequest $request, InventoryFacade $inventory): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_POST);
+
         return (new InventoryAdjustmentResource($inventory->adjust($request->toData())))
             ->response()
             ->setStatusCode(201);
@@ -25,16 +30,22 @@ final class PurchaseIntegrationController
 
     public function previewInvoice(StorePurchaseInvoiceRequest $request, PurchaseInvoiceIntegrationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
+
         return response()->json(['data' => get_object_vars($service->previewSupplierInvoice($request->toData()))]);
     }
 
     public function createInvoice(StorePurchaseInvoiceRequest $request, PurchaseInvoiceIntegrationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_CREATE);
+
         return response()->json(['data' => $service->createSupplierInvoice($request->toData())], 201);
     }
 
     public function preparePayment(PreparePurchasePaymentRequest $request, PurchasePaymentIntegrationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::PAYMENTS_EXECUTE);
+
         $data = $service->prepareSupplierPayment(
             tenantId: $request->tenantId(),
             paymentDate: (string) $request->input('payment_date'),

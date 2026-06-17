@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -20,10 +21,15 @@ final class PurchaseInventoryIntegrationService
 {
     public function __construct(
         private readonly InventoryFacade $inventory,
+        private readonly DecimalMath $math,
     ) {}
 
     public function receipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
     {
+        if ($this->math->isZero((string) $line->accepted_quantity)) {
+            return null;
+        }
+
         if (! $this->affectsStock((int) $line->item_id)) {
             return null;
         }
@@ -78,6 +84,10 @@ final class PurchaseInventoryIntegrationService
 
     public function reverseReceipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
     {
+        if ($this->math->isZero((string) $line->accepted_quantity)) {
+            return null;
+        }
+
         if (! $this->affectsStock((int) $line->item_id)) {
             return null;
         }

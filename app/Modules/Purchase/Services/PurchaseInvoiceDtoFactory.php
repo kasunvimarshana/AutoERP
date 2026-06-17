@@ -21,6 +21,8 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\PreparedPurchaseInvoiceData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
+use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
@@ -52,11 +54,18 @@ final class PurchaseInvoiceDtoFactory
         $goodsReceipts = collect();
         $resolvedSupplierType = $data->supplierType;
         $resolvedSupplierId = $data->supplierId;
+        $seenSources = [];
 
         foreach ($data->sources as $source) {
             if (! $source instanceof PurchaseInvoiceSourceData) {
                 throw new InvalidArgumentException('Purchase supplier invoice sources are invalid.');
             }
+
+            $sourceKey = $source->sourceType.':'.$source->sourceId;
+            if (isset($seenSources[$sourceKey])) {
+                throw new InvalidArgumentException('Duplicate purchase invoice source document.');
+            }
+            $seenSources[$sourceKey] = true;
 
             if ($source->sourceType === self::PURCHASE_ORDER) {
                 $lineNumber = $this->appendPurchaseOrderSource(
@@ -153,6 +162,9 @@ final class PurchaseInvoiceDtoFactory
             $grn->organization_unit_id,
             $data,
         );
+        if ($grn->status !== GoodsReceiptNoteStatus::Posted) {
+            throw new InvalidArgumentException('Purchase invoices can only use posted goods receipts.');
+        }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,
             $resolvedSupplierId,
@@ -162,19 +174,34 @@ final class PurchaseInvoiceDtoFactory
 
         $goodsReceipts->push($grn);
         $selectedTotal = '0.000000';
+        $selectedLines = 0;
+        $requestedLineIds = array_map('intval', array_keys($source->lineQuantities));
+        $seenRequestedLineIds = [];
 
         foreach ($grn->lines as $sourceLine) {
+            $remainingInvoiceable = $this->math->sub(
+                (string) $sourceLine->accepted_quantity,
+                (string) $sourceLine->invoiced_quantity,
+            );
+            if ($this->math->isNegative($remainingInvoiceable)) {
+                throw new InvalidArgumentException('GRN invoiceable quantity is negative.');
+            }
+
+            if (array_key_exists((int) $sourceLine->getKey(), $source->lineQuantities)) {
+                $seenRequestedLineIds[] = (int) $sourceLine->getKey();
+            }
             $quantity = $source->lineQuantities[(int) $sourceLine->getKey()]
-                ?? (string) $sourceLine->remaining_quantity;
+                ?? $remainingInvoiceable;
             $quantity = $this->math->normalize($quantity);
             if ($this->math->isZero($quantity)) {
                 continue;
             }
-            if ($this->math->compare($quantity, (string) $sourceLine->remaining_quantity) > 0) {
+            if ($this->math->compare($quantity, $remainingInvoiceable) > 0) {
                 throw new InvalidArgumentException(
                     'Purchase invoice quantity cannot exceed GRN remaining quantity.',
                 );
             }
+            $selectedLines++;
 
             $selectedTotal = $this->math->add(
                 $selectedTotal,
@@ -225,6 +252,13 @@ final class PurchaseInvoiceDtoFactory
                 organizationUnitId: $data->organizationUnitId,
                 previouslyInvoicedQuantity: (string) $sourceLine->invoiced_quantity,
             );
+        }
+
+        if (array_diff($requestedLineIds, $seenRequestedLineIds) !== []) {
+            throw new InvalidArgumentException('Purchase invoice source line does not belong to the selected goods receipt.');
+        }
+        if ($selectedLines === 0) {
+            throw new InvalidArgumentException('Purchase invoice source has no invoiceable lines.');
         }
 
         $sourceAdjustmentTotal = $this->adjustmentTotal($grn->adjustments);
@@ -323,6 +357,9 @@ final class PurchaseInvoiceDtoFactory
             $order->organization_unit_id,
             $data,
         );
+        if ($order->status !== PurchaseOrderStatus::Approved) {
+            throw new InvalidArgumentException('Purchase invoices can only use approved purchase orders.');
+        }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,
             $resolvedSupplierId,
@@ -331,6 +368,9 @@ final class PurchaseInvoiceDtoFactory
         );
 
         $selectedTotal = '0.000000';
+        $selectedLines = 0;
+        $requestedLineIds = array_map('intval', array_keys($source->lineQuantities));
+        $seenRequestedLineIds = [];
         foreach ($order->lines as $sourceLine) {
             /** @var PurchaseOrderLine $sourceLine */
             $remaining = $this->math->sub(
@@ -338,6 +378,12 @@ final class PurchaseInvoiceDtoFactory
                 (string) $sourceLine->invoiced_quantity,
             );
             $remaining = $this->math->sub($remaining, (string) $sourceLine->cancelled_quantity);
+            if ($this->math->isNegative($remaining)) {
+                throw new InvalidArgumentException('PO invoiceable quantity is negative.');
+            }
+            if (array_key_exists((int) $sourceLine->getKey(), $source->lineQuantities)) {
+                $seenRequestedLineIds[] = (int) $sourceLine->getKey();
+            }
             $quantity = $source->lineQuantities[(int) $sourceLine->getKey()] ?? $remaining;
             $quantity = $this->math->normalize($quantity);
 
@@ -349,6 +395,7 @@ final class PurchaseInvoiceDtoFactory
                     'Purchase invoice quantity cannot exceed PO remaining quantity.',
                 );
             }
+            $selectedLines++;
 
             $selectedTotal = $this->math->add(
                 $selectedTotal,
@@ -396,6 +443,13 @@ final class PurchaseInvoiceDtoFactory
                 organizationUnitId: $data->organizationUnitId,
                 previouslyInvoicedQuantity: (string) $sourceLine->invoiced_quantity,
             );
+        }
+
+        if (array_diff($requestedLineIds, $seenRequestedLineIds) !== []) {
+            throw new InvalidArgumentException('Purchase invoice source line does not belong to the selected purchase order.');
+        }
+        if ($selectedLines === 0) {
+            throw new InvalidArgumentException('Purchase invoice source has no invoiceable lines.');
         }
 
         $sourceAdjustmentTotal = $this->adjustmentTotal($order->adjustments);

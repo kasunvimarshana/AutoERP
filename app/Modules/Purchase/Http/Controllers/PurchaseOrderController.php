@@ -14,7 +14,9 @@ use Modules\Purchase\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchase\Http\Resources\PurchaseOrderLineResource;
 use Modules\Purchase\Http\Resources\PurchaseOrderResource;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderQuantityService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
@@ -25,8 +27,13 @@ final class PurchaseOrderController
 {
     use ScopesPurchaseRequests;
 
+    public function __construct(private readonly PurchaseAuthorizationService $authorization) {}
+
     public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertAllowedStatus($request, PurchaseOrderStatus::cases());
+
         $query = $this->scope(PurchaseOrder::query(), $request)->with([
             'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
             'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
@@ -65,6 +72,8 @@ final class PurchaseOrderController
 
     public function store(StorePurchaseOrderRequest $request, PurchaseOrderService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CREATE);
+
         return (new PurchaseOrderResource($service->create($request->toData())))
             ->response()
             ->setStatusCode(201);
@@ -72,6 +81,8 @@ final class PurchaseOrderController
 
     public function show(ListPurchaseDocumentRequest $request, int $order): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+
         return new PurchaseOrderResource($this->scope(PurchaseOrder::query(), $request)
             ->with([
                 'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy', 'closedBy',
@@ -85,11 +96,15 @@ final class PurchaseOrderController
 
     public function update(UpdatePurchaseOrderRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_UPDATE);
+
         return new PurchaseOrderResource($service->update($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->toData()));
     }
 
     public function destroy(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_DELETE);
+
         $service->delete($this->scope(PurchaseOrder::query(), $request)->findOrFail($order));
 
         return response()->json(status: 204);
@@ -97,21 +112,29 @@ final class PurchaseOrderController
 
     public function approve(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_APPROVE);
+
         return new PurchaseOrderResource($service->approve($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
     public function submit(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_SUBMIT);
+
         return new PurchaseOrderResource($service->submit($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
     public function cancel(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CANCEL);
+
         return new PurchaseOrderResource($service->cancel($this->scope(PurchaseOrder::query(), $request)->findOrFail($order)));
     }
 
     public function close(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CLOSE);
+
         return new PurchaseOrderResource($service->close($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
@@ -120,6 +143,8 @@ final class PurchaseOrderController
         int $order,
         PurchaseOrderQuantityService $quantities,
     ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW);
+
         $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
 
         return response()->json(['data' => $model->lines
@@ -134,6 +159,8 @@ final class PurchaseOrderController
         int $order,
         PurchaseOrderQuantityService $quantities,
     ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
+
         $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
 
         return response()->json(['data' => $model->lines
@@ -145,6 +172,8 @@ final class PurchaseOrderController
 
     public function supplierItemMappings(ListPurchaseDocumentRequest $request, int $supplier): AnonymousResourceCollection
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+
         $supplierModel = $this->scope(Supplier::query(), $request)->findOrFail($supplier);
 
         return SupplierItemMappingResource::collection(SupplierItemMapping::query()

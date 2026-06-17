@@ -16,6 +16,12 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'received_date' => $this->received_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'workflow_status' => $this->enumValue($this->status),
+            'workflow_status_label' => $this->statusLabel($this->status),
+            'invoice_status' => $this->invoiceStatus(),
+            'invoice_status_label' => $this->statusLabel($this->invoiceStatus()),
+            'return_status' => $this->returnStatus(),
+            'return_status_label' => $this->statusLabel($this->returnStatus()),
             'purchase_order' => $this->whenLoaded('purchaseOrder', fn () => $this->summary($this->purchaseOrder, ['purchase_order_number', 'status'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
@@ -39,6 +45,14 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'invoiced_quantity' => (string) $line->invoiced_quantity,
                 'returned_quantity' => (string) $line->returned_quantity,
                 'remaining_quantity' => (string) $line->remaining_quantity,
+                'remaining_invoiceable_quantity' => $this->add(
+                    (string) $line->accepted_quantity,
+                    '-'.(string) $line->invoiced_quantity,
+                ),
+                'remaining_returnable_quantity' => $this->add(
+                    (string) $line->accepted_quantity,
+                    '-'.(string) $line->returned_quantity,
+                ),
                 'unit_price' => (string) $line->unit_price,
                 'line_subtotal' => (string) $line->line_subtotal,
                 'line_total' => (string) $line->line_total,
@@ -48,5 +62,41 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
+    }
+
+    private function invoiceStatus(): string
+    {
+        return $this->quantityProgressStatus('accepted_quantity', 'invoiced_quantity', 'not_invoiced', 'partially_invoiced', 'invoiced');
+    }
+
+    private function returnStatus(): string
+    {
+        return $this->quantityProgressStatus('accepted_quantity', 'returned_quantity', 'not_returned', 'partially_returned', 'returned');
+    }
+
+    private function quantityProgressStatus(
+        string $basisColumn,
+        string $progressColumn,
+        string $none,
+        string $partial,
+        string $complete,
+    ): string {
+        $lines = $this->whenLoaded('lines');
+        if (! $lines instanceof \Illuminate\Support\Collection) {
+            return $none;
+        }
+
+        $basis = '0.000000';
+        $progress = '0.000000';
+        foreach ($lines as $line) {
+            $basis = $this->add($basis, (string) ($line->{$basisColumn} ?? '0.000000'));
+            $progress = $this->add($progress, (string) ($line->{$progressColumn} ?? '0.000000'));
+        }
+
+        if ($this->compare($progress, '0.000000') <= 0 || $this->compare($basis, '0.000000') <= 0) {
+            return $none;
+        }
+
+        return $this->compare($progress, $basis) >= 0 ? $complete : $partial;
     }
 }

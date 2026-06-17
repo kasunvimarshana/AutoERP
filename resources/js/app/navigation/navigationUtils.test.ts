@@ -156,7 +156,7 @@ describe('navigation access and matching', () => {
                 { label: 'Users', children: ['User List', 'Roles', 'Permissions'] },
             ] },
             { section: 'Operations', items: [
-                { label: 'Purchase', children: ['Fast Purchase', 'Purchase Orders', 'Goods Receipts', 'Purchase Returns', 'Supplier Invoices', 'Supplier Payments'] },
+                { label: 'Purchase', children: ['Fast Purchase', 'Purchase Orders', 'Goods Receipts', 'Supplier Invoices', 'Supplier Payments', 'Purchase Returns', 'Debit Notes'] },
                 { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Goods Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Service', children: ['Service Jobs', 'Service Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Customer Running Charts', 'Owner / Supplier Running Charts', 'Linked Running Charts', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },

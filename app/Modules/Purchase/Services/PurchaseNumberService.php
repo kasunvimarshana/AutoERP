@@ -4,14 +4,29 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
-use Illuminate\Support\Facades\DB;
+use RuntimeException;
+use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
 
 final class PurchaseNumberService
 {
+    public function __construct(private readonly GenerateSequenceNumberService $sequences) {}
+
     public function next(int $tenantId, string $prefix, string $table, string $column): string
     {
-        $count = (int) DB::table($table)->where('tenant_id', $tenantId)->count() + 1;
+        $result = $this->sequences->execute([
+            'tenant_id' => $tenantId,
+            'document_type' => $table.'.'.$column,
+            'prefix' => $prefix.'-',
+            'padding' => 6,
+            'period_type' => 'infinite',
+        ]);
 
-        return $prefix.'-'.str_pad((string) $count, 6, '0', STR_PAD_LEFT);
+        if ($result->isFailure()) {
+            throw new RuntimeException($result->errorOrFail()->message);
+        }
+
+        $payload = $result->valueOrFail();
+
+        return (string) $payload['generated_number'];
     }
 }

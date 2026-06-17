@@ -16,7 +16,28 @@ final class PurchaseReturnAdjustmentService
 
     public function allocateFromReceiptLine(PurchaseReturn $return, GoodsReceiptNoteLine $sourceLine, string $returnedQuantity): string
     {
-        $grn = $sourceLine->goodsReceiptNote()->with('adjustments')->first();
+        return $this->calculateFromReceiptLine($return, $sourceLine, $returnedQuantity, mutate: true);
+    }
+
+    public function previewFromReceiptLine(PurchaseReturn $return, GoodsReceiptNoteLine $sourceLine, string $returnedQuantity): string
+    {
+        return $this->calculateFromReceiptLine($return, $sourceLine, $returnedQuantity, mutate: false);
+    }
+
+    private function calculateFromReceiptLine(
+        PurchaseReturn $return,
+        GoodsReceiptNoteLine $sourceLine,
+        string $returnedQuantity,
+        bool $mutate,
+    ): string {
+        $grnQuery = $sourceLine->goodsReceiptNote();
+        $grnQuery->with(['adjustments' => function ($query) use ($mutate): void {
+            if ($mutate) {
+                $query->lockForUpdate();
+            }
+        }]);
+
+        $grn = $grnQuery->first();
         if ($grn === null || $this->math->isZero((string) $grn->subtotal)) {
             return '0.000000';
         }
@@ -33,22 +54,28 @@ final class PurchaseReturnAdjustmentService
             $previouslyReturned = (string) $adjustment->returned_amount;
             $remaining = $this->math->sub((string) $adjustment->amount, $this->math->add($previouslyReturned, $returnedAmount));
 
-            PurchaseReturnAdjustmentAllocation::query()->create([
-                'tenant_id' => $return->tenant_id,
-                'organization_unit_id' => $return->organization_unit_id,
-                'purchase_return_id' => $return->getKey(),
-                'purchase_header_adjustment_id' => $adjustment->getKey(),
-                'adjustment_type' => $adjustment->adjustment_type,
-                'effect' => $adjustment->effect,
-                'source_amount' => $adjustment->amount,
-                'previously_returned_amount' => $previouslyReturned,
-                'returned_amount' => $returnedAmount,
-                'remaining_amount' => $remaining,
-            ]);
+            if ($this->math->isNegative($remaining)) {
+                throw new \InvalidArgumentException('Purchase return adjustment allocation cannot exceed source adjustment amount.');
+            }
 
-            $adjustment->returned_amount = $this->math->add($previouslyReturned, $returnedAmount);
-            $adjustment->remaining_amount = $remaining;
-            $adjustment->save();
+            if ($mutate) {
+                PurchaseReturnAdjustmentAllocation::query()->create([
+                    'tenant_id' => $return->tenant_id,
+                    'organization_unit_id' => $return->organization_unit_id,
+                    'purchase_return_id' => $return->getKey(),
+                    'purchase_header_adjustment_id' => $adjustment->getKey(),
+                    'adjustment_type' => $adjustment->adjustment_type,
+                    'effect' => $adjustment->effect,
+                    'source_amount' => $adjustment->amount,
+                    'previously_returned_amount' => $previouslyReturned,
+                    'returned_amount' => $returnedAmount,
+                    'remaining_amount' => $remaining,
+                ]);
+
+                $adjustment->returned_amount = $this->math->add($previouslyReturned, $returnedAmount);
+                $adjustment->remaining_amount = $remaining;
+                $adjustment->save();
+            }
 
             $netReturn = $adjustment->effect->value === 'increase'
                 ? $this->math->add($netReturn, $returnedAmount)

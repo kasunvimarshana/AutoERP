@@ -175,7 +175,7 @@ final class InventoryMovementTest extends InventoryTestCase
         $otherTenantId = $this->createTenant('OTHER');
         $warehouseId = $this->createWarehouse($tenantId, 'WH-SCOPE');
         $otherWarehouseId = $this->createWarehouse($otherTenantId, 'WH-OTHER');
-        $serviceItem = $this->createItem($tenantId, 'SERVICE-ITEM', TrackingType::None, CostingMethod::Fifo, ItemType::Service, false);
+        $serviceItem = $this->createItem($tenantId, 'SERVICE-ITEM', TrackingType::None, CostingMethod::None, ItemType::Service, false);
 
         try {
             $this->receipt($tenantId, $warehouseId, $serviceItem, '1.000000', '1.000000');

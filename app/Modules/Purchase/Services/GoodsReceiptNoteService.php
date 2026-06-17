@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
@@ -35,6 +36,14 @@ final class GoodsReceiptNoteService
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
     {
         $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        if ($data->warehouseLocationId !== null) {
+            $this->validator->warehouseLocation(
+                $data->tenantId,
+                $data->organizationUnitId,
+                $data->warehouseId,
+                $data->warehouseLocationId,
+            );
+        }
 
         $order = $data->purchaseOrderId !== null
             ? PurchaseOrder::query()->with(['lines', 'adjustments'])->findOrFail($data->purchaseOrderId)
@@ -42,34 +51,63 @@ final class GoodsReceiptNoteService
 
         if ($order instanceof PurchaseOrder) {
             $this->validator->assertTenantOrg((int) $order->tenant_id, $order->organization_unit_id, $data->tenantId, $data->organizationUnitId);
+            if ($order->status !== \Modules\Purchase\Enums\PurchaseOrderStatus::Approved) {
+                throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
+            }
+            if ($data->supplierId !== null && (int) $data->supplierId !== (int) $order->supplier_id) {
+                throw new InvalidArgumentException('GRN supplier must match the selected purchase order.');
+            }
+            if ($data->supplierType !== null && $data->supplierType !== $order->supplier_type) {
+                throw new InvalidArgumentException('GRN supplier type must match the selected purchase order.');
+            }
+        } elseif ($data->supplierId !== null) {
+            $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId);
         }
 
+        $sourceLines = [];
+        $seenSourceLines = [];
         foreach ($data->lines as $line) {
-            $this->validator->assertPositiveQuantity($line->receivedQuantity);
-            $this->validator->assertPositiveQuantity($line->acceptedQuantity);
-            if ($this->math->compare($line->acceptedQuantity, $line->receivedQuantity) > 0) {
-                throw new InvalidArgumentException('Accepted quantity cannot exceed received quantity.');
-            }
-            $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
-            $uomId = $line->orderedUomId ?? $line->uomId;
+            $this->validateReceiptQuantities($line);
+
             if ($line->purchaseOrderLineId !== null) {
-                $poLine = PurchaseOrderLine::query()->with('order')->findOrFail($line->purchaseOrderLineId);
-                $this->validator->assertTenantOrg((int) $poLine->tenant_id, $poLine->organization_unit_id, $data->tenantId, $data->organizationUnitId);
-                if ($order instanceof PurchaseOrder && (int) $poLine->purchase_order_id !== (int) $order->getKey()) {
+                if (! $order instanceof PurchaseOrder) {
+                    throw new InvalidArgumentException('A GRN source purchase order is required when a PO line is selected.');
+                }
+
+                $poLine = $order->lines->firstWhere('id', $line->purchaseOrderLineId);
+                if (! $poLine instanceof PurchaseOrderLine) {
                     throw new InvalidArgumentException('GRN source line must belong to the selected purchase order.');
                 }
-                $this->validator->assertReceiptWithinOrder($poLine, $line->acceptedQuantity);
-                $uomId ??= (int) ($poLine->ordered_uom_id ?: $poLine->uom_id);
+
+                $sourceKey = (int) $poLine->getKey();
+                if (isset($seenSourceLines[$sourceKey])) {
+                    throw new InvalidArgumentException('Duplicate GRN source purchase order line.');
+                }
+                $seenSourceLines[$sourceKey] = true;
+
+                $this->assertSourceLineMatchesPayload($poLine, $line);
+                $this->validator->assertReceiptWithinOrder($poLine, $line->receivedQuantity);
+                $sourceLines[$sourceKey] = $poLine;
+
+                continue;
             }
+
+            if ($order instanceof PurchaseOrder) {
+                throw new InvalidArgumentException('PO-based GRNs require every line to reference a purchase order line.');
+            }
+
+            $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
+            $uomId = $line->orderedUomId ?? $line->uomId;
             if ($uomId === null) {
                 throw new InvalidArgumentException('GRN line UOM is required.');
             }
             $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId);
+            $this->validator->assertNonNegative($line->unitPrice, 'GRN line unit price cannot be negative.');
             $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->acceptedQuantity);
         }
 
-        return DB::transaction(function () use ($data, $order): GoodsReceiptNote {
-            $calculation = $this->calculator->calculate($this->receiptLinesAsOrderLines($data), []);
+        return DB::transaction(function () use ($data, $order, $sourceLines): GoodsReceiptNote {
+            $calculation = $this->calculator->calculate($this->receiptLinesAsOrderLines($data, $sourceLines), []);
             $grn = GoodsReceiptNote::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -92,25 +130,26 @@ final class GoodsReceiptNoteService
 
             foreach ($data->lines as $index => $line) {
                 $poLine = $line->purchaseOrderLineId !== null
-                    ? PurchaseOrderLine::query()->find($line->purchaseOrderLineId)
+                    ? ($sourceLines[$line->purchaseOrderLineId] ?? PurchaseOrderLine::query()->find($line->purchaseOrderLineId))
                     : null;
-                $item = Item::query()->findOrFail($line->itemId);
-                $uomId = $line->orderedUomId ?? $line->uomId ?? ($poLine?->ordered_uom_id ?: $poLine?->uom_id);
+                $itemId = $poLine instanceof PurchaseOrderLine ? (int) $poLine->item_id : $line->itemId;
+                $variantId = $poLine instanceof PurchaseOrderLine ? $poLine->item_variant_id : $line->itemVariantId;
+                $item = Item::query()->findOrFail($itemId);
+                $uomId = $poLine instanceof PurchaseOrderLine
+                    ? (int) ($poLine->ordered_uom_id ?: $poLine->uom_id)
+                    : ($line->orderedUomId ?? $line->uomId);
                 $uom = $this->uoms->resolveLineUom($data->tenantId, $item, (int) $uomId, $line->acceptedQuantity);
+                $unitPrice = $line->unitPrice;
                 $discountAmount = $line->discountAmount;
                 $taxAmount = $line->taxAmount;
                 $chargeAmount = $line->chargeAmount;
                 if ($poLine instanceof PurchaseOrderLine) {
-                    $ratio = $this->math->isZero((string) $poLine->ordered_quantity)
-                        ? '0.000000'
-                        : $this->math->div($line->acceptedQuantity, (string) $poLine->ordered_quantity, 12);
-                    $discountAmount = $line->discountAmount === '0.000000' ? $this->math->mul((string) $poLine->discount_amount, $ratio) : $line->discountAmount;
-                    $taxAmount = $line->taxAmount === '0.000000' ? $this->math->mul((string) $poLine->tax_amount, $ratio) : $line->taxAmount;
-                    $chargeAmount = $line->chargeAmount === '0.000000' ? $this->math->mul((string) $poLine->charge_amount, $ratio) : $line->chargeAmount;
+                    $unitPrice = (string) $poLine->unit_price;
+                    [$discountAmount, $taxAmount, $chargeAmount] = $this->sourceLineFinancialAmounts($poLine, $line->acceptedQuantity);
                 }
                 $amounts = $this->calculator->lineAmounts((object) [
                     'orderedQuantity' => $line->acceptedQuantity,
-                    'unitPrice' => $line->unitPrice,
+                    'unitPrice' => $unitPrice,
                     'discountAmount' => $discountAmount,
                     'taxAmount' => $taxAmount,
                     'chargeAmount' => $chargeAmount,
@@ -119,21 +158,21 @@ final class GoodsReceiptNoteService
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'purchase_order_line_id' => $line->purchaseOrderLineId,
-                    'item_id' => $line->itemId,
-                    'item_variant_id' => $line->itemVariantId,
-                    'description' => $line->description,
+                    'item_id' => $itemId,
+                    'item_variant_id' => $variantId,
+                    'description' => $line->description ?? $poLine?->description,
                     'uom_id' => $uom['ordered_uom_id'],
                     'ordered_uom_id' => $uom['ordered_uom_id'],
                     'base_uom_id' => $uom['base_uom_id'],
                     'uom_conversion_factor' => $uom['conversion_factor'],
-                    'ordered_quantity' => $this->math->normalize($line->orderedQuantity === '0.000000' && $poLine !== null ? (string) $poLine->ordered_quantity : $line->orderedQuantity),
+                    'ordered_quantity' => $this->math->normalize($poLine instanceof PurchaseOrderLine ? (string) $poLine->ordered_quantity : $line->orderedQuantity),
                     'received_quantity' => $this->math->normalize($line->receivedQuantity),
                     'base_received_quantity' => $line->baseReceivedQuantity ?? $this->math->mul($line->receivedQuantity, $uom['conversion_factor']),
                     'accepted_quantity' => $this->math->normalize($line->acceptedQuantity),
                     'base_accepted_quantity' => $line->baseAcceptedQuantity ?? $uom['base_quantity'],
                     'rejected_quantity' => $this->math->normalize($line->rejectedQuantity),
                     'remaining_quantity' => $this->math->normalize($line->acceptedQuantity),
-                    'unit_price' => $this->math->normalize($line->unitPrice),
+                    'unit_price' => $this->math->normalize($unitPrice),
                     'line_subtotal' => $amounts['subtotal'],
                     'discount_amount' => $this->math->normalize($discountAmount),
                     'tax_amount' => $this->math->normalize($taxAmount),
@@ -151,14 +190,30 @@ final class GoodsReceiptNoteService
 
     public function post(GoodsReceiptNote $grn, ?int $postedBy = null): GoodsReceiptNote
     {
-        if ($grn->status !== GoodsReceiptNoteStatus::Draft) {
-            throw new InvalidArgumentException('Only draft GRNs can be posted.');
-        }
-
         return DB::transaction(function () use ($grn, $postedBy): GoodsReceiptNote {
-            $grn->load('lines');
-            foreach ($grn->lines as $line) {
-                $movement = $this->inventory->receipt($grn, $line, $postedBy);
+            $locked = GoodsReceiptNote::query()
+                ->with('lines.purchaseOrderLine')
+                ->lockForUpdate()
+                ->findOrFail($grn->getKey());
+
+            if ($locked->status === GoodsReceiptNoteStatus::Posted) {
+                return $locked->refresh()->load(['lines', 'adjustments']);
+            }
+
+            if ($locked->status !== GoodsReceiptNoteStatus::Draft) {
+                throw new InvalidArgumentException('Only draft GRNs can be posted.');
+            }
+
+            foreach ($locked->lines as $line) {
+                if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
+                    $sourceLine = PurchaseOrderLine::query()
+                        ->lockForUpdate()
+                        ->findOrFail((int) $line->purchase_order_line_id);
+                    $this->validator->assertReceiptWithinOrder($sourceLine, (string) $line->received_quantity);
+                    $line->setRelation('purchaseOrderLine', $sourceLine);
+                }
+
+                $movement = $this->inventory->receipt($locked, $line, $postedBy);
                 if ($movement !== null) {
                     $line->inventory_movement_id = $movement->getKey();
                 }
@@ -170,42 +225,52 @@ final class GoodsReceiptNoteService
                 }
             }
 
-            $grn->status = GoodsReceiptNoteStatus::Posted;
-            $grn->posted_by = $postedBy;
-            $grn->posted_at = now();
-            $grn->save();
-            $this->taxDocuments->postGoodsReceiptNote($grn->refresh()->load('lines'));
+            $locked->status = GoodsReceiptNoteStatus::Posted;
+            $locked->posted_by = $postedBy;
+            $locked->posted_at = now();
+            $locked->save();
+            $this->taxDocuments->postGoodsReceiptNote($locked->refresh()->load('lines'));
 
-            return $grn->refresh()->load(['lines', 'adjustments']);
+            return $locked->refresh()->load(['lines', 'adjustments']);
         });
     }
 
     public function reverse(GoodsReceiptNote $grn, ?int $reversedBy = null): GoodsReceiptNote
     {
-        if ($grn->status !== GoodsReceiptNoteStatus::Posted) {
-            throw new InvalidArgumentException('Only posted GRNs can be reversed.');
-        }
-
         return DB::transaction(function () use ($grn, $reversedBy): GoodsReceiptNote {
-            $grn->load('lines.purchaseOrderLine');
-            foreach ($grn->lines as $line) {
+            $locked = GoodsReceiptNote::query()
+                ->with('lines.purchaseOrderLine')
+                ->lockForUpdate()
+                ->findOrFail($grn->getKey());
+
+            if ($locked->status === GoodsReceiptNoteStatus::Reversed) {
+                return $locked->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);
+            }
+
+            if ($locked->status !== GoodsReceiptNoteStatus::Posted) {
+                throw new InvalidArgumentException('Only posted GRNs can be reversed.');
+            }
+
+            foreach ($locked->lines as $line) {
                 if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0
                     || $this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
                     throw new InvalidArgumentException('GRNs with invoiced or returned lines cannot be reversed.');
                 }
 
-                $this->inventory->reverseReceipt($grn, $line, $reversedBy);
+                $this->inventory->reverseReceipt($locked, $line, $reversedBy);
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
                     $this->orderQuantities->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
                 }
             }
 
-            $grn->status = GoodsReceiptNoteStatus::Reversed;
-            $grn->reversed_by = $reversedBy;
-            $grn->reversed_at = now();
-            $grn->save();
+            $this->taxDocuments->reverseGoodsReceiptNote($locked);
 
-            return $grn->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);
+            $locked->status = GoodsReceiptNoteStatus::Reversed;
+            $locked->reversed_by = $reversedBy;
+            $locked->reversed_at = now();
+            $locked->save();
+
+            return $locked->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);
         });
     }
 
@@ -226,19 +291,78 @@ final class GoodsReceiptNoteService
         }
     }
 
+    private function validateReceiptQuantities(GoodsReceiptNoteLineData $line): void
+    {
+        $this->validator->assertPositiveQuantity($line->receivedQuantity);
+        $this->validator->assertNonNegative($line->acceptedQuantity, 'Accepted quantity cannot be negative.');
+        $this->validator->assertNonNegative($line->rejectedQuantity, 'Rejected quantity cannot be negative.');
+
+        $total = $this->math->add($line->acceptedQuantity, $line->rejectedQuantity);
+        if ($this->math->compare($total, $line->receivedQuantity) !== 0) {
+            throw new InvalidArgumentException('Accepted and rejected quantities must equal received quantity.');
+        }
+    }
+
+    private function assertSourceLineMatchesPayload(PurchaseOrderLine $poLine, GoodsReceiptNoteLineData $line): void
+    {
+        if ((int) $poLine->item_id !== $line->itemId) {
+            throw new InvalidArgumentException('GRN line item must match the source purchase order line.');
+        }
+
+        if ($line->itemVariantId !== null && (int) ($poLine->item_variant_id ?? 0) !== $line->itemVariantId) {
+            throw new InvalidArgumentException('GRN line item variant must match the source purchase order line.');
+        }
+
+        $sourceUomId = (int) ($poLine->ordered_uom_id ?: $poLine->uom_id);
+        foreach ([$line->orderedUomId, $line->uomId] as $uomId) {
+            if ($uomId !== null && $uomId !== $sourceUomId) {
+                throw new InvalidArgumentException('GRN line UOM must match the source purchase order line.');
+            }
+        }
+    }
+
     /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function sourceLineFinancialAmounts(PurchaseOrderLine $poLine, string $acceptedQuantity): array
+    {
+        $ratio = $this->math->isZero((string) $poLine->ordered_quantity)
+            ? '0.000000'
+            : $this->math->div($acceptedQuantity, (string) $poLine->ordered_quantity, 12);
+
+        return [
+            $this->math->mul((string) $poLine->discount_amount, $ratio),
+            $this->math->mul((string) $poLine->tax_amount, $ratio),
+            $this->math->mul((string) $poLine->charge_amount, $ratio),
+        ];
+    }
+
+    /**
+     * @param  array<int, PurchaseOrderLine>  $sourceLines
      * @return list<object>
      */
-    private function receiptLinesAsOrderLines(CreateGoodsReceiptNoteData $data): array
+    private function receiptLinesAsOrderLines(CreateGoodsReceiptNoteData $data, array $sourceLines): array
     {
         return array_map(
-            static fn ($line): object => (object) [
-                'orderedQuantity' => $line->acceptedQuantity,
-                'unitPrice' => $line->unitPrice,
-                'discountAmount' => $line->discountAmount,
-                'taxAmount' => $line->taxAmount,
-                'chargeAmount' => $line->chargeAmount,
-            ],
+            function (GoodsReceiptNoteLineData $line) use ($sourceLines): object {
+                $poLine = $line->purchaseOrderLineId !== null ? ($sourceLines[$line->purchaseOrderLineId] ?? null) : null;
+                $unitPrice = $poLine instanceof PurchaseOrderLine ? (string) $poLine->unit_price : $line->unitPrice;
+                $discountAmount = $line->discountAmount;
+                $taxAmount = $line->taxAmount;
+                $chargeAmount = $line->chargeAmount;
+
+                if ($poLine instanceof PurchaseOrderLine) {
+                    [$discountAmount, $taxAmount, $chargeAmount] = $this->sourceLineFinancialAmounts($poLine, $line->acceptedQuantity);
+                }
+
+                return (object) [
+                    'orderedQuantity' => $line->acceptedQuantity,
+                    'unitPrice' => $unitPrice,
+                    'discountAmount' => $discountAmount,
+                    'taxAmount' => $taxAmount,
+                    'chargeAmount' => $chargeAmount,
+                ];
+            },
             $data->lines,
         );
     }

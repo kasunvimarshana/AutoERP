@@ -170,6 +170,67 @@ final class TaxDocumentIntegrationService
     /**
      * @return list<TaxDocumentSnapshot>
      */
+    public function reverseGoodsReceiptNote(GoodsReceiptNote $grn): array
+    {
+        $tenantId = (int) $grn->tenant_id;
+        $sourceType = 'goods_receipt_note_reversal';
+        $sourceId = (int) $grn->getKey();
+
+        if (TaxDocumentSnapshot::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->exists()) {
+            return [];
+        }
+
+        $originals = TaxDocumentSnapshot::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', 'goods_receipt_note')
+            ->where('source_id', $sourceId)
+            ->where('posted', true)
+            ->orderBy('sequence')
+            ->get();
+
+        $created = [];
+        foreach ($originals as $original) {
+            $snapshot = $this->snapshots->createReversalSnapshot(
+                original: $original,
+                source: [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $grn->organization_unit_id,
+                    'source_module' => 'purchase',
+                    'source_type' => $sourceType,
+                    'source_id' => $sourceId,
+                    'source_number' => (string) $grn->grn_number,
+                    'source_date' => now()->toDateString(),
+                ],
+                line: [
+                    'line_type' => 'goods_receipt_note_reversal',
+                    'line_id' => $original->line_id,
+                    'line_number' => is_array($original->metadata) ? ($original->metadata['line_number'] ?? null) : null,
+                ],
+                ratio: '1.000000000000',
+                metadata: ['reversed_source_type' => 'goods_receipt_note', 'reversed_source_id' => $sourceId],
+            );
+
+            $this->snapshots->recordTransaction($snapshot, [
+                'transaction_date' => now()->toDateString(),
+                'party_type' => $grn->supplier_id !== null ? 'supplier' : null,
+                'party_id' => $grn->supplier_id,
+                'metadata' => $snapshot->metadata,
+            ]);
+            $created[] = $snapshot;
+        }
+
+        $this->snapshots->markPosted($tenantId, $sourceType, $sourceId);
+
+        return $created;
+    }
+
+    /**
+     * @return list<TaxDocumentSnapshot>
+     */
     public function snapshotSalesDelivery(SalesDelivery $delivery): array
     {
         $delivery->loadMissing(['lines.salesOrderLine']);

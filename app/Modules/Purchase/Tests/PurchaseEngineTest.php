@@ -152,6 +152,7 @@ final class PurchaseEngineTest extends TestCase
                 new PurchaseOrderLineData((int) $service->getKey(), '1.000000', '50.000000', uomId: $uomId),
             ],
         ));
+        $order = $this->approveOrder($order);
 
         $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
             tenantId: $tenantId,
@@ -170,7 +171,8 @@ final class PurchaseEngineTest extends TestCase
         $this->assertCount(1, InventoryMovement::query()->where('source_type', 'goods_receipt_note')->get());
         $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
         $this->assertSame('4.000000', $availability->quantityOnHand);
-        $this->assertSame(PurchaseOrderStatus::PartiallyReceived, $order->refresh()->status);
+        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
+        $this->assertSame('4.000000', (string) $order->lines()->firstOrFail()->received_quantity);
     }
 
     public function test_many_grns_can_create_one_supplier_invoice_with_header_adjustments(): void
@@ -199,6 +201,7 @@ final class PurchaseEngineTest extends TestCase
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $order = $this->approveOrder($order);
         $otherSupplierId = $this->createSupplier(
             $tenantId,
             'SUP-OTHER-'.Str::upper(Str::random(4)),
@@ -246,7 +249,8 @@ final class PurchaseEngineTest extends TestCase
 
         $this->assertSame('4920.000000', (string) $invoiceOne->grand_total);
         $this->assertSame('44280.000000', (string) $invoiceTwo->grand_total);
-        $this->assertSame(GoodsReceiptNoteStatus::Invoiced, $grn->refresh()->status);
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
+        $this->assertSame('40.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
     }
 
     public function test_example_40_percent_grn_invoice_allocates_adjustments(): void
@@ -307,8 +311,9 @@ final class PurchaseEngineTest extends TestCase
             ],
         );
 
-        $this->assertSame(GoodsReceiptNoteStatus::PartiallyInvoiced, $grn->refresh()->status);
-        $this->assertSame(PurchaseOrderStatus::PartiallyInvoiced, $order->refresh()->status);
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
+        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
+        $this->assertSame('20.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
         $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
         $this->assertSame(PaymentDirection::Outbound, $payment->direction);
         $this->assertSame((int) $invoice->getKey(), $payment->allocations[0]->invoiceId);
@@ -468,6 +473,7 @@ final class PurchaseEngineTest extends TestCase
         $statuses = app(InvoiceStatusService::class);
         $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
         $invoice = $statuses->transition($invoice, InvoiceStatus::Posted);
+        $this->assertSame('posted', DB::table('invoices')->where('id', $invoice->getKey())->value('status'));
 
         $debitNotes = app(PurchaseDebitNoteService::class);
         $note = $debitNotes->create(new CreatePurchaseDebitNoteData(
@@ -676,6 +682,7 @@ final class PurchaseEngineTest extends TestCase
      */
     private function receiveOrderInTwoParts(PurchaseOrder $order, int $warehouseId, Item $item): array
     {
+        $order = $this->approveOrder($order);
         $line = $order->lines->first();
         $first = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
             tenantId: (int) $order->tenant_id,
@@ -702,6 +709,24 @@ final class PurchaseEngineTest extends TestCase
         return [$first->refresh()->load(['lines', 'adjustments']), $second->refresh()->load(['lines', 'adjustments'])];
     }
 
+    private function approveOrder(PurchaseOrder $order): PurchaseOrder
+    {
+        if ($order->status === PurchaseOrderStatus::Approved) {
+            return $order->refresh()->load('lines');
+        }
+
+        $orders = app(PurchaseOrderService::class);
+        if ($order->status === PurchaseOrderStatus::Draft) {
+            $order = $orders->submit($order);
+        }
+
+        if ($order->status === PurchaseOrderStatus::PendingApproval) {
+            $order = $orders->approve($order);
+        }
+
+        return $order->refresh()->load('lines');
+    }
+
     private function purchaseContext(): array
     {
         $tenantId = $this->createTenant();
@@ -721,7 +746,7 @@ final class PurchaseEngineTest extends TestCase
             name: 'Purchase '.$code,
             itemType: $type,
             trackingType: TrackingType::None,
-            costingMethod: CostingMethod::Fifo,
+            costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
             baseUomId: $uomId,
             isStockable: $stockable,
         ));

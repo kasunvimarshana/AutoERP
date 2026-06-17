@@ -10,8 +10,6 @@ use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\PurchasePostingResult;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
-use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
-use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
@@ -113,7 +111,7 @@ final class PurchaseReturnService
                 $sourceLine = GoodsReceiptNoteLine::query()->with('goodsReceiptNote')->findOrFail($lineData->sourceLineId);
                 $lineTotal = $this->math->mul($lineData->returnedQuantity, (string) $sourceLine->unit_price);
                 $subtotal = $this->math->add($subtotal, $lineTotal);
-                $adjustmentReturnTotal = $this->math->add($adjustmentReturnTotal, $this->adjustments->allocateFromReceiptLine($return, $sourceLine, $lineData->returnedQuantity));
+                $adjustmentReturnTotal = $this->math->add($adjustmentReturnTotal, $this->adjustments->previewFromReceiptLine($return, $sourceLine, $lineData->returnedQuantity));
 
                 $return->lines()->create([
                     'tenant_id' => $return->tenant_id,
@@ -162,16 +160,24 @@ final class PurchaseReturnService
 
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
     {
-        if ($return->status === PurchaseReturnStatus::Posted) {
-            throw new \InvalidArgumentException('Posted purchase returns are immutable.');
-        }
         if ((bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Approved) {
             throw new \InvalidArgumentException('Purchase return must be approved before posting.');
         }
+        if (! (bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Draft) {
+            throw new \InvalidArgumentException('Only draft purchase returns can be posted without approval.');
+        }
 
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
-            $return->load('lines');
+            $return = PurchaseReturn::query()->with('lines')->lockForUpdate()->findOrFail($return->getKey());
+            if ((bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Approved) {
+                throw new \InvalidArgumentException('Purchase return must be approved before posting.');
+            }
+            if (! (bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Draft) {
+                throw new \InvalidArgumentException('Only draft purchase returns can be posted without approval.');
+            }
+
             $movementIds = [];
+            $adjustmentReturnTotal = '0.000000';
             foreach ($return->lines as $line) {
                 $movement = $this->inventory->returnOut($return, $line, $postedBy);
                 if ($movement !== null) {
@@ -181,21 +187,31 @@ final class PurchaseReturnService
                 $line->save();
 
                 $sourceLine = $line->source_line_type === 'goods_receipt_note_line'
-                    ? GoodsReceiptNoteLine::query()->find((int) $line->source_line_id)
+                    ? GoodsReceiptNoteLine::query()->with('purchaseOrderLine')->lockForUpdate()->find((int) $line->source_line_id)
                     : null;
                 if ($sourceLine instanceof GoodsReceiptNoteLine) {
+                    $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
+                    $adjustmentReturnTotal = $this->math->add(
+                        $adjustmentReturnTotal,
+                        $this->adjustments->allocateFromReceiptLine($return, $sourceLine, (string) $line->returned_quantity),
+                    );
                     $sourceLine->returned_quantity = $this->math->add((string) $sourceLine->returned_quantity, (string) $line->returned_quantity);
-                    $sourceLine->remaining_quantity = $this->math->sub((string) $sourceLine->accepted_quantity, (string) $sourceLine->returned_quantity);
-                    $sourceLine->status = $this->math->isZero((string) $sourceLine->remaining_quantity)
+                    $returnable = $this->math->sub((string) $sourceLine->accepted_quantity, (string) $sourceLine->returned_quantity);
+                    $sourceLine->status = $this->math->isZero($returnable)
                         ? GoodsReceiptNoteLineStatus::Returned
                         : GoodsReceiptNoteLineStatus::PartiallyReturned;
                     $sourceLine->save();
-                    $this->refreshGrnReturnStatus($sourceLine);
                     if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine) {
                         $this->orderQuantities->applyReturned($sourceLine->purchaseOrderLine, (string) $line->returned_quantity);
                     }
                 }
             }
+
+            $return->adjustment_return_total = $adjustmentReturnTotal;
+            $return->grand_total = (bool) $return->affects_supplier_balance
+                ? $this->math->add((string) $return->subtotal, $adjustmentReturnTotal)
+                : '0.000000';
+            $return->save();
 
             $debitNote = null;
             if ((bool) $return->affects_supplier_balance && ! $this->math->isZero((string) $return->grand_total)) {
@@ -211,8 +227,8 @@ final class PurchaseReturnService
                     sourceId: (int) $return->getKey(),
                     reason: $return->reason ?: 'Purchase return '.$return->return_number,
                 ));
-                $debitNote->status = PurchaseDebitNoteStatus::Posted;
-                $debitNote->save();
+                $debitNote = $this->debitNotes->approve($debitNote, $postedBy);
+                $debitNote = $this->debitNotes->post($debitNote);
             }
 
             $return->status = PurchaseReturnStatus::Posted;
@@ -267,20 +283,4 @@ final class PurchaseReturnService
         }
     }
 
-    private function refreshGrnReturnStatus(GoodsReceiptNoteLine $line): void
-    {
-        $grn = $line->goodsReceiptNote()->with('lines')->first();
-        if ($grn === null) {
-            return;
-        }
-
-        $accepted = $this->math->sum($grn->lines->pluck('accepted_quantity')->all());
-        $returned = $this->math->sum($grn->lines->pluck('returned_quantity')->all());
-        if ($this->math->compare($returned, $accepted) >= 0) {
-            $grn->status = GoodsReceiptNoteStatus::Returned;
-        } elseif ($this->math->compare($returned, '0.000000') > 0) {
-            $grn->status = GoodsReceiptNoteStatus::PartiallyReturned;
-        }
-        $grn->save();
-    }
 }

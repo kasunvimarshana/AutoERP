@@ -69,13 +69,15 @@ final class PurchaseOrderWriteService
 
     public function update(PurchaseOrder $order, CreatePurchaseOrderData $data): PurchaseOrder
     {
-        $this->assertEditable($order);
         $this->validateOrderData($data);
 
         $number = $data->purchaseOrderNumber ?? (string) $order->purchase_order_number;
         $this->assertUniqueNumber($data->tenantId, $number, (int) $order->getKey());
 
         return DB::transaction(function () use ($order, $data, $number): PurchaseOrder {
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->getKey());
+            $this->assertEditable($order);
+
             $calculation = $this->calculator->calculate($data->lines, $data->adjustments);
             $order->fill([
                 'supplier_type' => $data->supplierType ?? 'supplier',
@@ -109,9 +111,10 @@ final class PurchaseOrderWriteService
 
     public function delete(PurchaseOrder $order): void
     {
-        $this->assertEditable($order);
-
         DB::transaction(function () use ($order): void {
+            $order = PurchaseOrder::query()->with('lines')->lockForUpdate()->findOrFail($order->getKey());
+            $this->assertEditable($order);
+
             $order->lines()->delete();
             $order->adjustments()->delete();
             $order->delete();
@@ -250,7 +253,7 @@ final class PurchaseOrderWriteService
                 'base_quantity' => $line->baseQuantity ?? $uom['base_quantity'],
                 'remaining_quantity' => $this->math->normalize($line->orderedQuantity),
                 'remaining_receivable_quantity' => $this->math->normalize($line->orderedQuantity),
-                'remaining_invoiceable_quantity' => '0.000000',
+                'remaining_invoiceable_quantity' => $this->math->normalize($line->orderedQuantity),
                 'remaining_returnable_quantity' => '0.000000',
                 'unit_price' => $this->math->normalize($line->unitPrice),
                 'line_subtotal' => $amounts['subtotal'],

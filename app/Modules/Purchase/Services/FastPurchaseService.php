@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Audit\DTOs\AuditLogActivityData;
@@ -94,7 +93,7 @@ final class FastPurchaseService
                 'create' => '/api/v1/purchase/fast-purchases',
             ],
             'warehouses' => $this->warehouseOptions($tenantId, $organizationUnitId, $search, $perPage),
-            'currencies' => $this->currencyOptions($search, $perPage),
+            'currencies' => $this->currencyOptions($tenantId, $organizationUnitId, $search, $perPage),
             'payment_methods' => $this->paymentMethodOptions($tenantId, $organizationUnitId, $search, $perPage),
             'payment_accounts' => $this->paymentAccountOptions($tenantId, $organizationUnitId, $search, $perPage),
             'tax_groups' => $this->taxGroupOptions($tenantId, $organizationUnitId, $search, $perPage),
@@ -1238,9 +1237,6 @@ final class FastPurchaseService
         if ($explicitDueDate !== null && trim((string) $explicitDueDate) !== '') {
             return (string) $explicitDueDate;
         }
-        if (preg_match('/(\d+)/', $paymentTerms, $matches) === 1) {
-            return CarbonImmutable::parse($purchaseDate)->addDays((int) $matches[1])->toDateString();
-        }
 
         return $purchaseDate;
     }
@@ -1300,10 +1296,16 @@ final class FastPurchaseService
     /**
      * @return list<array<string, mixed>>
      */
-    private function currencyOptions(string $search, int $limit): array
+    private function currencyOptions(int $tenantId, ?int $organizationUnitId, string $search, int $limit): array
     {
         return CurrencyModel::query()
             ->where('is_active', true)
+            ->where(function ($query) use ($tenantId): void {
+                $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
+            })
+            ->when($organizationUnitId !== null, fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
+                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
+            }))
             ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
                 $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
             }))
