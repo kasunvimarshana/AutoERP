@@ -14,6 +14,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
@@ -50,11 +51,11 @@ export default function RentalExpensePage() {
     const [employee, setEmployee] = useState<EmployeeSummary | null>(null);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const searchEmployee = useCallback(
-        (query: string, signal: AbortSignal) => searchEmployees(query, signal),
+        (params: LookupLoadParams) => searchEmployees(params),
         [],
     );
     const searchSupplier = useCallback(
-        (query: string, signal: AbortSignal) => searchSuppliers(query, signal),
+        (params: LookupLoadParams) => searchSuppliers(params),
         [],
     );
     if (agreement.loading) return <LoadingState />;

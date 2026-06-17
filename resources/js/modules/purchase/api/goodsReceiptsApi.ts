@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { GoodsReceipt, GoodsReceiptPayload, ReturnableLine } from '../purchaseTypes';
 
 export async function listGoodsReceipts(params: ListParams, signal?: AbortSignal) {
@@ -37,11 +38,20 @@ export async function getReturnableGoodsReceiptLines(id: number, signal?: AbortS
     return response.data.data;
 }
 
-export async function searchGoodsReceipts(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await listGoodsReceipts({ search, per_page: 20 }, signal);
-    return response.data.map((grn) => ({
-        id: grn.id,
-        code: grn.grn_number,
-        name: `${grn.grn_number ?? 'Goods receipt'}${grn.supplier?.name ? ` - ${grn.supplier.name}` : ''}`,
-    }));
+export async function searchGoodsReceipts({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listGoodsReceipts({ search, page, per_page: perPage }, signal);
+    return {
+        data: response.data.map((grn) => ({
+            id: grn.id,
+            code: grn.grn_number,
+            name: `${grn.grn_number ?? 'Goods receipt'}${grn.supplier?.name ? ` - ${grn.supplier.name}` : ''}`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
 }

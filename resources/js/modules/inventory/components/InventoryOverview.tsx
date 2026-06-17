@@ -133,7 +133,7 @@ export function AvailabilityTab() {
                 }}
             >
                 <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} placeholder="Search stockable items..." />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} placeholder="Search warehouses..." />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} placeholder="Search warehouses..." loadOnOpen minSearchLength={0} />
                 <div className="flex items-end">
                     <Button type="submit" loading={checking} disabled={!item || !warehouse}>Check</Button>
                 </div>

@@ -7,6 +7,7 @@ import { searchDepartments, searchDesignations, searchEmployees } from '@/module
 import type { HrDepartment, HrDesignation } from '@/modules/hr/hrTypes';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
+import { mapLookupResult } from '@/shared/api/lookupRequest';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -23,6 +24,7 @@ import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { humanize } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { ExportActions } from '../components/ExportActions';
 import { runEmployeeCommissionReport } from '../reportingApi';
 import type {
@@ -106,9 +108,9 @@ export default function EmployeeCommissionReportPage() {
         return () => controller.abort();
     }, [filters]);
 
-    const employeeSearch = useCallback(async (query: string, signal: AbortSignal): Promise<EmployeeLookupOption[]> => {
-        const rows = await searchEmployees(query, signal);
-        return rows.map((row) => ({
+    const employeeSearch = useCallback(async (params: LookupLoadParams) => {
+        const result = await searchEmployees(params);
+        return mapLookupResult(result, (row): EmployeeLookupOption => ({
             id: row.id,
             code: row.employee_number,
             name: row.display_name,
@@ -207,6 +209,8 @@ export default function EmployeeCommissionReportPage() {
                                 }}
                                 search={searchDepartments}
                                 formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()}
+                                loadOnOpen
+                                minSearchLength={0}
                             />
                             <GenericLookupSelect<HrDesignation>
                                 label="Designation"
@@ -217,6 +221,8 @@ export default function EmployeeCommissionReportPage() {
                                 }}
                                 search={searchDesignations}
                                 formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()}
+                                loadOnOpen
+                                minSearchLength={0}
                             />
                             <GenericLookupSelect<EmployeeLookupOption>
                                 label="Supervisor"

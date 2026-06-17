@@ -7,6 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { CommissionType, VehicleServiceJobLine } from '../../vehicleServiceTypes';
 import type { AssignmentFormValue } from './assignmentForm';
 
@@ -21,8 +22,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
 }) {
     const [draft, setDraft] = useState(value);
     const search = useCallback(
-        async (query: string, signal: AbortSignal): Promise<NamedResource[]> =>
-            lookupApi.availableEmployees(query, signal),
+        (params: LookupLoadParams) => lookupApi.availableEmployees(params),
         [],
     );
     const set = <K extends keyof AssignmentFormValue>(

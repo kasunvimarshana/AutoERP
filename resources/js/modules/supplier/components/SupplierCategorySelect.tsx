@@ -9,5 +9,5 @@ export function SupplierCategorySelect({ value, onChange, error }: {
     onChange: (category: SupplierCategory | null) => void;
     error?: string;
 }) {
-    return <GenericLookupSelect label="Category" value={value} onChange={onChange} search={searchSupplierCategories} formatLabel={formatCategory} error={error} />;
+    return <GenericLookupSelect label="Category" value={value} onChange={onChange} search={searchSupplierCategories} formatLabel={formatCategory} error={error} loadOnOpen minSearchLength={0} />;
 }

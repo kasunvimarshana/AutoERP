@@ -1,7 +1,9 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     Supplier,
     SupplierAddress,
@@ -47,28 +49,16 @@ export const changeSupplierStatus = (id: number, status: string, reason?: string
     apiClient.patch<ApiResource<Supplier>>(`${endpoints.suppliers}/${id}/status`, { status, reason })
         .then((response) => response.data.data);
 
-export async function searchSuppliers(search: string, signal?: AbortSignal, kind = 'active'): Promise<SupplierSummary[]> {
-    const response = await apiClient.get<ApiCollection<SupplierSummary>>(`${endpoints.suppliers}/lookup/${kind}`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchSuppliers(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<SupplierSummary>> {
+    return requestLookup<SupplierSummary>(`${endpoints.suppliers}/lookup/${kind}`, params);
 }
 
-export async function searchSupplierCategories(search: string, signal?: AbortSignal): Promise<SupplierCategory[]> {
-    const response = await apiClient.get<ApiCollection<SupplierCategory>>(`${endpoints.supplierCategories}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchSupplierCategories(params: LookupLoadParams): Promise<LookupResult<SupplierCategory>> {
+    return requestLookup<SupplierCategory>(`${endpoints.supplierCategories}/lookup`, params);
 }
 
-export async function searchActiveItems(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.items}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchActiveItems(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(`${endpoints.items}/lookup`, params);
 }
 
 export async function listItemVariantsForLookup(itemId: number, signal?: AbortSignal): Promise<NamedResource[]> {
@@ -79,12 +69,8 @@ export async function listItemVariantsForLookup(itemId: number, signal?: AbortSi
     return response.data.data;
 }
 
-export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
-        params: { search, is_active: true, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(endpoints.currencies, params, { is_active: true });
 }
 
 const relationPath = (supplierId: number, relation: string) => `${endpoints.suppliers}/${supplierId}/${relation}`;

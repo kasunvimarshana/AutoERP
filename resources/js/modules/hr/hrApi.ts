@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     Employee, EmployeeAddress, EmployeeAddressPayload, EmployeeAvailability, EmployeeAvailabilityPayload,
     EmployeeCertificationAssignment, EmployeeCertificationPayload, EmployeeContact, EmployeeContactPayload,
@@ -20,21 +22,19 @@ export const setEmployeeActive = (id: number, active: boolean) => apiClient.patc
 export const changeEmployeeStatus = (id: number, status: string, reason?: string) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/status`, { status, reason }).then((r) => r.data.data);
 export const changeEmployeeAvailability = (id: number, payload: EmployeeAvailabilityPayload) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/availability`, payload).then((r) => r.data.data);
 
-export async function searchEmployees(search: string, signal: AbortSignal, kind = 'active'): Promise<EmployeeSummary[]> {
-    const response = await apiClient.get<ApiCollection<EmployeeSummary>>(`${endpoints.hrEmployees}/lookup/${kind}`, { params: { search, per_page: 20 }, signal });
-    return response.data.data;
+export function searchEmployees(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<EmployeeSummary>> {
+    return requestLookup<EmployeeSummary>(`${endpoints.hrEmployees}/lookup/${kind}`, params);
 }
 type Master = HrDepartment | HrDesignation | HrEmploymentType | HrSkill | HrCertification | HrLicense;
-async function searchMaster<T extends Master>(endpoint: string, search: string, signal: AbortSignal): Promise<T[]> {
-    const response = await apiClient.get<ApiCollection<T>>(`${endpoint}/lookup`, { params: { search, per_page: 20 }, signal });
-    return response.data.data;
+function searchMaster<T extends Master>(endpoint: string, params: LookupLoadParams): Promise<LookupResult<T>> {
+    return requestLookup<T>(`${endpoint}/lookup`, params);
 }
-export const searchDepartments = (q: string, s: AbortSignal) => searchMaster<HrDepartment>(endpoints.hrDepartments, q, s);
-export const searchDesignations = (q: string, s: AbortSignal) => searchMaster<HrDesignation>(endpoints.hrDesignations, q, s);
-export const searchEmploymentTypes = (q: string, s: AbortSignal) => searchMaster<HrEmploymentType>(endpoints.hrEmploymentTypes, q, s);
-export const searchSkills = (q: string, s: AbortSignal) => searchMaster<HrSkill>(endpoints.hrSkills, q, s);
-export const searchCertifications = (q: string, s: AbortSignal) => searchMaster<HrCertification>(endpoints.hrCertifications, q, s);
-export const searchLicenses = (q: string, s: AbortSignal) => searchMaster<HrLicense>(endpoints.hrLicenses, q, s);
+export const searchDepartments = (params: LookupLoadParams) => searchMaster<HrDepartment>(endpoints.hrDepartments, params);
+export const searchDesignations = (params: LookupLoadParams) => searchMaster<HrDesignation>(endpoints.hrDesignations, params);
+export const searchEmploymentTypes = (params: LookupLoadParams) => searchMaster<HrEmploymentType>(endpoints.hrEmploymentTypes, params);
+export const searchSkills = (params: LookupLoadParams) => searchMaster<HrSkill>(endpoints.hrSkills, params);
+export const searchCertifications = (params: LookupLoadParams) => searchMaster<HrCertification>(endpoints.hrCertifications, params);
+export const searchLicenses = (params: LookupLoadParams) => searchMaster<HrLicense>(endpoints.hrLicenses, params);
 
 const path = (employeeId: number, relation: string) => `${endpoints.hrEmployees}/${employeeId}/${relation}`;
 function relationApi<T, P>(relation: string) {

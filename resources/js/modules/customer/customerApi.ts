@@ -1,7 +1,9 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     Customer,
     CustomerAddress,
@@ -45,28 +47,16 @@ export const changeCustomerStatus = (id: number, status: string, reason?: string
     apiClient.patch<ApiResource<Customer>>(`${endpoints.customers}/${id}/status`, { status, reason })
         .then((response) => response.data.data);
 
-export async function searchCustomers(search: string, signal?: AbortSignal, kind = 'active'): Promise<CustomerSummary[]> {
-    const response = await apiClient.get<ApiCollection<CustomerSummary>>(`${endpoints.customers}/lookup/${kind}`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchCustomers(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<CustomerSummary>> {
+    return requestLookup<CustomerSummary>(`${endpoints.customers}/lookup/${kind}`, params);
 }
 
-export async function searchCustomerCategories(search: string, signal?: AbortSignal): Promise<CustomerCategory[]> {
-    const response = await apiClient.get<ApiCollection<CustomerCategory>>(`${endpoints.customerCategories}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchCustomerCategories(params: LookupLoadParams): Promise<LookupResult<CustomerCategory>> {
+    return requestLookup<CustomerCategory>(`${endpoints.customerCategories}/lookup`, params);
 }
 
-export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
-        params: { search, is_active: true, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(endpoints.currencies, params, { is_active: true });
 }
 
 const relationPath = (customerId: number, relation: string) => `${endpoints.customers}/${customerId}/${relation}`;

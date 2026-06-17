@@ -4,12 +4,15 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { listUoms, searchCurrencies, searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupBehaviorOptions, LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { searchGoodsReceipts, searchPurchaseOrders } from '../purchaseApi';
 
-interface LookupProps {
+interface LookupProps extends LookupBehaviorOptions {
     value: NamedResource | null;
     onChange: (value: NamedResource | null) => void;
     error?: string;
+    disabled?: boolean;
+    required?: boolean;
 }
 
 interface WarehouseLocationLookupProps extends LookupProps {
@@ -25,16 +28,16 @@ export function ItemLookupSelect(props: LookupProps) {
 }
 
 export function UomLookupSelect(props: LookupProps) {
-    return <LookupSelect label="UOM" search={listUoms} placeholder="Search UOMs..." {...props} />;
+    return <LookupSelect label="UOM" search={listUoms} placeholder="Search UOMs..." loadOnOpen minSearchLength={0} {...props} />;
 }
 
 export function WarehouseLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Warehouse" search={searchWarehouses} placeholder="Search warehouses..." {...props} />;
+    return <LookupSelect label="Warehouse" search={searchWarehouses} placeholder="Search warehouses..." loadOnOpen minSearchLength={0} {...props} />;
 }
 
 export function WarehouseLocationLookupSelect({ warehouseId, ...props }: WarehouseLocationLookupProps) {
     const search = useCallback(
-        (query: string, signal: AbortSignal) => searchWarehouseLocations(query, signal, warehouseId),
+        (params: LookupLoadParams) => searchWarehouseLocations(params, warehouseId),
         [warehouseId],
     );
 
@@ -44,12 +47,15 @@ export function WarehouseLocationLookupSelect({ warehouseId, ...props }: Warehou
             search={search}
             placeholder="Search locations..."
             {...props}
+            disabled={!warehouseId || props.disabled}
+            loadOnOpen={props.loadOnOpen ?? true}
+            minSearchLength={props.minSearchLength ?? 0}
         />
     );
 }
 
 export function CurrencyLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Currency" search={searchCurrencies} placeholder="Search currency code..." {...props} />;
+    return <LookupSelect label="Currency" search={searchCurrencies} placeholder="Search currency code..." loadOnOpen minSearchLength={0} {...props} />;
 }
 
 export function PurchaseOrderLookupSelect(props: LookupProps) {
@@ -62,20 +68,25 @@ export function GoodsReceiptLookupSelect(props: LookupProps) {
 
 export function PurchaseInvoiceLookupSelect({ partyId, ...props }: LookupProps & { partyId?: number | null }) {
     const search = useCallback(
-        async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
+        async ({ search, page, perPage, signal }: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
             const response = await listInvoices({
-                search: query,
+                search,
+                page,
                 invoice_type: 'purchase',
                 direction: 'inbound',
                 party_id: partyId ?? undefined,
-                per_page: 20,
+                per_page: perPage,
             }, signal);
 
-            return response.data.map((invoice) => ({
-                id: invoice.id,
-                code: invoice.invoice_number,
-                name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
-            }));
+            return {
+                data: response.data.map((invoice) => ({
+                    id: invoice.id,
+                    code: invoice.invoice_number,
+                    name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
+                })),
+                links: response.links,
+                meta: response.meta,
+            };
         },
         [partyId],
     );

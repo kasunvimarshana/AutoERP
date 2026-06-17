@@ -44,8 +44,8 @@ export function TransfersTab({ data, loading, error, reload }: WorkflowProps) {
         <WorkflowPanel title="Transfer workflow" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_9rem_9rem_1fr_auto]" onSubmit={submit}>
                 <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="From warehouse" value={fromWarehouse} onChange={setFromWarehouse} search={searchWarehouses} error={fieldError(actionError, 'from_warehouse_id')} />
-                <LookupSelect label="To warehouse" value={toWarehouse} onChange={setToWarehouse} search={searchWarehouses} error={fieldError(actionError, 'to_warehouse_id')} />
+                <LookupSelect label="From warehouse" value={fromWarehouse} onChange={setFromWarehouse} search={searchWarehouses} error={fieldError(actionError, 'from_warehouse_id')} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="To warehouse" value={toWarehouse} onChange={setToWarehouse} search={searchWarehouses} error={fieldError(actionError, 'to_warehouse_id')} loadOnOpen minSearchLength={0} />
                 <DecimalInput label="Qty (base)" value={form.quantity} error={fieldError(actionError, 'lines.0.quantity')} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
                 <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
                 <Input label="Date" type="date" value={form.transfer_date} error={fieldError(actionError, 'transfer_date')} onChange={(event) => setForm({ ...form, transfer_date: event.target.value })} />

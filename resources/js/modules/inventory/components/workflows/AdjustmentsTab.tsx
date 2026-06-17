@@ -60,7 +60,7 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
         <WorkflowPanel title="Stock adjustment workflow" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 xl:grid-cols-[1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
                 <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
                 <Select
                     label="Type"
                     value={form.adjustment_type}

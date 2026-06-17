@@ -33,6 +33,8 @@ export function LineBasicFields({ value, error, set }: {
                 error={fieldError(error, 'uom_id')}
                 onChange={(uom) => set('uom', uom)}
                 search={listUoms}
+                loadOnOpen
+                minSearchLength={0}
             />
         </>
     );

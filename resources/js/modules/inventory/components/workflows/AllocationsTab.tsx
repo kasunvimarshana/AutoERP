@@ -52,7 +52,7 @@ export function AllocationsTab({
         <WorkflowPanel title="Allocation management" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_12rem_auto]" onSubmit={submit}>
                 <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
                 <DecimalInput label="Quantity (base)" value={form.quantity_allocated} error={fieldError(actionError, 'quantity_allocated')} onChange={(event) => setForm({ ...form, quantity_allocated: event.target.value })} />
                 <Input label="Date" type="date" value={form.allocation_date} error={fieldError(actionError, 'allocation_date')} onChange={(event) => setForm({ ...form, allocation_date: event.target.value })} />
                 <Select

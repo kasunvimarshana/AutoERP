@@ -8,6 +8,7 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
 import { createRentalUsageLog } from '../vehicleRentalApi';
@@ -43,7 +44,7 @@ export function UsageLogEditor({
     });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const searchDriver = useCallback((query: string, signal: AbortSignal) => searchEmployees(query, signal), []);
+    const searchDriver = useCallback((params: LookupLoadParams) => searchEmployees(params), []);
     const dirty = Boolean(
         form.end_odometer
         || form.comparative_km

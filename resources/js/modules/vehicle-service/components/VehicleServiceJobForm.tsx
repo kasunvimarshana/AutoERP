@@ -11,6 +11,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
@@ -38,15 +39,15 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [error, setError] = useState<ApiError | null>(null);
     const errorFor = (key: string) => fieldError(error, key);
 
-    const searchCustomer = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
-        return lookupApi.customers(query, signal);
+    const searchCustomer = useCallback((params: LookupLoadParams) => {
+        return lookupApi.customers(params);
     }, []);
-    const searchVehicle = useCallback(async (query: string, signal: AbortSignal): Promise<VehicleLookupResource[]> => {
-        if (!customer) return [];
-        return lookupApi.serviceVehicles(customer.id, query, signal);
+    const searchVehicle = useCallback((params: LookupLoadParams) => {
+        if (!customer) return Promise.resolve({ data: [] });
+        return lookupApi.serviceVehicles(customer.id, params);
     }, [customer]);
-    const searchSupervisor = useCallback(async (query: string, signal: AbortSignal): Promise<NamedResource[]> => {
-        return lookupApi.availableEmployees(query, signal);
+    const searchSupervisor = useCallback((params: LookupLoadParams) => {
+        return lookupApi.availableEmployees(params);
     }, []);
 
     const payload = (): VehicleServiceJobPayload => ({
@@ -89,7 +90,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         if (value?.odometer_reading && !form.odometer_reading) {
                             setForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
                         }
-                    }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} />
+                    }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} disabled={!customer} loadOnOpen={Boolean(customer)} minSearchLength={0} />
                     <GenericLookupSelect label="Supervisor" value={supervisor} onChange={setSupervisor} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
                     <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => setForm({ ...form, job_date: event.target.value })} />
                     <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setForm({ ...form, expected_delivery_date: event.target.value })} />

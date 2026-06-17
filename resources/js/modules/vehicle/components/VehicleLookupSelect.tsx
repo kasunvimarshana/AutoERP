@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
+import { mapLookupResult } from '@/shared/api/lookupRequest';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { searchVehicles } from '../vehicleApi';
 import type { VehicleSummary } from '../vehicleTypes';
 
@@ -12,9 +14,9 @@ export function VehicleLookupSelect({ value, onChange, error, kind = 'active' }:
     error?: string;
     kind?: string;
 }) {
-    const search = useCallback(async (query: string, signal: AbortSignal) => {
-        const results = await searchVehicles(query, signal, kind);
-        return results.map((vehicle) => ({ ...vehicle, name: vehicle.vehicle_number }));
+    const search = useCallback(async (params: LookupLoadParams) => {
+        const result = await searchVehicles(params, kind);
+        return mapLookupResult(result, (vehicle): VehicleLookupOption => ({ ...vehicle, name: vehicle.vehicle_number }));
     }, [kind]);
     const selected = value ? { ...value, name: value.vehicle_number } : null;
     return (

@@ -10,5 +10,5 @@ export function ItemUomSelect({ label = 'UOM', value, onChange, error }: {
     onChange: (uom: NamedResource | null) => void;
     error?: string;
 }) {
-    return <GenericLookupSelect label={label} value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} />;
+    return <GenericLookupSelect label={label} value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} loadOnOpen minSearchLength={0} />;
 }

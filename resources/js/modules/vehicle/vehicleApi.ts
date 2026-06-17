@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     Vehicle,
     VehicleAttribute,
@@ -42,35 +44,29 @@ export const setVehicleActive = (id: number, active: boolean) =>
 export const changeVehicleStatus = (id: number, status: string, reason?: string) =>
     apiClient.patch<ApiResource<Vehicle>>(`${endpoints.vehicles}/${id}/status`, { status, reason }).then((response) => response.data.data);
 
-export async function searchVehicles(search: string, signal?: AbortSignal, kind = 'active'): Promise<VehicleSummary[]> {
-    const response = await apiClient.get<ApiCollection<VehicleSummary>>(`${endpoints.vehicles}/lookup/${kind}`, {
-        params: { search, per_page: 20 },
-        signal,
+export function searchVehicles(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<VehicleSummary>> {
+    return requestLookup<VehicleSummary>(`${endpoints.vehicles}/lookup/${kind}`, params);
+}
+
+export function searchVehicleMakes(params: LookupLoadParams): Promise<LookupResult<VehicleMake>> {
+    return requestLookup<VehicleMake>(`${endpoints.vehicleMakes}/lookup`, params);
+}
+
+export function searchVehicleModels(
+    params: LookupLoadParams,
+    vehicleMakeId?: number | null,
+): Promise<LookupResult<VehicleModel>> {
+    return requestLookup<VehicleModel>(`${endpoints.vehicleModels}/lookup`, params, {
+        vehicle_make_id: vehicleMakeId ?? undefined,
     });
-    return response.data.data;
 }
 
-export async function searchVehicleMakes(search: string, signal?: AbortSignal): Promise<VehicleMake[]> {
-    const response = await apiClient.get<ApiCollection<VehicleMake>>(`${endpoints.vehicleMakes}/lookup`, { params: { search, per_page: 20 }, signal });
-    return response.data.data;
+export function searchVehicleTypes(params: LookupLoadParams): Promise<LookupResult<VehicleType>> {
+    return requestLookup<VehicleType>(`${endpoints.vehicleTypes}/lookup`, params);
 }
 
-export async function searchVehicleModels(search: string, vehicleMakeId?: number | null, signal?: AbortSignal): Promise<VehicleModel[]> {
-    const response = await apiClient.get<ApiCollection<VehicleModel>>(`${endpoints.vehicleModels}/lookup`, {
-        params: { search, vehicle_make_id: vehicleMakeId ?? undefined, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
-}
-
-export async function searchVehicleTypes(search: string, signal?: AbortSignal): Promise<VehicleType[]> {
-    const response = await apiClient.get<ApiCollection<VehicleType>>(`${endpoints.vehicleTypes}/lookup`, { params: { search, per_page: 20 }, signal });
-    return response.data.data;
-}
-
-export async function searchVehicleCategories(search: string, signal?: AbortSignal): Promise<VehicleCategory[]> {
-    const response = await apiClient.get<ApiCollection<VehicleCategory>>(`${endpoints.vehicleCategories}/lookup`, { params: { search, per_page: 20 }, signal });
-    return response.data.data;
+export function searchVehicleCategories(params: LookupLoadParams): Promise<LookupResult<VehicleCategory>> {
+    return requestLookup<VehicleCategory>(`${endpoints.vehicleCategories}/lookup`, params);
 }
 
 const relationPath = (vehicleId: number, relation: string) => `${endpoints.vehicles}/${vehicleId}/${relation}`;

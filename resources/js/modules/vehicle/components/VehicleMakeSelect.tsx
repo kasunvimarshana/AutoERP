@@ -8,6 +8,6 @@ export function VehicleMakeSelect({ value, onChange, error }: {
     onChange: (value: VehicleMake | null) => void;
     error?: string;
 }) {
-    const search = useCallback((query: string, signal: AbortSignal) => searchVehicleMakes(query, signal), []);
-    return <GenericLookupSelect label="Make" value={value} onChange={onChange} search={search} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} />;
+    const search = useCallback(searchVehicleMakes, []);
+    return <GenericLookupSelect label="Make" value={value} onChange={onChange} search={search} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} loadOnOpen minSearchLength={0} />;
 }

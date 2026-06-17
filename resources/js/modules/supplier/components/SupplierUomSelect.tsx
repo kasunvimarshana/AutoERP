@@ -9,5 +9,5 @@ export function SupplierUomSelect({ value, onChange, error }: {
     onChange: (uom: NamedResource | null) => void;
     error?: string;
 }) {
-    return <GenericLookupSelect label="Purchase UOM" value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} />;
+    return <GenericLookupSelect label="Purchase UOM" value={value} onChange={onChange} search={listUoms} formatLabel={formatUom} error={error} loadOnOpen minSearchLength={0} />;
 }

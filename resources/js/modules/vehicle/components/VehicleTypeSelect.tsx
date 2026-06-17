@@ -8,6 +8,6 @@ export function VehicleTypeSelect({ value, onChange, error }: {
     onChange: (value: VehicleType | null) => void;
     error?: string;
 }) {
-    const search = useCallback((query: string, signal: AbortSignal) => searchVehicleTypes(query, signal), []);
-    return <GenericLookupSelect label="Type" value={value} onChange={onChange} search={search} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} />;
+    const search = useCallback(searchVehicleTypes, []);
+    return <GenericLookupSelect label="Type" value={value} onChange={onChange} search={search} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} loadOnOpen minSearchLength={0} />;
 }

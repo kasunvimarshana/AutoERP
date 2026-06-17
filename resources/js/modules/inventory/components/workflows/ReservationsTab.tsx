@@ -45,7 +45,7 @@ export function ReservationsTab({ data, loading, error, reload }: WorkflowProps)
         <WorkflowPanel title="Reservation management" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_auto]" onSubmit={submit}>
                 <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
                 <DecimalInput label="Quantity (base)" value={form.quantity_reserved} error={fieldError(actionError, 'quantity_reserved')} onChange={(event) => setForm({ ...form, quantity_reserved: event.target.value })} />
                 <Input label="Date" type="date" value={form.reservation_date} error={fieldError(actionError, 'reservation_date')} onChange={(event) => setForm({ ...form, reservation_date: event.target.value })} />
                 <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Reserve</Button></div>

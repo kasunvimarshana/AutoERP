@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { SalesDocumentPayload, SalesLineSummary, SalesOrder } from './salesTypes';
 
 const base = `${endpoints.sales}/orders`;
@@ -66,17 +67,23 @@ export async function getInvoiceableSalesOrderLines(id: number, signal?: AbortSi
     ).data.data;
 }
 
-export async function searchSalesOrders(
-    search: string,
-    signal?: AbortSignal,
-): Promise<NamedResource[]> {
-    const response = await listSalesOrders({ search, per_page: 20 }, signal);
+export async function searchSalesOrders({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listSalesOrders({ search, page, per_page: perPage }, signal);
 
-    return response.data.map((order) => ({
-        id: order.id,
-        code: order.sales_order_number,
-        name: `${order.sales_order_number ?? 'Sales order'}${
-            order.customer?.name ? ` - ${order.customer.name}` : ''
-        }`,
-    }));
+    return {
+        data: response.data.map((order) => ({
+            id: order.id,
+            code: order.sales_order_number,
+            name: `${order.sales_order_number ?? 'Sales order'}${
+                order.customer?.name ? ` - ${order.customer.name}` : ''
+            }`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
 }

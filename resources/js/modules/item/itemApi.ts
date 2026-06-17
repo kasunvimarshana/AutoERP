@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     Item,
     ItemBrand,
@@ -60,29 +62,17 @@ export async function setItemActive(id: number, active: boolean): Promise<Item> 
     return response.data.data;
 }
 
-export async function searchItems(search: string, signal?: AbortSignal, kind = ''): Promise<ItemSummary[]> {
+export function searchItems(params: LookupLoadParams, kind = ''): Promise<LookupResult<ItemSummary>> {
     const path = kind ? `${endpoints.items}/lookup/${kind}` : `${endpoints.items}/lookup`;
-    const response = await apiClient.get<ApiCollection<ItemSummary>>(path, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+    return requestLookup<ItemSummary>(path, params);
 }
 
-export async function searchItemCategories(search: string, signal?: AbortSignal): Promise<ItemCategory[]> {
-    const response = await apiClient.get<ApiCollection<ItemCategory>>(`${endpoints.itemCategories}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchItemCategories(params: LookupLoadParams): Promise<LookupResult<ItemCategory>> {
+    return requestLookup<ItemCategory>(`${endpoints.itemCategories}/lookup`, params);
 }
 
-export async function searchItemBrands(search: string, signal?: AbortSignal): Promise<ItemBrand[]> {
-    const response = await apiClient.get<ApiCollection<ItemBrand>>(`${endpoints.itemBrands}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchItemBrands(params: LookupLoadParams): Promise<LookupResult<ItemBrand>> {
+    return requestLookup<ItemBrand>(`${endpoints.itemBrands}/lookup`, params);
 }
 
 const relationPath = (itemId: number, relation: string) => `${endpoints.items}/${itemId}/${relation}`;

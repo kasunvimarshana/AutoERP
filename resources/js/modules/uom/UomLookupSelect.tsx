@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { searchUoms } from './uomApi';
 import type { UomSummary } from './uomTypes';
 
@@ -10,8 +11,8 @@ export function UomLookupSelect({ label, value, onChange, excludeId, error }: {
     excludeId?: number | null;
     error?: string;
 }) {
-    const search = useCallback((query: string, signal: AbortSignal) => searchUoms(query, signal), []);
-    return <GenericLookupSelect label={label} value={value} onChange={onChange} excludeId={excludeId} error={error} search={search} formatLabel={uomLabel} placeholder="Search UOM code, name, or symbol" />;
+    const search = useCallback((params: LookupLoadParams) => searchUoms(params), []);
+    return <GenericLookupSelect label={label} value={value} onChange={onChange} excludeId={excludeId} error={error} search={search} formatLabel={uomLabel} placeholder="Search UOM code, name, or symbol" loadOnOpen minSearchLength={0} />;
 }
 
 export function uomLabel(uom: UomSummary): string {

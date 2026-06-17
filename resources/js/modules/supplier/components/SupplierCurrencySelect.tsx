@@ -9,5 +9,5 @@ export function SupplierCurrencySelect({ value, onChange, error }: {
     onChange: (currency: NamedResource | null) => void;
     error?: string;
 }) {
-    return <GenericLookupSelect label="Currency" value={value} onChange={onChange} search={searchCurrencies} formatLabel={formatCurrency} error={error} placeholder="Search currency code" />;
+    return <GenericLookupSelect label="Currency" value={value} onChange={onChange} search={searchCurrencies} formatLabel={formatCurrency} error={error} placeholder="Search currency code" loadOnOpen minSearchLength={0} />;
 }

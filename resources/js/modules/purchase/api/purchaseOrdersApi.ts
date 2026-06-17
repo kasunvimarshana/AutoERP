@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderPayload } from '../purchaseTypes';
 
 export async function listPurchaseOrders(params: ListParams, signal?: AbortSignal) {
@@ -66,11 +67,20 @@ export async function getSupplierItemMappings(supplierId: number, signal?: Abort
     return response.data;
 }
 
-export async function searchPurchaseOrders(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await listPurchaseOrders({ search, per_page: 20 }, signal);
-    return response.data.map((order) => ({
-        id: order.id,
-        code: order.purchase_order_number,
-        name: `${order.purchase_order_number ?? 'Purchase order'}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
-    }));
+export async function searchPurchaseOrders({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listPurchaseOrders({ search, page, per_page: perPage }, signal);
+    return {
+        data: response.data.map((order) => ({
+            id: order.id,
+            code: order.purchase_order_number,
+            name: `${order.purchase_order_number ?? 'Purchase order'}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
 }

@@ -1,36 +1,26 @@
-import { apiClient } from './apiClient';
 import { endpoints } from './endpoints';
-import type { ApiCollection } from '@/shared/types/api';
+import { requestLookup } from './lookupRequest';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 
-export async function listUoms(search = '', signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(`${endpoints.uoms}/lookup`, {
-        params: { search, per_page: 50, page: 1 },
-        signal,
-    });
-    return response.data.data;
+export function listUoms(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(`${endpoints.uoms}/lookup`, params);
 }
 
-export async function searchWarehouses(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.warehouses, {
-        params: { search, is_active: true, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchWarehouses(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(endpoints.warehouses, params, { is_active: true });
 }
 
-export async function searchWarehouseLocations(search: string, signal?: AbortSignal, warehouseId?: number | null): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.warehouseLocations, {
-        params: { search, warehouse_id: warehouseId ?? undefined, is_active: true, per_page: 20 },
-        signal,
+export function searchWarehouseLocations(
+    params: LookupLoadParams,
+    warehouseId?: number | null,
+): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(endpoints.warehouseLocations, params, {
+        warehouse_id: warehouseId ?? undefined,
+        is_active: true,
     });
-    return response.data.data;
 }
 
-export async function searchCurrencies(search: string, signal?: AbortSignal): Promise<NamedResource[]> {
-    const response = await apiClient.get<ApiCollection<NamedResource>>(endpoints.currencies, {
-        params: { search, is_active: true, per_page: 20 },
-        signal,
-    });
-    return response.data.data;
+export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(endpoints.currencies, params, { is_active: true });
 }

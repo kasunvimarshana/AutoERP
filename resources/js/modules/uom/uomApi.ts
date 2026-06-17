@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { mapLookupResult, requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     UnitOfMeasure,
     UomConversion,
@@ -36,12 +38,9 @@ export async function deactivateUom(id: number): Promise<UnitOfMeasure> {
     return response.data.data;
 }
 
-export async function searchUoms(search: string, signal?: AbortSignal): Promise<UomSummary[]> {
-    const response = await apiClient.get<ApiCollection<UnitOfMeasure>>(`${endpoints.uoms}/lookup`, {
-        params: { search, per_page: 20 },
-        signal,
-    });
-    return response.data.data.map((uom) => ({
+export async function searchUoms(params: LookupLoadParams): Promise<LookupResult<UomSummary>> {
+    const result = await requestLookup<UnitOfMeasure>(`${endpoints.uoms}/lookup`, params);
+    return mapLookupResult(result, (uom) => ({
         id: uom.id,
         code: uom.code,
         name: uom.name,

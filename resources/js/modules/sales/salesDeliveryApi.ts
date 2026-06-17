@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     ReturnableSalesLine,
     SalesDelivery,
@@ -38,17 +39,23 @@ export async function getReturnableSalesDeliveryLines(id: number, signal?: Abort
     ).data.data;
 }
 
-export async function searchSalesDeliveries(
-    search: string,
-    signal?: AbortSignal,
-): Promise<NamedResource[]> {
-    const response = await listSalesDeliveries({ search, per_page: 20 }, signal);
+export async function searchSalesDeliveries({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listSalesDeliveries({ search, page, per_page: perPage }, signal);
 
-    return response.data.map((delivery) => ({
-        id: delivery.id,
-        code: delivery.delivery_number,
-        name: `${delivery.delivery_number ?? 'Delivery'}${
-            delivery.customer?.name ? ` - ${delivery.customer.name}` : ''
-        }`,
-    }));
+    return {
+        data: response.data.map((delivery) => ({
+            id: delivery.id,
+            code: delivery.delivery_number,
+            name: `${delivery.delivery_number ?? 'Delivery'}${
+                delivery.customer?.name ? ` - ${delivery.customer.name}` : ''
+            }`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
 }

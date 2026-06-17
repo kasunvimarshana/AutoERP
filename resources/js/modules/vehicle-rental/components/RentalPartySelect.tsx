@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { RentalPartyType } from '../vehicleRentalTypes';
 
 export function RentalPartySelect({ partyType, value, onChange, error }: {
@@ -10,8 +11,8 @@ export function RentalPartySelect({ partyType, value, onChange, error }: {
     onChange: (value: NamedResource | null) => void;
     error?: string;
 }) {
-    const search = useCallback((query: string, signal: AbortSignal) => (
-        partyType === 'customer' ? lookupApi.customers(query, signal) : lookupApi.suppliers(query, signal)
+    const search = useCallback((params: LookupLoadParams) => (
+        partyType === 'customer' ? lookupApi.customers(params) : lookupApi.suppliers(params)
     ), [partyType]);
     return (
         <GenericLookupSelect

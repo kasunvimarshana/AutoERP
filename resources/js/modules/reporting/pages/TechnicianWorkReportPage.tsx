@@ -16,6 +16,7 @@ import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { ExportActions } from '../components/ExportActions';
 import { runTechnicianWorkReport } from '../reportingApi';
 import type { TechnicianWorkReportParams, TechnicianWorkReportResult, TechnicianWorkReportRow } from '../reportingTypes';
@@ -121,7 +122,7 @@ export default function TechnicianWorkReportPage() {
     }, [filters]);
 
     const exportParams = useMemo(() => cleanParams(filters), [filters]);
-    const employeeSearch = useCallback((query: string, signal: AbortSignal) => searchEmployees(query, signal), []);
+    const employeeSearch = useCallback((params: LookupLoadParams) => searchEmployees(params), []);
 
     const updateDraft = (patch: Partial<TechnicianWorkReportParams>) => {
         setDraft((current) => ({ ...current, ...patch }));
