@@ -43,7 +43,6 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     const [model, setModel] = useState<VehicleModel | null>(initial?.model as VehicleModel ?? null);
     const [type, setType] = useState<VehicleType | null>(initial?.type as VehicleType ?? null);
     const [category, setCategory] = useState<VehicleCategory | null>(initial?.category as VehicleCategory ?? null);
-    const [customer, setCustomer] = useState<NamedResource | null>(initial?.customer ?? null);
     const [ownershipCustomer, setOwnershipCustomer] = useState<NamedResource | null>(null);
     const [payload, setPayload] = useState<VehiclePayload>({
         vehicle_number: initial?.vehicle_number ?? '',
@@ -66,7 +65,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
     const [ownerships, setOwnerships] = useState<VehicleOwnershipPayload[]>([]);
     const [documents, setDocuments] = useState<VehicleDocumentPayload[]>([]);
     const [attributes, setAttributes] = useState<VehicleAttributePayload[]>([]);
-    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true });
+    const [ownershipDraft, setOwnershipDraft] = useState<VehicleOwnershipPayload>({ ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
     const [documentDraft, setDocumentDraft] = useState<VehicleDocumentPayload>({ document_type: 'registration', status: 'pending', document_number: '' });
     const [attributeDraft, setAttributeDraft] = useState<VehicleAttributePayload>({ attribute_key: '', attribute_value: '', data_type: 'text', sort_order: 0 });
 
@@ -76,8 +75,7 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
         vehicle_model_id: model?.id ?? null,
         vehicle_type_id: type?.id ?? null,
         vehicle_category_id: category?.id ?? null,
-        customer_id: customer?.id ?? null,
-    }), [category, customer, make, model, payload, type]);
+    }), [category, make, model, payload, type]);
     const formSnapshot = JSON.stringify({ finalPayload, documents, ownerships, attributes });
     const initialSnapshot = useRef(formSnapshot);
     const confirmDiscard = useUnsavedChanges(formSnapshot !== initialSnapshot.current && !submitting);
@@ -115,7 +113,6 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                         <VehicleModelSelect makeId={make?.id} value={model} onChange={setModel} error={fieldError(error, 'vehicle_model_id')} />
                         <VehicleTypeSelect value={type} onChange={setType} error={fieldError(error, 'vehicle_type_id')} />
                         <VehicleCategorySelect value={category} onChange={setCategory} error={fieldError(error, 'vehicle_category_id')} />
-                        <LookupSelect label="Customer" value={customer} onChange={setCustomer} search={lookupApi.customers} error={fieldError(error, 'customer_id')} />
                         <Select label="Status" options={statusOptions.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} {...input('status')} />
                         <DecimalInput label="Odometer" value={String(payload.odometer_reading ?? '')} onChange={(event) => setPayload({ ...payload, odometer_reading: event.target.value })} error={fieldError(error, 'odometer_reading')} />
                         </fieldset>
@@ -147,8 +144,11 @@ export function VehicleForm({ initial, submitting, error, enableRelations = fals
                             <LookupSelect label="Customer" value={ownershipCustomer} onChange={setOwnershipCustomer} search={lookupApi.customers} error={fieldError(error, 'ownerships.0.customer_id')} />
                         </div>
                         <Button type="button" onClick={() => {
-                            setOwnerships([...ownerships, { ...ownershipDraft, customer_id: ownershipCustomer?.id ?? null }]);
-                            setOwnershipDraft({ ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true });
+                            setOwnerships([...ownerships, {
+                                ...ownershipDraft,
+                                customer_id: ownershipDraft.ownership_type === 'customer_owned' ? ownershipCustomer?.id ?? null : null,
+                            }]);
+                            setOwnershipDraft({ ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true });
                             setOwnershipCustomer(null);
                         }}>Add Ownership</Button>
                         <Count label="Ownerships" count={ownerships.length} />

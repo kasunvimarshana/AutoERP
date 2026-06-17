@@ -78,7 +78,7 @@ export interface VehicleSummary {
     model?: NamedResource | null;
     type?: NamedResource | null;
     category?: NamedResource | null;
-    customer?: NamedResource | null;
+    current_ownership?: VehicleOwnership | null;
     status: VehicleStatus;
     odometer_reading: string;
     odometer_unit?: string | null;
@@ -87,8 +87,6 @@ export interface VehicleSummary {
 }
 
 export interface Vehicle extends VehicleSummary {
-    current_owner_type?: string | null;
-    current_owner_id?: number | null;
     manufacture_year?: number | null;
     registration_date?: string | null;
     color?: string | null;
@@ -98,7 +96,6 @@ export interface Vehicle extends VehicleSummary {
     notes?: string | null;
     metadata?: Record<string, unknown> | null;
     approved_at?: string | null;
-    current_ownership?: VehicleOwnership | null;
     documents?: VehicleDocument[];
     ownerships?: VehicleOwnership[];
     attributes?: VehicleAttribute[];
@@ -112,9 +109,6 @@ export interface VehiclePayload {
     vehicle_model_id?: number | null;
     vehicle_type_id?: number | null;
     vehicle_category_id?: number | null;
-    customer_id?: number | null;
-    current_owner_type?: string | null;
-    current_owner_id?: number | null;
     registration_number?: string | null;
     chassis_number?: string | null;
     engine_number?: string | null;

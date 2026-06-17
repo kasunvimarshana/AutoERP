@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
-use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Enums\VehicleFuelType;
@@ -33,8 +32,6 @@ final class Vehicle extends CoreModel
             'vehicle_model_id' => 'integer',
             'vehicle_type_id' => 'integer',
             'vehicle_category_id' => 'integer',
-            'customer_id' => 'integer',
-            'current_owner_id' => 'integer',
             'manufacture_year' => 'integer',
             'registration_date' => 'date',
             'fuel_type' => VehicleFuelType::class,
@@ -53,7 +50,6 @@ final class Vehicle extends CoreModel
     public function model(): BelongsTo { return $this->belongsTo(VehicleModel::class, 'vehicle_model_id'); }
     public function type(): BelongsTo { return $this->belongsTo(VehicleType::class, 'vehicle_type_id'); }
     public function category(): BelongsTo { return $this->belongsTo(VehicleCategory::class, 'vehicle_category_id'); }
-    public function customer(): BelongsTo { return $this->belongsTo(Customer::class, 'customer_id'); }
     public function documents(): HasMany { return $this->hasMany(VehicleDocument::class, 'vehicle_id'); }
     public function statusHistories(): HasMany { return $this->hasMany(VehicleStatusHistory::class, 'vehicle_id'); }
     public function ownerships(): HasMany { return $this->hasMany(VehicleOwnership::class, 'vehicle_id'); }

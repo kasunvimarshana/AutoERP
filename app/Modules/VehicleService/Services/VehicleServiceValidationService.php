@@ -31,11 +31,12 @@ final class VehicleServiceValidationService
     public function vehicle(int $tenantId, ?int $organizationUnitId, int $vehicleId, int $customerId): Vehicle
     {
         /** @var Vehicle $vehicle */
-        $vehicle = $this->scoped(Vehicle::query(), $tenantId, $organizationUnitId)->findOrFail($vehicleId);
+        $vehicle = $this->scoped(Vehicle::query()->with('currentOwnership.customer'), $tenantId, $organizationUnitId)->findOrFail($vehicleId);
         if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
             throw new InvalidArgumentException('Inactive or unavailable vehicles cannot be used for service jobs.');
         }
-        if ($vehicle->customer_id !== null && (int) $vehicle->customer_id !== $customerId) {
+        $currentOwnership = $vehicle->currentOwnership;
+        if ($currentOwnership?->customer_id !== null && (int) $currentOwnership->customer_id !== $customerId) {
             throw new InvalidArgumentException('Vehicle does not belong to the selected customer.');
         }
 

@@ -7,6 +7,7 @@ namespace Modules\Vehicle\Tests;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Customer\DTOs\CreateCustomerData;
@@ -64,7 +65,6 @@ final class VehicleEngineTest extends TestCase
             vehicleModelId: (int) $model->getKey(),
             vehicleTypeId: (int) $type->getKey(),
             vehicleCategoryId: (int) $category->getKey(),
-            customerId: (int) $customer->getKey(),
             registrationNumber: 'CAR-1234',
             chassisNumber: 'CH-1234',
             engineNumber: 'EN-1234',
@@ -82,7 +82,7 @@ final class VehicleEngineTest extends TestCase
         $this->assertCount(1, $vehicle->ownerships);
         $this->assertCount(1, $vehicle->attributes);
         $this->assertCount(1, $vehicle->statusHistories);
-        $this->assertSame((int) $customer->getKey(), (int) $vehicle->refresh()->customer_id);
+        $this->assertSame((int) $customer->getKey(), (int) $vehicle->refresh()->currentOwnership?->customer_id);
 
         $result = app(VehicleLookupService::class)->result($vehicle);
         $this->assertSame('VEH-CREATE-1', $result->vehicleNumber);
@@ -125,6 +125,7 @@ final class VehicleEngineTest extends TestCase
         $second = app(VehicleOwnershipService::class)->assign($vehicle, new VehicleOwnershipData(VehicleOwnershipType::CompanyOwned, now()->addDay()->toDateString(), isCurrent: true));
         $this->assertFalse((bool) $ownership->refresh()->is_current);
         $this->assertTrue((bool) $second->is_current);
+        $this->assertSame(1, $vehicle->ownerships()->where('is_current', true)->count());
 
         app(VehicleDocumentService::class)->delete($vehicle, $document);
         app(VehicleAttributeService::class)->delete($vehicle, $attribute);
@@ -202,7 +203,6 @@ final class VehicleEngineTest extends TestCase
                 'vehicle_model_id' => $model->getKey(),
                 'vehicle_type_id' => $type->getKey(),
                 'vehicle_category_id' => $category->getKey(),
-                'customer_id' => $customer->getKey(),
                 'registration_number' => 'API-1234',
                 'status' => 'active',
             ],
@@ -215,9 +215,9 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonPath('data.vehicle_number', 'VEH-API')
             ->assertJsonPath('data.make.name', $make->name)
             ->assertJsonPath('data.model.name', $model->name)
-            ->assertJsonPath('data.customer.name', $customer->name)
+            ->assertJsonPath('data.current_ownership.customer.name', $customer->name)
             ->assertJsonPath('data.documents.0.document_type', 'insurance')
-            ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'customer', 'documents', 'ownerships', 'attributes']]);
+            ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'current_ownership', 'documents', 'ownerships', 'attributes']]);
 
         $id = (int) $create->json('data.id');
         $this->getJson("/api/v1/vehicles/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
@@ -248,6 +248,7 @@ final class VehicleEngineTest extends TestCase
         [$tenantId, $organizationUnitId] = $this->scopeContext();
         [$make, $model] = $this->masterData($tenantId, $organizationUnitId);
         $customer = $this->customer($tenantId, $organizationUnitId, 'FILTER-CUS');
+        $supplierId = $this->supplier($tenantId, $organizationUnitId, 'FILTER-SUP');
 
         app(VehicleCreationService::class)->create(new CreateVehicleData(
             tenantId: $tenantId,
@@ -255,7 +256,7 @@ final class VehicleEngineTest extends TestCase
             vehicleNumber: 'VEH-CUSTOMER',
             vehicleMakeId: (int) $make->getKey(),
             vehicleModelId: (int) $model->getKey(),
-            customerId: (int) $customer->getKey(),
+            ownerships: [new VehicleOwnershipData(VehicleOwnershipType::CustomerOwned, now()->toDateString(), customerId: (int) $customer->getKey())],
         ));
         app(VehicleCreationService::class)->create(new CreateVehicleData(
             tenantId: $tenantId,
@@ -263,7 +264,7 @@ final class VehicleEngineTest extends TestCase
             vehicleNumber: 'VEH-SUPPLIER',
             vehicleMakeId: (int) $make->getKey(),
             vehicleModelId: (int) $model->getKey(),
-            currentOwnerType: 'supplier',
+            ownerships: [new VehicleOwnershipData(VehicleOwnershipType::ThirdParty, now()->toDateString(), ownerType: 'supplier', ownerId: $supplierId)],
         ));
         app(VehicleCreationService::class)->create(new CreateVehicleData(
             tenantId: $tenantId,
@@ -271,6 +272,7 @@ final class VehicleEngineTest extends TestCase
             vehicleNumber: 'VEH-COMPANY',
             vehicleMakeId: (int) $make->getKey(),
             vehicleModelId: (int) $model->getKey(),
+            ownerships: [new VehicleOwnershipData(VehicleOwnershipType::CompanyOwned, now()->toDateString())],
         ));
 
         $scope = [
@@ -287,6 +289,11 @@ final class VehicleEngineTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.vehicle_number', 'VEH-SUPPLIER');
+
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'company']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-COMPANY');
     }
 
     public function test_master_data_api_and_validation_errors(): void
@@ -327,6 +334,10 @@ final class VehicleEngineTest extends TestCase
         $this->assertDatabaseHas('vehicle_types', ['tenant_id' => $tenantId, 'code' => 'CAR']);
         $this->assertDatabaseHas('vehicle_categories', ['tenant_id' => $tenantId, 'code' => 'CUSTOMER']);
         $this->assertDatabaseHas('vehicles', ['tenant_id' => $tenantId, 'vehicle_number' => 'VEH-000001']);
+        $this->assertDatabaseHas('vehicle_ownerships', ['tenant_id' => $tenantId, 'ownership_type' => 'customer_owned', 'is_current' => true]);
+        foreach (['customer_id', 'current_owner_'.'type', 'current_owner_'.'id'] as $removedColumn) {
+            $this->assertFalse(Schema::hasColumn('vehicles', $removedColumn));
+        }
         $this->assertSame(1, Vehicle::query()->where('tenant_id', $tenantId)->count());
     }
 
@@ -376,6 +387,22 @@ final class VehicleEngineTest extends TestCase
             customerType: CustomerType::Company,
             status: CustomerStatus::Active,
         ));
+    }
+
+    private function supplier(int $tenantId, ?int $organizationUnitId, string $code): int
+    {
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'supplier_number' => $code,
+            'code' => $code,
+            'name' => 'Supplier '.$code,
+            'display_name' => 'Supplier '.$code,
+            'supplier_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**

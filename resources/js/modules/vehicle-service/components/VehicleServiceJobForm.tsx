@@ -114,7 +114,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
                         <VehicleContext label="Make" value={vehicle.make?.name ?? '-'} />
                         <VehicleContext label="Model" value={vehicle.model?.name ?? '-'} />
-                        <VehicleContext label="Owner" value={vehicle.customer?.name ?? customer?.name ?? '-'} />
+                        <VehicleContext label="Owner" value={vehicle.current_ownership?.customer?.name ?? customer?.name ?? '-'} />
                         <VehicleContext label="Odometer" value={`${vehicle.odometer_reading ?? '-'} ${vehicle.odometer_unit ?? ''}`.trim()} />
                     </div>
                 )}

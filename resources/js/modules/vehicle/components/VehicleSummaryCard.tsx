@@ -19,7 +19,7 @@ export function VehicleSummaryCard({ vehicle }: { vehicle: Vehicle }) {
                     { label: 'Model', value: vehicle.model?.name ?? '-' },
                     { label: 'Type', value: vehicle.type?.name ?? '-' },
                     { label: 'Category', value: vehicle.category?.name ?? '-' },
-                    { label: 'Customer', value: vehicle.customer?.name ?? '-' },
+                    { label: 'Current Customer', value: vehicle.current_ownership?.customer?.name ?? '-' },
                     { label: 'Odometer', value: `${vehicle.odometer_reading ?? '0.000000'} ${vehicle.odometer_unit ?? ''}`.trim() },
                     { label: 'Fuel', value: vehicle.fuel_type ?? '-' },
                     { label: 'Transmission', value: vehicle.transmission_type ?? '-' },

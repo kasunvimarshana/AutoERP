@@ -80,9 +80,23 @@ final class VehicleServiceJobResource extends ModuleResource
             'registration_number' => $this->vehicle->registration_number,
             'make' => $this->vehicle->relationLoaded('make') ? $this->namedRelation($this->vehicle->make) : null,
             'model' => $this->vehicle->relationLoaded('model') ? $this->namedRelation($this->vehicle->model) : null,
-            'customer' => $this->vehicle->relationLoaded('customer') ? $this->customerRelation($this->vehicle->customer) : null,
+            'current_ownership' => $this->vehicle->relationLoaded('currentOwnership') ? $this->vehicleCurrentOwnership() : null,
             'odometer_reading' => (string) $this->vehicle->odometer_reading,
             'odometer_unit' => $this->vehicle->odometer_unit,
+        ];
+    }
+
+    private function vehicleCurrentOwnership(): ?array
+    {
+        $ownership = $this->vehicle->currentOwnership;
+
+        return $ownership === null ? null : [
+            'id' => (int) $ownership->getKey(),
+            'ownership_type' => $this->enum($ownership->ownership_type),
+            'customer' => $ownership->relationLoaded('customer') ? $this->customerRelation($ownership->customer) : null,
+            'started_at' => $ownership->started_at?->toISOString(),
+            'ended_at' => $ownership->ended_at?->toISOString(),
+            'is_current' => (bool) $ownership->is_current,
         ];
     }
 

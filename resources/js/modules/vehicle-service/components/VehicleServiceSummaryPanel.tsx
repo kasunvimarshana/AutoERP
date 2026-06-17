@@ -13,7 +13,7 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Customer', value: readableRelation(job.customer) },
                 { label: 'Vehicle', value: readableRelation(job.vehicle) },
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
-                { label: 'Registered owner', value: readableRelation(job.vehicle?.customer ?? job.customer) },
+                { label: 'Registered owner', value: readableRelation(job.vehicle?.current_ownership?.customer ?? job.customer) },
                 { label: 'Supervisor', value: readableRelation(job.supervisor) },
                 { label: 'Job date', value: formatDate(job.job_date) },
                 { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },

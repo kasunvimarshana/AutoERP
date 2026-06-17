@@ -13,7 +13,13 @@ use Modules\Vehicle\Models\Vehicle;
 final class VehicleLookupService
 {
     public function activeVehicles(int $tenantId, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->active()->get(); }
-    public function vehiclesByCustomer(int $tenantId, int $customerId, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->where('customer_id', $customerId)->get(); }
+    public function vehiclesByCustomer(int $tenantId, int $customerId, ?int $organizationUnitId = null): Collection
+    {
+        return $this->baseQuery($tenantId, $organizationUnitId)
+            ->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership->where('customer_id', $customerId))
+            ->with('currentOwnership.customer')
+            ->get();
+    }
     public function vehiclesByRegistrationNumber(int $tenantId, string $registrationNumber, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->where('registration_number', $registrationNumber)->get(); }
     public function vehiclesAvailableForService(int $tenantId, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value])->get(); }
     public function vehiclesAvailableForRental(int $tenantId, ?int $organizationUnitId = null): Collection { return $this->baseQuery($tenantId, $organizationUnitId)->where('status', VehicleStatus::Active->value)->get(); }
@@ -23,7 +29,7 @@ final class VehicleLookupService
 
     public function result(Vehicle $vehicle): VehicleResultData
     {
-        return new VehicleResultData((int) $vehicle->getKey(), (int) $vehicle->tenant_id, $vehicle->organization_unit_id, (string) $vehicle->vehicle_number, $vehicle->code, $vehicle->registration_number, $vehicle->status, $vehicle->customer_id, (string) $vehicle->odometer_reading);
+        return new VehicleResultData((int) $vehicle->getKey(), (int) $vehicle->tenant_id, $vehicle->organization_unit_id, (string) $vehicle->vehicle_number, $vehicle->code, $vehicle->registration_number, $vehicle->status, (string) $vehicle->odometer_reading);
     }
 
     private function baseQuery(int $tenantId, ?int $organizationUnitId): Builder { return Vehicle::query()->forTenant($tenantId, $organizationUnitId); }

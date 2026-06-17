@@ -20,8 +20,11 @@ final class VehicleOwnershipService
         $this->validator->validateOwnership($vehicle, $data);
 
         return DB::transaction(function () use ($vehicle, $data): VehicleOwnership {
+            $this->lockVehicle($vehicle);
             if ($data->isCurrent) {
-                $vehicle->ownerships()->where('is_current', true)->update(['is_current' => false, 'ended_at' => now()]);
+                $this->closeCurrentOwnerships($vehicle);
+            } elseif (! $this->hasCurrentOwnership($vehicle)) {
+                throw new InvalidArgumentException('Vehicle must have one current ownership.');
             }
 
             $ownership = $vehicle->ownerships()->create([
@@ -37,14 +40,6 @@ final class VehicleOwnershipService
                 'notes' => $data->notes,
             ]);
 
-            if ($data->isCurrent) {
-                $vehicle->fill([
-                    'customer_id' => $data->customerId,
-                    'current_owner_type' => $data->ownerType,
-                    'current_owner_id' => $data->ownerId,
-                ])->save();
-            }
-
             return $ownership->refresh()->load('customer');
         });
     }
@@ -55,8 +50,15 @@ final class VehicleOwnershipService
         $this->validator->validateOwnership($vehicle, $data);
 
         return DB::transaction(function () use ($vehicle, $ownership, $data): VehicleOwnership {
+            $this->lockVehicle($vehicle);
+            $ownership = VehicleOwnership::query()->lockForUpdate()->findOrFail($ownership->getKey());
+            $this->assertOwned($vehicle, $ownership);
+
+            if (! $data->isCurrent && (bool) $ownership->is_current && ! $this->hasOtherCurrentOwnership($vehicle, $ownership)) {
+                throw new InvalidArgumentException('Vehicle must keep one current ownership. Assign a new current ownership before ending this one.');
+            }
             if ($data->isCurrent) {
-                $vehicle->ownerships()->whereKeyNot($ownership->getKey())->where('is_current', true)->update(['is_current' => false, 'ended_at' => now()]);
+                $this->closeCurrentOwnerships($vehicle, $ownership);
             }
             $ownership->fill([
                 'owner_type' => $data->ownerType,
@@ -68,9 +70,7 @@ final class VehicleOwnershipService
                 'is_current' => $data->isCurrent,
                 'notes' => $data->notes,
             ])->save();
-            if ($data->isCurrent) {
-                $vehicle->fill(['customer_id' => $data->customerId, 'current_owner_type' => $data->ownerType, 'current_owner_id' => $data->ownerId])->save();
-            }
+
             return $ownership->refresh()->load('customer');
         });
     }
@@ -87,8 +87,11 @@ final class VehicleOwnershipService
     /** @param list<VehicleOwnershipData> $ownerships */
     public function replace(Vehicle $vehicle, array $ownerships): void
     {
-        $vehicle->ownerships()->delete();
-        foreach ($ownerships as $ownership) { $this->assign($vehicle, $ownership); }
+        DB::transaction(function () use ($vehicle, $ownerships): void {
+            foreach ($ownerships as $ownership) {
+                $this->assign($vehicle, $ownership);
+            }
+        });
     }
 
     private function assertOwned(Vehicle $vehicle, VehicleOwnership $ownership): void
@@ -96,5 +99,37 @@ final class VehicleOwnershipService
         if ((int) $ownership->vehicle_id !== (int) $vehicle->getKey()) {
             throw new InvalidArgumentException('Vehicle ownership does not belong to the vehicle.');
         }
+    }
+
+    private function lockVehicle(Vehicle $vehicle): void
+    {
+        Vehicle::query()->whereKey($vehicle->getKey())->lockForUpdate()->firstOrFail();
+    }
+
+    private function closeCurrentOwnerships(Vehicle $vehicle, ?VehicleOwnership $except = null): void
+    {
+        $query = $vehicle->ownerships()->where('is_current', true);
+        if ($except !== null) {
+            $query->whereKeyNot($except->getKey());
+        }
+        $query->lockForUpdate()->get();
+        $query->update(['is_current' => false, 'ended_at' => now()]);
+    }
+
+    private function hasOtherCurrentOwnership(Vehicle $vehicle, VehicleOwnership $ownership): bool
+    {
+        return $vehicle->ownerships()
+            ->whereKeyNot($ownership->getKey())
+            ->where('is_current', true)
+            ->lockForUpdate()
+            ->exists();
+    }
+
+    private function hasCurrentOwnership(Vehicle $vehicle): bool
+    {
+        return $vehicle->ownerships()
+            ->where('is_current', true)
+            ->lockForUpdate()
+            ->exists();
     }
 }

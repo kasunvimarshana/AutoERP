@@ -126,7 +126,7 @@ final class VehicleServiceJobService
     public function relations(): array
     {
         return [
-            'customer', 'vehicle.make', 'vehicle.model', 'vehicle.customer', 'supervisor', 'inspection.inspector',
+            'customer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnership.customer', 'supervisor', 'inspection.inspector',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment', 'paymentLinks.invoice',
         ];
     }

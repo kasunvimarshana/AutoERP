@@ -430,9 +430,18 @@ final class ItemBaseUomTest extends TestCase
         $vehicleId = DB::table('vehicles')->insertGetId([
             ...$this->scope($context),
             'vehicle_number' => 'VEH-HISTORY',
-            'customer_id' => $customerId,
             'odometer_reading' => '0.000000',
             'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        DB::table('vehicle_ownerships')->insert([
+            ...$this->scope($context),
+            'vehicle_id' => $vehicleId,
+            'customer_id' => $customerId,
+            'ownership_type' => 'customer_owned',
+            'started_at' => $now,
+            'is_current' => true,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

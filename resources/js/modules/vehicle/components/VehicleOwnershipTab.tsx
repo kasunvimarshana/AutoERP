@@ -14,7 +14,7 @@ import { createVehicleOwnership, deleteVehicleOwnership, listVehicleOwnerships, 
 import type { VehicleOwnership, VehicleOwnershipPayload } from '../vehicleTypes';
 
 const ownershipTypes = ['owned', 'customer_owned', 'leased', 'rented', 'company_owned', 'third_party'];
-const emptyPayload: VehicleOwnershipPayload = { ownership_type: 'owned', started_at: businessDateInputValue(), is_current: true, notes: '' };
+const emptyPayload: VehicleOwnershipPayload = { ownership_type: 'customer_owned', started_at: businessDateInputValue(), is_current: true, notes: '' };
 
 export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
     const [rows, setRows] = useState<VehicleOwnership[]>([]);
@@ -50,7 +50,10 @@ export function VehicleOwnershipTab({ vehicleId }: { vehicleId: number }) {
         setSubmitting(true);
         setError(null);
         try {
-            const payload = { ...form, customer_id: customer?.id ?? form.customer_id ?? null };
+            const payload = {
+                ...form,
+                customer_id: form.ownership_type === 'customer_owned' ? customer?.id ?? form.customer_id ?? null : null,
+            };
             if (editing) await updateVehicleOwnership(vehicleId, editing, payload);
             else await createVehicleOwnership(vehicleId, payload);
             setForm(emptyPayload);

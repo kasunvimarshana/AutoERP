@@ -82,7 +82,7 @@ export default function VehicleServiceJobDetailPage() {
                     { label: 'Customer', value: readableRelation(job.customer) },
                     { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
                     { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
-                    { label: 'Vehicle owner', value: readableRelation(job.vehicle?.customer ?? job.customer) },
+                    { label: 'Vehicle owner', value: readableRelation(job.vehicle?.current_ownership?.customer ?? job.customer) },
                     { label: 'Odometer', value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim() },
                     { label: 'Supervisor', value: readableRelation(job.supervisor) },
                     { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },

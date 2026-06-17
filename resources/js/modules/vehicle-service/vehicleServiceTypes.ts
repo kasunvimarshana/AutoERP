@@ -24,7 +24,14 @@ export interface VehicleServiceVehicle extends NamedResource {
     registration_number?: string | null;
     make?: NamedResource | null;
     model?: NamedResource | null;
-    customer?: NamedResource | null;
+    current_ownership?: {
+        id: number;
+        ownership_type: string;
+        customer?: NamedResource | null;
+        started_at?: string | null;
+        ended_at?: string | null;
+        is_current: boolean;
+    } | null;
     odometer_reading?: string | null;
     odometer_unit?: string | null;
 }

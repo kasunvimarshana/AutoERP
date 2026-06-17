@@ -13,7 +13,7 @@ final class VehicleQueryService
 {
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
-        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['make', 'model', 'type', 'category', 'customer']);
+        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['make', 'model', 'type', 'category', 'currentOwnership.customer']);
         $this->applyCriteria($query, $criteria);
         $sort = in_array(($criteria['sort'] ?? null), ['vehicle_number', 'code', 'registration_number', 'status', 'created_at'], true) ? (string) $criteria['sort'] : 'vehicle_number';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
@@ -39,7 +39,7 @@ final class VehicleQueryService
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Vehicle
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->with(['make', 'model', 'type', 'category', 'customer', 'currentOwnership.customer'])
+            ->with(['make', 'model', 'type', 'category', 'currentOwnership.customer'])
             ->findOrFail($id);
     }
 
@@ -71,28 +71,31 @@ final class VehicleQueryService
                     ->orWhere('vin_number', 'like', "%{$search}%");
             });
         }
-        foreach (['status', 'vehicle_make_id', 'vehicle_model_id', 'vehicle_type_id', 'vehicle_category_id', 'customer_id'] as $filter) {
+        foreach (['status', 'vehicle_make_id', 'vehicle_model_id', 'vehicle_type_id', 'vehicle_category_id'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
         }
+        if (! empty($criteria['customer_id'])) {
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership->where('customer_id', $criteria['customer_id']));
+        }
         if (($criteria['ownership_scope'] ?? null) === 'customer') {
-            $query->where(function (Builder $scope): void {
-                $scope->whereNotNull('customer_id')
-                    ->orWhere('current_owner_type', 'Modules\\Customer\\Models\\Customer')
-                    ->orWhereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
-                        ->where('ownership_type', 'customer_owned'));
-            });
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->whereNotNull('customer_id')
+                ->orWhere('ownership_type', 'customer_owned'));
         }
         if (($criteria['ownership_scope'] ?? null) === 'supplier') {
-            $query->where(function (Builder $scope): void {
-                $scope->whereIn('current_owner_type', [
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->whereIn('owner_type', [
                     'supplier',
                     'owner',
                     'Modules\\Supplier\\Models\\Supplier',
-                ])->orWhereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
-                    ->whereIn('ownership_type', ['leased', 'rented', 'third_party']));
-            });
+                ])
+                ->orWhereIn('ownership_type', ['leased', 'rented', 'third_party']));
+        }
+        if (($criteria['ownership_scope'] ?? null) === 'company') {
+            $query->whereHas('currentOwnership', fn (Builder $ownership): Builder => $ownership
+                ->whereIn('ownership_type', ['owned', 'company_owned']));
         }
         if (! empty($criteria['available_for_service'])) {
             $query->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value]);

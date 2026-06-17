@@ -548,17 +548,30 @@ final class TechnicianWorkReportTest extends TestCase
 
     private function vehicle(int $tenantId, int $organizationUnitId, int $customerId, string $code): int
     {
-        return (int) DB::table('vehicles')->insertGetId([
+        $vehicleId = (int) DB::table('vehicles')->insertGetId([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'vehicle_number' => $code,
-            'customer_id' => $customerId,
             'registration_number' => 'REG-'.$code,
             'odometer_reading' => '12000.000000',
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DB::table('vehicle_ownerships')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'vehicle_id' => $vehicleId,
+            'customer_id' => $customerId,
+            'ownership_type' => 'customer_owned',
+            'started_at' => now(),
+            'is_current' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $vehicleId;
     }
 
     private function employee(int $tenantId, int $organizationUnitId, string $code, int $departmentId, int $designationId): int

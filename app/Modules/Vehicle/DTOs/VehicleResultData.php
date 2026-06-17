@@ -16,7 +16,6 @@ final readonly class VehicleResultData
         public ?string $code,
         public ?string $registrationNumber,
         public VehicleStatus $status,
-        public ?int $customerId,
         public string $odometerReading,
     ) {}
 }

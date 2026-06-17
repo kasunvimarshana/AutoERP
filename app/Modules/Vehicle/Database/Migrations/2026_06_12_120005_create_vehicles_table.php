@@ -20,9 +20,6 @@ return new class extends Migration
             $table->foreignId('vehicle_model_id')->nullable()->constrained('vehicle_models')->nullOnDelete();
             $table->foreignId('vehicle_type_id')->nullable()->constrained('vehicle_types')->nullOnDelete();
             $table->foreignId('vehicle_category_id')->nullable()->constrained('vehicle_categories')->nullOnDelete();
-            $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
-            $table->string('current_owner_type')->nullable();
-            $table->unsignedBigInteger('current_owner_id')->nullable();
             $table->string('registration_number')->nullable();
             $table->string('chassis_number')->nullable();
             $table->string('engine_number')->nullable();
@@ -51,8 +48,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'vin_number'], 'vehicles_tenant_vin_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicles_tenant_org_idx');
             $table->index('status', 'vehicles_status_idx');
-            $table->index('customer_id', 'vehicles_customer_idx');
-            $table->index(['current_owner_type', 'current_owner_id'], 'vehicles_owner_idx');
         });
     }
 

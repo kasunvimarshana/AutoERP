@@ -10,10 +10,13 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Supplier\Enums\SupplierStatus;
+use Modules\Supplier\Models\Supplier;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\DTOs\VehicleModelData;
 use Modules\Vehicle\DTOs\VehicleOwnershipData;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
@@ -37,7 +40,7 @@ final class VehicleValidationService
         $this->assertNonNegative($data->odometerReading, 'Vehicle odometer reading cannot be negative.');
         $this->assertManufactureYear($data->manufactureYear);
         $this->assertOrganizationUsable($data->tenantId, $data->organizationUnitId);
-        $this->assertReferences($data->tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId, $data->customerId);
+        $this->assertReferences($data->tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId);
     }
 
     public function validateUpdate(Vehicle $vehicle, UpdateVehicleData $data): void
@@ -54,7 +57,7 @@ final class VehicleValidationService
         }
         $this->assertManufactureYear($data->manufactureYear);
         $this->assertOrganizationUsable($tenantId, $data->organizationUnitId);
-        $this->assertReferences($tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId, $data->customerId);
+        $this->assertReferences($tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId);
     }
 
     public function validateModelData(VehicleModelData $data): VehicleMake
@@ -82,9 +85,45 @@ final class VehicleValidationService
         if ($data->endedAt !== null && strtotime($data->startedAt) > strtotime($data->endedAt)) {
             throw new InvalidArgumentException('Vehicle ownership start date cannot be after end date.');
         }
-        if ($data->customerId !== null) {
-            $this->assertCustomerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->customerId);
+
+        if (($data->ownerType === null) !== ($data->ownerId === null)) {
+            throw new InvalidArgumentException('Vehicle owner type and owner id must be provided together.');
         }
+
+        match ($data->ownershipType) {
+            VehicleOwnershipType::CustomerOwned => $this->assertCustomerOwnership($vehicle, $data),
+            VehicleOwnershipType::Owned, VehicleOwnershipType::CompanyOwned => $this->assertCompanyOwnership($data),
+            VehicleOwnershipType::Leased, VehicleOwnershipType::Rented, VehicleOwnershipType::ThirdParty => $this->assertExternalOwnership($vehicle, $data),
+        };
+    }
+
+    private function assertCustomerOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
+    {
+        if ($data->customerId === null) {
+            throw new InvalidArgumentException('Customer-owned vehicle ownership requires a customer.');
+        }
+        if ($data->ownerType !== null || $data->ownerId !== null) {
+            throw new InvalidArgumentException('Customer-owned vehicle ownership cannot include an external owner.');
+        }
+        $this->assertCustomerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->customerId);
+    }
+
+    private function assertCompanyOwnership(VehicleOwnershipData $data): void
+    {
+        if ($data->customerId !== null || $data->ownerType !== null || $data->ownerId !== null) {
+            throw new InvalidArgumentException('Company-owned vehicle ownership cannot include a customer or external owner.');
+        }
+    }
+
+    private function assertExternalOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
+    {
+        if ($data->customerId !== null) {
+            throw new InvalidArgumentException('External vehicle ownership cannot include a customer.');
+        }
+        if ($data->ownerType === null || $data->ownerId === null) {
+            throw new InvalidArgumentException('External vehicle ownership requires an owner type and owner id.');
+        }
+        $this->assertOwnerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->ownerType, $data->ownerId);
     }
 
     public function assertOrganizationUsable(int $tenantId, ?int $organizationUnitId): void
@@ -119,7 +158,7 @@ final class VehicleValidationService
         }
     }
 
-    private function assertReferences(int $tenantId, ?int $organizationUnitId, ?int $makeId, ?int $modelId, ?int $typeId, ?int $categoryId, ?int $customerId): void
+    private function assertReferences(int $tenantId, ?int $organizationUnitId, ?int $makeId, ?int $modelId, ?int $typeId, ?int $categoryId): void
     {
         if ($makeId !== null) {
             $make = VehicleMake::query()->findOrFail($makeId);
@@ -140,9 +179,6 @@ final class VehicleValidationService
             $category = VehicleCategory::query()->findOrFail($categoryId);
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $category, 'Inactive vehicle category cannot be used.');
         }
-        if ($customerId !== null) {
-            $this->assertCustomerUsable($tenantId, $organizationUnitId, $customerId);
-        }
     }
 
     private function assertCustomerUsable(int $tenantId, ?int $organizationUnitId, int $customerId): void
@@ -151,6 +187,19 @@ final class VehicleValidationService
         $this->assertScope($tenantId, $organizationUnitId, (int) $customer->tenant_id, $customer->organization_unit_id);
         if (enum_exists(CustomerStatus::class) && in_array($customer->status, [CustomerStatus::Inactive, CustomerStatus::Blacklisted], true)) {
             throw new InvalidArgumentException('Inactive or blacklisted customer cannot be assigned to a vehicle.');
+        }
+    }
+
+    private function assertOwnerUsable(int $tenantId, ?int $organizationUnitId, string $ownerType, int $ownerId): void
+    {
+        if (! in_array($ownerType, ['supplier', 'owner', Supplier::class], true)) {
+            throw new InvalidArgumentException('Vehicle owner type is not supported.');
+        }
+
+        $owner = Supplier::query()->findOrFail($ownerId);
+        $this->assertScope($tenantId, $organizationUnitId, (int) $owner->tenant_id, $owner->organization_unit_id);
+        if (in_array($owner->status, [SupplierStatus::Inactive, SupplierStatus::Blacklisted, SupplierStatus::OnHold], true)) {
+            throw new InvalidArgumentException('Vehicle owner must be an active supplier or owner.');
         }
     }
 

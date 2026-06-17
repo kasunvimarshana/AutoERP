@@ -36,9 +36,6 @@ final class VehicleCreationService
                 'vehicle_model_id' => $data->vehicleModelId,
                 'vehicle_type_id' => $data->vehicleTypeId,
                 'vehicle_category_id' => $data->vehicleCategoryId,
-                'customer_id' => $data->customerId,
-                'current_owner_type' => $data->currentOwnerType,
-                'current_owner_id' => $data->currentOwnerId,
                 'registration_number' => $data->registrationNumber,
                 'chassis_number' => $data->chassisNumber,
                 'engine_number' => $data->engineNumber,
@@ -69,7 +66,7 @@ final class VehicleCreationService
             }
             $this->statuses->recordInitial($vehicle, $data->createdBy);
 
-            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'customer', 'documents', 'ownerships.customer', 'currentOwnership.customer', 'attributes', 'statusHistories']);
+            return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customer', 'currentOwnership.customer', 'attributes', 'statusHistories']);
         });
     }
 }

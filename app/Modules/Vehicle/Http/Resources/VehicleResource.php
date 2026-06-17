@@ -16,8 +16,6 @@ final class VehicleResource extends JsonResource
     {
         return [
             ...(new VehicleSummaryResource($this->resource))->resolve($request),
-            'current_owner_type' => $this->current_owner_type,
-            'current_owner_id' => $this->current_owner_id,
             'manufacture_year' => $this->manufacture_year,
             'registration_date' => $this->registration_date?->toDateString(),
             'color' => $this->color,
@@ -27,9 +25,6 @@ final class VehicleResource extends JsonResource
             'notes' => $this->notes,
             'metadata' => $this->metadata,
             'approved_at' => $this->approved_at?->toISOString(),
-            'current_ownership' => $this->whenLoaded('currentOwnership', fn () => $this->currentOwnership
-                ? (new VehicleOwnershipResource($this->currentOwnership))->resolve($request)
-                : null),
             'documents' => $this->whenLoaded('documents', fn () => VehicleDocumentResource::collection($this->documents)->resolve($request)),
             'ownerships' => $this->whenLoaded('ownerships', fn () => VehicleOwnershipResource::collection($this->ownerships)->resolve($request)),
             'attributes' => $this->whenLoaded('attributes', fn () => VehicleAttributeResource::collection($this->attributes)->resolve($request)),
