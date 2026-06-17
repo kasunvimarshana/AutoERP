@@ -46,15 +46,18 @@ final class ItemCreationService
                 'purchase_tax_group_id' => $data->purchaseTaxGroupId,
                 'sales_tax_group_id' => $data->salesTaxGroupId,
                 'is_stockable' => $data->isStockable,
-                'is_combo' => in_array($data->itemType, [ItemType::Combo, ItemType::Package], true)
-                    || $data->isCombo === true,
+                'is_combo' => in_array($data->itemType, [ItemType::Combo, ItemType::Package], true),
                 'is_tax_exempt' => $data->isTaxExempt,
                 'is_active' => $data->isActive,
                 'metadata' => $data->metadata,
             ]);
 
+            if ($item->base_uom_id !== null) {
+                $this->units->syncBaseUnit($item);
+            }
+
             foreach ($data->units as $unit) {
-                $this->units->assign($item, $unit);
+                $this->units->assignInitial($item, $unit);
             }
 
             foreach ($data->variants as $variant) {
@@ -81,6 +84,9 @@ final class ItemCreationService
                 'category',
                 'brand',
                 'baseUom',
+                'defaultTaxGroup',
+                'purchaseTaxGroup',
+                'salesTaxGroup',
                 'units.uom',
                 'variants',
                 'bundleLines.childItem.category',

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Tests\TestCase;
 
@@ -630,6 +631,36 @@ final class ItemBaseUomTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'name' => 'Item Base UOM Test Role',
+            'guard_name' => 'web',
+            'description' => 'Item Base UOM test role',
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        foreach ($this->seedItemPermissions($tenantId) as $permissionId) {
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
         DB::table('auth_providers')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
@@ -657,5 +688,25 @@ final class ItemBaseUomTest extends TestCase
             'organization_unit_id' => $organizationUnitId,
             'token' => $token,
         ];
+    }
+
+    private function seedItemPermissions(int $tenantId): array
+    {
+        $ids = [];
+        foreach (array_keys(ItemAuthorizationService::descriptions()) as $name) {
+            $ids[] = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'name' => $name,
+                'guard_name' => 'web',
+                'module' => 'Item',
+                'description' => ItemAuthorizationService::descriptions()[$name],
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $ids;
     }
 }

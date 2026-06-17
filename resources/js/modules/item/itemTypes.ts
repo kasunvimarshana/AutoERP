@@ -20,6 +20,9 @@ export interface ItemSummary extends NamedResource {
     category?: NamedResource | null;
     brand?: NamedResource | null;
     base_uom?: NamedResource | null;
+    default_tax_group_id?: number | null;
+    purchase_tax_group_id?: number | null;
+    sales_tax_group_id?: number | null;
     is_stockable: boolean;
     is_combo: boolean;
     is_active: boolean;
@@ -28,6 +31,10 @@ export interface ItemSummary extends NamedResource {
 export interface Item extends ItemSummary {
     description?: string | null;
     metadata?: Record<string, unknown> | null;
+    default_tax_group?: NamedResource | null;
+    purchase_tax_group?: NamedResource | null;
+    sales_tax_group?: NamedResource | null;
+    is_tax_exempt?: boolean;
     units?: ItemUnit[];
     variants?: ItemVariant[];
     bundles?: ItemBundle[];
@@ -48,8 +55,12 @@ export interface ItemPayload {
     barcode?: string | null;
     description?: string | null;
     base_uom_id?: number | null;
+    default_tax_group_id?: number | null;
+    purchase_tax_group_id?: number | null;
+    sales_tax_group_id?: number | null;
     is_stockable: boolean;
     is_combo: boolean;
+    is_tax_exempt: boolean;
     is_active: boolean;
 }
 
@@ -152,6 +163,12 @@ export interface ItemUsageRule {
 
 export type ItemUsageRulePayload = Omit<ItemUsageRule, 'id'>;
 
+export interface ItemUsageModule {
+    code: string;
+    name: string;
+    supported_item_types: string[];
+}
+
 export interface ItemCategory extends NamedResource {
     code: string;
     description?: string | null;
@@ -160,8 +177,24 @@ export interface ItemCategory extends NamedResource {
     sort_order: number;
 }
 
+export interface ItemCategoryPayload {
+    code: string;
+    name: string;
+    parent_id?: number | null;
+    description?: string | null;
+    is_active: boolean;
+    sort_order: number;
+}
+
 export interface ItemBrand extends NamedResource {
     code: string;
+    description?: string | null;
+    is_active: boolean;
+}
+
+export interface ItemBrandPayload {
+    code: string;
+    name: string;
     description?: string | null;
     is_active: boolean;
 }

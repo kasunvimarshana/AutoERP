@@ -14,12 +14,19 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { listItems, setItemActive } from './itemApi';
+import { hasItemPermission, itemPermissions } from './itemPermissions';
 import { itemTypes, type ItemSummary } from './itemTypes';
 import { ItemBrandSelect } from './components/ItemBrandSelect';
 import { ItemCategorySelect } from './components/ItemCategorySelect';
 
 export default function ItemListPage() {
+    const auth = useAuth();
+    const canCreate = hasItemPermission(auth.permissions, itemPermissions.create);
+    const canUpdate = hasItemPermission(auth.permissions, itemPermissions.update);
+    const canActivate = hasItemPermission(auth.permissions, itemPermissions.activate);
+    const canDeactivate = hasItemPermission(auth.permissions, itemPermissions.deactivate);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
@@ -45,7 +52,13 @@ export default function ItemListPage() {
         { key: 'brand', header: 'Brand', render: (row) => readableRelation(row.brand) },
         { key: 'uom', header: 'Base UOM', render: (row) => readableRelation(row.base_uom) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/items/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.is_active ? 'Deactivate' : 'Activate'}</button></div> },
+        { key: 'actions', header: '', className: 'text-right', render: (row) => (
+            <div className="flex justify-end gap-3">
+                {canUpdate && <Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/items/${row.id}/edit`}>Edit</Link>}
+                {row.is_active && canDeactivate && <button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>Deactivate</button>}
+                {!row.is_active && canActivate && <button type="button" className="font-semibold text-emerald-700" onClick={() => void toggle(row)}>Activate</button>}
+            </div>
+        ) },
     ];
 
     async function toggle(item: ItemSummary) {
@@ -59,7 +72,7 @@ export default function ItemListPage() {
     }
 
     return <>
-        <ContentHeader title="Items" description="Service-first item master data with readable resources." actions={<LinkButton to="/items/create">New item</LinkButton>} />
+        <ContentHeader title="Items" description="Service-first item master data with readable resources." actions={canCreate ? <LinkButton to="/items/create">Create Item</LinkButton> : undefined} />
         <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Input type="search" label="Search" placeholder="Code, name, SKU, barcode" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             <ItemCategorySelect value={category} onChange={(value) => { setCategory(value); setPage(1); }} />

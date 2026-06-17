@@ -19,25 +19,27 @@ import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemBundles(itemId, { page, per_page: 20 }, signal);
 
-export default function ItemBundleTab({ itemId, canBundle }: { itemId: number; canBundle: boolean }) {
+export default function ItemBundleTab({ itemId, canBundle, readOnly = false }: { itemId: number; canBundle: boolean; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemBundle, update: updateItemBundle, remove: deleteItemBundle });
     const columns: DataColumn<ItemBundle>[] = [
         { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
+    if (!readOnly) {
+        columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
+    }
     return (
         <>
-            <ItemRelationHeader title="Bundle composition" description={canBundle ? 'Define readable child item composition.' : 'Only combo or package items can own bundle lines.'} onAdd={crud.startCreate} disabled={!canBundle} />
+            <ItemRelationHeader title="Bundle composition" description={canBundle ? 'Define readable child item composition.' : 'Only combo or package items can own bundle lines.'} onAdd={readOnly ? undefined : crud.startCreate} disabled={!canBundle} />
             {!canBundle && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Change the item type to combo or package before adding bundle lines.</p>}
             <ErrorAlert error={crud.actionError ?? crud.error} />
             {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-'} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>Qty: {row.quantity}</span><span>UOM: {row.uom?.code ?? '-'}</span></div>} />}
             <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-            <FormDrawer open={crud.open} title={crud.editing ? 'Edit bundle line' : 'Add bundle line'} onClose={crud.close}>
+            {!readOnly && <FormDrawer open={crud.open} title={crud.editing ? 'Edit bundle line' : 'Add bundle line'} onClose={crud.close}>
                 {crud.open && <BundleForm key={crud.editing?.id ?? 'new'} row={crud.editing} itemId={itemId} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-            </FormDrawer>
-            {crud.confirmDialog}
+            </FormDrawer>}
+            {!readOnly && crud.confirmDialog}
         </>
     );
 }

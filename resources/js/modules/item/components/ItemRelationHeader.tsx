@@ -3,7 +3,7 @@ import { Button } from '@/shared/components/Button';
 export function ItemRelationHeader({ title, description, onAdd, disabled = false }: {
     title: string;
     description: string;
-    onAdd: () => void;
+    onAdd?: () => void;
     disabled?: boolean;
 }) {
     return (
@@ -12,7 +12,7 @@ export function ItemRelationHeader({ title, description, onAdd, disabled = false
                 <h3 className="font-semibold text-slate-900">{title}</h3>
                 <p className="text-sm text-slate-500">{description}</p>
             </div>
-            <Button onClick={onAdd} disabled={disabled}>Add</Button>
+            {onAdd && <Button onClick={onAdd} disabled={disabled}>Add</Button>}
         </div>
     );
 }

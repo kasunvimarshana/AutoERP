@@ -86,6 +86,26 @@ describe('navigation access and matching', () => {
         expect(sections.flatMap((section) => section.items).map((item) => item.id)).not.toContain('vehicle');
     });
 
+    it('filters item navigation children by exact permissions', () => {
+        const sections = filterNavigation(navigationSections, {
+            tenantId: 10,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: ['item.view'],
+            enabledModules: ['item'],
+        });
+        const itemModule = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'items');
+
+        expect(itemModule?.type).toBe('module');
+        expect(itemModule?.type === 'module' ? itemModule.children.map((child) => child.label) : []).toEqual([
+            'Categories',
+            'Brands',
+            'Items',
+        ]);
+    });
+
     it('selects the query-specific child for shared invoice routes', () => {
         const match = findNavigationMatch('/invoices', '?view=service', navigationSections);
 
@@ -115,7 +135,7 @@ describe('navigation access and matching', () => {
         expect(match?.item.id).toBe('linked-running-charts');
     });
 
-    it('keeps the requested business hierarchy and excludes action links', () => {
+    it('keeps the requested business hierarchy', () => {
         const labels = navigationSections.map((section) => ({
             section: section.label ?? '',
             items: section.items.map((item) => ({
@@ -130,7 +150,7 @@ describe('navigation access and matching', () => {
                 { label: 'Suppliers', children: ['Supplier List', 'Supplier Vehicles'] },
                 { label: 'Customers', children: ['Customer List', 'Customer Vehicles'] },
                 { label: 'Vehicle', children: ['Makes', 'Types', 'Categories', 'Models', 'Vehicles'] },
-                { label: 'Items', children: ['Item List'] },
+                { label: 'Items', children: ['Categories', 'Create Category', 'Brands', 'Create Brand', 'Items', 'Create Item'] },
             ] },
             { section: 'Access Control', items: [
                 { label: 'Users', children: ['User List', 'Roles', 'Permissions'] },
@@ -152,7 +172,10 @@ describe('navigation access and matching', () => {
             ] },
         ]);
 
-        const allLabels = labels.flatMap((section) => section.items.flatMap((item) => [item.label, ...item.children]));
-        expect(allLabels.some((label) => /^(create|edit|view|approve|print|\+)/i.test(label))).toBe(false);
+        const itemLabels = labels
+            .flatMap((section) => section.items)
+            .find((item) => item.label === 'Items')?.children ?? [];
+        expect(itemLabels).toContain('Create Brand');
+        expect(itemLabels).toContain('Create Item');
     });
 });

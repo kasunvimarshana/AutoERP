@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Item\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Item\DTOs\ItemCodeData;
 use Modules\Item\Models\Item;
@@ -16,38 +17,52 @@ final class ItemCodeService
 
     public function create(Item $item, ItemCodeData $data): ItemCode
     {
-        $this->validator->validateCode($item, $data);
-        $this->assertUnique($item, $data);
+        return DB::transaction(function () use ($item, $data): ItemCode {
+            $lockedItem = $this->lockItem($item);
+            $this->validator->validateCode($lockedItem, $data);
+            $this->assertUnique($lockedItem, $data);
 
-        return ItemCode::query()->create([
-            'tenant_id' => $item->tenant_id,
-            'organization_unit_id' => $item->organization_unit_id,
-            'item_id' => $item->getKey(),
-            'item_variant_id' => $data->itemVariantId,
-            'code_type' => $data->codeType,
-            'code' => $data->code,
-            'party_type' => $data->partyType,
-            'party_id' => $data->partyId,
-            'is_primary' => $data->isPrimary,
-        ]);
+            if ($data->isPrimary) {
+                $this->clearOtherPrimaryCodes($lockedItem);
+            }
+
+            return ItemCode::query()->create([
+                'tenant_id' => $lockedItem->tenant_id,
+                'organization_unit_id' => $lockedItem->organization_unit_id,
+                'item_id' => $lockedItem->getKey(),
+                'item_variant_id' => $data->itemVariantId,
+                'code_type' => $data->codeType,
+                'code' => $data->code,
+                'party_type' => $data->partyType,
+                'party_id' => $data->partyId,
+                'is_primary' => $data->isPrimary,
+            ]);
+        });
     }
 
     public function update(Item $item, ItemCode $code, ItemCodeData $data): ItemCode
     {
-        $this->assertBelongsToItem($item, $code);
-        $this->validator->validateCode($item, $data);
-        $this->assertUnique($item, $data, (int) $code->getKey());
+        return DB::transaction(function () use ($item, $code, $data): ItemCode {
+            $lockedItem = $this->lockItem($item);
+            $this->assertBelongsToItem($lockedItem, $code);
+            $this->validator->validateCode($lockedItem, $data);
+            $this->assertUnique($lockedItem, $data, (int) $code->getKey());
 
-        $code->fill([
-            'item_variant_id' => $data->itemVariantId,
-            'code_type' => $data->codeType,
-            'code' => $data->code,
-            'party_type' => $data->partyType,
-            'party_id' => $data->partyId,
-            'is_primary' => $data->isPrimary,
-        ])->save();
+            if ($data->isPrimary) {
+                $this->clearOtherPrimaryCodes($lockedItem, (int) $code->getKey());
+            }
 
-        return $code->refresh()->load('variant');
+            $code->fill([
+                'item_variant_id' => $data->itemVariantId,
+                'code_type' => $data->codeType,
+                'code' => $data->code,
+                'party_type' => $data->partyType,
+                'party_id' => $data->partyId,
+                'is_primary' => $data->isPrimary,
+            ])->save();
+
+            return $code->refresh()->load('variant');
+        });
     }
 
     public function delete(Item $item, ItemCode $code): void
@@ -68,6 +83,26 @@ final class ItemCodeService
         if ($query->exists()) {
             throw new InvalidArgumentException('Item alternative code already exists for this tenant and code type.');
         }
+    }
+
+    private function lockItem(Item $item): Item
+    {
+        return Item::query()
+            ->where('tenant_id', $item->tenant_id)
+            ->whereKey($item->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function clearOtherPrimaryCodes(Item $item, ?int $ignoreId = null): void
+    {
+        $query = ItemCode::query()
+            ->where('item_id', $item->getKey());
+        if ($ignoreId !== null) {
+            $query->whereKeyNot($ignoreId);
+        }
+
+        $query->update(['is_primary' => false]);
     }
 
     private function assertBelongsToItem(Item $item, ItemCode $code): void

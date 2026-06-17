@@ -14,7 +14,7 @@ abstract class ItemUsageRuleRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'module_code' => ['required', 'string', 'max:50', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'module_code' => ['required', 'string', 'max:50', 'regex:/^[a-z][a-z0-9_-]*$/'],
             'is_enabled' => ['nullable', 'boolean'],
         ];
     }

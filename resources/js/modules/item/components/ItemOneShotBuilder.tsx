@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
+import { listItemUsageModules } from '../itemApi';
 import {
     bundleLineTypes,
     itemCodeTypes,
     itemPriceTypes,
-    itemUnitRoles,
     type ItemBundlePayload,
     type ItemCodePayload,
     type ItemPricePayload,
@@ -16,6 +18,7 @@ import {
     type ItemUnitPayload,
     type ItemUsageRulePayload,
     type ItemVariantPayload,
+    type ItemUsageModule,
 } from '../itemTypes';
 import { ItemLookupSelect } from './ItemLookupSelect';
 import { ItemUomSelect } from './ItemUomSelect';
@@ -39,7 +42,7 @@ export const emptyOneShotDraft: OneShotDraft = {
 };
 
 export function ItemOneShotBuilder({ section, value, onChange }: {
-    section: 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules' | 'review';
+    section: 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
     value: OneShotDraft;
     onChange: (value: OneShotDraft) => void;
 }) {
@@ -50,29 +53,29 @@ export function ItemOneShotBuilder({ section, value, onChange }: {
     if (section === 'codes') return <CodeDraft value={value} onChange={onChange} />;
     if (section === 'usage_rules') return <UsageDraft value={value} onChange={onChange} />;
 
-    return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Count label="Units" value={value.units.length} />
-        <Count label="Variants" value={value.variants.length} />
-        <Count label="Bundle lines" value={value.bundles.length} />
-        <Count label="Prices" value={value.prices.length} />
-        <Count label="Codes" value={value.codes.length} />
-        <Count label="Usage rules" value={value.usageRules.length} />
-    </div>;
+    return null;
 }
 
 function UnitDraft({ value, onChange }: DraftProps) {
     const [uom, setUom] = useState<NamedResource | null>(null);
-    const [role, setRole] = useState('base');
+    const [role, setRole] = useState('purchase');
     const [factor, setFactor] = useState('1.000000');
     const [isDefault, setDefault] = useState(true);
     return <DraftSection title="Initial units" rows={value.units.map((row) => `${row.uom.code} - ${row.uom.name} / ${row.unit_role} / ${row.conversion_factor}`)} remove={(index) => onChange({ ...value, units: value.units.filter((_, rowIndex) => rowIndex !== index) })}>
         <ItemUomSelect value={uom} onChange={setUom} />
-        <Select label="Role" value={role} onChange={(event) => setRole(event.target.value)} options={options(itemUnitRoles)} />
+        <Select label="Role" value={role} onChange={(event) => setRole(event.target.value)} options={options(['purchase', 'sales', 'service', 'rental'])} />
         <Input label="Conversion factor" value={factor} onChange={(event) => setFactor(event.target.value)} />
-        <label className="self-end pb-2 text-sm"><input className="mr-2" type="checkbox" checked={isDefault} onChange={(event) => setDefault(event.target.checked)} />Default</label>
+        <label className="self-end pb-2 text-sm"><input className="mr-2" type="checkbox" checked={isDefault} onChange={(event) => setDefault(event.target.checked)} />Default Unit</label>
         <Button type="button" disabled={!uom} onClick={() => {
             if (!uom) return;
-            onChange({ ...value, units: [...value.units, { uom, uom_id: Number(uom.id), unit_role: role, conversion_factor: factor, is_default: isDefault, is_active: true }] });
+            const nextUnit = { uom, uom_id: Number(uom.id), unit_role: role, conversion_factor: factor, is_default: isDefault, is_active: true };
+            onChange({
+                ...value,
+                units: [
+                    ...(isDefault ? value.units.map((row) => ({ ...row, is_default: false })) : value.units),
+                    nextUnit,
+                ],
+            });
             setUom(null);
         }}>Add unit</Button>
     </DraftSection>;
@@ -127,16 +130,39 @@ function CodeDraft({ value, onChange }: DraftProps) {
     return <DraftSection title="Initial codes" rows={value.codes.map((row) => `${row.code_type} / ${row.code}`)} remove={(index) => onChange({ ...value, codes: value.codes.filter((_, rowIndex) => rowIndex !== index) })}>
         <Select label="Code type" value={codeType} onChange={(event) => setCodeType(event.target.value)} options={options(itemCodeTypes)} />
         <Input label="Code" value={code} onChange={(event) => setCode(event.target.value)} />
-        <Button type="button" disabled={!code} onClick={() => { onChange({ ...value, codes: [...value.codes, { code_type: codeType, code, is_primary: value.codes.length === 0 }] }); setCode(''); }}>Add code</Button>
+        <Button type="button" disabled={!code} onClick={() => {
+            const isPrimary = value.codes.length === 0;
+            onChange({
+                ...value,
+                codes: [
+                    ...(isPrimary ? value.codes.map((row) => ({ ...row, is_primary: false })) : value.codes),
+                    { code_type: codeType, code, is_primary: isPrimary },
+                ],
+            });
+            setCode('');
+        }}>Add code</Button>
     </DraftSection>;
 }
 
 function UsageDraft({ value, onChange }: DraftProps) {
+    const modules = useApi((signal) => listItemUsageModules(signal), []);
     const [moduleCode, setModuleCode] = useState('');
+    const moduleOptions = usageModuleOptions(modules.data);
+
     return <DraftSection title="Initial usage rules" rows={value.usageRules.map((row) => `${row.module_code} / ${row.is_enabled ? 'enabled' : 'disabled'}`)} remove={(index) => onChange({ ...value, usageRules: value.usageRules.filter((_, rowIndex) => rowIndex !== index) })}>
-        <Input label="Module code" placeholder="inventory" value={moduleCode} onChange={(event) => setModuleCode(event.target.value)} />
+        <div>
+            <ErrorAlert error={modules.error} />
+            <Select label="Module" value={moduleCode} onChange={(event) => setModuleCode(event.target.value)} options={moduleOptions} disabled={modules.loading || moduleOptions.length === 0} />
+        </div>
         <Button type="button" disabled={!moduleCode} onClick={() => { onChange({ ...value, usageRules: [...value.usageRules, { module_code: moduleCode, is_enabled: true }] }); setModuleCode(''); }}>Add usage rule</Button>
     </DraftSection>;
+}
+
+function usageModuleOptions(modules: ItemUsageModule[] | null) {
+    return (modules ?? []).map((module) => ({
+        value: module.code,
+        label: module.name,
+    }));
 }
 
 function DraftSection({ title, rows, remove, children }: { title: string; rows: string[]; remove: (index: number) => void; children: ReactNode }) {
@@ -145,10 +171,6 @@ function DraftSection({ title, rows, remove, children }: { title: string; rows: 
         <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">{children}</div>
         <div className="mt-5 space-y-2">{rows.map((row, index) => <div key={`${row}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"><span>{row}</span><button type="button" className="font-semibold text-rose-600" onClick={() => remove(index)}>Remove</button></div>)}</div>
     </div>;
-}
-
-function Count({ label, value }: { label: string; value: number }) {
-    return <div className="rounded-lg border border-slate-200 p-4"><span className="text-sm text-slate-500">{label}</span><strong className="mt-1 block text-2xl">{value}</strong></div>;
 }
 
 function options(values: readonly string[]) {

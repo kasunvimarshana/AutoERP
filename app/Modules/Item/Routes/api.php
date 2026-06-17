@@ -21,6 +21,7 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
     Route::get('items/lookup/{kind?}', [ItemController::class, 'lookup'])
         ->whereIn('kind', ['stockable', 'service', 'labour', 'combo', 'package'])
         ->name('items.lookup');
+    Route::get('items/usage-modules', [ItemController::class, 'usageModules'])->name('items.usage-modules');
     Route::post('items/with-relations', [ItemController::class, 'storeWithRelations'])->name('items.with-relations.store');
 
     Route::patch('items/{item}/activate', [ItemController::class, 'activate'])->whereNumber('item')->name('items.activate');

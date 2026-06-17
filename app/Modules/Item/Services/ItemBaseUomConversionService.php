@@ -26,6 +26,7 @@ final class ItemBaseUomConversionService
         private readonly DecimalMath $math,
         private readonly ItemBaseUomConversionValidator $validator,
         private readonly UomConversionService $uomConversions,
+        private readonly ItemUnitService $units,
     ) {}
 
     public function apply(
@@ -252,6 +253,7 @@ final class ItemBaseUomConversionService
             if ($locked->base_uom_id === null) {
                 $locked->base_uom_id = $fromUomId;
                 $locked->save();
+                $this->units->syncBaseUnit($locked);
             }
 
             return $locked->refresh();
@@ -278,16 +280,20 @@ final class ItemBaseUomConversionService
         }
 
         if ($baseUnit instanceof ItemUnit) {
+            $baseShouldBeDefault = (bool) $baseUnit->is_default
+                || ! $this->hasValidNonBaseDefault($item);
             $baseUnit->fill([
                 'uom_id' => $newBaseUomId,
                 'conversion_factor' => '1.000000',
-                'is_default' => true,
+                'is_default' => $baseShouldBeDefault,
                 'is_active' => true,
             ])->save();
+            $this->normalizeDefaultUnits($item, $baseShouldBeDefault ? (int) $baseUnit->getKey() : null);
 
             return;
         }
 
+        $makeDefault = ! $this->hasValidNonBaseDefault($item);
         ItemUnit::query()->create([
             'tenant_id' => $item->tenant_id,
             'organization_unit_id' => $item->organization_unit_id,
@@ -295,9 +301,52 @@ final class ItemBaseUomConversionService
             'uom_id' => $newBaseUomId,
             'unit_role' => ItemUnitRole::Base,
             'conversion_factor' => '1.000000',
-            'is_default' => true,
+            'is_default' => $makeDefault,
             'is_active' => true,
         ]);
+        $this->normalizeDefaultUnits($item);
+    }
+
+    private function hasValidNonBaseDefault(Item $item): bool
+    {
+        return ItemUnit::query()
+            ->where('tenant_id', $item->tenant_id)
+            ->where('item_id', $item->getKey())
+            ->where('unit_role', '!=', ItemUnitRole::Base->value)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    private function normalizeDefaultUnits(Item $item, ?int $preferredDefaultId = null): void
+    {
+        if ($preferredDefaultId !== null) {
+            ItemUnit::query()
+                ->where('item_id', $item->getKey())
+                ->whereKeyNot($preferredDefaultId)
+                ->update(['is_default' => false]);
+
+            return;
+        }
+
+        $keeper = ItemUnit::query()
+            ->where('item_id', $item->getKey())
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+        if (! $keeper instanceof ItemUnit) {
+            ItemUnit::query()
+                ->where('item_id', $item->getKey())
+                ->update(['is_default' => false]);
+
+            return;
+        }
+
+        ItemUnit::query()
+            ->where('item_id', $item->getKey())
+            ->whereKeyNot($keeper->getKey())
+            ->update(['is_default' => false]);
     }
 
     /**

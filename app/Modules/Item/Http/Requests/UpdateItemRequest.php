@@ -18,15 +18,15 @@ final class UpdateItemRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'code' => ['sometimes', 'string', 'max:100'],
+            'code' => ['sometimes', 'string', 'max:80'],
             'name' => ['sometimes', 'string', 'max:255'],
             'item_type' => ['sometimes', Rule::enum(ItemType::class)],
             'tracking_type' => ['sometimes', Rule::enum(TrackingType::class)],
             'costing_method' => ['sometimes', Rule::enum(CostingMethod::class)],
             'item_category_id' => ['nullable', 'integer', 'min:1'],
             'item_brand_id' => ['nullable', 'integer', 'min:1'],
-            'sku' => ['nullable', 'string', 'max:100'],
-            'barcode' => ['nullable', 'string', 'max:100'],
+            'sku' => ['nullable', 'string', 'max:120'],
+            'barcode' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
             'default_tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
@@ -46,7 +46,7 @@ final class UpdateItemRequest extends TenantScopedRequest
             code: $this->stringOrNull('code'),
             name: $this->stringOrNull('name'),
             itemType: $this->filled('item_type') ? ItemType::from((string) $this->input('item_type')) : null,
-            organizationUnitId: $this->organizationUnitId(),
+            organizationUnitId: null,
             itemCategoryId: $this->intOrNull('item_category_id'),
             itemBrandId: $this->intOrNull('item_brand_id'),
             sku: $this->stringOrNull('sku'),
@@ -63,7 +63,7 @@ final class UpdateItemRequest extends TenantScopedRequest
             isTaxExempt: $this->has('is_tax_exempt') ? $this->boolean('is_tax_exempt') : null,
             isActive: $this->has('is_active') ? $this->boolean('is_active') : null,
             metadata: $this->has('metadata') ? $this->input('metadata') : null,
-            provided: array_keys($this->validated()),
+            provided: $this->providedEditableFields(),
         );
     }
 
@@ -75,5 +75,39 @@ final class UpdateItemRequest extends TenantScopedRequest
     private function intOrNull(string $key): ?int
     {
         return $this->filled($key) ? (int) $this->input($key) : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function providedEditableFields(): array
+    {
+        $input = $this->all();
+        $editable = [
+            'code',
+            'name',
+            'item_type',
+            'tracking_type',
+            'costing_method',
+            'item_category_id',
+            'item_brand_id',
+            'sku',
+            'barcode',
+            'description',
+            'base_uom_id',
+            'default_tax_group_id',
+            'purchase_tax_group_id',
+            'sales_tax_group_id',
+            'is_stockable',
+            'is_combo',
+            'is_tax_exempt',
+            'is_active',
+            'metadata',
+        ];
+
+        return array_values(array_filter(
+            $editable,
+            static fn (string $key): bool => array_key_exists($key, $input),
+        ));
     }
 }

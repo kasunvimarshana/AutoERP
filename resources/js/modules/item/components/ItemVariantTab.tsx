@@ -15,25 +15,27 @@ import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemVariants(itemId, { page, per_page: 20 }, signal);
 
-export default function ItemVariantTab({ itemId }: { itemId: number }) {
+export default function ItemVariantTab({ itemId, readOnly = false }: { itemId: number; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemVariant, update: updateItemVariant, remove: deleteItemVariant });
     const columns: DataColumn<ItemVariant>[] = [
         { key: 'variant', header: 'Variant', render: (row) => <span className="font-medium">{row.name}<span className="block text-xs text-slate-500">{row.code}</span></span> },
         { key: 'sku', header: 'SKU', render: (row) => row.sku ?? '-' },
         { key: 'barcode', header: 'Barcode', render: (row) => row.barcode ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
+    if (!readOnly) {
+        columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
+    }
     return (
         <>
-            <ItemRelationHeader title="Variants" description="Item-specific identities such as size, color, or configuration." onAdd={crud.startCreate} />
+            <ItemRelationHeader title="Variants" description="Item-specific identities such as size, color, or configuration." onAdd={readOnly ? undefined : crud.startCreate} />
             <ErrorAlert error={crud.actionError ?? crud.error} />
             {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-            <FormDrawer open={crud.open} title={crud.editing ? 'Edit variant' : 'Add variant'} onClose={crud.close}>
+            {!readOnly && <FormDrawer open={crud.open} title={crud.editing ? 'Edit variant' : 'Add variant'} onClose={crud.close}>
                 {crud.open && <VariantForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-            </FormDrawer>
-            {crud.confirmDialog}
+            </FormDrawer>}
+            {!readOnly && crud.confirmDialog}
         </>
     );
 }

@@ -8,6 +8,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\DTOs\ItemBundleData;
@@ -153,8 +154,7 @@ final class ItemEngineTest extends TestCase
     {
         $tenantId = $this->createTenant();
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Service and labour items cannot be stockable.');
+        $this->expectException(ValidationException::class);
 
         app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,

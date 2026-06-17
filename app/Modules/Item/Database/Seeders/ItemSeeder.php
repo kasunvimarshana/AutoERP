@@ -14,6 +14,7 @@ use Modules\Item\Models\ItemBundle;
 use Modules\Item\Models\ItemCategory;
 use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
+use Modules\Item\Services\ItemAuthorizationService;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class ItemSeeder extends Seeder
@@ -35,6 +36,7 @@ final class ItemSeeder extends Seeder
         DB::transaction(function () use ($tenant, $organizationUnit): void {
             $tenantId = (int) $tenant->getKey();
             $organizationUnitId = $organizationUnit?->getKey();
+            $this->seedPermissions($tenantId);
             $categories = $this->seedCategories($tenantId, $organizationUnitId);
             $brand = $this->seedBrand($tenantId, $organizationUnitId);
             $items = $this->seedItems($tenantId, $organizationUnitId, $categories, $brand);
@@ -170,7 +172,7 @@ final class ItemSeeder extends Seeder
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $organizationUnitId,
                         'conversion_factor' => '1.000000',
-                        'is_default' => true,
+                        'is_default' => $role === 'base',
                         'is_active' => true,
                     ],
                 );
@@ -266,5 +268,27 @@ final class ItemSeeder extends Seeder
             ->where('tenant_id', $tenantId)
             ->where('code', $code)
             ->first();
+    }
+
+    private function seedPermissions(int $tenantId): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            return;
+        }
+
+        $guard = (string) config('auth.defaults.guard', 'web');
+        foreach (ItemAuthorizationService::descriptions() as $name => $description) {
+            DB::table('permissions')->updateOrInsert(
+                ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
+                [
+                    'organization_unit_id' => null,
+                    'module' => 'Item',
+                    'description' => $description,
+                    'row_version' => 1,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
+        }
     }
 }

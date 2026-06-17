@@ -19,7 +19,7 @@ import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemPrices(itemId, { page, per_page: 20 }, signal);
 
-export default function ItemPriceTab({ itemId }: { itemId: number }) {
+export default function ItemPriceTab({ itemId, readOnly = false }: { itemId: number; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemPrice, update: updateItemPrice, remove: deleteItemPrice });
     const columns: DataColumn<ItemPrice>[] = [
         { key: 'type', header: 'Price type', render: (row) => row.price_type },
@@ -27,17 +27,19 @@ export default function ItemPriceTab({ itemId }: { itemId: number }) {
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
         { key: 'effective', header: 'Effective', render: (row) => `${row.effective_from ?? 'Any'} to ${row.effective_to ?? 'Open'}` },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
+    if (!readOnly) {
+        columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
+    }
     return <>
-        <ItemRelationHeader title="Reference prices" description="Maintain decimal-safe reference amounts without owning sales or purchase documents." onAdd={crud.startCreate} />
+        <ItemRelationHeader title="Reference prices" description="Maintain decimal-safe reference amounts without owning sales or purchase documents." onAdd={readOnly ? undefined : crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />
         {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => `${row.price_type}: ${row.amount}`} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>UOM: {row.uom?.code ?? '-'}</span><span>{row.is_active ? 'Active' : 'Inactive'}</span></div>} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <FormDrawer open={crud.open} title={crud.editing ? 'Edit price' : 'Add price'} onClose={crud.close}>
+        {!readOnly && <FormDrawer open={crud.open} title={crud.editing ? 'Edit price' : 'Add price'} onClose={crud.close}>
             {crud.open && <PriceForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-        </FormDrawer>
-        {crud.confirmDialog}
+        </FormDrawer>}
+        {!readOnly && crud.confirmDialog}
     </>;
 }
 

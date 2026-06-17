@@ -1,18 +1,50 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { Panel } from '@/shared/components/Panel';
+import { Tabs } from '@/shared/components/Tabs';
+import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import type { NamedResource } from '@/shared/types/common';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { getBaseUomUsageAudit, getItem, updateItem } from './itemApi';
+import { hasItemPermission, itemPermissions } from './itemPermissions';
 import type { BaseUomUsageAudit, ItemPayload } from './itemTypes';
 import { ItemForm } from './components/ItemForm';
 
+const ItemUnitTab = lazy(() => import('./components/ItemUnitTab'));
+const ItemVariantTab = lazy(() => import('./components/ItemVariantTab'));
+const ItemBundleTab = lazy(() => import('./components/ItemBundleTab'));
+const ItemPriceTab = lazy(() => import('./components/ItemPriceTab'));
+const ItemCodeTab = lazy(() => import('./components/ItemCodeTab'));
+const ItemUsageRuleTab = lazy(() => import('./components/ItemUsageRuleTab'));
+const BaseUomChangeWizard = lazy(() => import('./components/BaseUomChangeWizard'));
+
+type Tab = 'basic' | 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
+const tabs = [
+    ['basic', 'Basic'], ['units', 'Units'], ['variants', 'Variants'], ['bundles', 'Bundle'],
+    ['prices', 'Pricing'], ['codes', 'Codes'], ['usage_rules', 'Usage'],
+].map(([id, label]) => ({ id: id as Tab, label }));
+
 export default function ItemEditPage() {
     const itemId = Number(useParams().id);
+    const auth = useAuth();
+    const canUpdate = hasItemPermission(auth.permissions, itemPermissions.update);
+    const canManageUnits = hasItemPermission(auth.permissions, itemPermissions.manageUnits);
+    const canChangeBaseUom = hasItemPermission(auth.permissions, itemPermissions.changeBaseUom);
+    const canManageVariants = hasItemPermission(auth.permissions, itemPermissions.manageVariants);
+    const canManageBundles = hasItemPermission(auth.permissions, itemPermissions.manageBundles);
+    const canManagePrices = hasItemPermission(auth.permissions, itemPermissions.managePrices);
+    const canManageCodes = hasItemPermission(auth.permissions, itemPermissions.manageCodes);
+    const canManageUsageRules = hasItemPermission(auth.permissions, itemPermissions.manageUsageRules);
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const requestedTab = tabs.some((entry) => entry.id === searchParams.get('tab')) ? searchParams.get('tab') as Tab : 'basic';
+    const tab = useOnDemandTab<Tab>(requestedTab);
     const [form, setForm] = useState<ItemPayload | null>(null);
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
@@ -36,11 +68,15 @@ export default function ItemEditPage() {
                     item_category_id: item.category ? Number(item.category.id) : null,
                     item_brand_id: item.brand ? Number(item.brand.id) : null,
                     base_uom_id: item.base_uom ? Number(item.base_uom.id) : null,
+                    default_tax_group_id: item.default_tax_group_id ?? null,
+                    purchase_tax_group_id: item.purchase_tax_group_id ?? null,
+                    sales_tax_group_id: item.sales_tax_group_id ?? null,
                     sku: item.sku ?? null,
                     barcode: item.barcode ?? null,
                     description: item.description ?? null,
                     is_stockable: item.is_stockable,
                     is_combo: item.is_combo,
+                    is_tax_exempt: item.is_tax_exempt ?? false,
                     is_active: item.is_active,
                 });
                 setCategory(item.category ?? null);
@@ -56,24 +92,43 @@ export default function ItemEditPage() {
     if (loading) return <LoadingState />;
     if (!form) return <ErrorAlert error={error} />;
     return <>
-        <ContentHeader title="Edit item" description="Relations remain on-demand in the item detail workspace." />
+        <ContentHeader title="Edit Item" description="Update item fields and manage related item data." />
+        {!canUpdate && tab.activeTab === 'basic' && <CapabilityNotice>You do not have permission to update item fields.</CapabilityNotice>}
         <ErrorAlert error={error} />
-        <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <ItemForm
-                value={form}
-                onChange={setForm}
-                category={category}
-                onCategoryChange={setCategory}
-                brand={brand}
-                onBrandChange={setBrand}
-                baseUom={baseUom}
-                onBaseUomChange={setBaseUom}
-                error={error}
-                baseUomLocked={baseUomAudit?.has_usage === true}
-                baseUomChangeHref={`/items/${itemId}?tab=base_uom`}
-            />
-            <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save item</Button></div>
-        </form>
+        <Panel className="p-0">
+            <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
+            <div className="p-5">
+                {tab.activeTab === 'basic' && canUpdate && (
+                    <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+                        <ItemForm
+                            value={form}
+                            onChange={setForm}
+                            category={category}
+                            onCategoryChange={setCategory}
+                            brand={brand}
+                            onBrandChange={setBrand}
+                            baseUom={baseUom}
+                            onBaseUomChange={setBaseUom}
+                            error={error}
+                            baseUomLocked={baseUomAudit?.has_usage === true}
+                            baseUomChangeHref={`/items/${itemId}/edit?tab=units`}
+                        />
+                        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save Item</Button></div>
+                    </form>
+                )}
+                <Suspense fallback={<LoadingState />}>
+                    {tab.openedTabs.has('units') && <div hidden={tab.activeTab !== 'units'} className="space-y-5">
+                        {canChangeBaseUom && <BaseUomChangeWizard itemId={itemId} onApplied={() => navigate(0)} />}
+                        <ItemUnitTab itemId={itemId} readOnly={!canManageUnits} />
+                    </div>}
+                    {tab.openedTabs.has('variants') && <div hidden={tab.activeTab !== 'variants'}><ItemVariantTab itemId={itemId} readOnly={!canManageVariants} /></div>}
+                    {tab.openedTabs.has('bundles') && <div hidden={tab.activeTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(form.item_type)} readOnly={!canManageBundles} /></div>}
+                    {tab.openedTabs.has('prices') && <div hidden={tab.activeTab !== 'prices'}><ItemPriceTab itemId={itemId} readOnly={!canManagePrices} /></div>}
+                    {tab.openedTabs.has('codes') && <div hidden={tab.activeTab !== 'codes'}><ItemCodeTab itemId={itemId} readOnly={!canManageCodes} /></div>}
+                    {tab.openedTabs.has('usage_rules') && <div hidden={tab.activeTab !== 'usage_rules'}><ItemUsageRuleTab itemId={itemId} readOnly={!canManageUsageRules} /></div>}
+                </Suspense>
+            </div>
+        </Panel>
     </>;
 
     async function save() {

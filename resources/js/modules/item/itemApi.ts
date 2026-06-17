@@ -14,11 +14,14 @@ import type {
     ItemPayload,
     ItemPrice,
     ItemPricePayload,
+    ItemBrandPayload,
+    ItemCategoryPayload,
     ItemSummary,
     ItemUnit,
     ItemUnitPayload,
     ItemUsageRule,
     ItemUsageRulePayload,
+    ItemUsageModule,
     ItemVariant,
     ItemVariantPayload,
     ItemWithRelationsPayload,
@@ -75,6 +78,54 @@ export function searchItemBrands(params: LookupLoadParams): Promise<LookupResult
     return requestLookup<ItemBrand>(`${endpoints.itemBrands}/lookup`, params);
 }
 
+export async function listItemCategories(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<ItemCategory>>(endpoints.itemCategories, { params, signal });
+    return response.data;
+}
+
+export async function getItemCategory(id: number, signal?: AbortSignal): Promise<ItemCategory> {
+    const response = await apiClient.get<ApiResource<ItemCategory>>(`${endpoints.itemCategories}/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function createItemCategory(payload: ItemCategoryPayload): Promise<ItemCategory> {
+    const response = await apiClient.post<ApiResource<ItemCategory>>(endpoints.itemCategories, payload);
+    return response.data.data;
+}
+
+export async function updateItemCategory(id: number, payload: ItemCategoryPayload): Promise<ItemCategory> {
+    const response = await apiClient.put<ApiResource<ItemCategory>>(`${endpoints.itemCategories}/${id}`, payload);
+    return response.data.data;
+}
+
+export async function deleteItemCategory(id: number): Promise<void> {
+    await apiClient.delete(`${endpoints.itemCategories}/${id}`);
+}
+
+export async function listItemBrands(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<ItemBrand>>(endpoints.itemBrands, { params, signal });
+    return response.data;
+}
+
+export async function getItemBrand(id: number, signal?: AbortSignal): Promise<ItemBrand> {
+    const response = await apiClient.get<ApiResource<ItemBrand>>(`${endpoints.itemBrands}/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function createItemBrand(payload: ItemBrandPayload): Promise<ItemBrand> {
+    const response = await apiClient.post<ApiResource<ItemBrand>>(endpoints.itemBrands, payload);
+    return response.data.data;
+}
+
+export async function updateItemBrand(id: number, payload: ItemBrandPayload): Promise<ItemBrand> {
+    const response = await apiClient.put<ApiResource<ItemBrand>>(`${endpoints.itemBrands}/${id}`, payload);
+    return response.data.data;
+}
+
+export async function deleteItemBrand(id: number): Promise<void> {
+    await apiClient.delete(`${endpoints.itemBrands}/${id}`);
+}
+
 const relationPath = (itemId: number, relation: string) => `${endpoints.items}/${itemId}/${relation}`;
 
 export const listItemUnits = (itemId: number, params: ListParams, signal?: AbortSignal) =>
@@ -124,6 +175,11 @@ export const createItemUsageRule = (itemId: number, payload: ItemUsageRulePayloa
 export const updateItemUsageRule = (itemId: number, id: number, payload: ItemUsageRulePayload) =>
     apiClient.put<ApiResource<ItemUsageRule>>(`${relationPath(itemId, 'usage-rules')}/${id}`, payload).then((response) => response.data.data);
 export const deleteItemUsageRule = (itemId: number, id: number) => apiClient.delete(`${relationPath(itemId, 'usage-rules')}/${id}`);
+
+export async function listItemUsageModules(signal?: AbortSignal): Promise<ItemUsageModule[]> {
+    const response = await apiClient.get<ApiResource<ItemUsageModule[]>>(`${endpoints.items}/usage-modules`, { signal });
+    return response.data.data;
+}
 
 export async function getBaseUomUsageAudit(itemId: number, signal?: AbortSignal): Promise<BaseUomUsageAudit> {
     const response = await apiClient.get<ApiResource<BaseUomUsageAudit>>(`${endpoints.items}/${itemId}/base-uom/usage-audit`, { signal });

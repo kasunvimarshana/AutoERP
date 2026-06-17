@@ -1,5 +1,6 @@
 import type { NavigationSection } from './navigationTypes';
 import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
+import { itemPermissions } from '@/modules/item/itemPermissions';
 
 const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
     requiresTenant: true,
@@ -128,15 +129,63 @@ export const navigationSections: NavigationSection[] = [
                 type: 'module',
                 label: 'Items',
                 icon: 'item',
-                access: tenantAccess(['item']),
+                access: {
+                    ...tenantAccess(['item']),
+                    permissions: [
+                        itemPermissions.view,
+                        itemPermissions.create,
+                        itemPermissions.manageCategories,
+                        itemPermissions.manageBrands,
+                    ],
+                },
                 children: [
+                    {
+                        id: 'item-categories',
+                        type: 'link',
+                        label: 'Categories',
+                        to: '/item-categories',
+                        match: ['/item-categories'],
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.view, itemPermissions.manageCategories] },
+                    },
+                    {
+                        id: 'item-category-create',
+                        type: 'link',
+                        label: 'Create Category',
+                        to: '/item-categories/create',
+                        match: ['/item-categories/create'],
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.manageCategories] },
+                    },
+                    {
+                        id: 'item-brands',
+                        type: 'link',
+                        label: 'Brands',
+                        to: '/item-brands',
+                        match: ['/item-brands'],
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.view, itemPermissions.manageBrands] },
+                    },
+                    {
+                        id: 'item-brand-create',
+                        type: 'link',
+                        label: 'Create Brand',
+                        to: '/item-brands/create',
+                        match: ['/item-brands/create'],
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.manageBrands] },
+                    },
                     {
                         id: 'item-list',
                         type: 'link',
-                        label: 'Item List',
+                        label: 'Items',
                         to: '/items',
                         match: ['/items'],
-                        access: tenantAccess(['item']),
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.view] },
+                    },
+                    {
+                        id: 'item-create',
+                        type: 'link',
+                        label: 'Create Item',
+                        to: '/items/create',
+                        match: ['/items/create'],
+                        access: { ...tenantAccess(['item']), permissions: [itemPermissions.create] },
                     },
                 ],
             },

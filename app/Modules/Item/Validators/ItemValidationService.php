@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\DTOs\CreateItemData;
@@ -15,12 +16,18 @@ use Modules\Item\DTOs\ItemUnitData;
 use Modules\Item\DTOs\ItemUsageRuleData;
 use Modules\Item\DTOs\ItemVariantData;
 use Modules\Item\DTOs\UpdateItemData;
+use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
+use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemBrand;
 use Modules\Item\Models\ItemBundle;
 use Modules\Item\Models\ItemCategory;
+use Modules\Item\Models\ItemUnit;
 use Modules\Item\Models\ItemVariant;
+use Modules\Item\Services\ItemBaseUomUsageAuditService;
+use Modules\Item\Services\ItemUsageModuleCatalogue;
+use Modules\Tax\Models\TaxGroup;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class ItemValidationService
@@ -49,7 +56,8 @@ final class ItemValidationService
 
     public function __construct(
         private readonly DecimalMath $math,
-        private readonly \Modules\Item\Services\ItemBaseUomUsageAuditService $baseUomUsageAudit,
+        private readonly ItemBaseUomUsageAuditService $baseUomUsageAudit,
+        private readonly ItemUsageModuleCatalogue $usageModules,
     ) {}
 
     public function validateCreate(CreateItemData $data): void
@@ -65,7 +73,7 @@ final class ItemValidationService
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->defaultTaxGroupId);
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->purchaseTaxGroupId);
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->salesTaxGroupId);
-        $this->assertTypeRules($data->itemType, $data->isStockable);
+        $this->assertTypeRules($data->itemType, $data->isStockable, $data->trackingType, $data->costingMethod, $data->isCombo);
     }
 
     public function validateUpdate(Item $item, UpdateItemData $data): void
@@ -99,16 +107,36 @@ final class ItemValidationService
 
         $itemType = $data->itemType ?? $item->item_type;
         $isStockable = $data->isStockable ?? (bool) $item->is_stockable;
+        $trackingType = $data->trackingType ?? $item->tracking_type;
+        $costingMethod = $data->costingMethod ?? $item->costing_method;
+        $isCombo = $data->isCombo ?? (bool) $item->is_combo;
         $this->assertTypeRules(
             $itemType instanceof ItemType ? $itemType : ItemType::from((string) $itemType),
             $isStockable,
+            $trackingType instanceof TrackingType ? $trackingType : TrackingType::from((string) $trackingType),
+            $costingMethod instanceof CostingMethod ? $costingMethod : CostingMethod::from((string) $costingMethod),
+            $isCombo,
         );
     }
 
-    public function validateUnit(Item $item, ItemUnitData $data, ?int $ignoreUnitId = null): void
+    public function validateUnit(Item $item, ItemUnitData $data, ?int $ignoreUnitId = null, bool $allowBaseRole = false): void
     {
+        if ($data->isDefault && ! $data->isActive) {
+            throw ValidationException::withMessages([
+                'is_default' => ['Default Unit must be active.'],
+                'is_active' => ['Inactive item units cannot be marked as Default Unit.'],
+            ]);
+        }
+
+        if (! $allowBaseRole && $data->unitRole->value === 'base') {
+            throw ValidationException::withMessages([
+                'unit_role' => ['Base item units are synchronized from the Base UOM workflow. Change the item Base UOM instead.'],
+            ]);
+        }
+
         $this->assertPositiveDecimal($data->conversionFactor, 'Item unit conversion factor must be greater than zero.');
         $this->assertUomIsUsable((int) $item->tenant_id, $item->organization_unit_id, $data->uomId);
+        $this->assertUomCompatibleWithItemBase($item, $data->uomId);
 
         $duplicate = $item->units()
             ->where('uom_id', $data->uomId)
@@ -119,6 +147,8 @@ final class ItemValidationService
         if ($duplicate->exists()) {
             throw new InvalidArgumentException('This UOM is already assigned for the selected item unit role.');
         }
+
+        $this->assertSameFactorForItemUom($item, $data, $ignoreUnitId);
 
         if ($data->unitRole->value === 'base') {
             if ($item->base_uom_id === null || (int) $item->base_uom_id !== $data->uomId) {
@@ -176,6 +206,7 @@ final class ItemValidationService
         }
 
         $this->assertUomIsUsable((int) $parent->tenant_id, $parent->organization_unit_id, $data->uomId);
+        $this->assertItemUomIsActive($child, $data->uomId, 'Bundle-line UOM must be an active unit for the child item.');
     }
 
     public function validatePrice(Item $item, ItemPriceData $data): void
@@ -183,6 +214,7 @@ final class ItemValidationService
         $this->assertNotNegativeDecimal($data->amount, 'Item price amount cannot be negative.');
         $this->assertVariantBelongsToItem($item, $data->itemVariantId);
         $this->assertUomIsUsable((int) $item->tenant_id, $item->organization_unit_id, $data->uomId);
+        $this->assertItemUomIsActive($item, $data->uomId, 'Price UOM must be an active unit for the selected item.');
 
         if ($data->effectiveFrom !== null && $data->effectiveTo !== null && $data->effectiveFrom > $data->effectiveTo) {
             throw new InvalidArgumentException('Item price effective from date cannot be after effective to date.');
@@ -198,17 +230,86 @@ final class ItemValidationService
     public function validateUsageRule(Item $item, ItemUsageRuleData $data): void
     {
         $this->assertText($data->moduleCode, 'Item usage rule module code is required.');
-        if (! preg_match('/^[a-z][a-z0-9_]*$/', $data->moduleCode)) {
-            throw new InvalidArgumentException('Item usage rule module code must be lowercase snake case.');
+        if (! preg_match('/^[a-z][a-z0-9_-]*$/', $data->moduleCode)) {
+            throw ValidationException::withMessages([
+                'module_code' => ['Item usage rule module code must be lowercase and may contain numbers, underscores, or hyphens.'],
+            ]);
+        }
+        if (! $this->usageModules->isEnabledForTenant((int) $item->tenant_id, $data->moduleCode)) {
+            throw ValidationException::withMessages([
+                'module_code' => ['Item usage rule module is not registered or enabled for this tenant.'],
+            ]);
+        }
+
+        $itemType = $item->item_type instanceof ItemType ? $item->item_type : ItemType::from((string) $item->item_type);
+        if (! $this->usageModules->supportsItemType($data->moduleCode, $itemType)) {
+            throw ValidationException::withMessages([
+                'module_code' => ['Item type is not supported by the selected usage module.'],
+            ]);
         }
     }
 
-    private function assertTypeRules(ItemType $itemType, bool $isStockable): void
-    {
-        if (in_array($itemType, [ItemType::Service, ItemType::Labour], true) && $isStockable) {
-            throw new InvalidArgumentException('Service and labour items cannot be stockable.');
+    private function assertTypeRules(
+        ItemType $itemType,
+        bool $isStockable,
+        TrackingType $trackingType,
+        CostingMethod $costingMethod,
+        ?bool $isCombo,
+    ): void {
+        $comboType = in_array($itemType, [ItemType::Combo, ItemType::Package], true);
+        if ($isCombo !== null && $isCombo !== $comboType) {
+            throw ValidationException::withMessages([
+                'is_combo' => ['Combo/package state must match the item type.'],
+            ]);
         }
 
+        if (in_array($itemType, [ItemType::Service, ItemType::Labour, ItemType::NonStock], true)) {
+            if ($isStockable) {
+                throw ValidationException::withMessages([
+                    'is_stockable' => ['Service, labour, and non-stock items cannot be stockable.'],
+                ]);
+            }
+            if ($trackingType !== TrackingType::None) {
+                throw ValidationException::withMessages([
+                    'tracking_type' => ['Non-stockable service, labour, and non-stock items cannot use inventory tracking.'],
+                ]);
+            }
+            if ($costingMethod !== CostingMethod::None) {
+                throw ValidationException::withMessages([
+                    'costing_method' => ['Service, labour, and non-stock items must use no inventory costing method.'],
+                ]);
+            }
+        }
+
+        if ($comboType) {
+            if ($isStockable) {
+                throw ValidationException::withMessages([
+                    'is_stockable' => ['Combo and package items cannot be stockable.'],
+                ]);
+            }
+            if ($trackingType !== TrackingType::None) {
+                throw ValidationException::withMessages([
+                    'tracking_type' => ['Combo and package items cannot use inventory tracking.'],
+                ]);
+            }
+            if ($costingMethod !== CostingMethod::None) {
+                throw ValidationException::withMessages([
+                    'costing_method' => ['Combo and package items must use no inventory costing method.'],
+                ]);
+            }
+        }
+
+        if (! $isStockable && $trackingType !== TrackingType::None) {
+            throw ValidationException::withMessages([
+                'tracking_type' => ['Non-stockable items cannot use serial, batch, or lot tracking.'],
+            ]);
+        }
+
+        if (! $comboType && $isCombo === true) {
+            throw ValidationException::withMessages([
+                'is_combo' => ['Only combo and package item types can be marked as combo/package items.'],
+            ]);
+        }
     }
 
     private function assertCodeIsUnique(int $tenantId, string $code, ?int $ignoreItemId = null): void
@@ -332,7 +433,7 @@ final class ItemValidationService
             return;
         }
 
-        $group = \Modules\Tax\Models\TaxGroup::query()->findOrFail($taxGroupId);
+        $group = TaxGroup::query()->findOrFail($taxGroupId);
         $this->assertScopedRecord($tenantId, $organizationUnitId, (int) $group->tenant_id, $group->organization_unit_id);
         if (! (bool) $group->active) {
             throw new InvalidArgumentException('Inactive tax group cannot be used for item master data.');
@@ -345,7 +446,11 @@ final class ItemValidationService
             throw new InvalidArgumentException('Item reference belongs to a different tenant.');
         }
 
-        if ($recordOrganizationUnitId !== null && $organizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
+        if ($recordOrganizationUnitId !== null && $organizationUnitId === null) {
+            throw new InvalidArgumentException('Global item records may only reference global records.');
+        }
+
+        if ($recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
             throw new InvalidArgumentException('Item reference belongs to a different organization unit.');
         }
     }
@@ -369,6 +474,59 @@ final class ItemValidationService
         $variant = ItemVariant::query()->findOrFail($variantId);
         if ((int) $variant->item_id !== (int) $item->getKey()) {
             throw new InvalidArgumentException('Item variant must belong to the item.');
+        }
+    }
+
+    private function assertUomCompatibleWithItemBase(Item $item, int $uomId): void
+    {
+        if ($item->base_uom_id === null || (int) $item->base_uom_id === $uomId) {
+            return;
+        }
+
+        $baseUom = UnitOfMeasureModel::query()->findOrFail((int) $item->base_uom_id);
+        $uom = UnitOfMeasureModel::query()->findOrFail($uomId);
+        if ($baseUom->type !== $uom->type || $baseUom->category !== $uom->category) {
+            throw ValidationException::withMessages([
+                'uom_id' => ['Item unit UOM must use the same type and category as the item Base UOM.'],
+            ]);
+        }
+    }
+
+    private function assertSameFactorForItemUom(Item $item, ItemUnitData $data, ?int $ignoreUnitId): void
+    {
+        $query = ItemUnit::query()
+            ->where('item_id', $item->getKey())
+            ->where('uom_id', $data->uomId);
+        if ($ignoreUnitId !== null) {
+            $query->whereKeyNot($ignoreUnitId);
+        }
+
+        $existing = $query->first();
+        if ($existing instanceof ItemUnit
+            && $this->math->compare((string) $existing->conversion_factor, $data->conversionFactor) !== 0) {
+            throw ValidationException::withMessages([
+                'conversion_factor' => ['The same Item and UOM must use one conversion factor across all unit roles.'],
+            ]);
+        }
+    }
+
+    private function assertItemUomIsActive(Item $item, ?int $uomId, string $message): void
+    {
+        if ($uomId === null) {
+            return;
+        }
+
+        $this->assertUomCompatibleWithItemBase($item, $uomId);
+        $exists = ItemUnit::query()
+            ->where('item_id', $item->getKey())
+            ->where('uom_id', $uomId)
+            ->where('is_active', true)
+            ->exists();
+
+        if (! $exists) {
+            throw ValidationException::withMessages([
+                'uom_id' => [$message],
+            ]);
         }
     }
 

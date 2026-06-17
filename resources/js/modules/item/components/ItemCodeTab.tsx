@@ -15,24 +15,26 @@ import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemCodes(itemId, { page, per_page: 20 }, signal);
 
-export default function ItemCodeTab({ itemId }: { itemId: number }) {
+export default function ItemCodeTab({ itemId, readOnly = false }: { itemId: number; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemCode, update: updateItemCode, remove: deleteItemCode });
     const columns: DataColumn<ItemCode>[] = [
         { key: 'type', header: 'Code type', render: (row) => row.code_type },
         { key: 'code', header: 'Code', render: (row) => <span className="font-medium">{row.code}</span> },
         { key: 'variant', header: 'Variant', render: (row) => row.variant ? `${row.variant.code} - ${row.variant.name}` : 'All variants' },
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
+    if (!readOnly) {
+        columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
+    }
     return <>
-        <ItemRelationHeader title="Alternative codes" description="Maintain readable SKU, barcode, OEM, and party-facing references." onAdd={crud.startCreate} />
+        <ItemRelationHeader title="Alternative codes" description="Maintain readable SKU, barcode, OEM, and party-facing references." onAdd={readOnly ? undefined : crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />
         {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <FormDrawer open={crud.open} title={crud.editing ? 'Edit code' : 'Add code'} onClose={crud.close}>
+        {!readOnly && <FormDrawer open={crud.open} title={crud.editing ? 'Edit code' : 'Add code'} onClose={crud.close}>
             {crud.open && <CodeForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-        </FormDrawer>
-        {crud.confirmDialog}
+        </FormDrawer>}
+        {!readOnly && crud.confirmDialog}
     </>;
 }
 

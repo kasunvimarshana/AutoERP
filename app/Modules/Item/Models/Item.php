@@ -13,6 +13,7 @@ use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Tax\Models\TaxGroup;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
@@ -69,6 +70,21 @@ final class Item extends CoreModel
     public function baseUom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
+    }
+
+    public function defaultTaxGroup(): BelongsTo
+    {
+        return $this->belongsTo(TaxGroup::class, 'default_tax_group_id');
+    }
+
+    public function purchaseTaxGroup(): BelongsTo
+    {
+        return $this->belongsTo(TaxGroup::class, 'purchase_tax_group_id');
+    }
+
+    public function salesTaxGroup(): BelongsTo
+    {
+        return $this->belongsTo(TaxGroup::class, 'sales_tax_group_id');
     }
 
     public function units(): HasMany

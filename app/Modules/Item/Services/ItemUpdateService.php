@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\DTOs\UpdateItemData;
-use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Enums\ItemType;
+use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUnit;
 use Modules\Item\Validators\ItemValidationService;
@@ -21,6 +21,7 @@ final class ItemUpdateService
         private readonly ItemValidationService $validator,
         private readonly DecimalMath $math,
         private readonly UomConversionService $uomConversions,
+        private readonly ItemUnitService $units,
     ) {}
 
     public function update(Item $item, UpdateItemData $data): Item
@@ -31,12 +32,16 @@ final class ItemUpdateService
         $unitFactor = $baseUomChanged ? $this->directEditUnitFactor($item, $data->baseUomId) : null;
 
         return DB::transaction(function () use ($item, $data, $baseUomChanged, $unitFactor): Item {
+            $item = Item::query()
+                ->where('tenant_id', $item->tenant_id)
+                ->whereKey($item->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
             $attributes = [];
             foreach ([
                 'code' => $data->code,
                 'name' => $data->name,
                 'item_type' => $data->itemType,
-                'organization_unit_id' => $data->organizationUnitId,
                 'item_category_id' => $data->itemCategoryId,
                 'item_brand_id' => $data->itemBrandId,
                 'sku' => $data->sku,
@@ -63,10 +68,9 @@ final class ItemUpdateService
             $resolvedType = $resolvedType instanceof ItemType
                 ? $resolvedType
                 : ItemType::from((string) $resolvedType);
-            if (in_array($resolvedType, [ItemType::Combo, ItemType::Package], true)) {
-                $attributes['is_combo'] = true;
-            } elseif (array_key_exists('item_type', $attributes) && ! in_array('is_combo', $data->provided, true)) {
-                $attributes['is_combo'] = false;
+            $attributes['is_combo'] = in_array($resolvedType, [ItemType::Combo, ItemType::Package], true);
+            if (! in_array('item_type', $data->provided, true) && ! in_array('is_combo', $data->provided, true)) {
+                unset($attributes['is_combo']);
             }
 
             $item->fill($attributes);
@@ -129,13 +133,6 @@ final class ItemUpdateService
         $units = ItemUnit::query()->where('item_id', $item->getKey())->lockForUpdate()->get();
         foreach ($units as $unit) {
             if ($unit->unit_role === ItemUnitRole::Base) {
-                $unit->fill([
-                    'uom_id' => $newBaseUomId,
-                    'conversion_factor' => '1.000000',
-                    'is_default' => true,
-                    'is_active' => true,
-                ])->save();
-
                 continue;
             }
             if ($factor !== null) {
@@ -146,17 +143,6 @@ final class ItemUpdateService
             }
         }
 
-        if (! $units->contains(fn (ItemUnit $unit): bool => $unit->unit_role === ItemUnitRole::Base)) {
-            ItemUnit::query()->create([
-                'tenant_id' => $item->tenant_id,
-                'organization_unit_id' => $item->organization_unit_id,
-                'item_id' => $item->getKey(),
-                'uom_id' => $newBaseUomId,
-                'unit_role' => ItemUnitRole::Base,
-                'conversion_factor' => '1.000000',
-                'is_default' => true,
-                'is_active' => true,
-            ]);
-        }
+        $this->units->syncBaseUnit($item);
     }
 }

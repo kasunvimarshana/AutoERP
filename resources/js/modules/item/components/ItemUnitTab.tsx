@@ -18,7 +18,7 @@ import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemUnits(itemId, { page, per_page: 20 }, signal);
 
-export default function ItemUnitTab({ itemId }: { itemId: number }) {
+export default function ItemUnitTab({ itemId, readOnly = false }: { itemId: number; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemUnit, update: updateItemUnit, remove: deleteItemUnit });
     const columns: DataColumn<ItemUnit>[] = [
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}${row.uom.symbol ? ` (${row.uom.symbol})` : ''}` : '-' },
@@ -26,19 +26,21 @@ export default function ItemUnitTab({ itemId }: { itemId: number }) {
         { key: 'factor', header: 'Factor', render: (row) => row.conversion_factor },
         { key: 'default', header: 'Default', render: (row) => row.is_default ? 'Yes' : 'No' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <RelationActions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
+    if (!readOnly) {
+        columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => row.unit_role === 'base' ? <span className="text-xs text-slate-500">Base UOM</span> : <RelationActions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
+    }
 
     return (
         <>
-            <ItemRelationHeader title="Item units" description="Map generic UOMs to item-specific usage roles." onAdd={crud.startCreate} />
+            <ItemRelationHeader title="Item units" description="Map generic UOMs to item-specific usage roles." onAdd={readOnly ? undefined : crud.startCreate} />
             <ErrorAlert error={crud.actionError ?? crud.error} />
             {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-            <FormDrawer open={crud.open} title={crud.editing ? 'Edit item unit' : 'Add item unit'} onClose={crud.close}>
+            {!readOnly && <FormDrawer open={crud.open} title={crud.editing ? 'Edit item unit' : 'Add item unit'} onClose={crud.close}>
                 {crud.open && <UnitForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-            </FormDrawer>
-            {crud.confirmDialog}
+            </FormDrawer>}
+            {!readOnly && crud.confirmDialog}
         </>
     );
 }
@@ -51,7 +53,7 @@ function UnitForm({ row, error, submitting, onCancel, onSubmit }: {
     onSubmit: (payload: ItemUnitPayload) => Promise<void>;
 }) {
     const [uom, setUom] = useState<NamedResource | null>(row?.uom ?? null);
-    const [role, setRole] = useState(row?.unit_role ?? 'base');
+    const [role, setRole] = useState(row?.unit_role === 'base' ? 'purchase' : row?.unit_role ?? 'purchase');
     const [factor, setFactor] = useState(row?.conversion_factor ?? '1.000000');
     const [isDefault, setDefault] = useState(row?.is_default ?? false);
     const [isActive, setActive] = useState(row?.is_active ?? true);
@@ -64,9 +66,9 @@ function UnitForm({ row, error, submitting, onCancel, onSubmit }: {
         }}>
             <ErrorAlert error={error} />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
-            <Select label="Unit role" value={role} onChange={(event) => setRole(event.target.value)} options={itemUnitRoles.map((value) => ({ value, label: value }))} error={fieldError(error, 'unit_role')} />
+            <Select label="Unit role" value={role} onChange={(event) => setRole(event.target.value)} options={itemUnitRoles.filter((value) => value !== 'base').map((value) => ({ value, label: value }))} error={fieldError(error, 'unit_role')} />
             <Input label="Conversion factor" value={factor} onChange={(event) => setFactor(event.target.value)} error={fieldError(error, 'conversion_factor')} required />
-            <label className="block text-sm"><input className="mr-2" type="checkbox" checked={isDefault} onChange={(event) => setDefault(event.target.checked)} />Default for this role</label>
+            <label className="block text-sm"><input className="mr-2" type="checkbox" checked={isDefault} onChange={(event) => setDefault(event.target.checked)} />Default Unit</label>
             <label className="block text-sm"><input className="mr-2" type="checkbox" checked={isActive} onChange={(event) => setActive(event.target.checked)} />Active</label>
             <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting} disabled={!uom}>Save</Button></div>
         </form>

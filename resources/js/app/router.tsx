@@ -40,6 +40,14 @@ const ItemListPage = lazy(() => import('@/modules/item/ItemListPage'));
 const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
 const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
 const ItemDetailPage = lazy(() => import('@/modules/item/ItemDetailPage'));
+const ItemCategoryListPage = lazy(() => import('@/modules/item/ItemCategoryListPage'));
+const ItemCategoryCreatePage = lazy(() => import('@/modules/item/ItemCategoryCreatePage'));
+const ItemCategoryEditPage = lazy(() => import('@/modules/item/ItemCategoryEditPage'));
+const ItemCategoryDetailPage = lazy(() => import('@/modules/item/ItemCategoryDetailPage'));
+const ItemBrandListPage = lazy(() => import('@/modules/item/ItemBrandListPage'));
+const ItemBrandCreatePage = lazy(() => import('@/modules/item/ItemBrandCreatePage'));
+const ItemBrandEditPage = lazy(() => import('@/modules/item/ItemBrandEditPage'));
+const ItemBrandDetailPage = lazy(() => import('@/modules/item/ItemBrandDetailPage'));
 const InventoryPage = lazy(() => import('@/modules/inventory/pages/InventoryPage'));
 const FastPurchasePage = lazy(() => import('@/modules/purchase/pages/FastPurchasePage'));
 const PurchaseOrderListPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderListPage'));
@@ -178,6 +186,14 @@ export function AppRouter() {
                     <Route path="/items/create" element={<ItemCreatePage />} />
                     <Route path="/items/:id/edit" element={<ItemEditPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
+                    <Route path="/item-categories" element={<ItemCategoryListPage />} />
+                    <Route path="/item-categories/create" element={<ItemCategoryCreatePage />} />
+                    <Route path="/item-categories/:id/edit" element={<ItemCategoryEditPage />} />
+                    <Route path="/item-categories/:id" element={<ItemCategoryDetailPage />} />
+                    <Route path="/item-brands" element={<ItemBrandListPage />} />
+                    <Route path="/item-brands/create" element={<ItemBrandCreatePage />} />
+                    <Route path="/item-brands/:id/edit" element={<ItemBrandEditPage />} />
+                    <Route path="/item-brands/:id" element={<ItemBrandDetailPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/purchase/fast-purchase" element={<FastPurchasePage />} />
                     <Route path="/purchase/orders" element={<PurchaseOrderListPage />} />

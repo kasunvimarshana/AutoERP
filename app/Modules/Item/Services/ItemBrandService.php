@@ -37,6 +37,7 @@ final class ItemBrandService
     public function create(array $data, int $tenantId, ?int $organizationUnitId): ItemBrand
     {
         $this->assertUniqueCode($tenantId, (string) $data['code']);
+        $this->assertUniqueName($tenantId, (string) $data['name']);
 
         return ItemBrand::query()->create([
             'tenant_id' => $tenantId,
@@ -49,6 +50,12 @@ final class ItemBrandService
     {
         if (isset($data['code'])) {
             $this->assertUniqueCode((int) $brand->tenant_id, (string) $data['code'], (int) $brand->getKey());
+        }
+        if (isset($data['name'])) {
+            $this->assertUniqueName((int) $brand->tenant_id, (string) $data['name'], (int) $brand->getKey());
+        }
+        if (array_key_exists('is_active', $data) && $data['is_active'] === false && $brand->items()->where('is_active', true)->exists()) {
+            throw new InvalidArgumentException('Item brand cannot be deactivated while active items reference it.');
         }
         $brand->fill($data)->save();
 
@@ -74,6 +81,17 @@ final class ItemBrandService
         }
     }
 
+    private function assertUniqueName(int $tenantId, string $name, ?int $ignoreId = null): void
+    {
+        $query = ItemBrand::query()->where('tenant_id', $tenantId)->where('name', $name);
+        if ($ignoreId !== null) {
+            $query->whereKeyNot($ignoreId);
+        }
+        if ($query->exists()) {
+            throw new InvalidArgumentException('Item brand name already exists for this tenant.');
+        }
+    }
+
     private function query(int $tenantId, ?int $organizationUnitId): Builder
     {
         $query = ItemBrand::query()->where('tenant_id', $tenantId);
@@ -81,6 +99,8 @@ final class ItemBrandService
             $query->where(fn (Builder $scope): Builder => $scope
                 ->whereNull('organization_unit_id')
                 ->orWhere('organization_unit_id', $organizationUnitId));
+        } else {
+            $query->whereNull('organization_unit_id');
         }
 
         return $query;
