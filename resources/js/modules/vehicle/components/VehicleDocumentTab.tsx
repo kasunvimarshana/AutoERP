@@ -6,12 +6,14 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Textarea } from '@/shared/components/Textarea';
 import type { ApiCollection } from '@/shared/types/api';
 import { createVehicleDocument, deleteVehicleDocument, listVehicleDocuments, updateVehicleDocument } from '../vehicleApi';
 import type { VehicleDocument, VehicleDocumentPayload } from '../vehicleTypes';
 
 const documentTypes = ['registration', 'insurance', 'emission_test', 'revenue_license', 'fitness_certificate', 'lease_document', 'ownership_document', 'warranty', 'other'];
-const statuses = ['active', 'expired', 'revoked', 'pending'];
+const statuses = ['pending', 'active', 'expired', 'revoked'];
 const emptyPayload: VehicleDocumentPayload = { document_type: 'registration', document_number: '', issued_date: '', expiry_date: '', file_path: '', status: 'pending', notes: '' };
 
 export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
@@ -64,11 +66,16 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
     return (
         <div className="space-y-4">
             <ErrorAlert error={error} />
-            <div className="grid gap-3 md:grid-cols-4">
-                <Select label="Type" value={form.document_type} options={documentTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, document_type: event.target.value as VehicleDocumentPayload['document_type'] })} error={fieldError(error, 'document_type')} />
-                <Input label="Number" value={form.document_number ?? ''} onChange={(event) => setForm({ ...form, document_number: event.target.value })} error={fieldError(error, 'document_number')} />
+            <div className="grid gap-3 md:grid-cols-3">
+                <Select label="Document Type" value={form.document_type} options={documentTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, document_type: event.target.value as VehicleDocumentPayload['document_type'] })} error={fieldError(error, 'document_type')} />
+                <Input label="Reference Number" value={form.document_number ?? ''} onChange={(event) => setForm({ ...form, document_number: event.target.value })} error={fieldError(error, 'document_number')} />
+                <Input label="File Path" value={form.file_path ?? ''} onChange={(event) => setForm({ ...form, file_path: event.target.value })} error={fieldError(error, 'file_path')} />
+                <Input label="Issue Date" type="date" value={form.issued_date ?? ''} onChange={(event) => setForm({ ...form, issued_date: event.target.value })} error={fieldError(error, 'issued_date')} />
                 <Input label="Expiry Date" type="date" value={form.expiry_date ?? ''} onChange={(event) => setForm({ ...form, expiry_date: event.target.value })} error={fieldError(error, 'expiry_date')} />
-                <Select label="Status" value={form.status} options={statuses.map((value) => ({ value, label: value }))} onChange={(event) => setForm({ ...form, status: event.target.value as VehicleDocumentPayload['status'] })} error={fieldError(error, 'status')} />
+                <Select label="Status" value={form.status} options={statuses.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, status: event.target.value as VehicleDocumentPayload['status'] })} error={fieldError(error, 'status')} />
+                <div className="md:col-span-3">
+                    <Textarea label="Remarks" value={form.notes ?? ''} onChange={(event) => setForm({ ...form, notes: event.target.value })} error={fieldError(error, 'notes')} />
+                </div>
             </div>
             <div className="flex gap-2">
                 <Button type="button" loading={submitting} onClick={submit}>{editing ? 'Update Document' : 'Add Document'}</Button>
@@ -78,10 +85,11 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
                 rows={rows}
                 rowKey={(row) => row.id}
                 columns={[
-                    { key: 'type', header: 'Type', render: (row) => row.document_type.replaceAll('_', ' ') },
-                    { key: 'number', header: 'Number', render: (row) => row.document_number ?? '-' },
+                    { key: 'type', header: 'Type', render: (row) => <div><p className="font-medium text-slate-900">{row.document_type.replaceAll('_', ' ')}</p><p className="text-xs text-slate-500">{row.file_path ? <a href={row.file_path} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">Preview / download</a> : 'No file'}</p></div> },
+                    { key: 'number', header: 'Reference', render: (row) => row.document_number ?? '-' },
+                    { key: 'issued', header: 'Issued', render: (row) => row.issued_date ?? '-' },
                     { key: 'expiry', header: 'Expiry', render: (row) => row.expiry_date ?? '-' },
-                    { key: 'status', header: 'Status', render: (row) => row.status },
+                    { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
                     { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => { setEditing(row.id); setForm({ document_type: row.document_type, document_number: row.document_number ?? '', issued_date: row.issued_date ?? '', expiry_date: row.expiry_date ?? '', file_path: row.file_path ?? '', status: row.status, notes: row.notes ?? '' }); }}>Edit</Button><Button variant="danger" onClick={() => deleteVehicleDocument(vehicleId, row.id).then(() => load()).catch((requestError) => setError(toApiError(requestError)))}>Delete</Button></div> },
                 ]}
             />

@@ -1,27 +1,63 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { FormActions } from '@/shared/components/FormActions';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { Panel } from '@/shared/components/Panel';
+import { TabPanel, Tabs } from '@/shared/components/Tabs';
+import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { getVehicle, updateVehicle } from './vehicleApi';
-import { VehicleForm } from './components/VehicleForm';
-import type { Vehicle, VehicleAttributePayload, VehicleDocumentPayload, VehicleOwnershipPayload, VehiclePayload } from './vehicleTypes';
+import { VehicleAttributeTab } from './components/VehicleAttributeTab';
+import { VehicleBasicFields } from './components/VehicleBasicFields';
+import { VehicleDocumentTab } from './components/VehicleDocumentTab';
+import type { Vehicle, VehicleCategory, VehicleMake, VehicleModel, VehiclePayload, VehicleType } from './vehicleTypes';
+
+type EditTab = 'basic' | 'documents' | 'attributes';
+const tabs = [
+    { id: 'basic' as const, label: 'Basic' },
+    { id: 'documents' as const, label: 'Documents' },
+    { id: 'attributes' as const, label: 'Attributes' },
+];
 
 export default function VehicleEditPage() {
-    const { id } = useParams();
+    const vehicleId = Number(useParams().id);
     const navigate = useNavigate();
-    const vehicleId = Number(id);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+    const [activeTab, setActiveTab] = useState<EditTab>('basic');
+    const [make, setMake] = useState<VehicleMake | null>(null);
+    const [model, setModel] = useState<VehicleModel | null>(null);
+    const [type, setType] = useState<VehicleType | null>(null);
+    const [category, setCategory] = useState<VehicleCategory | null>(null);
+    const [payload, setPayload] = useState<VehiclePayload | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const initialSnapshot = useRef<string | null>(null);
 
     useEffect(() => {
         const controller = new AbortController();
+        setLoading(true);
         getVehicle(vehicleId, controller.signal)
             .then((value) => {
-                if (!controller.signal.aborted) setVehicle(value);
+                if (controller.signal.aborted) return;
+                setVehicle(value);
+                setMake(value.make as VehicleMake ?? null);
+                setModel(value.model as VehicleModel ?? null);
+                setType(value.type as VehicleType ?? null);
+                setCategory(value.category as VehicleCategory ?? null);
+                const mapped = vehicleToPayload(value);
+                setPayload(mapped);
+                initialSnapshot.current = JSON.stringify({
+                    payload: mapped,
+                    makeId: value.make?.id ?? null,
+                    modelId: value.model?.id ?? null,
+                    typeId: value.type?.id ?? null,
+                    categoryId: value.category?.id ?? null,
+                });
+                setError(null);
             })
             .catch((requestError) => {
                 if (!controller.signal.aborted) setError(toApiError(requestError));
@@ -29,14 +65,32 @@ export default function VehicleEditPage() {
             .finally(() => {
                 if (!controller.signal.aborted) setLoading(false);
             });
+
         return () => controller.abort();
     }, [vehicleId]);
 
-    const submit = async (payload: VehiclePayload, _relations: { documents: VehicleDocumentPayload[]; ownerships: VehicleOwnershipPayload[]; attributes: VehicleAttributePayload[] }) => {
+    const finalPayload = useMemo<VehiclePayload | null>(() => payload === null ? null : ({
+        ...payload,
+        vehicle_make_id: make?.id ?? null,
+        vehicle_model_id: model?.id ?? null,
+        vehicle_type_id: type?.id ?? null,
+        vehicle_category_id: category?.id ?? null,
+    }), [category, make, model, payload, type]);
+    const snapshot = finalPayload === null ? '' : JSON.stringify({
+        payload: finalPayload,
+        makeId: make?.id ?? null,
+        modelId: model?.id ?? null,
+        typeId: type?.id ?? null,
+        categoryId: category?.id ?? null,
+    });
+    const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot.current && snapshot !== initialSnapshot.current && !submitting));
+
+    const submit = async () => {
+        if (submitting || finalPayload === null) return;
         setSubmitting(true);
         setError(null);
         try {
-            const updated = await updateVehicle(vehicleId, payload);
+            const updated = await updateVehicle(vehicleId, finalPayload);
             navigate(`/vehicles/${updated.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -45,13 +99,65 @@ export default function VehicleEditPage() {
         }
     };
 
-    if (loading) return <LoadingState label="Loading vehicle..." />;
+    if (loading || payload === null) return <LoadingState label="Loading vehicle..." />;
     if (!vehicle) return <ErrorAlert error={error} />;
 
     return (
-        <div>
+        <div className="mx-auto max-w-6xl">
             <ContentHeader title="Edit Vehicle" description={vehicle.vehicle_number} />
-            <VehicleForm initial={vehicle} error={error} submitting={submitting} onSubmit={submit} />
+            <ErrorAlert error={error} />
+            <Panel className="p-0">
+                <Tabs<EditTab> id="vehicle-edit-tabs" tabs={tabs} active={activeTab} onChange={setActiveTab} />
+                <div className="p-5">
+                    <TabPanel tabsId="vehicle-edit-tabs" tabId="basic" active={activeTab}>
+                        <VehicleBasicFields
+                            value={payload}
+                            onChange={setPayload}
+                            make={make}
+                            onMakeChange={setMake}
+                            model={model}
+                            onModelChange={setModel}
+                            type={type}
+                            onTypeChange={setType}
+                            category={category}
+                            onCategoryChange={setCategory}
+                            error={error}
+                            vehicleNumberReadOnly
+                        />
+                    </TabPanel>
+                    <TabPanel tabsId="vehicle-edit-tabs" tabId="documents" active={activeTab}>
+                        <VehicleDocumentTab vehicleId={vehicle.id} />
+                    </TabPanel>
+                    <TabPanel tabsId="vehicle-edit-tabs" tabId="attributes" active={activeTab}>
+                        <VehicleAttributeTab vehicleId={vehicle.id} />
+                    </TabPanel>
+                </div>
+            </Panel>
+            <FormActions>
+                <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate(-1)}>Cancel</Button>
+                <Button type="button" loading={submitting} onClick={submit}>Save Changes</Button>
+            </FormActions>
         </div>
     );
+}
+
+function vehicleToPayload(vehicle: Vehicle): VehiclePayload {
+    return {
+        vehicle_number: vehicle.vehicle_number ?? '',
+        code: vehicle.code ?? '',
+        registration_number: vehicle.registration_number ?? '',
+        chassis_number: vehicle.chassis_number ?? '',
+        engine_number: vehicle.engine_number ?? '',
+        vin_number: vehicle.vin_number ?? '',
+        manufacture_year: vehicle.manufacture_year ?? undefined,
+        registration_date: vehicle.registration_date ?? '',
+        color: vehicle.color ?? '',
+        fuel_type: vehicle.fuel_type ?? '',
+        transmission_type: vehicle.transmission_type ?? '',
+        odometer_reading: vehicle.odometer_reading ?? '0.000000',
+        odometer_unit: vehicle.odometer_unit ?? 'km',
+        fuel_level: vehicle.fuel_level ?? '',
+        status: vehicle.status ?? 'active',
+        notes: vehicle.notes ?? '',
+    };
 }
