@@ -22,5 +22,13 @@ interface UserRepositoryInterface extends RepositoryPortInterface
         string $providerUserKey,
     ): ?DataRecord;
 
-    public function pageByFilters(?int $tenantId, ?string $search, int $perPage, int $page): PagedResult;
+    public function pageByFilters(
+        ?int $tenantId,
+        ?string $search,
+        ?string $status,
+        ?int $roleId,
+        ?int $organizationUnitId,
+        int $perPage,
+        int $page,
+    ): PagedResult;
 }

@@ -18,7 +18,7 @@ describe('navigation access and matching', () => {
         expect(sections.flatMap((section) => section.items).map((item) => item.id)).toEqual(['dashboard']);
     });
 
-    it('uses enabled tenant modules and permission prefixes without treating navigation as authorization', () => {
+    it('uses enabled tenant modules and exact permissions without treating navigation as authorization', () => {
         const sections = filterNavigation(navigationSections, {
             tenantId: 10,
             organizationUnitId: 20,

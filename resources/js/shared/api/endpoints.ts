@@ -3,6 +3,7 @@ export const endpoints = {
     users: '/api/user/users',
     roles: '/api/user/roles',
     permissions: '/api/user/permissions',
+    organizationUnits: '/api/organization-unit/organization-units',
     configuration: '/api/v1/configuration/entries',
     customers: '/api/v1/customers',
     customerCategories: '/api/v1/customer-categories',

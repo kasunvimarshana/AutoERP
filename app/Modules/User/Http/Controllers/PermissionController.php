@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Requests\ListUserEntityRequest;
 use Modules\User\Http\Requests\UpsertPermissionRequest;
 use Modules\User\Http\Resources\UserRecordResource;
@@ -21,6 +22,10 @@ final class PermissionController extends AbstractUserCrudController
 
     public function show(int|string $permission): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::PERMISSIONS_VIEW)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForShow($this->service->get($permission));
     }
 

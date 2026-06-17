@@ -6,7 +6,15 @@ import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
 const AccessOverviewPage = lazy(() => import('@/modules/access/AccessOverviewPage'));
-const AccessListPage = lazy(() => import('@/modules/access/AccessListPage'));
+const UserListPage = lazy(() => import('@/modules/access/UserListPage'));
+const CreateUserPage = lazy(() => import('@/modules/access/CreateUserPage'));
+const UserEditPage = lazy(() => import('@/modules/access/UserEditPage'));
+const UserDetailPage = lazy(() => import('@/modules/access/UserDetailPage'));
+const RoleListPage = lazy(() => import('@/modules/access/RoleListPage'));
+const RoleCreatePage = lazy(() => import('@/modules/access/RoleCreatePage'));
+const RoleEditPage = lazy(() => import('@/modules/access/RoleEditPage'));
+const RoleDetailPage = lazy(() => import('@/modules/access/RoleDetailPage'));
+const PermissionCataloguePage = lazy(() => import('@/modules/access/PermissionCataloguePage'));
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'));
 const UomListPage = lazy(() => import('@/modules/uom/UomListPage'));
 const UomCreatePage = lazy(() => import('@/modules/uom/UomCreatePage'));
@@ -131,9 +139,15 @@ export function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/access/users" element={<AccessListPage kind="users" />} />
-                    <Route path="/access/roles" element={<AccessListPage kind="roles" />} />
-                    <Route path="/access/permissions" element={<AccessListPage kind="permissions" />} />
+                    <Route path="/access/users" element={<UserListPage />} />
+                    <Route path="/access/users/create" element={<CreateUserPage />} />
+                    <Route path="/access/users/:id/edit" element={<UserEditPage />} />
+                    <Route path="/access/users/:id" element={<UserDetailPage />} />
+                    <Route path="/access/roles" element={<RoleListPage />} />
+                    <Route path="/access/roles/create" element={<RoleCreatePage />} />
+                    <Route path="/access/roles/:id/edit" element={<RoleEditPage />} />
+                    <Route path="/access/roles/:id" element={<RoleDetailPage />} />
+                    <Route path="/access/permissions" element={<PermissionCataloguePage />} />
                     <Route path="/administration/access" element={<AccessOverviewPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/uoms" element={<UomListPage />} />

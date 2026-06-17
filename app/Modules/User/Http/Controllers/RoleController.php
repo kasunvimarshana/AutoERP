@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Requests\ListUserEntityRequest;
 use Modules\User\Http\Requests\UpsertRoleRequest;
 use Modules\User\Http\Resources\UserRecordResource;
@@ -21,6 +22,10 @@ final class RoleController extends AbstractUserCrudController
 
     public function show(int|string $role): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::ROLES_VIEW)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForShow($this->service->get($role));
     }
 
@@ -36,6 +41,10 @@ final class RoleController extends AbstractUserCrudController
 
     public function destroy(int|string $role): JsonResponse
     {
+        if (! $this->canUse(UserPermission::ROLES_DELETE)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForDelete($this->service->delete($role));
     }
 }

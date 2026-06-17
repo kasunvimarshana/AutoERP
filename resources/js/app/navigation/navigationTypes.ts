@@ -38,7 +38,6 @@ export interface NavigationAccessRule {
     requiresOrganizationUnit?: boolean;
     modules?: NavigationModule[];
     permissions?: string[];
-    permissionPrefixes?: string[];
     roles?: string[];
 }
 

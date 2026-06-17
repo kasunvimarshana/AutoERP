@@ -6,6 +6,7 @@ import type {
     NavigationModuleItem,
     NavigationSection,
 } from './navigationTypes';
+import { protectedAccessRoles } from '@/modules/access/accessPermissions';
 
 export function normalizeAccessValue(value: string): string {
     return value.trim().toLowerCase();
@@ -24,22 +25,18 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     }
 
     const roles = context.roles.map(normalizeAccessValue);
-    if (roles.includes('super admin')) return true;
+    if (roles.includes(protectedAccessRoles.superAdmin)) return true;
 
     const permissions = context.permissions.map(normalizeAccessValue);
     const exactMatch = rule.permissions?.some((permission) => permissions.includes(normalizeAccessValue(permission)));
-    const prefixMatch = rule.permissionPrefixes?.some((prefix) => {
-        const normalizedPrefix = normalizeAccessValue(prefix);
-        return permissions.some((permission) => permission.startsWith(normalizedPrefix));
-    });
     const roleMatch = rule.roles?.some((role) => roles.includes(normalizeAccessValue(role)));
-    const hasPermissionRule = Boolean(rule.permissions?.length || rule.permissionPrefixes?.length);
+    const hasPermissionRule = Boolean(rule.permissions?.length);
     const hasRoleRule = Boolean(rule.roles?.length);
 
     if (!hasPermissionRule && !hasRoleRule) return true;
     if (context.permissions.length === 0 && !hasRoleRule) return true;
 
-    return Boolean(exactMatch || prefixMatch || roleMatch);
+    return Boolean(exactMatch || roleMatch);
 }
 
 function normalizeModule(value: string): string {

@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
+use Modules\User\Models\RolePermissionModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserRoleModel;
 use Modules\User\Models\UserTenantModel;
@@ -36,16 +39,22 @@ final class UserSeeder extends Seeder
             $role = RoleModel::query()->updateOrCreate(
                 [
                     'tenant_id' => $tenant->getKey(),
-                    'name' => 'Super Admin',
+                    'name' => UserPermission::SUPER_ADMIN_ROLE,
                     'guard_name' => $guardName,
                 ],
                 [
                     'organization_unit_id' => null,
                     'description' => 'Full tenant administration.',
                     'row_version' => 1,
-                    'metadata' => json_encode(['seed_source' => 'user_module'], JSON_THROW_ON_ERROR),
+                    'metadata' => json_encode([
+                        'seed_source' => 'user_module',
+                        'is_system' => true,
+                        'is_protected' => true,
+                    ], JSON_THROW_ON_ERROR),
                 ],
             );
+
+            $this->seedAccessPermissions((int) $tenant->getKey(), (int) $role->getKey(), $guardName);
 
             $email = $this->adminEmail();
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -98,6 +107,43 @@ final class UserSeeder extends Seeder
                 );
             }
         }, 3);
+    }
+
+    private function seedAccessPermissions(int $tenantId, int $roleId, string $guardName): void
+    {
+        if (! Schema::hasTable('permissions') || ! Schema::hasTable('role_permissions')) {
+            return;
+        }
+
+        foreach (UserPermission::descriptions() as $name => $description) {
+            $permission = PermissionModel::query()->updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'name' => $name,
+                    'guard_name' => $guardName,
+                ],
+                [
+                    'organization_unit_id' => null,
+                    'module' => 'Users',
+                    'description' => $description,
+                    'row_version' => 1,
+                    'metadata' => json_encode(['seed_source' => 'user_module'], JSON_THROW_ON_ERROR),
+                ],
+            );
+
+            RolePermissionModel::query()->updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'role_id' => $roleId,
+                    'permission_id' => $permission->getKey(),
+                ],
+                [
+                    'organization_unit_id' => null,
+                    'row_version' => 1,
+                    'metadata' => json_encode(['seed_source' => 'user_module'], JSON_THROW_ON_ERROR),
+                ],
+            );
+        }
     }
 
     private function adminEmail(): string

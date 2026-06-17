@@ -9,9 +9,20 @@ use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
 use Modules\User\Http\Resources\UserRecordResource;
+use Modules\User\Services\UserAuthorizationService;
 
 abstract class AbstractUserCrudController extends Controller
 {
+    protected function canUse(string $permission): bool
+    {
+        return app(UserAuthorizationService::class)->canCurrent($permission);
+    }
+
+    protected function forbidden(): JsonResponse
+    {
+        return response()->json(['message' => 'This action is not authorized.'], 403);
+    }
+
     protected function responseForList(Result $result): JsonResponse
     {
         if ($result->isFailure()) {

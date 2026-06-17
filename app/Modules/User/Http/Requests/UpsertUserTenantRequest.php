@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Modules\User\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Http\Requests\Concerns\AuthorizesUserPermission;
 
 final class UpsertUserTenantRequest extends FormRequest
 {
+    use AuthorizesUserPermission;
+
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->canUse(UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS);
     }
 
     /**

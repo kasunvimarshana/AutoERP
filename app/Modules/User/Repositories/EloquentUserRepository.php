@@ -62,11 +62,55 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
     }
 
-    public function pageByFilters(?int $tenantId, ?string $search, int $perPage, int $page): PagedResult
-    {
+    public function pageByFilters(
+        ?int $tenantId,
+        ?string $search,
+        ?string $status,
+        ?int $roleId,
+        ?int $organizationUnitId,
+        int $perPage,
+        int $page,
+    ): PagedResult {
         $query = $this->query();
 
         $this->applyTenantScope($query, $tenantId);
+
+        if ($status !== null && trim($status) !== '') {
+            $query->where('status', trim(strtolower($status)));
+        }
+
+        if ($roleId !== null) {
+            $query->whereExists(function ($subquery) use ($roleId, $tenantId): void {
+                $subquery->selectRaw('1')
+                    ->from('user_roles')
+                    ->whereColumn('user_roles.user_id', 'users.id')
+                    ->where('user_roles.role_id', $roleId);
+
+                if ($tenantId === null) {
+                    $subquery->whereNull('user_roles.tenant_id');
+                } else {
+                    $subquery->where('user_roles.tenant_id', $tenantId);
+                }
+            });
+        }
+
+        if ($organizationUnitId !== null) {
+            $query->where(function (Builder $builder) use ($organizationUnitId, $tenantId): void {
+                $builder->where('organization_unit_id', $organizationUnitId)
+                    ->orWhereExists(function ($subquery) use ($organizationUnitId, $tenantId): void {
+                        $subquery->selectRaw('1')
+                            ->from('user_tenants')
+                            ->whereColumn('user_tenants.user_id', 'users.id')
+                            ->where('user_tenants.organization_unit_id', $organizationUnitId);
+
+                        if ($tenantId === null) {
+                            $subquery->whereNull('user_tenants.tenant_id');
+                        } else {
+                            $subquery->where('user_tenants.tenant_id', $tenantId);
+                        }
+                    });
+            });
+        }
 
         if ($search !== null && trim($search) !== '') {
             $term = trim($search);
@@ -79,7 +123,10 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
             });
         }
 
-        $paginator = $query->paginate(max(1, $perPage), ['*'], 'page', max(1, $page));
+        $paginator = $query
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->paginate(max(1, $perPage), ['*'], 'page', max(1, $page));
 
         $items = [];
         foreach ($paginator->items() as $model) {

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\User\Services;
 
+use InvalidArgumentException;
+use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
 use Modules\User\Constants\UserErrorCode;
 use Modules\User\Repositories\PermissionRepositoryInterface;
@@ -15,6 +19,7 @@ final class PermissionService extends AbstractUserCrudService
     public function __construct(
         private readonly PermissionRepositoryInterface $permissions,
         private readonly UserDomainServiceInterface $domain,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
     ) {}
 
     public function list(array $filters): Result
@@ -22,11 +27,17 @@ final class PermissionService extends AbstractUserCrudService
         try {
             $perPage = max(1, (int) ($filters['per_page'] ?? 15));
             $page = max(1, (int) ($filters['page'] ?? 1));
-            $tenantId = $this->toNullableInt($filters['tenant_id'] ?? null);
+            $tenantId = $this->resolveTenantId($this->toNullableInt($filters['tenant_id'] ?? null));
             $module = $this->domain->normalizeNullableString($filters['module'] ?? null);
             $search = $this->domain->normalizeNullableString((string) ($filters['search'] ?? ''));
+            $result = $this->permissions->pageByFilters($tenantId, $module, $search, $perPage, $page);
 
-            return $this->success($this->permissions->pageByFilters($tenantId, $module, $search, $perPage, $page));
+            return $this->success(new PagedResult(
+                array_map(fn (DataRecord $record): DataRecord => $this->withCatalogueFields($record), $result->items),
+                $result->total,
+                $result->page,
+                $result->perPage,
+            ));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -36,11 +47,11 @@ final class PermissionService extends AbstractUserCrudService
     {
         try {
             $record = $this->permissions->findById($id);
-            if ($record === null) {
+            if ($record === null || (int) $record->require('tenant_id') !== $this->resolveTenantId(null)) {
                 return $this->notFound('Permission not found.');
             }
 
-            return $this->success($record);
+            return $this->success($this->withCatalogueFields($record));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -139,5 +150,33 @@ final class PermissionService extends AbstractUserCrudService
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
+    }
+
+    private function resolveTenantId(?int $requestedTenantId): int
+    {
+        $currentTenantId = $this->currentTenant->currentTenantId();
+        if ($currentTenantId !== null && $requestedTenantId !== null && $requestedTenantId !== $currentTenantId) {
+            throw new InvalidArgumentException('Tenant scope mismatch for permission operation.');
+        }
+
+        $resolvedTenantId = $requestedTenantId ?? $currentTenantId;
+        if ($resolvedTenantId === null || $resolvedTenantId < 1) {
+            throw new InvalidArgumentException('Tenant context is required for permission operations.');
+        }
+
+        return $resolvedTenantId;
+    }
+
+    private function withCatalogueFields(DataRecord $record): DataRecord
+    {
+        $payload = $record->toArray();
+        $name = (string) ($payload['name'] ?? '');
+        $segments = explode('.', $name);
+        $payload['resource'] = $segments[0] ?? null;
+        $payload['action'] = count($segments) > 1 ? implode('.', array_slice($segments, 1)) : null;
+        $payload['status'] = 'system_defined';
+        $payload['is_read_only'] = true;
+
+        return new DataRecord($payload);
     }
 }

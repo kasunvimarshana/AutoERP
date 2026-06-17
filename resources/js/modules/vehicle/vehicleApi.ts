@@ -169,8 +169,8 @@ function documentFormData(payload: VehicleDocumentPayload, method?: 'PUT'): Form
     return formData;
 }
 
-function appendObject(formData: FormData, prefix: string, value: Record<string, unknown>) {
-    Object.entries(value).forEach(([key, entry]) => {
+function appendObject(formData: FormData, prefix: string, value: object) {
+    Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
         const field = prefix ? `${prefix}[${key}]` : key;
         appendValue(formData, field, entry);
     });

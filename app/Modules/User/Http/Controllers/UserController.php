@@ -6,6 +6,7 @@ namespace Modules\User\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Modules\User\Constants\UserErrorCode;
+use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Requests\AssignUserToOrganizationUnitRequest;
 use Modules\User\Http\Requests\ListUserEntityRequest;
 use Modules\User\Http\Requests\ResolveUserByIdentityRequest;
@@ -24,6 +25,10 @@ final class UserController extends AbstractUserCrudController
 
     public function show(int|string $user): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::USERS_VIEW)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForShow($this->service->get($user));
     }
 
@@ -39,21 +44,37 @@ final class UserController extends AbstractUserCrudController
 
     public function destroy(int|string $user): JsonResponse
     {
+        if (! $this->canUse(UserPermission::USERS_DELETE)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForDelete($this->service->delete($user));
     }
 
     public function activate(int|string $user): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::USERS_ACTIVATE)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForUpdate($this->service->activate($user));
     }
 
     public function deactivate(int|string $user): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::USERS_DEACTIVATE)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForUpdate($this->service->deactivate($user));
     }
 
     public function suspend(int|string $user): JsonResponse|UserRecordResource
     {
+        if (! $this->canUse(UserPermission::USERS_DEACTIVATE)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForUpdate($this->service->suspend($user));
     }
 
@@ -68,6 +89,10 @@ final class UserController extends AbstractUserCrudController
         int|string $user,
         int|string $organizationUnit,
     ): JsonResponse {
+        if (! $this->canUse(UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS)) {
+            return $this->forbidden();
+        }
+
         return $this->responseForDelete(
             $this->service->removeUserFromOrganizationUnit($user, $organizationUnit),
             UserErrorCode::ASSIGNMENT_NOT_FOUND,
@@ -77,6 +102,10 @@ final class UserController extends AbstractUserCrudController
     public function resolveByIdentity(
         ResolveUserByIdentityRequest $request,
     ): JsonResponse|UserRecordResource {
+        if (! $this->canUse(UserPermission::USERS_VIEW)) {
+            return $this->forbidden();
+        }
+
         $payload = $request->validated();
 
         return $this->responseForShow(

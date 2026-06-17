@@ -5,12 +5,25 @@ declare(strict_types=1);
 namespace Modules\User\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Http\Requests\Concerns\AuthorizesUserPermission;
 
 final class ListUserEntityRequest extends FormRequest
 {
+    use AuthorizesUserPermission;
+
     public function authorize(): bool
     {
-        return auth()->check();
+        return match ($this->route()?->getName()) {
+            'user.users.index' => $this->canUse(UserPermission::USERS_VIEW),
+            'user.roles.index' => $this->canUse(UserPermission::ROLES_VIEW),
+            'user.permissions.index' => $this->canUse(UserPermission::PERMISSIONS_VIEW),
+            'user.role-permissions.index' => $this->canUse(UserPermission::ROLES_VIEW),
+            'user.user-roles.index' => $this->canUse(UserPermission::USERS_VIEW),
+            'user.user-permissions.index' => $this->canUse(UserPermission::USERS_VIEW),
+            'user.user-tenants.index' => $this->canUse(UserPermission::USERS_VIEW),
+            default => auth()->check(),
+        };
     }
 
     /**
@@ -21,9 +34,11 @@ final class ListUserEntityRequest extends FormRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_filter_id' => ['nullable', 'integer', 'min:1'],
             'user_id' => ['nullable', 'integer', 'min:1'],
             'role_id' => ['nullable', 'integer', 'min:1'],
             'permission_id' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', 'string', 'max:80'],
             'search' => ['nullable', 'string', 'max:255'],
             'module' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],

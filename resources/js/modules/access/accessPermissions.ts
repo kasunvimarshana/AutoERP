@@ -1,0 +1,25 @@
+export const accessPermissions = {
+    usersView: 'users.view',
+    usersCreate: 'users.create',
+    usersUpdate: 'users.update',
+    usersDelete: 'users.delete',
+    usersActivate: 'users.activate',
+    usersDeactivate: 'users.deactivate',
+    usersAssignRoles: 'users.assign_roles',
+    usersManageOrganizationAccess: 'users.manage_organization_access',
+    rolesView: 'roles.view',
+    rolesCreate: 'roles.create',
+    rolesUpdate: 'roles.update',
+    rolesDelete: 'roles.delete',
+    rolesAssignPermissions: 'roles.assign_permissions',
+    permissionsView: 'permissions.view',
+} as const;
+
+export const protectedAccessRoles = {
+    superAdmin: 'super admin',
+} as const;
+
+export function hasAccessPermission(permissions: string[], roles: string[], permission: string): boolean {
+    return roles.map((role) => role.trim().toLowerCase()).includes(protectedAccessRoles.superAdmin)
+        || permissions.includes(permission);
+}

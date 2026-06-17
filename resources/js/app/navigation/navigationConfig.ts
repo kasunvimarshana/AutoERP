@@ -1,4 +1,5 @@
 import type { NavigationSection } from './navigationTypes';
+import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
 
 const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
     requiresTenant: true,
@@ -8,6 +9,37 @@ const operationalAccess = (modules: NonNullable<NavigationSection['items'][numbe
     ...tenantAccess(modules),
     requiresOrganizationUnit: true,
 });
+
+const accessControlPermissions = [
+    accessPermissions.usersView,
+    accessPermissions.usersCreate,
+    accessPermissions.usersUpdate,
+    accessPermissions.usersAssignRoles,
+    accessPermissions.usersManageOrganizationAccess,
+    accessPermissions.rolesView,
+    accessPermissions.rolesCreate,
+    accessPermissions.rolesUpdate,
+    accessPermissions.rolesAssignPermissions,
+    accessPermissions.permissionsView,
+];
+
+const vehicleRentalPermissions = [
+    'vehicle-rental.reservations.manage',
+    'vehicle-rental.agreements.manage',
+    'vehicle-rental.allocations.manage',
+    'vehicle-rental.inspections.record',
+    'vehicle-rental.links.manage',
+    'vehicle-rental.links.approve',
+    'vehicle-rental.usage.approve',
+    'vehicle-rental.usage.record',
+    'vehicle-rental.usage.mileage-override',
+    'vehicle-rental.usage.classify-holiday',
+    'vehicle-rental.expenses.approve',
+    'vehicle-rental.expenses.record',
+    'vehicle-rental.charges.generate',
+    'vehicle-rental.charges.approve',
+    'vehicle-rental.financial.create',
+];
 
 export const navigationSections: NavigationSection[] = [
     {
@@ -121,8 +153,8 @@ export const navigationSections: NavigationSection[] = [
                 icon: 'users',
                 access: {
                     ...tenantAccess(['user']),
-                    roles: ['super admin'],
-                    permissionPrefixes: ['user.', 'users.', 'role.', 'roles.', 'permission.', 'permissions.'],
+                    roles: [protectedAccessRoles.superAdmin],
+                    permissions: accessControlPermissions,
                 },
                 children: [
                     {
@@ -130,7 +162,10 @@ export const navigationSections: NavigationSection[] = [
                         type: 'link',
                         label: 'User List',
                         to: '/access/users',
-                        access: tenantAccess(['user']),
+                        access: {
+                            ...tenantAccess(['user']),
+                            permissions: [accessPermissions.usersView],
+                        },
                     },
                     {
                         id: 'roles',
@@ -138,7 +173,10 @@ export const navigationSections: NavigationSection[] = [
                         label: 'Roles',
                         to: '/access/roles',
                         icon: 'role',
-                        access: tenantAccess(['user']),
+                        access: {
+                            ...tenantAccess(['user']),
+                            permissions: [accessPermissions.rolesView],
+                        },
                     },
                     {
                         id: 'permissions',
@@ -146,7 +184,10 @@ export const navigationSections: NavigationSection[] = [
                         label: 'Permissions',
                         to: '/access/permissions',
                         icon: 'permission',
-                        access: tenantAccess(['user']),
+                        access: {
+                            ...tenantAccess(['user']),
+                            permissions: [accessPermissions.permissionsView],
+                        },
                     },
                 ],
             },
@@ -205,7 +246,7 @@ export const navigationSections: NavigationSection[] = [
                 icon: 'rental',
                 access: {
                     ...operationalAccess(['vehicle-rental']),
-                    permissionPrefixes: ['vehicle-rental.'],
+                    permissions: vehicleRentalPermissions,
                 },
                 children: [
                     { id: 'owner-agreements', type: 'link', label: 'Owner / Supplier Agreements', to: '/vehicle-rental/agreements?direction=inbound', match: ['/vehicle-rental/agreements'], access: operationalAccess(['vehicle-rental']) },
@@ -241,8 +282,8 @@ export const navigationSections: NavigationSection[] = [
                 icon: 'users',
                 access: {
                     ...tenantAccess(['user']),
-                    roles: ['super admin'],
-                    permissionPrefixes: ['user.', 'users.', 'role.', 'roles.', 'permission.', 'permissions.'],
+                    roles: [protectedAccessRoles.superAdmin],
+                    permissions: accessControlPermissions,
                 },
             },
             { id: 'settings', type: 'link', label: 'Settings', to: '/settings', icon: 'settings', access: tenantAccess(['configuration']) },
