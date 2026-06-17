@@ -117,7 +117,7 @@ describe('navigation access and matching', () => {
                 { label: 'Purchase', children: ['Fast Purchase', 'Purchase Orders', 'Goods Receipts', 'Purchase Returns', 'Supplier Invoices', 'Supplier Payments'] },
                 { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Goods Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Service', children: ['Service Jobs', 'Service Invoices', 'Customer Receipts'] },
-                { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Lessee Running Charts - Customer', 'Lessor Running Charts - Owner / Supplier', 'Linked Running Charts - Customer + Owner', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
+                { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Customer Running Charts', 'Owner / Supplier Running Charts', 'Linked Running Charts', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
             ] },
             { section: 'Finance', items: [
                 { label: 'Invoices', children: [] },

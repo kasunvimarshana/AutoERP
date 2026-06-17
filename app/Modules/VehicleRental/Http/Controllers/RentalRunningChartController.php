@@ -20,6 +20,7 @@ use Modules\VehicleRental\Http\Requests\RentalActionRequest;
 use Modules\VehicleRental\Http\Requests\RunningChartPreviewRequest;
 use Modules\VehicleRental\Http\Requests\RunningChartContextRequest;
 use Modules\VehicleRental\Http\Requests\StoreRunningChartTripRequest;
+use Modules\VehicleRental\Http\Requests\SubmitRunningChartDailyRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementVehicleLinkResource;
 use Modules\VehicleRental\Http\Resources\RentalRateSnapshotResource;
 use Modules\VehicleRental\Http\Resources\RentalUsageLogResource;
@@ -40,6 +41,9 @@ final class RentalRunningChartController extends RentalController
         $direction = $request->filled('direction') ? (string) $request->input('direction') : null;
         $mode = $request->filled('mode') ? (string) $request->input('mode') : null;
         $side = $request->filled('side') ? (string) $request->input('side') : null;
+        $usageDay = $request->filled('usage_date')
+            ? CarbonImmutable::parse((string) $request->input('usage_date'))->startOfDay()
+            : null;
         if ($direction === null) {
             $direction = match (true) {
                 $mode === RentalUsageContextService::MODE_LESSEE => 'outbound',
@@ -56,6 +60,16 @@ final class RentalRunningChartController extends RentalController
                 RentalAgreementStatus::Active->value,
                 RentalAgreementStatus::Returned->value,
             ]))
+            ->when($usageDay !== null, fn (Builder $query) => $query
+                ->where('allocated_from', '<', $usageDay->addDay())
+                ->where(function (Builder $scope) use ($usageDay): void {
+                    $scope->where('allocated_to', '>', $usageDay)
+                        ->orWhere(function (Builder $openEnded) use ($usageDay): void {
+                            $openEnded->whereNull('allocated_to')
+                                ->whereHas('agreement', fn (Builder $agreement) => $agreement
+                                    ->where('expected_end_at', '>', $usageDay));
+                        });
+                }))
             ->when($request->filled('agreement_id'), fn (Builder $query) => $query
                 ->where('agreement_id', (int) $request->input('agreement_id')))
             ->when($request->filled('vehicle_id'), fn (Builder $query) => $query
@@ -356,6 +370,74 @@ final class RentalRunningChartController extends RentalController
         ));
     }
 
+    public function submitDaily(
+        SubmitRunningChartDailyRequest $request,
+        RentalUsageLogService $usageLogs,
+        RentalUsageEventService $events,
+        VehicleRentalAuthorizationService $authorization,
+    ): AnonymousResourceCollection {
+        $authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::RECORD_USAGE,
+        );
+        foreach ($request->tripRows() as $trip) {
+            $this->assertEventPermissions($request, $request->eventData($trip), $authorization);
+        }
+
+        $logs = DB::transaction(function () use ($request, $usageLogs, $events): array {
+            $agreement = $this->agreement($request, $request->selectedAgreementId());
+            $counterpart = $request->counterpartAgreementId() === null
+                ? null
+                : $this->agreement($request, $request->counterpartAgreementId());
+            $submitted = [];
+
+            foreach ($request->tripRows() as $trip) {
+                $eventData = $request->eventData($trip);
+                $tripId = $request->tripId($trip);
+                if ($tripId === null) {
+                    $log = $usageLogs->createForMode(
+                        $request->mode(),
+                        $agreement,
+                        $request->toData($trip),
+                        $counterpart,
+                        $request->counterpartAgreementVehicleId(),
+                    );
+                    if ($log->wasRecentlyCreated) {
+                        foreach ($eventData as $event) {
+                            $events->create($log, $event);
+                        }
+                    }
+                } else {
+                    $log = $usageLogs->updateForMode(
+                        $request->mode(),
+                        $this->runningChartLog($request, $tripId),
+                        $request->toData($trip),
+                        $agreement,
+                        $counterpart,
+                        $request->counterpartAgreementVehicleId(),
+                    );
+                    foreach ($log->events()->lockForUpdate()->get() as $event) {
+                        $events->delete($event);
+                    }
+                    foreach ($eventData as $event) {
+                        $events->create($log, $event);
+                    }
+                }
+
+                $submitted[] = $usageLogs->changeStatus(
+                    $log->refresh(),
+                    RentalUsageLogStatus::Submitted,
+                    $request->currentUserId(),
+                );
+            }
+
+            return $submitted;
+        });
+
+        return RentalUsageLogResource::collection($logs);
+    }
+
     public function approveTrip(
         RentalActionRequest $request,
         int $usageLog,
@@ -498,7 +580,7 @@ final class RentalRunningChartController extends RentalController
      * @param  list<\Modules\VehicleRental\DTOs\RentalUsageEventData>  $events
      */
     private function assertEventPermissions(
-        StoreRunningChartTripRequest $request,
+        TenantScopedRequest $request,
         array $events,
         VehicleRentalAuthorizationService $authorization,
     ): void {

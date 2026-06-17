@@ -28,21 +28,25 @@ export function toApiError(error: unknown): ApiError {
     const payload = error.response?.data;
     const status = error.response?.status ?? null;
     const fields = payload?.errors ?? payload?.error?.details?.fields ?? {};
-    const fallback = status === 401
+    const fallback = status === 422
+        ? 'Please correct the highlighted fields and try again.'
+        : status === 401
         ? 'Your session is not authorized.'
         : status === 403
             ? 'You do not have permission to perform this action.'
             : status !== null && status >= 500
                 ? 'The server reported an unexpected error.'
                 : status === null
-                    ? 'The server could not be reached. Check your connection and try again.'
+                    ? networkErrorMessage(error)
                 : 'The request could not be completed.';
+
+    logAxiosDiagnostics(error);
 
     return new ApiError(
         payload?.error?.message ?? payload?.message ?? fallback,
         status,
-        payload?.error?.code ?? null,
-        payload?.error?.type ?? null,
+        payload?.error?.code ?? error.code ?? null,
+        payload?.error?.type ?? (status === null ? networkErrorType(error) : null),
         fields,
     );
 }
@@ -70,4 +74,41 @@ export function hasNestedFieldError(error: ApiError | null, prefix: string): boo
 
 export function nestedFieldError(error: ApiError | null, prefix: string, field: string): string | undefined {
     return firstFieldError(error, [`${prefix}.${field}`, field]);
+}
+
+function networkErrorMessage(error: unknown): string {
+    if (!axios.isAxiosError(error)) return 'The request could not be completed.';
+    if (error.code === 'ECONNABORTED' || error.message.toLowerCase().includes('timeout')) {
+        return 'The request timed out. Check your connection and try again.';
+    }
+    if (typeof window !== 'undefined' && window.navigator.onLine === false) {
+        return 'This device appears to be offline. Reconnect and try again.';
+    }
+    if (error.code === 'ERR_NETWORK') {
+        return 'The browser blocked or lost the network request. Check connectivity and try again.';
+    }
+
+    return 'A network error prevented the request from completing. Try again.';
+}
+
+function networkErrorType(error: unknown): string {
+    if (!axios.isAxiosError(error)) return 'network';
+    if (error.code === 'ECONNABORTED' || error.message.toLowerCase().includes('timeout')) return 'timeout';
+    if (typeof window !== 'undefined' && window.navigator.onLine === false) return 'offline';
+    if (error.code === 'ERR_NETWORK') return 'network';
+
+    return 'client';
+}
+
+function logAxiosDiagnostics(error: unknown): void {
+    if (!import.meta.env.DEV || !axios.isAxiosError(error)) return;
+
+    console.error('API request failed', {
+        code: error.code,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+        url: error.config?.url,
+        timeout: error.config?.timeout,
+        status: error.response?.status ?? null,
+    });
 }

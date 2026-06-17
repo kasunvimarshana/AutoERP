@@ -113,6 +113,16 @@ export const changeRunningChartTripStatus = async (
     reason?: string,
 ): Promise<RentalUsageLog> =>
     (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips/${usageLogId}/${status}`, { reason })).data.data;
+export const submitRunningChartDaily = async (payload: {
+    mode: string;
+    lessee_agreement_id?: number;
+    lessee_agreement_vehicle_id?: number;
+    lessor_agreement_id?: number;
+    lessor_agreement_vehicle_id?: number;
+    usage_date: string;
+    trips: RunningChartTripPayload[];
+}): Promise<RentalUsageLog[]> =>
+    (await apiClient.post<ApiResource<RentalUsageLog[]>>(`${endpoint}/running-chart/daily-submit`, payload)).data.data;
 export const previewRunningChart = async (payload: {
     mode: string;
     lessee_agreement_id?: number;

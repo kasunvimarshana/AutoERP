@@ -309,6 +309,7 @@ export interface RunningChartContext {
 export type RunningChartMode = 'lessee' | 'lessor' | 'linked';
 
 export interface RunningChartTripPayload {
+    id?: number;
     tenant_id?: number;
     organization_unit_id?: number | null;
     mode: RunningChartMode;

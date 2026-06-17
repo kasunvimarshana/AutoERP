@@ -13,6 +13,20 @@ export function useUnsavedChanges(active: boolean, message = defaultMessage) {
     useEffect(() => {
         if (!active) return;
 
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const confirmHistoryNavigation = () => {
+            if (window.confirm(message)) return;
+
+            window.history.pushState(null, '', currentUrl);
+        };
+
+        window.addEventListener('popstate', confirmHistoryNavigation);
+        return () => window.removeEventListener('popstate', confirmHistoryNavigation);
+    }, [active, message]);
+
+    useEffect(() => {
+        if (!active) return;
+
         const confirmLinkNavigation = (event: MouseEvent) => {
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
                 return;

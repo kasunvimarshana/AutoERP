@@ -12,6 +12,7 @@ use Modules\VehicleRental\Enums\RentalBillingCycle;
 use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Enums\RentalType;
+use Modules\VehicleRental\Services\RentalUsageContextService;
 
 final class ListRentalRequest extends TenantScopedRequest
 {
@@ -25,6 +26,12 @@ final class ListRentalRequest extends TenantScopedRequest
                 ...array_column(RentalAgreementStatus::cases(), 'value'),
                 ...array_column(RentalReservationStatus::cases(), 'value'),
             ]))],
+            'mode' => ['nullable', Rule::in([
+                RentalUsageContextService::MODE_LESSEE,
+                RentalUsageContextService::MODE_LESSOR,
+                RentalUsageContextService::MODE_LINKED,
+            ])],
+            'side' => ['nullable', Rule::in(['lessee', 'lessor'])],
             'direction' => ['nullable', Rule::enum(RentalAgreementDirection::class)],
             'party_type' => ['nullable', Rule::enum(RentalPartyType::class)],
             'party_id' => ['nullable', 'integer', 'min:1'],
@@ -32,6 +39,7 @@ final class ListRentalRequest extends TenantScopedRequest
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'rental_type' => ['nullable', Rule::enum(RentalType::class)],
             'billing_cycle' => ['nullable', Rule::enum(RentalBillingCycle::class)],
+            'usage_date' => ['nullable', 'date'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'overdue' => ['nullable', 'boolean'],

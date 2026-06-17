@@ -13,7 +13,7 @@ const DEFAULT_DEBOUNCE_MS = 350;
 interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehaviorOptions {
     label: string;
     value: T | null;
-    onChange: (resource: T | null) => void;
+    onChange: (resource: T | null) => void | boolean;
     search: LookupLoader<T>;
     formatLabel: (resource: T) => string;
     excludeId?: number | null;
@@ -267,7 +267,12 @@ export function GenericLookupSelect<T extends NamedResource>({
 
                     if (value) {
                         skipNextValueSyncRef.current = true;
-                        onChange(null);
+                        if (onChange(null) === false) {
+                            skipNextValueSyncRef.current = false;
+                            setInputValue(selectedLabel);
+                            setHasUserInput(false);
+                            closeDropdown();
+                        }
                     }
                 }}
             />
@@ -365,7 +370,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     }
 
     function selectOption(option: T) {
-        onChange(option);
+        if (onChange(option) === false) return;
         setInputValue(formatLabel(option));
         setHasUserInput(false);
         closeDropdown();

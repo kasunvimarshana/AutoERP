@@ -11,19 +11,18 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
-import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import type { ApiCollection } from '@/shared/types/api';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { compareDecimalStrings, isPositiveDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
-import type { LookupLoadParams } from '@/shared/types/lookup';
-import type { PaginationMeta } from '@/shared/types/pagination';
 import { RentalStatusBadge } from '../components/RentalStatusBadge';
 import {
     changeRunningChartTripStatus,
@@ -33,6 +32,7 @@ import {
     listRunningChartAgreements,
     listRunningChartTrips,
     previewRunningChart,
+    submitRunningChartDaily,
     updateRunningChartTrip,
 } from '../vehicleRentalApi';
 import type {
@@ -44,13 +44,18 @@ import type {
 } from '../vehicleRentalTypes';
 
 const today = businessDateInputValue;
-const modes: Array<{ value: RunningChartMode; label: string }> = [
-    { value: 'lessee', label: 'Lessee Running Charts - Customer' },
-    { value: 'lessor', label: 'Lessor Running Charts - Owner / Supplier' },
-    { value: 'linked', label: 'Linked Running Charts - Customer + Owner' },
-];
-const optionKey = (option: RunningChartAgreementOption) => `${option.agreement_id}:${option.agreement_vehicle_id}`;
+const unsavedRunningChartMessage = 'You have unsaved Running Chart data.\nDiscard the changes and continue?';
 const editableStatuses = ['local', 'draft', 'rejected'];
+const modeOptions: Array<{ value: RunningChartMode; label: string }> = [
+    { value: 'lessee', label: 'Customer Running Charts' },
+    { value: 'lessor', label: 'Owner / Supplier Running Charts' },
+    { value: 'linked', label: 'Linked Running Charts' },
+];
+const modeHeadings: Record<RunningChartMode, string> = {
+    lessee: 'Customer Running Charts — Lessee',
+    lessor: 'Owner / Supplier Running Charts — Lessor',
+    linked: 'Linked Running Charts — Customer + Owner',
+};
 
 interface DraftTrip {
     localId: string;
@@ -78,109 +83,149 @@ interface DraftTrip {
     dirty: boolean;
 }
 
-export default function UsageLogPage() {
-    const routeAgreementId = Number(useParams().id) || null;
-    const [searchParams, setSearchParams] = useSearchParams();
-    const requestedMode = modeFromValue(searchParams.get('mode')) ?? 'lessee';
-    const requestedAgreementId = Number(searchParams.get('agreement_id')) || routeAgreementId;
-    const auth = useAuth();
+interface RunningChartAgreementLookupOption extends RunningChartAgreementOption {
+    id: number;
+    name: string;
+}
 
-    const [mode, setMode] = useState<RunningChartMode>(requestedMode);
+export default function UsageLogPage() {
+    const routeAgreementId = positiveInteger(useParams().id);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const mode = modeFromValue(searchParams.get('mode')) ?? 'lessee';
+    const requestedAgreementId = positiveInteger(searchParams.get('agreement_id')) ?? routeAgreementId;
+
+    const changeMode = useCallback((nextMode: RunningChartMode) => {
+        const params = new URLSearchParams(searchParams);
+        params.set('mode', nextMode);
+        params.delete('agreement_id');
+        setSearchParams(params);
+    }, [searchParams, setSearchParams]);
+
+    return (
+        <>
+            <ContentHeader title={modeHeadings[mode]} description="Daily rental usage is entered once per physical trip and resolved into the selected financial context." />
+            <RunningChartWorkspace
+                key={mode}
+                mode={mode}
+                requestedAgreementId={requestedAgreementId}
+                onModeChange={changeMode}
+            />
+        </>
+    );
+}
+
+function RunningChartWorkspace({
+    mode,
+    requestedAgreementId,
+    onModeChange,
+}: {
+    mode: RunningChartMode;
+    requestedAgreementId: number | null;
+    onModeChange: (mode: RunningChartMode) => void;
+}) {
+    const auth = useAuth();
     const [usageDate, setUsageDate] = useState(today());
-    const [lesseeSearch, setLesseeSearch] = useState('');
-    const [lessorSearch, setLessorSearch] = useState('');
-    const [lesseePage, setLesseePage] = useState(1);
-    const [lessorPage, setLessorPage] = useState(1);
-    const [lessee, setLessee] = useState<RunningChartAgreementOption | null>(null);
-    const [lessor, setLessor] = useState<RunningChartAgreementOption | null>(null);
+    const [lessee, setLessee] = useState<RunningChartAgreementLookupOption | null>(null);
+    const [lessor, setLessor] = useState<RunningChartAgreementLookupOption | null>(null);
     const [trips, setTrips] = useState<DraftTrip[]>([]);
     const [drawerTripId, setDrawerTripId] = useState<string | null>(null);
     const [preview, setPreview] = useState<RunningChartPreview | null>(null);
-    const [noUsageMarked, setNoUsageMarked] = useState(false);
     const [busyAction, setBusyAction] = useState<string | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
 
-    const debouncedLesseeSearch = useDebounce(lesseeSearch);
-    const debouncedLessorSearch = useDebounce(lessorSearch);
     const searchDriver = useCallback((params: LookupLoadParams) => searchEmployees(params), []);
-    const superAdmin = auth.user?.roles?.includes('Super Admin');
-    const canRecordUsage = superAdmin || auth.user?.permissions?.includes('vehicle-rental.usage.record');
-    const canApproveUsage = superAdmin || auth.user?.permissions?.includes('vehicle-rental.usage.approve');
-    const hasUnsavedTrips = trips.some((trip) => trip.dirty || trip.status === 'local');
-    useUnsavedChanges(hasUnsavedTrips && !busyAction);
+    const permissions = auth.permissions.length > 0 ? auth.permissions : auth.user?.permissions ?? [];
+    const roles = auth.roles.length > 0 ? auth.roles : auth.user?.roles ?? [];
+    const superAdmin = roles.includes('Super Admin');
+    const hasPermission = useCallback((permission: string) => superAdmin || permissions.includes(permission), [permissions, superAdmin]);
+    const canRecordUsage = hasPermission('vehicle-rental.usage.record');
+    const canApproveUsage = hasPermission('vehicle-rental.usage.approve');
+    const canClassifyHoliday = hasPermission('vehicle-rental.usage.classify-holiday');
 
-    const lesseeOptions = useApi(
-        (signal) => listRunningChartAgreements({
+    const hasUnsavedTrips = trips.some((trip) => trip.dirty || trip.status === 'local');
+    const confirmDiscard = useUnsavedChanges(hasUnsavedTrips && !busyAction, unsavedRunningChartMessage);
+
+    const lesseePreselection = useApi(
+        (signal) => loadAgreementOptions({
             mode,
             side: 'lessee',
-            search: debouncedLesseeSearch || undefined,
-            agreement_id: mode !== 'lessor' ? requestedAgreementId ?? undefined : undefined,
-            page: lesseePage,
-            per_page: 20,
-        }, signal),
-        [mode, debouncedLesseeSearch, requestedAgreementId, lesseePage],
-        mode !== 'lessor',
+            agreementId: requestedAgreementId ?? undefined,
+            usageDate,
+            signal,
+        }),
+        [mode, requestedAgreementId, usageDate],
+        requestedAgreementId !== null && mode !== 'lessor' && lessee === null,
         true,
     );
-    const lessorOptions = useApi(
-        (signal) => listRunningChartAgreements({
+    const lessorPreselection = useApi(
+        (signal) => loadAgreementOptions({
             mode,
             side: 'lessor',
-            search: debouncedLessorSearch || undefined,
-            agreement_id: mode === 'lessor' ? requestedAgreementId ?? undefined : undefined,
-            vehicle_id: mode === 'linked' ? lessee?.vehicle_id : undefined,
-            page: lessorPage,
-            per_page: 20,
-        }, signal),
-        [mode, debouncedLessorSearch, requestedAgreementId, lessee?.vehicle_id, lessorPage],
-        mode !== 'lessee',
+            agreementId: requestedAgreementId ?? undefined,
+            usageDate,
+            signal,
+        }),
+        [mode, requestedAgreementId, usageDate],
+        requestedAgreementId !== null && mode !== 'lessee' && lessor === null,
         true,
     );
 
     useEffect(() => {
-        const next = modeFromValue(searchParams.get('mode')) ?? 'lessee';
-        setMode(next);
-    }, [searchParams]);
+        if (lessee || requestedAgreementId === null) return;
+
+        const match = lesseePreselection.data?.data.find((row) => row.agreement_id === requestedAgreementId);
+        if (match) setLessee(match);
+    }, [lessee, lesseePreselection.data, requestedAgreementId]);
 
     useEffect(() => {
-        if (searchParams.get('mode') === mode) return;
-        const params = new URLSearchParams(searchParams);
-        params.set('mode', mode);
-        setSearchParams(params, { replace: true });
-    }, [mode, searchParams, setSearchParams]);
+        if (lessor || requestedAgreementId === null) return;
 
-    useEffect(() => {
-        if (lessee || mode === 'lessor' || !lesseeOptions.data?.data.length) return;
-        const initial = lesseeOptions.data.data.find((row) => row.agreement_id === requestedAgreementId)
-            ?? lesseeOptions.data.data[0];
-        setLessee(initial);
-        setUsageDate(dateInsideOption(initial));
-    }, [lessee, lesseeOptions.data, mode, requestedAgreementId]);
+        const match = lessorPreselection.data?.data.find((row) => row.agreement_id === requestedAgreementId);
+        if (match) setLessor(match);
+    }, [lessor, lessorPreselection.data, requestedAgreementId]);
 
-    useEffect(() => {
-        if (lessor || mode === 'lessee' || !lessorOptions.data?.data.length) return;
-        const initial = lessorOptions.data.data.find((row) => row.agreement_id === requestedAgreementId)
-            ?? lessorOptions.data.data[0];
-        setLessor(initial);
-        if (mode === 'lessor') setUsageDate(dateInsideOption(initial));
-    }, [lessor, lessorOptions.data, mode, requestedAgreementId]);
+    const lesseeDateError = lessee && !agreementCoversDate(lessee, usageDate)
+        ? `${lessee.agreement_number} does not cover ${usageDate}. Select an eligible customer agreement or choose a covered date.`
+        : '';
+    const lessorDateError = lessor && !agreementCoversDate(lessor, usageDate)
+        ? `${lessor.agreement_number} does not cover ${usageDate}. Select an eligible owner / supplier agreement or choose a covered date.`
+        : '';
+    const linkedVehicleError = mode === 'linked' && lessee && lessor && lessee.vehicle_id !== lessor.vehicle_id
+        ? 'Linked running charts require customer and owner / supplier agreements for the same physical vehicle.'
+        : '';
+    const selectionError = lesseeDateError || lessorDateError || linkedVehicleError;
 
-    useEffect(() => {
-        if (mode !== 'linked' || !lessee || !lessor) return;
-        if (lessee.vehicle_id !== lessor.vehicle_id) setLessor(null);
-    }, [lessee, lessor, mode]);
+    const selection = useMemo(() => {
+        if (selectionError) return null;
 
-    const selection = useMemo(() => buildSelection(mode, lessee, lessor, usageDate), [mode, lessee, lessor, usageDate]);
+        return buildSelection(mode, lessee, lessor, usageDate);
+    }, [lessee, lessor, mode, selectionError, usageDate]);
     const selectionReady = Boolean(selection);
+    const selectionKey = selection ? stableSelectionKey(selection) : 'none';
+
     const context = useApi(
         (signal) => getRunningChartContext(selection!, signal),
-        [selection?.mode, selection?.usage_date, selection?.lessee_agreement_id, selection?.lessee_agreement_vehicle_id, selection?.lessor_agreement_id, selection?.lessor_agreement_vehicle_id],
+        [
+            selection?.mode,
+            selection?.usage_date,
+            selection?.lessee_agreement_id,
+            selection?.lessee_agreement_vehicle_id,
+            selection?.lessor_agreement_id,
+            selection?.lessor_agreement_vehicle_id,
+        ],
         selectionReady,
         true,
     );
     const savedTrips = useApi(
         (signal) => listRunningChartTrips(selection!, signal),
-        [selection?.mode, selection?.usage_date, selection?.lessee_agreement_id, selection?.lessee_agreement_vehicle_id, selection?.lessor_agreement_id, selection?.lessor_agreement_vehicle_id],
+        [
+            selection?.mode,
+            selection?.usage_date,
+            selection?.lessee_agreement_id,
+            selection?.lessee_agreement_vehicle_id,
+            selection?.lessor_agreement_id,
+            selection?.lessor_agreement_vehicle_id,
+        ],
         selectionReady,
         true,
     );
@@ -188,24 +233,86 @@ export default function UsageLogPage() {
     useEffect(() => {
         setTrips([]);
         setPreview(null);
-        setNoUsageMarked(false);
         setDrawerTripId(null);
         setError(null);
-    }, [mode, usageDate, lessee?.agreement_vehicle_id, lessor?.agreement_vehicle_id]);
+    }, [selectionKey]);
 
     useEffect(() => {
         if (!savedTrips.data) return;
         setTrips(savedTrips.data.map(tripFromLog));
     }, [savedTrips.data]);
 
+    const searchLesseeAgreements = useCallback((params: LookupLoadParams) => loadAgreementOptions({
+        mode,
+        side: 'lessee',
+        search: params.search,
+        page: params.page,
+        perPage: params.perPage,
+        usageDate,
+        vehicleId: mode === 'linked' ? lessor?.vehicle_id : undefined,
+        signal: params.signal,
+    }), [lessor?.vehicle_id, mode, usageDate]);
+
+    const searchLessorAgreements = useCallback((params: LookupLoadParams) => loadAgreementOptions({
+        mode,
+        side: 'lessor',
+        search: params.search,
+        page: params.page,
+        perPage: params.perPage,
+        usageDate,
+        vehicleId: mode === 'linked' ? lessee?.vehicle_id : undefined,
+        signal: params.signal,
+    }), [lessee?.vehicle_id, mode, usageDate]);
+
     const selectedDrawerTrip = trips.find((trip) => trip.localId === drawerTripId) ?? null;
-    const displayError = error ?? lesseeOptions.error ?? lessorOptions.error ?? context.error ?? savedTrips.error;
+    const selectedDrawerTripEditable = selectedDrawerTrip ? isTripEditable(selectedDrawerTrip, canRecordUsage) : false;
+    const displayError = error ?? lesseePreselection.error ?? lessorPreselection.error ?? context.error ?? savedTrips.error;
+    const hasSubmittableTrips = trips.some((trip) => isTripSubmittable(trip, canRecordUsage));
+    const actionBusy = Boolean(busyAction);
+
+    const requestModeChange = (nextMode: RunningChartMode) => {
+        if (nextMode === mode) return;
+        if (!confirmDiscard()) return;
+
+        onModeChange(nextMode);
+    };
+
+    const changeUsageDate = (nextDate: string) => {
+        if (nextDate === usageDate) return;
+        if (!confirmDiscard()) return;
+
+        setUsageDate(nextDate);
+    };
+
+    const changeLesseeAgreement = (row: RunningChartAgreementLookupOption | null): boolean => {
+        if (sameAgreement(lessee, row)) return true;
+        if (!confirmDiscard()) return false;
+
+        setLessee(row);
+        if (mode === 'linked' && row && lessor && row.vehicle_id !== lessor.vehicle_id) {
+            setLessor(null);
+        }
+
+        return true;
+    };
+
+    const changeLessorAgreement = (row: RunningChartAgreementLookupOption | null): boolean => {
+        if (sameAgreement(lessor, row)) return true;
+        if (!confirmDiscard()) return false;
+
+        setLessor(row);
+        if (mode === 'linked' && row && lessee && row.vehicle_id !== lessee.vehicle_id) {
+            setLessee(null);
+        }
+
+        return true;
+    };
 
     const addTrip = () => {
         const resolvedContext = context.data;
-        if (!resolvedContext) return;
+        if (!resolvedContext || !canRecordUsage || actionBusy) return;
+
         const previous = trips.at(-1);
-        setNoUsageMarked(false);
         setPreview(null);
         setTrips((current) => [...current, blankTrip(
             previous?.end_odometer || resolvedContext.last_valid_finish_odometer,
@@ -214,12 +321,13 @@ export default function UsageLogPage() {
     };
 
     const copyPreviousTrip = () => {
+        if (!canRecordUsage || actionBusy) return;
+
         const previous = trips.at(-1);
         if (!previous) {
             addTrip();
             return;
         }
-        setNoUsageMarked(false);
         setPreview(null);
         setTrips((current) => [...current, {
             ...previous,
@@ -234,83 +342,99 @@ export default function UsageLogPage() {
         }]);
     };
 
-    const saveDrafts = async (): Promise<RentalUsageLog[]> => {
-        if (!selection || !canRecordUsage || noUsageMarked) return [];
+    const persistDraftTrips = async (): Promise<RentalUsageLog[]> => {
+        if (!selection || !canRecordUsage) return [];
+
+        const saved: RentalUsageLog[] = [];
+        for (const trip of trips) {
+            if (!isTripEditable(trip, canRecordUsage) || (!trip.dirty && trip.savedId)) continue;
+
+            const payload = payloadFromTrip(selection, trip);
+            const row = trip.savedId
+                ? await updateRunningChartTrip(trip.savedId, payload)
+                : await createRunningChartTrip(payload);
+            saved.push(row);
+        }
+
+        return saved;
+    };
+
+    const saveDrafts = async () => {
+        if (actionBusy || !selection || !canRecordUsage) return;
+
         setBusyAction('save');
         setError(null);
         try {
-            const saved: RentalUsageLog[] = [];
-            for (const trip of trips) {
-                if (!editableStatuses.includes(trip.status) || (!trip.dirty && trip.savedId)) continue;
-                const payload = payloadFromTrip(selection, trip);
-                const row = trip.savedId
-                    ? await updateRunningChartTrip(trip.savedId, payload)
-                    : await createRunningChartTrip(payload);
-                saved.push(row);
-            }
+            await persistDraftTrips();
             savedTrips.reload();
             setPreview(null);
-            return saved;
         } catch (requestError) {
-            setError(toApiError(requestError));
-            return [];
+            handleRequestError(requestError);
         } finally {
             setBusyAction(null);
         }
     };
 
     const previewTrips = async () => {
-        if (!selection) return;
+        if (actionBusy || !selection) return;
+
         setBusyAction('preview');
         setError(null);
         try {
             setPreview(await previewRunningChart({
                 ...selection,
-                trips: noUsageMarked ? [] : trips.map((trip) => payloadFromTrip(selection, trip)),
+                trips: trips.map((trip) => payloadFromTrip(selection, trip)),
             }));
         } catch (requestError) {
-            setError(toApiError(requestError));
+            handleRequestError(requestError);
         } finally {
             setBusyAction(null);
         }
     };
 
     const submitTrips = async () => {
-        if (!selection || !canRecordUsage || noUsageMarked) return;
+        if (actionBusy || !selection || !canRecordUsage) return;
+
+        const tripsToSubmit = trips.filter((trip) => isTripSubmittable(trip, canRecordUsage));
+        if (tripsToSubmit.length === 0) return;
+
         setBusyAction('submit');
         setError(null);
         try {
-            const saved = await saveDrafts();
-            const ids = saved.length > 0
-                ? saved.map((trip) => trip.id)
-                : trips.filter((trip) => trip.savedId && ['draft', 'rejected'].includes(trip.status)).map((trip) => trip.savedId!);
-            for (const id of ids) {
-                await changeRunningChartTripStatus(id, 'submit');
-            }
+            await submitRunningChartDaily({
+                ...selection,
+                trips: tripsToSubmit.map((trip) => ({
+                    ...payloadFromTrip(selection, trip),
+                    id: trip.savedId,
+                })),
+            });
             savedTrips.reload();
+            setPreview(null);
         } catch (requestError) {
-            setError(toApiError(requestError));
+            handleRequestError(requestError);
         } finally {
             setBusyAction(null);
         }
     };
 
     const changeStatus = async (trip: DraftTrip, status: 'approve' | 'reject') => {
-        if (!trip.savedId || !canApproveUsage) return;
+        if (actionBusy || !trip.savedId || !canApproveUsage) return;
+
         setBusyAction(`${status}-${trip.savedId}`);
         setError(null);
         try {
             await changeRunningChartTripStatus(trip.savedId, status);
             savedTrips.reload();
         } catch (requestError) {
-            setError(toApiError(requestError));
+            handleRequestError(requestError);
         } finally {
             setBusyAction(null);
         }
     };
 
     const deleteTrip = async (trip: DraftTrip) => {
-        if (!canRecordUsage || !editableStatuses.includes(trip.status)) return;
+        if (actionBusy || !isTripEditable(trip, canRecordUsage)) return;
+
         setBusyAction(`delete-${trip.localId}`);
         setError(null);
         try {
@@ -318,15 +442,19 @@ export default function UsageLogPage() {
             setTrips((current) => current.filter((row) => row.localId !== trip.localId));
             savedTrips.reload();
         } catch (requestError) {
-            setError(toApiError(requestError));
+            handleRequestError(requestError);
         } finally {
             setBusyAction(null);
         }
     };
 
+    function handleRequestError(requestError: unknown) {
+        setError(toApiError(requestError));
+        logRunningChartDiagnostics(requestError, mode, selection);
+    }
+
     return (
         <>
-            <ContentHeader title={modes.find((item) => item.value === mode)?.label ?? 'Running Charts'} description="Daily rental usage is entered once per physical trip and resolved into the selected financial context." />
             <ErrorAlert error={displayError} />
             <div className="space-y-5">
                 <Panel title="Daily running chart">
@@ -334,58 +462,32 @@ export default function UsageLogPage() {
                         <Select
                             label="Mode"
                             value={mode}
-                            options={modes}
-                            onChange={(event) => {
-                                const next = modeFromValue(event.target.value) ?? 'lessee';
-                                setMode(next);
-                                setLessee(null);
-                                setLessor(null);
-                            }}
+                            options={modeOptions}
+                            onChange={(event) => requestModeChange(modeFromValue(event.target.value) ?? 'lessee')}
                         />
-                        <Input label="Usage date" type="date" value={usageDate} onChange={(event) => setUsageDate(event.target.value)} />
+                        <Input label="Usage date" type="date" value={usageDate} onChange={(event) => changeUsageDate(event.target.value)} />
                         {mode !== 'lessor' && (
-                            <Input label="Search customer agreements" value={lesseeSearch} onChange={(event) => {
-                                setLesseeSearch(event.target.value);
-                                setLesseePage(1);
-                            }} />
-                        )}
-                        {mode !== 'lessee' && (
-                            <Input label="Search owner / supplier agreements" value={lessorSearch} onChange={(event) => {
-                                setLessorSearch(event.target.value);
-                                setLessorPage(1);
-                            }} />
-                        )}
-                    </div>
-                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                        {mode !== 'lessor' && (
-                            <AgreementPicker
-                                title="Lessee agreement"
+                            <RunningChartAgreementSelector
+                                label="Customer agreement"
                                 value={lessee}
-                                rows={withSelected(lesseeOptions.data?.data ?? [], lessee)}
-                                loading={lesseeOptions.loading}
-                                meta={lesseeOptions.data?.meta}
-                                onPageChange={setLesseePage}
-                                onChange={(row) => {
-                                    setLessee(row);
-                                    if (row) setUsageDate(dateInsideOption(row));
-                                }}
+                                search={searchLesseeAgreements}
+                                onChange={changeLesseeAgreement}
                             />
                         )}
                         {mode !== 'lessee' && (
-                            <AgreementPicker
-                                title="Lessor agreement"
+                            <RunningChartAgreementSelector
+                                label="Owner / supplier agreement"
                                 value={lessor}
-                                rows={withSelected(lessorOptions.data?.data ?? [], lessor)}
-                                loading={lessorOptions.loading}
-                                meta={lessorOptions.data?.meta}
-                                onPageChange={setLessorPage}
-                                onChange={(row) => {
-                                    setLessor(row);
-                                    if (row && mode === 'lessor') setUsageDate(dateInsideOption(row));
-                                }}
+                                search={searchLessorAgreements}
+                                onChange={changeLessorAgreement}
                             />
                         )}
                     </div>
+                    {selectionError && (
+                        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                            {selectionError}
+                        </p>
+                    )}
                 </Panel>
 
                 {context.loading && selectionReady && <LoadingState label="Resolving running chart context..." />}
@@ -422,22 +524,12 @@ export default function UsageLogPage() {
                 {context.data && (
                     <Panel title="Trip rows">
                         <div className="mb-4 flex flex-wrap gap-2">
-                            <Button type="button" variant="secondary" disabled={!canRecordUsage || Boolean(busyAction)} onClick={addTrip}>Add Trip</Button>
-                            <Button type="button" variant="secondary" disabled={!canRecordUsage || Boolean(busyAction)} onClick={copyPreviousTrip}>Copy Previous Trip</Button>
-                            <Button type="button" variant="secondary" disabled={!canRecordUsage || Boolean(busyAction)} onClick={() => {
-                                setTrips([]);
-                                setNoUsageMarked(true);
-                                setPreview(null);
-                            }}>Mark No Usage</Button>
-                            <Button type="button" variant="secondary" loading={busyAction === 'preview'} onClick={() => void previewTrips()}>Preview</Button>
-                            <Button type="button" loading={busyAction === 'save'} disabled={!canRecordUsage || noUsageMarked} onClick={() => void saveDrafts()}>Save Draft</Button>
-                            <Button type="button" loading={busyAction === 'submit'} disabled={!canRecordUsage || noUsageMarked} onClick={() => void submitTrips()}>Submit</Button>
+                            <Button type="button" variant="secondary" disabled={!canRecordUsage || actionBusy} onClick={addTrip}>Add Trip</Button>
+                            <Button type="button" variant="secondary" disabled={!canRecordUsage || actionBusy} onClick={copyPreviousTrip}>Copy Previous Trip</Button>
+                            <Button type="button" variant="secondary" loading={busyAction === 'preview'} disabled={actionBusy && busyAction !== 'preview'} onClick={() => void previewTrips()}>Preview</Button>
+                            <Button type="button" loading={busyAction === 'save'} disabled={!canRecordUsage || (actionBusy && busyAction !== 'save')} onClick={() => void saveDrafts()}>Save Draft</Button>
+                            <Button type="button" loading={busyAction === 'submit'} disabled={!canRecordUsage || !hasSubmittableTrips || (actionBusy && busyAction !== 'submit')} onClick={() => void submitTrips()}>Submit</Button>
                         </div>
-                        {noUsageMarked && (
-                            <p className="mb-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
-                                No usage is marked for this working date. No rental usage log will be stored unless a trip row is added.
-                            </p>
-                        )}
                         {savedTrips.loading ? <LoadingState label="Loading daily trips..." /> : (
                             <DataTable
                                 rows={trips}
@@ -447,7 +539,7 @@ export default function UsageLogPage() {
                                     { key: 'time', header: 'Start / Finish', render: (trip) => editableInput(trip, 'time') },
                                     { key: 'odo', header: 'Start / Finish KM', render: (trip) => editableInput(trip, 'odometer') },
                                     { key: 'distance', header: 'Distance', render: (trip) => calculatedDistance(trip) },
-                                    { key: 'hours', header: 'Working Hours', render: (trip) => calculatedHours(trip) },
+                                    { key: 'duration', header: 'Working Time', render: (trip) => calculatedDuration(trip) },
                                     { key: 'route', header: 'Route', render: (trip) => editableInput(trip, 'route') },
                                     { key: 'purpose', header: 'Purpose', render: (trip) => editableInput(trip, 'purpose') },
                                     { key: 'ot', header: 'OT', render: (trip) => `${trip.ot_hours || '-'} ${trip.ot_hours ? trip.ot_type.replaceAll('_', ' ') : ''}` },
@@ -456,14 +548,16 @@ export default function UsageLogPage() {
                                     { key: 'status', header: 'Status', render: (trip) => <RentalStatusBadge status={trip.status === 'local' ? 'draft' : trip.status} /> },
                                     { key: 'actions', header: '', render: (trip) => (
                                         <div className="flex flex-wrap justify-end gap-2">
-                                            <Button type="button" variant="secondary" onClick={() => setDrawerTripId(trip.localId)}>Edit</Button>
-                                            {editableStatuses.includes(trip.status) && canRecordUsage && (
-                                                <Button type="button" variant="danger" loading={busyAction === `delete-${trip.localId}`} onClick={() => void deleteTrip(trip)}>Delete Draft Trip</Button>
+                                            <Button type="button" variant="secondary" disabled={actionBusy} onClick={() => setDrawerTripId(trip.localId)}>
+                                                {isTripEditable(trip, canRecordUsage) ? 'Edit' : 'View'}
+                                            </Button>
+                                            {isTripEditable(trip, canRecordUsage) && (
+                                                <Button type="button" variant="danger" loading={busyAction === `delete-${trip.localId}`} disabled={actionBusy && busyAction !== `delete-${trip.localId}`} onClick={() => void deleteTrip(trip)}>Delete Draft Trip</Button>
                                             )}
                                             {trip.status === 'submitted' && canApproveUsage && (
                                                 <>
-                                                    <Button type="button" loading={busyAction === `approve-${trip.savedId}`} onClick={() => void changeStatus(trip, 'approve')}>Approve</Button>
-                                                    <Button type="button" variant="secondary" loading={busyAction === `reject-${trip.savedId}`} onClick={() => void changeStatus(trip, 'reject')}>Reject</Button>
+                                                    <Button type="button" loading={busyAction === `approve-${trip.savedId}`} disabled={actionBusy && busyAction !== `approve-${trip.savedId}`} onClick={() => void changeStatus(trip, 'approve')}>Approve</Button>
+                                                    <Button type="button" variant="secondary" loading={busyAction === `reject-${trip.savedId}`} disabled={actionBusy && busyAction !== `reject-${trip.savedId}`} onClick={() => void changeStatus(trip, 'reject')}>Reject</Button>
                                                 </>
                                             )}
                                         </div>
@@ -478,6 +572,7 @@ export default function UsageLogPage() {
                     <Panel title="Preview">
                         <DetailGrid items={[
                             { label: 'Daily KM', value: preview.daily_km },
+                            { label: 'Minutes', value: preview.working_minutes },
                             { label: 'Hours', value: preview.working_hours },
                             { label: 'OT', value: preview.overtime_hours },
                             { label: 'Customer revenue', value: preview.customer_revenue },
@@ -492,6 +587,8 @@ export default function UsageLogPage() {
                 {selectedDrawerTrip && (
                     <TripDrawer
                         trip={selectedDrawerTrip}
+                        editable={selectedDrawerTripEditable}
+                        canClassifyHoliday={canClassifyHoliday}
                         searchDriver={searchDriver}
                         onChange={(patch) => updateTripRow(selectedDrawerTrip.localId, patch)}
                     />
@@ -501,7 +598,7 @@ export default function UsageLogPage() {
     );
 
     function editableInput(trip: DraftTrip, kind: 'time' | 'odometer' | 'route' | 'purpose') {
-        const editable = editableStatuses.includes(trip.status) && canRecordUsage;
+        const editable = isTripEditable(trip, canRecordUsage);
         if (kind === 'time') {
             return (
                 <div className="grid min-w-36 gap-2">
@@ -518,6 +615,7 @@ export default function UsageLogPage() {
                 </div>
             );
         }
+
         return (
             <Input
                 value={kind === 'route' ? trip.route : trip.purpose}
@@ -529,58 +627,50 @@ export default function UsageLogPage() {
 
     function updateTripRow(localId: string, patch: Partial<DraftTrip>) {
         setPreview(null);
-        setNoUsageMarked(false);
         setTrips((current) => current.map((trip) => (
             trip.localId === localId ? { ...trip, ...patch, dirty: true } : trip
         )));
     }
 }
 
-function AgreementPicker({
-    title,
+function RunningChartAgreementSelector({
+    label,
     value,
-    rows,
-    loading,
-    meta,
-    onPageChange,
+    search,
     onChange,
 }: {
-    title: string;
-    value: RunningChartAgreementOption | null;
-    rows: RunningChartAgreementOption[];
-    loading: boolean;
-    meta?: PaginationMeta;
-    onPageChange: (page: number) => void;
-    onChange: (row: RunningChartAgreementOption | null) => void;
+    label: string;
+    value: RunningChartAgreementLookupOption | null;
+    search: (params: LookupLoadParams) => Promise<ApiCollection<RunningChartAgreementLookupOption>>;
+    onChange: (row: RunningChartAgreementLookupOption | null) => boolean;
 }) {
     return (
-        <div>
-            <Select
-                label={title}
-                value={value ? optionKey(value) : ''}
-                options={rows.map((row) => ({
-                    value: optionKey(row),
-                    label: `${row.agreement_number} / ${row.party_name ?? row.party_type} / ${row.vehicle_registration ?? row.vehicle_id}`,
-                }))}
-                onChange={(event) => onChange(rows.find((row) => optionKey(row) === event.target.value) ?? null)}
-            />
-            {loading && <LoadingState />}
-            <Pagination meta={meta} onPageChange={onPageChange} />
-        </div>
+        <GenericLookupSelect
+            label={label}
+            value={value}
+            onChange={onChange}
+            search={search}
+            formatLabel={agreementLabel}
+            placeholder="Search agreement, party, or vehicle"
+            minSearchLength={0}
+            loadOnOpen
+        />
     );
 }
 
 function TripDrawer({
     trip,
+    editable,
+    canClassifyHoliday,
     searchDriver,
     onChange,
 }: {
     trip: DraftTrip;
+    editable: boolean;
+    canClassifyHoliday: boolean;
     searchDriver: (params: LookupLoadParams) => ReturnType<typeof searchEmployees>;
     onChange: (patch: Partial<DraftTrip>) => void;
 }) {
-    const editable = editableStatuses.includes(trip.status);
-
     return (
         <div className="grid gap-4 md:grid-cols-2">
             <GenericLookupSelect
@@ -601,7 +691,7 @@ function TripDrawer({
             <DecimalInput label="Pass / allowance" value={trip.pass_allowance} disabled={!editable} onChange={(event) => onChange({ pass_allowance: event.target.value })} />
             <Checkbox label="Outstation" checked={trip.outstation} disabled={!editable} onChange={(checked) => onChange({ outstation: checked })} />
             <Checkbox label="Weekend" checked={trip.weekend} disabled={!editable} onChange={(checked) => onChange({ weekend: checked })} />
-            <Checkbox label="Holiday" checked={trip.holiday} disabled={!editable} onChange={(checked) => onChange({ holiday: checked })} />
+            <Checkbox label="Holiday" checked={trip.holiday} disabled={!editable || !canClassifyHoliday} onChange={(checked) => onChange({ holiday: checked })} />
             <Checkbox label="Day out" checked={trip.day_out} disabled={!editable} onChange={(checked) => onChange({ day_out: checked })} />
             <Checkbox label="Night out" checked={trip.night_out} disabled={!editable} onChange={(checked) => onChange({ night_out: checked })} />
             <div className="md:col-span-2">
@@ -682,10 +772,10 @@ function payloadFromTrip(selection: NonNullable<ReturnType<typeof buildSelection
 
 function eventsFromTrip(trip: DraftTrip) {
     const events: RunningChartTripPayload['events'] = [];
-    if (positive(trip.ot_hours)) events.push({ event_type: trip.ot_type, quantity: trip.ot_hours });
+    if (isPositiveDecimal(trip.ot_hours)) events.push({ event_type: trip.ot_type, quantity: trip.ot_hours });
     if (trip.night_out) events.push({ event_type: 'night_out', quantity: '1.000000' });
-    if (positive(trip.pass_allowance)) events.push({ event_type: 'pass', quantity: trip.pass_allowance, remarks: 'Pass / allowance' });
-    if (positive(trip.waiting_hours)) events.push({ event_type: 'waiting', quantity: trip.waiting_hours });
+    if (isPositiveDecimal(trip.pass_allowance)) events.push({ event_type: 'pass', quantity: trip.pass_allowance, remarks: 'Pass / allowance' });
+    if (isPositiveDecimal(trip.waiting_hours)) events.push({ event_type: 'waiting', quantity: trip.waiting_hours });
     if (trip.outstation) events.push({ event_type: 'outstation', quantity: '1.000000' });
     if (trip.weekend) events.push({ event_type: 'weekend', quantity: '1.000000' });
     if (trip.holiday) events.push({ event_type: 'holiday', quantity: '1.000000', remarks: trip.remarks || 'Holiday usage' });
@@ -750,41 +840,138 @@ function blankTrip(startOdometer: string, startTime: string): DraftTrip {
 }
 
 function calculatedDistance(trip: DraftTrip): string {
-    const start = Number(trip.start_odometer);
-    const end = Number(trip.end_odometer);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '-';
+    if (!trip.start_odometer.trim() || !trip.end_odometer.trim()) return '-';
+    if (compareDecimalStrings(trip.end_odometer, trip.start_odometer) < 0) return '-';
 
-    return (end - start).toFixed(3);
+    return subtractDecimal(trip.end_odometer, trip.start_odometer);
 }
 
-function calculatedHours(trip: DraftTrip): string {
-    if (!trip.start_time || !trip.end_time) return '-';
-    const [startHour, startMinute] = trip.start_time.split(':').map(Number);
-    const [endHour, endMinute] = trip.end_time.split(':').map(Number);
-    const start = startHour * 60 + startMinute;
-    let end = endHour * 60 + endMinute;
-    if (end < start) end += 24 * 60;
-    const minutes = Math.max(0, end - start);
+function calculatedDuration(trip: DraftTrip): string {
+    const start = timeToMinutes(trip.start_time);
+    const finish = timeToMinutes(trip.end_time);
+    if (start === null || finish === null) return '-';
 
-    return (minutes / 60).toFixed(2);
+    const minutes = finish < start ? finish + (24 * 60) - start : finish - start;
+
+    return formatMinutes(minutes);
 }
 
-function positive(value: string): boolean {
-    const parsed = Number(value);
+function timeToMinutes(value: string): number | null {
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return null;
 
-    return Number.isFinite(parsed) && parsed > 0;
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    if (hours > 23 || minutes > 59) return null;
+
+    return (hours * 60) + minutes;
 }
 
-function withSelected(rows: RunningChartAgreementOption[], selected: RunningChartAgreementOption | null): RunningChartAgreementOption[] {
-    if (!selected || rows.some((row) => optionKey(row) === optionKey(selected))) return rows;
+function formatMinutes(totalMinutes: number): string {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
 
-    return [selected, ...rows];
+    return minutes === 0 ? `${hours}h` : `${hours}h ${String(minutes).padStart(2, '0')}m`;
 }
 
-function dateInsideOption(option: RunningChartAgreementOption): string {
-    const current = today();
+function loadAgreementOptions({
+    mode,
+    side,
+    search,
+    page,
+    perPage,
+    usageDate,
+    agreementId,
+    vehicleId,
+    signal,
+}: {
+    mode: RunningChartMode;
+    side: 'lessee' | 'lessor';
+    search?: string;
+    page?: number;
+    perPage?: number;
+    usageDate: string;
+    agreementId?: number;
+    vehicleId?: number;
+    signal?: AbortSignal;
+}): Promise<ApiCollection<RunningChartAgreementLookupOption>> {
+    return listRunningChartAgreements({
+        mode,
+        side,
+        search: search || undefined,
+        usage_date: usageDate,
+        agreement_id: agreementId,
+        vehicle_id: vehicleId,
+        page,
+        per_page: perPage,
+    }, signal).then((result) => ({
+        ...result,
+        data: result.data.map(toAgreementLookupOption),
+    }));
+}
+
+function toAgreementLookupOption(option: RunningChartAgreementOption): RunningChartAgreementLookupOption {
+    return {
+        ...option,
+        id: option.agreement_vehicle_id,
+        name: agreementLabel(option),
+    };
+}
+
+function agreementLabel(option: RunningChartAgreementOption): string {
+    return `${option.agreement_number} / ${option.party_name ?? option.party_type} / ${option.vehicle_registration ?? option.vehicle_id}`;
+}
+
+function agreementCoversDate(option: RunningChartAgreementOption, usageDate: string): boolean {
     const from = option.allocation_from.slice(0, 10);
     const to = (option.allocation_to ?? option.expected_end_at).slice(0, 10);
 
-    return current >= from && current <= to ? current : from;
+    return usageDate >= from && usageDate <= to;
+}
+
+function sameAgreement(left: RunningChartAgreementOption | null, right: RunningChartAgreementOption | null): boolean {
+    return left?.agreement_id === right?.agreement_id
+        && left?.agreement_vehicle_id === right?.agreement_vehicle_id;
+}
+
+function isTripEditable(trip: DraftTrip, canRecordUsage: boolean): boolean {
+    return canRecordUsage && editableStatuses.includes(trip.status);
+}
+
+function isTripSubmittable(trip: DraftTrip, canRecordUsage: boolean): boolean {
+    return canRecordUsage && ['local', 'draft', 'rejected'].includes(trip.status);
+}
+
+function stableSelectionKey(selection: NonNullable<ReturnType<typeof buildSelection>>): string {
+    return [
+        selection.mode,
+        selection.usage_date,
+        selection.lessee_agreement_id ?? '',
+        selection.lessee_agreement_vehicle_id ?? '',
+        selection.lessor_agreement_id ?? '',
+        selection.lessor_agreement_vehicle_id ?? '',
+    ].join('|');
+}
+
+function positiveInteger(value: string | undefined | null): number | null {
+    if (!value) return null;
+
+    const parsed = parseInt(value, 10);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function logRunningChartDiagnostics(
+    requestError: unknown,
+    mode: RunningChartMode,
+    selection: ReturnType<typeof buildSelection>,
+) {
+    if (!import.meta.env.DEV) return;
+
+    console.error('Running Chart request failed', {
+        mode,
+        usageDate: selection?.usage_date,
+        lesseeAgreementId: selection?.lessee_agreement_id,
+        lessorAgreementId: selection?.lessor_agreement_id,
+        error: requestError,
+    });
 }

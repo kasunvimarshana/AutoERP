@@ -36,6 +36,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
         ->whereNumber('usageLog')->name('running-chart.trips.destroy');
     Route::patch('running-chart/trips/{usageLog}/submit', [RentalRunningChartController::class, 'submitTrip'])
         ->whereNumber('usageLog')->name('running-chart.trips.submit');
+    Route::post('running-chart/daily-submit', [RentalRunningChartController::class, 'submitDaily'])->name('running-chart.daily-submit');
     Route::patch('running-chart/trips/{usageLog}/approve', [RentalRunningChartController::class, 'approveTrip'])
         ->whereNumber('usageLog')->name('running-chart.trips.approve');
     Route::patch('running-chart/trips/{usageLog}/reject', [RentalRunningChartController::class, 'rejectTrip'])

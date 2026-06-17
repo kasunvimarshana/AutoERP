@@ -13,6 +13,7 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Reporting\Services\ReportCatalog;
 use Modules\Reporting\Services\ReportQueryBuilder;
+use Modules\User\Models\UserModel;
 use Modules\VehicleRental\DTOs\RentalAgreementData;
 use Modules\VehicleRental\DTOs\RentalAgreementVehicleData;
 use Modules\VehicleRental\DTOs\RentalAgreementVehicleLinkData;
@@ -44,6 +45,7 @@ use Modules\VehicleRental\Services\RentalReturnService;
 use Modules\VehicleRental\Services\RentalUsageContextService;
 use Modules\VehicleRental\Services\RentalUsageEventService;
 use Modules\VehicleRental\Services\RentalUsageLogService;
+use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 use Tests\TestCase;
 
 final class VehicleRentalLinkedRunningChartTest extends TestCase
@@ -498,6 +500,55 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
         );
     }
 
+    public function test_daily_submit_rolls_back_all_rows_when_one_trip_fails(): void
+    {
+        $context = $this->context();
+        [$agreement, $allocation] = $this->activeAgreement(
+            $context,
+            RentalAgreementDirection::Outbound,
+            'AGR-DAILY-ROLLBACK',
+            '100.000000',
+            '10.000000',
+            '20.000000',
+            '30.000000',
+        );
+        $this->actingAs(
+            $this->runningChartUser($context['tenant_id'], $context['organization_unit_id']),
+            (string) config('module-auth.protected_route_guard', 'auth-api'),
+        );
+
+        try {
+            $this->withoutExceptionHandling()
+                ->withoutMiddleware()
+                ->postJson('/api/v1/vehicle-rental/running-chart/daily-submit', [
+                    'tenant_id' => $context['tenant_id'],
+                    'organization_unit_id' => $context['organization_unit_id'],
+                    'mode' => RentalUsageContextService::MODE_LESSEE,
+                    'lessee_agreement_id' => $agreement->getKey(),
+                    'lessee_agreement_vehicle_id' => $allocation->getKey(),
+                    'usage_date' => '2026-06-02',
+                    'trips' => [[
+                        'start_time' => '08:00',
+                        'end_time' => '10:00',
+                        'start_odometer' => '1000.000000',
+                        'end_odometer' => '1010.000000',
+                    ], [
+                        'start_time' => '09:00',
+                        'end_time' => '11:00',
+                        'start_odometer' => '1010.000000',
+                        'end_odometer' => '1020.000000',
+                    ]],
+                ]);
+            $this->fail('Expected overlapping daily submit rows to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('overlaps an existing running chart', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('rental_usage_logs', 0);
+        $this->assertDatabaseCount('rental_usage_contexts', 0);
+        $this->assertDatabaseCount('rental_usage_events', 0);
+    }
+
     public function test_no_usage_preview_does_not_persist_fake_daily_records(): void
     {
         $context = $this->context();
@@ -881,6 +932,38 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
         $service->changeStatus($usage, RentalUsageLogStatus::Submitted);
 
         return $service->changeStatus($usage->refresh(), RentalUsageLogStatus::Approved);
+    }
+
+    private function runningChartUser(int $tenantId, int $organizationUnitId): UserModel
+    {
+        $user = UserModel::query()->create([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'first_name' => 'Running',
+            'last_name' => 'Chart',
+            'email' => 'running-chart-'.$tenantId.'@example.test',
+            'password' => bcrypt('password'),
+            'status' => 'active',
+        ]);
+        $permissionId = (int) DB::table('permissions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'name' => VehicleRentalAuthorizationService::RECORD_USAGE,
+            'guard_name' => (string) config('auth.defaults.guard', 'api'),
+            'module' => 'vehicle-rental',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('user_permissions')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $user->getKey(),
+            'permission_id' => $permissionId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $user;
     }
 
     /**
