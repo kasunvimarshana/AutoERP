@@ -11,6 +11,13 @@ export interface VehicleMake extends NamedResource {
     is_active: boolean;
 }
 
+export interface VehicleMakePayload {
+    code: string;
+    name: string;
+    description?: string | null;
+    is_active?: boolean;
+}
+
 export interface VehicleModel extends NamedResource {
     make?: NamedResource | null;
     year_from?: number | null;
@@ -19,10 +26,28 @@ export interface VehicleModel extends NamedResource {
     is_active: boolean;
 }
 
+export interface VehicleModelPayload {
+    vehicle_make_id: number | null;
+    code: string;
+    name: string;
+    year_from?: number | null;
+    year_to?: number | null;
+    description?: string | null;
+    is_active?: boolean;
+}
+
 export interface VehicleType extends NamedResource {
     description?: string | null;
     is_active: boolean;
     sort_order: number;
+}
+
+export interface VehicleTypePayload {
+    code: string;
+    name: string;
+    description?: string | null;
+    is_active?: boolean;
+    sort_order?: number;
 }
 
 export interface VehicleCategory extends NamedResource {
@@ -30,6 +55,15 @@ export interface VehicleCategory extends NamedResource {
     description?: string | null;
     is_active: boolean;
     sort_order: number;
+}
+
+export interface VehicleCategoryPayload {
+    parent_id?: number | null;
+    code: string;
+    name: string;
+    description?: string | null;
+    is_active?: boolean;
+    sort_order?: number;
 }
 
 export interface VehicleSummary {

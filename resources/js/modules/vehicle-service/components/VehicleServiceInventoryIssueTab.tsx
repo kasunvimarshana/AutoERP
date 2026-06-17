@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -20,7 +20,6 @@ export default function VehicleServiceInventoryIssueTab({ jobId }: { jobId: numb
     const [selected, setSelected] = useState<number[]>([]);
     const [issuing, setIssuing] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const search = useCallback(searchWarehouses, []);
     const columns: DataColumn<VehicleServiceJobLine>[] = [
         { key: 'select', header: '', render: (line) => <input type="checkbox" disabled={!warehouse || line.issue_eligible === false} checked={selected.includes(line.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, line.id] : current.filter((id) => id !== line.id))} /> },
         { key: 'line', header: 'Line', render: (line) => line.line_number },
@@ -41,7 +40,7 @@ export default function VehicleServiceInventoryIssueTab({ jobId }: { jobId: numb
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                <GenericLookupSelect label="Issue warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setSelected([]); }} search={search} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} loadOnOpen minSearchLength={0} />
+                <GenericLookupSelect label="Issue warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setSelected([]); }} search={searchWarehouses} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} loadOnOpen minSearchLength={0} />
                 <div className="flex items-end">
                     <Button type="button" loading={issuing} disabled={!warehouse || selected.length === 0} onClick={async () => {
                         if (!warehouse) return;

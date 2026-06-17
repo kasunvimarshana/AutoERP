@@ -8,16 +8,20 @@ import type {
     VehicleAttribute,
     VehicleAttributePayload,
     VehicleCategory,
+    VehicleCategoryPayload,
     VehicleDocument,
     VehicleDocumentPayload,
     VehicleMake,
+    VehicleMakePayload,
     VehicleModel,
+    VehicleModelPayload,
     VehicleOwnership,
     VehicleOwnershipPayload,
     VehiclePayload,
     VehicleStatusHistory,
     VehicleSummary,
     VehicleType,
+    VehicleTypePayload,
     VehicleWithRelationsPayload,
 } from './vehicleTypes';
 
@@ -68,6 +72,34 @@ export function searchVehicleTypes(params: LookupLoadParams): Promise<LookupResu
 export function searchVehicleCategories(params: LookupLoadParams): Promise<LookupResult<VehicleCategory>> {
     return requestLookup<VehicleCategory>(`${endpoints.vehicleCategories}/lookup`, params);
 }
+
+export const listVehicleMakes = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleMake>>(endpoints.vehicleMakes, { params, signal }).then((response) => response.data);
+export const createVehicleMake = (payload: VehicleMakePayload) =>
+    apiClient.post<ApiResource<VehicleMake>>(endpoints.vehicleMakes, payload).then((response) => response.data.data);
+export const updateVehicleMake = (id: number, payload: VehicleMakePayload) =>
+    apiClient.put<ApiResource<VehicleMake>>(`${endpoints.vehicleMakes}/${id}`, payload).then((response) => response.data.data);
+
+export const listVehicleTypes = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleType>>(endpoints.vehicleTypes, { params, signal }).then((response) => response.data);
+export const createVehicleType = (payload: VehicleTypePayload) =>
+    apiClient.post<ApiResource<VehicleType>>(endpoints.vehicleTypes, payload).then((response) => response.data.data);
+export const updateVehicleType = (id: number, payload: VehicleTypePayload) =>
+    apiClient.put<ApiResource<VehicleType>>(`${endpoints.vehicleTypes}/${id}`, payload).then((response) => response.data.data);
+
+export const listVehicleCategories = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleCategory>>(endpoints.vehicleCategories, { params, signal }).then((response) => response.data);
+export const createVehicleCategory = (payload: VehicleCategoryPayload) =>
+    apiClient.post<ApiResource<VehicleCategory>>(endpoints.vehicleCategories, payload).then((response) => response.data.data);
+export const updateVehicleCategory = (id: number, payload: VehicleCategoryPayload) =>
+    apiClient.put<ApiResource<VehicleCategory>>(`${endpoints.vehicleCategories}/${id}`, payload).then((response) => response.data.data);
+
+export const listVehicleModels = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleModel>>(endpoints.vehicleModels, { params, signal }).then((response) => response.data);
+export const createVehicleModel = (payload: VehicleModelPayload) =>
+    apiClient.post<ApiResource<VehicleModel>>(endpoints.vehicleModels, payload).then((response) => response.data.data);
+export const updateVehicleModel = (id: number, payload: VehicleModelPayload) =>
+    apiClient.put<ApiResource<VehicleModel>>(`${endpoints.vehicleModels}/${id}`, payload).then((response) => response.data.data);
 
 const relationPath = (vehicleId: number, relation: string) => `${endpoints.vehicles}/${vehicleId}/${relation}`;
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { TabPanel, Tabs } from './Tabs';
@@ -18,7 +18,7 @@ describe('Tabs', () => {
         summary.focus();
         await user.keyboard('{ArrowRight}');
 
-        expect(screen.getByRole('tab', { name: 'History' })).toHaveFocus();
+        await waitFor(() => expect(screen.getByRole('tab', { name: 'History' })).toHaveFocus());
         expect(screen.getByRole('tabpanel')).toHaveTextContent('History content');
     });
 });

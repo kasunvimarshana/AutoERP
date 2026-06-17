@@ -148,6 +148,32 @@ final class VehicleEngineTest extends TestCase
         $this->assertTrue(app(VehicleLookupService::class)->vehiclesByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($vehicle));
     }
 
+    public function test_referenced_master_records_cannot_be_deleted(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$make, $model, $type, $category] = $this->masterData($tenantId, $organizationUnitId);
+        $this->vehicle($tenantId, $organizationUnitId, 'VEH-MASTER-REF', (int) $make->getKey(), (int) $model->getKey(), typeId: (int) $type->getKey(), categoryId: (int) $category->getKey());
+
+        foreach ([
+            fn () => app(VehicleMakeService::class)->delete($make),
+            fn () => app(VehicleModelService::class)->delete($model),
+            fn () => app(VehicleTypeService::class)->delete($type),
+            fn () => app(VehicleCategoryService::class)->delete($category),
+        ] as $deleteReferencedRecord) {
+            try {
+                $deleteReferencedRecord();
+                $this->fail('Expected referenced vehicle master data delete to fail.');
+            } catch (InvalidArgumentException) {
+                $this->assertTrue(true);
+            }
+        }
+
+        $this->assertDatabaseHas('vehicle_makes', ['id' => $make->getKey(), 'deleted_at' => null]);
+        $this->assertDatabaseHas('vehicle_models', ['id' => $model->getKey(), 'deleted_at' => null]);
+        $this->assertDatabaseHas('vehicle_types', ['id' => $type->getKey(), 'deleted_at' => null]);
+        $this->assertDatabaseHas('vehicle_categories', ['id' => $category->getKey(), 'deleted_at' => null]);
+    }
+
     public function test_cross_tenant_and_organization_references_are_rejected(): void
     {
         [$tenantId, $organizationUnitId] = $this->scopeContext();

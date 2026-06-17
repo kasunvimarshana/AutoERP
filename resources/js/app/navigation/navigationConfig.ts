@@ -78,6 +78,20 @@ export const navigationSections: NavigationSection[] = [
                 ],
             },
             {
+                id: 'vehicle',
+                type: 'module',
+                label: 'Vehicle',
+                icon: 'vehicle',
+                access: tenantAccess(['vehicle']),
+                children: [
+                    { id: 'vehicle-makes', type: 'link', label: 'Makes', to: '/vehicles/makes', match: ['/vehicles/makes'], access: tenantAccess(['vehicle']) },
+                    { id: 'vehicle-types', type: 'link', label: 'Types', to: '/vehicles/types', match: ['/vehicles/types'], access: tenantAccess(['vehicle']) },
+                    { id: 'vehicle-categories', type: 'link', label: 'Categories', to: '/vehicles/categories', match: ['/vehicles/categories'], access: tenantAccess(['vehicle']) },
+                    { id: 'vehicle-models', type: 'link', label: 'Models', to: '/vehicles/models', match: ['/vehicles/models'], access: tenantAccess(['vehicle']) },
+                    { id: 'vehicle-list', type: 'link', label: 'Vehicles', to: '/vehicles', match: ['/vehicles'], access: tenantAccess(['vehicle']) },
+                ],
+            },
+            {
                 id: 'items',
                 type: 'module',
                 label: 'Items',

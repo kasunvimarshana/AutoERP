@@ -27,6 +27,7 @@ const VehicleListPage = lazy(() => import('@/modules/vehicle/VehicleListPage'));
 const VehicleCreatePage = lazy(() => import('@/modules/vehicle/VehicleCreatePage'));
 const VehicleEditPage = lazy(() => import('@/modules/vehicle/VehicleEditPage'));
 const VehicleDetailPage = lazy(() => import('@/modules/vehicle/VehicleDetailPage'));
+const VehicleMasterDataPage = lazy(() => import('@/modules/vehicle/VehicleMasterDataPage'));
 const ItemListPage = lazy(() => import('@/modules/item/ItemListPage'));
 const ItemCreatePage = lazy(() => import('@/modules/item/ItemCreatePage'));
 const ItemEditPage = lazy(() => import('@/modules/item/ItemEditPage'));
@@ -151,6 +152,10 @@ export function AppRouter() {
                     <Route path="/customers/create" element={<CustomerCreatePage />} />
                     <Route path="/customers/:id/edit" element={<CustomerEditPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                    <Route path="/vehicles/makes" element={<VehicleMasterDataPage kind="makes" />} />
+                    <Route path="/vehicles/types" element={<VehicleMasterDataPage kind="types" />} />
+                    <Route path="/vehicles/categories" element={<VehicleMasterDataPage kind="categories" />} />
+                    <Route path="/vehicles/models" element={<VehicleMasterDataPage kind="models" />} />
                     <Route path="/vehicles" element={<VehicleListPage />} />
                     <Route path="/vehicles/create" element={<VehicleCreatePage />} />
                     <Route path="/vehicles/:id/edit" element={<VehicleEditPage />} />

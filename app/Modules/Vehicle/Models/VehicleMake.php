@@ -25,4 +25,5 @@ final class VehicleMake extends CoreModel
     }
 
     public function models(): HasMany { return $this->hasMany(VehicleModel::class, 'vehicle_make_id'); }
+    public function vehicles(): HasMany { return $this->hasMany(Vehicle::class, 'vehicle_make_id'); }
 }

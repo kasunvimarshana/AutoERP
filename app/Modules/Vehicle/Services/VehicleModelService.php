@@ -31,7 +31,7 @@ final class VehicleModelService
         return $model->refresh()->load('make');
     }
 
-    public function delete(VehicleModel $model): void { $model->delete(); }
+    public function delete(VehicleModel $model): void { if ($model->vehicles()->exists()) { throw new InvalidArgumentException('Vehicle model cannot be deleted while vehicles reference it.'); } $model->delete(); }
     public function find(int $id, int $tenantId, ?int $organizationUnitId): VehicleModel { return $this->baseQuery($tenantId, $organizationUnitId)->with('make')->findOrFail($id); }
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator { return $this->criteria($this->baseQuery($tenantId, $organizationUnitId)->with('make'), $criteria)->orderBy('name')->paginate($perPage); }
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator { $criteria['is_active'] = true; return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50)); }

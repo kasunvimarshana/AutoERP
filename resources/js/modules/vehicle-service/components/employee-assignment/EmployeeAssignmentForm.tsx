@@ -6,7 +6,6 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Select } from '@/shared/components/Select';
-import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { CommissionType, VehicleServiceJobLine } from '../../vehicleServiceTypes';
 import type { AssignmentFormValue } from './assignmentForm';

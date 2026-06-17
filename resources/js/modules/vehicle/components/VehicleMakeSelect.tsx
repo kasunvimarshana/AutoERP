@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { searchVehicleMakes } from '../vehicleApi';
 import type { VehicleMake } from '../vehicleTypes';
@@ -8,6 +7,5 @@ export function VehicleMakeSelect({ value, onChange, error }: {
     onChange: (value: VehicleMake | null) => void;
     error?: string;
 }) {
-    const search = useCallback(searchVehicleMakes, []);
-    return <GenericLookupSelect label="Make" value={value} onChange={onChange} search={search} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} loadOnOpen minSearchLength={0} />;
+    return <GenericLookupSelect label="Make" value={value} onChange={onChange} search={searchVehicleMakes} formatLabel={(item) => `${item.code ?? ''} ${item.name}`.trim()} error={error} loadOnOpen minSearchLength={0} />;
 }

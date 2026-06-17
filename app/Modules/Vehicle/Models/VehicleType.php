@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Vehicle\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 
@@ -23,4 +24,6 @@ final class VehicleType extends CoreModel
             'sort_order' => 'integer',
         ]);
     }
+
+    public function vehicles(): HasMany { return $this->hasMany(Vehicle::class, 'vehicle_type_id'); }
 }

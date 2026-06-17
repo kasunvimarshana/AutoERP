@@ -46,6 +46,7 @@ describe('navigation access and matching', () => {
 
         expect(itemIds).toContain('purchase');
         expect(itemIds).toContain('vehicle-rental');
+        expect(itemIds).toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
     });
@@ -63,6 +64,26 @@ describe('navigation access and matching', () => {
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('sales');
         expect(itemIds).toContain('suppliers');
+        expect(itemIds).toContain('vehicle');
+    });
+
+    it('selects vehicle master-data children before the broader vehicle list route', () => {
+        const match = findNavigationMatch('/vehicles/models', '', navigationSections);
+
+        expect(match?.parent?.id).toBe('vehicle');
+        expect(match?.item.id).toBe('vehicle-models');
+    });
+
+    it('hides the vehicle parent when the vehicle module is unavailable', () => {
+        const sections = filterNavigation(navigationSections, {
+            tenantId: 10,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [],
+            enabledModules: ['supplier', 'customer'],
+        });
+
+        expect(sections.flatMap((section) => section.items).map((item) => item.id)).not.toContain('vehicle');
     });
 
     it('selects the query-specific child for shared invoice routes', () => {
@@ -108,6 +129,7 @@ describe('navigation access and matching', () => {
             { section: 'Master Data', items: [
                 { label: 'Suppliers', children: ['Supplier List', 'Supplier Vehicles'] },
                 { label: 'Customers', children: ['Customer List', 'Customer Vehicles'] },
+                { label: 'Vehicle', children: ['Makes', 'Types', 'Categories', 'Models', 'Vehicles'] },
                 { label: 'Items', children: ['Item List'] },
             ] },
             { section: 'Access Control', items: [
