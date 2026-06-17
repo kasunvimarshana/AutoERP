@@ -41,7 +41,19 @@ final class VehicleQueryService
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Vehicle
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->with(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner'])
+            ->with([
+                'make',
+                'model',
+                'type',
+                'category',
+                'documents',
+                'attributes',
+                'ownerships.customerOwner',
+                'ownerships.supplierOwner',
+                'currentOwnerships.customerOwner',
+                'currentOwnerships.supplierOwner',
+                'statusHistories',
+            ])
             ->findOrFail($id);
     }
 

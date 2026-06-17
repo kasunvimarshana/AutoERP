@@ -16,6 +16,7 @@ use Modules\Vehicle\Http\Resources\VehicleResource;
 use Modules\Vehicle\Http\Resources\VehicleSummaryResource;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Services\VehicleCreationService;
+use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleQueryService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleUpdateService;
@@ -27,10 +28,13 @@ final class VehicleController
         private readonly VehicleCreationService $creation,
         private readonly VehicleUpdateService $updates,
         private readonly VehicleStatusService $statuses,
+        private readonly VehicleAuthorizationService $authorization,
     ) {}
 
     public function index(ListVehicleRequest $request): AnonymousResourceCollection
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::VIEW);
+
         return VehicleSummaryResource::collection($this->queries->paginate(
             $request->validated(),
             $request->tenantId(),
@@ -41,16 +45,22 @@ final class VehicleController
 
     public function store(StoreVehicleRequest $request): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CREATE);
+
         return $this->created($this->creation->create($request->toData()));
     }
 
     public function storeWithRelations(StoreVehicleWithRelationsRequest $request): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CREATE);
+
         return $this->created($this->creation->create($request->toData()));
     }
 
     public function show(ListVehicleRequest $request, int $vehicle): VehicleResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::VIEW);
+
         return new VehicleResource($this->queries->find(
             $vehicle,
             $request->tenantId(),
@@ -60,6 +70,8 @@ final class VehicleController
 
     public function update(UpdateVehicleRequest $request, int $vehicle): VehicleResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::UPDATE);
+
         return new VehicleResource($this->updates->update(
             $this->queries->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId()),
             $request->toData(),
@@ -68,6 +80,8 @@ final class VehicleController
 
     public function destroy(ListVehicleRequest $request, int $vehicle): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::DELETE);
+
         $this->queries->delete($this->queries->vehicle(
             $vehicle,
             $request->tenantId(),
@@ -89,6 +103,8 @@ final class VehicleController
 
     public function changeStatus(ChangeVehicleStatusRequest $request, int $vehicle): VehicleResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CHANGE_STATUS);
+
         $model = $this->queries->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
 
         return new VehicleResource($this->statuses->change($model, $request->toData())->load(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner']));
@@ -96,6 +112,8 @@ final class VehicleController
 
     public function lookup(ListVehicleRequest $request, ?string $kind = null): AnonymousResourceCollection
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::VIEW);
+
         return VehicleSummaryResource::collection($this->queries->lookup(
             $request->validated(),
             $request->tenantId(),
@@ -107,6 +125,8 @@ final class VehicleController
 
     private function changeTo(ListVehicleRequest $request, int $vehicle, VehicleStatus $status): VehicleResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CHANGE_STATUS);
+
         $model = $this->queries->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
 
         return new VehicleResource($this->statuses->changeTo(

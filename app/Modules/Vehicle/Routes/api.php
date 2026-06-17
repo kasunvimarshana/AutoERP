@@ -29,6 +29,8 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
 
     Route::get('vehicles/{vehicle}/documents', [VehicleRelationController::class, 'documents'])->whereNumber('vehicle');
     Route::post('vehicles/{vehicle}/documents', [VehicleRelationController::class, 'storeDocument'])->whereNumber('vehicle');
+    Route::get('vehicles/{vehicle}/documents/{document}/preview', [VehicleRelationController::class, 'previewDocument'])->whereNumber(['vehicle', 'document']);
+    Route::get('vehicles/{vehicle}/documents/{document}/download', [VehicleRelationController::class, 'downloadDocument'])->whereNumber(['vehicle', 'document']);
     Route::put('vehicles/{vehicle}/documents/{document}', [VehicleRelationController::class, 'updateDocument'])->whereNumber(['vehicle', 'document']);
     Route::delete('vehicles/{vehicle}/documents/{document}', [VehicleRelationController::class, 'destroyDocument'])->whereNumber(['vehicle', 'document']);
 

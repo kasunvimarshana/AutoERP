@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { FormActions } from '@/shared/components/FormActions';
@@ -9,10 +10,12 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { getVehicle, updateVehicle } from './vehicleApi';
 import { VehicleAttributeTab } from './components/VehicleAttributeTab';
 import { VehicleBasicFields } from './components/VehicleBasicFields';
 import { VehicleDocumentTab } from './components/VehicleDocumentTab';
+import { hasVehiclePermission, vehiclePermissions } from './vehiclePermissions';
 import type { Vehicle, VehicleCategory, VehicleMake, VehicleModel, VehiclePayload, VehicleType } from './vehicleTypes';
 
 type EditTab = 'basic' | 'documents' | 'attributes';
@@ -25,6 +28,8 @@ const tabs = [
 export default function VehicleEditPage() {
     const vehicleId = Number(useParams().id);
     const navigate = useNavigate();
+    const auth = useAuth();
+    const canUpdate = hasVehiclePermission(auth.permissions, vehiclePermissions.update);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [activeTab, setActiveTab] = useState<EditTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);
@@ -85,12 +90,24 @@ export default function VehicleEditPage() {
     });
     const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot.current && snapshot !== initialSnapshot.current && !submitting));
 
+    if (!canUpdate) {
+        return (
+            <div className="mx-auto max-w-6xl">
+                <ContentHeader title="Edit Vehicle" description={vehicle?.vehicle_number ?? undefined} />
+                <CapabilityNotice>You do not have permission to edit vehicles.</CapabilityNotice>
+            </div>
+        );
+    }
+
     const submit = async () => {
         if (submitting || finalPayload === null) return;
         setSubmitting(true);
         setError(null);
         try {
-            const updated = await updateVehicle(vehicleId, finalPayload);
+            const editablePayload = { ...finalPayload };
+            delete editablePayload.status;
+            delete editablePayload.vehicle_number;
+            const updated = await updateVehicle(vehicleId, editablePayload);
             navigate(`/vehicles/${updated.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -123,6 +140,7 @@ export default function VehicleEditPage() {
                             onCategoryChange={setCategory}
                             error={error}
                             vehicleNumberReadOnly
+                            statusReadOnly
                         />
                     </TabPanel>
                     <TabPanel tabsId="vehicle-edit-tabs" tabId="documents" active={activeTab}>

@@ -15,6 +15,7 @@ use Modules\Vehicle\Models\VehicleMake;
 use Modules\Vehicle\Models\VehicleModel;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\Vehicle\Models\VehicleType;
+use Modules\Vehicle\Services\VehicleAuthorizationService;
 
 final class VehicleSeeder extends Seeder
 {
@@ -35,6 +36,7 @@ final class VehicleSeeder extends Seeder
         DB::transaction(function () use ($tenant, $organizationUnit): void {
             $tenantId = (int) $tenant->getKey();
             $organizationUnitId = $organizationUnit?->getKey();
+            $this->seedPermissions($tenantId);
             $makes = $this->seedMakesAndModels($tenantId, $organizationUnitId);
             $type = $this->seedType($tenantId, $organizationUnitId);
             $category = $this->seedCategory($tenantId, $organizationUnitId);
@@ -84,6 +86,37 @@ final class VehicleSeeder extends Seeder
                 );
             }
         }, 3);
+    }
+
+    private function seedPermissions(int $tenantId): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            return;
+        }
+
+        $guard = (string) config('auth.defaults.guard', 'web');
+        foreach ([
+            VehicleAuthorizationService::VIEW => 'View vehicles, master data, documents, attributes, and status history.',
+            VehicleAuthorizationService::CREATE => 'Create vehicle master records.',
+            VehicleAuthorizationService::UPDATE => 'Update vehicle master records.',
+            VehicleAuthorizationService::DELETE => 'Delete vehicle master records.',
+            VehicleAuthorizationService::MANAGE_DOCUMENTS => 'Upload, update, replace, and delete vehicle documents.',
+            VehicleAuthorizationService::DOWNLOAD_DOCUMENTS => 'Preview and download vehicle documents.',
+            VehicleAuthorizationService::MANAGE_ATTRIBUTES => 'Create, update, and delete vehicle attributes.',
+            VehicleAuthorizationService::CHANGE_STATUS => 'Change vehicle status through the status workflow.',
+        ] as $name => $description) {
+            DB::table('permissions')->updateOrInsert(
+                ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
+                [
+                    'organization_unit_id' => null,
+                    'module' => 'Vehicle',
+                    'description' => $description,
+                    'row_version' => 1,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
+        }
     }
 
     /**

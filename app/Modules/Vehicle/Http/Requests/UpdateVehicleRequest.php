@@ -12,6 +12,28 @@ use Modules\Vehicle\Enums\VehicleTransmissionType;
 
 final class UpdateVehicleRequest extends TenantScopedRequest
 {
+    private const EDITABLE_FIELDS = [
+        'code',
+        'vehicle_make_id',
+        'vehicle_model_id',
+        'vehicle_type_id',
+        'vehicle_category_id',
+        'registration_number',
+        'chassis_number',
+        'engine_number',
+        'vin_number',
+        'manufacture_year',
+        'registration_date',
+        'color',
+        'fuel_type',
+        'transmission_type',
+        'odometer_reading',
+        'odometer_unit',
+        'fuel_level',
+        'notes',
+        'metadata',
+    ];
+
     public function rules(): array
     {
         return [
@@ -62,7 +84,7 @@ final class UpdateVehicleRequest extends TenantScopedRequest
             fuelLevel: $this->stringOrNull('fuel_level'),
             notes: $this->stringOrNull('notes'),
             metadata: $this->has('metadata') ? $this->input('metadata') : null,
-            provided: array_keys($this->all()),
+            provided: array_values(array_intersect(self::EDITABLE_FIELDS, array_keys($this->validated()))),
         );
     }
 

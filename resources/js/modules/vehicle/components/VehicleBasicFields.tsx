@@ -3,6 +3,7 @@ import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { VehicleCategorySelect } from './VehicleCategorySelect';
 import { VehicleMakeSelect } from './VehicleMakeSelect';
@@ -27,6 +28,7 @@ export function VehicleBasicFields({
     onCategoryChange,
     error,
     vehicleNumberReadOnly = false,
+    statusReadOnly = false,
 }: {
     value: VehiclePayload;
     onChange: (value: VehiclePayload) => void;
@@ -40,6 +42,7 @@ export function VehicleBasicFields({
     onCategoryChange: (value: VehicleCategory | null) => void;
     error: ApiError | null;
     vehicleNumberReadOnly?: boolean;
+    statusReadOnly?: boolean;
 }) {
     const set = (key: keyof VehiclePayload, next: unknown) => onChange({ ...value, [key]: next });
     const input = (key: keyof VehiclePayload) => ({
@@ -55,11 +58,29 @@ export function VehicleBasicFields({
                 <Input label="Vehicle Number" {...input('vehicle_number')} disabled={vehicleNumberReadOnly} />
                 <Input label="Code" {...input('code')} />
                 <Input label="Registration" {...input('registration_number')} />
-                <VehicleMakeSelect value={make} onChange={(next) => { onMakeChange(next); if (!next) onModelChange(null); }} error={fieldError(error, 'vehicle_make_id')} />
+                <VehicleMakeSelect
+                    value={make}
+                    onChange={(next) => {
+                        const currentMakeId = make?.id ?? null;
+                        const nextMakeId = next?.id ?? null;
+                        onMakeChange(next);
+                        if (currentMakeId !== nextMakeId) onModelChange(null);
+                    }}
+                    error={fieldError(error, 'vehicle_make_id')}
+                />
                 <VehicleModelSelect makeId={make?.id} value={model} onChange={onModelChange} error={fieldError(error, 'vehicle_model_id')} />
                 <VehicleTypeSelect value={type} onChange={onTypeChange} error={fieldError(error, 'vehicle_type_id')} />
                 <VehicleCategorySelect value={category} onChange={onCategoryChange} error={fieldError(error, 'vehicle_category_id')} />
-                <Select label="Status" options={statusOptions.map((option) => ({ value: option, label: option.replaceAll('_', ' ') }))} {...input('status')} />
+                {statusReadOnly ? (
+                    <div className="block text-sm text-slate-700">
+                        <span className="mb-1.5 block font-medium">Status</span>
+                        <div className="flex min-h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
+                            <StatusBadge status={String(value.status ?? '')} />
+                        </div>
+                    </div>
+                ) : (
+                    <Select label="Status" options={statusOptions.map((option) => ({ value: option, label: option.replaceAll('_', ' ') }))} {...input('status')} />
+                )}
                 <DecimalInput label="Odometer" value={String(value.odometer_reading ?? '')} onChange={(event) => set('odometer_reading', event.target.value)} error={fieldError(error, 'odometer_reading')} />
             </fieldset>
 

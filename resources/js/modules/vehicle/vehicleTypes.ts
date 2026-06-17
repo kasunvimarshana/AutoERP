@@ -140,12 +140,23 @@ export interface VehicleDocument {
     document_number?: string | null;
     issued_date?: string | null;
     expiry_date?: string | null;
-    file_path?: string | null;
+    file_name?: string | null;
+    has_file?: boolean;
+    preview_url?: string | null;
+    download_url?: string | null;
     status: VehicleDocumentStatus;
     notes?: string | null;
 }
 
-export type VehicleDocumentPayload = Omit<VehicleDocument, 'id'>;
+export interface VehicleDocumentPayload {
+    document_type: VehicleDocumentType;
+    document_number?: string | null;
+    issued_date?: string | null;
+    expiry_date?: string | null;
+    file?: File | null;
+    status?: VehicleDocumentStatus;
+    notes?: string | null;
+}
 
 export interface VehicleOwnership {
     id: number;

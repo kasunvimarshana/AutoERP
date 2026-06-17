@@ -35,7 +35,11 @@ export const createVehicle = (payload: VehiclePayload) =>
     apiClient.post<ApiResource<Vehicle>>(endpoints.vehicles, payload).then((response) => response.data.data);
 
 export const createVehicleWithRelations = (payload: VehicleWithRelationsPayload) =>
-    apiClient.post<ApiResource<Vehicle>>(`${endpoints.vehicles}/with-relations`, payload).then((response) => response.data.data);
+    apiClient.post<ApiResource<Vehicle>>(
+        `${endpoints.vehicles}/with-relations`,
+        hasDocumentFiles(payload.documents) ? vehicleWithRelationsFormData(payload) : payload,
+        hasDocumentFiles(payload.documents) ? multipartConfig : undefined,
+    ).then((response) => response.data.data);
 
 export const updateVehicle = (id: number, payload: Partial<VehiclePayload>) =>
     apiClient.put<ApiResource<Vehicle>>(`${endpoints.vehicles}/${id}`, payload).then((response) => response.data.data);
@@ -106,10 +110,21 @@ const relationPath = (vehicleId: number, relation: string) => `${endpoints.vehic
 export const listVehicleDocuments = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleDocument>>(relationPath(vehicleId, 'documents'), { params, signal }).then((response) => response.data);
 export const createVehicleDocument = (vehicleId: number, payload: VehicleDocumentPayload) =>
-    apiClient.post<ApiResource<VehicleDocument>>(relationPath(vehicleId, 'documents'), payload).then((response) => response.data.data);
+    apiClient.post<ApiResource<VehicleDocument>>(
+        relationPath(vehicleId, 'documents'),
+        payload.file ? documentFormData(payload) : payload,
+        payload.file ? multipartConfig : undefined,
+    ).then((response) => response.data.data);
 export const updateVehicleDocument = (vehicleId: number, id: number, payload: VehicleDocumentPayload) =>
-    apiClient.put<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, payload).then((response) => response.data.data);
+    payload.file
+        ? apiClient.post<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, documentFormData(payload, 'PUT'), multipartConfig).then((response) => response.data.data)
+        : apiClient.put<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, payload).then((response) => response.data.data);
 export const deleteVehicleDocument = (vehicleId: number, id: number) => apiClient.delete(`${relationPath(vehicleId, 'documents')}/${id}`);
+export const previewVehicleDocumentUrl = (vehicleId: number, id: number) => `${relationPath(vehicleId, 'documents')}/${id}/preview`;
+export const downloadVehicleDocumentUrl = (vehicleId: number, id: number) => `${relationPath(vehicleId, 'documents')}/${id}/download`;
+export const fetchVehicleDocumentFile = (vehicleId: number, id: number, mode: 'preview' | 'download') =>
+    apiClient.get<Blob>(mode === 'preview' ? previewVehicleDocumentUrl(vehicleId, id) : downloadVehicleDocumentUrl(vehicleId, id), { responseType: 'blob' })
+        .then((response) => response.data);
 
 export const listVehicleOwnerships = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleOwnership>>(relationPath(vehicleId, 'ownerships'), { params, signal }).then((response) => response.data);
@@ -129,3 +144,56 @@ export const deleteVehicleAttribute = (vehicleId: number, id: number) => apiClie
 
 export const listVehicleStatusHistory = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleStatusHistory>>(relationPath(vehicleId, 'status-history'), { params, signal }).then((response) => response.data);
+
+const multipartConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
+function hasDocumentFiles(documents: VehicleDocumentPayload[]): boolean {
+    return documents.some((document) => Boolean(document.file));
+}
+
+function vehicleWithRelationsFormData(payload: VehicleWithRelationsPayload): FormData {
+    const formData = new FormData();
+    appendObject(formData, 'vehicle', payload.vehicle);
+    payload.documents.forEach((document, index) => appendObject(formData, `documents[${index}]`, document));
+    payload.ownerships.forEach((ownership, index) => appendObject(formData, `ownerships[${index}]`, ownership));
+    payload.attributes.forEach((attribute, index) => appendObject(formData, `attributes[${index}]`, attribute));
+
+    return formData;
+}
+
+function documentFormData(payload: VehicleDocumentPayload, method?: 'PUT'): FormData {
+    const formData = new FormData();
+    if (method) formData.append('_method', method);
+    appendObject(formData, '', payload);
+
+    return formData;
+}
+
+function appendObject(formData: FormData, prefix: string, value: Record<string, unknown>) {
+    Object.entries(value).forEach(([key, entry]) => {
+        const field = prefix ? `${prefix}[${key}]` : key;
+        appendValue(formData, field, entry);
+    });
+}
+
+function appendValue(formData: FormData, field: string, entry: unknown) {
+    if (entry === undefined) return;
+    if (entry instanceof File) {
+        formData.append(field, entry);
+        return;
+    }
+    if (entry === null) {
+        formData.append(field, '');
+        return;
+    }
+    if (Array.isArray(entry)) {
+        entry.forEach((item, index) => appendValue(formData, `${field}[${index}]`, item));
+        return;
+    }
+    if (typeof entry === 'object' && !(entry instanceof Blob)) {
+        Object.entries(entry as Record<string, unknown>).forEach(([key, value]) => appendValue(formData, `${field}[${key}]`, value));
+        return;
+    }
+
+    formData.append(field, String(entry));
+}

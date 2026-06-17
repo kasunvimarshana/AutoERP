@@ -2,13 +2,16 @@ import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { FormActions } from '@/shared/components/FormActions';
 import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { createVehicle, createVehicleWithRelations } from './vehicleApi';
+import { hasVehiclePermission, vehiclePermissions } from './vehiclePermissions';
 import { VehicleAttributeDraftEditor } from './components/VehicleAttributeDraftEditor';
 import { VehicleBasicFields } from './components/VehicleBasicFields';
 import { VehicleDocumentDraftEditor } from './components/VehicleDocumentDraftEditor';
@@ -23,6 +26,8 @@ const tabs = [
 
 export default function VehicleCreatePage() {
     const navigate = useNavigate();
+    const auth = useAuth();
+    const canCreate = hasVehiclePermission(auth.permissions, vehiclePermissions.create);
     const [activeTab, setActiveTab] = useState<CreateTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);
@@ -41,9 +46,18 @@ export default function VehicleCreatePage() {
         vehicle_type_id: type?.id ?? null,
         vehicle_category_id: category?.id ?? null,
     }), [category, make, model, payload, type]);
-    const snapshot = JSON.stringify({ finalPayload, documents, attributes });
+    const snapshot = JSON.stringify({ finalPayload, documents: documentsForSnapshot(documents), attributes });
     const initialSnapshot = useRef(snapshot);
     const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot.current && !submitting);
+
+    if (!canCreate) {
+        return (
+            <div className="mx-auto max-w-6xl">
+                <ContentHeader title="Create Vehicle" description="Create vehicle master data, documents, and attributes." />
+                <CapabilityNotice>You do not have permission to create vehicles.</CapabilityNotice>
+            </div>
+        );
+    }
 
     const submit = async () => {
         if (submitting) return;
@@ -97,6 +111,13 @@ export default function VehicleCreatePage() {
             </FormActions>
         </div>
     );
+}
+
+function documentsForSnapshot(documents: VehicleDocumentPayload[]) {
+    return documents.map((document) => ({
+        ...document,
+        file: document.file ? { name: document.file.name, size: document.file.size, type: document.file.type } : null,
+    }));
 }
 
 function defaultVehiclePayload(): VehiclePayload {

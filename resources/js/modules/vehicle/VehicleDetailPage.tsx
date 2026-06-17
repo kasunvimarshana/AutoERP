@@ -10,6 +10,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { getVehicle } from './vehicleApi';
+import { hasVehiclePermission, vehiclePermissions } from './vehiclePermissions';
 import { VehicleAttributesView } from './components/VehicleAttributesView';
 import { VehicleDocumentsView } from './components/VehicleDocumentsView';
 import { VehicleSummaryCard } from './components/VehicleSummaryCard';
@@ -34,7 +35,7 @@ export default function VehicleDetailPage() {
     if (result.loading) return <LoadingState label="Loading vehicle..." />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const vehicle = result.data;
-    const canEdit = auth.permissions.length === 0 || auth.permissions.some((permission) => permission.startsWith('vehicle.'));
+    const canEdit = hasVehiclePermission(auth.permissions, vehiclePermissions.update);
 
     return (
         <div className="mx-auto max-w-6xl">

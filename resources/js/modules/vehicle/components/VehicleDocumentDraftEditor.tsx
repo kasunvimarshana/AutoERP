@@ -9,7 +9,7 @@ import type { VehicleDocumentPayload } from '../vehicleTypes';
 
 const documentTypes = ['registration', 'insurance', 'emission_test', 'revenue_license', 'fitness_certificate', 'lease_document', 'ownership_document', 'warranty', 'other'];
 const statuses = ['pending', 'active', 'expired', 'revoked'];
-const emptyDocument: VehicleDocumentPayload = { document_type: 'registration', document_number: '', issued_date: '', expiry_date: '', file_path: '', status: 'pending', notes: '' };
+const emptyDocument: VehicleDocumentPayload = { document_type: 'registration', document_number: '', issued_date: '', expiry_date: '', file: null, status: 'pending', notes: '' };
 
 export function VehicleDocumentDraftEditor({
     documents,
@@ -32,7 +32,7 @@ export function VehicleDocumentDraftEditor({
             <div className="grid gap-3 md:grid-cols-3">
                 <Select label="Document Type" value={draft.document_type} options={documentTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setDraft({ ...draft, document_type: event.target.value as VehicleDocumentPayload['document_type'] })} error={fieldError(error, 'documents.0.document_type')} />
                 <Input label="Reference Number" value={draft.document_number ?? ''} onChange={(event) => setDraft({ ...draft, document_number: event.target.value })} error={fieldError(error, 'documents.0.document_number')} />
-                <Input label="File Path" value={draft.file_path ?? ''} onChange={(event) => setDraft({ ...draft, file_path: event.target.value })} error={fieldError(error, 'documents.0.file_path')} />
+                <Input label="File" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={(event) => setDraft({ ...draft, file: event.target.files?.[0] ?? null })} error={fieldError(error, 'documents.0.file')} />
                 <Input label="Issue Date" type="date" value={draft.issued_date ?? ''} onChange={(event) => setDraft({ ...draft, issued_date: event.target.value })} error={fieldError(error, 'documents.0.issued_date')} />
                 <Input label="Expiry Date" type="date" value={draft.expiry_date ?? ''} onChange={(event) => setDraft({ ...draft, expiry_date: event.target.value })} error={fieldError(error, 'documents.0.expiry_date')} />
                 <Select label="Status" value={draft.status} options={statuses.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setDraft({ ...draft, status: event.target.value as VehicleDocumentPayload['status'] })} error={fieldError(error, 'documents.0.status')} />
@@ -65,7 +65,7 @@ function DocumentCards({ documents, onRemove }: { documents: VehicleDocumentPayl
                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                         <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issue Date</dt><dd>{document.issued_date || '-'}</dd></div>
                         <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expiry Date</dt><dd>{document.expiry_date || '-'}</dd></div>
-                        <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">File</dt><dd className="break-all">{document.file_path || '-'}</dd></div>
+                        <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">File</dt><dd className="break-all">{document.file?.name || '-'}</dd></div>
                     </dl>
                     <div className="mt-4 flex justify-end">
                         <Button type="button" variant="ghost" onClick={() => onRemove(index)}>Remove</Button>
