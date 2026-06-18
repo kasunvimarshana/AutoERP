@@ -107,6 +107,49 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(2, FinanceJournalEntry::query()->count());
     }
 
+    public function test_header_adjustments_affect_fast_purchase_invoice_and_payment_once(): void
+    {
+        $context = $this->context();
+
+        $result = app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-ADJUSTED',
+            'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
+            'adjustments' => [
+                [
+                    'name' => 'Freight',
+                    'adjustment_type' => 'freight',
+                    'effect' => 'increase',
+                    'amount' => '40.000000',
+                    'allocation_method' => 'proportional',
+                ],
+                [
+                    'name' => 'Order Discount',
+                    'adjustment_type' => 'discount',
+                    'effect' => 'decrease',
+                    'amount' => '10.000000',
+                    'allocation_method' => 'proportional',
+                ],
+            ],
+            'payment' => [
+                'lines' => [
+                    ['amount' => '300.000000', 'payment_method_id' => $context['cash_method_id'], 'source_account_id' => $context['cash_account_id']],
+                    ['amount' => '230.000000', 'payment_method_id' => $context['bank_method_id'], 'source_account_id' => $context['bank_account_id']],
+                ],
+            ],
+        ]));
+
+        $this->assertSame('30.000000', $result['summary']['adjustment_total']);
+        $this->assertSame('530.000000', $result['summary']['grand_total']);
+        $this->assertSame('530.000000', $result['summary']['paid_total']);
+        $this->assertSame('0.000000', $result['summary']['balance_due']);
+        $this->assertSame('530.000000', (string) Invoice::query()->firstOrFail()->grand_total);
+        $this->assertSame('530.000000', (string) Payment::query()->firstOrFail()->total_amount);
+        $this->assertSame('530.000000', (string) PaymentAllocation::query()->firstOrFail()->allocated_amount);
+        $this->assertSame(2, DB::table('invoice_adjustments')->count());
+        $this->assertSame(2, PaymentLine::query()->count());
+        $this->assertSame(3, FinanceJournalEntry::query()->count());
+    }
+
     public function test_direct_non_stock_purchase_has_invoice_payment_and_no_inventory(): void
     {
         $context = $this->context();

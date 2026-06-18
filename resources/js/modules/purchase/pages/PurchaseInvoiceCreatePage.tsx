@@ -10,7 +10,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
-import { createPurchaseInvoice, getInvoiceableGoodsReceiptLines, getInvoiceablePurchaseOrderLines, getPurchaseOrder, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
+import { createPurchaseInvoice, getGoodsReceipt, getInvoiceableGoodsReceiptLines, getInvoiceablePurchaseOrderLines, getPurchaseOrder, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, GoodsReceiptLookupSelect, PurchaseOrderLookupSelect, SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseInvoicePreview } from '../components/PurchaseInvoicePreview';
@@ -39,18 +39,17 @@ export default function PurchaseInvoiceCreatePage() {
     const [busy, setBusy] = useState(false);
     const errorFor = (field: string) => fieldError(error, field);
 
-    const addSource = async () => {
-        if (!source?.id) return;
-        if (sources.some((current) => current.type === sourceType && current.id === source.id)) return;
+    const appendSource = async (type: PurchaseInvoiceSourceType, sourceId: number, sourceLabel: string) => {
+        if (sources.some((current) => current.type === type && current.id === sourceId)) return;
         setBusy(true);
         setError(null);
         try {
-            if (sourceType === 'purchase_order') {
-                const rows = await getInvoiceablePurchaseOrderLines(source.id);
+            if (type === 'purchase_order') {
+                const rows = await getInvoiceablePurchaseOrderLines(sourceId);
                 setLines((current) => [...current, ...rows.map((row: PurchaseOrderLine) => ({
-                    sourceType,
-                    sourceId: source.id,
-                    sourceLabel: source.name,
+                    sourceType: type,
+                    sourceId,
+                    sourceLabel,
                     lineId: row.id ?? 0,
                     itemName: row.item?.name ?? '-',
                     sourceQty: row.ordered_quantity,
@@ -59,11 +58,11 @@ export default function PurchaseInvoiceCreatePage() {
                     quantity: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
                 }))]);
             } else {
-                const rows = await getInvoiceableGoodsReceiptLines(source.id);
+                const rows = await getInvoiceableGoodsReceiptLines(sourceId);
                 setLines((current) => [...current, ...rows.map((row: GoodsReceiptLine) => ({
-                    sourceType,
-                    sourceId: source.id,
-                    sourceLabel: source.name,
+                    sourceType: type,
+                    sourceId,
+                    sourceLabel,
                     lineId: row.id ?? 0,
                     itemName: row.item?.name ?? '-',
                     sourceQty: row.accepted_quantity,
@@ -72,7 +71,7 @@ export default function PurchaseInvoiceCreatePage() {
                     quantity: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
                 }))]);
             }
-            setSources((current) => [...current, { type: sourceType, id: source.id, label: source.name }]);
+            setSources((current) => [...current, { type, id: sourceId, label: sourceLabel }]);
             setSource(null);
             setPreview(null);
         } catch (requestError) {
@@ -82,6 +81,11 @@ export default function PurchaseInvoiceCreatePage() {
         }
     };
 
+    const addSource = async () => {
+        if (!source?.id) return;
+        await appendSource(sourceType, source.id, source.name);
+    };
+
     useEffect(() => {
         const poId = Number(searchParams.get('purchase_order_id'));
         const grnId = Number(searchParams.get('goods_receipt_id') ?? searchParams.get('grn_id'));
@@ -89,15 +93,25 @@ export default function PurchaseInvoiceCreatePage() {
             void getPurchaseOrder(poId)
                 .then((order) => {
                     setSourceType('purchase_order');
-                    setSource({ id: order.id, code: order.purchase_order_number, name: order.purchase_order_number ?? `Purchase Order #${order.id}` });
+                    const label = order.purchase_order_number ?? `Purchase Order #${order.id}`;
+                    setSource({ id: order.id, code: order.purchase_order_number, name: label });
                     if (order.supplier) setSupplier(order.supplier);
                     if (order.currency) setCurrency(order.currency);
+                    void appendSource('purchase_order', order.id, label);
                 })
                 .catch((requestError) => setError(toApiError(requestError)));
         } else if (Number.isFinite(grnId) && grnId > 0 && sources.length === 0 && !source) {
-            setSourceType('goods_receipt_note');
-            setSource({ id: grnId, name: `Goods Receipt #${grnId}` });
+            void getGoodsReceipt(grnId)
+                .then((grn) => {
+                    setSourceType('goods_receipt_note');
+                    const label = grn.grn_number ?? `Goods Receipt #${grn.id}`;
+                    setSource({ id: grn.id, code: grn.grn_number, name: label });
+                    if (grn.supplier) setSupplier(grn.supplier);
+                    void appendSource('goods_receipt_note', grn.id, label);
+                })
+                .catch((requestError) => setError(toApiError(requestError)));
         }
+        // Query source is consumed only while the form has no selected source.
     }, [searchParams, source, sources.length]);
 
     const removeSource = (item: { type: PurchaseInvoiceSourceType; id: number }) => {
@@ -152,7 +166,7 @@ export default function PurchaseInvoiceCreatePage() {
                 <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
                     <Select label="Source type" value={sourceType} options={[{ value: 'goods_receipt_note', label: 'GRN' }, { value: 'purchase_order', label: 'PO' }]} onChange={(event) => { setSourceType(event.target.value as PurchaseInvoiceSourceType); setSource(null); }} />
                     {sourceType === 'goods_receipt_note' ? <GoodsReceiptLookupSelect value={source} onChange={setSource} /> : <PurchaseOrderLookupSelect value={source} onChange={setSource} />}
-                    <Button type="button" variant="secondary" loading={busy} onClick={addSource}>Add source</Button>
+                    <Button type="button" variant="secondary" loading={busy} onClick={() => void addSource()}>Add source</Button>
                 </div>
                 {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}<button type="button" className="font-semibold text-rose-600" onClick={() => removeSource(item)}>Remove</button></span>)}</div>}
             </Panel>

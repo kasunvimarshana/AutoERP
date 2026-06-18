@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Requests;
 
+use Illuminate\Validation\Rule;
+use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
+use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
+use Modules\Purchase\Enums\PurchaseAdjustmentType;
+
 final class FastPurchaseRequest extends PurchaseRequest
 {
     /**
@@ -42,6 +49,23 @@ final class FastPurchaseRequest extends PurchaseRequest
             'lines.*.unit_cost' => ['nullable', 'decimal:0,6', 'gt:0'],
             'lines.*.discount_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.tax_group_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments' => ['nullable', 'array'],
+            'adjustments.*.name' => ['required', 'string', 'max:255'],
+            'adjustments.*.adjustment_type' => ['required', Rule::enum(PurchaseAdjustmentType::class)],
+            'adjustments.*.effect' => ['required', Rule::enum(PurchaseAdjustmentEffect::class)],
+            'adjustments.*.calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
+            'adjustments.*.calculation_base' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationBase::class)],
+            'adjustments.*.rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
+            'adjustments.*.amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'adjustments.*.allocation_method' => ['nullable', Rule::enum(PurchaseAdjustmentAllocationMethod::class)],
+            'adjustments.*.is_allocatable' => ['nullable', 'boolean'],
+            'adjustments.*.finance_posting_profile_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments.*.finance_account_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments.*.cost_treatment' => ['nullable', 'string', 'max:80'],
+            'adjustments.*.tax_treatment' => ['nullable', 'string', 'max:80'],
+            'adjustments.*.mapping_source' => ['nullable', 'in:catalogue,override'],
+            'adjustments.*.override_reason' => ['nullable', 'string', 'max:1000'],
+            'adjustments.*.description' => ['nullable', 'string'],
             'payment' => ['nullable', 'array'],
             'payment.amount' => ['nullable', 'decimal:0,6', 'gt:0'],
             'payment.payment_method_id' => ['nullable', 'integer', 'min:1'],

@@ -159,16 +159,23 @@ final class PurchaseReturnService
 
     public function approve(PurchaseReturn $return, ?int $approvedBy = null): PurchaseReturn
     {
-        if ($return->status !== PurchaseReturnStatus::Draft) {
-            throw new \InvalidArgumentException('Only draft purchase returns can be approved.');
-        }
+        return DB::transaction(function () use ($return, $approvedBy): PurchaseReturn {
+            $return = PurchaseReturn::query()->lockForUpdate()->findOrFail($return->getKey());
 
-        $return->status = PurchaseReturnStatus::Approved;
-        $return->approved_by = $approvedBy;
-        $return->approved_at = now();
-        $return->save();
+            if (! (bool) $return->approval_required) {
+                throw new \InvalidArgumentException('Purchase return does not require approval.');
+            }
+            if ($return->status !== PurchaseReturnStatus::Draft) {
+                throw new \InvalidArgumentException('Only draft purchase returns can be approved.');
+            }
 
-        return $return->refresh()->load(['supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustmentAllocations']);
+            $return->status = PurchaseReturnStatus::Approved;
+            $return->approved_by = $approvedBy;
+            $return->approved_at = now();
+            $return->save();
+
+            return $return->refresh()->load(['supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustmentAllocations']);
+        });
     }
 
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult

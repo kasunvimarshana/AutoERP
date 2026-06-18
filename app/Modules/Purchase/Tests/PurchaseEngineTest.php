@@ -51,6 +51,7 @@ use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
@@ -322,6 +323,106 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(PaymentDirection::Outbound, $payment->direction);
         $this->assertSame((int) $invoice->getKey(), $payment->allocations[0]->invoiceId);
         $this->assertSame((string) $invoice->grand_total, $payment->allocations[0]->allocatedAmount);
+    }
+
+    public function test_supplier_payment_creation_persists_payment_and_allocation(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $lineId = (int) $grn->lines->first()->getKey();
+
+        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            new CreatePurchaseInvoiceData(
+                tenantId: $tenantId,
+                invoiceDate: '2026-06-08',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                sources: [
+                    new PurchaseInvoiceSourceData(
+                        'goods_receipt_note',
+                        (int) $grn->getKey(),
+                        [$lineId => '20.000000'],
+                    ),
+                ],
+            ),
+        );
+
+        $payment = app(PurchasePaymentIntegrationService::class)->createSupplierPayment(
+            tenantId: $tenantId,
+            paymentDate: '2026-06-09',
+            amount: (string) $invoice->grand_total,
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            lines: [new PaymentLineData((string) $invoice->grand_total, referenceNumber: 'PAY-PURCHASE')],
+            allocations: [
+                new PaymentAllocationData(
+                    (int) $invoice->getKey(),
+                    (string) $invoice->grand_total,
+                    '2026-06-09',
+                ),
+            ],
+        );
+
+        $this->assertSame(1, Payment::query()->count());
+        $this->assertSame((string) $invoice->grand_total, (string) $payment->total_amount);
+        $this->assertSame((string) $invoice->grand_total, (string) $payment->allocated_amount);
+        $this->assertSame('0.000000', (string) $invoice->refresh()->balance_due);
+    }
+
+    public function test_purchase_return_approval_matrix_respects_approval_required(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $lineId = (int) $grn->lines->first()->getKey();
+        $returns = app(PurchaseReturnService::class);
+
+        $noApproval = $returns->create(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-10',
+            warehouseId: $warehouseId,
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            sourceType: 'goods_receipt_note',
+            sourceId: (int) $grn->getKey(),
+            approvalRequired: false,
+            lines: [new PurchaseReturnLineData('goods_receipt_note_line', $lineId, '5.000000')],
+        ));
+
+        try {
+            $returns->approve($noApproval);
+            $this->fail('Expected non-approval return approval to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Purchase return does not require approval.', $exception->getMessage());
+        }
+
+        $postedWithoutApproval = $returns->post($noApproval);
+        $this->assertSame(PurchaseReturnStatus::Posted->value, $postedWithoutApproval->status);
+
+        $approvalRequired = $returns->create(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-11',
+            warehouseId: $warehouseId,
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            sourceType: 'goods_receipt_note',
+            sourceId: (int) $grn->getKey(),
+            approvalRequired: true,
+            lines: [new PurchaseReturnLineData('goods_receipt_note_line', $lineId, '5.000000')],
+        ));
+
+        try {
+            $returns->post($approvalRequired);
+            $this->fail('Expected approval-required return posting to fail before approval.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Purchase return must be approved before posting.', $exception->getMessage());
+        }
+
+        $approved = $returns->approve($approvalRequired);
+        $this->assertSame(PurchaseReturnStatus::Approved, $approved->status);
+        $postedAfterApproval = $returns->post($approved);
+        $this->assertSame(PurchaseReturnStatus::Posted->value, $postedAfterApproval->status);
     }
 
     public function test_sequential_double_invoicing_is_prevented(): void

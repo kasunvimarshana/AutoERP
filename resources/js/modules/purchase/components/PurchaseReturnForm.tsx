@@ -43,6 +43,7 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
         Promise.all([getGoodsReceipt(source.id, controller.signal), getReturnableGoodsReceiptLines(source.id, controller.signal)])
             .then(([grn, rows]) => {
                 if (controller.signal.aborted) return;
+                setSource({ id: grn.id, code: grn.grn_number, name: grn.grn_number ?? `Goods Receipt #${grn.id}` });
                 setSupplier(grn.supplier ?? null);
                 setWarehouse(grn.warehouse ?? null);
                 setWarehouseLocation(grn.warehouse_location ?? null);

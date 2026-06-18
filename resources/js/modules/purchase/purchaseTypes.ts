@@ -498,6 +498,18 @@ export interface PurchasePaymentPreparePayload {
     currency_id?: number;
     exchange_rate?: string;
     reference_number?: string;
+    lines?: Array<{
+        amount: string;
+        payment_method_id?: number;
+        source_account_id?: number;
+        reference?: string;
+        instrument_direction?: 'received' | 'issued' | 'outbound';
+        external_bank_name?: string;
+        external_bank_branch?: string;
+        instrument_number?: string;
+        instrument_date?: string;
+        notes?: string;
+    }>;
     allocations?: Array<{
         invoice_id: number;
         allocated_amount: string;
@@ -540,6 +552,15 @@ export interface FastPurchaseContext {
     defaults: {
         purchase_date: string;
         exchange_rate: string;
+        currency_id?: number | null;
+        currency?: NamedResource | null;
+        currency_source?: string;
+        exchange_rate_source?: string;
+        warehouse_id?: number | null;
+        warehouse?: NamedResource | null;
+        warehouse_location_id?: number | null;
+        warehouse_location?: NamedResource | null;
+        warehouse_location_source?: string;
     };
     endpoints: Record<string, string>;
     warehouses: FastPurchaseOptionResource[];
@@ -574,6 +595,22 @@ export interface FastPurchasePayload {
         unit_cost?: string;
         discount_amount?: string;
         tax_group_id?: number;
+    }>;
+    adjustments?: Array<{
+        name: string;
+        adjustment_type: string;
+        effect: 'increase' | 'decrease';
+        calculation_type?: 'fixed' | 'percentage';
+        calculation_base?: string;
+        rate?: string;
+        amount?: string;
+        allocation_method?: string;
+        is_allocatable?: boolean;
+        cost_treatment?: string;
+        tax_treatment?: string;
+        mapping_source?: 'catalogue' | 'override';
+        override_reason?: string;
+        description?: string;
     }>;
     payment?: {
         amount?: string;
@@ -634,12 +671,18 @@ export interface FastPurchaseResult {
         discount_total: string;
         tax_total: string;
         withholding_total: string;
+        line_withholding_total?: string;
+        charge_total?: string;
+        adjustment_total?: string;
+        header_increase_total?: string;
+        header_decrease_total?: string;
         grand_total: string;
         paid_total: string;
         balance_due: string;
         stock_taxable_total?: string;
         non_stock_taxable_total?: string;
     };
+    adjustments?: Array<Record<string, unknown>>;
     lines: FastPurchaseLinePreview[];
     documents: {
         goods_receipt?: FastPurchaseDocumentReference | null;

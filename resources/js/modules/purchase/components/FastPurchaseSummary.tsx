@@ -7,6 +7,8 @@ const emptySummary = {
     discount_total: '0.000000',
     tax_total: '0.000000',
     withholding_total: '0.000000',
+    charge_total: '0.000000',
+    adjustment_total: '0.000000',
     grand_total: '0.000000',
     paid_total: '0.000000',
     balance_due: '0.000000',
@@ -18,10 +20,12 @@ interface FastPurchaseSummaryProps {
     submitting: boolean;
     previewing: boolean;
     canSubmit: boolean;
+    stale?: boolean;
     onPreview: () => void;
+    onCreateAnother?: () => void;
 }
 
-export function FastPurchaseSummary({ preview, result, submitting, previewing, canSubmit, onPreview }: FastPurchaseSummaryProps) {
+export function FastPurchaseSummary({ preview, result, submitting, previewing, canSubmit, stale, onPreview, onCreateAnother }: FastPurchaseSummaryProps) {
     const active = result ?? preview;
     const summary = active?.summary ?? emptySummary;
     const mode = active?.mode ? active.mode.replaceAll('_', ' ') : 'draft';
@@ -44,17 +48,19 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
     ].filter(Boolean);
 
     return (
-        <aside className="sticky bottom-0 top-4 space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:w-80">
+        <aside className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-slate-700">{mode}</span>
-                <Button type="button" variant="secondary" loading={previewing} onClick={onPreview}>Preview</Button>
+                {!result && <Button type="button" variant="secondary" loading={previewing} onClick={onPreview}>Preview</Button>}
             </div>
             <dl className="space-y-2 text-sm">
                 {[
                     ['Subtotal', summary.subtotal],
                     ['Discount', summary.discount_total],
                     ['Tax', summary.tax_total],
+                    ['Charges', summary.charge_total ?? '0.000000'],
                     ['Withholding', summary.withholding_total],
+                    ['Header adjustment net', summary.adjustment_total ?? '0.000000'],
                     ['Grand total', summary.grand_total],
                     ['Paid', summary.paid_total],
                     ['Balance', summary.balance_due],
@@ -73,7 +79,10 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
                     </ul>
                 </div>
             )}
-            <Button type="submit" className="w-full" loading={submitting} disabled={!canSubmit}>Create fast purchase</Button>
+            {stale && !result && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">Preview is stale. Refresh before submitting.</div>}
+            {result
+                ? <Button type="button" className="w-full" onClick={onCreateAnother}>Create another fast purchase</Button>
+                : <Button type="submit" className="w-full" loading={submitting} disabled={!canSubmit || stale}>Create fast purchase</Button>}
             {links.length > 0 && (
                 <div className="border-t border-slate-200 pt-3 text-sm">
                     <div className="space-y-1.5">

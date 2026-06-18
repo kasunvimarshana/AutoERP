@@ -41,7 +41,13 @@ use Modules\Payment\Services\PaymentCreationService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
+use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
+use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
+use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
+use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
+use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Supplier\Models\Supplier;
@@ -70,6 +76,9 @@ final class FastPurchaseService
         private readonly FinancePostingInterface $financePostings,
         private readonly LogActivityService $audit,
         private readonly WarehouseDefaultResolver $warehouses,
+        private readonly PurchaseDocumentContextService $documentContexts,
+        private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
+        private readonly PurchaseOrderCalculationService $purchaseCalculator,
     ) {}
 
     /**
@@ -83,10 +92,22 @@ final class FastPurchaseService
         $search = trim((string) ($payload['search'] ?? ''));
         $perPage = max(1, min(100, (int) ($payload['per_page'] ?? 25)));
 
+        $createContext = $this->documentContexts->purchaseOrderCreateContext($tenantId, $organizationUnitId);
+        $defaults = $createContext['defaults'] ?? [];
+
         return [
             'defaults' => [
-                'purchase_date' => now()->toDateString(),
-                'exchange_rate' => '1.000000',
+                'purchase_date' => $defaults['purchase_order_date'] ?? now()->toDateString(),
+                'exchange_rate' => $defaults['exchange_rate'] ?? '1.000000',
+                'currency_id' => $defaults['currency_id'] ?? null,
+                'currency' => $defaults['currency'] ?? null,
+                'currency_source' => $defaults['currency_source'] ?? 'none',
+                'exchange_rate_source' => $defaults['exchange_rate_source'] ?? 'none',
+                'warehouse_id' => $defaults['warehouse_id'] ?? null,
+                'warehouse' => $defaults['warehouse'] ?? null,
+                'warehouse_location_id' => $defaults['warehouse_location_id'] ?? null,
+                'warehouse_location' => $defaults['warehouse_location'] ?? null,
+                'warehouse_location_source' => $defaults['warehouse_location_source'] ?? 'none',
             ],
             'endpoints' => [
                 'supplier_search' => '/api/v1/suppliers/lookup/active',
@@ -189,7 +210,13 @@ final class FastPurchaseService
             }
         }
 
-        $summary = $this->summary($lines);
+        $adjustments = $this->resolveAdjustments(
+            is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [],
+            $lines,
+            $tenantId,
+            $organizationUnitId,
+        );
+        $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
         $this->validateCredit($supplier, $createInvoice, $summary['grand_total'], $payment['amount']);
 
@@ -214,6 +241,7 @@ final class FastPurchaseService
             ],
             'mode' => $this->mode($lines, $receiveStock, $createInvoice, $recordPayment),
             'lines' => $lines,
+            'adjustments' => $adjustments,
             'summary' => $summary,
             'payment' => $payment,
         ];
@@ -338,16 +366,19 @@ final class FastPurchaseService
             ? [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $goodsReceipt->getKey())]
             : [];
 
-        $adjustments = [];
-        if ($this->math->compare($resolved['summary']['withholding_total'], '0.000000') > 0) {
+        $adjustments = array_map(
+            fn (array $adjustment): InvoiceAdjustmentData => $this->invoiceAdjustmentData($adjustment),
+            $resolved['adjustments'],
+        );
+        if ($this->math->compare($resolved['summary']['line_withholding_total'], '0.000000') > 0) {
             $adjustments[] = new InvoiceAdjustmentData(
                 name: 'Withholding',
                 adjustmentType: AdjustmentType::Withholding,
                 effect: AdjustmentEffect::Decrease,
-                amount: $resolved['summary']['withholding_total'],
+                amount: $resolved['summary']['line_withholding_total'],
                 calculationType: 'fixed',
                 rate: '0.000000',
-                sourceAmount: $resolved['summary']['withholding_total'],
+                sourceAmount: $resolved['summary']['line_withholding_total'],
                 allocationMethod: AllocationMethod::Manual,
                 isSystemGenerated: true,
                 description: 'Fast purchase withholding',
@@ -452,7 +483,8 @@ final class FastPurchaseService
         $directTaxable = $resolved['summary']['non_stock_taxable_total'];
         $tax = $resolved['summary']['tax_total'];
         $withholding = $resolved['summary']['withholding_total'];
-        if ($this->math->isZero($directTaxable) && $this->math->isZero($tax) && $this->math->isZero($withholding)) {
+        $nonTaxAdjustments = $this->nonTaxAdjustmentFinanceLines($resolved);
+        if ($this->math->isZero($directTaxable) && $this->math->isZero($tax) && $this->math->isZero($withholding) && $nonTaxAdjustments === []) {
             return [];
         }
 
@@ -470,6 +502,7 @@ final class FastPurchaseService
         if (! $this->math->isZero($withholding)) {
             $lines[] = new FinancePostingLine(null, 'Withholding payable', credit: $withholding, profileKey: 'payable');
         }
+        $lines = array_merge($lines, $nonTaxAdjustments);
 
         return [$this->financePostings->post(new FinancePostingRequest(
             source: new PostingSourceData(
@@ -636,6 +669,11 @@ final class FastPurchaseService
             'discount_total' => '0.000000',
             'tax_total' => '0.000000',
             'withholding_total' => '0.000000',
+            'line_withholding_total' => '0.000000',
+            'charge_total' => '0.000000',
+            'adjustment_total' => '0.000000',
+            'header_increase_total' => '0.000000',
+            'header_decrease_total' => '0.000000',
             'grand_total' => '0.000000',
             'paid_total' => '0.000000',
             'balance_due' => '0.000000',
@@ -649,6 +687,7 @@ final class FastPurchaseService
             $summary['discount_total'] = $this->math->add($summary['discount_total'], $line['discount_amount']);
             $summary['tax_total'] = $this->math->add($summary['tax_total'], $line['non_withholding_tax_amount']);
             $summary['withholding_total'] = $this->math->add($summary['withholding_total'], $line['withholding_amount']);
+            $summary['line_withholding_total'] = $this->math->add($summary['line_withholding_total'], $line['withholding_amount']);
             $summary['grand_total'] = $this->math->add($summary['grand_total'], $line['line_total']);
 
             if ((bool) $line['is_stock']) {
@@ -656,6 +695,46 @@ final class FastPurchaseService
             } else {
                 $summary['non_stock_taxable_total'] = $this->math->add($summary['non_stock_taxable_total'], $taxable);
             }
+        }
+
+        $summary['balance_due'] = $summary['grand_total'];
+
+        return $summary;
+    }
+
+    /**
+     * @param  list<array{data: PurchaseHeaderAdjustmentData, amount: string}>  $adjustments
+     * @return array<string, string>
+     */
+    private function summaryWithAdjustments(array $summary, array $adjustments): array
+    {
+        foreach ($adjustments as $row) {
+            $data = $row['data'];
+            $amount = $row['amount'];
+
+            if ($data->effect === PurchaseAdjustmentEffect::Increase) {
+                $summary['grand_total'] = $this->math->add($summary['grand_total'], $amount);
+                $summary['adjustment_total'] = $this->math->add($summary['adjustment_total'], $amount);
+                $summary['header_increase_total'] = $this->math->add($summary['header_increase_total'], $amount);
+            } else {
+                $summary['grand_total'] = $this->math->sub($summary['grand_total'], $amount);
+                $summary['adjustment_total'] = $this->math->sub($summary['adjustment_total'], $amount);
+                $summary['header_decrease_total'] = $this->math->add($summary['header_decrease_total'], $amount);
+            }
+
+            if (in_array($data->adjustmentType, [PurchaseAdjustmentType::Discount, PurchaseAdjustmentType::CreditNote], true)) {
+                $summary['discount_total'] = $this->math->add($summary['discount_total'], $amount);
+            } elseif ($data->adjustmentType === PurchaseAdjustmentType::Tax) {
+                $summary['tax_total'] = $this->math->add($summary['tax_total'], $amount);
+            } elseif ($data->adjustmentType === PurchaseAdjustmentType::Withholding) {
+                $summary['withholding_total'] = $this->math->add($summary['withholding_total'], $amount);
+            } elseif ($data->effect === PurchaseAdjustmentEffect::Increase) {
+                $summary['charge_total'] = $this->math->add($summary['charge_total'], $amount);
+            }
+        }
+
+        if ($this->math->isNegative($summary['grand_total'])) {
+            throw new InvalidArgumentException('Fast purchase total cannot be negative.');
         }
 
         $summary['balance_due'] = $summary['grand_total'];
@@ -776,6 +855,129 @@ final class FastPurchaseService
         if (! $receiveStock && ! $createInvoice) {
             throw new InvalidArgumentException('Fast purchase must create a stock receipt or supplier invoice.');
         }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $payloads
+     * @param  list<array<string, mixed>>  $lines
+     * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string}>
+     */
+    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId): array
+    {
+        $adjustments = [];
+        foreach (array_values($payloads) as $index => $row) {
+            if (! is_array($row)) {
+                throw new InvalidArgumentException('Fast purchase adjustments are invalid.');
+            }
+
+            $data = new PurchaseHeaderAdjustmentData(
+                name: trim((string) $row['name']),
+                adjustmentType: PurchaseAdjustmentType::from((string) $row['adjustment_type']),
+                effect: PurchaseAdjustmentEffect::from((string) $row['effect']),
+                amount: $this->math->normalize((string) ($row['amount'] ?? '0.000000')),
+                calculationType: PurchaseAdjustmentCalculationType::from((string) ($row['calculation_type'] ?? PurchaseAdjustmentCalculationType::Fixed->value)),
+                calculationBase: PurchaseAdjustmentCalculationBase::from((string) ($row['calculation_base'] ?? PurchaseAdjustmentCalculationBase::Subtotal->value)),
+                rate: $this->math->normalize((string) ($row['rate'] ?? '0.000000')),
+                allocationMethod: PurchaseAdjustmentAllocationMethod::from((string) ($row['allocation_method'] ?? PurchaseAdjustmentAllocationMethod::Proportional->value)),
+                isAllocatable: (bool) ($row['is_allocatable'] ?? true),
+                sortOrder: $index,
+                description: $this->nullableString($row['description'] ?? null),
+                financePostingProfileId: $this->nullableInt($row['finance_posting_profile_id'] ?? null),
+                financeAccountId: $this->nullableInt($row['finance_account_id'] ?? null),
+                costTreatment: $this->nullableString($row['cost_treatment'] ?? null),
+                taxTreatment: $this->nullableString($row['tax_treatment'] ?? null),
+                mappingSource: $this->nullableString($row['mapping_source'] ?? null),
+                overrideReason: $this->nullableString($row['override_reason'] ?? null),
+            );
+
+            $this->validator->assertNonNegative($data->amount, 'Fast purchase adjustment amount cannot be negative.');
+            $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
+            $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
+            $adjustments[] = $data;
+        }
+
+        $amounts = $this->purchaseCalculator->headerAdjustmentAmounts(
+            array_map(fn (array $line): object => (object) [
+                'orderedQuantity' => $line['quantity'],
+                'unitPrice' => $line['unit_cost'],
+                'discountAmount' => $line['discount_amount'],
+                'taxAmount' => $line['non_withholding_tax_amount'],
+                'chargeAmount' => '0.000000',
+            ], $lines),
+            $adjustments,
+        );
+
+        return array_map(
+            static fn (PurchaseHeaderAdjustmentData $data, string $amount): array => ['data' => $data, 'amount' => $amount],
+            $adjustments,
+            $amounts,
+        );
+    }
+
+    /**
+     * @param  array{data: PurchaseHeaderAdjustmentData, amount: string}  $adjustment
+     */
+    private function invoiceAdjustmentData(array $adjustment): InvoiceAdjustmentData
+    {
+        $data = $adjustment['data'];
+
+        return new InvoiceAdjustmentData(
+            name: $data->name,
+            adjustmentType: $this->invoiceAdjustmentType($data->adjustmentType),
+            effect: $data->effect === PurchaseAdjustmentEffect::Increase ? AdjustmentEffect::Increase : AdjustmentEffect::Decrease,
+            amount: $adjustment['amount'],
+            calculationType: $data->calculationType->value,
+            rate: $data->rate,
+            sourceAmount: $adjustment['amount'],
+            allocationMethod: AllocationMethod::Manual,
+            isSystemGenerated: false,
+            description: $data->description,
+        );
+    }
+
+    private function invoiceAdjustmentType(PurchaseAdjustmentType $type): AdjustmentType
+    {
+        return match ($type) {
+            PurchaseAdjustmentType::Discount => AdjustmentType::Discount,
+            PurchaseAdjustmentType::Tax => AdjustmentType::Tax,
+            PurchaseAdjustmentType::Freight => AdjustmentType::Freight,
+            PurchaseAdjustmentType::CreditNote => AdjustmentType::CreditNote,
+            PurchaseAdjustmentType::DebitNote => AdjustmentType::DebitNote,
+            PurchaseAdjustmentType::Withholding => AdjustmentType::Withholding,
+            PurchaseAdjustmentType::Rounding => AdjustmentType::Rounding,
+            PurchaseAdjustmentType::Other,
+            PurchaseAdjustmentType::Custom => AdjustmentType::Other,
+            default => AdjustmentType::Charge,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $resolved
+     * @return list<FinancePostingLine>
+     */
+    private function nonTaxAdjustmentFinanceLines(array $resolved): array
+    {
+        $lines = [];
+        foreach ($resolved['adjustments'] as $adjustment) {
+            /** @var PurchaseHeaderAdjustmentData $data */
+            $data = $adjustment['data'];
+            $amount = $adjustment['amount'];
+            if ($this->math->isZero($amount)
+                || in_array($data->adjustmentType, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)
+            ) {
+                continue;
+            }
+
+            if ($data->effect === PurchaseAdjustmentEffect::Increase) {
+                $lines[] = new FinancePostingLine(null, $data->name, debit: $amount, profileKey: 'expense');
+                $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
+            } else {
+                $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
+                $lines[] = new FinancePostingLine(null, $data->name, credit: $amount, profileKey: 'expense');
+            }
+        }
+
+        return $lines;
     }
 
     /**
@@ -1043,6 +1245,7 @@ final class FastPurchaseService
             'options' => $resolved['options'],
             'summary' => $resolved['summary'],
             'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
+            'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
             'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
             'documents' => [],
         ];
@@ -1070,6 +1273,7 @@ final class FastPurchaseService
             'options' => $resolved['options'],
             'summary' => $this->summaryWithPaid($resolved['summary'], $invoice, $payment),
             'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
+            'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
             'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
             'documents' => [
                 'goods_receipt' => $goodsReceipt instanceof GoodsReceiptNote ? $this->goodsReceiptRef($goodsReceipt) : null,
@@ -1121,6 +1325,34 @@ final class FastPurchaseService
             'line_total' => $line['line_total'],
             'taxes' => $line['taxes'],
         ];
+    }
+
+    /**
+     * @param  list<array{data: PurchaseHeaderAdjustmentData, amount: string}>  $adjustments
+     * @return list<array<string, mixed>>
+     */
+    private function adjustmentPreview(array $adjustments): array
+    {
+        return array_map(static function (array $adjustment): array {
+            /** @var PurchaseHeaderAdjustmentData $data */
+            $data = $adjustment['data'];
+
+            return [
+                'name' => $data->name,
+                'adjustment_type' => $data->adjustmentType->value,
+                'effect' => $data->effect->value,
+                'calculation_type' => $data->calculationType->value,
+                'calculation_base' => $data->calculationBase->value,
+                'rate' => $data->rate,
+                'amount' => $adjustment['amount'],
+                'allocation_method' => $data->allocationMethod->value,
+                'finance_mapping' => [
+                    'cost_treatment' => $data->costTreatment,
+                    'tax_treatment' => $data->taxTreatment,
+                    'mapping_source' => $data->mappingSource,
+                ],
+            ];
+        }, $adjustments);
     }
 
     private function goodsReceiptRef(GoodsReceiptNote $goodsReceipt): array

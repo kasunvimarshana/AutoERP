@@ -77,6 +77,8 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
 
     Route::post('invoices/preview', [PurchaseIntegrationController::class, 'previewInvoice'])->name('invoices.preview');
     Route::post('invoices', [PurchaseIntegrationController::class, 'createInvoice'])->name('invoices.store');
+    Route::get('payments/context', [PurchaseIntegrationController::class, 'paymentContext'])->name('payments.context');
+    Route::post('payments', [PurchaseIntegrationController::class, 'createPayment'])->name('payments.store');
     Route::post('payments/prepare', [PurchaseIntegrationController::class, 'preparePayment'])->name('payments.prepare');
 
     Route::get('suppliers/{supplier}/item-mappings', [PurchaseOrderController::class, 'supplierItemMappings'])->whereNumber('supplier')->name('suppliers.item-mappings');

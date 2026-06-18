@@ -86,8 +86,7 @@ export default function PurchaseOrderDetailPage() {
                 actions={<div className="flex flex-wrap justify-end gap-2">
                     {capabilities.canReceive && hasPurchasePermission(auth.permissions, purchasePermissions.goodsReceiptsCreate) && <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary">Create Goods Receipt</LinkButton>}
                     {capabilities.canInvoice && hasPurchasePermission(auth.permissions, purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Invoice</LinkButton>}
-                    {hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute) && <LinkButton to={`/purchase/payments/prepare?purchase_order_id=${order.id}`} variant="secondary">Prepare Payment</LinkButton>}
-                    {capabilities.canReturn && hasPurchasePermission(auth.permissions, purchasePermissions.returnsCreate) && <LinkButton to={`/purchase/returns/create?purchase_order_id=${order.id}`} variant="secondary">Create Return</LinkButton>}
+                    {hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute) && <LinkButton to={`/purchase/payments/prepare?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Payment</LinkButton>}
                     <PurchaseOrderActions
                         order={order}
                         busy={busy}
