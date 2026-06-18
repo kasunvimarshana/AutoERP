@@ -10,11 +10,14 @@ import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { listPurchaseDebitNotes, type PurchaseDebitNote } from '../purchaseApi';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchaseDebitNoteListPage() {
+    const auth = useAuth();
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search);
@@ -28,9 +31,12 @@ export default function PurchaseDebitNoteListPage() {
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: 'Actions', render: (row) => <LinkButton to={`/purchase/debit-notes/${row.id}`} variant="ghost">View</LinkButton> },
     ];
+    const actions = hasPurchasePermission(auth.permissions, purchasePermissions.debitNotesCreate)
+        ? <LinkButton to="/purchase/debit-notes/create">New debit note</LinkButton>
+        : undefined;
     return (
         <div className="space-y-5">
-            <ContentHeader title="Purchase debit notes" actions={<LinkButton to="/purchase/debit-notes/create">New debit note</LinkButton>} />
+            <ContentHeader title="Purchase debit notes" actions={actions} />
             <ErrorAlert error={result.error} />
             <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

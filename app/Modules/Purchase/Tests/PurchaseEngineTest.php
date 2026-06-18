@@ -58,6 +58,7 @@ use Modules\Purchase\Models\PurchaseDebitNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Models\PurchaseReturnLine;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseDebitNoteService;
@@ -85,6 +86,26 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('10000.000000', (string) $order->charge_total);
         $this->assertSame('123000.000000', (string) $order->grand_total);
         $this->assertCount(3, $order->adjustments);
+    }
+
+    public function test_purchase_permission_descriptions_exclude_unsupported_workflows(): void
+    {
+        $permissions = PurchaseAuthorizationService::descriptions();
+
+        foreach ([
+            'purchase.goods_receipts.update',
+            'purchase.goods_receipts.cancel',
+            'purchase.supplier_invoices.update',
+            'purchase.supplier_invoices.post',
+            'purchase.supplier_invoices.cancel',
+            'purchase.returns.update',
+            'purchase.returns.reverse',
+            'purchase.debit_notes.update',
+            'purchase.debit_notes.reverse',
+            'purchase.debit_notes.cancel',
+        ] as $permission) {
+            $this->assertArrayNotHasKey($permission, $permissions);
+        }
     }
 
     public function test_line_and_header_percentage_adjustments_and_uom_conversion(): void
@@ -843,6 +864,167 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('2.500000', (string) $returnLine->charge_amount);
         $this->assertSame('506.500000', (string) $returnLine->line_total);
         $this->assertSame('506.500000', (string) $return->grand_total);
+    }
+
+    public function test_draft_purchase_return_blocks_grn_reversal(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '1.000000')],
+        ));
+
+        try {
+            app(GoodsReceiptNoteService::class)->reverse($grn);
+            $this->fail('Expected draft purchase return to block GRN reversal.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('Cannot reverse GRN while purchase returns are unresolved or impacting', $exception->getMessage());
+            $this->assertStringContainsString((string) $return->return_number, $exception->getMessage());
+        }
+
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
+    }
+
+    public function test_reversed_grn_blocks_existing_draft_return_posting(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '1.000000')],
+        ));
+        DB::table('goods_receipt_notes')->where('id', $grn->getKey())->update(['status' => GoodsReceiptNoteStatus::Reversed->value]);
+        DB::table('goods_receipt_note_lines')->where('goods_receipt_note_id', $grn->getKey())->update(['status' => 'reversed']);
+
+        try {
+            app(PurchaseReturnService::class)->post($return);
+            $this->fail('Expected reversed GRN to block purchase return posting.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Purchase return source goods receipt is no longer returnable.', $exception->getMessage());
+        }
+
+        $this->assertSame(0, InventoryMovement::query()->where('source_type', 'purchase_return')->count());
+        $this->assertSame(0, PurchaseDebitNote::query()->count());
+    }
+
+    public function test_partial_return_final_residual_reconciles_source_amounts(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData(
+                itemId: (int) $item->getKey(),
+                orderedQuantity: '3.000000',
+                unitPrice: '10.000000',
+                uomId: $uomId,
+                discountAmount: '1.000000',
+                taxAmount: '1.000000',
+                chargeAmount: '1.000000',
+            )],
+            adjustments: [
+                new PurchaseHeaderAdjustmentData('Freight', PurchaseAdjustmentType::Freight, PurchaseAdjustmentEffect::Increase, '1.000000'),
+            ],
+        ));
+        $order = $this->approveOrder($order);
+        $line = $order->lines->first();
+        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            tenantId: $tenantId,
+            receivedDate: '2026-06-06',
+            warehouseId: $warehouseId,
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '3.000000', '3.000000', '10.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '3.000000')],
+        ));
+        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load(['lines', 'adjustments']);
+        $sourceLine = $grn->lines->first();
+
+        for ($i = 0; $i < 3; $i++) {
+            $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+                tenantId: $tenantId,
+                returnDate: '2026-06-0'.(7 + $i),
+                warehouseId: $warehouseId,
+                lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $sourceLine->getKey(), '1.000000')],
+            ));
+            app(PurchaseReturnService::class)->post($return);
+        }
+
+        $returnLines = PurchaseReturnLine::query()
+            ->where('source_line_type', 'goods_receipt_note_line')
+            ->where('source_line_id', $sourceLine->getKey())
+            ->orderBy('id')
+            ->get();
+        $math = app(\Modules\Core\Services\DecimalMath::class);
+
+        $this->assertSame('30.000000', $math->sum($returnLines->pluck('base_amount')->map(fn ($value): string => (string) $value)->all()));
+        $this->assertSame('1.000000', $math->sum($returnLines->pluck('discount_amount')->map(fn ($value): string => (string) $value)->all()));
+        $this->assertSame('1.000000', $math->sum($returnLines->pluck('tax_amount')->map(fn ($value): string => (string) $value)->all()));
+        $this->assertSame('1.000000', $math->sum($returnLines->pluck('charge_amount')->map(fn ($value): string => (string) $value)->all()));
+        $this->assertSame('31.000000', $math->sum($returnLines->pluck('line_total')->map(fn ($value): string => (string) $value)->all()));
+        $this->assertSame('0.333334', (string) $returnLines->last()->discount_amount);
+
+        $adjustment = $grn->adjustments->first();
+        $returnedAdjustment = $math->sum(DB::table('purchase_return_adjustment_allocations')
+            ->where('purchase_header_adjustment_id', $adjustment->getKey())
+            ->pluck('returned_amount')
+            ->map(fn ($value): string => (string) $value)
+            ->all());
+        $this->assertSame('1.000000', $returnedAdjustment);
+    }
+
+    public function test_purchase_order_close_rejects_unresolved_returns(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $order = $order->refresh()->load('lines');
+        app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000');
+        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '1.000000')],
+        ));
+
+        try {
+            app(PurchaseOrderService::class)->close($order->refresh());
+            $this->fail('Expected unresolved return to block purchase order close.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('Purchase order cannot be closed while purchase returns are unresolved', $exception->getMessage());
+            $this->assertStringContainsString((string) $return->return_number, $exception->getMessage());
+        }
+    }
+
+    public function test_closed_purchase_order_rejects_later_grn_creation(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $order = $order->refresh()->load('lines');
+        app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000');
+        $closed = app(PurchaseOrderService::class)->close($order->refresh());
+
+        try {
+            app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: $tenantId,
+                receivedDate: '2026-06-09',
+                warehouseId: $warehouseId,
+                purchaseOrderId: (int) $closed->getKey(),
+                lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '1.000000', '1.000000', '1000.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '100.000000')],
+            ));
+            $this->fail('Expected closed purchase order to reject later GRN creation.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame('Goods receipts can only be created from approved purchase orders.', $exception->getMessage());
+        }
     }
 
     public function test_manual_return_debit_note_only_inventory_adjustment_only_and_payment_prepare_boundaries(): void

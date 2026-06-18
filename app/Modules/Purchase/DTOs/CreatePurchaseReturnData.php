@@ -14,7 +14,7 @@ final readonly class CreatePurchaseReturnData
     public function __construct(
         public int $tenantId,
         public string $returnDate,
-        public int $warehouseId,
+        public ?int $warehouseId,
         public ?int $organizationUnitId = null,
         public ?string $returnNumber = null,
         public ?int $warehouseLocationId = null,

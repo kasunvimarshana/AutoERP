@@ -37,6 +37,7 @@ export default function PurchaseDebitNoteDetailPage() {
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const note = result.data;
+    const capabilities = note.capabilities ?? {};
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     return (
         <PurchaseDocumentShell
@@ -44,9 +45,9 @@ export default function PurchaseDebitNoteDetailPage() {
                 title={note.debit_note_number ?? 'Debit note'}
                 description={formatDate(note.debit_note_date)}
                 actions={<div className="flex gap-2">
-                    {note.status === 'draft' && can(purchasePermissions.debitNotesApprove) && <Button loading={busy} onClick={() => void runAction('approve')}>Approve</Button>}
-                    {note.status === 'approved' && can(purchasePermissions.debitNotesPost) && <Button loading={busy} onClick={() => void runAction('post')}>Post</Button>}
-                    {note.status === 'posted' && can(purchasePermissions.debitNotesAllocate) && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button disabled={busy} onClick={() => {
+                    {capabilities.can_approve && can(purchasePermissions.debitNotesApprove) && <Button loading={busy} onClick={() => void runAction('approve')}>Approve</Button>}
+                    {capabilities.can_post && can(purchasePermissions.debitNotesPost) && <Button loading={busy} onClick={() => void runAction('post')}>Post</Button>}
+                    {capabilities.can_allocate && can(purchasePermissions.debitNotesAllocate) && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button disabled={busy} onClick={() => {
                         setError(null);
                         setInvoice(null);
                         setAmount(note.remaining_amount ?? '0.000000');

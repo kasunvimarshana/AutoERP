@@ -11,11 +11,14 @@ import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { PurchasePageHeader } from '../components/PurchaseDocumentShell';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchasePaymentWorkspacePage() {
+    const auth = useAuth();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
@@ -26,6 +29,7 @@ export default function PurchasePaymentWorkspacePage() {
         page,
         per_page: 25,
     }, signal), [debounced, page]);
+    const canCreatePayment = hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute);
 
     const columns: DataColumn<Payment>[] = [
         { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? `Payment #${row.id}`}</Link> },
@@ -42,7 +46,7 @@ export default function PurchasePaymentWorkspacePage() {
             <PurchasePageHeader
                 title="Supplier Payments"
                 description="Outbound payments created for supplier invoices from the Purchase workflow."
-                actions={<LinkButton to="/purchase/payments/create">Create Supplier Payment</LinkButton>}
+                actions={canCreatePayment ? <LinkButton to="/purchase/payments/create">Create Supplier Payment</LinkButton> : undefined}
             />
             <div className="max-w-md">
                 <Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

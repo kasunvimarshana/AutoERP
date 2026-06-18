@@ -13,10 +13,13 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -32,6 +35,7 @@ final class GoodsReceiptNoteService
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
         private readonly TaxDocumentIntegrationService $taxDocuments,
+        private readonly PurchaseDocumentLockService $locks,
     ) {}
 
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
@@ -130,6 +134,41 @@ final class GoodsReceiptNoteService
         }
 
         return DB::transaction(function () use ($data, $order, $sourceLines): GoodsReceiptNote {
+            if ($order instanceof PurchaseOrder) {
+                $lockedOrder = $this->locks->purchaseOrders([(int) $order->getKey()])->first();
+                if (! $lockedOrder instanceof PurchaseOrder) {
+                    throw new InvalidArgumentException('Purchase order was not found.');
+                }
+                $lockedOrderStatus = $lockedOrder->status instanceof PurchaseOrderStatus
+                    ? $lockedOrder->status
+                    : PurchaseOrderStatus::from((string) $lockedOrder->status);
+                if (! in_array($lockedOrderStatus, [
+                    PurchaseOrderStatus::Approved,
+                    PurchaseOrderStatus::PartiallyReceived,
+                    PurchaseOrderStatus::Received,
+                    PurchaseOrderStatus::PartiallyInvoiced,
+                    PurchaseOrderStatus::Invoiced,
+                ], true)) {
+                    throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
+                }
+
+                $lockedSourceLines = $this->locks->purchaseOrderLines(array_keys($sourceLines))
+                    ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
+                foreach ($data->lines as $line) {
+                    if ($line->purchaseOrderLineId === null) {
+                        continue;
+                    }
+                    $sourceLine = $lockedSourceLines->get($line->purchaseOrderLineId);
+                    if (! $sourceLine instanceof PurchaseOrderLine || (int) $sourceLine->purchase_order_id !== (int) $lockedOrder->getKey()) {
+                        throw new InvalidArgumentException('GRN source line must belong to the selected purchase order.');
+                    }
+                    $this->validator->assertReceiptWithinOrder($sourceLine, $line->receivedQuantity);
+                    $sourceLines[(int) $sourceLine->getKey()] = $sourceLine;
+                }
+                $order = $lockedOrder;
+                $order->setRelation('lines', $lockedSourceLines->values());
+            }
+
             $calculation = $this->calculator->calculate($this->receiptLinesAsOrderLines($data, $sourceLines), []);
             $grn = GoodsReceiptNote::query()->create([
                 'tenant_id' => $data->tenantId,
@@ -214,10 +253,7 @@ final class GoodsReceiptNoteService
     public function post(GoodsReceiptNote $grn, ?int $postedBy = null): GoodsReceiptNote
     {
         return DB::transaction(function () use ($grn, $postedBy): GoodsReceiptNote {
-            $locked = GoodsReceiptNote::query()
-                ->with('lines.purchaseOrderLine')
-                ->lockForUpdate()
-                ->findOrFail($grn->getKey());
+            $locked = $this->lockGoodsReceiptForMutation($grn);
 
             if ($locked->status === GoodsReceiptNoteStatus::Posted) {
                 return $locked->refresh()->load(['lines', 'adjustments']);
@@ -229,9 +265,11 @@ final class GoodsReceiptNoteService
 
             foreach ($locked->lines as $line) {
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
-                    $sourceLine = PurchaseOrderLine::query()
-                        ->lockForUpdate()
-                        ->findOrFail((int) $line->purchase_order_line_id);
+                    $sourceLine = $line->purchaseOrderLine;
+                    if ($sourceLine->relationLoaded('order')
+                        && in_array($sourceLine->order?->status, [PurchaseOrderStatus::Closed, PurchaseOrderStatus::Cancelled], true)) {
+                        throw new InvalidArgumentException('Goods receipts cannot be posted after the source purchase order is closed or cancelled.');
+                    }
                     $this->validator->assertReceiptWithinOrder($sourceLine, (string) $line->received_quantity);
                     $line->setRelation('purchaseOrderLine', $sourceLine);
                 }
@@ -261,10 +299,7 @@ final class GoodsReceiptNoteService
     public function reverse(GoodsReceiptNote $grn, ?int $reversedBy = null): GoodsReceiptNote
     {
         return DB::transaction(function () use ($grn, $reversedBy): GoodsReceiptNote {
-            $locked = GoodsReceiptNote::query()
-                ->with('lines.purchaseOrderLine')
-                ->lockForUpdate()
-                ->findOrFail($grn->getKey());
+            $locked = $this->lockGoodsReceiptForMutation($grn);
 
             if ($locked->status === GoodsReceiptNoteStatus::Reversed) {
                 return $locked->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);
@@ -273,8 +308,12 @@ final class GoodsReceiptNoteService
             if ($locked->status !== GoodsReceiptNoteStatus::Posted) {
                 throw new InvalidArgumentException('Only posted GRNs can be reversed.');
             }
+            $this->assertNoBlockingReturnsForReverse($locked);
 
             foreach ($locked->lines as $line) {
+                if (in_array($line->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+                    throw new InvalidArgumentException('Only posted GRN lines can be reversed.');
+                }
                 if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0
                     || $this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
                     throw new InvalidArgumentException('GRNs with invoiced or returned lines cannot be reversed.');
@@ -297,6 +336,77 @@ final class GoodsReceiptNoteService
 
             return $locked->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);
         });
+    }
+
+    private function lockGoodsReceiptForMutation(GoodsReceiptNote $grn): GoodsReceiptNote
+    {
+        $snapshot = GoodsReceiptNote::query()
+            ->with('lines.purchaseOrderLine')
+            ->findOrFail($grn->getKey());
+        $purchaseOrderLineIds = $snapshot->lines
+            ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchase_order_line_id === null ? null : (int) $line->purchase_order_line_id)
+            ->filter()
+            ->values()
+            ->all();
+        $purchaseOrderIds = $snapshot->lines
+            ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchaseOrderLine instanceof PurchaseOrderLine ? (int) $line->purchaseOrderLine->purchase_order_id : null)
+            ->filter()
+            ->values()
+            ->all();
+
+        $orders = $this->locks->purchaseOrders($purchaseOrderIds)
+            ->keyBy(fn (PurchaseOrder $order): int => (int) $order->getKey());
+        $orderLines = $this->locks->purchaseOrderLines($purchaseOrderLineIds)
+            ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
+        $locked = $this->locks->goodsReceipts([(int) $snapshot->getKey()])->first();
+        if (! $locked instanceof GoodsReceiptNote) {
+            throw new InvalidArgumentException('Goods receipt note was not found.');
+        }
+
+        $lines = $this->locks->goodsReceiptLines($snapshot->lines->pluck('id')->map(fn ($id): int => (int) $id)->all());
+        foreach ($lines as $line) {
+            if ($line->purchase_order_line_id === null) {
+                continue;
+            }
+
+            $orderLine = $orderLines->get((int) $line->purchase_order_line_id);
+            if ($orderLine instanceof PurchaseOrderLine) {
+                $order = $orders->get((int) $orderLine->purchase_order_id);
+                if ($order instanceof PurchaseOrder) {
+                    $orderLine->setRelation('order', $order);
+                }
+                $line->setRelation('purchaseOrderLine', $orderLine);
+            }
+        }
+        $locked->setRelation('lines', $lines->values());
+
+        return $locked;
+    }
+
+    private function assertNoBlockingReturnsForReverse(GoodsReceiptNote $grn): void
+    {
+        $returns = $this->locks->purchaseReturnsForGoodsReceipt((int) $grn->getKey());
+        if ($returns->isEmpty()) {
+            return;
+        }
+
+        $this->locks->purchaseReturnLinesForReturns($returns->pluck('id')->map(fn ($id): int => (int) $id)->all());
+        $blocking = $returns->filter(function (PurchaseReturn $return): bool {
+            $status = $return->status instanceof PurchaseReturnStatus
+                ? $return->status
+                : PurchaseReturnStatus::from((string) $return->status);
+
+            return ! in_array($status, [PurchaseReturnStatus::Cancelled, PurchaseReturnStatus::Reversed], true);
+        });
+        if ($blocking->isEmpty()) {
+            return;
+        }
+
+        $numbers = $blocking
+            ->map(fn (PurchaseReturn $return): string => (string) ($return->return_number ?: '#'.$return->getKey()))
+            ->implode(', ');
+
+        throw new InvalidArgumentException('Cannot reverse GRN while purchase returns are unresolved or impacting: '.$numbers.'.');
     }
 
     private function copyOrderAdjustments(?PurchaseOrder $order, GoodsReceiptNote $grn): void

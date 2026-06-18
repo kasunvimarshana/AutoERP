@@ -8,7 +8,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\CreatePurchaseOrderData;
+use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
+use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Tests\TestCase;
@@ -213,6 +218,79 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.defaults.warehouse_id', $context['warehouse_id'])
             ->assertJsonPath('data.defaults.warehouse_location_id', $locationId)
             ->assertJsonPath('data.defaults.warehouse_location_source', 'warehouse_default');
+    }
+
+    public function test_referenced_purchase_return_http_contract_derives_backend_controlled_fields(): void
+    {
+        $context = $this->context();
+        $orders = app(PurchaseOrderService::class);
+        $order = $orders->create(new CreatePurchaseOrderData(
+            tenantId: $context['tenant_id'],
+            purchaseOrderDate: '2026-06-18',
+            organizationUnitId: $context['organization_unit_id'],
+            supplierType: 'supplier',
+            supplierId: $context['supplier_id'],
+            warehouseId: $context['warehouse_id'],
+            lines: [new PurchaseOrderLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id'])],
+        ));
+        $order = $orders->approve($orders->submit($order));
+        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            tenantId: $context['tenant_id'],
+            receivedDate: '2026-06-18',
+            warehouseId: $context['warehouse_id'],
+            organizationUnitId: $context['organization_unit_id'],
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData($context['item_id'], '2.000000', '2.000000', '10.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '2.000000')],
+        ));
+        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
+
+        $invalidPayload = [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'return_date' => '2026-06-19',
+            'return_type' => 'referenced',
+            'source_id' => (int) $grn->getKey(),
+            'warehouse_id' => $context['warehouse_id'],
+            'approval_required' => true,
+            'affects_supplier_balance' => false,
+            'lines' => [[
+                'source_line_type' => 'goods_receipt_note_line',
+                'source_line_id' => (int) $grn->lines->first()->getKey(),
+                'returned_quantity' => '1.000000',
+                'item_id' => $context['item_id'],
+            ]],
+        ];
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/returns', $invalidPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'warehouse_id',
+                'approval_required',
+                'affects_supplier_balance',
+                'lines.0.item_id',
+            ]);
+
+        $validPayload = [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'return_date' => '2026-06-19',
+            'return_type' => 'referenced',
+            'source_id' => (int) $grn->getKey(),
+            'lines' => [[
+                'source_line_type' => 'goods_receipt_note_line',
+                'source_line_id' => (int) $grn->lines->first()->getKey(),
+                'returned_quantity' => '1.000000',
+                'reason' => 'Damaged',
+            ]],
+        ];
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/returns', $validPayload)
+            ->assertCreated()
+            ->assertJsonPath('data.supplier.id', $context['supplier_id'])
+            ->assertJsonPath('data.warehouse.id', $context['warehouse_id'])
+            ->assertJsonPath('data.approval_required', false)
+            ->assertJsonPath('data.affects_supplier_balance', true)
+            ->assertJsonMissingPath('data.capabilities.can_reverse');
     }
 
     public function test_item_purchase_context_uses_item_scoped_uom_and_purchase_price(): void

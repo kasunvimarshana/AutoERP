@@ -17,7 +17,6 @@ use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Inventory\Models\InventoryMovement;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\AdjustmentEffect;
@@ -79,6 +78,7 @@ final class FastPurchaseService
         private readonly PurchaseDocumentContextService $documentContexts,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
         private readonly PurchaseOrderCalculationService $purchaseCalculator,
+        private readonly FastPurchaseResponseBuilder $responses,
     ) {}
 
     /**
@@ -131,7 +131,7 @@ final class FastPurchaseService
     {
         $this->rejectClientAuthorityFields($payload);
 
-        return $this->previewResponse($this->resolve($payload, lockRecords: false));
+        return $this->responses->preview($this->resolve($payload, lockRecords: false));
     }
 
     /**
@@ -161,7 +161,7 @@ final class FastPurchaseService
             }
 
             $documents = $this->createDocuments($resolved);
-            $response = $this->createResponse($resolved, $documents);
+            $response = $this->responses->created($resolved, $documents);
             $this->writeAuditLog($resolved, $referenceHash, $requestHash, $response);
 
             return $response;
@@ -1232,174 +1232,6 @@ final class FastPurchaseService
             ->lockForUpdate()
             ->latest('id')
             ->first();
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return array<string, mixed>
-     */
-    private function previewResponse(array $resolved): array
-    {
-        return [
-            'mode' => $resolved['mode'],
-            'options' => $resolved['options'],
-            'summary' => $resolved['summary'],
-            'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
-            'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
-            'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
-            'documents' => [],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @param  array<string, mixed>  $documents
-     * @return array<string, mixed>
-     */
-    private function createResponse(array $resolved, array $documents): array
-    {
-        /** @var GoodsReceiptNote|null $goodsReceipt */
-        $goodsReceipt = $documents['goods_receipt'];
-        /** @var Invoice|null $invoice */
-        $invoice = $documents['supplier_invoice'];
-        /** @var Payment|null $payment */
-        $payment = $documents['supplier_payment'];
-        $financePostings = $documents['finance_postings'];
-        $inventoryMovements = $goodsReceipt instanceof GoodsReceiptNote ? $goodsReceipt->lines->pluck('inventoryMovement')->filter()->values() : collect();
-
-        return [
-            'supplier_reference' => $resolved['supplier_reference'],
-            'mode' => $resolved['mode'],
-            'options' => $resolved['options'],
-            'summary' => $this->summaryWithPaid($resolved['summary'], $invoice, $payment),
-            'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
-            'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
-            'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
-            'documents' => [
-                'goods_receipt' => $goodsReceipt instanceof GoodsReceiptNote ? $this->goodsReceiptRef($goodsReceipt) : null,
-                'supplier_invoice' => $invoice instanceof Invoice ? $this->invoiceRef($invoice) : null,
-                'supplier_payment' => $payment instanceof Payment ? $this->paymentRef($payment) : null,
-                'inventory_transaction' => $inventoryMovements->first() instanceof InventoryMovement ? $this->inventoryMovementRef($inventoryMovements->first()) : null,
-                'inventory_transactions' => $inventoryMovements->map(fn (InventoryMovement $movement): array => $this->inventoryMovementRef($movement))->all(),
-                'finance_posting' => isset($financePostings[0]) ? $this->financePostingRef($financePostings[0]) : null,
-                'finance_postings' => array_map(fn (PostingResultData $posting): array => $this->financePostingRef($posting), $financePostings),
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $summary
-     * @return array<string, string>
-     */
-    private function summaryWithPaid(array $summary, ?Invoice $invoice, ?Payment $payment): array
-    {
-        if ($invoice instanceof Invoice) {
-            $summary['paid_total'] = (string) $invoice->paid_total;
-            $summary['balance_due'] = (string) $invoice->balance_due;
-        }
-        if ($payment instanceof Payment) {
-            $summary['paid_total'] = (string) $payment->allocated_amount;
-            $summary['balance_due'] = $this->math->sub($summary['grand_total'], (string) $payment->allocated_amount);
-        }
-
-        return $summary;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function linePreview(array $line): array
-    {
-        return [
-            'line_number' => $line['line_number'],
-            'item' => $this->modelSummary($line['item'], ['code', 'sku', 'name']),
-            'uom' => $this->modelSummary($line['uom'], ['code', 'name', 'symbol']),
-            'description' => $line['description'],
-            'is_stock' => $line['is_stock'],
-            'quantity' => $line['quantity'],
-            'base_quantity' => $line['base_quantity'],
-            'unit_cost' => $line['unit_cost'],
-            'discount_amount' => $line['discount_amount'],
-            'tax_amount' => $line['non_withholding_tax_amount'],
-            'withholding_amount' => $line['withholding_amount'],
-            'line_total' => $line['line_total'],
-            'taxes' => $line['taxes'],
-        ];
-    }
-
-    /**
-     * @param  list<array{data: PurchaseHeaderAdjustmentData, amount: string}>  $adjustments
-     * @return list<array<string, mixed>>
-     */
-    private function adjustmentPreview(array $adjustments): array
-    {
-        return array_map(static function (array $adjustment): array {
-            /** @var PurchaseHeaderAdjustmentData $data */
-            $data = $adjustment['data'];
-
-            return [
-                'name' => $data->name,
-                'adjustment_type' => $data->adjustmentType->value,
-                'effect' => $data->effect->value,
-                'calculation_type' => $data->calculationType->value,
-                'calculation_base' => $data->calculationBase->value,
-                'rate' => $data->rate,
-                'amount' => $adjustment['amount'],
-                'allocation_method' => $data->allocationMethod->value,
-                'finance_mapping' => [
-                    'cost_treatment' => $data->costTreatment,
-                    'tax_treatment' => $data->taxTreatment,
-                    'mapping_source' => $data->mappingSource,
-                ],
-            ];
-        }, $adjustments);
-    }
-
-    private function goodsReceiptRef(GoodsReceiptNote $goodsReceipt): array
-    {
-        return ['id' => (int) $goodsReceipt->getKey(), 'number' => (string) $goodsReceipt->grn_number, 'status' => $this->enumValue($goodsReceipt->status), 'url' => '/purchase/goods-receipts/'.$goodsReceipt->getKey()];
-    }
-
-    private function invoiceRef(Invoice $invoice): array
-    {
-        return ['id' => (int) $invoice->getKey(), 'number' => (string) $invoice->invoice_number, 'status' => $this->enumValue($invoice->status), 'url' => '/invoices/'.$invoice->getKey()];
-    }
-
-    private function paymentRef(Payment $payment): array
-    {
-        return ['id' => (int) $payment->getKey(), 'number' => (string) $payment->payment_number, 'status' => $this->enumValue($payment->status), 'url' => '/payments/'.$payment->getKey()];
-    }
-
-    private function inventoryMovementRef(InventoryMovement $movement): array
-    {
-        return ['id' => (int) $movement->getKey(), 'number' => (string) $movement->movement_number, 'status' => $this->enumValue($movement->status), 'url' => '/inventory/movements/'.$movement->getKey()];
-    }
-
-    private function financePostingRef(PostingResultData $posting): array
-    {
-        return ['id' => $posting->journalId, 'number' => $posting->journalNumber, 'status' => $posting->status, 'url' => '/finance/journals/'.$posting->journalId, 'total_debit' => $posting->totalDebit, 'total_credit' => $posting->totalCredit];
-    }
-
-    /**
-     * @param  list<string>  $fields
-     */
-    private function modelSummary(mixed $model, array $fields): ?array
-    {
-        if (! is_object($model) || ! method_exists($model, 'getKey')) {
-            return null;
-        }
-
-        $data = ['id' => (int) $model->getKey()];
-        foreach ($fields as $field) {
-            if (($model->{$field} ?? null) !== null && $model->{$field} !== '') {
-                $data[$field] = $model->{$field};
-            }
-        }
-        if (! isset($data['name']) && isset($data['display_name'])) {
-            $data['name'] = $data['display_name'];
-        }
-
-        return $data;
     }
 
     private function enumValue(mixed $value): mixed

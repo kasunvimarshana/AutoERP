@@ -10,7 +10,7 @@ import type { NamedResource } from '@/shared/types/common';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createPurchaseReturn, getGoodsReceipt, getReturnableGoodsReceiptLines, type PurchaseReturnPayload, type ReturnableLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
-import { GoodsReceiptLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
+import { GoodsReceiptLookupSelect } from './PurchaseLookups';
 import { PurchaseReturnLineEditor, type EditableReturnLine } from './PurchaseReturnLineEditor';
 
 export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceiptId?: number }) {
@@ -18,7 +18,6 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
     const [source, setSource] = useState<NamedResource | null>(null);
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
-    const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [returnDate, setReturnDate] = useState(todayDate());
     const [reason, setReason] = useState('');
     const [lines, setLines] = useState<EditableReturnLine[]>([]);
@@ -47,7 +46,6 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
                 setSource({ id: grn.id, code: grn.grn_number, name: grn.grn_number ?? `Goods Receipt #${grn.id}` });
                 setSupplier(grn.supplier ?? null);
                 setWarehouse(grn.warehouse ?? null);
-                setWarehouseLocation(grn.warehouse_location ?? null);
                 setLines(rows.map((row: ReturnableLine) => ({ source: row, include: false, returned_quantity: '0.000000', reason: '' })));
             })
             .catch((requestError) => {
@@ -61,8 +59,6 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
 
     const payload = (): PurchaseReturnPayload => ({
         return_date: returnDate,
-        warehouse_id: warehouse?.id ?? 0,
-        warehouse_location_id: warehouseLocation?.id,
         reason: reason || undefined,
         return_type: 'referenced',
         source_id: source?.id,
@@ -100,7 +96,7 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
                 <div className="grid gap-4 md:grid-cols-4">
                     <GoodsReceiptLookupSelect value={source} onChange={changeSource} error={errorFor('source_id')} />
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
-                    <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Warehouse</span><br />{warehouse?.name ?? '-'}</div>
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Supplier</span><br />{supplier?.name ?? '-'}</div>
                 </div>
             </Panel>

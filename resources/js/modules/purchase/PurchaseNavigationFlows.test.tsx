@@ -17,22 +17,32 @@ const purchaseApiMocks = vi.hoisted(() => ({
 const paymentApiMocks = vi.hoisted(() => ({
     listPayments: vi.fn(),
 }));
+const authMock = vi.hoisted(() => ({
+    permissions: [
+        'purchase.supplier_invoices.create',
+        'purchase.returns.create',
+        'purchase.debit_notes.create',
+        'purchase.payments.execute',
+    ],
+}));
 
 vi.mock('./purchaseApi', () => purchaseApiMocks);
 vi.mock('@/modules/payment/paymentApi', () => paymentApiMocks);
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
-        permissions: [
-            'purchase.supplier_invoices.create',
-            'purchase.returns.create',
-            'purchase.debit_notes.create',
-        ],
+        permissions: authMock.permissions,
     }),
 }));
 
 describe('Purchase navigation flows', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authMock.permissions = [
+            'purchase.supplier_invoices.create',
+            'purchase.returns.create',
+            'purchase.debit_notes.create',
+            'purchase.payments.execute',
+        ];
         purchaseApiMocks.getGoodsReceipt.mockResolvedValue(goodsReceipt());
         purchaseApiMocks.listPurchaseDebitNotes.mockResolvedValue(collection([]));
         paymentApiMocks.listPayments.mockResolvedValue(collection<Payment>([payment()]));
@@ -65,6 +75,19 @@ describe('Purchase navigation flows', () => {
         expect(screen.queryByText('/payments?view=supplier')).not.toBeInTheDocument();
     });
 
+    it('hides the supplier payment create action without execute permission', async () => {
+        authMock.permissions = [];
+        cleanup();
+        render(
+            <MemoryRouter initialEntries={['/purchase/payments']}>
+                <PurchasePaymentWorkspacePage />
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('heading', { name: 'Supplier Payments' })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Create Supplier Payment' })).not.toBeInTheDocument();
+    });
+
     it('opens the dedicated Debit Note create workflow instead of the return form', async () => {
         cleanup();
         render(
@@ -75,6 +98,19 @@ describe('Purchase navigation flows', () => {
 
         expect(await screen.findByRole('heading', { name: 'Purchase debit notes' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'New debit note' })).toHaveAttribute('href', '/purchase/debit-notes/create');
+    });
+
+    it('hides the debit note create action without create permission', async () => {
+        authMock.permissions = [];
+        cleanup();
+        render(
+            <MemoryRouter initialEntries={['/purchase/debit-notes']}>
+                <PurchaseDebitNoteListPage />
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('heading', { name: 'Purchase debit notes' })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'New debit note' })).not.toBeInTheDocument();
     });
 });
 

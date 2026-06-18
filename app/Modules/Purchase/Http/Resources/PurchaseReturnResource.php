@@ -46,6 +46,7 @@ final class PurchaseReturnResource extends PurchaseResource
                 'remaining_quantity' => (string) $line->remaining_quantity,
                 'unit_price' => (string) $line->unit_price,
                 'cost_basis' => $line->cost_basis === null ? null : (string) $line->cost_basis,
+                'base_amount' => (string) $line->base_amount,
                 'discount_amount' => (string) $line->discount_amount,
                 'tax_amount' => (string) $line->tax_amount,
                 'charge_amount' => (string) $line->charge_amount,
@@ -102,7 +103,6 @@ final class PurchaseReturnResource extends PurchaseResource
             'can_approve' => $approvalRequired && $status === 'draft',
             'can_post' => ($approvalRequired && $status === 'approved') || (! $approvalRequired && $status === 'draft'),
             'can_cancel' => in_array($status, ['draft', 'approved'], true),
-            'can_reverse' => $status === 'posted',
             'read_only' => in_array($status, ['posted', 'cancelled', 'reversed'], true),
         ];
     }

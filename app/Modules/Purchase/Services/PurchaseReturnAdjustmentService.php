@@ -9,6 +9,7 @@ use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseReturnAdjustmentAllocation;
+use Modules\Purchase\Models\PurchaseReturnLine;
 
 final class PurchaseReturnAdjustmentService
 {
@@ -31,11 +32,14 @@ final class PurchaseReturnAdjustmentService
         bool $mutate,
     ): string {
         $grnQuery = $sourceLine->goodsReceiptNote();
-        $grnQuery->with(['adjustments' => function ($query) use ($mutate): void {
-            if ($mutate) {
-                $query->lockForUpdate();
-            }
-        }]);
+        $grnQuery->with([
+            'lines',
+            'adjustments' => function ($query) use ($mutate): void {
+                if ($mutate) {
+                    $query->lockForUpdate();
+                }
+            },
+        ]);
 
         $grn = $grnQuery->first();
         if ($grn === null || $this->math->isZero((string) $grn->subtotal)) {
@@ -43,6 +47,7 @@ final class PurchaseReturnAdjustmentService
         }
 
         $lineRatio = $this->math->div($this->math->mul($returnedQuantity, (string) $sourceLine->unit_price), (string) $grn->subtotal, 12);
+        $isFinalReceiptReturn = $this->isFinalReceiptReturn($return, $sourceLine, $returnedQuantity, $grn->lines);
         $netReturn = '0.000000';
 
         foreach ($grn->adjustments as $adjustment) {
@@ -50,8 +55,10 @@ final class PurchaseReturnAdjustmentService
                 continue;
             }
 
-            $returnedAmount = $this->math->mul((string) $adjustment->amount, $lineRatio);
             $previouslyReturned = (string) $adjustment->returned_amount;
+            $returnedAmount = $isFinalReceiptReturn
+                ? $this->math->sub((string) $adjustment->amount, $previouslyReturned)
+                : $this->math->mul((string) $adjustment->amount, $lineRatio);
             $remaining = $this->math->sub((string) $adjustment->amount, $this->math->add($previouslyReturned, $returnedAmount));
 
             if ($this->math->isNegative($remaining)) {
@@ -95,5 +102,53 @@ final class PurchaseReturnAdjustmentService
         }
 
         return $netReturn;
+    }
+
+    private function isFinalReceiptReturn(
+        PurchaseReturn $return,
+        GoodsReceiptNoteLine $sourceLine,
+        string $returnedQuantity,
+        iterable $receiptLines,
+    ): bool {
+        $currentReturnQuantities = [];
+        $hasCurrentLine = false;
+        $returnLines = PurchaseReturnLine::query()
+            ->where('purchase_return_id', $return->getKey())
+            ->where('source_line_type', 'goods_receipt_note_line')
+            ->get(['source_line_id', 'returned_quantity']);
+
+        foreach ($returnLines as $line) {
+            $sourceLineId = (int) $line->source_line_id;
+            $currentReturnQuantities[$sourceLineId] = $this->math->add(
+                $currentReturnQuantities[$sourceLineId] ?? '0.000000',
+                (string) $line->returned_quantity,
+            );
+            if ($sourceLineId === (int) $sourceLine->getKey()) {
+                $hasCurrentLine = true;
+            }
+        }
+
+        if (! $hasCurrentLine) {
+            $currentReturnQuantities[(int) $sourceLine->getKey()] = $this->math->add(
+                $currentReturnQuantities[(int) $sourceLine->getKey()] ?? '0.000000',
+                $returnedQuantity,
+            );
+        }
+
+        foreach ($receiptLines as $receiptLine) {
+            if (! $receiptLine instanceof GoodsReceiptNoteLine) {
+                continue;
+            }
+
+            $projectedReturned = $this->math->add(
+                (string) $receiptLine->returned_quantity,
+                $currentReturnQuantities[(int) $receiptLine->getKey()] ?? '0.000000',
+            );
+            if ($this->math->compare($projectedReturned, (string) $receiptLine->accepted_quantity) < 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

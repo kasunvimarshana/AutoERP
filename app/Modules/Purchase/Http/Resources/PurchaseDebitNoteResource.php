@@ -16,6 +16,7 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'debit_note_date' => $this->debit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'capabilities' => $this->capabilities(),
             'supplier_type' => $this->supplier_type,
             'supplier_id' => $this->supplier_id,
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
@@ -55,5 +56,27 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'number' => null,
             'date' => null,
         ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function capabilities(): array
+    {
+        $status = $this->enumValue($this->status);
+        $remaining = (string) $this->remaining_amount;
+
+        return [
+            'can_approve' => $status === 'draft',
+            'can_post' => $status === 'approved',
+            'can_allocate' => $status === 'posted' && $this->hasPositiveAmount($remaining),
+            'read_only' => in_array($status, ['posted', 'allocated', 'cancelled', 'reversed'], true),
+        ];
+    }
+
+    private function hasPositiveAmount(string $amount): bool
+    {
+        return ! str_starts_with($amount, '-')
+            && preg_replace('/[.0]/', '', $amount) !== '';
     }
 }

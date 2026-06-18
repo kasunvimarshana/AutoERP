@@ -59,28 +59,40 @@ final class PurchaseDebitNoteService
 
     public function approve(PurchaseDebitNote $note, ?int $approvedBy = null): PurchaseDebitNote
     {
-        if ($note->status !== PurchaseDebitNoteStatus::Draft) {
-            throw new InvalidArgumentException('Only draft purchase debit notes can be approved.');
-        }
+        return DB::transaction(function () use ($note, $approvedBy): PurchaseDebitNote {
+            $lockedNote = PurchaseDebitNote::query()
+                ->lockForUpdate()
+                ->findOrFail($note->getKey());
 
-        $note->status = PurchaseDebitNoteStatus::Approved;
-        $note->approved_by = $approvedBy;
-        $note->approved_at = now();
-        $note->save();
+            if ($lockedNote->status !== PurchaseDebitNoteStatus::Draft) {
+                throw new InvalidArgumentException('Only draft purchase debit notes can be approved.');
+            }
 
-        return $note->refresh();
+            $lockedNote->status = PurchaseDebitNoteStatus::Approved;
+            $lockedNote->approved_by = $approvedBy;
+            $lockedNote->approved_at = now();
+            $lockedNote->save();
+
+            return $lockedNote->refresh();
+        });
     }
 
     public function post(PurchaseDebitNote $note): PurchaseDebitNote
     {
-        if ($note->status !== PurchaseDebitNoteStatus::Approved) {
-            throw new InvalidArgumentException('Only approved purchase debit notes can be posted.');
-        }
+        return DB::transaction(function () use ($note): PurchaseDebitNote {
+            $lockedNote = PurchaseDebitNote::query()
+                ->lockForUpdate()
+                ->findOrFail($note->getKey());
 
-        $note->status = PurchaseDebitNoteStatus::Posted;
-        $note->save();
+            if ($lockedNote->status !== PurchaseDebitNoteStatus::Approved) {
+                throw new InvalidArgumentException('Only approved purchase debit notes can be posted.');
+            }
 
-        return $note->refresh();
+            $lockedNote->status = PurchaseDebitNoteStatus::Posted;
+            $lockedNote->save();
+
+            return $lockedNote->refresh();
+        });
     }
 
     public function allocate(
@@ -89,12 +101,12 @@ final class PurchaseDebitNoteService
         string $amount,
     ): PurchaseDebitNote {
         return DB::transaction(function () use ($note, $invoice, $amount): PurchaseDebitNote {
-            $lockedNote = PurchaseDebitNote::query()
-                ->lockForUpdate()
-                ->findOrFail($note->getKey());
             $lockedInvoice = Invoice::query()
                 ->lockForUpdate()
                 ->findOrFail($invoice->getKey());
+            $lockedNote = PurchaseDebitNote::query()
+                ->lockForUpdate()
+                ->findOrFail($note->getKey());
             $this->assertAllocationScope($lockedNote, $lockedInvoice);
             if (! in_array($lockedNote->status, [
                 PurchaseDebitNoteStatus::Posted,

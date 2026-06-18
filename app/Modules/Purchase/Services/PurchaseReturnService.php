@@ -15,6 +15,7 @@ use Modules\Purchase\DTOs\PurchaseReturnLineData;
 use Modules\Purchase\DTOs\PurchaseReturnLineValuationData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNote;
@@ -38,6 +39,7 @@ final class PurchaseReturnService
         private readonly PurchaseReturnValuationService $valuations,
         private readonly PurchaseStatusService $statuses,
         private readonly TaxReturnAllocationService $taxReturns,
+        private readonly PurchaseDocumentLockService $locks,
     ) {}
 
     public function create(CreatePurchaseReturnData $data): PurchaseReturn
@@ -48,6 +50,9 @@ final class PurchaseReturnService
 
             if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
                 $this->validateManualSupplierReturn($data);
+                if ($data->warehouseId === null) {
+                    throw new InvalidArgumentException('Unreferenced supplier return requires warehouse.');
+                }
                 $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
                 if ($data->warehouseLocationId !== null) {
                     $this->validator->warehouseLocation(
@@ -165,10 +170,12 @@ final class PurchaseReturnService
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
     {
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
-            $return = PurchaseReturn::query()->with('lines')->lockForUpdate()->findOrFail($return->getKey());
+            $snapshot = PurchaseReturn::query()->with('lines')->findOrFail($return->getKey());
+            $sourceLines = $this->lockReturnSourcesForPost($snapshot);
+            $return = $this->lockReturnForPost($snapshot);
             $this->assertPostable($return);
+            $this->assertLockedReturnSources($return, $sourceLines);
 
-            $sourceLines = $this->lockReturnSourceLines($return);
             $movementIds = [];
             $subtotal = '0.000000';
             $adjustmentReturnTotal = '0.000000';
@@ -182,7 +189,7 @@ final class PurchaseReturnService
                     }
 
                     $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
-                    $valuation = $this->valuations->fromReceiptLine($sourceLine, (string) $line->returned_quantity);
+                    $valuation = $this->valuations->fromReceiptLine($sourceLine, (string) $line->returned_quantity, (int) $return->getKey());
                     $this->applyValuationToLine($line, $valuation);
                     $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
                 } else {
@@ -270,14 +277,22 @@ final class PurchaseReturnService
 
     public function cancel(PurchaseReturn $return): PurchaseReturn
     {
-        if ($return->status === PurchaseReturnStatus::Posted) {
-            throw new InvalidArgumentException('Posted purchase returns cannot be cancelled.');
-        }
+        return DB::transaction(function () use ($return): PurchaseReturn {
+            $locked = $this->locks->purchaseReturns([(int) $return->getKey()])->first();
+            if (! $locked instanceof PurchaseReturn) {
+                throw new InvalidArgumentException('Purchase return was not found.');
+            }
+            $this->locks->purchaseReturnLinesForReturns([(int) $locked->getKey()]);
 
-        $return->status = PurchaseReturnStatus::Cancelled;
-        $return->save();
+            if ($locked->status === PurchaseReturnStatus::Posted) {
+                throw new InvalidArgumentException('Posted purchase returns cannot be cancelled.');
+            }
 
-        return $return->refresh();
+            $locked->status = PurchaseReturnStatus::Cancelled;
+            $locked->save();
+
+            return $locked->refresh();
+        });
     }
 
     /**
@@ -324,15 +339,14 @@ final class PurchaseReturnService
             $lineIds[$line->sourceLineId] = "lines.{$index}.source_line_id";
         }
 
-        $query = GoodsReceiptNoteLine::query()
-            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
-            ->whereIn('id', array_keys($lineIds));
-        if ($lockSources) {
-            $query->lockForUpdate();
-        }
-
         /** @var Collection<int, GoodsReceiptNoteLine> $lines */
-        $lines = $query->get()->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+        $lines = $lockSources
+            ? collect($this->lockReceiptSourcesByLineIds(array_keys($lineIds)))
+            : GoodsReceiptNoteLine::query()
+                ->with(['goodsReceiptNote', 'purchaseOrderLine'])
+                ->whereIn('id', array_keys($lineIds))
+                ->get()
+                ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
         if ($lines->count() !== count($lineIds)) {
             throw new InvalidArgumentException('One or more selected goods receipt note lines were not found.');
         }
@@ -378,6 +392,14 @@ final class PurchaseReturnService
             }
             if (! $this->isReturnableReceiptStatus($header)) {
                 throw new InvalidArgumentException('Purchase returns can only reference posted goods receipt notes.');
+            }
+            if (in_array($sourceLine->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+                throw new InvalidArgumentException('Purchase return source goods receipt line is no longer returnable.');
+            }
+            if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine
+                && $sourceLine->purchaseOrderLine->relationLoaded('order')
+                && in_array($sourceLine->purchaseOrderLine->order?->status, [PurchaseOrderStatus::Closed, PurchaseOrderStatus::Cancelled], true)) {
+                throw new InvalidArgumentException('Purchase returns cannot be created after the source purchase order is closed or cancelled.');
             }
 
             $this->validator->assertReturnWithinReceipt($sourceLine, $lineData->returnedQuantity);
@@ -425,6 +447,7 @@ final class PurchaseReturnService
             'remaining_quantity' => $valuation->remainingQuantity,
             'unit_price' => $valuation->unitPrice,
             'cost_basis' => $valuation->costBasis,
+            'base_amount' => $valuation->baseAmount,
             'discount_amount' => $valuation->discountAmount,
             'tax_amount' => $valuation->taxAmount,
             'charge_amount' => $valuation->chargeAmount,
@@ -453,6 +476,7 @@ final class PurchaseReturnService
             'remaining_quantity' => $valuation->remainingQuantity,
             'unit_price' => $valuation->unitPrice,
             'cost_basis' => $valuation->costBasis,
+            'base_amount' => $valuation->baseAmount,
             'discount_amount' => $valuation->discountAmount,
             'tax_amount' => $valuation->taxAmount,
             'charge_amount' => $valuation->chargeAmount,
@@ -468,6 +492,7 @@ final class PurchaseReturnService
         $line->remaining_quantity = $valuation->remainingQuantity;
         $line->unit_price = $valuation->unitPrice;
         $line->cost_basis = $valuation->costBasis;
+        $line->base_amount = $valuation->baseAmount;
         $line->discount_amount = $valuation->discountAmount;
         $line->tax_amount = $valuation->taxAmount;
         $line->charge_amount = $valuation->chargeAmount;
@@ -487,7 +512,7 @@ final class PurchaseReturnService
     /**
      * @return array<int, GoodsReceiptNoteLine>
      */
-    private function lockReturnSourceLines(PurchaseReturn $return): array
+    private function lockReturnSourcesForPost(PurchaseReturn $return): array
     {
         $sourceLineIds = $return->lines
             ->filter(fn (PurchaseReturnLine $line): bool => $line->source_line_type === 'goods_receipt_note_line')
@@ -499,13 +524,34 @@ final class PurchaseReturnService
             return [];
         }
 
-        /** @var Collection<int, GoodsReceiptNoteLine> $sourceLines */
-        $sourceLines = GoodsReceiptNoteLine::query()
-            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
-            ->whereIn('id', $sourceLineIds)
-            ->lockForUpdate()
-            ->get()
-            ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+        return $this->lockReceiptSourcesByLineIds($sourceLineIds);
+    }
+
+    private function lockReturnForPost(PurchaseReturn $return): PurchaseReturn
+    {
+        $lockedReturns = $this->locks->purchaseReturns([(int) $return->getKey()]);
+        $locked = $lockedReturns->first();
+        if (! $locked instanceof PurchaseReturn) {
+            throw new InvalidArgumentException('Purchase return was not found.');
+        }
+
+        $lockedLines = $this->locks
+            ->purchaseReturnLinesForReturns([(int) $locked->getKey()])
+            ->where('purchase_return_id', (int) $locked->getKey())
+            ->values();
+        $locked->setRelation('lines', $lockedLines);
+
+        return $locked;
+    }
+
+    /**
+     * @param  array<int, GoodsReceiptNoteLine>  $sourceLines
+     */
+    private function assertLockedReturnSources(PurchaseReturn $return, array $sourceLines): void
+    {
+        if ($sourceLines === []) {
+            return;
+        }
 
         $resolved = [];
         $seen = [];
@@ -518,9 +564,13 @@ final class PurchaseReturnService
             }
             $seen[(int) $line->source_line_id] = true;
 
-            $sourceLine = $sourceLines->get((int) $line->source_line_id);
+            $sourceLine = $sourceLines[(int) $line->source_line_id] ?? null;
             if (! $sourceLine instanceof GoodsReceiptNoteLine || ! $sourceLine->goodsReceiptNote instanceof GoodsReceiptNote) {
                 throw new InvalidArgumentException('Selected goods receipt note line was not found for this return.');
+            }
+            if (! $this->isReturnableReceiptStatus($sourceLine->goodsReceiptNote)
+                || in_array($sourceLine->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+                throw new InvalidArgumentException('Purchase return source goods receipt is no longer returnable.');
             }
             if ((int) $sourceLine->tenant_id !== (int) $return->tenant_id
                 || $sourceLine->organization_unit_id !== $return->organization_unit_id
@@ -530,8 +580,75 @@ final class PurchaseReturnService
             ) {
                 throw new InvalidArgumentException('Purchase return source line is outside the return scope.');
             }
+            if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine
+                && $sourceLine->purchaseOrderLine->relationLoaded('order')
+                && in_array($sourceLine->purchaseOrderLine->order?->status, [PurchaseOrderStatus::Closed, PurchaseOrderStatus::Cancelled], true)) {
+                throw new InvalidArgumentException('Purchase returns cannot be posted after the source purchase order is closed or cancelled.');
+            }
 
             $resolved[(int) $sourceLine->getKey()] = $sourceLine;
+        }
+    }
+
+    /**
+     * @param  list<int>  $sourceLineIds
+     * @return array<int, GoodsReceiptNoteLine>
+     */
+    private function lockReceiptSourcesByLineIds(array $sourceLineIds): array
+    {
+        /** @var Collection<int, GoodsReceiptNoteLine> $snapshots */
+        $snapshots = GoodsReceiptNoteLine::query()
+            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
+            ->whereIn('id', $sourceLineIds)
+            ->get();
+
+        if ($snapshots->count() !== count(array_unique($sourceLineIds))) {
+            throw new InvalidArgumentException('One or more selected goods receipt note lines were not found.');
+        }
+
+        $purchaseOrderLineIds = $snapshots
+            ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchase_order_line_id === null ? null : (int) $line->purchase_order_line_id)
+            ->filter()
+            ->values()
+            ->all();
+        $purchaseOrderIds = $snapshots
+            ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchaseOrderLine instanceof PurchaseOrderLine ? (int) $line->purchaseOrderLine->purchase_order_id : null)
+            ->filter()
+            ->values()
+            ->all();
+        $goodsReceiptIds = $snapshots
+            ->map(fn (GoodsReceiptNoteLine $line): int => (int) $line->goods_receipt_note_id)
+            ->values()
+            ->all();
+
+        $lockedOrders = $this->locks->purchaseOrders($purchaseOrderIds)
+            ->keyBy(fn ($order): int => (int) $order->getKey());
+        $lockedOrderLines = $this->locks->purchaseOrderLines($purchaseOrderLineIds)
+            ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
+        $lockedReceipts = $this->locks->goodsReceipts($goodsReceiptIds)
+            ->keyBy(fn (GoodsReceiptNote $receipt): int => (int) $receipt->getKey());
+        $lockedLines = $this->locks->goodsReceiptLines($sourceLineIds)
+            ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+
+        $resolved = [];
+        foreach ($lockedLines as $line) {
+            $receipt = $lockedReceipts->get((int) $line->goods_receipt_note_id);
+            if ($receipt instanceof GoodsReceiptNote) {
+                $line->setRelation('goodsReceiptNote', $receipt);
+            }
+
+            if ($line->purchase_order_line_id !== null) {
+                $orderLine = $lockedOrderLines->get((int) $line->purchase_order_line_id);
+                if ($orderLine instanceof PurchaseOrderLine) {
+                    $order = $lockedOrders->get((int) $orderLine->purchase_order_id);
+                    if ($order !== null) {
+                        $orderLine->setRelation('order', $order);
+                    }
+                    $line->setRelation('purchaseOrderLine', $orderLine);
+                }
+            }
+
+            $resolved[(int) $line->getKey()] = $line;
         }
 
         return $resolved;

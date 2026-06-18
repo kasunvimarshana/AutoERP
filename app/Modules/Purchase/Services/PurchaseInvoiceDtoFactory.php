@@ -169,7 +169,7 @@ final class PurchaseInvoiceDtoFactory
         string $field,
     ): int {
         $grn = GoodsReceiptNote::query()
-            ->with(['lines.purchaseOrderLine', 'adjustments'])
+            ->with(['lines.purchaseOrderLine.order', 'adjustments'])
             ->when($lockSources, fn ($query) => $query->lockForUpdate())
             ->find($source->sourceId);
         if (! $grn instanceof GoodsReceiptNote) {
@@ -188,7 +188,7 @@ final class PurchaseInvoiceDtoFactory
         }
         if ($lockSources) {
             $grn->setRelation('lines', GoodsReceiptNoteLine::query()
-                ->with('purchaseOrderLine')
+                ->with('purchaseOrderLine.order')
                 ->where('goods_receipt_note_id', $grn->getKey())
                 ->lockForUpdate()
                 ->get());
@@ -208,6 +208,12 @@ final class PurchaseInvoiceDtoFactory
         $seenRequestedLineIds = [];
 
         foreach ($grn->lines as $sourceLine) {
+            if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine
+                && $sourceLine->purchaseOrderLine->relationLoaded('order')
+                && in_array($sourceLine->purchaseOrderLine->order?->status, [PurchaseOrderStatus::Closed, PurchaseOrderStatus::Cancelled], true)) {
+                throw new InvalidArgumentException('Purchase invoices cannot be created after the source purchase order is closed or cancelled.');
+            }
+
             $remainingInvoiceable = $this->balances->remainingInvoiceableForGoodsReceiptLine($sourceLine);
             if ($this->math->isNegative($remainingInvoiceable)) {
                 throw new InvalidArgumentException('GRN invoiceable quantity is negative.');

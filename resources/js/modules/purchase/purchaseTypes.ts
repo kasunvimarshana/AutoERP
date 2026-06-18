@@ -384,6 +384,10 @@ export interface PurchaseReturnLine {
     remaining_quantity?: string;
     unit_price: string;
     cost_basis?: string | null;
+    base_amount?: string;
+    discount_amount?: string;
+    tax_amount?: string;
+    charge_amount?: string;
     line_total?: string;
     reason?: string | null;
 }
@@ -402,7 +406,6 @@ export interface PurchaseReturn {
         can_approve?: boolean;
         can_post?: boolean;
         can_cancel?: boolean;
-        can_reverse?: boolean;
         read_only?: boolean;
     };
     supplier?: NamedResource | null;
@@ -423,16 +426,13 @@ export interface PurchaseReturn {
 
 export interface PurchaseReturnPayload {
     return_date: string;
-    warehouse_id: number;
+    warehouse_id?: number;
     warehouse_location_id?: number;
     supplier_type?: string;
     supplier_id?: number;
     reason?: string;
     return_type?: 'referenced' | 'manual_supplier_return';
-    source_type?: string;
     source_id?: number;
-    approval_required?: boolean;
-    affects_supplier_balance?: boolean;
     cost_basis?: string;
     lines: Array<{
         source_line_type: string;
@@ -459,6 +459,12 @@ export interface PurchaseDebitNote {
     source_type?: string | null;
     source_id?: number | null;
     source?: SourceSummary | null;
+    capabilities?: {
+        can_approve?: boolean;
+        can_post?: boolean;
+        can_allocate?: boolean;
+        read_only?: boolean;
+    };
     amount?: string;
     allocated_amount?: string;
     remaining_amount?: string;
