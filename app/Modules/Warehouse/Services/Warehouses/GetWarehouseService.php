@@ -7,21 +7,19 @@ namespace Modules\Warehouse\Services\Warehouses;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Warehouse\Constants\WarehouseErrorCode;
-use Modules\Warehouse\Repositories\WarehouseRepositoryInterface;
+use Modules\Warehouse\Models\WarehouseModel;
 use Throwable;
 
 final class GetWarehouseService
 {
-    public function __construct(private readonly WarehouseRepositoryInterface $repository) {}
-
     public function execute(int|string $id, int $tenantId, ?int $organizationUnitId): Result
     {
         try {
-            $record = $this->repository->list([
-                'id' => $id,
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-            ])[0] ?? null;
+            $record = WarehouseModel::query()
+                ->forTenant($tenantId, $organizationUnitId)
+                ->with(['organizationUnit', 'defaultLocation', 'locations' => fn ($query) => $query->orderBy('path')->orderBy('name')])
+                ->withCount('locations')
+                ->find($id);
 
             if ($record === null) {
                 return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
@@ -29,7 +27,9 @@ final class GetWarehouseService
 
             return Result::success($record);
         } catch (Throwable $exception) {
-            return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, 'Warehouse could not be loaded.'));
         }
     }
 }

@@ -24,6 +24,7 @@ export type NavigationModule =
     | 'item'
     | 'vehicle'
     | 'user'
+    | 'warehouse'
     | 'purchase'
     | 'sales'
     | 'vehicle-service'

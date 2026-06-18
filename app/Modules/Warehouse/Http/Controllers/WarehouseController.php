@@ -7,9 +7,14 @@ namespace Modules\Warehouse\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Core\Results\Error;
+use Modules\Core\Results\Result;
 use Modules\Warehouse\Http\Requests\ListWarehouseRequest;
 use Modules\Warehouse\Http\Requests\UpsertWarehouseRequest;
 use Modules\Warehouse\Http\Resources\WarehouseResource;
+use Modules\Warehouse\Models\WarehouseModel;
+use Modules\Warehouse\Services\WarehouseAuthorizationService;
+use Modules\Warehouse\Services\WarehouseDefaultResolver;
 use Modules\Warehouse\Services\Warehouses\CreateWarehouseService;
 use Modules\Warehouse\Services\Warehouses\DeleteWarehouseService;
 use Modules\Warehouse\Services\Warehouses\GetWarehouseService;
@@ -24,10 +29,14 @@ final class WarehouseController extends Controller
         private readonly CreateWarehouseService $createService,
         private readonly UpdateWarehouseService $updateService,
         private readonly DeleteWarehouseService $deleteService,
+        private readonly WarehouseAuthorizationService $authorization,
+        private readonly WarehouseDefaultResolver $defaults,
     ) {}
 
     public function index(ListWarehouseRequest $request): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_VIEW);
+
         $validated = $request->validated();
         $perPage = (int) ($validated['per_page'] ?? 0);
         $page = (int) ($validated['page'] ?? 0);
@@ -36,7 +45,7 @@ final class WarehouseController extends Controller
         $result = $this->listService->execute($validated, $perPage, $page);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         $pageResult = $result->valueOrFail();
@@ -52,10 +61,12 @@ final class WarehouseController extends Controller
 
     public function show(ListWarehouseRequest $request, int|string $id): JsonResponse|WarehouseResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_VIEW);
+
         $result = $this->getService->execute($id, $request->tenantId(), $request->organizationUnitId());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return new WarehouseResource($result->valueOrFail());
@@ -63,10 +74,15 @@ final class WarehouseController extends Controller
 
     public function store(UpsertWarehouseRequest $request): JsonResponse|WarehouseResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_CREATE);
+        if ($request->boolean('is_default')) {
+            $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_MANAGE_DEFAULTS);
+        }
+
         $result = $this->createService->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return (new WarehouseResource($result->valueOrFail()))->response()->setStatusCode(201);
@@ -74,6 +90,11 @@ final class WarehouseController extends Controller
 
     public function update(UpsertWarehouseRequest $request, int|string $id): JsonResponse|WarehouseResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_UPDATE);
+        if ($request->has('is_default')) {
+            $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_MANAGE_DEFAULTS);
+        }
+
         $result = $this->updateService->execute(
             $id,
             $request->tenantId(),
@@ -82,10 +103,7 @@ final class WarehouseController extends Controller
         );
 
         if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'WAREHOUSE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return new WarehouseResource($result->valueOrFail());
@@ -93,12 +111,61 @@ final class WarehouseController extends Controller
 
     public function destroy(ListWarehouseRequest $request, int|string $id): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_DELETE);
+
         $result = $this->deleteService->execute($id, $request->tenantId(), $request->organizationUnitId());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return response()->json(null, 204);
+    }
+
+    public function activate(ListWarehouseRequest $request, int|string $warehouse): JsonResponse|WarehouseResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_ACTIVATE);
+
+        return $this->activeResponse($this->updateService->setActive($warehouse, $request->tenantId(), $request->organizationUnitId(), true));
+    }
+
+    public function deactivate(ListWarehouseRequest $request, int|string $warehouse): JsonResponse|WarehouseResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_DEACTIVATE);
+
+        return $this->activeResponse($this->updateService->setActive($warehouse, $request->tenantId(), $request->organizationUnitId(), false));
+    }
+
+    public function defaultWarehouse(ListWarehouseRequest $request): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_VIEW);
+
+        $warehouse = $this->defaults->resolveDefaultWarehouse($request->tenantId(), $request->organizationUnitId());
+
+        return response()->json([
+            'data' => $warehouse instanceof WarehouseModel
+                ? (new WarehouseResource($warehouse->load(['organizationUnit', 'defaultLocation'])->loadCount('locations')))->resolve($request)
+                : null,
+        ]);
+    }
+
+    private function activeResponse(Result $result): JsonResponse|WarehouseResource
+    {
+        if ($result->isFailure()) {
+            return $this->errorResponse($result->errorOrFail());
+        }
+
+        return new WarehouseResource($result->valueOrFail());
+    }
+
+    private function errorResponse(Error $error): JsonResponse
+    {
+        $status = match ($error->code) {
+            'WAREHOUSE_NOT_FOUND' => 404,
+            'WAREHOUSE_STALE_RECORD' => 409,
+            default => 422,
+        };
+
+        return response()->json(['message' => $error->message], $status);
     }
 }

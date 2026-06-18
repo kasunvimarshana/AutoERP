@@ -4,28 +4,72 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Services\WarehouseLocations;
 
+use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Warehouse\Constants\WarehouseDefaults;
 use Modules\Warehouse\Constants\WarehouseErrorCode;
-use Modules\Warehouse\Repositories\WarehouseLocationRepositoryInterface;
+use Modules\Warehouse\Models\WarehouseLocationModel;
 use Throwable;
 
 final class ListWarehouseLocationsService
 {
-    public function __construct(private readonly WarehouseLocationRepositoryInterface $repository) {}
-
     public function execute(array $criteria, int $perPage, int $page): Result
     {
         try {
+            $tenantId = (int) $criteria['tenant_id'];
+            $organizationUnitId = $criteria['organization_unit_id'] ?? null;
             $resolvedPage = $page > 0 ? $page : WarehouseDefaults::DEFAULT_PAGE;
             $resolvedPerPage = $perPage > 0
                 ? min($perPage, (int) config('warehouse.pagination.max_per_page', WarehouseDefaults::MAX_PER_PAGE))
                 : (int) config('warehouse.pagination.default_per_page', WarehouseDefaults::DEFAULT_PER_PAGE);
 
-            return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
+            $query = WarehouseLocationModel::query()
+                ->forTenant($tenantId, is_numeric($organizationUnitId) ? (int) $organizationUnitId : null)
+                ->with(['warehouse', 'parent', 'organizationUnit']);
+
+            $this->applyFilters($query, $criteria);
+
+            $paginator = $query
+                ->orderByDesc('is_default')
+                ->orderBy('warehouse_id')
+                ->orderBy('path')
+                ->orderBy('name')
+                ->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage);
+
+            return Result::success(new PagedResult(
+                $paginator->items(),
+                $paginator->total(),
+                $paginator->currentPage(),
+                $paginator->perPage(),
+            ));
         } catch (Throwable $exception) {
-            return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, 'Warehouse locations could not be listed.'));
+        }
+    }
+
+    private function applyFilters(Builder $query, array $criteria): void
+    {
+        $search = trim((string) ($criteria['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function (Builder $scope) use ($search): void {
+                $scope->where('code', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%')
+                    ->orWhere('path', 'like', '%'.$search.'%');
+            });
+        }
+
+        foreach (['warehouse_id', 'parent_id', 'type', 'is_active', 'is_default'] as $filter) {
+            if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
+                $query->where($filter, $criteria[$filter]);
+            }
+        }
+
+        if (! empty($criteria['organization_unit_filter_id'])) {
+            $query->where('organization_unit_id', (int) $criteria['organization_unit_filter_id']);
         }
     }
 }

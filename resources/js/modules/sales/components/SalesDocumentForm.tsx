@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -25,6 +25,7 @@ import {
     type EditableSalesLine,
     type SalesDocument,
 } from './salesDocumentFormUtils';
+import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
 
 type DocumentKind = 'quotation' | 'order';
 
@@ -60,11 +61,33 @@ export function SalesDocumentForm({
     );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const warehouseTouched = useRef(Boolean(order?.warehouse));
+    const locationTouched = useRef(Boolean(order?.warehouse_location));
     const totals = useMemo(
         () => salesDocumentTotals(lines, adjustments),
         [lines, adjustments],
     );
     const errorFor = (name: string) => fieldError(error, name);
+
+    useEffect(() => {
+        if (kind !== 'order' || document || warehouseTouched.current || warehouse || location) return;
+
+        const controller = new AbortController();
+        void getDefaultWarehouse(controller.signal)
+            .then(async (defaultWarehouse) => {
+                if (controller.signal.aborted || warehouseTouched.current || warehouse || !defaultWarehouse) return;
+                setWarehouse(defaultWarehouse);
+
+                if (locationTouched.current || location) return;
+                const defaultLocation = await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
+                if (!controller.signal.aborted && !locationTouched.current && !location && defaultLocation) {
+                    setLocation(defaultLocation);
+                }
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [document, kind, location, warehouse]);
 
     async function submit(payload: SalesDocumentPayload) {
         const saved = kind === 'quotation'
@@ -148,10 +171,14 @@ export function SalesDocumentForm({
                     notes={notes}
                     onCustomerChange={setCustomer}
                     onWarehouseChange={(value) => {
+                        warehouseTouched.current = true;
                         setWarehouse(value);
                         setLocation(null);
                     }}
-                    onLocationChange={setLocation}
+                    onLocationChange={(value) => {
+                        locationTouched.current = true;
+                        setLocation(value);
+                    }}
                     onCurrencyChange={setCurrency}
                     onDocumentDateChange={setDocumentDate}
                     onSecondaryDateChange={setSecondaryDate}

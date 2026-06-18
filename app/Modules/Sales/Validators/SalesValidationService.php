@@ -92,6 +92,12 @@ final class SalesValidationService
             throw new InvalidArgumentException('Sales warehouse location must be active and belong to the selected warehouse.');
         }
 
+        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
+        if ((int) $location->tenant_id !== (int) $warehouse->tenant_id
+            || $location->organization_unit_id !== $warehouse->organization_unit_id) {
+            throw new InvalidArgumentException('Sales warehouse location scope must match the selected warehouse.');
+        }
+
         return $location;
     }
 

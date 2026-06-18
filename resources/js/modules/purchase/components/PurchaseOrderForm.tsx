@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -16,6 +16,7 @@ import { PurchaseHeaderAdjustmentEditor, type EditableHeaderAdjustment } from '.
 import { PurchaseOrderLineEditor, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderSummaryPanel';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
+import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
 
 interface HeaderState {
     purchase_order_date: string;
@@ -111,6 +112,28 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const [error, setError] = useState<ApiError | null>(null);
     const totals = useMemo(() => calculatePreview(lines, adjustments), [lines, adjustments]);
     const errorFor = (field: string) => fieldError(error, field);
+    const warehouseTouched = useRef(Boolean(order?.warehouse));
+    const locationTouched = useRef(Boolean(order?.warehouse_location));
+
+    useEffect(() => {
+        if (order || warehouseTouched.current || warehouse || warehouseLocation) return;
+
+        const controller = new AbortController();
+        void getDefaultWarehouse(controller.signal)
+            .then(async (defaultWarehouse) => {
+                if (controller.signal.aborted || warehouseTouched.current || warehouse || !defaultWarehouse) return;
+                setWarehouse(defaultWarehouse);
+
+                if (locationTouched.current || warehouseLocation) return;
+                const defaultLocation = await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
+                if (!controller.signal.aborted && !locationTouched.current && !warehouseLocation && defaultLocation) {
+                    setWarehouseLocation(defaultLocation);
+                }
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [order, warehouse, warehouseLocation]);
 
     const payload = (): PurchaseOrderPayload => ({
         purchase_order_date: header.purchase_order_date,
@@ -172,8 +195,8 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                 <Panel title="Order header">
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
-                        <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
-                        <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                        <WarehouseLookupSelect value={warehouse} onChange={(value) => { warehouseTouched.current = true; setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
+                        <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={(value) => { locationTouched.current = true; setWarehouseLocation(value); }} error={errorFor('warehouse_location_id')} />
                         <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
                         <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />

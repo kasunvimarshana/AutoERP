@@ -69,6 +69,7 @@ use Modules\Tax\Services\TaxCalculationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
+use Modules\Warehouse\Services\WarehouseDefaultResolver;
 
 final class FastSalesService
 {
@@ -88,6 +89,7 @@ final class FastSalesService
         private readonly PaymentCreationService $payments,
         private readonly FinancePostingInterface $financePostings,
         private readonly LogActivityService $audit,
+        private readonly WarehouseDefaultResolver $warehouses,
     ) {}
 
     /**
@@ -1661,21 +1663,7 @@ final class FastSalesService
      */
     private function warehouseOptions(int $tenantId, ?int $organizationUnitId, string $search, int $limit): array
     {
-        return WarehouseModel::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
-            ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
-                $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
-            }))
-            ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->limit($limit)
-            ->get(['id', 'code', 'name', 'is_default'])
-            ->map(fn (WarehouseModel $warehouse): array => ['id' => (int) $warehouse->getKey(), 'code' => $warehouse->code, 'name' => $warehouse->name, 'is_default' => (bool) $warehouse->is_default])
-            ->all();
+        return $this->warehouses->activeWarehouseOptions($tenantId, $organizationUnitId, $search, $limit);
     }
 
     /**

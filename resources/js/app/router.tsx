@@ -49,6 +49,14 @@ const ItemBrandCreatePage = lazy(() => import('@/modules/item/ItemBrandCreatePag
 const ItemBrandEditPage = lazy(() => import('@/modules/item/ItemBrandEditPage'));
 const ItemBrandDetailPage = lazy(() => import('@/modules/item/ItemBrandDetailPage'));
 const InventoryPage = lazy(() => import('@/modules/inventory/pages/InventoryPage'));
+const WarehouseListPage = lazy(() => import('@/modules/warehouse/WarehouseListPage'));
+const WarehouseCreatePage = lazy(() => import('@/modules/warehouse/WarehouseCreatePage'));
+const WarehouseEditPage = lazy(() => import('@/modules/warehouse/WarehouseEditPage'));
+const WarehouseDetailPage = lazy(() => import('@/modules/warehouse/WarehouseDetailPage'));
+const WarehouseLocationListPage = lazy(() => import('@/modules/warehouse/WarehouseLocationListPage'));
+const WarehouseLocationCreatePage = lazy(() => import('@/modules/warehouse/WarehouseLocationCreatePage'));
+const WarehouseLocationEditPage = lazy(() => import('@/modules/warehouse/WarehouseLocationEditPage'));
+const WarehouseLocationDetailPage = lazy(() => import('@/modules/warehouse/WarehouseLocationDetailPage'));
 const FastPurchasePage = lazy(() => import('@/modules/purchase/pages/FastPurchasePage'));
 const PurchaseOrderListPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderListPage'));
 const PurchaseOrderFormPage = lazy(() => import('@/modules/purchase/pages/PurchaseOrderFormPage'));
@@ -195,6 +203,14 @@ export function AppRouter() {
                     <Route path="/item-brands/:id/edit" element={<ItemBrandEditPage />} />
                     <Route path="/item-brands/:id" element={<ItemBrandDetailPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
+                    <Route path="/warehouses" element={<WarehouseListPage />} />
+                    <Route path="/warehouses/create" element={<WarehouseCreatePage />} />
+                    <Route path="/warehouses/:id/edit" element={<WarehouseEditPage />} />
+                    <Route path="/warehouses/:id" element={<WarehouseDetailPage />} />
+                    <Route path="/warehouse-locations" element={<WarehouseLocationListPage />} />
+                    <Route path="/warehouse-locations/create" element={<WarehouseLocationCreatePage />} />
+                    <Route path="/warehouse-locations/:id/edit" element={<WarehouseLocationEditPage />} />
+                    <Route path="/warehouse-locations/:id" element={<WarehouseLocationDetailPage />} />
                     <Route path="/purchase/fast-purchase" element={<FastPurchasePage />} />
                     <Route path="/purchase/orders" element={<PurchaseOrderListPage />} />
                     <Route path="/purchase/orders/create" element={<PurchaseOrderFormPage />} />

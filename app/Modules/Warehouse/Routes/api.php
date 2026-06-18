@@ -24,6 +24,23 @@ Route::prefix('api/v1')
     ])
     ->name('api.v1.')
     ->group(function (): void {
+        Route::get('warehouses/default', [WarehouseController::class, 'defaultWarehouse'])
+            ->name('warehouses.default');
+        Route::patch('warehouses/{warehouse}/activate', [WarehouseController::class, 'activate'])
+            ->whereNumber('warehouse')
+            ->name('warehouses.activate');
+        Route::patch('warehouses/{warehouse}/deactivate', [WarehouseController::class, 'deactivate'])
+            ->whereNumber('warehouse')
+            ->name('warehouses.deactivate');
         Route::apiResource('warehouses', WarehouseController::class);
+
+        Route::get('warehouse-locations/default', [WarehouseLocationController::class, 'defaultLocation'])
+            ->name('warehouse-locations.default');
+        Route::patch('warehouse-locations/{warehouseLocation}/activate', [WarehouseLocationController::class, 'activate'])
+            ->whereNumber('warehouseLocation')
+            ->name('warehouse-locations.activate');
+        Route::patch('warehouse-locations/{warehouseLocation}/deactivate', [WarehouseLocationController::class, 'deactivate'])
+            ->whereNumber('warehouseLocation')
+            ->name('warehouse-locations.deactivate');
         Route::apiResource('warehouse-locations', WarehouseLocationController::class);
     });

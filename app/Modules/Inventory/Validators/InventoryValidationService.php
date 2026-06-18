@@ -92,6 +92,11 @@ final class InventoryValidationService
             throw new InvalidArgumentException('Warehouse location must belong to the warehouse.');
         }
 
+        if ((int) $location->tenant_id !== (int) $warehouse->tenant_id
+            || $location->organization_unit_id !== $warehouse->organization_unit_id) {
+            throw new InvalidArgumentException('Warehouse location scope must match the selected warehouse.');
+        }
+
         if (! (bool) $location->is_active) {
             throw new InvalidArgumentException('Inactive warehouse location cannot be used for inventory.');
         }

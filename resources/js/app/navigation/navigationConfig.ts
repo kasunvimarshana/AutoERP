@@ -2,6 +2,7 @@ import type { NavigationSection } from './navigationTypes';
 import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { warehousePermissions } from '@/modules/warehouse/warehousePermissions';
 
 const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
     requiresTenant: true,
@@ -58,6 +59,13 @@ const purchaseNavigationPermissions = [
     purchasePermissions.returnsCreate,
     purchasePermissions.debitNotesView,
     purchasePermissions.debitNotesCreate,
+];
+
+const warehouseNavigationPermissions = [
+    warehousePermissions.warehousesView,
+    warehousePermissions.warehousesCreate,
+    warehousePermissions.locationsView,
+    warehousePermissions.locationsCreate,
 ];
 
 export const navigationSections: NavigationSection[] = [
@@ -264,6 +272,19 @@ export const navigationSections: NavigationSection[] = [
         id: 'operations',
         label: 'Operations',
         items: [
+            {
+                id: 'warehouses',
+                type: 'module',
+                label: 'Warehouses',
+                icon: 'list',
+                access: { ...operationalAccess(['warehouse']), permissions: warehouseNavigationPermissions },
+                children: [
+                    { id: 'warehouse-list', type: 'link', label: 'Warehouses', to: '/warehouses', match: ['/warehouses'], access: { ...operationalAccess(['warehouse']), permissions: [warehousePermissions.warehousesView] } },
+                    { id: 'warehouse-create', type: 'link', label: 'Create Warehouse', to: '/warehouses/create', match: ['/warehouses/create'], access: { ...operationalAccess(['warehouse']), permissions: [warehousePermissions.warehousesCreate] } },
+                    { id: 'warehouse-location-list', type: 'link', label: 'Warehouse Locations', to: '/warehouse-locations', match: ['/warehouse-locations'], access: { ...operationalAccess(['warehouse']), permissions: [warehousePermissions.locationsView] } },
+                    { id: 'warehouse-location-create', type: 'link', label: 'Create Warehouse Location', to: '/warehouse-locations/create', match: ['/warehouse-locations/create'], access: { ...operationalAccess(['warehouse']), permissions: [warehousePermissions.locationsCreate] } },
+                ],
+            },
             {
                 id: 'purchase',
                 type: 'module',

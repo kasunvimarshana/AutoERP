@@ -7,6 +7,9 @@ namespace Tests\Feature\Api;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\User\Models\UserModel;
+use Modules\Warehouse\Services\WarehouseAuthorizationService;
 use Tests\TestCase;
 
 final class BooleanQueryFilterTest extends TestCase
@@ -21,12 +24,12 @@ final class BooleanQueryFilterTest extends TestCase
 
     public function test_warehouse_boolean_filters_accept_supported_query_representations(): void
     {
-        [$tenantId, $organizationUnitId] = $this->scope();
-        $this->warehouse($tenantId, $organizationUnitId, 'ACTIVE', true);
-        $this->warehouse($tenantId, $organizationUnitId, 'INACTIVE', false);
+        [$tenantId, $organizationUnitId, $userId] = $this->scope();
+        $this->warehouse($tenantId, $organizationUnitId, $userId, 'ACTIVE', true);
+        $this->warehouse($tenantId, $organizationUnitId, $userId, 'INACTIVE', false);
 
         foreach (['true', '1'] as $value) {
-            $this->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
+            $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
                 ->assertOk()
                 ->assertJsonCount(1, 'data')
                 ->assertJsonPath('data.0.code', 'ACTIVE')
@@ -35,43 +38,45 @@ final class BooleanQueryFilterTest extends TestCase
         }
 
         foreach (['false', '0'] as $value) {
-            $this->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
+            $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
                 ->assertOk()
                 ->assertJsonCount(1, 'data')
                 ->assertJsonPath('data.0.code', 'INACTIVE');
         }
 
-        $this->getJson($this->warehouseUrl($tenantId, $organizationUnitId, 'yes'))
+        $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, 'yes'))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('is_active');
     }
 
     public function test_warehouse_record_access_is_tenant_scoped(): void
     {
-        [$tenantId, $organizationUnitId] = $this->scope();
-        [$otherTenantId, $otherOrganizationUnitId] = $this->scope();
+        [$tenantId, $organizationUnitId, $userId] = $this->scope();
+        [$otherTenantId, $otherOrganizationUnitId, $otherUserId] = $this->scope();
         $sameTenantOtherOrganizationId = $this->organization($tenantId);
-        $warehouseId = $this->warehouse($tenantId, $organizationUnitId, 'PRIVATE', true);
+        $warehouseId = $this->warehouse($tenantId, $organizationUnitId, $userId, 'PRIVATE', true);
 
         $scope = '?tenant_id='.$otherTenantId.'&organization_unit_id='.$otherOrganizationUnitId;
 
-        $this->getJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
-        $this->patchJson('/api/v1/warehouses/'.$warehouseId, [
+        $this->asWarehouseUser($otherUserId)->getJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
+        $this->asWarehouseUser($otherUserId)->patchJson('/api/v1/warehouses/'.$warehouseId, [
             'tenant_id' => $otherTenantId,
             'organization_unit_id' => $otherOrganizationUnitId,
+            'row_version' => 1,
             'name' => 'Cross tenant update',
         ])->assertNotFound();
-        $this->deleteJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
+        $this->asWarehouseUser($otherUserId)->deleteJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
 
         $organizationScope = '?tenant_id='.$tenantId.'&organization_unit_id='.$sameTenantOtherOrganizationId;
 
-        $this->getJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
-        $this->patchJson('/api/v1/warehouses/'.$warehouseId, [
+        $this->asWarehouseUser($userId)->getJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
+        $this->asWarehouseUser($userId)->patchJson('/api/v1/warehouses/'.$warehouseId, [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $sameTenantOtherOrganizationId,
+            'row_version' => 1,
             'name' => 'Cross organization update',
         ])->assertNotFound();
-        $this->deleteJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
+        $this->asWarehouseUser($userId)->deleteJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
     }
 
     private function warehouseUrl(int $tenantId, int $organizationUnitId, string $isActive): string
@@ -81,9 +86,9 @@ final class BooleanQueryFilterTest extends TestCase
             .'&is_active='.$isActive;
     }
 
-    private function warehouse(int $tenantId, int $organizationUnitId, string $code, bool $isActive): int
+    private function warehouse(int $tenantId, int $organizationUnitId, int $userId, string $code, bool $isActive): int
     {
-        return (int) $this->postJson('/api/v1/warehouses', [
+        return (int) $this->asWarehouseUser($userId)->postJson('/api/v1/warehouses', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => $code,
@@ -94,7 +99,7 @@ final class BooleanQueryFilterTest extends TestCase
     }
 
     /**
-     * @return array{int, int}
+     * @return array{int, int, int}
      */
     private function scope(): array
     {
@@ -111,7 +116,10 @@ final class BooleanQueryFilterTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        return [$tenantId, $this->organization($tenantId, $suffix)];
+        $organizationUnitId = $this->organization($tenantId, $suffix);
+        $userId = $this->userWithWarehousePermissions($tenantId, $organizationUnitId, $suffix);
+
+        return [$tenantId, $organizationUnitId, $userId];
     }
 
     private function organization(int $tenantId, ?string $suffix = null): int
@@ -126,5 +134,74 @@ final class BooleanQueryFilterTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function userWithWarehousePermissions(int $tenantId, int $organizationUnitId, string $suffix): int
+    {
+        $now = now();
+        $userId = (int) DB::table('users')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'first_name' => 'Warehouse',
+            'last_name' => 'Filter',
+            'email' => 'warehouse-filter-'.Str::lower($suffix).'@example.test',
+            'password' => app(PasswordHasherInterface::class)->hash('secret-password'),
+            'status' => 'active',
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'name' => 'Warehouse Filter Role',
+            'guard_name' => 'web',
+            'description' => 'Warehouse filter test role',
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach (array_keys(WarehouseAuthorizationService::descriptions()) as $permissionName) {
+            $permissionId = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'name' => $permissionName,
+                'guard_name' => 'web',
+                'module' => 'Warehouse',
+                'description' => WarehouseAuthorizationService::descriptions()[$permissionName],
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return $userId;
+    }
+
+    private function asWarehouseUser(int $userId): self
+    {
+        $this->actingAs(UserModel::query()->findOrFail($userId));
+
+        return $this;
     }
 }

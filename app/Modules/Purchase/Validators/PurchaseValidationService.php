@@ -177,6 +177,13 @@ final class PurchaseValidationService
             $this->invalidReference($field, 'warehouse location', 'The selected warehouse location does not belong to the selected warehouse.');
         }
 
+        $warehouse = WarehouseModel::query()->find($warehouseId);
+        if (! $warehouse instanceof WarehouseModel
+            || (int) $location->tenant_id !== (int) $warehouse->tenant_id
+            || $this->nullableScopeId($location->organization_unit_id ?? null) !== $this->nullableScopeId($warehouse->organization_unit_id ?? null)) {
+            $this->invalidReference($field, 'warehouse location', 'The selected warehouse location scope does not match the selected warehouse.');
+        }
+
         if (isset($location->is_active) && ! (bool) $location->is_active) {
             $this->invalidReference($field, 'warehouse location', 'The selected warehouse location is not active.');
         }

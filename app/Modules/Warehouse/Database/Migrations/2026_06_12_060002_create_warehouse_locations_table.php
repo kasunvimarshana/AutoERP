@@ -27,13 +27,17 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_pickable')->default(true);
             $table->boolean('is_receivable')->default(true);
+            $table->boolean('is_default')->default(false);
             $table->decimal('capacity', 20, 6)->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'warehouse_id', 'name'], 'warehouse_locations_warehouse_name_uk');
+            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'warehouse_locations_warehouse_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_parent_idx');
+            $table->index(['warehouse_id', 'is_default'], 'warehouse_locations_default_idx');
+            $table->index(['warehouse_id', 'path'], 'warehouse_locations_path_idx');
         });
     }
 
