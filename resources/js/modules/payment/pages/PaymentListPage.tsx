@@ -18,9 +18,9 @@ import { LinkButton } from '@/shared/components/Button';
 const paymentViews = {
     supplier: {
         title: 'Supplier Payments',
-        description: 'Outbound payments prepared for supplier liabilities.',
+        description: 'Outbound payments created for supplier liabilities.',
         params: { payment_type: 'supplier_payment', direction: 'outbound' },
-        action: { to: '/purchase/payments/prepare', label: 'Prepare supplier payment' },
+        action: { to: '/purchase/payments/create', label: 'Create supplier payment' },
     },
     customer: {
         title: 'Customer Receipts',

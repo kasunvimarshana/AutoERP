@@ -96,8 +96,8 @@ final class PurchaseAuthorizationService
             self::DEBIT_NOTES_ALLOCATE => 'Allocate purchase debit notes to supplier invoices.',
             self::DEBIT_NOTES_REVERSE => 'Reverse purchase debit notes.',
             self::DEBIT_NOTES_CANCEL => 'Cancel purchase debit notes.',
-            self::PAYMENTS_VIEW => 'View supplier payment preparation data.',
-            self::PAYMENTS_EXECUTE => 'Prepare supplier payment allocations through the Payment module.',
+            self::PAYMENTS_VIEW => 'View supplier payment workspace data.',
+            self::PAYMENTS_EXECUTE => 'Create supplier payments through the Payment module.',
             self::FAST_PURCHASE_VIEW => 'View Fast Purchase context and previews.',
             self::FAST_PURCHASE_EXECUTE => 'Execute Fast Purchase workflows.',
         ];

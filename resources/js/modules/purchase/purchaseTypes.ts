@@ -490,7 +490,7 @@ export interface PurchaseInvoicePayload {
     }>;
 }
 
-export interface PurchasePaymentPreparePayload {
+export interface PurchasePaymentCreatePayload {
     payment_date: string;
     amount: string;
     supplier_type?: string;
@@ -516,6 +516,8 @@ export interface PurchasePaymentPreparePayload {
         allocation_date?: string;
     }>;
 }
+
+export type PurchasePaymentPreparePayload = PurchasePaymentCreatePayload;
 
 export interface InventoryAdjustmentRequestPayload {
     adjustment_date: string;

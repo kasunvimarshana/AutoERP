@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { itemPermissions } from '@/modules/item/itemPermissions';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { navigationSections } from './navigationConfig';
 import {
     filterNavigation,
@@ -34,7 +36,7 @@ describe('navigation access and matching', () => {
         expect(itemIds).not.toContain('users');
     });
 
-    it('keeps ordinary tenant navigation visible while hiding role-restricted access control', () => {
+    it('keeps module-only tenant navigation visible while hiding permission-gated access', () => {
         const sections = filterNavigation(navigationSections, {
             tenantId: 10,
             organizationUnitId: 20,
@@ -44,11 +46,29 @@ describe('navigation access and matching', () => {
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
-        expect(itemIds).toContain('purchase');
-        expect(itemIds).toContain('vehicle-rental');
+        expect(itemIds).not.toContain('purchase');
+        expect(itemIds).not.toContain('items');
+        expect(itemIds).not.toContain('vehicle-rental');
+        expect(itemIds).toContain('sales');
         expect(itemIds).toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
+    });
+
+    it('does not grant permission-gated navigation while permissions are loading', () => {
+        const sections = filterNavigation(navigationSections, {
+            tenantId: 10,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [purchasePermissions.ordersView, itemPermissions.view],
+            permissionsLoaded: false,
+            enabledModules: null,
+        });
+        const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
+
+        expect(itemIds).not.toContain('purchase');
+        expect(itemIds).not.toContain('items');
+        expect(itemIds).toContain('vehicle');
     });
 
     it('hides organization workflows when no branch or organization unit is selected', () => {
@@ -56,7 +76,7 @@ describe('navigation access and matching', () => {
             tenantId: 10,
             organizationUnitId: null,
             roles: [],
-            permissions: [],
+            permissions: [purchasePermissions.ordersView],
             enabledModules: null,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);

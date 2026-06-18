@@ -3,7 +3,7 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Select } from '@/shared/components/Select';
 import { Button } from '@/shared/components/Button';
 import { subtractDecimal, multiplyDecimal } from '@/shared/utils/decimal';
-import type { FastPurchaseContext, PurchaseItemContext } from '../purchaseTypes';
+import type { FastPurchaseContext, FastPurchaseLinePreview, PurchaseItemContext } from '../purchaseTypes';
 import { getPurchaseItemContext } from '../purchaseApi';
 import { ItemLookupSelect } from './PurchaseLookups';
 import type { NamedResource } from '@/shared/types/common';
@@ -29,6 +29,7 @@ interface FastPurchaseLinesProps {
     supplierId?: number;
     currencyId?: number;
     warehouseId?: number;
+    previewLines?: FastPurchaseLinePreview[];
     errorFor: (field: string) => string | undefined;
     onChange: (rows: FastPurchaseLineRow[]) => void;
 }
@@ -49,7 +50,7 @@ export function blankFastPurchaseLine(): FastPurchaseLineRow {
     };
 }
 
-export function FastPurchaseLines({ rows, context, supplierId, currencyId, warehouseId, errorFor, onChange }: FastPurchaseLinesProps) {
+export function FastPurchaseLines({ rows, context, supplierId, currencyId, warehouseId, previewLines = [], errorFor, onChange }: FastPurchaseLinesProps) {
     const rowsRef = useRef(rows);
     useEffect(() => {
         rowsRef.current = rows;
@@ -66,17 +67,18 @@ export function FastPurchaseLines({ rows, context, supplierId, currencyId, wareh
 
     return (
         <div className="space-y-3">
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="min-w-[980px] w-full table-fixed border-collapse text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+            <div className="overflow-hidden rounded-lg border border-slate-200 md:overflow-x-auto">
+                <table className="w-full border-collapse text-sm md:min-w-[1120px]">
+                    <thead className="hidden bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 md:table-header-group">
                         <tr>
                             <th className="w-64 px-3 py-2">Item</th>
+                            <th className="w-40 px-3 py-2">Variant</th>
                             <th className="w-40 px-3 py-2">UOM</th>
-                            <th className="w-32 px-3 py-2">Qty</th>
+                            <th className="w-32 px-3 py-2">Quantity</th>
                             <th className="w-36 px-3 py-2">Unit cost</th>
                             <th className="w-36 px-3 py-2">Discount</th>
                             <th className="w-44 px-3 py-2">Tax</th>
-                            <th className="w-36 px-3 py-2 text-right">Line total</th>
+                            <th className="w-36 px-3 py-2 text-right">Amount</th>
                             <th className="w-24 px-3 py-2" />
                         </tr>
                     </thead>
@@ -96,7 +98,7 @@ export function FastPurchaseLines({ rows, context, supplierId, currencyId, wareh
                                     supplierId={supplierId}
                                     currencyId={currencyId}
                                     warehouseId={warehouseId}
-                                    estimatedTotal={estimatedTotal}
+                                    amount={previewLines[index]?.line_total ?? estimatedTotal}
                                     isLast={index === rows.length - 1}
                                     errorFor={errorFor}
                                     addRow={addRow}
@@ -114,14 +116,14 @@ export function FastPurchaseLines({ rows, context, supplierId, currencyId, wareh
     );
 }
 
-function FastPurchaseLine({ row, index, context, supplierId, currencyId, warehouseId, estimatedTotal, isLast, errorFor, addRow, removeRow, update, updateWith }: {
+function FastPurchaseLine({ row, index, context, supplierId, currencyId, warehouseId, amount, isLast, errorFor, addRow, removeRow, update, updateWith }: {
     row: FastPurchaseLineRow;
     index: number;
     context: FastPurchaseContext | null;
     supplierId?: number;
     currencyId?: number;
     warehouseId?: number;
-    estimatedTotal: string;
+    amount: string;
     isLast: boolean;
     errorFor: (field: string) => string | undefined;
     addRow: () => void;
@@ -171,7 +173,8 @@ function FastPurchaseLine({ row, index, context, supplierId, currencyId, warehou
     }, [row.item?.id, row.item_variant?.id, supplierId, currencyId, warehouseId]);
 
     return (
-        <tr className="align-top">
+        <>
+        <tr className="hidden align-top md:table-row">
             <td className="px-3 py-3">
                 <ItemLookupSelect
                     value={row.item}
@@ -185,28 +188,8 @@ function FastPurchaseLine({ row, index, context, supplierId, currencyId, warehou
                     placeholder="Description"
                 />
             </td>
-            <td className="px-3 py-3 space-y-2">
-                <Select
-                    value={row.item_variant?.id ?? ''}
-                    onChange={(event) => {
-                        const variant = purchaseContext?.variants.find((option) => String(option.id) === event.target.value) ?? null;
-                        update(index, { item_variant: variant });
-                    }}
-                    options={(purchaseContext?.variants ?? []).map((variant) => ({ value: variant.id, label: `${variant.code ?? ''} ${variant.name ?? ''}`.trim() }))}
-                    placeholder="Variant"
-                    error={errorFor(`lines.${index}.item_variant_id`)}
-                />
-                <Select
-                    value={row.uom?.id ?? ''}
-                    onChange={(event) => {
-                        const unit = purchaseContext?.allowed_purchase_uoms.find((option) => String(option.id) === event.target.value);
-                        update(index, { uom: unit?.uom ?? null, auto_uom: false });
-                    }}
-                    options={(purchaseContext?.allowed_purchase_uoms ?? []).map((unit) => ({ value: unit.id, label: `${unit.uom?.code ?? ''} ${unit.uom?.name ?? ''}`.trim() }))}
-                    placeholder={loadingContext ? 'Loading...' : 'UOM'}
-                    error={errorFor(`lines.${index}.uom_id`)}
-                />
-            </td>
+            <td className="px-3 py-3"><VariantSelect row={row} index={index} context={purchaseContext} errorFor={errorFor} update={update} /></td>
+            <td className="px-3 py-3"><UomSelect row={row} index={index} context={purchaseContext} loading={loadingContext} errorFor={errorFor} update={update} /></td>
             <td className="px-3 py-3">
                 <DecimalInput
                     value={row.quantity}
@@ -236,10 +219,98 @@ function FastPurchaseLine({ row, index, context, supplierId, currencyId, warehou
                     error={errorFor(`lines.${index}.tax_group_id`)}
                 />
             </td>
-            <td className="px-3 py-3 text-right font-medium text-slate-800">{estimatedTotal}</td>
+            <td className="px-3 py-3 text-right font-medium text-slate-800">{amount}</td>
             <td className="px-3 py-3 text-right">
                 <Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button>
             </td>
         </tr>
+        <tr className="md:hidden">
+            <td className="border-b border-slate-100 p-3" colSpan={9}>
+                <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="grid gap-3">
+                        <ItemLookupSelect
+                            value={row.item}
+                            onChange={(item) => update(index, { item, item_variant: null, description: item?.name ?? '', uom: null, unit_cost: '', auto_uom: true, auto_price: true })}
+                            error={errorFor(`lines.${index}.item_id`)}
+                        />
+                        <input
+                            className="min-h-9 w-full rounded-lg border border-slate-300 px-3 py-1.5 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                            value={row.description}
+                            onChange={(event) => update(index, { description: event.target.value })}
+                            placeholder="Description"
+                        />
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <VariantSelect row={row} index={index} context={purchaseContext} errorFor={errorFor} update={update} />
+                            <UomSelect row={row} index={index} context={purchaseContext} loading={loadingContext} errorFor={errorFor} update={update} />
+                            <DecimalInput label="Quantity" value={row.quantity} onChange={(event) => update(index, { quantity: event.target.value })} error={errorFor(`lines.${index}.quantity`)} />
+                            <DecimalInput label="Unit cost" value={row.unit_cost} onChange={(event) => update(index, { unit_cost: event.target.value, auto_price: false })} error={errorFor(`lines.${index}.unit_cost`)} />
+                            <DecimalInput label="Discount" value={row.discount_amount} onChange={(event) => update(index, { discount_amount: event.target.value })} error={errorFor(`lines.${index}.discount_amount`)} />
+                            <Select
+                                label="Tax"
+                                value={row.tax_group_id}
+                                onChange={(event) => update(index, { tax_group_id: event.target.value })}
+                                options={(context?.tax_groups ?? []).map((group) => ({ value: group.id, label: `${group.code ?? ''} ${group.name ?? ''}`.trim() }))}
+                                placeholder="Default"
+                                error={errorFor(`lines.${index}.tax_group_id`)}
+                            />
+                        </div>
+                        {row.price_source_label && <div className="text-xs text-slate-500">{row.price_source_label}</div>}
+                        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                            <span className="text-xs font-semibold uppercase text-slate-500">Amount</span>
+                            <strong className="tabular-nums text-slate-900">{amount}</strong>
+                        </div>
+                        <div className="flex justify-end">
+                            <Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button>
+                        </div>
+                    </div>
+                </article>
+            </td>
+        </tr>
+        </>
+    );
+}
+
+function VariantSelect({ row, index, context, errorFor, update }: {
+    row: FastPurchaseLineRow;
+    index: number;
+    context: PurchaseItemContext | null;
+    errorFor: (field: string) => string | undefined;
+    update: (index: number, patch: Partial<FastPurchaseLineRow>) => void;
+}) {
+    return (
+        <Select
+            label="Variant"
+            value={row.item_variant?.id ?? ''}
+            onChange={(event) => {
+                const variant = context?.variants.find((option) => String(option.id) === event.target.value) ?? null;
+                update(index, { item_variant: variant });
+            }}
+            options={(context?.variants ?? []).map((variant) => ({ value: variant.id, label: `${variant.code ?? ''} ${variant.name ?? ''}`.trim() }))}
+            placeholder="Variant"
+            error={errorFor(`lines.${index}.item_variant_id`)}
+        />
+    );
+}
+
+function UomSelect({ row, index, context, loading, errorFor, update }: {
+    row: FastPurchaseLineRow;
+    index: number;
+    context: PurchaseItemContext | null;
+    loading: boolean;
+    errorFor: (field: string) => string | undefined;
+    update: (index: number, patch: Partial<FastPurchaseLineRow>) => void;
+}) {
+    return (
+        <Select
+            label="UOM"
+            value={row.uom?.id ?? ''}
+            onChange={(event) => {
+                const unit = context?.allowed_purchase_uoms.find((option) => String(option.id) === event.target.value);
+                update(index, { uom: unit?.uom ?? null, auto_uom: false });
+            }}
+            options={(context?.allowed_purchase_uoms ?? []).map((unit) => ({ value: unit.id, label: `${unit.uom?.code ?? ''} ${unit.uom?.name ?? ''}`.trim() }))}
+            placeholder={loading ? 'Loading...' : 'UOM'}
+            error={errorFor(`lines.${index}.uom_id`)}
+        />
     );
 }

@@ -40,7 +40,7 @@ final class PurchasePaymentIntegrationService
     }
 
     /**
-     * Prepare a supplier payment DTO. Payment owns persistence and invoice settlement.
+     * Build canonical supplier payment creation data. Payment owns persistence and invoice settlement.
      *
      * @param  list<PaymentLineData>  $lines
      * @param  list<PaymentAllocationData>  $allocations

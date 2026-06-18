@@ -28,7 +28,7 @@ export default function PurchasePaymentWorkspacePage() {
     }, signal), [debounced, page]);
 
     const columns: DataColumn<Payment>[] = [
-        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? `Payment #${row.id}`}</Link> },
+        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? `Payment #${row.id}`}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Supplier', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },
@@ -42,7 +42,7 @@ export default function PurchasePaymentWorkspacePage() {
             <PurchasePageHeader
                 title="Supplier Payments"
                 description="Outbound payments created for supplier invoices from the Purchase workflow."
-                actions={<LinkButton to="/purchase/payments/prepare">Create Supplier Payment</LinkButton>}
+                actions={<LinkButton to="/purchase/payments/create">Create Supplier Payment</LinkButton>}
             />
             <div className="max-w-md">
                 <Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
@@ -50,7 +50,7 @@ export default function PurchasePaymentWorkspacePage() {
             <ErrorAlert error={result.error} />
             {result.loading
                 ? <LoadingState />
-                : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/payments/${row.id}`} emptyMessage="No supplier payments found." />}
+                : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/payments/${row.id}?from=purchase`} emptyMessage="No supplier payments found." />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </div>
     );

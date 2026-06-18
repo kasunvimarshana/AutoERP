@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { getInvoice, getInvoiceAdjustments, getInvoiceBalance, getInvoiceSources } from '../invoiceApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -13,12 +13,14 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
+import { LinkButton } from '@/shared/components/Button';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
 const tabs = [['summary', 'Summary'], ['balance', 'Balance'], ['sources', 'Sources'], ['lines', 'Lines'], ['adjustments', 'Adjustments']].map(([id, label]) => ({ id: id as Tab, label }));
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
+    const [searchParams] = useSearchParams();
     const tabState = useOnDemandTab<Tab>('summary');
     const invoice = useApi((signal) => getInvoice(id, signal), [id]);
     const balance = useApi((signal) => getInvoiceBalance(id, signal), [id], tabState.openedTabs.has('balance'));
@@ -27,9 +29,20 @@ export default function InvoiceDetailPage() {
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
+    const fromPurchase = searchParams.get('from') === 'purchase';
+    const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
     return (
         <>
-            <ContentHeader title={value.invoice_number ?? 'Invoice'} description={formatDate(value.invoice_date)} />
+            <ContentHeader
+                title={value.invoice_number ?? 'Invoice'}
+                description={formatDate(value.invoice_date)}
+                actions={fromPurchase && isSupplierInvoice ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                        <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
+                        <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
+                    </div>
+                ) : undefined}
+            />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">

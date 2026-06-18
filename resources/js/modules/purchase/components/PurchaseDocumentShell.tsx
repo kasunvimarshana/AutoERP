@@ -10,10 +10,14 @@ export function PurchaseDocumentShell({ header, tabs, children, summary }: {
         <div className="mx-auto max-w-7xl space-y-5">
             {header}
             {tabs}
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+            {summary ? (
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="min-w-0 space-y-5">{children}</div>
+                    <aside className="xl:sticky xl:top-20 xl:self-start">{summary}</aside>
+                </div>
+            ) : (
                 <div className="min-w-0 space-y-5">{children}</div>
-                {summary && <aside className="xl:sticky xl:top-20 xl:self-start">{summary}</aside>}
-            </div>
+            )}
         </div>
     );
 }

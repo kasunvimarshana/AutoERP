@@ -50,26 +50,69 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
 
     return (
         <div className="space-y-3">
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="min-w-[980px] w-full table-fixed text-sm">
+            <div className="grid gap-3 md:hidden">
+                {rows.map((row, index) => {
+                    const method = methods.find((option) => String(option.id) === row.payment_method_id);
+
+                    return (
+                        <article key={row.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                            <div className="grid gap-3">
+                                <Select
+                                    label="Method"
+                                    value={row.payment_method_id}
+                                    options={methods.map((option) => ({ value: option.id, label: optionLabel(option) }))}
+                                    onChange={(event) => update(index, { payment_method_id: event.target.value })}
+                                    error={errorFor(`lines.${index}.payment_method_id`) ?? errorFor(`payment.lines.${index}.payment_method_id`)}
+                                />
+                                <Select
+                                    label="Account"
+                                    value={row.source_account_id}
+                                    options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
+                                    onChange={(event) => update(index, { source_account_id: event.target.value })}
+                                    error={errorFor(`lines.${index}.source_account_id`) ?? errorFor(`payment.lines.${index}.source_account_id`)}
+                                />
+                                <Input
+                                    label="Reference"
+                                    value={row.reference}
+                                    onChange={(event) => update(index, { reference: event.target.value })}
+                                    error={errorFor(`lines.${index}.reference`) ?? errorFor(`payment.lines.${index}.reference`)}
+                                />
+                                <MethodSpecificFields methodType={method?.method_type} row={row} index={index} errorFor={errorFor} update={update} />
+                                <DecimalInput
+                                    label="Amount"
+                                    value={row.amount}
+                                    onChange={(event) => update(index, { amount: event.target.value })}
+                                    error={errorFor(`lines.${index}.amount`) ?? errorFor(`payment.lines.${index}.amount`)}
+                                />
+                                <div className="flex justify-end">
+                                    <Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button>
+                                </div>
+                            </div>
+                        </article>
+                    );
+                })}
+            </div>
+            <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
+                <table className="min-w-full table-fixed text-sm">
                     <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                         <tr>
                             <th className="w-44 px-3 py-2">Method</th>
                             <th className="w-52 px-3 py-2">Account</th>
-                            <th className="w-36 px-3 py-2">Amount</th>
-                            <th className="w-44 px-3 py-2">Reference</th>
-                            <th className="w-40 px-3 py-2">Instrument</th>
-                            <th className="w-36 px-3 py-2">Date</th>
+                            <th className="px-3 py-2">Reference</th>
+                            <th className="w-40 px-3 py-2">Amount</th>
                             <th className="w-24 px-3 py-2" />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                        {rows.map((row, index) => (
-                            <tr key={row.key} className="align-top">
+                        {rows.map((row, index) => {
+                            const method = methods.find((option) => String(option.id) === row.payment_method_id);
+
+                            return (
+                                <tr key={row.key} className="align-top">
                                 <td className="px-3 py-3">
                                     <Select
                                         value={row.payment_method_id}
-                                        options={methods.map((method) => ({ value: method.id, label: `${method.code ?? ''} ${method.name ?? ''}`.trim() }))}
+                                        options={methods.map((option) => ({ value: option.id, label: optionLabel(option) }))}
                                         onChange={(event) => update(index, { payment_method_id: event.target.value })}
                                         error={errorFor(`lines.${index}.payment_method_id`) ?? errorFor(`payment.lines.${index}.payment_method_id`)}
                                     />
@@ -77,18 +120,20 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                                 <td className="px-3 py-3">
                                     <Select
                                         value={row.source_account_id}
-                                        options={accounts.map((account) => ({ value: account.id, label: `${account.code ?? ''} ${account.name ?? ''}`.trim() }))}
+                                        options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
                                         onChange={(event) => update(index, { source_account_id: event.target.value })}
                                         error={errorFor(`lines.${index}.source_account_id`) ?? errorFor(`payment.lines.${index}.source_account_id`)}
                                     />
                                 </td>
+                                <td className="px-3 py-3">
+                                    <Input value={row.reference} onChange={(event) => update(index, { reference: event.target.value })} error={errorFor(`lines.${index}.reference`) ?? errorFor(`payment.lines.${index}.reference`)} />
+                                    <MethodSpecificFields methodType={method?.method_type} row={row} index={index} errorFor={errorFor} update={update} />
+                                </td>
                                 <td className="px-3 py-3"><DecimalInput value={row.amount} onChange={(event) => update(index, { amount: event.target.value })} error={errorFor(`lines.${index}.amount`) ?? errorFor(`payment.lines.${index}.amount`)} /></td>
-                                <td className="px-3 py-3"><Input value={row.reference} onChange={(event) => update(index, { reference: event.target.value })} error={errorFor(`lines.${index}.reference`) ?? errorFor(`payment.lines.${index}.reference`)} /></td>
-                                <td className="px-3 py-3"><Input value={row.instrument_number} onChange={(event) => update(index, { instrument_number: event.target.value })} error={errorFor(`lines.${index}.instrument_number`) ?? errorFor(`payment.lines.${index}.instrument_number`)} /></td>
-                                <td className="px-3 py-3"><Input type="date" value={row.instrument_date} onChange={(event) => update(index, { instrument_date: event.target.value })} error={errorFor(`lines.${index}.instrument_date`) ?? errorFor(`payment.lines.${index}.instrument_date`)} /></td>
                                 <td className="px-3 py-3 text-right"><Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button></td>
                             </tr>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -98,4 +143,45 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
             </div>
         </div>
     );
+}
+
+function MethodSpecificFields({ methodType, row, index, errorFor, update }: {
+    methodType?: string | null;
+    row: PurchasePaymentMethodRow;
+    index: number;
+    errorFor: (field: string) => string | undefined;
+    update: (index: number, patch: Partial<PurchasePaymentMethodRow>) => void;
+}) {
+    const type = methodType ?? '';
+    if (type === 'cash' || type === '') return null;
+
+    if (type === 'cheque') {
+        return (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Cheque number" value={row.instrument_number} onChange={(event) => update(index, { instrument_number: event.target.value })} error={errorFor(`lines.${index}.instrument_number`) ?? errorFor(`payment.lines.${index}.instrument_number`)} />
+                <Input type="date" value={row.instrument_date} onChange={(event) => update(index, { instrument_date: event.target.value })} error={errorFor(`lines.${index}.instrument_date`) ?? errorFor(`payment.lines.${index}.instrument_date`)} />
+                <Input placeholder="Bank" value={row.external_bank_name} onChange={(event) => update(index, { external_bank_name: event.target.value })} error={errorFor(`lines.${index}.external_bank_name`) ?? errorFor(`payment.lines.${index}.external_bank_name`)} />
+                <Input placeholder="Branch" value={row.external_bank_branch} onChange={(event) => update(index, { external_bank_branch: event.target.value })} error={errorFor(`lines.${index}.external_bank_branch`) ?? errorFor(`payment.lines.${index}.external_bank_branch`)} />
+            </div>
+        );
+    }
+
+    if (type === 'card') {
+        return (
+            <div className="mt-2">
+                <Input placeholder="Card authorization/reference" value={row.instrument_number} onChange={(event) => update(index, { instrument_number: event.target.value })} error={errorFor(`lines.${index}.instrument_number`) ?? errorFor(`payment.lines.${index}.instrument_number`)} />
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <Input placeholder="Transfer reference" value={row.instrument_number} onChange={(event) => update(index, { instrument_number: event.target.value })} error={errorFor(`lines.${index}.instrument_number`) ?? errorFor(`payment.lines.${index}.instrument_number`)} />
+            <Input type="date" value={row.instrument_date} onChange={(event) => update(index, { instrument_date: event.target.value })} error={errorFor(`lines.${index}.instrument_date`) ?? errorFor(`payment.lines.${index}.instrument_date`)} />
+        </div>
+    );
+}
+
+function optionLabel(option: FastPurchaseOptionResource): string {
+    return `${option.code ?? ''} ${option.name ?? ''}`.trim() || `#${option.id}`;
 }

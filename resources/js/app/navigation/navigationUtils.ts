@@ -34,7 +34,7 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     const hasRoleRule = Boolean(rule.roles?.length);
 
     if (!hasPermissionRule && !hasRoleRule) return true;
-    if (context.permissions.length === 0 && !hasRoleRule) return true;
+    if (hasPermissionRule && context.permissionsLoaded === false) return false;
 
     return Boolean(exactMatch || roleMatch);
 }

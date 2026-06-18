@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { FormDrawer } from '@/shared/components/Drawer';
@@ -22,6 +21,7 @@ import {
     postPurchaseDebitNote,
 } from '../purchaseApi';
 import { PurchaseInvoiceLookupSelect } from '../components/PurchaseLookups';
+import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 
 export default function PurchaseDebitNoteDetailPage() {
     const id = Number(useParams().id);
@@ -35,8 +35,8 @@ export default function PurchaseDebitNoteDetailPage() {
     if (!result.data) return <ErrorAlert error={result.error} />;
     const note = result.data;
     return (
-        <div className="space-y-5">
-            <ContentHeader
+        <PurchaseDocumentShell
+            header={<PurchasePageHeader
                 title={note.debit_note_number ?? 'Debit note'}
                 description={formatDate(note.debit_note_date)}
                 actions={<div className="flex gap-2">
@@ -49,7 +49,8 @@ export default function PurchaseDebitNoteDetailPage() {
                         setAllocationOpen(true);
                     }}>Allocate</Button>}
                 </div>}
-            />
+            />}
+        >
             <ErrorAlert error={error ?? result.error} />
             <Panel>
                 <DetailGrid items={[
@@ -103,7 +104,7 @@ export default function PurchaseDebitNoteDetailPage() {
                     </div>
                 </form>
             </FormDrawer>
-        </div>
+        </PurchaseDocumentShell>
     );
 
     async function runAction(action: 'approve' | 'post') {

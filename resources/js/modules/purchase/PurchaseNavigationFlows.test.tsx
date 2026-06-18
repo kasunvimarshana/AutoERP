@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiCollection } from '@/shared/types/api';
 import type { Payment } from '@/modules/payment/paymentApi';
 import GoodsReceiptDetailPage from './pages/GoodsReceiptDetailPage';
+import PurchaseDebitNoteListPage from './pages/PurchaseDebitNoteListPage';
 import PurchasePaymentWorkspacePage from './pages/PurchasePaymentWorkspacePage';
 
 const purchaseApiMocks = vi.hoisted(() => ({
     getGoodsReceipt: vi.fn(),
+    listPurchaseDebitNotes: vi.fn(),
     postGoodsReceipt: vi.fn(),
     reverseGoodsReceipt: vi.fn(),
 }));
@@ -23,6 +25,7 @@ describe('Purchase navigation flows', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         purchaseApiMocks.getGoodsReceipt.mockResolvedValue(goodsReceipt());
+        purchaseApiMocks.listPurchaseDebitNotes.mockResolvedValue(collection([]));
         paymentApiMocks.listPayments.mockResolvedValue(collection<Payment>([payment()]));
     });
 
@@ -49,8 +52,20 @@ describe('Purchase navigation flows', () => {
         );
 
         expect(await screen.findByRole('heading', { name: 'Supplier Payments' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Create Supplier Payment' })).toHaveAttribute('href', '/purchase/payments/prepare');
+        expect(screen.getByRole('link', { name: 'Create Supplier Payment' })).toHaveAttribute('href', '/purchase/payments/create');
         expect(screen.queryByText('/payments?view=supplier')).not.toBeInTheDocument();
+    });
+
+    it('opens the dedicated Debit Note create workflow instead of the return form', async () => {
+        cleanup();
+        render(
+            <MemoryRouter initialEntries={['/purchase/debit-notes']}>
+                <PurchaseDebitNoteListPage />
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByRole('heading', { name: 'Purchase debit notes' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'New debit note' })).toHaveAttribute('href', '/purchase/debit-notes/create');
     });
 });
 

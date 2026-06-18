@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useId, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 export interface PurchaseTabItem {
     id: string;
@@ -12,27 +13,56 @@ export function PurchaseTabs({ tabs, activeTab, onChange }: {
     activeTab: string;
     onChange?: (tab: string) => void;
 }) {
-    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const generatedId = useId();
+    const refs = useRef(new Map<string, HTMLButtonElement>());
+    const currentTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0]?.id;
+    const setTab = (tabId: string, focus = false) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', tabId);
+        setSearchParams(next);
+        onChange?.(tabId);
+        if (focus) window.requestAnimationFrame(() => refs.current.get(tabId)?.focus());
+    };
 
     return (
-        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200" aria-label="Purchase document sections">
+        <div className="overflow-x-auto border-b border-slate-200">
+            <div className="flex min-w-max gap-1" role="tablist" aria-label="Purchase document sections">
             {tabs.map((tab) => {
-                const params = new URLSearchParams(location.search);
-                params.set('tab', tab.id);
-                const selected = tab.id === activeTab;
+                const selected = tab.id === currentTab;
                 const label = `${tab.label}${tab.count !== undefined ? ` (${tab.count})` : ''}`;
 
                 return (
-                    <Link
+                    <button
                         key={tab.id}
-                        to={`${location.pathname}?${params.toString()}`}
-                        onClick={() => onChange?.(tab.id)}
-                        className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${selected ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'} ${tab.error ? 'text-rose-700' : ''}`}
+                        ref={(element) => {
+                            if (element) refs.current.set(tab.id, element);
+                            else refs.current.delete(tab.id);
+                        }}
+                        id={`${generatedId}-${tab.id}-tab`}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        tabIndex={selected ? 0 : -1}
+                        onClick={() => setTab(tab.id)}
+                        onKeyDown={(event) => {
+                            if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+                            event.preventDefault();
+                            const index = tabs.findIndex((item) => item.id === currentTab);
+                            const next = event.key === 'Home'
+                                ? tabs[0]
+                                : event.key === 'End'
+                                    ? tabs[tabs.length - 1]
+                                    : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+                            if (next) setTab(next.id, true);
+                        }}
+                        className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${selected ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'} ${tab.error ? 'text-rose-700' : ''}`}
                     >
                         {label}
-                    </Link>
+                    </button>
                 );
             })}
-        </nav>
+            </div>
+        </div>
     );
 }

@@ -1,4 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -92,7 +93,7 @@ function RelatedDocumentTimeline({ order }: { order: PurchaseOrder }) {
     ].sort((left, right) => (left.date ?? '').localeCompare(right.date ?? ''));
     const columns: DataColumn<PurchaseRelatedDocument>[] = [
         { key: 'type', header: 'Type', render: (row) => row.type.replaceAll('_', ' ') },
-        { key: 'document', header: 'Document', render: (row) => row.url ? <a className="font-semibold text-sky-700 hover:underline" href={row.url}>{row.number ?? `#${row.id}`}</a> : row.number ?? `#${row.id}` },
+        { key: 'document', header: 'Document', render: (row) => row.url ? <Link className="font-semibold text-sky-700 hover:underline" to={row.url}>{row.number ?? `#${row.id}`}</Link> : row.number ?? `#${row.id}` },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.date) },
         { key: 'status', header: 'Status', render: (row) => row.status ? <StatusBadge status={row.status} /> : '-' },
     ];

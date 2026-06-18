@@ -30,7 +30,7 @@ export default function PurchaseDebitNoteListPage() {
     ];
     return (
         <div className="space-y-5">
-            <ContentHeader title="Purchase debit notes" actions={<LinkButton to="/purchase/returns/create?tab=debit">New debit note</LinkButton>} />
+            <ContentHeader title="Purchase debit notes" actions={<LinkButton to="/purchase/debit-notes/create">New debit note</LinkButton>} />
             <ErrorAlert error={result.error} />
             <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

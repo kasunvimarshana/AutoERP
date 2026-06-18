@@ -37,7 +37,6 @@ const tabs: PurchaseTabItem[] = [
     { id: 'details', label: 'Order Details' },
     { id: 'lines', label: 'Lines' },
     { id: 'adjustments', label: 'Adjustments' },
-    { id: 'attachments', label: 'Attachments' },
 ];
 
 function resourceOrNull(resource: NamedResource | null | undefined): NamedResource | null {
@@ -343,7 +342,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
             <PurchaseDocumentShell
                 header={<PurchasePageHeader
                     title={order ? 'Edit Purchase Order' : 'Create Purchase Order'}
-                    description="Prepare supplier, warehouse, line, adjustment, and attachment details before submitting the order."
+                    description="Prepare supplier, warehouse, line, and adjustment details before submitting the order."
                     status={<span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{order?.status ?? 'draft'}</span>}
                     actions={<>
                         <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
@@ -391,11 +390,6 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                 {activeTab === 'adjustments' && (
                     <Panel title="Adjustments">
                         <PurchaseHeaderAdjustmentEditor adjustments={adjustments} onChange={setAdjustments} errorFor={errorFor} />
-                    </Panel>
-                )}
-                {activeTab === 'attachments' && (
-                    <Panel title="Attachments">
-                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">Purchase attachment upload and preview will use the backend attachment endpoints for this document.</div>
                     </Panel>
                 )}
             </PurchaseDocumentShell>

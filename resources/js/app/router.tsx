@@ -71,8 +71,10 @@ const ManualSupplierReturnCreatePage = lazy(() => import('@/modules/purchase/pag
 const PurchaseInvoiceListPage = lazy(() => import('@/modules/purchase/pages/PurchaseInvoiceListPage'));
 const PurchaseInvoiceCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseInvoiceCreatePage'));
 const PurchasePaymentWorkspacePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentWorkspacePage'));
+const PurchasePaymentCreatePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentCreatePage'));
 const PurchasePaymentPreparePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentPreparePage'));
 const PurchaseDebitNoteListPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteListPage'));
+const PurchaseDebitNoteCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteCreatePage'));
 const PurchaseDebitNoteDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteDetailPage'));
 const SalesDocumentListPage = lazy(() => import('@/modules/sales/pages/SalesDocumentListPage'));
 const SalesDocumentFormPage = lazy(() => import('@/modules/sales/pages/SalesDocumentFormPage'));
@@ -228,8 +230,10 @@ export function AppRouter() {
                     <Route path="/purchase/invoices" element={<PurchaseInvoiceListPage />} />
                     <Route path="/purchase/invoices/create" element={<PurchaseInvoiceCreatePage />} />
                     <Route path="/purchase/payments" element={<PurchasePaymentWorkspacePage />} />
+                    <Route path="/purchase/payments/create" element={<PurchasePaymentCreatePage />} />
                     <Route path="/purchase/payments/prepare" element={<PurchasePaymentPreparePage />} />
                     <Route path="/purchase/debit-notes" element={<PurchaseDebitNoteListPage />} />
+                    <Route path="/purchase/debit-notes/create" element={<PurchaseDebitNoteCreatePage />} />
                     <Route path="/purchase/debit-notes/:id" element={<PurchaseDebitNoteDetailPage />} />
                     <Route path="/sales/quotations" element={<SalesDocumentListPage kind="quotation" />} />
                     <Route path="/sales/quotations/create" element={<SalesDocumentFormPage kind="quotation" />} />

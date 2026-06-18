@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { getPayment, getPaymentAllocations, getPaymentUnappliedBalance, refundPayment, reversePayment } from '../paymentApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useApi } from '@/shared/hooks/useApi';
@@ -37,6 +37,7 @@ function today(): string {
 
 export default function PaymentDetailPage() {
     const id = Number(useParams().id);
+    const [searchParams] = useSearchParams();
     const tabState = useOnDemandTab<Tab>('summary');
     const payment = useApi((signal) => getPayment(id, signal), [id]);
     const allocations = useApi((signal) => getPaymentAllocations(id, signal), [id], tabState.openedTabs.has('allocations'));
@@ -53,6 +54,7 @@ export default function PaymentDetailPage() {
     if (payment.loading) return <LoadingState />;
     if (!payment.data) return <ErrorAlert error={payment.error} />;
     const value = payment.data;
+    const fromPurchase = searchParams.get('from') === 'purchase';
     const isCheque = value.lines?.some((line) => line.payment_method?.method_type === 'cheque') ?? false;
     const readOnly = ['posted', 'partially_allocated', 'fully_allocated', 'allocated', 'refunded', 'reversed', 'cancelled', 'void'].includes(String(value.status));
     const canRefund = !['refunded', 'reversed', 'cancelled', 'void'].includes(String(value.status)) && value.unapplied_amount !== '0.000000';
@@ -106,7 +108,10 @@ export default function PaymentDetailPage() {
             <ContentHeader
                 title={value.payment_number ?? 'Payment'}
                 description={formatDate(value.payment_date)}
-                actions={isCheque ? <LinkButton to={`/payments/${id}/cheque-print`}>Print cheque</LinkButton> : undefined}
+                actions={fromPurchase || isCheque ? <div className="flex flex-wrap justify-end gap-2">
+                    {fromPurchase && <LinkButton to="/purchase/payments" variant="secondary">Back to Purchase</LinkButton>}
+                    {isCheque && <LinkButton to={`/payments/${id}/cheque-print`}>Print cheque</LinkButton>}
+                </div> : undefined}
             />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />

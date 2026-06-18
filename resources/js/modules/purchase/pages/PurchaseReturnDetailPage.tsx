@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -14,6 +13,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, getPurchaseReturn, postPurchaseReturn, type PurchaseReturnLine } from '../purchaseApi';
+import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
@@ -49,12 +49,13 @@ export default function PurchaseReturnDetailPage() {
         { key: 'total', header: 'Total', render: (line) => formatMoney(line.line_total) },
     ];
     return (
-        <div className="space-y-5">
-            <ContentHeader
+        <PurchaseDocumentShell
+            header={<PurchasePageHeader
                 title={row.return_number ?? 'Purchase return'}
                 description={formatDate(row.return_date)}
                 actions={<>{capabilities.can_approve && <Button onClick={() => run('approve')}>Approve</Button>}{capabilities.can_post && <Button variant="secondary" onClick={() => run('post')}>Post</Button>}{capabilities.can_cancel && <Button variant="ghost" onClick={() => run('cancel')}>Cancel</Button>}</>}
-            />
+            />}
+        >
             <ErrorAlert error={result.error ?? actionError} />
             <Panel>
                 <Tabs tabs={[{ id: 'summary', label: 'Summary' }, { id: 'lines', label: 'Lines' }, { id: 'adjustments', label: 'Adjustment allocations' }, { id: 'linked', label: 'Linked documents' }]} active={tab} onChange={setTab} />
@@ -81,6 +82,6 @@ export default function PurchaseReturnDetailPage() {
                     ]} />}
                 </div>
             </Panel>
-        </div>
+        </PurchaseDocumentShell>
     );
 }

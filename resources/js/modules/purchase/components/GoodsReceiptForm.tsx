@@ -22,7 +22,7 @@ function orderLabel(order: PurchaseOrder): NamedResource {
 }
 
 function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine {
-    return { source: line, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' };
+    return { source: line, include: false, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' };
 }
 
 export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrderId?: number }) {
@@ -37,6 +37,12 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const errorFor = (field: string) => fieldError(error, field);
+    const hasEnteredLines = lines.some((line) => (
+        line.include ||
+        isPositiveDecimal(line.received_quantity)
+        || isPositiveDecimal(line.accepted_quantity)
+        || isPositiveDecimal(line.rejected_quantity)
+    ));
 
     useEffect(() => {
         if (sourcePurchaseOrderId && !purchaseOrder) {
@@ -83,7 +89,7 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
         supplier_type: 'supplier',
         supplier_id: sourceOrder?.supplier?.id ?? sourceOrder?.supplier_id ?? undefined,
         notes: notes || undefined,
-        lines: lines.filter((line) => isPositiveDecimal(line.received_quantity)).map((line) => ({
+        lines: lines.filter((line) => line.include && isPositiveDecimal(line.received_quantity)).map((line) => ({
             item_id: line.source.item?.id ?? line.source.item_id ?? 0,
             item_variant_id: line.source.item_variant?.id ?? line.source.item_variant_id ?? undefined,
             uom_id: line.source.uom?.id ?? line.source.uom_id ?? undefined,
@@ -96,6 +102,12 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
             unit_price: decimalOr(line.source.unit_price),
         })),
     });
+    const changePurchaseOrder = (next: NamedResource | null) => {
+        if (purchaseOrder?.id && next?.id !== purchaseOrder.id && hasEnteredLines && !window.confirm('Changing the purchase order clears entered receipt quantities.')) {
+            return;
+        }
+        setPurchaseOrder(next);
+    };
 
     return (
         <form className="space-y-5" onSubmit={async (event) => {
@@ -115,7 +127,7 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
             <ErrorAlert error={error} />
             <Panel title="Source">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <PurchaseOrderLookupSelect value={purchaseOrder} onChange={setPurchaseOrder} error={errorFor('purchase_order_id')} />
+                    <PurchaseOrderLookupSelect value={purchaseOrder} onChange={changePurchaseOrder} error={errorFor('purchase_order_id')} />
                     <Input label="Received date" type="date" value={receivedDate} error={errorFor('received_date')} onChange={(event) => setReceivedDate(event.target.value)} />
                     <WarehouseLocationLookupSelect warehouseId={sourceOrder?.warehouse?.id ?? sourceOrder?.warehouse_id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                 </div>

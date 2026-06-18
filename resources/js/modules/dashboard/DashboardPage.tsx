@@ -11,7 +11,7 @@ const workflowWidgets = [
             ['Pending purchase orders', '/purchase/orders?status=draft'],
             ['Goods receipts to post', '/purchase/goods-receipts'],
             ['Supplier invoices to create', '/purchase/invoices/create'],
-            ['Supplier payments to prepare', '/purchase/payments/prepare'],
+            ['Supplier payments to create', '/purchase/payments/create'],
         ],
     },
     {

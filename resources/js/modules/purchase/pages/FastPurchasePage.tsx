@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fieldError, hasNestedFieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -42,7 +42,7 @@ const paymentTerms = [
 ];
 
 type FastPurchasePreset = 'expense_only' | 'purchase_receive' | 'purchase_receive_invoice' | 'purchase_receive_invoice_pay';
-type FastPurchaseTab = 'details' | 'lines' | 'adjustments' | 'payment' | 'impact' | 'attachments';
+type FastPurchaseTab = 'details' | 'lines' | 'adjustments' | 'payment' | 'impact';
 
 const presets: Array<{ value: FastPurchasePreset; label: string; description: string }> = [
     { value: 'expense_only', label: 'Expense Only', description: 'Invoice non-stock supplier costs.' },
@@ -51,7 +51,7 @@ const presets: Array<{ value: FastPurchasePreset; label: string; description: st
     { value: 'purchase_receive_invoice_pay', label: 'Purchase + Receive + Invoice + Pay', description: 'Create receipt, invoice, and supplier payment.' },
 ];
 
-const tabIds: FastPurchaseTab[] = ['details', 'lines', 'adjustments', 'payment', 'impact', 'attachments'];
+const tabIds: FastPurchaseTab[] = ['details', 'lines', 'adjustments', 'payment', 'impact'];
 
 export default function FastPurchasePage() {
     const context = useApi((signal) => getFastPurchaseContext(signal), []);
@@ -315,13 +315,17 @@ export default function FastPurchasePage() {
         lastPreviewKey.current = null;
     };
 
+    const resetForm = () => {
+        if (!window.confirm('Reset this fast purchase form and clear entered data?')) return;
+        createAnother();
+    };
+
     const tabs: PurchaseTabItem[] = [
         { id: 'details', label: 'Purchase Details', error: hasAnyError(currentError, ['supplier_id', 'purchase_date', 'warehouse_id', 'warehouse_location_id', 'currency_id', 'exchange_rate']) },
         { id: 'lines', label: 'Lines', count: lines.filter((line) => line.item?.id).length, error: hasNestedFieldError(currentError, 'lines') },
         { id: 'adjustments', label: 'Adjustments', count: adjustments.length, error: hasNestedFieldError(currentError, 'adjustments') },
         { id: 'payment', label: 'Payment', count: recordPayment ? paymentRows.length : undefined, error: hasNestedFieldError(currentError, 'payment') },
         { id: 'impact', label: 'Impact Summary' },
-        { id: 'attachments', label: 'Attachments' },
     ];
 
     const header = (
@@ -329,11 +333,15 @@ export default function FastPurchasePage() {
             title="Fast Purchase"
             description="Quickly record supplier purchases while keeping receipt, invoice, payment, inventory, tax, and finance posting rules authoritative."
             status={<span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-slate-700">{preset.replaceAll('_', ' ')}</span>}
-            actions={<>
-                <Button type="button" variant="secondary" onClick={createAnother} disabled={submitting || previewing}>Cancel</Button>
-                {!result && <Button type="button" variant="secondary" loading={previewing} disabled={!canSubmit} onClick={() => void runPreview()}>Preview</Button>}
-                {!result && <Button type="submit" loading={submitting} disabled={!canSubmit || previewStale}>Create Fast Purchase</Button>}
-            </>}
+            actions={result ? (
+                <Button type="button" onClick={createAnother}>Create Another Fast Purchase</Button>
+            ) : (
+                <>
+                    <Button type="button" variant="secondary" onClick={resetForm} disabled={submitting || previewing}>Reset</Button>
+                    <Button type="button" variant="secondary" loading={previewing} disabled={!canSubmit || previewing} onClick={() => void runPreview()}>Preview</Button>
+                    <Button type="submit" loading={submitting} disabled={!canSubmit || previewStale}>Create Fast Purchase</Button>
+                </>
+            )}
         />
     );
 
@@ -345,12 +353,7 @@ export default function FastPurchasePage() {
                 summary={<FastPurchaseSummary
                     preview={preview}
                     result={result}
-                    submitting={submitting}
-                    previewing={previewing}
-                    canSubmit={canSubmit}
                     stale={previewStale}
-                    onPreview={() => void runPreview()}
-                    onCreateAnother={createAnother}
                 />}
             >
                 <ErrorAlert error={currentError} />
@@ -407,6 +410,7 @@ export default function FastPurchasePage() {
                             supplierId={supplier?.id}
                             currencyId={currency?.id}
                             warehouseId={warehouse?.id}
+                            previewLines={preview?.lines ?? []}
                             errorFor={errorFor}
                             onChange={setLines}
                         />
@@ -432,11 +436,7 @@ export default function FastPurchasePage() {
                     </Section>}
 
                     {activeTab === 'impact' && <Section title="Impact Summary">
-                        <ImpactList preset={preset} />
-                    </Section>}
-
-                    {activeTab === 'attachments' && <Section title="Attachments">
-                        <EmptyState title="Attach supplier documents after the fast purchase is created." />
+                        <ImpactList preset={preset} result={preview ?? result} />
                     </Section>}
                 </>}
             </PurchaseDocumentShell>
@@ -457,24 +457,32 @@ function EmptyState({ title }: { title: string }) {
     return <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-600">{title}</div>;
 }
 
-function ImpactList({ preset }: { preset: FastPurchasePreset }) {
+function ImpactList({ preset, result }: { preset: FastPurchasePreset; result: FastPurchaseResult | null }) {
     const receiveStock = preset !== 'expense_only';
     const createInvoice = preset !== 'purchase_receive';
     const recordPayment = preset === 'purchase_receive_invoice_pay';
-    const rows = [
-        receiveStock ? 'Goods Receipt' : null,
-        createInvoice ? 'Supplier Invoice' : null,
-        recordPayment ? 'Payment' : null,
-        receiveStock ? 'Inventory Movement' : null,
-        createInvoice || receiveStock ? 'Tax Posting' : null,
-        createInvoice || recordPayment ? 'Finance Entries' : null,
-    ].filter(Boolean);
+    const rows = result
+        ? [
+            result.documents.goods_receipt ? 'Goods Receipt' : null,
+            result.documents.supplier_invoice ? 'Supplier Invoice' : null,
+            result.documents.supplier_payment ? 'Payment' : null,
+            (result.documents.inventory_transactions?.length ?? 0) > 0 || result.documents.inventory_transaction ? 'Inventory Movement' : null,
+            (result.documents.finance_postings?.length ?? 0) > 0 || result.documents.finance_posting ? 'Finance Entries' : null,
+        ].filter(Boolean)
+        : [
+            receiveStock ? 'Goods Receipt' : null,
+            createInvoice ? 'Supplier Invoice' : null,
+            recordPayment ? 'Payment' : null,
+            receiveStock ? 'Inventory Movement' : null,
+            createInvoice || receiveStock ? 'Tax Posting' : null,
+            createInvoice || recordPayment ? 'Finance Entries' : null,
+        ].filter(Boolean);
 
     return (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
             <div className="font-semibold text-slate-900">This transaction will create</div>
             <ul className="mt-2 space-y-1 text-slate-700">
-                {rows.map((label) => <li key={label}>✓ {label}</li>)}
+                {rows.map((label) => <li key={label}>{label}</li>)}
             </ul>
         </div>
     );
@@ -495,9 +503,9 @@ function CompletedSummary({ result }: { result: FastPurchaseResult }) {
             {documents.length > 0 && (
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                     {documents.map((document) => document && (
-                        <a key={document.url} href={document.url} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">
+                        <Link key={document.url} to={document.url} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">
                             {document.number}
-                        </a>
+                        </Link>
                     ))}
                 </div>
             )}

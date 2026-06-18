@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { listInvoices, type Invoice } from '../invoiceApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -48,9 +49,16 @@ const invoiceViews = {
     },
 } as const;
 
-export default function InvoiceListPage() {
+type InvoiceViewKey = keyof typeof invoiceViews;
+type InvoiceView = (typeof invoiceViews)[InvoiceViewKey];
+
+export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, rowHref }: {
+    viewKey?: InvoiceViewKey;
+    renderHeader?: (view: InvoiceView | undefined) => ReactNode;
+    rowHref?: (invoice: Invoice) => string;
+}) {
     const [searchParams] = useSearchParams();
-    const viewKey = searchParams.get('view') as keyof typeof invoiceViews | null;
+    const viewKey = forcedViewKey ?? (searchParams.get('view') as InvoiceViewKey | null);
     const view = viewKey ? invoiceViews[viewKey] : undefined;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
@@ -62,7 +70,7 @@ export default function InvoiceListPage() {
         per_page: 25,
     }, signal), [debounced, page, viewKey]);
     const columns: DataColumn<Invoice>[] = [
-        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
+        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={rowHref ? rowHref(row) : `/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },
@@ -72,15 +80,21 @@ export default function InvoiceListPage() {
     ];
     return (
         <>
-            <ContentHeader
-                title={view?.title ?? 'Invoices'}
-                description={view?.description ?? 'Invoice list and on-demand financial relations.'}
-                actions={view?.action ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton> : undefined}
-            />
+            {renderHeader ? renderHeader(view) : (
+                <ContentHeader
+                    title={view?.title ?? 'Invoices'}
+                    description={view?.description ?? 'Invoice list and on-demand financial relations.'}
+                    actions={view?.action ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton> : undefined}
+                />
+            )}
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search invoice number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
-            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/invoices/${row.id}`} />}
+            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => rowHref ? rowHref(row) : `/invoices/${row.id}`} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </>
     );
+}
+
+export default function InvoiceListPage() {
+    return <InvoiceListWorkspace />;
 }

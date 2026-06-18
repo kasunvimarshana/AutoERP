@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -14,6 +13,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getGoodsReceipt, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceiptLine } from '../purchaseApi';
+import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
@@ -51,8 +51,8 @@ export default function GoodsReceiptDetailPage() {
     ];
 
     return (
-        <div className="space-y-5">
-            <ContentHeader
+        <PurchaseDocumentShell
+            header={<PurchasePageHeader
                 title={grn.grn_number ?? 'Goods receipt'}
                 description={formatDate(grn.received_date)}
                 actions={<div className="flex flex-wrap justify-end gap-2">
@@ -61,7 +61,8 @@ export default function GoodsReceiptDetailPage() {
                     {grn.status === 'draft' && <Button loading={busy} onClick={() => void run('post')}>Post</Button>}
                     {grn.status === 'posted' && <Button loading={busy} variant="secondary" onClick={() => void run('reverse')}>Reverse</Button>}
                 </div>}
-            />
+            />}
+        >
             <ErrorAlert error={result.error ?? actionError} />
             <Panel>
                 <Tabs tabs={[{ id: 'summary', label: 'Summary' }, { id: 'lines', label: 'Lines' }, { id: 'adjustments', label: 'Adjustments' }, { id: 'linked', label: 'Linked documents' }]} active={tab} onChange={setTab} />
@@ -89,6 +90,6 @@ export default function GoodsReceiptDetailPage() {
                     ]} />}
                 </div>
             </Panel>
-        </div>
+        </PurchaseDocumentShell>
     );
 }

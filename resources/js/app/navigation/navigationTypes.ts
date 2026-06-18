@@ -75,6 +75,7 @@ export interface NavigationAccessContext {
     organizationUnitId?: number | string | null;
     roles: string[];
     permissions: string[];
+    permissionsLoaded?: boolean;
     enabledModules: string[] | null;
 }
 

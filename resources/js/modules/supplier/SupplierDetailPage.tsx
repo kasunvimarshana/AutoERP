@@ -41,7 +41,7 @@ export default function SupplierDetailPage() {
             <>
                 <LinkButton to="/purchase/orders/create" variant="secondary" className="w-full">Create purchase order</LinkButton>
                 <LinkButton to="/purchase/invoices/create" variant="secondary" className="w-full">Create supplier invoice</LinkButton>
-                <LinkButton to="/purchase/payments/prepare" variant="secondary" className="w-full">Prepare payment</LinkButton>
+                <LinkButton to="/purchase/payments/create" variant="secondary" className="w-full">Create payment</LinkButton>
             </>
         }>
             <Panel className="p-0">

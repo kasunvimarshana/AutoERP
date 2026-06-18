@@ -3,7 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
 import type { Payment } from '@/modules/payment/paymentApi';
-import type { FastPurchaseOptionResource, PurchaseInvoicePayload, PurchasePaymentPreparePayload } from '../purchaseTypes';
+import type { FastPurchaseOptionResource, PurchaseInvoicePayload, PurchasePaymentCreatePayload } from '../purchaseTypes';
 
 export async function previewPurchaseInvoice(payload: PurchaseInvoicePayload) {
     const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
@@ -21,7 +21,7 @@ export async function createPurchaseInvoice(payload: PurchaseInvoicePayload) {
     return response.data.data;
 }
 
-export async function preparePurchasePayment(payload: PurchasePaymentPreparePayload) {
+export async function preparePurchasePayment(payload: PurchasePaymentCreatePayload) {
     const response = await apiClient.post<ApiResource<Payment>>(
         `${endpoints.purchase}/payments/prepare`,
         payload,
@@ -29,7 +29,7 @@ export async function preparePurchasePayment(payload: PurchasePaymentPreparePayl
     return response.data.data;
 }
 
-export async function createPurchasePayment(payload: PurchasePaymentPreparePayload) {
+export async function createPurchasePayment(payload: PurchasePaymentCreatePayload) {
     const response = await apiClient.post<ApiResource<Payment>>(
         `${endpoints.purchase}/payments`,
         payload,

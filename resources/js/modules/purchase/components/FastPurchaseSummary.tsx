@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
 import type { FastPurchaseResult } from '../purchaseTypes';
 
 const emptySummary = {
@@ -17,15 +16,10 @@ const emptySummary = {
 interface FastPurchaseSummaryProps {
     preview: FastPurchaseResult | null;
     result: FastPurchaseResult | null;
-    submitting: boolean;
-    previewing: boolean;
-    canSubmit: boolean;
     stale?: boolean;
-    onPreview: () => void;
-    onCreateAnother?: () => void;
 }
 
-export function FastPurchaseSummary({ preview, result, submitting, previewing, canSubmit, stale, onPreview, onCreateAnother }: FastPurchaseSummaryProps) {
+export function FastPurchaseSummary({ preview, result, stale }: FastPurchaseSummaryProps) {
     const active = result ?? preview;
     const summary = active?.summary ?? emptySummary;
     const mode = active?.mode ? active.mode.replaceAll('_', ' ') : 'draft';
@@ -34,9 +28,6 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
         options?.receive_stock_now ? 'Goods Receipt' : null,
         options?.create_supplier_invoice_now ? 'Supplier Invoice' : null,
         options?.record_payment_now ? 'Payment' : null,
-        options?.receive_stock_now ? 'Inventory Movement' : null,
-        options?.create_supplier_invoice_now || options?.receive_stock_now ? 'Tax Posting' : null,
-        options?.create_supplier_invoice_now || options?.record_payment_now ? 'Finance Entries' : null,
     ].filter(Boolean);
     const documents = result?.documents;
     const links = [
@@ -48,10 +39,9 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
     ].filter(Boolean);
 
     return (
-        <aside className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-slate-700">{mode}</span>
-                {!result && <Button type="button" variant="secondary" loading={previewing} onClick={onPreview}>Preview</Button>}
             </div>
             <dl className="space-y-2 text-sm">
                 {[
@@ -75,14 +65,11 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                     <div className="font-semibold text-slate-900">This transaction will create</div>
                     <ul className="mt-2 space-y-1 text-slate-700">
-                        {impact.map((label) => <li key={label}>✓ {label}</li>)}
+                        {impact.map((label) => <li key={label}>{label}</li>)}
                     </ul>
                 </div>
             )}
             {stale && !result && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">Preview is stale. Refresh before submitting.</div>}
-            {result
-                ? <Button type="button" className="w-full" onClick={onCreateAnother}>Create another fast purchase</Button>
-                : <Button type="submit" className="w-full" loading={submitting} disabled={!canSubmit || stale}>Create fast purchase</Button>}
             {links.length > 0 && (
                 <div className="border-t border-slate-200 pt-3 text-sm">
                     <div className="space-y-1.5">
@@ -94,6 +81,6 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
                     </div>
                 </div>
             )}
-        </aside>
+        </div>
     );
 }

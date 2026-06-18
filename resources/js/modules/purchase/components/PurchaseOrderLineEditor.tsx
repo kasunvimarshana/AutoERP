@@ -86,12 +86,12 @@ function PurchaseLineTable({ lines, onAdd, onEdit, onRemove, hasError }: {
     const columns: DataColumn<EditablePurchaseLine & { rowIndex: number }>[] = [
         { key: 'item', header: 'Item', render: formatItemLabel },
         { key: 'variant', header: 'Variant', render: (line) => line.item_variant?.code ?? line.item_variant?.name ?? '-' },
-        { key: 'quantity', header: 'Qty', render: (line) => line.ordered_quantity, className: 'tabular-nums' },
+        { key: 'quantity', header: 'Quantity', render: (line) => line.ordered_quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.uom?.code ?? line.uom?.name ?? '-' },
         { key: 'price', header: 'Unit price', render: (line) => line.unit_price, className: 'tabular-nums' },
         { key: 'discount', header: 'Discount', render: formatDiscountSummary },
         { key: 'tax', header: 'Tax', render: formatTaxSummary },
-        { key: 'total', header: 'Total', render: previewLineTotal, className: 'tabular-nums font-semibold' },
+        { key: 'total', header: 'Amount', render: previewLineTotal, className: 'tabular-nums font-semibold' },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <LineActions onEdit={() => onEdit(line, line.rowIndex)} onRemove={() => onRemove(line.rowIndex)} /> },
     ];
 
@@ -139,7 +139,7 @@ function PreviewValue({ label, value }: { label: string; value: string }) {
 }
 
 function LineMobileDetails({ line }: { line: EditablePurchaseLine }) {
-    return <div className="grid grid-cols-2 gap-2"><PreviewValue label="Qty" value={line.ordered_quantity} /><PreviewValue label="UOM" value={line.uom?.code ?? '-'} /><PreviewValue label="Price" value={line.unit_price} /><PreviewValue label="Total" value={previewLineTotal(line)} /></div>;
+    return <div className="grid grid-cols-2 gap-2"><PreviewValue label="Variant" value={line.item_variant?.code ?? line.item_variant?.name ?? '-'} /><PreviewValue label="Quantity" value={line.ordered_quantity} /><PreviewValue label="UOM" value={line.uom?.code ?? '-'} /><PreviewValue label="Unit price" value={line.unit_price} /><PreviewValue label="Discount" value={formatDiscountSummary(line)} /><PreviewValue label="Tax" value={formatTaxSummary(line)} /><PreviewValue label="Amount" value={previewLineTotal(line)} /></div>;
 }
 
 function ErrorBadge() {

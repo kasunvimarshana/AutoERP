@@ -21,8 +21,9 @@ export function AppLayout() {
         organizationUnitId: auth.organizationUnit?.id ?? null,
         roles: auth.roles,
         permissions: auth.permissions,
+        permissionsLoaded: !auth.isLoading && auth.isAuthenticated,
         enabledModules: auth.enabledModules,
-    }), [auth.enabledModules, auth.organizationUnit?.id, auth.permissions, auth.roles, auth.tenant?.id]);
+    }), [auth.enabledModules, auth.isAuthenticated, auth.isLoading, auth.organizationUnit?.id, auth.permissions, auth.roles, auth.tenant?.id]);
     const match = useMemo(
         () => findNavigationMatch(location.pathname, location.search, visibleSections),
         [location.pathname, location.search, visibleSections],
