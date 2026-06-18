@@ -34,7 +34,7 @@ final class PurchaseSourceEligibilityService
     ): LengthAwarePaginator {
         return $this->orderQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', PurchaseOrderStatus::Approved->value)
-            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0'))
+            ->whereHas('lines', fn (Builder $query) => $this->balances->wherePurchaseOrderLineReceivable($query))
             ->latest('purchase_order_date')
             ->paginate($perPage);
     }
@@ -48,7 +48,7 @@ final class PurchaseSourceEligibilityService
     ): LengthAwarePaginator {
         return $this->orderQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', PurchaseOrderStatus::Approved->value)
-            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0'))
+            ->whereHas('lines', fn (Builder $query) => $this->balances->wherePurchaseOrderLineInvoiceable($query))
             ->latest('purchase_order_date')
             ->paginate($perPage);
     }
@@ -63,11 +63,11 @@ final class PurchaseSourceEligibilityService
         return $this->goodsReceiptQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', GoodsReceiptNoteStatus::Posted->value)
             ->whereHas('lines', function (Builder $query): void {
-                $query->whereRaw('(accepted_quantity - invoiced_quantity) > 0')
+                $this->balances->whereGoodsReceiptLineInvoiceable($query)
                     ->where(function (Builder $scope): void {
                         $scope->whereNull('purchase_order_line_id')
                             ->orWhereHas('purchaseOrderLine', fn (Builder $poLine): Builder => $poLine
-                                ->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')
+                                ->whereRaw($this->balances->purchaseOrderInvoiceableRemainingSql().' > 0')
                                 ->whereDoesntHave('order', fn (Builder $order): Builder => $order
                                     ->whereIn('status', [PurchaseOrderStatus::Closed->value, PurchaseOrderStatus::Cancelled->value])));
                     });
@@ -86,7 +86,7 @@ final class PurchaseSourceEligibilityService
         return $this->goodsReceiptQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', GoodsReceiptNoteStatus::Posted->value)
             ->whereHas('lines', function (Builder $query): void {
-                $query->whereRaw('(accepted_quantity - returned_quantity) > 0')
+                $this->balances->whereGoodsReceiptLineReturnable($query)
                     ->where(function (Builder $scope): void {
                         $scope->whereNull('purchase_order_line_id')
                             ->orWhereHas('purchaseOrderLine', fn (Builder $poLine): Builder => $poLine

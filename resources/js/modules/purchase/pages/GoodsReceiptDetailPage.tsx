@@ -15,6 +15,7 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getGoodsReceipt, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceiptLine } from '../purchaseApi';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
+import { capabilityDetail } from '../purchaseCapabilities';
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
@@ -32,6 +33,7 @@ export default function GoodsReceiptDetailPage() {
 
     const grn = result.data;
     const capabilities = grn.capabilities ?? {};
+    const reverseBlocker = capabilityDetail(capabilities, 'can_reverse');
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'post' | 'reverse') => {
         if (!window.confirm(`Confirm ${action} for this goods receipt?`)) return;
@@ -65,6 +67,7 @@ export default function GoodsReceiptDetailPage() {
                     {capabilities.can_return && can(purchasePermissions.returnsCreate) && <LinkButton to={`/purchase/returns/create?goods_receipt_id=${grn.id}`} variant="secondary">Create return</LinkButton>}
                     {capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button loading={busy} onClick={() => void run('post')}>Post</Button>}
                     {capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button loading={busy} variant="secondary" onClick={() => void run('reverse')}>Reverse</Button>}
+                    {!capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && reverseBlocker?.reason && <Button disabled title={reverseBlocker.reason} variant="secondary">Reverse</Button>}
                 </div>}
             />}
         >

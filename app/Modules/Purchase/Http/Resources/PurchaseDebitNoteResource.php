@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
+use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 
 final class PurchaseDebitNoteResource extends PurchaseResource
 {
@@ -61,19 +62,11 @@ final class PurchaseDebitNoteResource extends PurchaseResource
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function capabilities(): array
     {
-        $status = $this->enumValue($this->status);
-        $remaining = (string) $this->remaining_amount;
-
-        return [
-            'can_approve' => $status === 'draft',
-            'can_post' => $status === 'approved',
-            'can_allocate' => $status === 'posted' && $this->hasPositiveAmount($remaining),
-            'read_only' => $status === 'posted',
-        ];
+        return app(PurchaseDocumentCapabilityService::class)->forDebitNote($this->resource);
     }
 
     private function allocationStatus(): string

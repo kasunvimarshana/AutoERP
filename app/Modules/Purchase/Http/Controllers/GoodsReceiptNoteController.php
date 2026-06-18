@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
@@ -15,9 +13,9 @@ use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
 use Modules\Purchase\Models\GoodsReceiptNote;
-use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
+use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
 final class GoodsReceiptNoteController
 {
@@ -90,30 +88,6 @@ final class GoodsReceiptNoteController
         return new GoodsReceiptNoteResource($service->reverse($this->scope(GoodsReceiptNote::query(), $request)->findOrFail($grn), $request->currentUserId()));
     }
 
-    public function returnableLines(ListPurchaseDocumentRequest $request, int $grn, DecimalMath $math): JsonResponse
-    {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_VIEW);
-
-        $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($grn);
-
-        return response()->json(['data' => $model->lines
-            ->filter(fn (GoodsReceiptNoteLine $line): bool => $math->compare(
-                $math->sub((string) $line->accepted_quantity, (string) $line->returned_quantity),
-                '0.000000',
-            ) > 0)
-            ->values()
-            ->map(fn (GoodsReceiptNoteLine $line): array => [
-                'id' => (int) $line->getKey(),
-                'source_line_type' => 'goods_receipt_note_line',
-                'source_line_id' => (int) $line->getKey(),
-                'item' => $line->relationLoaded('item') ? ['id' => (int) $line->item->getKey(), 'code' => $line->item->code, 'name' => $line->item->name] : null,
-                'uom' => $line->relationLoaded('uom') ? ['id' => (int) $line->uom->getKey(), 'code' => $line->uom->code, 'name' => $line->uom->name, 'symbol' => $line->uom->symbol] : null,
-                'returnable_quantity' => $math->sub((string) $line->accepted_quantity, (string) $line->returned_quantity),
-                'unit_price' => (string) $line->unit_price,
-            ])
-            ->all()]);
-    }
-
     private function relations(): array
     {
         return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'adjustments'];
@@ -121,30 +95,11 @@ final class GoodsReceiptNoteController
 
     private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void
     {
-        if ($request->filled('invoice_status')) {
-            match ((string) $request->input('invoice_status')) {
-                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0')),
-                'partially_invoiced' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - invoiced_quantity) > 0')),
-                'invoiced' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
-                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - invoiced_quantity) > 0')),
-                default => null,
-            };
-        }
-
-        if ($request->filled('return_status')) {
-            match ((string) $request->input('return_status')) {
-                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0')),
-                'partially_returned' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - returned_quantity) > 0')),
-                'returned' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
-                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - returned_quantity) > 0')),
-                default => null,
-            };
+        $balances = app(PurchaseProcurementBalanceService::class);
+        foreach (['invoice_status', 'return_status'] as $filter) {
+            if ($request->filled($filter)) {
+                $balances->applyGoodsReceiptProgressFilter($query, $filter, (string) $request->input($filter));
+            }
         }
     }
 }

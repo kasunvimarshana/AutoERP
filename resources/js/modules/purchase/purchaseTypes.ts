@@ -12,6 +12,16 @@ export type InvoiceProgressStatus = 'not_invoiced' | 'partially_invoiced' | 'inv
 export type ReturnProgressStatus = 'not_returned' | 'partially_returned' | 'returned';
 export type AllocationProgressStatus = 'unallocated' | 'partially_allocated' | 'allocated';
 
+export interface PurchaseCapabilityDetail {
+    allowed: boolean;
+    code?: string | null;
+    reason?: string | null;
+}
+
+export type PurchaseCapabilityDetails<K extends string> = {
+    details?: Partial<Record<K, PurchaseCapabilityDetail>>;
+};
+
 export interface PurchaseOrderLine {
     id?: number;
     line_number?: number;
@@ -87,14 +97,14 @@ export interface PurchaseOrder {
     receipt_status?: ReceiptProgressStatus;
     invoice_status?: InvoiceProgressStatus;
     return_status?: ReturnProgressStatus;
-    capabilities?: {
+    capabilities?: PurchaseCapabilityDetails<'can_edit' | 'can_submit' | 'can_approve' | 'can_receive' | 'can_invoice' | 'can_close' | 'can_force_close' | 'can_cancel' | 'can_delete'> & {
         can_edit?: boolean;
         can_submit?: boolean;
         can_approve?: boolean;
         can_receive?: boolean;
         can_invoice?: boolean;
-        can_return?: boolean;
         can_close?: boolean;
+        can_force_close?: boolean;
         can_cancel?: boolean;
         can_delete?: boolean;
     };
@@ -320,7 +330,7 @@ export interface GoodsReceipt {
     workflow_status?: GoodsReceiptStatus | string;
     invoice_status?: InvoiceProgressStatus;
     return_status?: ReturnProgressStatus;
-    capabilities?: {
+    capabilities?: PurchaseCapabilityDetails<'can_post' | 'can_invoice' | 'can_return' | 'can_reverse' | 'read_only'> & {
         can_post?: boolean;
         can_invoice?: boolean;
         can_return?: boolean;
@@ -383,7 +393,7 @@ export interface PurchaseDebitNote {
     source_type?: string | null;
     source_id?: number | null;
     source?: SourceSummary | null;
-    capabilities?: {
+    capabilities?: PurchaseCapabilityDetails<'can_approve' | 'can_post' | 'can_allocate' | 'read_only'> & {
         can_approve?: boolean;
         can_post?: boolean;
         can_allocate?: boolean;

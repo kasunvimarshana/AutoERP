@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
@@ -11,6 +12,127 @@ use Modules\Purchase\Models\PurchaseOrderLine;
 final class PurchaseProcurementBalanceService
 {
     public function __construct(private readonly DecimalMath $math) {}
+
+    public function purchaseOrderReceivableRemainingSql(string $table = 'purchase_order_lines'): string
+    {
+        return "({$table}.ordered_quantity - {$table}.cancelled_quantity - {$table}.received_quantity)";
+    }
+
+    public function purchaseOrderInvoiceableRemainingSql(string $table = 'purchase_order_lines'): string
+    {
+        return "({$table}.ordered_quantity - {$table}.cancelled_quantity - {$table}.invoiced_quantity)";
+    }
+
+    public function purchaseOrderReturnableRemainingSql(string $table = 'purchase_order_lines'): string
+    {
+        return "({$table}.received_quantity - {$table}.returned_quantity)";
+    }
+
+    public function goodsReceiptInvoiceableRemainingSql(string $table = 'goods_receipt_note_lines'): string
+    {
+        return "({$table}.accepted_quantity - {$table}.invoiced_quantity)";
+    }
+
+    public function goodsReceiptReturnableRemainingSql(string $table = 'goods_receipt_note_lines'): string
+    {
+        return "({$table}.accepted_quantity - {$table}.returned_quantity)";
+    }
+
+    public function wherePurchaseOrderLineReceivable(Builder $query): Builder
+    {
+        return $query->whereRaw($this->purchaseOrderReceivableRemainingSql().' > 0');
+    }
+
+    public function wherePurchaseOrderLineInvoiceable(Builder $query): Builder
+    {
+        return $query->whereRaw($this->purchaseOrderInvoiceableRemainingSql().' > 0');
+    }
+
+    public function wherePurchaseOrderLineReturnable(Builder $query): Builder
+    {
+        return $query->whereRaw($this->purchaseOrderReturnableRemainingSql().' > 0');
+    }
+
+    public function whereGoodsReceiptLineInvoiceable(Builder $query): Builder
+    {
+        return $query->whereRaw($this->goodsReceiptInvoiceableRemainingSql().' > 0');
+    }
+
+    public function whereGoodsReceiptLineReturnable(Builder $query): Builder
+    {
+        return $query->whereRaw($this->goodsReceiptReturnableRemainingSql().' > 0');
+    }
+
+    public function applyPurchaseOrderProgressFilter(Builder $query, string $progressField, string $progressStatus): void
+    {
+        if ($progressField === 'receipt_status') {
+            match ($progressStatus) {
+                'not_received' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.received_quantity > 0')),
+                'partially_received' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.received_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $this->wherePurchaseOrderLineReceivable($line)),
+                'received' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.received_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $this->wherePurchaseOrderLineReceivable($line)),
+                default => null,
+            };
+        }
+
+        if ($progressField === 'invoice_status') {
+            match ($progressStatus) {
+                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.invoiced_quantity > 0')),
+                'partially_invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.invoiced_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $this->wherePurchaseOrderLineInvoiceable($line)),
+                'invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.invoiced_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $this->wherePurchaseOrderLineInvoiceable($line)),
+                default => null,
+            };
+        }
+
+        if ($progressField === 'return_status') {
+            match ($progressStatus) {
+                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.returned_quantity > 0')),
+                'partially_returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.returned_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $this->wherePurchaseOrderLineReturnable($line)),
+                'returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('purchase_order_lines.returned_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $this->wherePurchaseOrderLineReturnable($line)),
+                default => null,
+            };
+        }
+    }
+
+    public function applyGoodsReceiptProgressFilter(Builder $query, string $progressField, string $progressStatus): void
+    {
+        if ($progressField === 'invoice_status') {
+            match ($progressStatus) {
+                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.invoiced_quantity > 0')),
+                'partially_invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.invoiced_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $this->whereGoodsReceiptLineInvoiceable($line)),
+                'invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.invoiced_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $this->whereGoodsReceiptLineInvoiceable($line)),
+                default => null,
+            };
+        }
+
+        if ($progressField === 'return_status') {
+            match ($progressStatus) {
+                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.returned_quantity > 0')),
+                'partially_returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.returned_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $this->whereGoodsReceiptLineReturnable($line)),
+                'returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('goods_receipt_note_lines.returned_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $this->whereGoodsReceiptLineReturnable($line)),
+                default => null,
+            };
+        }
+    }
 
     public function remainingInvoiceableForPurchaseOrderLine(PurchaseOrderLine $line): string
     {

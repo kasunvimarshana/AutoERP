@@ -1,8 +1,17 @@
 import type {
+    PurchaseCapabilityDetail,
     PurchaseOrder,
     PurchaseOrderStatus,
+    PurchaseReturn,
     PurchaseReturnStatus,
 } from './purchaseTypes';
+
+export function capabilityDetail(
+    capabilities: { details?: Record<string, PurchaseCapabilityDetail | undefined> } | undefined,
+    key: string,
+) {
+    return capabilities?.details?.[key];
+}
 
 export function purchaseOrderCapabilities(orderOrStatus?: PurchaseOrder | PurchaseOrderStatus) {
     const status = typeof orderOrStatus === 'string' ? orderOrStatus : orderOrStatus?.status;
@@ -14,18 +23,21 @@ export function purchaseOrderCapabilities(orderOrStatus?: PurchaseOrder | Purcha
         canApprove: Boolean(server?.can_approve),
         canReceive: Boolean(server?.can_receive),
         canInvoice: Boolean(server?.can_invoice),
-        canReturn: Boolean(server?.can_return),
         canCancel: Boolean(server?.can_cancel),
         canClose: server?.can_close ?? false,
+        canForceClose: server?.can_force_close ?? false,
         canDelete: Boolean(server?.can_delete),
         isReadOnly: ['closed', 'cancelled'].includes(status ?? ''),
     };
 }
 
-export function purchaseReturnCapabilities(status?: PurchaseReturnStatus | string) {
+export function purchaseReturnCapabilities(returnOrStatus?: PurchaseReturn | PurchaseReturnStatus | string) {
+    const status = typeof returnOrStatus === 'string' ? returnOrStatus : returnOrStatus?.status;
+    const server = typeof returnOrStatus === 'string' ? undefined : returnOrStatus?.capabilities;
+
     return {
-        canApprove: status === 'draft',
-        canPost: status === 'draft' || status === 'approved',
-        canCancel: status !== 'posted' && status !== 'cancelled',
+        canApprove: Boolean(server?.can_approve ?? status === 'draft'),
+        canPost: Boolean(server?.can_post ?? (status === 'draft' || status === 'approved')),
+        canCancel: Boolean(server?.can_cancel ?? (status !== 'posted' && status !== 'cancelled')),
     };
 }

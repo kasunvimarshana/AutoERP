@@ -6,6 +6,7 @@ namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
 final class GoodsReceiptNoteResource extends PurchaseResource
@@ -83,41 +84,11 @@ final class GoodsReceiptNoteResource extends PurchaseResource
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function capabilities(): array
     {
-        $status = (string) $this->enumValue($this->status);
-        $remainingInvoiceable = '0.000000';
-        $remainingReturnable = '0.000000';
-        $invoiced = '0.000000';
-        $returned = '0.000000';
-        $balances = app(PurchaseProcurementBalanceService::class);
-
-        foreach ($this->loadedLines() as $line) {
-            $remainingInvoiceable = $this->add(
-                $remainingInvoiceable,
-                $balances->remainingInvoiceableForGoodsReceiptLine($line),
-            );
-            $remainingReturnable = $this->add(
-                $remainingReturnable,
-                $balances->remainingReturnableForGoodsReceiptLine($line),
-            );
-            $invoiced = $this->add($invoiced, (string) $line->invoiced_quantity);
-            $returned = $this->add($returned, (string) $line->returned_quantity);
-        }
-
-        $open = $status === 'posted';
-
-        return [
-            'can_post' => $status === 'draft',
-            'can_invoice' => $open && $this->compare($remainingInvoiceable, '0.000000') > 0,
-            'can_return' => $open && $this->compare($remainingReturnable, '0.000000') > 0,
-            'can_reverse' => $status === 'posted'
-                && $this->compare($invoiced, '0.000000') === 0
-                && $this->compare($returned, '0.000000') === 0,
-            'read_only' => in_array($status, ['posted', 'reversed'], true),
-        ];
+        return app(PurchaseDocumentCapabilityService::class)->forGoodsReceipt($this->resource);
     }
 
 }

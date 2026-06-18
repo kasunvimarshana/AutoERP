@@ -65,6 +65,38 @@ describe('Purchase navigation flows', () => {
         expect(screen.getByRole('link', { name: 'Create return' })).toHaveAttribute('href', '/purchase/returns/create?goods_receipt_id=77');
     });
 
+    it('uses the backend capability reason when a permitted GRN action is blocked', async () => {
+        authMock.permissions = ['purchase.goods_receipts.reverse'];
+        purchaseApiMocks.getGoodsReceipt.mockResolvedValue({
+            ...goodsReceipt(),
+            capabilities: {
+                can_invoice: false,
+                can_return: false,
+                can_post: false,
+                can_reverse: false,
+                details: {
+                    can_reverse: {
+                        allowed: false,
+                        code: 'unresolved_returns',
+                        reason: 'Cannot reverse GRN while purchase returns are unresolved or impacting.',
+                    },
+                },
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/purchase/goods-receipts/77']}>
+                <Routes>
+                    <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetailPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        const reverse = await screen.findByRole('button', { name: 'Reverse' });
+        expect(reverse).toBeDisabled();
+        expect(reverse).toHaveAttribute('title', 'Cannot reverse GRN while purchase returns are unresolved or impacting.');
+    });
+
     it('renders supplier payments inside the Purchase workspace', async () => {
         cleanup();
         render(

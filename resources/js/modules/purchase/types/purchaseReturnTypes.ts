@@ -1,5 +1,5 @@
 import type { NamedResource } from '@/shared/types/common';
-import type { SourceSummary } from '../purchaseTypes';
+import type { PurchaseCapabilityDetails, SourceSummary } from '../purchaseTypes';
 
 export type PurchaseReturnStatus = 'draft' | 'approved' | 'posted' | 'cancelled';
 
@@ -46,7 +46,7 @@ export interface PurchaseReturn {
     source_id?: number | null;
     source?: SourceSummary | null;
     status?: PurchaseReturnStatus | string;
-    capabilities?: {
+    capabilities?: PurchaseCapabilityDetails<'can_approve' | 'can_post' | 'can_cancel' | 'read_only'> & {
         can_approve?: boolean;
         can_post?: boolean;
         can_cancel?: boolean;

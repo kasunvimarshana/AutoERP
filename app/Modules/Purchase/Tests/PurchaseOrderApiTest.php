@@ -17,6 +17,7 @@ use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\User\Services\UserAccessResolver;
+use RuntimeException;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -196,6 +197,9 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.invoice_status', 'partially_invoiced')
             ->assertJsonPath('data.return_status', 'partially_returned')
             ->assertJsonPath('data.capabilities.can_receive', true)
+            ->assertJsonPath('data.capabilities.details.can_receive.allowed', true)
+            ->assertJsonPath('data.capabilities.details.can_close.code', 'remaining_receivable')
+            ->assertJsonMissingPath('data.capabilities.can_return')
             ->assertJsonPath('data.received_quantity', '1.000000')
             ->assertJsonPath('data.invoiced_quantity', '0.500000')
             ->assertJsonPath('data.returned_quantity', '0.250000');
@@ -297,6 +301,51 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.approval_required', false)
             ->assertJsonPath('data.affects_supplier_balance', true)
             ->assertJsonMissingPath('data.capabilities.can_reverse');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/goods-receipts/'.$grn->getKey())
+            ->assertOk()
+            ->assertJsonPath('data.capabilities.can_reverse', false)
+            ->assertJsonPath('data.capabilities.details.can_reverse.code', 'unresolved_returns');
+    }
+
+    public function test_lifecycle_legacy_preflight_normalizes_safe_rows_and_reports_blockers(): void
+    {
+        if (DB::getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('Legacy upgrade preflight fixture must run before lifecycle CHECK constraints are installed.');
+        }
+
+        $context = $this->context();
+        $orderId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
+        $order = PurchaseOrder::query()->with('lines')->findOrFail($orderId);
+        $order = app(PurchaseOrderService::class)->approve(app(PurchaseOrderService::class)->submit($order));
+        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            tenantId: $context['tenant_id'],
+            receivedDate: '2026-06-18',
+            warehouseId: $context['warehouse_id'],
+            organizationUnitId: $context['organization_unit_id'],
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData($context['item_id'], '1.000000', '1.000000', '10.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '1.000000')],
+        ));
+        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
+
+        DB::table('purchase_orders')->where('id', $order->getKey())->update(['status' => 'partially_received']);
+        DB::table('goods_receipt_note_lines')->where('id', $grn->lines->first()->getKey())->update(['status' => 'cancelled']);
+
+        $migration = require base_path('app/Modules/Purchase/Database/Migrations/2026_06_19_005000_preflight_purchase_lifecycle_legacy_statuses.php');
+
+        try {
+            $migration->up();
+            $this->fail('Expected unsupported cancelled GRN line to be reported.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('goods_receipt_note_lines.status=cancelled count=1', $exception->getMessage());
+            $this->assertSame('approved', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
+        }
+
+        DB::table('goods_receipt_notes')->where('id', $grn->getKey())->update(['status' => 'reversed']);
+        $migration->up();
+
+        $this->assertSame('approved', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
+        $this->assertSame('reversed', (string) DB::table('goods_receipt_note_lines')->where('id', $grn->lines->first()->getKey())->value('status'));
     }
 
     public function test_manual_supplier_return_requires_manual_permission_and_separate_route(): void

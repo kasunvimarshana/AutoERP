@@ -41,9 +41,18 @@ return new class extends Migration
         ];
 
         foreach ($unsupported as $table => $statuses) {
-            $count = DB::table($table)->whereIn('status', $statuses)->count();
-            if ($count > 0) {
-                throw new RuntimeException("Cannot normalize Purchase lifecycle: {$table} contains unsupported statuses.");
+            $rows = DB::table($table)
+                ->select('status', DB::raw('COUNT(*) as aggregate'))
+                ->whereIn('status', $statuses)
+                ->groupBy('status')
+                ->orderBy('status')
+                ->get();
+            if ($rows->isNotEmpty()) {
+                $details = $rows
+                    ->map(fn ($row): string => "{$row->status}={$row->aggregate}")
+                    ->implode(', ');
+
+                throw new RuntimeException("Cannot normalize Purchase lifecycle: {$table} still contains unsupported statuses ({$details}) after legacy preflight remediation.");
             }
         }
     }

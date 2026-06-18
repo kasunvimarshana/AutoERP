@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
+use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 
 final class PurchaseReturnResource extends PurchaseResource
 {
@@ -93,18 +94,10 @@ final class PurchaseReturnResource extends PurchaseResource
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function capabilities(): array
     {
-        $status = $this->enumValue($this->status);
-        $approvalRequired = (bool) $this->approval_required;
-
-        return [
-            'can_approve' => $approvalRequired && $status === 'draft',
-            'can_post' => ($approvalRequired && $status === 'approved') || (! $approvalRequired && $status === 'draft'),
-            'can_cancel' => in_array($status, ['draft', 'approved'], true),
-            'read_only' => in_array($status, ['posted', 'cancelled'], true),
-        ];
+        return app(PurchaseDocumentCapabilityService::class)->forPurchaseReturn($this->resource);
     }
 }

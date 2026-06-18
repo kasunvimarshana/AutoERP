@@ -175,25 +175,31 @@ final class PurchaseReturnService
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
     {
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
-            $snapshot = PurchaseReturn::query()->with('lines')->findOrFail($return->getKey());
-            $sourceLines = $this->lockReturnSourcesForPost($snapshot);
-            $returnContext = $this->lockReturnContextForPost($snapshot, $sourceLines);
-            $return = $returnContext['return'];
-            $postedLineSums = $returnContext['posted_line_sums'];
-            if ($return->status === PurchaseReturnStatus::Posted) {
+            $lockedReturn = $this->locks->purchaseReturns([(int) $return->getKey()])->first();
+            if (! $lockedReturn instanceof PurchaseReturn) {
+                throw new InvalidArgumentException('Purchase return was not found.');
+            }
+            $lockedReturn->setRelation('lines', $this->locks->purchaseReturnLinesForReturns([(int) $lockedReturn->getKey()])->values());
+
+            if ($lockedReturn->status === PurchaseReturnStatus::Posted) {
                 return new PurchasePostingResult(
-                    (int) $return->getKey(),
-                    (string) $return->return_number,
-                    $return->status->value,
-                    $return->lines
+                    (int) $lockedReturn->getKey(),
+                    (string) $lockedReturn->return_number,
+                    $lockedReturn->status->value,
+                    $lockedReturn->lines
                         ->pluck('inventory_movement_id')
                         ->filter()
                         ->map(static fn ($id): int => (int) $id)
                         ->values()
                         ->all(),
-                    debitNoteId: $return->debit_note_id === null ? null : (int) $return->debit_note_id,
+                    debitNoteId: $lockedReturn->debit_note_id === null ? null : (int) $lockedReturn->debit_note_id,
                 );
             }
+
+            $sourceLines = $this->lockReturnSourcesForPost($lockedReturn);
+            $returnContext = $this->lockReturnContextForPost($lockedReturn, $sourceLines);
+            $return = $returnContext['return'];
+            $postedLineSums = $returnContext['posted_line_sums'];
             $this->assertPostable($return);
             $this->assertLockedReturnSources($return, $sourceLines);
 
@@ -575,29 +581,35 @@ final class PurchaseReturnService
     private function lockReturnContextForPost(PurchaseReturn $return, array $sourceLines): array
     {
         $sourceLineIds = array_keys($sourceLines);
-        $postedReturnIds = [];
-        if ($sourceLineIds !== []) {
-            $postedReturnIds = PurchaseReturnLine::query()
-                ->where('source_line_type', 'goods_receipt_note_line')
-                ->whereIn('source_line_id', $sourceLineIds)
-                ->where('purchase_return_id', '!=', $return->getKey())
-                ->whereHas('purchaseReturn', fn ($query) => $query->where('status', PurchaseReturnStatus::Posted->value))
-                ->pluck('purchase_return_id')
-                ->map(static fn ($id): int => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-        }
+        $goodsReceiptIds = array_values(array_unique(array_map(
+            static fn (GoodsReceiptNoteLine $line): int => (int) $line->goods_receipt_note_id,
+            $sourceLines,
+        )));
+        sort($goodsReceiptIds);
 
-        $returnIds = array_values(array_unique(array_merge([(int) $return->getKey()], $postedReturnIds)));
-        sort($returnIds);
-
-        $lockedReturns = $this->locks->purchaseReturns($returnIds);
+        $lockedReturns = PurchaseReturn::query()
+            ->where(function ($query) use ($return, $goodsReceiptIds): void {
+                $query->where('id', $return->getKey());
+                if ($goodsReceiptIds !== []) {
+                    $query->orWhere(function ($scope) use ($goodsReceiptIds): void {
+                        $scope->where('source_type', 'goods_receipt_note')
+                            ->whereIn('source_id', $goodsReceiptIds)
+                            ->where('status', PurchaseReturnStatus::Posted->value);
+                    });
+                }
+            })
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
         $locked = $lockedReturns->first(fn (PurchaseReturn $candidate): bool => (int) $candidate->getKey() === (int) $return->getKey());
         if (! $locked instanceof PurchaseReturn) {
             throw new InvalidArgumentException('Purchase return was not found.');
         }
 
+        $returnIds = $lockedReturns
+            ->map(fn (PurchaseReturn $candidate): int => (int) $candidate->getKey())
+            ->values()
+            ->all();
         $lockedLines = $this->locks
             ->purchaseReturnLinesForReturns($returnIds)
             ->values();
@@ -605,13 +617,16 @@ final class PurchaseReturnService
             ->where('purchase_return_id', (int) $locked->getKey())
             ->values());
 
-        $postedReturnIdMap = array_fill_keys($postedReturnIds, true);
+        $postedReturnIdMap = [];
+        foreach ($lockedReturns as $lockedCandidate) {
+            if ((int) $lockedCandidate->getKey() === (int) $locked->getKey()) {
+                continue;
+            }
+            if ($lockedCandidate->status === PurchaseReturnStatus::Posted) {
+                $postedReturnIdMap[(int) $lockedCandidate->getKey()] = true;
+            }
+        }
         $postedLineSums = $this->sumLockedPostedReturnLines($lockedLines, $postedReturnIdMap, $sourceLineIds);
-        $goodsReceiptIds = array_values(array_unique(array_map(
-            static fn (GoodsReceiptNoteLine $line): int => (int) $line->goods_receipt_note_id,
-            $sourceLines,
-        )));
-        sort($goodsReceiptIds);
 
         $receiptLinesByGrn = [];
         foreach ($sourceLines as $sourceLine) {
@@ -745,28 +760,40 @@ final class PurchaseReturnService
      */
     private function lockReceiptSourcesByLineIds(array $sourceLineIds): array
     {
-        /** @var Collection<int, GoodsReceiptNoteLine> $snapshots */
-        $snapshots = GoodsReceiptNoteLine::query()
-            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
-            ->whereIn('id', $sourceLineIds)
-            ->get();
+        $sourceLineIds = array_values(array_unique(array_map(static fn (int $id): int => $id, $sourceLineIds)));
+        sort($sourceLineIds);
+        if ($sourceLineIds === []) {
+            return [];
+        }
 
-        if ($snapshots->count() !== count(array_unique($sourceLineIds))) {
+        /** @var Collection<int, GoodsReceiptNoteLine> $lineSources */
+        $lineSources = GoodsReceiptNoteLine::query()
+            ->whereIn('id', $sourceLineIds)
+            ->orderBy('id')
+            ->get(['id', 'goods_receipt_note_id', 'purchase_order_line_id']);
+
+        if ($lineSources->count() !== count($sourceLineIds)) {
             throw new InvalidArgumentException('One or more selected goods receipt note lines were not found.');
         }
 
-        $purchaseOrderLineIds = $snapshots
+        $purchaseOrderLineIds = $lineSources
             ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchase_order_line_id === null ? null : (int) $line->purchase_order_line_id)
             ->filter()
             ->values()
             ->all();
-        $purchaseOrderIds = $snapshots
-            ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchaseOrderLine instanceof PurchaseOrderLine ? (int) $line->purchaseOrderLine->purchase_order_id : null)
-            ->filter()
-            ->values()
-            ->all();
-        $goodsReceiptIds = $snapshots
+        $purchaseOrderIds = $purchaseOrderLineIds === []
+            ? []
+            : PurchaseOrderLine::query()
+                ->whereIn('id', array_values(array_unique($purchaseOrderLineIds)))
+                ->orderBy('id')
+                ->pluck('purchase_order_id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        $goodsReceiptIds = $lineSources
             ->map(fn (GoodsReceiptNoteLine $line): int => (int) $line->goods_receipt_note_id)
+            ->unique()
             ->values()
             ->all();
 

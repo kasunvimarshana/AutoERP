@@ -12,13 +12,12 @@ use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Http\Requests\UpdatePurchaseOrderRequest;
-use Modules\Purchase\Http\Resources\PurchaseOrderLineResource;
 use Modules\Purchase\Http\Resources\PurchaseOrderResource;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
-use Modules\Purchase\Services\PurchaseOrderQuantityService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierItemMapping;
@@ -139,38 +138,6 @@ final class PurchaseOrderController
         return new PurchaseOrderResource($service->close($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
     }
 
-    public function receivableLines(
-        ListPurchaseDocumentRequest $request,
-        int $order,
-        PurchaseOrderQuantityService $quantities,
-    ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW);
-
-        $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
-
-        return response()->json(['data' => $model->lines
-            ->filter(fn ($line): bool => $quantities->isReceivable($line))
-            ->values()
-            ->map(fn ($line): array => (new PurchaseOrderLineResource($line))->resolve($request))
-            ->all()]);
-    }
-
-    public function invoiceableLines(
-        ListPurchaseDocumentRequest $request,
-        int $order,
-        PurchaseOrderQuantityService $quantities,
-    ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
-
-        $model = $this->scope(PurchaseOrder::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($order);
-
-        return response()->json(['data' => $model->lines
-            ->filter(fn ($line): bool => $quantities->isInvoiceable($line))
-            ->values()
-            ->map(fn ($line): array => (new PurchaseOrderLineResource($line))->resolve($request))
-            ->all()]);
-    }
-
     public function supplierItemMappings(ListPurchaseDocumentRequest $request, int $supplier): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
@@ -186,43 +153,11 @@ final class PurchaseOrderController
 
     private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void
     {
-        if ($request->filled('receipt_status')) {
-            match ((string) $request->input('receipt_status')) {
-                'not_received' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0')),
-                'partially_received' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0'))
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0')),
-                'received' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0'))
-                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0')),
-                default => null,
-            };
-        }
-
-        if ($request->filled('invoice_status')) {
-            match ((string) $request->input('invoice_status')) {
-                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0')),
-                'partially_invoiced' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')),
-                'invoiced' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
-                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')),
-                default => null,
-            };
-        }
-
-        if ($request->filled('return_status')) {
-            match ((string) $request->input('return_status')) {
-                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0')),
-                'partially_returned' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(received_quantity - returned_quantity) > 0')),
-                'returned' => $query
-                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
-                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(received_quantity - returned_quantity) > 0')),
-                default => null,
-            };
+        $balances = app(PurchaseProcurementBalanceService::class);
+        foreach (['receipt_status', 'invoice_status', 'return_status'] as $filter) {
+            if ($request->filled($filter)) {
+                $balances->applyPurchaseOrderProgressFilter($query, $filter, (string) $request->input($filter));
+            }
         }
     }
 }

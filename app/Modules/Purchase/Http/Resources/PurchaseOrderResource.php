@@ -6,7 +6,7 @@ namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 use Modules\Purchase\Services\PurchaseRelatedDocumentService;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
@@ -107,44 +107,11 @@ final class PurchaseOrderResource extends PurchaseResource
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function capabilities(): array
     {
-        $workflow = $this->status;
-        $hasReceivedOrInvoiced = $this->compare($this->sumLines('received_quantity'), '0.000000') > 0
-            || $this->compare($this->sumLines('invoiced_quantity'), '0.000000') > 0;
-        $remainingReceivable = '0.000000';
-        $remainingInvoiceable = '0.000000';
-        $remainingReturnable = '0.000000';
-        $balances = app(PurchaseProcurementBalanceService::class);
-        foreach ($this->loadedLines() as $line) {
-            $remainingReceivable = $this->add($remainingReceivable, $balances->remainingReceivableForPurchaseOrderLine($line));
-            $remainingInvoiceable = $this->add($remainingInvoiceable, $balances->remainingInvoiceableForPurchaseOrderLine($line));
-            $remainingReturnable = $this->add($remainingReturnable, $balances->remainingReturnableForPurchaseOrderLine($line));
-        }
-        $hasReceivable = $this->compare($remainingReceivable, '0.000000') > 0;
-        $hasInvoiceable = $this->compare($remainingInvoiceable, '0.000000') > 0;
-        $hasReturnable = $this->compare($remainingReturnable, '0.000000') > 0;
-        $openWorkflow = in_array($workflow, [
-            PurchaseOrderStatus::Approved,
-        ], true);
-
-        return [
-            'can_edit' => $workflow === PurchaseOrderStatus::Draft,
-            'can_submit' => $workflow === PurchaseOrderStatus::Draft,
-            'can_approve' => $workflow === PurchaseOrderStatus::PendingApproval,
-            'can_receive' => $openWorkflow && $hasReceivable,
-            'can_invoice' => $openWorkflow && $hasInvoiceable,
-            'can_return' => $openWorkflow && $hasReturnable,
-            'can_close' => $openWorkflow && ! $hasReceivable && ! $hasInvoiceable,
-            'can_cancel' => in_array($workflow, [
-                PurchaseOrderStatus::Draft,
-                PurchaseOrderStatus::PendingApproval,
-                PurchaseOrderStatus::Approved,
-            ], true) && ! $hasReceivedOrInvoiced,
-            'can_delete' => $workflow === PurchaseOrderStatus::Draft && ! $hasReceivedOrInvoiced,
-        ];
+        return app(PurchaseDocumentCapabilityService::class)->forPurchaseOrder($this->resource);
     }
 
     private function loadedLines(): Collection
@@ -158,13 +125,4 @@ final class PurchaseOrderResource extends PurchaseResource
         return $lines instanceof Collection ? $lines : collect();
     }
 
-    private function sumLines(string $column): string
-    {
-        $total = '0.000000';
-        foreach ($this->loadedLines() as $line) {
-            $total = $this->add($total, (string) ($line->{$column} ?? '0.000000'));
-        }
-
-        return $total;
-    }
 }
