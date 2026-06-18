@@ -37,7 +37,7 @@ final class PurchaseDebitNoteService
             throw new InvalidArgumentException('Purchase debit note reason is required.');
         }
 
-        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId);
+        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
 
         return PurchaseDebitNote::query()->create([
             'tenant_id' => $data->tenantId,

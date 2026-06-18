@@ -7,6 +7,7 @@ namespace Modules\Purchase\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Inventory\DTOs\StockAdjustmentData;
@@ -207,25 +208,28 @@ final class PurchaseEngineTest extends TestCase
             'SUP-OTHER-'.Str::upper(Str::random(4)),
         );
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'All purchase invoice sources must belong to the selected supplier.',
-        );
-
-        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
-            new CreatePurchaseInvoiceData(
-                tenantId: $tenantId,
-                invoiceDate: '2026-06-06',
-                supplierType: 'supplier',
-                supplierId: $otherSupplierId,
-                sources: [
-                    new PurchaseInvoiceSourceData(
-                        'purchase_order',
-                        (int) $order->getKey(),
-                    ),
-                ],
-            ),
-        );
+        try {
+            app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+                new CreatePurchaseInvoiceData(
+                    tenantId: $tenantId,
+                    invoiceDate: '2026-06-06',
+                    supplierType: 'supplier',
+                    supplierId: $otherSupplierId,
+                    sources: [
+                        new PurchaseInvoiceSourceData(
+                            'purchase_order',
+                            (int) $order->getKey(),
+                        ),
+                    ],
+                ),
+            );
+            $this->fail('Expected selected supplier validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'All purchase invoice sources must belong to the selected supplier.',
+                $exception->errors()['supplier_id'][0] ?? null,
+            );
+        }
     }
 
     public function test_one_grn_can_be_invoiced_by_many_supplier_invoices(): void
@@ -510,24 +514,27 @@ final class PurchaseEngineTest extends TestCase
         $grn->organization_unit_id = $organizationUnitId;
         $grn->save();
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Purchase invoice source belongs to a different organization unit.',
-        );
-
-        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
-            new CreatePurchaseInvoiceData(
-                tenantId: $tenantId,
-                invoiceDate: '2026-06-08',
-                organizationUnitId: $otherOrganizationUnitId,
-                sources: [
-                    new PurchaseInvoiceSourceData(
-                        'goods_receipt_note',
-                        (int) $grn->getKey(),
-                    ),
-                ],
-            ),
-        );
+        try {
+            app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+                new CreatePurchaseInvoiceData(
+                    tenantId: $tenantId,
+                    invoiceDate: '2026-06-08',
+                    organizationUnitId: $otherOrganizationUnitId,
+                    sources: [
+                        new PurchaseInvoiceSourceData(
+                            'goods_receipt_note',
+                            (int) $grn->getKey(),
+                        ),
+                    ],
+                ),
+            );
+            $this->fail('Expected purchase invoice source organization validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'The selected goods receipt is not available for this organization unit.',
+                $exception->errors()['sources.0.source_id'][0] ?? null,
+            );
+        }
     }
 
     public function test_purchase_return_from_grn_line_posts_inventory_and_creates_debit_note(): void
@@ -627,17 +634,19 @@ final class PurchaseEngineTest extends TestCase
         $otherTenant = $this->createTenant('OTHER');
         $otherWarehouse = $this->createWarehouse($otherTenant, 'WH-OTHER');
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Purchase reference belongs to a different tenant.');
-
-        app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
-            tenantId: $tenantId,
-            purchaseOrderDate: '2026-06-06',
-            supplierType: 'supplier',
-            supplierId: $supplierId,
-            warehouseId: $otherWarehouse,
-            lines: [new PurchaseOrderLineData((int) $item->getKey(), '1.000000', '1.000000', uomId: $uomId)],
-        ));
+        try {
+            app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+                tenantId: $tenantId,
+                purchaseOrderDate: '2026-06-06',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                warehouseId: $otherWarehouse,
+                lines: [new PurchaseOrderLineData((int) $item->getKey(), '1.000000', '1.000000', uomId: $uomId)],
+            ));
+            $this->fail('Expected purchase warehouse tenant validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('The selected warehouse is not available.', $exception->errors()['warehouse_id'][0] ?? null);
+        }
     }
 
     public function test_payment_and_finance_preparation_dtos_are_created_without_persistence(): void

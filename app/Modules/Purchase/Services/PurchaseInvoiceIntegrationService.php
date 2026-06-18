@@ -12,6 +12,7 @@ use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\PreparedPurchaseInvoiceData;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
+use Modules\Purchase\Validators\PurchaseValidationService;
 
 final class PurchaseInvoiceIntegrationService
 {
@@ -20,11 +21,13 @@ final class PurchaseInvoiceIntegrationService
         private readonly InvoiceCreationService $invoices,
         private readonly PurchaseInvoiceDtoFactory $invoiceData,
         private readonly PurchaseInvoiceQuantityUpdater $quantities,
+        private readonly PurchaseValidationService $validator,
     ) {}
 
     public function createSupplierInvoice(CreatePurchaseInvoiceData $data): Invoice
     {
         return DB::transaction(function () use ($data): Invoice {
+            $this->validateHeaderReferences($data);
             $prepared = $this->invoiceData->prepare($data, lockSources: true);
             $invoice = $this->invoices->create($prepared->invoiceData);
 
@@ -37,7 +40,16 @@ final class PurchaseInvoiceIntegrationService
 
     public function previewSupplierInvoice(CreatePurchaseInvoiceData $data): InvoiceCalculationResult
     {
+        $this->validateHeaderReferences($data);
+
         return $this->invoices->preview($this->invoiceData->prepare($data)->invoiceData);
+    }
+
+    private function validateHeaderReferences(CreatePurchaseInvoiceData $data): void
+    {
+        if ($data->currencyId !== null) {
+            $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId, 'currency_id');
+        }
     }
 
     private function createPurchaseLinks(

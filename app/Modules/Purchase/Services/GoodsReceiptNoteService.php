@@ -35,13 +35,14 @@ final class GoodsReceiptNoteService
 
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
     {
-        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
         if ($data->warehouseLocationId !== null) {
             $this->validator->warehouseLocation(
                 $data->tenantId,
                 $data->organizationUnitId,
                 $data->warehouseId,
                 $data->warehouseLocationId,
+                'warehouse_location_id',
             );
         }
 
@@ -50,7 +51,14 @@ final class GoodsReceiptNoteService
             : null;
 
         if ($order instanceof PurchaseOrder) {
-            $this->validator->assertTenantOrg((int) $order->tenant_id, $order->organization_unit_id, $data->tenantId, $data->organizationUnitId);
+            $this->validator->assertTenantOrg(
+                $order->tenant_id !== null ? (int) $order->tenant_id : null,
+                $order->organization_unit_id !== null ? (int) $order->organization_unit_id : null,
+                $data->tenantId,
+                $data->organizationUnitId,
+                'purchase_order_id',
+                'purchase order',
+            );
             if ($order->status !== \Modules\Purchase\Enums\PurchaseOrderStatus::Approved) {
                 throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
             }
@@ -61,12 +69,12 @@ final class GoodsReceiptNoteService
                 throw new InvalidArgumentException('GRN supplier type must match the selected purchase order.');
             }
         } elseif ($data->supplierId !== null) {
-            $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId);
+            $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
         }
 
         $sourceLines = [];
         $seenSourceLines = [];
-        foreach ($data->lines as $line) {
+        foreach ($data->lines as $index => $line) {
             $this->validateReceiptQuantities($line);
 
             if ($line->purchaseOrderLineId !== null) {
@@ -96,12 +104,15 @@ final class GoodsReceiptNoteService
                 throw new InvalidArgumentException('PO-based GRNs require every line to reference a purchase order line.');
             }
 
-            $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
+            $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId, "lines.{$index}.item_id");
             $uomId = $line->orderedUomId ?? $line->uomId;
             if ($uomId === null) {
                 throw new InvalidArgumentException('GRN line UOM is required.');
             }
-            $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId);
+            $uomField = $line->orderedUomId !== null
+                ? "lines.{$index}.ordered_uom_id"
+                : "lines.{$index}.uom_id";
+            $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId, $uomField);
             $this->validator->assertNonNegative($line->unitPrice, 'GRN line unit price cannot be negative.');
             $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->acceptedQuantity);
         }

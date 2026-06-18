@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Validators;
 
 use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
@@ -34,110 +35,205 @@ final class PurchaseValidationService
         }
     }
 
-    public function item(int $tenantId, ?int $organizationUnitId, int $itemId): Item
+    public function item(int $tenantId, ?int $organizationUnitId, int $itemId, string $field = 'item_id'): Item
     {
-        $item = Item::query()->findOrFail($itemId);
-        $this->assertTenantOrg((int) $item->tenant_id, $item->organization_unit_id, $tenantId, $organizationUnitId);
+        $item = Item::query()->find($itemId);
+        if (! $item instanceof Item) {
+            $this->invalidReference($field, 'item');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($item->tenant_id),
+            $this->nullableScopeId($item->organization_unit_id),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'item',
+        );
 
         if (! (bool) $item->is_active) {
-            throw new InvalidArgumentException('Purchase item must be active.');
+            $this->invalidReference($field, 'item', 'The selected item is not active.');
         }
 
         return $item;
     }
 
-    public function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId): Supplier
+    public function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId, string $field = 'supplier_id'): Supplier
     {
-        $supplier = Supplier::query()->findOrFail($supplierId);
-        $this->assertTenantOrg((int) $supplier->tenant_id, $supplier->organization_unit_id, $tenantId, $organizationUnitId);
+        $supplier = Supplier::query()->find($supplierId);
+        if (! $supplier instanceof Supplier) {
+            $this->invalidReference($field, 'supplier');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($supplier->tenant_id),
+            $this->nullableScopeId($supplier->organization_unit_id),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'supplier',
+        );
 
         $status = $supplier->status instanceof \BackedEnum
             ? $supplier->status->value
             : (string) $supplier->status;
         if ($status !== 'active') {
-            throw new InvalidArgumentException('Purchase supplier must be active.');
+            $this->invalidReference($field, 'supplier', 'The selected supplier is not active.');
         }
 
         return $supplier;
     }
 
-    public function uom(int $tenantId, ?int $organizationUnitId, int $uomId): UnitOfMeasureModel
+    public function uom(int $tenantId, ?int $organizationUnitId, int $uomId, string $field = 'uom_id'): UnitOfMeasureModel
     {
-        $uom = UnitOfMeasureModel::query()->findOrFail($uomId);
-        $this->assertTenantOrg((int) $uom->tenant_id, $uom->organization_unit_id, $tenantId, $organizationUnitId);
+        $uom = UnitOfMeasureModel::query()->find($uomId);
+        if (! $uom instanceof UnitOfMeasureModel) {
+            $this->invalidReference($field, 'UOM');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($uom->tenant_id),
+            $this->nullableScopeId($uom->organization_unit_id),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'UOM',
+        );
 
         if (isset($uom->is_active) && ! (bool) $uom->is_active) {
-            throw new InvalidArgumentException('Purchase UOM must be active.');
+            $this->invalidReference($field, 'UOM', 'The selected UOM is not active.');
         }
 
         return $uom;
     }
 
-    public function itemVariant(int $tenantId, ?int $organizationUnitId, int $itemId, int $variantId): ItemVariant
+    public function itemVariant(int $tenantId, ?int $organizationUnitId, int $itemId, int $variantId, string $field = 'item_variant_id'): ItemVariant
     {
-        $variant = ItemVariant::query()->findOrFail($variantId);
-        $this->assertTenantOrg((int) $variant->tenant_id, $variant->organization_unit_id, $tenantId, $organizationUnitId);
+        $variant = ItemVariant::query()->find($variantId);
+        if (! $variant instanceof ItemVariant) {
+            $this->invalidReference($field, 'item variant');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($variant->tenant_id),
+            $this->nullableScopeId($variant->organization_unit_id),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'item variant',
+        );
 
         if ((int) $variant->item_id !== $itemId) {
-            throw new InvalidArgumentException('Purchase item variant must belong to the selected item.');
+            $this->invalidReference($field, 'item variant', 'The selected item variant does not belong to the selected item.');
         }
 
         if (isset($variant->is_active) && ! (bool) $variant->is_active) {
-            throw new InvalidArgumentException('Purchase item variant must be active.');
+            $this->invalidReference($field, 'item variant', 'The selected item variant is not active.');
         }
 
         return $variant;
     }
 
-    public function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId): WarehouseModel
+    public function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId, string $field = 'warehouse_id'): WarehouseModel
     {
-        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
-        $this->assertTenantOrg((int) $warehouse->tenant_id, $warehouse->organization_unit_id ?? null, $tenantId, $organizationUnitId);
+        $warehouse = WarehouseModel::query()->find($warehouseId);
+        if (! $warehouse instanceof WarehouseModel) {
+            $this->invalidReference($field, 'warehouse');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($warehouse->tenant_id),
+            $this->nullableScopeId($warehouse->organization_unit_id ?? null),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'warehouse',
+        );
 
         if (isset($warehouse->is_active) && ! (bool) $warehouse->is_active) {
-            throw new InvalidArgumentException('Purchase warehouse must be active.');
+            $this->invalidReference($field, 'warehouse', 'The selected warehouse is not active.');
         }
 
         return $warehouse;
     }
 
-    public function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId): WarehouseLocationModel
+    public function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId, string $field = 'warehouse_location_id'): WarehouseLocationModel
     {
-        $location = WarehouseLocationModel::query()->findOrFail($locationId);
-        $this->assertTenantOrg((int) $location->tenant_id, $location->organization_unit_id ?? null, $tenantId, $organizationUnitId);
+        $location = WarehouseLocationModel::query()->find($locationId);
+        if (! $location instanceof WarehouseLocationModel) {
+            $this->invalidReference($field, 'warehouse location');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($location->tenant_id),
+            $this->nullableScopeId($location->organization_unit_id ?? null),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'warehouse location',
+        );
 
         if ((int) $location->warehouse_id !== $warehouseId) {
-            throw new InvalidArgumentException('Purchase warehouse location must belong to the selected warehouse.');
+            $this->invalidReference($field, 'warehouse location', 'The selected warehouse location does not belong to the selected warehouse.');
         }
 
         if (isset($location->is_active) && ! (bool) $location->is_active) {
-            throw new InvalidArgumentException('Purchase warehouse location must be active.');
+            $this->invalidReference($field, 'warehouse location', 'The selected warehouse location is not active.');
         }
 
         return $location;
     }
 
-    public function currency(int $tenantId, ?int $organizationUnitId, int $currencyId): CurrencyModel
+    public function currency(int $tenantId, ?int $organizationUnitId, int $currencyId, string $field = 'currency_id'): CurrencyModel
     {
-        $currency = CurrencyModel::query()->findOrFail($currencyId);
-        $this->assertTenantOrg((int) $currency->tenant_id, $currency->organization_unit_id ?? null, $tenantId, $organizationUnitId);
+        $currency = CurrencyModel::query()->find($currencyId);
+        if (! $currency instanceof CurrencyModel) {
+            $this->invalidReference($field, 'currency');
+        }
 
         if (isset($currency->is_active) && ! (bool) $currency->is_active) {
-            throw new InvalidArgumentException('Purchase currency must be active.');
+            $this->invalidReference($field, 'currency', 'The selected currency is not active.');
         }
 
         return $currency;
     }
 
-    public function assertTenantOrg(?int $actualTenantId, ?int $actualOrgId, int $tenantId, ?int $organizationUnitId): void
+    public function assertTenantOrg(
+        ?int $actualTenantId,
+        ?int $actualOrgId,
+        int $tenantId,
+        ?int $organizationUnitId,
+        ?string $field = null,
+        string $label = 'reference',
+    ): void
     {
         if ($actualTenantId !== null && $actualTenantId !== $tenantId) {
+            if ($field !== null) {
+                $this->invalidReference($field, $label);
+            }
+
             throw new InvalidArgumentException('Purchase reference belongs to a different tenant.');
         }
 
-        if ($organizationUnitId !== null && $actualOrgId !== null && $actualOrgId !== $organizationUnitId) {
+        if ($actualOrgId !== null && $actualOrgId !== $organizationUnitId) {
+            if ($field !== null) {
+                $this->invalidReference($field, $label, "The selected {$label} is not available for this organization unit.");
+            }
+
             throw new InvalidArgumentException('Purchase reference belongs to a different organization unit.');
         }
+    }
+
+    public function invalidReference(string $field, string $label, ?string $message = null): never
+    {
+        throw ValidationException::withMessages([
+            $field => [$message ?? "The selected {$label} is not available."],
+        ]);
+    }
+
+    private function nullableScopeId(mixed $value): ?int
+    {
+        return $value !== null && $value !== '' ? (int) $value : null;
     }
 
     public function assertReceiptWithinOrder(PurchaseOrderLine $line, string $receivedQuantity): void

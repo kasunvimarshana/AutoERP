@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -56,7 +57,7 @@ final class PurchaseInvoiceDtoFactory
         $resolvedSupplierId = $data->supplierId;
         $seenSources = [];
 
-        foreach ($data->sources as $source) {
+        foreach ($data->sources as $index => $source) {
             if (! $source instanceof PurchaseInvoiceSourceData) {
                 throw new InvalidArgumentException('Purchase supplier invoice sources are invalid.');
             }
@@ -81,6 +82,7 @@ final class PurchaseInvoiceDtoFactory
                     $lockSources,
                     $resolvedSupplierType,
                     $resolvedSupplierId,
+                    "sources.{$index}.source_id",
                 );
 
                 continue;
@@ -106,6 +108,7 @@ final class PurchaseInvoiceDtoFactory
                 $lockSources,
                 $resolvedSupplierType,
                 $resolvedSupplierId,
+                "sources.{$index}.source_id",
             );
         }
 
@@ -152,15 +155,22 @@ final class PurchaseInvoiceDtoFactory
         bool $lockSources,
         ?string &$resolvedSupplierType,
         ?int &$resolvedSupplierId,
+        string $field,
     ): int {
         $grn = GoodsReceiptNote::query()
             ->with(['lines', 'adjustments'])
             ->when($lockSources, fn ($query) => $query->lockForUpdate())
-            ->findOrFail($source->sourceId);
+            ->find($source->sourceId);
+        if (! $grn instanceof GoodsReceiptNote) {
+            $this->invalidReference($field, 'goods receipt');
+        }
+
         $this->assertSourceScope(
-            (int) $grn->tenant_id,
-            $grn->organization_unit_id,
+            $grn->tenant_id !== null ? (int) $grn->tenant_id : null,
+            $grn->organization_unit_id !== null ? (int) $grn->organization_unit_id : null,
             $data,
+            $field,
+            'goods receipt',
         );
         if ($grn->status !== GoodsReceiptNoteStatus::Posted) {
             throw new InvalidArgumentException('Purchase invoices can only use posted goods receipts.');
@@ -170,6 +180,7 @@ final class PurchaseInvoiceDtoFactory
             $resolvedSupplierId,
             $grn->supplier_type,
             $grn->supplier_id,
+            $data->supplierId !== null ? 'supplier_id' : $field,
         );
 
         $goodsReceipts->push($grn);
@@ -347,15 +358,22 @@ final class PurchaseInvoiceDtoFactory
         bool $lockSources,
         ?string &$resolvedSupplierType,
         ?int &$resolvedSupplierId,
+        string $field,
     ): int {
         $order = PurchaseOrder::query()
             ->with(['lines', 'adjustments'])
             ->when($lockSources, fn ($query) => $query->lockForUpdate())
-            ->findOrFail($source->sourceId);
+            ->find($source->sourceId);
+        if (! $order instanceof PurchaseOrder) {
+            $this->invalidReference($field, 'purchase order');
+        }
+
         $this->assertSourceScope(
-            (int) $order->tenant_id,
-            $order->organization_unit_id,
+            $order->tenant_id !== null ? (int) $order->tenant_id : null,
+            $order->organization_unit_id !== null ? (int) $order->organization_unit_id : null,
             $data,
+            $field,
+            'purchase order',
         );
         if ($order->status !== PurchaseOrderStatus::Approved) {
             throw new InvalidArgumentException('Purchase invoices can only use approved purchase orders.');
@@ -365,6 +383,7 @@ final class PurchaseInvoiceDtoFactory
             $resolvedSupplierId,
             $order->supplier_type,
             $order->supplier_id,
+            $data->supplierId !== null ? 'supplier_id' : $field,
         );
 
         $selectedTotal = '0.000000';
@@ -479,19 +498,26 @@ final class PurchaseInvoiceDtoFactory
     }
 
     private function assertSourceScope(
-        int $sourceTenantId,
+        ?int $sourceTenantId,
         ?int $sourceOrganizationUnitId,
         CreatePurchaseInvoiceData $data,
+        string $field,
+        string $label,
     ): void {
         if ($sourceTenantId !== $data->tenantId) {
-            throw new InvalidArgumentException('Purchase invoice source belongs to a different tenant.');
+            $this->invalidReference($field, $label);
         }
 
         if ($sourceOrganizationUnitId !== $data->organizationUnitId) {
-            throw new InvalidArgumentException(
-                'Purchase invoice source belongs to a different organization unit.',
-            );
+            $this->invalidReference($field, $label, "The selected {$label} is not available for this organization unit.");
         }
+    }
+
+    private function invalidReference(string $field, string $label, ?string $message = null): never
+    {
+        throw ValidationException::withMessages([
+            $field => [$message ?? "The selected {$label} is not available."],
+        ]);
     }
 
     private function appendAdjustments(
@@ -587,6 +613,7 @@ final class PurchaseInvoiceDtoFactory
         ?int $selectedId,
         mixed $sourceType,
         mixed $sourceId,
+        string $field,
     ): array {
         $resolvedType = trim((string) $sourceType);
         $resolvedId = is_numeric($sourceId) ? (int) $sourceId : null;
@@ -598,9 +625,7 @@ final class PurchaseInvoiceDtoFactory
         if (($selectedType !== null && $selectedType !== $resolvedType)
             || ($selectedId !== null && $selectedId !== $resolvedId)
         ) {
-            throw new InvalidArgumentException(
-                'All purchase invoice sources must belong to the selected supplier.',
-            );
+            $this->invalidReference($field, 'supplier', 'All purchase invoice sources must belong to the selected supplier.');
         }
 
         return [$resolvedType, $resolvedId];

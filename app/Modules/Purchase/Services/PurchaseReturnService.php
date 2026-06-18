@@ -33,20 +33,33 @@ final class PurchaseReturnService
 
     public function create(CreatePurchaseReturnData $data): PurchaseReturn
     {
-        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
         if ($data->warehouseLocationId !== null) {
-            $this->validator->warehouseLocation($data->tenantId, $data->organizationUnitId, $data->warehouseId, $data->warehouseLocationId);
+            $this->validator->warehouseLocation(
+                $data->tenantId,
+                $data->organizationUnitId,
+                $data->warehouseId,
+                $data->warehouseLocationId,
+                'warehouse_location_id',
+            );
         }
 
         if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
             $this->validateManualSupplierReturn($data);
         } else {
-            foreach ($data->lines as $line) {
+            foreach ($data->lines as $index => $line) {
                 if ($line->sourceLineType !== 'goods_receipt_note_line') {
                     throw new \InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
                 }
                 $sourceLine = GoodsReceiptNoteLine::query()->findOrFail($line->sourceLineId);
-                $this->validator->assertTenantOrg((int) $sourceLine->tenant_id, $sourceLine->organization_unit_id, $data->tenantId, $data->organizationUnitId);
+                $this->validator->assertTenantOrg(
+                    $sourceLine->tenant_id !== null ? (int) $sourceLine->tenant_id : null,
+                    $sourceLine->organization_unit_id !== null ? (int) $sourceLine->organization_unit_id : null,
+                    $data->tenantId,
+                    $data->organizationUnitId,
+                    "lines.{$index}.source_line_id",
+                    'goods receipt line',
+                );
                 $this->validator->assertReturnWithinReceipt($sourceLine, $line->returnedQuantity);
             }
         }
@@ -269,17 +282,17 @@ final class PurchaseReturnService
             throw new \InvalidArgumentException('Unreferenced supplier return requires explicit cost basis.');
         }
 
-        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId);
+        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
         $this->validator->assertNonNegative($data->costBasis, 'Unreferenced supplier return cost basis cannot be negative.');
 
-        foreach ($data->lines as $line) {
+        foreach ($data->lines as $index => $line) {
             if ($line->itemId === null || $line->uomId === null || $line->costBasis === null) {
                 throw new \InvalidArgumentException('Unreferenced supplier return lines require item, UOM, and cost basis.');
             }
             $this->validator->assertPositiveQuantity($line->returnedQuantity);
             $this->validator->assertNonNegative($line->costBasis, 'Unreferenced supplier return line cost basis cannot be negative.');
-            $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
-            $this->validator->uom($data->tenantId, $data->organizationUnitId, $line->uomId);
+            $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId, "lines.{$index}.item_id");
+            $this->validator->uom($data->tenantId, $data->organizationUnitId, $line->uomId, "lines.{$index}.uom_id");
         }
     }
 

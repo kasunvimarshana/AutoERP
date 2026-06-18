@@ -181,9 +181,9 @@ final class FastPurchaseService
                 throw new InvalidArgumentException('Warehouse is required when receiving stock.');
             }
 
-            $this->warehouse($tenantId, $organizationUnitId, $warehouseId, $lockRecords);
+            $this->warehouse($tenantId, $organizationUnitId, $warehouseId, $lockRecords, 'warehouse_id');
             if ($warehouseLocationId !== null) {
-                $this->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId, $lockRecords);
+                $this->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId, $lockRecords, 'warehouse_location_id');
             }
         }
 
@@ -542,10 +542,10 @@ final class FastPurchaseService
                 throw new InvalidArgumentException('Fast purchase lines are invalid.');
             }
 
-            $item = $this->item($tenantId, $organizationUnitId, (int) $line['item_id'], $lockRecords);
+            $item = $this->item($tenantId, $organizationUnitId, (int) $line['item_id'], $lockRecords, "lines.{$index}.item_id");
             $quantity = $this->math->normalize((string) $line['quantity']);
             $uomId = $this->resolveUomId($tenantId, $organizationUnitId, (int) $supplier->getKey(), $item, $line);
-            $uom = $this->validator->uom($tenantId, $organizationUnitId, $uomId);
+            $uom = $this->validator->uom($tenantId, $organizationUnitId, $uomId, "lines.{$index}.uom_id");
             $uomBasis = $this->uoms->resolveLineUom($tenantId, $item, $uomId, $quantity);
             $unitCost = array_key_exists('unit_cost', $line) && $line['unit_cost'] !== null
                 ? $this->math->normalize((string) $line['unit_cost'])
@@ -556,7 +556,7 @@ final class FastPurchaseService
             $discount = $this->math->normalize((string) ($line['discount_amount'] ?? '0.000000'));
             $taxGroupId = $this->nullableInt($line['tax_group_id'] ?? null);
             if ($taxGroupId !== null) {
-                $this->taxGroup($tenantId, $organizationUnitId, $taxGroupId, $lockRecords);
+                $this->taxGroup($tenantId, $organizationUnitId, $taxGroupId, $lockRecords, "lines.{$index}.tax_group_id");
             }
 
             $lineSubtotal = $this->math->mul($quantity, $unitCost);
@@ -673,7 +673,8 @@ final class FastPurchaseService
         }
 
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
-        $linePayloads = is_array($payment['lines'] ?? null) && $payment['lines'] !== []
+        $usesPaymentLines = is_array($payment['lines'] ?? null) && $payment['lines'] !== [];
+        $linePayloads = $usesPaymentLines
             ? $payment['lines']
             : [[
                 'amount' => $payment['amount'] ?? null,
@@ -691,10 +692,12 @@ final class FastPurchaseService
         $amount = '0.000000';
         $headerBankAccountId = null;
 
-        foreach ($linePayloads as $line) {
+        foreach (array_values($linePayloads) as $index => $line) {
             if (! is_array($line) || ($line['amount'] ?? null) === null) {
                 throw new InvalidArgumentException('Payment amount is required when recording payment.');
             }
+
+            $fieldPrefix = $usesPaymentLines ? "payment.lines.{$index}" : 'payment';
 
             $lineAmount = $this->math->normalize((string) $line['amount']);
             $accountId = $this->nullableInt($line['source_account_id'] ?? null);
@@ -702,10 +705,10 @@ final class FastPurchaseService
                 throw new InvalidArgumentException('Payment source account is required.');
             }
 
-            $account = $this->paymentAccount($tenantId, $organizationUnitId, $accountId, $lockRecords);
+            $account = $this->paymentAccount($tenantId, $organizationUnitId, $accountId, $lockRecords, "{$fieldPrefix}.source_account_id");
             $methodId = $this->nullableInt($line['payment_method_id'] ?? null);
             if ($methodId !== null) {
-                $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords);
+                $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords, "{$fieldPrefix}.payment_method_id");
             }
 
             if ((bool) $account->is_bank_account && $headerBankAccountId === null) {
@@ -889,30 +892,42 @@ final class FastPurchaseService
 
     private function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId, bool $lockRecords): Supplier
     {
-        $supplier = Supplier::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($supplierId);
+        $supplier = Supplier::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($supplierId);
+        if (! $supplier instanceof Supplier) {
+            $this->validator->invalidReference('supplier_id', 'supplier');
+        }
 
-        return $this->validator->supplier($tenantId, $organizationUnitId, (int) $supplier->getKey());
+        return $this->validator->supplier($tenantId, $organizationUnitId, (int) $supplier->getKey(), 'supplier_id');
     }
 
-    private function item(int $tenantId, ?int $organizationUnitId, int $itemId, bool $lockRecords): Item
+    private function item(int $tenantId, ?int $organizationUnitId, int $itemId, bool $lockRecords, string $field): Item
     {
-        $item = Item::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($itemId);
+        $item = Item::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($itemId);
+        if (! $item instanceof Item) {
+            $this->validator->invalidReference($field, 'item');
+        }
 
-        return $this->validator->item($tenantId, $organizationUnitId, (int) $item->getKey());
+        return $this->validator->item($tenantId, $organizationUnitId, (int) $item->getKey(), $field);
     }
 
-    private function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId, bool $lockRecords): WarehouseModel
+    private function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId, bool $lockRecords, string $field): WarehouseModel
     {
-        $warehouse = WarehouseModel::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($warehouseId);
+        $warehouse = WarehouseModel::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($warehouseId);
+        if (! $warehouse instanceof WarehouseModel) {
+            $this->validator->invalidReference($field, 'warehouse');
+        }
 
-        return $this->validator->warehouse($tenantId, $organizationUnitId, (int) $warehouse->getKey());
+        return $this->validator->warehouse($tenantId, $organizationUnitId, (int) $warehouse->getKey(), $field);
     }
 
-    private function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId, bool $lockRecords): WarehouseLocationModel
+    private function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId, bool $lockRecords, string $field): WarehouseLocationModel
     {
-        $location = WarehouseLocationModel::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($locationId);
+        $location = WarehouseLocationModel::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($locationId);
+        if (! $location instanceof WarehouseLocationModel) {
+            $this->validator->invalidReference($field, 'warehouse location');
+        }
 
-        return $this->validator->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, (int) $location->getKey());
+        return $this->validator->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, (int) $location->getKey(), $field);
     }
 
     private function currencyId(array $payload, Supplier $supplier, int $tenantId, ?int $organizationUnitId, bool $lockRecords): ?int
@@ -922,50 +937,68 @@ final class FastPurchaseService
             return null;
         }
 
-        CurrencyModel::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($currencyId);
-        $this->validator->currency($tenantId, $organizationUnitId, (int) $currencyId);
+        $this->validator->currency($tenantId, $organizationUnitId, (int) $currencyId, 'currency_id');
 
         return (int) $currencyId;
     }
 
-    private function taxGroup(int $tenantId, ?int $organizationUnitId, int $taxGroupId, bool $lockRecords): TaxGroup
+    private function taxGroup(int $tenantId, ?int $organizationUnitId, int $taxGroupId, bool $lockRecords, string $field): TaxGroup
     {
-        $group = TaxGroup::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($taxGroupId);
-        $this->validator->assertTenantOrg((int) $group->tenant_id, $group->organization_unit_id, $tenantId, $organizationUnitId);
+        $group = TaxGroup::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($taxGroupId);
+        if (! $group instanceof TaxGroup) {
+            $this->validator->invalidReference($field, 'tax group');
+        }
+
+        $this->validator->assertTenantOrg(
+            $group->tenant_id !== null ? (int) $group->tenant_id : null,
+            $group->organization_unit_id !== null ? (int) $group->organization_unit_id : null,
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'tax group',
+        );
         if (! (bool) $group->active) {
-            throw new InvalidArgumentException('Tax group must be active.');
+            $this->validator->invalidReference($field, 'tax group', 'The selected tax group is not active.');
         }
 
         return $group;
     }
 
-    private function paymentMethod(int $tenantId, ?int $organizationUnitId, int $methodId, bool $lockRecords): PaymentMethod
+    private function paymentMethod(int $tenantId, ?int $organizationUnitId, int $methodId, bool $lockRecords, string $field): PaymentMethod
     {
-        $method = PaymentMethod::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($methodId);
-        if ($method->tenant_id !== null && (int) $method->tenant_id !== $tenantId) {
-            throw new InvalidArgumentException('Payment method belongs to a different tenant.');
+        $method = PaymentMethod::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($methodId);
+        if (! $method instanceof PaymentMethod) {
+            $this->validator->invalidReference($field, 'payment method');
         }
-        if ($method->organization_unit_id !== null && $organizationUnitId !== null && (int) $method->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Payment method belongs to a different organization unit.');
+
+        if ($method->tenant_id !== null && (int) $method->tenant_id !== $tenantId) {
+            $this->validator->invalidReference($field, 'payment method');
+        }
+        if ($method->organization_unit_id !== null && (int) $method->organization_unit_id !== $organizationUnitId) {
+            $this->validator->invalidReference($field, 'payment method', 'The selected payment method is not available for this organization unit.');
         }
         if (! (bool) $method->is_active) {
-            throw new InvalidArgumentException('Payment method is inactive.');
+            $this->validator->invalidReference($field, 'payment method', 'The selected payment method is not active.');
         }
 
         return $method;
     }
 
-    private function paymentAccount(int $tenantId, ?int $organizationUnitId, int $accountId, bool $lockRecords): FinanceAccount
+    private function paymentAccount(int $tenantId, ?int $organizationUnitId, int $accountId, bool $lockRecords, string $field): FinanceAccount
     {
-        $account = FinanceAccount::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->findOrFail($accountId);
+        $account = FinanceAccount::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($accountId);
+        if (! $account instanceof FinanceAccount) {
+            $this->validator->invalidReference($field, 'payment source account');
+        }
+
         if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Payment source account belongs to a different scope.');
+            $this->validator->invalidReference($field, 'payment source account');
         }
         if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            throw new InvalidArgumentException('Payment source account must be active and postable.');
+            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be active and postable.');
         }
         if (! (bool) $account->is_cash_account && ! (bool) $account->is_bank_account) {
-            throw new InvalidArgumentException('Payment source account must be a cash or bank account.');
+            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be a cash or bank account.');
         }
 
         return $account;
@@ -1300,12 +1333,6 @@ final class FastPurchaseService
     {
         return CurrencyModel::query()
             ->where('is_active', true)
-            ->where(function ($query) use ($tenantId): void {
-                $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
-            })
-            ->when($organizationUnitId !== null, fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
             ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
                 $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
             }))
@@ -1329,7 +1356,7 @@ final class FastPurchaseService
             ->where(function ($query) use ($tenantId): void {
                 $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
             })
-            ->when($organizationUnitId !== null, fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
+            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
                 $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
             }))
             ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {

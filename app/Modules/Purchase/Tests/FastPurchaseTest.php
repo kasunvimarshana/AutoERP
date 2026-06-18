@@ -7,6 +7,7 @@ namespace Modules\Purchase\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Audit\Models\AuditLogModel;
 use Modules\Finance\Contracts\FinancePostingInterface;
@@ -272,10 +273,26 @@ final class FastPurchaseTest extends TestCase
         $otherSupplierId = $this->supplier($otherTenantId, 'SUP-OTHER');
 
         $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Fast purchase totals, statuses, quantities, and finance accounts are server controlled.');
         app(FastPurchaseService::class)->preview($this->payload($context, [
-            'supplier_id' => $otherSupplierId,
             'grand_total' => '1.000000',
         ]));
+    }
+
+    public function test_cross_tenant_fast_purchase_reference_returns_field_error(): void
+    {
+        $context = $this->context();
+        $otherTenantId = $this->tenant('OTHER');
+        $otherSupplierId = $this->supplier($otherTenantId, 'SUP-OTHER');
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, [
+                'supplier_id' => $otherSupplierId,
+            ]));
+            $this->fail('Expected supplier validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('The selected supplier is not available.', $exception->errors()['supplier_id'][0] ?? null);
+        }
     }
 
     /**

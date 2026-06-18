@@ -189,20 +189,218 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.returned_quantity', '0.250000');
     }
 
-    public function test_tenant_isolation_is_enforced_for_references(): void
+    public function test_active_global_currency_can_be_used_without_frontend_tenant_override(): void
+    {
+        $context = $this->context();
+        $currencyId = $this->createCurrency('CUR-'.Str::upper(Str::random(5)));
+        $payload = $this->payload($context, [
+            'purchase_order_date' => '2026-06-18',
+            'expected_delivery_date' => '2026-06-19',
+            'currency_id' => $currencyId,
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'ordered_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ]);
+        unset($payload['tenant_id']);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/orders', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.currency_id', $currencyId)
+            ->assertJsonPath('data.grand_total', '10.000000');
+    }
+
+    public function test_currency_reference_errors_are_field_specific(): void
+    {
+        $context = $this->context();
+        $inactiveCurrencyId = $this->createCurrency('INACT-'.Str::upper(Str::random(4)), active: false);
+
+        $inactive = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'currency_id' => $inactiveCurrencyId,
+        ]));
+        $inactive->assertUnprocessable()->assertJsonValidationErrors(['currency_id']);
+        $this->assertSame('The selected currency is not active.', $inactive->json('errors.currency_id.0'));
+        $this->assertNotSame('Purchase reference belongs to a different tenant.', $inactive->json('error.message'));
+
+        $unknown = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'currency_id' => 999999,
+        ]));
+        $unknown->assertUnprocessable()->assertJsonValidationErrors(['currency_id']);
+        $this->assertSame('The selected currency is not available.', $unknown->json('errors.currency_id.0'));
+        $this->assertNotSame('Purchase reference belongs to a different tenant.', $unknown->json('error.message'));
+    }
+
+    public function test_tenant_isolation_is_enforced_for_purchase_references(): void
     {
         $context = $this->context();
         $other = $this->context('OTHER');
 
-        $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+        $supplier = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'supplier_id' => $other['supplier_id'],
+        ]));
+        $supplier->assertUnprocessable()->assertJsonValidationErrors(['supplier_id']);
+        $this->assertSame('The selected supplier is not available.', $supplier->json('errors.supplier_id.0'));
+
+        $item = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
             'lines' => [[
                 'item_id' => $other['item_id'],
                 'uom_id' => $context['uom_id'],
                 'ordered_quantity' => '1.000000',
                 'unit_price' => '10.000000',
             ]],
-        ]))->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Purchase reference belongs to a different tenant.');
+        ]));
+        $item->assertUnprocessable()->assertJsonValidationErrors(['lines.0.item_id']);
+        $this->assertSame('The selected item is not available.', $item->json('errors')['lines.0.item_id'][0] ?? null);
+
+        $uom = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $other['uom_id'],
+                'ordered_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ]));
+        $uom->assertUnprocessable()->assertJsonValidationErrors(['lines.0.uom_id']);
+        $this->assertSame('The selected UOM is not available.', $uom->json('errors')['lines.0.uom_id'][0] ?? null);
+
+        $warehouse = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'warehouse_id' => $other['warehouse_id'],
+        ]));
+        $warehouse->assertUnprocessable()->assertJsonValidationErrors(['warehouse_id']);
+        $this->assertSame('The selected warehouse is not available.', $warehouse->json('errors.warehouse_id.0'));
+    }
+
+    public function test_item_variant_must_match_selected_item_and_scope(): void
+    {
+        $context = $this->context();
+        $other = $this->context('VAROTHER');
+        $secondItemId = $this->createItem(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'ITM-VAR-'.Str::upper(Str::random(4)),
+            $context['uom_id'],
+        );
+        $otherItemVariantId = $this->createItemVariant(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            $secondItemId,
+            'VAR-'.Str::upper(Str::random(4)),
+        );
+        $crossTenantVariantId = $this->createItemVariant(
+            $other['tenant_id'],
+            $other['organization_unit_id'],
+            $other['item_id'],
+            'VAR-'.Str::upper(Str::random(4)),
+        );
+
+        $wrongItem = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'item_variant_id' => $otherItemVariantId,
+                'uom_id' => $context['uom_id'],
+                'ordered_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ]));
+        $wrongItem->assertUnprocessable()->assertJsonValidationErrors(['lines.0.item_variant_id']);
+        $this->assertSame(
+            'The selected item variant does not belong to the selected item.',
+            $wrongItem->json('errors')['lines.0.item_variant_id'][0] ?? null,
+        );
+
+        $crossTenant = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'item_variant_id' => $crossTenantVariantId,
+                'uom_id' => $context['uom_id'],
+                'ordered_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ]));
+        $crossTenant->assertUnprocessable()->assertJsonValidationErrors(['lines.0.item_variant_id']);
+        $this->assertSame('The selected item variant is not available.', $crossTenant->json('errors')['lines.0.item_variant_id'][0] ?? null);
+    }
+
+    public function test_organization_scoped_records_and_tenant_level_records_are_handled_consistently(): void
+    {
+        $context = $this->context();
+        $otherOrganizationUnitId = $this->createOrganizationUnit($context['tenant_id'], 'ORG-B-'.Str::upper(Str::random(4)));
+        $tenantLevelUomId = $this->createUom($context['tenant_id'], null, 'TEN-UOM-'.Str::upper(Str::random(4)));
+        $tenantLevelItemId = $this->createItem(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'TEN-ITM-'.Str::upper(Str::random(4)),
+            $tenantLevelUomId,
+        );
+        $sameOrgLocationId = $this->createWarehouseLocation(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            $context['warehouse_id'],
+            'LOC-A-'.Str::upper(Str::random(4)),
+        );
+        $otherOrgWarehouseId = $this->createWarehouse(
+            $context['tenant_id'],
+            $otherOrganizationUnitId,
+            'WH-ORG-B-'.Str::upper(Str::random(4)),
+        );
+        $otherOrgLocationId = $this->createWarehouseLocation(
+            $context['tenant_id'],
+            $otherOrganizationUnitId,
+            $context['warehouse_id'],
+            'LOC-B-'.Str::upper(Str::random(4)),
+        );
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'warehouse_location_id' => $sameOrgLocationId,
+            'lines' => [[
+                'item_id' => $tenantLevelItemId,
+                'uom_id' => $tenantLevelUomId,
+                'ordered_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ]))->assertCreated();
+
+        $warehouse = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'warehouse_id' => $otherOrgWarehouseId,
+        ]));
+        $warehouse->assertUnprocessable()->assertJsonValidationErrors(['warehouse_id']);
+        $this->assertSame(
+            'The selected warehouse is not available for this organization unit.',
+            $warehouse->json('errors.warehouse_id.0'),
+        );
+
+        $location = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'warehouse_location_id' => $otherOrgLocationId,
+        ]));
+        $location->assertUnprocessable()->assertJsonValidationErrors(['warehouse_location_id']);
+        $this->assertSame(
+            'The selected warehouse location is not available for this organization unit.',
+            $location->json('errors.warehouse_location_id.0'),
+        );
+    }
+
+    public function test_purchase_lookups_do_not_return_cross_tenant_data_and_keep_global_currencies_available(): void
+    {
+        $context = $this->context();
+        $other = $this->context('LOOKUPOTHER');
+        $activeCurrencyCode = 'LOOK-'.Str::upper(Str::random(4));
+        $inactiveCurrencyCode = 'NOLOOK-'.Str::upper(Str::random(4));
+        $this->createCurrency($activeCurrencyCode);
+        $this->createCurrency($inactiveCurrencyCode, active: false);
+
+        $fastPurchaseContext = $this->withAuth($context)->getJson('/api/v1/purchase/fast-purchases/context');
+        $fastPurchaseContext->assertOk();
+        $currencyCodes = collect($fastPurchaseContext->json('data.currencies'))->pluck('code');
+        $warehouseCodes = collect($fastPurchaseContext->json('data.warehouses'))->pluck('code');
+        $this->assertTrue($currencyCodes->contains($activeCurrencyCode));
+        $this->assertFalse($currencyCodes->contains($inactiveCurrencyCode));
+        $this->assertFalse($warehouseCodes->contains($other['warehouse_code']));
+
+        $supplierLookup = $this->withAuth($context)->getJson('/api/v1/suppliers/lookup/active?search='.$other['supplier_code']);
+        $supplierLookup->assertOk();
+        $this->assertFalse(collect($supplierLookup->json('data'))->pluck('code')->contains($other['supplier_code']));
     }
 
     public function test_exact_purchase_order_permissions_are_enforced(): void
@@ -267,7 +465,21 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createUom(int $tenantId, int $organizationUnitId, string $code): int
+    private function createCurrency(string $code, bool $active = true): int
+    {
+        return (int) DB::table('currencies')->insertGetId([
+            'row_version' => 1,
+            'code' => $code,
+            'name' => 'Currency '.$code,
+            'symbol' => substr($code, 0, 1),
+            'decimal_places' => 2,
+            'is_active' => $active,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createUom(int $tenantId, ?int $organizationUnitId, string $code): int
     {
         return (int) DB::table('unit_of_measures')->insertGetId([
             'tenant_id' => $tenantId,
@@ -287,7 +499,7 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createSupplier(int $tenantId, int $organizationUnitId, string $code): int
+    private function createSupplier(int $tenantId, ?int $organizationUnitId, string $code): int
     {
         return (int) DB::table('suppliers')->insertGetId([
             'tenant_id' => $tenantId,
@@ -305,7 +517,7 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createWarehouse(int $tenantId, int $organizationUnitId, string $code): int
+    private function createWarehouse(int $tenantId, ?int $organizationUnitId, string $code): int
     {
         return (int) DB::table('warehouses')->insertGetId([
             'tenant_id' => $tenantId,
@@ -321,7 +533,25 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createItem(int $tenantId, int $organizationUnitId, string $code, int $uomId): int
+    private function createWarehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, string $code, bool $active = true): int
+    {
+        return (int) DB::table('warehouse_locations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'row_version' => 1,
+            'warehouse_id' => $warehouseId,
+            'name' => 'Location '.$code,
+            'code' => $code,
+            'type' => 'bin',
+            'is_active' => $active,
+            'is_pickable' => true,
+            'is_receivable' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createItem(int $tenantId, ?int $organizationUnitId, string $code, int $uomId): int
     {
         return (int) DB::table('items')->insertGetId([
             'tenant_id' => $tenantId,
@@ -335,6 +565,20 @@ final class PurchaseOrderApiTest extends TestCase
             'is_stockable' => true,
             'is_combo' => false,
             'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createItemVariant(int $tenantId, ?int $organizationUnitId, int $itemId, string $code, bool $active = true): int
+    {
+        return (int) DB::table('item_variants')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'item_id' => $itemId,
+            'code' => $code,
+            'name' => 'Variant '.$code,
+            'is_active' => $active,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

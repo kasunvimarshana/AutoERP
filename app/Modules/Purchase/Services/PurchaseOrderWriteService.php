@@ -135,8 +135,8 @@ final class PurchaseOrderWriteService
             throw new InvalidArgumentException('Purchase order requires at least one line.');
         }
 
-        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId);
-        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId);
+        $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
+        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
 
         if ($data->warehouseLocationId !== null) {
             $this->validator->warehouseLocation(
@@ -144,16 +144,17 @@ final class PurchaseOrderWriteService
                 $data->organizationUnitId,
                 $data->warehouseId,
                 $data->warehouseLocationId,
+                'warehouse_location_id',
             );
         }
 
         if ($data->currencyId !== null) {
-            $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId);
+            $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId, 'currency_id');
         }
 
         $seenLines = [];
-        foreach ($data->lines as $line) {
-            $this->validateLine($data, $line);
+        foreach ($data->lines as $index => $line) {
+            $this->validateLine($data, $line, $index);
 
             $uomId = $line->orderedUomId ?? $line->uomId;
             $key = implode(':', [$line->itemId, $line->itemVariantId ?? 0, $uomId]);
@@ -176,7 +177,7 @@ final class PurchaseOrderWriteService
         }
     }
 
-    private function validateLine(CreatePurchaseOrderData $data, object $line): void
+    private function validateLine(CreatePurchaseOrderData $data, object $line, int $index): void
     {
         $this->validator->assertPositiveQuantity($line->orderedQuantity);
         $this->validator->assertNonNegative($line->unitPrice, 'Purchase unit price cannot be negative.');
@@ -184,13 +185,21 @@ final class PurchaseOrderWriteService
         $this->validator->assertNonNegative($line->taxAmount, 'Purchase line tax cannot be negative.');
         $this->validator->assertNonNegative($line->chargeAmount, 'Purchase line charge cannot be negative.');
 
-        $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId);
+        $item = $this->validator->item(
+            $data->tenantId,
+            $data->organizationUnitId,
+            $line->itemId,
+            "lines.{$index}.item_id",
+        );
         $uomId = $line->orderedUomId ?? $line->uomId;
         if ($uomId === null) {
             throw new InvalidArgumentException('Purchase line UOM is required.');
         }
 
-        $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId);
+        $uomField = $line->orderedUomId !== null
+            ? "lines.{$index}.ordered_uom_id"
+            : "lines.{$index}.uom_id";
+        $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId, $uomField);
         $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->orderedQuantity);
 
         if ($line->itemVariantId !== null) {
@@ -199,6 +208,7 @@ final class PurchaseOrderWriteService
                 $data->organizationUnitId,
                 $line->itemId,
                 $line->itemVariantId,
+                "lines.{$index}.item_variant_id",
             );
         }
 
