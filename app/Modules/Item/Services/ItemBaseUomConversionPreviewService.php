@@ -84,6 +84,16 @@ final class ItemBaseUomConversionPreviewService
                     'after' => $this->math->div((string) $layer->unit_cost, $factor),
                 ];
             }
+
+            if ($item->standard_price !== null) {
+                $rows[] = [
+                    'area' => 'item_master',
+                    'reference' => 'Standard Price',
+                    'metric' => 'standard_price',
+                    'before' => $this->math->normalize((string) $item->standard_price),
+                    'after' => $this->math->div((string) $item->standard_price, $factor),
+                ];
+            }
         }
 
         return [

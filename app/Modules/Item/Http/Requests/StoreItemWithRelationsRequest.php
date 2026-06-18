@@ -44,6 +44,7 @@ final class StoreItemWithRelationsRequest extends TenantScopedRequest
             'item.is_tax_exempt' => ['nullable', 'boolean'],
             'item.is_active' => ['nullable', 'boolean'],
             'item.metadata' => ['nullable', 'array'],
+            'item.standard_price' => ['nullable', 'decimal:0,6', 'gte:0'],
             'units' => ['nullable', 'array'],
             'units.*.uom_id' => ['required', 'integer', 'min:1'],
             'units.*.unit_role' => ['required', Rule::enum(ItemUnitRole::class)],

@@ -66,7 +66,7 @@ final class ItemQueryService
      */
     private function summaryRelations(): array
     {
-        return ['category', 'brand', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
+        return ['category', 'brand', 'tenant.currency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
     }
 
     private function applyCriteria(Builder $query, array $criteria): void

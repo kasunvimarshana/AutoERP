@@ -113,7 +113,7 @@ function BundleDraft({ value, onChange }: DraftProps) {
 }
 
 function PriceDraft({ value, onChange }: DraftProps) {
-    const [priceType, setPriceType] = useState('standard');
+    const [priceType, setPriceType] = useState('sales');
     const [amount, setAmount] = useState('0.000000');
     const [uom, setUom] = useState<NamedResource | null>(null);
     return <DraftSection title="Initial prices" rows={value.prices.map((row) => `${row.price_type} / ${row.amount}${row.uom ? ` / ${row.uom.code}` : ''}`)} remove={(index) => onChange({ ...value, prices: value.prices.filter((_, rowIndex) => rowIndex !== index) })}>

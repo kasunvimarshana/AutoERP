@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('tracking_type', 30)->default('none');
             $table->string('costing_method', 30)->default('none');
             $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
+            $table->decimal('standard_price', 20, 6)->nullable();
             $table->foreignId('default_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->foreignId('purchase_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->foreignId('sales_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();

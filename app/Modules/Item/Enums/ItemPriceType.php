@@ -10,6 +10,4 @@ enum ItemPriceType: string
     case Sales = 'sales';
     case Service = 'service';
     case Rental = 'rental';
-    case Cost = 'cost';
-    case Standard = 'standard';
 }

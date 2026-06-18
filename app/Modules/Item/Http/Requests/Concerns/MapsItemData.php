@@ -36,6 +36,7 @@ trait MapsItemData
             trackingType: TrackingType::from((string) ($item['tracking_type'] ?? TrackingType::None->value)),
             costingMethod: CostingMethod::from((string) ($item['costing_method'] ?? CostingMethod::None->value)),
             baseUomId: $this->nullableInt($item, 'base_uom_id'),
+            standardPrice: $this->nullableString($item, 'standard_price'),
             defaultTaxGroupId: $this->nullableInt($item, 'default_tax_group_id'),
             purchaseTaxGroupId: $this->nullableInt($item, 'purchase_tax_group_id'),
             salesTaxGroupId: $this->nullableInt($item, 'sales_tax_group_id'),

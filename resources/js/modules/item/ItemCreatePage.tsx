@@ -36,6 +36,7 @@ const initialItem: ItemPayload = {
     sku: null,
     barcode: null,
     description: null,
+    standard_price: null,
     is_stockable: true,
     is_combo: false,
     is_tax_exempt: false,

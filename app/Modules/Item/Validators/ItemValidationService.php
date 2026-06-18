@@ -70,6 +70,7 @@ final class ItemValidationService
         $this->assertCategoryIsUsable($data->tenantId, $data->organizationUnitId, $data->itemCategoryId);
         $this->assertBrandIsUsable($data->tenantId, $data->organizationUnitId, $data->itemBrandId);
         $this->assertUomIsUsable($data->tenantId, $data->organizationUnitId, $data->baseUomId);
+        $this->assertStandardPriceIsValid($data->standardPrice, $data->baseUomId);
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->defaultTaxGroupId);
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->purchaseTaxGroupId);
         $this->assertTaxGroupIsUsable($data->tenantId, $data->organizationUnitId, $data->salesTaxGroupId);
@@ -86,6 +87,18 @@ final class ItemValidationService
             && $this->baseUomUsageAudit->audit($item)['has_usage']) {
             throw new InvalidArgumentException('Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.');
         }
+        if (in_array('base_uom_id', $data->provided, true)
+            && (int) ($data->baseUomId ?? 0) !== (int) ($item->base_uom_id ?? 0)) {
+            $resolvedStandardPrice = in_array('standard_price', $data->provided, true)
+                ? $data->standardPrice
+                : ($item->standard_price === null ? null : (string) $item->standard_price);
+            if ($resolvedStandardPrice !== null) {
+                throw ValidationException::withMessages([
+                    'base_uom_id' => ['Base UOM cannot be edited directly while Standard Price is configured. Clear Standard Price first or use the Base UOM Conversion Wizard.'],
+                    'standard_price' => ['Standard Price is stored per Base UOM and must be explicitly handled during Base UOM conversion.'],
+                ]);
+            }
+        }
 
         if ($data->code !== null) {
             $this->assertText($data->code, 'Item code is required.');
@@ -101,6 +114,12 @@ final class ItemValidationService
         $this->assertCategoryIsUsable($tenantId, $organizationUnitId, $data->itemCategoryId);
         $this->assertBrandIsUsable($tenantId, $organizationUnitId, $data->itemBrandId);
         $this->assertUomIsUsable($tenantId, $organizationUnitId, $data->baseUomId);
+        if (in_array('standard_price', $data->provided, true)) {
+            $resolvedBaseUomId = in_array('base_uom_id', $data->provided, true)
+                ? $data->baseUomId
+                : $item->base_uom_id;
+            $this->assertStandardPriceIsValid($data->standardPrice, $resolvedBaseUomId === null ? null : (int) $resolvedBaseUomId);
+        }
         $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->defaultTaxGroupId);
         $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->purchaseTaxGroupId);
         $this->assertTaxGroupIsUsable($tenantId, $organizationUnitId, $data->salesTaxGroupId);
@@ -541,6 +560,21 @@ final class ItemValidationService
     {
         if ($this->math->isNegative($value)) {
             throw new InvalidArgumentException($message);
+        }
+    }
+
+    private function assertStandardPriceIsValid(?string $value, ?int $baseUomId): void
+    {
+        if ($value === null) {
+            return;
+        }
+
+        $this->assertNotNegativeDecimal($value, 'Item Standard Price cannot be negative.');
+        if ($baseUomId === null) {
+            throw ValidationException::withMessages([
+                'standard_price' => ['A non-null Standard Price requires a valid Base UOM.'],
+                'base_uom_id' => ['Base UOM is required when Standard Price is configured.'],
+            ]);
         }
     }
 

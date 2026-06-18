@@ -1,5 +1,6 @@
 import type { ApiError } from '@/shared/api/apiError';
 import { fieldError } from '@/shared/api/apiError';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
@@ -22,6 +23,7 @@ export function ItemForm({
     onBrandChange,
     baseUom,
     onBaseUomChange,
+    tenantBaseCurrency,
     error,
     baseUomLocked = false,
     baseUomChangeHref,
@@ -34,6 +36,7 @@ export function ItemForm({
     onBrandChange: (value: NamedResource | null) => void;
     baseUom: NamedResource | null;
     onBaseUomChange: (value: NamedResource | null) => void;
+    tenantBaseCurrency?: NamedResource | null;
     error: ApiError | null;
     baseUomLocked?: boolean;
     baseUomChangeHref?: string;
@@ -86,6 +89,21 @@ export function ItemForm({
                 )}
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="md:col-span-2 xl:col-span-3">
+                    <h3 className="mb-3 font-semibold text-slate-900">Pricing</h3>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <DecimalInput
+                            label="Standard Price"
+                            value={value.standard_price ?? ''}
+                            hint="Fallback charge per Base UOM when no applicable contextual price exists."
+                            onChange={(event) => set('standard_price', event.target.value || null)}
+                            error={fieldError(error, 'standard_price') ?? fieldError(error, 'item.standard_price')}
+                        />
+                        <ReadOnlyFact label="Currency" value={tenantBaseCurrency ? `${tenantBaseCurrency.code ?? ''} ${tenantBaseCurrency.name}`.trim() : 'Tenant Base Currency'} />
+                        <ReadOnlyFact label="Basis" value={baseUom ? `${baseUom.code ?? ''} ${baseUom.name}`.trim() : 'Item Base UOM'} />
+                        <ReadOnlyFact label="Tax basis" value="Exclusive" />
+                    </div>
+                </div>
                 <Select
                     label="Default tax group"
                     value={value.default_tax_group_id ?? ''}
@@ -121,5 +139,14 @@ export function ItemForm({
                 <label><input className="mr-2" type="checkbox" checked={value.is_active} onChange={(event) => set('is_active', event.target.checked)} />Active</label>
             </div>
         </Panel>
+    );
+}
+
+function ReadOnlyFact({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{value}</div>
+        </div>
     );
 }

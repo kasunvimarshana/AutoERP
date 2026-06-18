@@ -56,6 +56,7 @@ final class ItemEngineTest extends TestCase
             trackingType: TrackingType::Serial,
             costingMethod: CostingMethod::WeightedAverage,
             baseUomId: $uomId,
+            standardPrice: '1250.000000',
             isStockable: true,
             units: [
                 new ItemUnitData($uomId, ItemUnitRole::Base, isDefault: true),
@@ -64,7 +65,7 @@ final class ItemEngineTest extends TestCase
                 new ItemVariantData('ITM-001-RED', 'Red'),
             ],
             prices: [
-                new ItemPriceData(ItemPriceType::Standard, '1250.000000', uomId: $uomId),
+                new ItemPriceData(ItemPriceType::Sales, '1275.000000', uomId: $uomId),
             ],
             codes: [
                 new ItemCodeData(ItemCodeType::InternalCode, 'INT-001', isPrimary: true),
@@ -83,7 +84,8 @@ final class ItemEngineTest extends TestCase
         $this->assertCount(1, $item->prices);
         $this->assertCount(1, $item->codes);
         $this->assertCount(2, $item->usageRules);
-        $this->assertSame('1250.000000', (string) $item->prices->first()->amount);
+        $this->assertSame('1250.000000', (string) $item->standard_price);
+        $this->assertSame('1275.000000', (string) $item->prices->first()->amount);
     }
 
     public function test_category_hierarchy_relationships_work(): void

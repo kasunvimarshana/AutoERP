@@ -4,7 +4,7 @@ export const itemTypes = ['stock', 'non_stock', 'service', 'labour', 'asset', 'c
 export const trackingTypes = ['none', 'batch', 'lot', 'serial'] as const;
 export const costingMethods = ['fifo', 'weighted_average', 'standard', 'manual', 'none'] as const;
 export const itemUnitRoles = ['base', 'purchase', 'sales', 'service', 'rental'] as const;
-export const itemPriceTypes = ['purchase', 'sales', 'service', 'rental', 'cost', 'standard'] as const;
+export const itemPriceTypes = ['purchase', 'sales', 'service', 'rental'] as const;
 export const itemCodeTypes = ['sku', 'barcode', 'supplier_code', 'customer_code', 'internal_code', 'oem_code'] as const;
 export const bundleLineTypes = ['stock', 'service', 'labour', 'non_stock', 'charge'] as const;
 
@@ -19,7 +19,10 @@ export interface ItemSummary extends NamedResource {
     costing_method: string;
     category?: NamedResource | null;
     brand?: NamedResource | null;
+    tenant_base_currency?: NamedResource | null;
     base_uom?: NamedResource | null;
+    standard_price?: string | null;
+    standard_price_basis?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;
@@ -55,6 +58,7 @@ export interface ItemPayload {
     barcode?: string | null;
     description?: string | null;
     base_uom_id?: number | null;
+    standard_price?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;

@@ -157,6 +157,9 @@ final class ItemBaseUomConversionService
                 }
 
                 $this->convertItemUnits($lockedItem, $newBaseUomId, $factor);
+                if ($lockedItem->standard_price !== null) {
+                    $lockedItem->standard_price = $this->math->div((string) $lockedItem->standard_price, $factor);
+                }
                 $lockedItem->base_uom_id = $newBaseUomId;
                 $lockedItem->save();
 

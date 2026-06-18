@@ -101,16 +101,16 @@ final class ItemSeeder extends Seeder
         ItemBrand $brand,
     ): array {
         $definitions = [
-            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'none', 'weighted_average'],
-            'OIL-FILTER' => ['Oil Filter', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
-            'BRAKE-PAD' => ['Brake Pad', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
-            'LABOUR-SERVICE' => ['Labour Service', 'LABOUR', 'labour', 'HOUR', false, false, 'none', 'none'],
-            'INSPECTION-SERVICE' => ['Inspection Service', 'SERVICES', 'service', 'HOUR', false, false, 'none', 'none'],
-            'FULL-SERVICE-PACKAGE' => ['Full Service Package', 'PACKAGES', 'package', 'PCS', false, true, 'none', 'none'],
+            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'none', 'weighted_average', '20.000000'],
+            'OIL-FILTER' => ['Oil Filter', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo', '10.000000'],
+            'BRAKE-PAD' => ['Brake Pad', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo', '50.000000'],
+            'LABOUR-SERVICE' => ['Labour Service', 'LABOUR', 'labour', 'HOUR', false, false, 'none', 'none', '25.000000'],
+            'INSPECTION-SERVICE' => ['Inspection Service', 'SERVICES', 'service', 'HOUR', false, false, 'none', 'none', '15.000000'],
+            'FULL-SERVICE-PACKAGE' => ['Full Service Package', 'PACKAGES', 'package', 'PCS', false, true, 'none', 'none', '100.000000'],
         ];
 
         $items = [];
-        foreach ($definitions as $code => [$name, $categoryCode, $itemType, $uomCode, $stockable, $combo, $tracking, $costing]) {
+        foreach ($definitions as $code => [$name, $categoryCode, $itemType, $uomCode, $stockable, $combo, $tracking, $costing, $standardPrice]) {
             $uom = $this->uom($tenantId, $uomCode);
             $items[$code] = Item::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
@@ -126,6 +126,7 @@ final class ItemSeeder extends Seeder
                     'tracking_type' => $tracking,
                     'costing_method' => $costing,
                     'base_uom_id' => $uom?->getKey(),
+                    'standard_price' => $standardPrice,
                     'is_stockable' => $stockable,
                     'is_combo' => $combo,
                     'is_active' => true,

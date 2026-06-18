@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Services\DecimalMath;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
@@ -14,6 +15,7 @@ final class ItemCreationService
 {
     public function __construct(
         private readonly ItemValidationService $validator,
+        private readonly DecimalMath $math,
         private readonly ItemUnitService $units,
         private readonly ItemVariantService $variants,
         private readonly ItemBundleService $bundles,
@@ -42,6 +44,7 @@ final class ItemCreationService
                 'tracking_type' => $data->trackingType,
                 'costing_method' => $data->costingMethod,
                 'base_uom_id' => $data->baseUomId,
+                'standard_price' => $data->standardPrice === null ? null : $this->math->normalize($data->standardPrice),
                 'default_tax_group_id' => $data->defaultTaxGroupId,
                 'purchase_tax_group_id' => $data->purchaseTaxGroupId,
                 'sales_tax_group_id' => $data->salesTaxGroupId,
@@ -83,6 +86,7 @@ final class ItemCreationService
             return $item->refresh()->load([
                 'category',
                 'brand',
+                'tenant.currency',
                 'baseUom',
                 'defaultTaxGroup',
                 'purchaseTaxGroup',

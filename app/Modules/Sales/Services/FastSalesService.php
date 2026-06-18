@@ -33,13 +33,12 @@ use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
-use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
 use Modules\Item\Models\ItemUsageRule;
+use Modules\Item\Services\ItemPriceResolutionService;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentMethodDirection;
@@ -85,6 +84,7 @@ final class FastSalesService
         private readonly SalesDeliveryService $deliveries,
         private readonly SalesInvoiceIntegrationService $salesInvoices,
         private readonly SalesPaymentPreparationService $salesPayments,
+        private readonly ItemPriceResolutionService $priceResolver,
         private readonly PaymentCreationService $payments,
         private readonly FinancePostingInterface $financePostings,
         private readonly LogActivityService $audit,
@@ -628,15 +628,16 @@ final class FastSalesService
             $uomId = $this->resolveUomId($tenantId, $organizationUnitId, $item, $line);
             $uomBasis = $this->validator->resolveUom($tenantId, $organizationUnitId, $item, $uomId, $quantity);
             $uom = $this->validator->resolveUom($tenantId, $organizationUnitId, $item, $uomId, '1.000000');
-            $unitPrice = $this->resolveUnitPrice(
-                $tenantId,
-                $organizationUnitId,
-                $item,
-                $variantId,
-                $currencyId,
-                $uomId,
-                $transactionDate,
+            $priceResolution = $this->priceResolver->resolvePrice(
+                item: $item,
+                context: $this->priceContext($item),
+                uomId: $uomId,
+                organizationUnitId: $organizationUnitId,
+                currencyId: $currencyId,
+                date: $transactionDate,
+                variantId: $variantId,
             );
+            $unitPrice = $priceResolution->amount ?? '0.000000';
             if ($this->math->compare($unitPrice, '0.000000') <= 0) {
                 throw new InvalidArgumentException('Sales unit price must be configured and greater than zero.');
             }
@@ -702,6 +703,14 @@ final class FastSalesService
                 'uom_conversion_factor' => $uomBasis['factor'],
                 'base_quantity' => $uomBasis['base_quantity'],
                 'unit_price' => $unitPrice,
+                'price_resolution' => [
+                    'source' => $priceResolution->source,
+                    'price_type' => $priceResolution->priceType,
+                    'price_id' => $priceResolution->priceId,
+                    'currency_id' => $priceResolution->currencyId,
+                    'uom_id' => $priceResolution->uomId,
+                    'metadata' => $priceResolution->metadata,
+                ],
                 'discount_amount' => $discount,
                 'tax_group_id' => $taxGroupId,
                 'is_stock' => $isStock,
@@ -1062,53 +1071,13 @@ final class FastSalesService
         return $baseUomId;
     }
 
-    private function resolveUnitPrice(
-        int $tenantId,
-        ?int $organizationUnitId,
-        Item $item,
-        ?int $variantId,
-        ?int $currencyId,
-        int $uomId,
-        string $transactionDate,
-    ): string {
+    private function priceContext(Item $item): string
+    {
         $type = $item->item_type instanceof ItemType ? $item->item_type : ItemType::from((string) $item->item_type);
-        $priceTypes = match ($type) {
-            ItemType::Service, ItemType::Labour => [ItemPriceType::Service, ItemPriceType::Sales, ItemPriceType::Standard],
-            default => [ItemPriceType::Sales, ItemPriceType::Service, ItemPriceType::Standard],
-        };
 
-        foreach ($priceTypes as $priceType) {
-            $price = ItemPrice::query()
-                ->where('tenant_id', $tenantId)
-                ->where('item_id', $item->getKey())
-                ->where('price_type', $priceType->value)
-                ->where('is_active', true)
-                ->when($currencyId !== null, fn ($query) => $query->where('currency_id', $currencyId))
-                ->when($variantId !== null, fn ($query) => $query->where(function ($scope) use ($variantId): void {
-                    $scope->whereNull('item_variant_id')->orWhere('item_variant_id', $variantId);
-                }))
-                ->where(function ($query) use ($uomId): void {
-                    $query->whereNull('uom_id')->orWhere('uom_id', $uomId);
-                })
-                ->where(function ($query) use ($transactionDate): void {
-                    $query->whereNull('effective_from')->orWhere('effective_from', '<=', $transactionDate);
-                })
-                ->where(function ($query) use ($transactionDate): void {
-                    $query->whereNull('effective_to')->orWhere('effective_to', '>=', $transactionDate);
-                })
-                ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                    $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-                }))
-                ->when($variantId !== null, fn ($query) => $query->orderByRaw('case when item_variant_id = ? then 0 else 1 end', [$variantId]))
-                ->orderByRaw('case when uom_id = ? then 0 else 1 end', [$uomId])
-                ->latest('effective_from')
-                ->first();
-            if ($price instanceof ItemPrice) {
-                return $this->math->normalize((string) $price->amount);
-            }
-        }
-
-        return '0.000000';
+        return in_array($type, [ItemType::Service, ItemType::Labour], true)
+            ? ItemPriceResolutionService::CONTEXT_SERVICE
+            : ItemPriceResolutionService::CONTEXT_SALES;
     }
 
     private function customer(int $tenantId, ?int $organizationUnitId, int $customerId, bool $lockRecords): Customer
@@ -1357,6 +1326,7 @@ final class FastSalesService
             'available_quantity' => $line['available_quantity'],
             'available_base_quantity' => $line['available_base_quantity'],
             'unit_price' => $line['unit_price'],
+            'price_resolution' => $line['price_resolution'],
             'discount_amount' => $line['discount_amount'],
             'tax_amount' => $line['non_withholding_tax_amount'],
             'withholding_amount' => $line['withholding_amount'],

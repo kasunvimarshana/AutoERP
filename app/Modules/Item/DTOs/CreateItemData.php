@@ -33,6 +33,7 @@ final readonly class CreateItemData
         public TrackingType $trackingType = TrackingType::None,
         public CostingMethod $costingMethod = CostingMethod::None,
         public ?int $baseUomId = null,
+        public ?string $standardPrice = null,
         public ?int $defaultTaxGroupId = null,
         public ?int $purchaseTaxGroupId = null,
         public ?int $salesTaxGroupId = null,

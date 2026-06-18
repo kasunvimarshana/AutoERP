@@ -860,31 +860,37 @@ final class FastPurchaseService
 
     private function resolveUnitCost(int $tenantId, ?int $organizationUnitId, Item $item, ?int $currencyId, int $uomId, string $purchaseDate): string
     {
-        foreach ([ItemPriceType::Purchase, ItemPriceType::Cost, ItemPriceType::Standard] as $type) {
-            $price = ItemPrice::query()
-                ->where('tenant_id', $tenantId)
-                ->where('item_id', $item->getKey())
-                ->where('price_type', $type->value)
-                ->where('is_active', true)
-                ->when($currencyId !== null, fn ($query) => $query->where('currency_id', $currencyId))
-                ->where(function ($query) use ($uomId): void {
-                    $query->whereNull('uom_id')->orWhere('uom_id', $uomId);
-                })
-                ->where(function ($query) use ($purchaseDate): void {
-                    $query->whereNull('effective_from')->orWhere('effective_from', '<=', $purchaseDate);
-                })
-                ->where(function ($query) use ($purchaseDate): void {
-                    $query->whereNull('effective_to')->orWhere('effective_to', '>=', $purchaseDate);
-                })
-                ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                    $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-                }))
-                ->orderByRaw('case when uom_id = ? then 0 else 1 end', [$uomId])
-                ->latest('effective_from')
-                ->first();
-            if ($price instanceof ItemPrice) {
-                return $this->math->normalize((string) $price->amount);
-            }
+        $price = ItemPrice::query()
+            ->where('tenant_id', $tenantId)
+            ->where('item_id', $item->getKey())
+            ->where('price_type', ItemPriceType::Purchase->value)
+            ->where('is_active', true)
+            ->when(
+                $currencyId === null,
+                fn ($query) => $query->whereNull('currency_id'),
+                fn ($query) => $query->where(function ($scope) use ($currencyId): void {
+                    $scope->whereNull('currency_id')->orWhere('currency_id', $currencyId);
+                }),
+            )
+            ->where(function ($query) use ($uomId): void {
+                $query->whereNull('uom_id')->orWhere('uom_id', $uomId);
+            })
+            ->where(function ($query) use ($purchaseDate): void {
+                $query->whereNull('effective_from')->orWhere('effective_from', '<=', $purchaseDate);
+            })
+            ->where(function ($query) use ($purchaseDate): void {
+                $query->whereNull('effective_to')->orWhere('effective_to', '>=', $purchaseDate);
+            })
+            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
+                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
+            }))
+            ->when($currencyId !== null, fn ($query) => $query->orderByRaw('case when currency_id = ? then 0 else 1 end', [$currencyId]))
+            ->orderByRaw('case when uom_id = ? then 0 else 1 end', [$uomId])
+            ->latest('effective_from')
+            ->latest('id')
+            ->first();
+        if ($price instanceof ItemPrice) {
+            return $this->math->normalize((string) $price->amount);
         }
 
         return '0.000000';

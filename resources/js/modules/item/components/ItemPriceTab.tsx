@@ -32,7 +32,7 @@ export default function ItemPriceTab({ itemId, readOnly = false }: { itemId: num
         columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
     }
     return <>
-        <ItemRelationHeader title="Reference prices" description="Maintain decimal-safe reference amounts without owning sales or purchase documents." onAdd={readOnly ? undefined : crud.startCreate} />
+        <ItemRelationHeader title="Specific Prices" description="Maintain contextual purchase, sales, service, and rental prices." onAdd={readOnly ? undefined : crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />
         {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => `${row.price_type}: ${row.amount}`} mobileDetails={(row) => <div className="grid grid-cols-2 gap-2 text-sm"><span>UOM: {row.uom?.code ?? '-'}</span><span>{row.is_active ? 'Active' : 'Inactive'}</span></div>} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
@@ -52,7 +52,7 @@ function PriceForm({ row, error, submitting, onCancel, onSubmit }: {
 }) {
     const [uom, setUom] = useState<NamedResource | null>(row?.uom ?? null);
     const [form, setForm] = useState<ItemPricePayload>({
-        price_type: row?.price_type ?? 'standard',
+        price_type: row?.price_type ?? 'sales',
         amount: row?.amount ?? '0.000000',
         effective_from: row?.effective_from ?? null,
         effective_to: row?.effective_to ?? null,

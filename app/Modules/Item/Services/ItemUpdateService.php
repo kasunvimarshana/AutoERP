@@ -50,6 +50,7 @@ final class ItemUpdateService
                 'tracking_type' => $data->trackingType,
                 'costing_method' => $data->costingMethod,
                 'base_uom_id' => $data->baseUomId,
+                'standard_price' => $data->standardPrice === null ? null : $this->math->normalize($data->standardPrice),
                 'default_tax_group_id' => $data->defaultTaxGroupId,
                 'purchase_tax_group_id' => $data->purchaseTaxGroupId,
                 'sales_tax_group_id' => $data->salesTaxGroupId,
