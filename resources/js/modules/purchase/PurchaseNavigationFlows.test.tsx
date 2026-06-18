@@ -59,6 +59,8 @@ describe('Purchase navigation flows', () => {
         );
 
         expect(await screen.findByRole('heading', { name: 'GRN-77' })).toBeInTheDocument();
+        expect(screen.getByText('partially invoiced')).toBeInTheDocument();
+        expect(screen.getByText('partially returned')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Create invoice' })).toHaveAttribute('href', '/purchase/invoices/create?goods_receipt_id=77');
         expect(screen.getByRole('link', { name: 'Create return' })).toHaveAttribute('href', '/purchase/returns/create?goods_receipt_id=77');
     });
@@ -155,6 +157,9 @@ function goodsReceipt() {
         grn_number: 'GRN-77',
         received_date: '2026-06-18',
         status: 'posted',
+        workflow_status: 'posted',
+        invoice_status: 'partially_invoiced',
+        return_status: 'partially_returned',
         capabilities: { can_invoice: true, can_return: true, can_post: false, can_reverse: true },
         supplier: { id: 11, name: 'Supplier A' },
         warehouse: { id: 21, name: 'Main Warehouse' },

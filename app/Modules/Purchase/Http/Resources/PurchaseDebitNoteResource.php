@@ -16,6 +16,8 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'debit_note_date' => $this->debit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'allocation_status' => $this->allocationStatus(),
+            'allocation_status_label' => $this->statusLabel($this->allocationStatus()),
             'capabilities' => $this->capabilities(),
             'supplier_type' => $this->supplier_type,
             'supplier_id' => $this->supplier_id,
@@ -70,8 +72,19 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'can_approve' => $status === 'draft',
             'can_post' => $status === 'approved',
             'can_allocate' => $status === 'posted' && $this->hasPositiveAmount($remaining),
-            'read_only' => in_array($status, ['posted', 'allocated', 'cancelled', 'reversed'], true),
+            'read_only' => $status === 'posted',
         ];
+    }
+
+    private function allocationStatus(): string
+    {
+        if (! $this->hasPositiveAmount((string) $this->allocated_amount)) {
+            return 'unallocated';
+        }
+
+        return $this->hasPositiveAmount((string) $this->remaining_amount)
+            ? 'partially_allocated'
+            : 'allocated';
     }
 
     private function hasPositiveAmount(string $amount): bool

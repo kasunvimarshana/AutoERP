@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Services\PurchaseRelatedDocumentService;
+use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
 final class PurchaseOrderResource extends PurchaseResource
 {
@@ -92,17 +93,17 @@ final class PurchaseOrderResource extends PurchaseResource
 
     private function receiptStatus(): string
     {
-        return $this->quantityProgressStatus('ordered_quantity', 'received_quantity', 'not_received', 'partially_received', 'received');
+        return app(PurchaseProcurementBalanceService::class)->receiptStatus($this->loadedLines());
     }
 
     private function invoiceStatus(): string
     {
-        return $this->quantityProgressStatus('ordered_quantity', 'invoiced_quantity', 'not_invoiced', 'partially_invoiced', 'invoiced');
+        return app(PurchaseProcurementBalanceService::class)->purchaseOrderInvoiceStatus($this->loadedLines());
     }
 
     private function returnStatus(): string
     {
-        return $this->quantityProgressStatus('received_quantity', 'returned_quantity', 'not_returned', 'partially_returned', 'returned');
+        return app(PurchaseProcurementBalanceService::class)->purchaseOrderReturnStatus($this->loadedLines());
     }
 
     /**
@@ -113,17 +114,20 @@ final class PurchaseOrderResource extends PurchaseResource
         $workflow = $this->status;
         $hasReceivedOrInvoiced = $this->compare($this->sumLines('received_quantity'), '0.000000') > 0
             || $this->compare($this->sumLines('invoiced_quantity'), '0.000000') > 0;
-        $hasReceivable = $this->compare($this->sumLines('remaining_receivable_quantity'), '0.000000') > 0;
-        $hasInvoiceable = $this->compare($this->sumLines('remaining_invoiceable_quantity'), '0.000000') > 0;
-        $hasReturnable = $this->compare($this->sumLines('remaining_returnable_quantity'), '0.000000') > 0;
+        $remainingReceivable = '0.000000';
+        $remainingInvoiceable = '0.000000';
+        $remainingReturnable = '0.000000';
+        $balances = app(PurchaseProcurementBalanceService::class);
+        foreach ($this->loadedLines() as $line) {
+            $remainingReceivable = $this->add($remainingReceivable, $balances->remainingReceivableForPurchaseOrderLine($line));
+            $remainingInvoiceable = $this->add($remainingInvoiceable, $balances->remainingInvoiceableForPurchaseOrderLine($line));
+            $remainingReturnable = $this->add($remainingReturnable, $balances->remainingReturnableForPurchaseOrderLine($line));
+        }
+        $hasReceivable = $this->compare($remainingReceivable, '0.000000') > 0;
+        $hasInvoiceable = $this->compare($remainingInvoiceable, '0.000000') > 0;
+        $hasReturnable = $this->compare($remainingReturnable, '0.000000') > 0;
         $openWorkflow = in_array($workflow, [
             PurchaseOrderStatus::Approved,
-            PurchaseOrderStatus::PartiallyReceived,
-            PurchaseOrderStatus::Received,
-            PurchaseOrderStatus::PartiallyInvoiced,
-            PurchaseOrderStatus::Invoiced,
-            PurchaseOrderStatus::PartiallyReturned,
-            PurchaseOrderStatus::Returned,
         ], true);
 
         return [
@@ -143,32 +147,21 @@ final class PurchaseOrderResource extends PurchaseResource
         ];
     }
 
-    private function quantityProgressStatus(
-        string $basisColumn,
-        string $progressColumn,
-        string $none,
-        string $partial,
-        string $complete,
-    ): string {
-        $basis = $this->sumLines($basisColumn);
-        $progress = $this->sumLines($progressColumn);
-
-        if ($this->compare($progress, '0.000000') <= 0 || $this->compare($basis, '0.000000') <= 0) {
-            return $none;
+    private function loadedLines(): Collection
+    {
+        if (! $this->resource->relationLoaded('lines')) {
+            $this->resource->load('lines');
         }
 
-        return $this->compare($progress, $basis) >= 0 ? $complete : $partial;
+        $lines = $this->whenLoaded('lines');
+
+        return $lines instanceof Collection ? $lines : collect();
     }
 
     private function sumLines(string $column): string
     {
-        $lines = $this->whenLoaded('lines');
-        if (! $lines instanceof Collection) {
-            return '0.000000';
-        }
-
         $total = '0.000000';
-        foreach ($lines as $line) {
+        foreach ($this->loadedLines() as $line) {
             $total = $this->add($total, (string) ($line->{$column} ?? '0.000000'));
         }
 

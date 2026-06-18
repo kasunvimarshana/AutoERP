@@ -59,7 +59,8 @@ export default function PurchaseDebitNoteDetailPage() {
             <ErrorAlert error={error ?? result.error} />
             <Panel>
                 <DetailGrid items={[
-                    { label: 'Status', value: <StatusBadge status={note.status} /> },
+                    { label: 'Workflow', value: <StatusBadge status={note.status} /> },
+                    { label: 'Allocation', value: note.allocation_status?.replaceAll('_', ' ') ?? '-' },
                     { label: 'Supplier', value: note.supplier?.name ?? '-' },
                     { label: 'Amount', value: formatMoney(note.amount) },
                     { label: 'Allocated', value: formatMoney(note.allocated_amount) },

@@ -840,9 +840,6 @@ final class PurchaseInvoiceDtoFactory
 
         return in_array($status, [
             GoodsReceiptNoteStatus::Posted,
-            GoodsReceiptNoteStatus::PartiallyInvoiced,
-            GoodsReceiptNoteStatus::Invoiced,
-            GoodsReceiptNoteStatus::PartiallyReturned,
         ], true);
     }
 
@@ -854,11 +851,6 @@ final class PurchaseInvoiceDtoFactory
 
         return in_array($status, [
             PurchaseOrderStatus::Approved,
-            PurchaseOrderStatus::PartiallyReceived,
-            PurchaseOrderStatus::Received,
-            PurchaseOrderStatus::PartiallyInvoiced,
-            PurchaseOrderStatus::Invoiced,
-            PurchaseOrderStatus::PartiallyReturned,
         ], true);
     }
 

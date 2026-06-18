@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
 final class GoodsReceiptNoteResource extends PurchaseResource
@@ -48,10 +49,7 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'returned_quantity' => (string) $line->returned_quantity,
                 'remaining_quantity' => (string) $line->remaining_quantity,
                 'remaining_invoiceable_quantity' => app(PurchaseProcurementBalanceService::class)->remainingInvoiceableForGoodsReceiptLine($line),
-                'remaining_returnable_quantity' => $this->add(
-                    (string) $line->accepted_quantity,
-                    '-'.(string) $line->returned_quantity,
-                ),
+                'remaining_returnable_quantity' => app(PurchaseProcurementBalanceService::class)->remainingReturnableForGoodsReceiptLine($line),
                 'unit_price' => (string) $line->unit_price,
                 'line_subtotal' => (string) $line->line_subtotal,
                 'line_total' => (string) $line->line_total,
@@ -65,38 +63,23 @@ final class GoodsReceiptNoteResource extends PurchaseResource
 
     private function invoiceStatus(): string
     {
-        return $this->quantityProgressStatus('accepted_quantity', 'invoiced_quantity', 'not_invoiced', 'partially_invoiced', 'invoiced');
+        return app(PurchaseProcurementBalanceService::class)->goodsReceiptInvoiceStatus($this->loadedLines());
     }
 
     private function returnStatus(): string
     {
-        return $this->quantityProgressStatus('accepted_quantity', 'returned_quantity', 'not_returned', 'partially_returned', 'returned');
+        return app(PurchaseProcurementBalanceService::class)->goodsReceiptReturnStatus($this->loadedLines());
     }
 
-    private function quantityProgressStatus(
-        string $basisColumn,
-        string $progressColumn,
-        string $none,
-        string $partial,
-        string $complete,
-    ): string {
+    private function loadedLines(): Collection
+    {
+        if (! $this->resource->relationLoaded('lines')) {
+            $this->resource->load('lines.purchaseOrderLine');
+        }
+
         $lines = $this->whenLoaded('lines');
-        if (! $lines instanceof \Illuminate\Support\Collection) {
-            return $none;
-        }
 
-        $basis = '0.000000';
-        $progress = '0.000000';
-        foreach ($lines as $line) {
-            $basis = $this->add($basis, (string) ($line->{$basisColumn} ?? '0.000000'));
-            $progress = $this->add($progress, (string) ($line->{$progressColumn} ?? '0.000000'));
-        }
-
-        if ($this->compare($progress, '0.000000') <= 0 || $this->compare($basis, '0.000000') <= 0) {
-            return $none;
-        }
-
-        return $this->compare($progress, $basis) >= 0 ? $complete : $partial;
+        return $lines instanceof Collection ? $lines : collect();
     }
 
     /**
@@ -109,24 +92,22 @@ final class GoodsReceiptNoteResource extends PurchaseResource
         $remainingReturnable = '0.000000';
         $invoiced = '0.000000';
         $returned = '0.000000';
+        $balances = app(PurchaseProcurementBalanceService::class);
 
-        $lines = $this->whenLoaded('lines');
-        if ($lines instanceof \Illuminate\Support\Collection) {
-            foreach ($lines as $line) {
-                $remainingInvoiceable = $this->add(
-                    $remainingInvoiceable,
-                    app(PurchaseProcurementBalanceService::class)->remainingInvoiceableForGoodsReceiptLine($line),
-                );
-                $remainingReturnable = $this->add(
-                    $remainingReturnable,
-                    $this->add((string) $line->accepted_quantity, '-'.(string) $line->returned_quantity),
-                );
-                $invoiced = $this->add($invoiced, (string) $line->invoiced_quantity);
-                $returned = $this->add($returned, (string) $line->returned_quantity);
-            }
+        foreach ($this->loadedLines() as $line) {
+            $remainingInvoiceable = $this->add(
+                $remainingInvoiceable,
+                $balances->remainingInvoiceableForGoodsReceiptLine($line),
+            );
+            $remainingReturnable = $this->add(
+                $remainingReturnable,
+                $balances->remainingReturnableForGoodsReceiptLine($line),
+            );
+            $invoiced = $this->add($invoiced, (string) $line->invoiced_quantity);
+            $returned = $this->add($returned, (string) $line->returned_quantity);
         }
 
-        $open = in_array($status, ['posted', 'partially_invoiced', 'invoiced', 'partially_returned'], true);
+        $open = $status === 'posted';
 
         return [
             'can_post' => $status === 'draft',
@@ -135,7 +116,8 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'can_reverse' => $status === 'posted'
                 && $this->compare($invoiced, '0.000000') === 0
                 && $this->compare($returned, '0.000000') === 0,
-            'read_only' => in_array($status, ['posted', 'partially_invoiced', 'invoiced', 'partially_returned', 'returned', 'cancelled', 'reversed'], true),
+            'read_only' => in_array($status, ['posted', 'reversed'], true),
         ];
     }
+
 }

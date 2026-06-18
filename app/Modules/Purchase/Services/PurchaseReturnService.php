@@ -20,8 +20,10 @@ use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
+use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Purchase\Models\PurchaseReturnAdjustmentAllocation;
 use Modules\Purchase\Models\PurchaseReturnLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxReturnAllocationService;
@@ -75,7 +77,7 @@ final class PurchaseReturnService
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'supplier_type' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
-                    ? ($data->supplierType ?? 'supplier')
+                    ? 'supplier'
                     : $sourceHeader?->supplier_type,
                 'supplier_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
                     ? $data->supplierId
@@ -175,9 +177,23 @@ final class PurchaseReturnService
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
             $snapshot = PurchaseReturn::query()->with('lines')->findOrFail($return->getKey());
             $sourceLines = $this->lockReturnSourcesForPost($snapshot);
-            $returnContext = $this->lockReturnContextForPost($snapshot, array_keys($sourceLines));
+            $returnContext = $this->lockReturnContextForPost($snapshot, $sourceLines);
             $return = $returnContext['return'];
             $postedLineSums = $returnContext['posted_line_sums'];
+            if ($return->status === PurchaseReturnStatus::Posted) {
+                return new PurchasePostingResult(
+                    (int) $return->getKey(),
+                    (string) $return->return_number,
+                    $return->status->value,
+                    $return->lines
+                        ->pluck('inventory_movement_id')
+                        ->filter()
+                        ->map(static fn ($id): int => (int) $id)
+                        ->values()
+                        ->all(),
+                    debitNoteId: $return->debit_note_id === null ? null : (int) $return->debit_note_id,
+                );
+            }
             $this->assertPostable($return);
             $this->assertLockedReturnSources($return, $sourceLines);
 
@@ -222,15 +238,21 @@ final class PurchaseReturnService
                     : null;
 
                 if ($sourceLine instanceof GoodsReceiptNoteLine) {
+                    $receiptId = (int) $sourceLine->goods_receipt_note_id;
                     $adjustmentReturnTotal = $this->math->add(
                         $adjustmentReturnTotal,
-                        $this->adjustments->allocateFromReceiptLine($return, $sourceLine, (string) $line->returned_quantity),
+                        $this->adjustments->allocateFromLockedReceiptLine(
+                            $return,
+                            $sourceLine,
+                            (string) $line->returned_quantity,
+                            $returnContext['receipt_lines_by_grn'][$receiptId] ?? collect(),
+                            $returnContext['adjustments_by_grn'][$receiptId] ?? collect(),
+                            $returnContext['adjustment_allocations'],
+                        ),
                     );
                     $sourceLine->returned_quantity = $this->math->add((string) $sourceLine->returned_quantity, (string) $line->returned_quantity);
                     $returnable = $this->math->sub((string) $sourceLine->accepted_quantity, (string) $sourceLine->returned_quantity);
-                    $sourceLine->status = $this->math->isZero($returnable)
-                        ? GoodsReceiptNoteLineStatus::Returned
-                        : GoodsReceiptNoteLineStatus::PartiallyReturned;
+                    $sourceLine->status = GoodsReceiptNoteLineStatus::Posted;
                     $sourceLine->save();
                     $touchedGoodsReceipts[(int) $sourceLine->goods_receipt_note_id] = true;
 
@@ -403,7 +425,7 @@ final class PurchaseReturnService
             if (! $this->isReturnableReceiptStatus($header)) {
                 throw new InvalidArgumentException('Purchase returns can only reference posted goods receipt notes.');
             }
-            if (in_array($sourceLine->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+            if ($sourceLine->status === GoodsReceiptNoteLineStatus::Reversed) {
                 throw new InvalidArgumentException('Purchase return source goods receipt line is no longer returnable.');
             }
             if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine
@@ -431,9 +453,6 @@ final class PurchaseReturnService
 
         return in_array($status, [
             GoodsReceiptNoteStatus::Posted,
-            GoodsReceiptNoteStatus::PartiallyReturned,
-            GoodsReceiptNoteStatus::PartiallyInvoiced,
-            GoodsReceiptNoteStatus::Invoiced,
         ], true);
     }
 
@@ -544,11 +563,18 @@ final class PurchaseReturnService
     }
 
     /**
-     * @param  list<int>  $sourceLineIds
-     * @return array{return: PurchaseReturn, posted_line_sums: array<int, array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}>}
+     * @param  array<int, GoodsReceiptNoteLine>  $sourceLines
+     * @return array{
+     *     return: PurchaseReturn,
+     *     posted_line_sums: array<int, array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}>,
+     *     receipt_lines_by_grn: array<int, Collection<int, GoodsReceiptNoteLine>>,
+     *     adjustments_by_grn: array<int, Collection<int, PurchaseHeaderAdjustment>>,
+     *     adjustment_allocations: Collection<int, PurchaseReturnAdjustmentAllocation>
+     * }
      */
-    private function lockReturnContextForPost(PurchaseReturn $return, array $sourceLineIds): array
+    private function lockReturnContextForPost(PurchaseReturn $return, array $sourceLines): array
     {
+        $sourceLineIds = array_keys($sourceLines);
         $postedReturnIds = [];
         if ($sourceLineIds !== []) {
             $postedReturnIds = PurchaseReturnLine::query()
@@ -581,8 +607,54 @@ final class PurchaseReturnService
 
         $postedReturnIdMap = array_fill_keys($postedReturnIds, true);
         $postedLineSums = $this->sumLockedPostedReturnLines($lockedLines, $postedReturnIdMap, $sourceLineIds);
+        $goodsReceiptIds = array_values(array_unique(array_map(
+            static fn (GoodsReceiptNoteLine $line): int => (int) $line->goods_receipt_note_id,
+            $sourceLines,
+        )));
+        sort($goodsReceiptIds);
 
-        return ['return' => $locked, 'posted_line_sums' => $postedLineSums];
+        $receiptLinesByGrn = [];
+        foreach ($sourceLines as $sourceLine) {
+            $receipt = $sourceLine->goodsReceiptNote;
+            if ($receipt instanceof GoodsReceiptNote && $receipt->relationLoaded('lines')) {
+                $receiptLinesByGrn[(int) $receipt->getKey()] = $receipt->lines->values();
+            }
+        }
+
+        $adjustments = $goodsReceiptIds === []
+            ? collect()
+            : PurchaseHeaderAdjustment::query()
+                ->where('source_type', 'goods_receipt_note')
+                ->whereIn('source_id', $goodsReceiptIds)
+                ->orderBy('source_id')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        $adjustmentsByGrn = [];
+        foreach ($adjustments->groupBy('source_id') as $receiptId => $rows) {
+            $adjustmentsByGrn[(int) $receiptId] = $rows->values();
+        }
+
+        $adjustmentIds = $adjustments
+            ->map(fn (PurchaseHeaderAdjustment $adjustment): int => (int) $adjustment->getKey())
+            ->values()
+            ->all();
+        $adjustmentAllocations = $adjustmentIds === []
+            ? collect()
+            : PurchaseReturnAdjustmentAllocation::query()
+                ->whereIn('purchase_header_adjustment_id', $adjustmentIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+        return [
+            'return' => $locked,
+            'posted_line_sums' => $postedLineSums,
+            'receipt_lines_by_grn' => $receiptLinesByGrn,
+            'adjustments_by_grn' => $adjustmentsByGrn,
+            'adjustment_allocations' => $adjustmentAllocations,
+        ];
     }
 
     /**
@@ -646,7 +718,7 @@ final class PurchaseReturnService
                 throw new InvalidArgumentException('Selected goods receipt note line was not found for this return.');
             }
             if (! $this->isReturnableReceiptStatus($sourceLine->goodsReceiptNote)
-                || in_array($sourceLine->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+                || $sourceLine->status === GoodsReceiptNoteLineStatus::Reversed) {
                 throw new InvalidArgumentException('Purchase return source goods receipt is no longer returnable.');
             }
             if ((int) $sourceLine->tenant_id !== (int) $return->tenant_id
@@ -704,8 +776,20 @@ final class PurchaseReturnService
             ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
         $lockedReceipts = $this->locks->goodsReceipts($goodsReceiptIds)
             ->keyBy(fn (GoodsReceiptNote $receipt): int => (int) $receipt->getKey());
-        $lockedLines = $this->locks->goodsReceiptLines($sourceLineIds)
+        $allReceiptLineIds = GoodsReceiptNoteLine::query()
+            ->whereIn('goods_receipt_note_id', array_values(array_unique($goodsReceiptIds)))
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+        $lockedLines = $this->locks->goodsReceiptLines($allReceiptLineIds)
             ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+
+        foreach ($lockedReceipts as $receipt) {
+            $receipt->setRelation('lines', $lockedLines
+                ->where('goods_receipt_note_id', (int) $receipt->getKey())
+                ->values());
+        }
 
         $resolved = [];
         foreach ($lockedLines as $line) {
@@ -725,7 +809,9 @@ final class PurchaseReturnService
                 }
             }
 
-            $resolved[(int) $line->getKey()] = $line;
+            if (in_array((int) $line->getKey(), $sourceLineIds, true)) {
+                $resolved[(int) $line->getKey()] = $line;
+            }
         }
 
         return $resolved;
@@ -735,6 +821,9 @@ final class PurchaseReturnService
     {
         if ($data->supplierId === null) {
             throw new InvalidArgumentException('Unreferenced supplier return requires supplier.');
+        }
+        if ($data->supplierType !== null && $data->supplierType !== 'supplier') {
+            throw new InvalidArgumentException('Unreferenced supplier return supplier type is not supported.');
         }
         if (trim((string) $data->reason) === '') {
             throw new InvalidArgumentException('Unreferenced supplier return requires reason.');

@@ -4,14 +4,13 @@ export type PurchaseOrderStatus =
     | 'draft'
     | 'pending_approval'
     | 'approved'
-    | 'partially_received'
-    | 'received'
-    | 'partially_invoiced'
-    | 'invoiced'
-    | 'partially_returned'
-    | 'returned'
     | 'closed'
     | 'cancelled';
+
+export type ReceiptProgressStatus = 'not_received' | 'partially_received' | 'received';
+export type InvoiceProgressStatus = 'not_invoiced' | 'partially_invoiced' | 'invoiced';
+export type ReturnProgressStatus = 'not_returned' | 'partially_returned' | 'returned';
+export type AllocationProgressStatus = 'unallocated' | 'partially_allocated' | 'allocated';
 
 export interface PurchaseOrderLine {
     id?: number;
@@ -85,9 +84,9 @@ export interface PurchaseOrder {
     expected_delivery_date?: string | null;
     status?: PurchaseOrderStatus;
     workflow_status?: PurchaseOrderStatus;
-    receipt_status?: string;
-    invoice_status?: string;
-    return_status?: string;
+    receipt_status?: ReceiptProgressStatus;
+    invoice_status?: InvoiceProgressStatus;
+    return_status?: ReturnProgressStatus;
     capabilities?: {
         can_edit?: boolean;
         can_submit?: boolean;
@@ -274,7 +273,7 @@ export interface PurchaseAdjustmentCatalogueEntry {
     override_allowed: boolean;
 }
 
-export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed' | 'partially_invoiced' | 'invoiced' | 'partially_returned' | 'returned' | 'cancelled';
+export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed';
 export type {
     ManualPurchaseReturnPayload,
     PurchaseReturn,
@@ -318,6 +317,9 @@ export interface GoodsReceipt {
     grn_number?: string;
     received_date?: string;
     status?: GoodsReceiptStatus | string;
+    workflow_status?: GoodsReceiptStatus | string;
+    invoice_status?: InvoiceProgressStatus;
+    return_status?: ReturnProgressStatus;
     capabilities?: {
         can_post?: boolean;
         can_invoice?: boolean;
@@ -373,6 +375,7 @@ export interface PurchaseDebitNote {
     debit_note_number?: string;
     debit_note_date?: string;
     status?: string;
+    allocation_status?: AllocationProgressStatus;
     supplier?: NamedResource | null;
     supplier_id?: number | null;
     purchase_return_id?: number | null;

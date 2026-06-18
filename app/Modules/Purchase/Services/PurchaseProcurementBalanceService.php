@@ -20,6 +20,21 @@ final class PurchaseProcurementBalanceService
         return $this->math->isNegative($remaining) ? '0.000000' : $this->math->normalize($remaining);
     }
 
+    public function remainingReceivableForPurchaseOrderLine(PurchaseOrderLine $line): string
+    {
+        $remaining = $this->math->sub((string) $line->ordered_quantity, (string) $line->cancelled_quantity);
+        $remaining = $this->math->sub($remaining, (string) $line->received_quantity);
+
+        return $this->math->isNegative($remaining) ? '0.000000' : $this->math->normalize($remaining);
+    }
+
+    public function remainingReturnableForPurchaseOrderLine(PurchaseOrderLine $line): string
+    {
+        $remaining = $this->math->sub((string) $line->received_quantity, (string) $line->returned_quantity);
+
+        return $this->math->isNegative($remaining) ? '0.000000' : $this->math->normalize($remaining);
+    }
+
     public function remainingInvoiceableForGoodsReceiptLine(GoodsReceiptNoteLine $line): string
     {
         $grnRemaining = $this->math->sub((string) $line->accepted_quantity, (string) $line->invoiced_quantity);
@@ -47,5 +62,58 @@ final class PurchaseProcurementBalanceService
         $remaining = $this->math->sub((string) $line->accepted_quantity, (string) $line->returned_quantity);
 
         return $this->math->isNegative($remaining) ? '0.000000' : $this->math->normalize($remaining);
+    }
+
+    public function receiptStatus(iterable $lines): string
+    {
+        return $this->quantityProgress($lines, 'ordered_quantity', 'cancelled_quantity', 'received_quantity', 'not_received', 'partially_received', 'received');
+    }
+
+    public function purchaseOrderInvoiceStatus(iterable $lines): string
+    {
+        return $this->quantityProgress($lines, 'ordered_quantity', 'cancelled_quantity', 'invoiced_quantity', 'not_invoiced', 'partially_invoiced', 'invoiced');
+    }
+
+    public function purchaseOrderReturnStatus(iterable $lines): string
+    {
+        return $this->quantityProgress($lines, 'received_quantity', null, 'returned_quantity', 'not_returned', 'partially_returned', 'returned');
+    }
+
+    public function goodsReceiptInvoiceStatus(iterable $lines): string
+    {
+        return $this->quantityProgress($lines, 'accepted_quantity', null, 'invoiced_quantity', 'not_invoiced', 'partially_invoiced', 'invoiced');
+    }
+
+    public function goodsReceiptReturnStatus(iterable $lines): string
+    {
+        return $this->quantityProgress($lines, 'accepted_quantity', null, 'returned_quantity', 'not_returned', 'partially_returned', 'returned');
+    }
+
+    private function quantityProgress(
+        iterable $lines,
+        string $basisColumn,
+        ?string $cancelledColumn,
+        string $progressColumn,
+        string $none,
+        string $partial,
+        string $complete,
+    ): string {
+        $basis = '0.000000';
+        $progress = '0.000000';
+
+        foreach ($lines as $line) {
+            $lineBasis = (string) ($line->{$basisColumn} ?? '0.000000');
+            if ($cancelledColumn !== null) {
+                $lineBasis = $this->math->sub($lineBasis, (string) ($line->{$cancelledColumn} ?? '0.000000'));
+            }
+            $basis = $this->math->add($basis, $lineBasis);
+            $progress = $this->math->add($progress, (string) ($line->{$progressColumn} ?? '0.000000'));
+        }
+
+        if ($this->math->compare($progress, '0.000000') <= 0 || $this->math->compare($basis, '0.000000') <= 0) {
+            return $none;
+        }
+
+        return $this->math->compare($progress, $basis) >= 0 ? $complete : $partial;
     }
 }

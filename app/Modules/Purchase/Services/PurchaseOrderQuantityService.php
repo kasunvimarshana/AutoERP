@@ -36,9 +36,7 @@ final class PurchaseOrderQuantityService
             (string) $line->returned_quantity,
         );
         $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
-        $line->status = $this->math->isZero($remaining)
-            ? PurchaseOrderLineStatus::Received
-            : PurchaseOrderLineStatus::PartiallyReceived;
+        $line->status = PurchaseOrderLineStatus::Open;
         $line->save();
         $this->refreshOrderFor($line);
     }
@@ -57,12 +55,7 @@ final class PurchaseOrderQuantityService
         );
         $this->assertNonNegative((string) $line->remaining_invoiceable_quantity, 'Purchase order invoiceable quantity cannot be negative.');
 
-        if ($this->math->compare((string) $line->invoiced_quantity, (string) $line->ordered_quantity) >= 0) {
-            $line->status = PurchaseOrderLineStatus::Invoiced;
-        } elseif ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
-            $line->status = PurchaseOrderLineStatus::PartiallyInvoiced;
-        }
-
+        $line->status = PurchaseOrderLineStatus::Open;
         $line->save();
         $this->refreshOrderFor($line);
     }
@@ -125,9 +118,7 @@ final class PurchaseOrderQuantityService
             (string) $line->returned_quantity,
         );
         $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
-        $line->status = $this->math->isZero((string) $line->received_quantity)
-            ? PurchaseOrderLineStatus::Open
-            : PurchaseOrderLineStatus::PartiallyReceived;
+        $line->status = PurchaseOrderLineStatus::Open;
         $line->save();
         $this->refreshOrderFor($line);
     }
@@ -152,24 +143,6 @@ final class PurchaseOrderQuantityService
 
     private function lineStatus(PurchaseOrderLine $line): PurchaseOrderLineStatus
     {
-        if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
-            return $this->math->compare(
-                (string) $line->invoiced_quantity,
-                (string) $line->ordered_quantity,
-            ) >= 0
-                ? PurchaseOrderLineStatus::Invoiced
-                : PurchaseOrderLineStatus::PartiallyInvoiced;
-        }
-
-        if ($this->math->compare((string) $line->received_quantity, '0.000000') > 0) {
-            return $this->math->compare(
-                (string) $line->received_quantity,
-                (string) $line->ordered_quantity,
-            ) >= 0
-                ? PurchaseOrderLineStatus::Received
-                : PurchaseOrderLineStatus::PartiallyReceived;
-        }
-
         return PurchaseOrderLineStatus::Open;
     }
 

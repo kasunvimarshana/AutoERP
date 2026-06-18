@@ -10,5 +10,4 @@ enum PurchaseReturnStatus: string
     case Approved = 'approved';
     case Posted = 'posted';
     case Cancelled = 'cancelled';
-    case Reversed = 'reversed';
 }

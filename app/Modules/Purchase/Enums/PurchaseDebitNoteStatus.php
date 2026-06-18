@@ -9,7 +9,4 @@ enum PurchaseDebitNoteStatus: string
     case Draft = 'draft';
     case Approved = 'approved';
     case Posted = 'posted';
-    case Allocated = 'allocated';
-    case Cancelled = 'cancelled';
-    case Reversed = 'reversed';
 }

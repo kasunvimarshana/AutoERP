@@ -48,7 +48,6 @@ export function ManualSupplierReturnForm() {
         return_date: returnDate,
         warehouse_id: warehouse?.id ?? 0,
         warehouse_location_id: warehouseLocation?.id,
-        supplier_type: 'supplier',
         supplier_id: supplier?.id,
         reason,
         return_type: 'manual_supplier_return',

@@ -85,7 +85,6 @@ export interface ManualPurchaseReturnPayload {
     return_date: string;
     warehouse_id: number;
     warehouse_location_id?: number;
-    supplier_type?: string;
     supplier_id?: number;
     reason: string;
     return_type?: 'manual_supplier_return';

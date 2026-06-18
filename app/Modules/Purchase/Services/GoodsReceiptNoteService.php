@@ -69,10 +69,6 @@ final class GoodsReceiptNoteService
                 : PurchaseOrderStatus::from((string) $order->status);
             if (! in_array($orderStatus, [
                 PurchaseOrderStatus::Approved,
-                PurchaseOrderStatus::PartiallyReceived,
-                PurchaseOrderStatus::Received,
-                PurchaseOrderStatus::PartiallyInvoiced,
-                PurchaseOrderStatus::Invoiced,
             ], true)) {
                 throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
             }
@@ -144,10 +140,6 @@ final class GoodsReceiptNoteService
                     : PurchaseOrderStatus::from((string) $lockedOrder->status);
                 if (! in_array($lockedOrderStatus, [
                     PurchaseOrderStatus::Approved,
-                    PurchaseOrderStatus::PartiallyReceived,
-                    PurchaseOrderStatus::Received,
-                    PurchaseOrderStatus::PartiallyInvoiced,
-                    PurchaseOrderStatus::Invoiced,
                 ], true)) {
                     throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
                 }
@@ -311,7 +303,7 @@ final class GoodsReceiptNoteService
             $this->assertNoBlockingReturnsForReverse($locked);
 
             foreach ($locked->lines as $line) {
-                if (in_array($line->status, [GoodsReceiptNoteLineStatus::Cancelled, GoodsReceiptNoteLineStatus::Reversed], true)) {
+                if ($line->status === GoodsReceiptNoteLineStatus::Reversed) {
                     throw new InvalidArgumentException('Only posted GRN lines can be reversed.');
                 }
                 if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0
@@ -396,7 +388,7 @@ final class GoodsReceiptNoteService
                 ? $return->status
                 : PurchaseReturnStatus::from((string) $return->status);
 
-            return ! in_array($status, [PurchaseReturnStatus::Cancelled, PurchaseReturnStatus::Reversed], true);
+            return $status !== PurchaseReturnStatus::Cancelled;
         });
         if ($blocking->isEmpty()) {
             return;

@@ -47,6 +47,14 @@ final class PurchaseDebitNoteController
                 $query->where($filter, $request->input($filter));
             }
         }
+        if ($request->filled('allocation_status')) {
+            match ((string) $request->input('allocation_status')) {
+                'unallocated' => $query->whereRaw('allocated_amount <= 0'),
+                'partially_allocated' => $query->whereRaw('allocated_amount > 0')->whereRaw('remaining_amount > 0'),
+                'allocated' => $query->whereRaw('allocated_amount > 0')->whereRaw('remaining_amount <= 0'),
+                default => null,
+            };
+        }
         if ($request->filled('date_from')) {
             $query->whereDate('debit_note_date', '>=', $request->input('date_from'));
         }

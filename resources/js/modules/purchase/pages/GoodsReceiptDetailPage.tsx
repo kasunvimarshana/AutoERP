@@ -73,7 +73,9 @@ export default function GoodsReceiptDetailPage() {
                 <Tabs tabs={[{ id: 'summary', label: 'Summary' }, { id: 'lines', label: 'Lines' }, { id: 'adjustments', label: 'Adjustments' }, { id: 'linked', label: 'Linked documents' }]} active={tab} onChange={setTab} />
                 <div className="p-5">
                     {tab === 'summary' && <DetailGrid items={[
-                        { label: 'Status', value: <StatusBadge status={grn.status} /> },
+                        { label: 'Workflow', value: <StatusBadge status={grn.workflow_status ?? grn.status} /> },
+                        { label: 'Invoice', value: grn.invoice_status?.replaceAll('_', ' ') ?? '-' },
+                        { label: 'Return', value: grn.return_status?.replaceAll('_', ' ') ?? '-' },
                         { label: 'Supplier', value: grn.supplier?.name ?? '-' },
                         { label: 'Purchase order', value: grn.purchase_order?.purchase_order_number ?? grn.purchase_order?.name ?? '-' },
                         { label: 'Warehouse', value: grn.warehouse?.name ?? '-' },

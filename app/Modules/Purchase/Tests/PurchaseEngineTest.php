@@ -195,8 +195,8 @@ final class PurchaseEngineTest extends TestCase
         $this->assertCount(1, InventoryMovement::query()->where('source_type', 'goods_receipt_note')->get());
         $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
         $this->assertSame('4.000000', $availability->quantityOnHand);
-        $this->assertSame(PurchaseOrderStatus::PartiallyReceived, $order->refresh()->status);
-        $this->assertSame('4.000000', (string) $order->lines()->firstOrFail()->received_quantity);
+        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
+        $this->assertSame('4.000000', (string) $order->lines()->where('item_id', $item->getKey())->firstOrFail()->received_quantity);
     }
 
     public function test_many_grns_can_create_one_supplier_invoice_with_header_adjustments(): void
@@ -276,7 +276,7 @@ final class PurchaseEngineTest extends TestCase
 
         $this->assertSame('4920.000000', (string) $invoiceOne->grand_total);
         $this->assertSame('44280.000000', (string) $invoiceTwo->grand_total);
-        $this->assertSame(GoodsReceiptNoteStatus::Invoiced, $grn->refresh()->status);
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
         $this->assertSame('40.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
     }
 
@@ -338,8 +338,8 @@ final class PurchaseEngineTest extends TestCase
             ],
         );
 
-        $this->assertSame(GoodsReceiptNoteStatus::PartiallyInvoiced, $grn->refresh()->status);
-        $this->assertSame(PurchaseOrderStatus::PartiallyInvoiced, $order->refresh()->status);
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
+        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
         $this->assertSame('20.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
         $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
         $this->assertSame(PaymentDirection::Outbound, $payment->direction);
@@ -707,7 +707,7 @@ final class PurchaseEngineTest extends TestCase
 
         $note = $debitNotes->allocate($note, $invoice->refresh(), '12.000000');
 
-        $this->assertSame(PurchaseDebitNoteStatus::Allocated, $note->status);
+        $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
         $this->assertSame('0.000000', (string) $note->remaining_amount);
         $this->assertSame('49180.000000', (string) $invoice->refresh()->balance_due);
     }

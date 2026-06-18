@@ -59,6 +59,7 @@ final class PurchaseOrderController
                 $query->where($filter, $request->input($filter));
             }
         }
+        $this->applyProgressFilters($query, $request);
 
         if ($request->filled('date_from')) {
             $query->whereDate('purchase_order_date', '>=', $request->input('date_from'));
@@ -181,5 +182,47 @@ final class PurchaseOrderController
             ->with(['item', 'variant', 'defaultPurchaseUom'])
             ->where('is_active', true)
             ->paginate($request->perPage()));
+    }
+
+    private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void
+    {
+        if ($request->filled('receipt_status')) {
+            match ((string) $request->input('receipt_status')) {
+                'not_received' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0')),
+                'partially_received' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0')),
+                'received' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('received_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0')),
+                default => null,
+            };
+        }
+
+        if ($request->filled('invoice_status')) {
+            match ((string) $request->input('invoice_status')) {
+                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0')),
+                'partially_invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')),
+                'invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')),
+                default => null,
+            };
+        }
+
+        if ($request->filled('return_status')) {
+            match ((string) $request->input('return_status')) {
+                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0')),
+                'partially_returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(received_quantity - returned_quantity) > 0')),
+                'returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(received_quantity - returned_quantity) > 0')),
+                default => null,
+            };
+        }
     }
 }

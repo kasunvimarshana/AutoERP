@@ -9,15 +9,15 @@ export function purchaseOrderCapabilities(orderOrStatus?: PurchaseOrder | Purcha
     const server = typeof orderOrStatus === 'string' ? undefined : orderOrStatus?.capabilities;
 
     return {
-        canEdit: server?.can_edit ?? status === 'draft',
-        canSubmit: server?.can_submit ?? status === 'draft',
-        canApprove: server?.can_approve ?? status === 'pending_approval',
-        canReceive: server?.can_receive ?? status === 'approved',
-        canInvoice: server?.can_invoice ?? status === 'approved',
-        canReturn: server?.can_return ?? status === 'approved',
-        canCancel: server?.can_cancel ?? (status === 'draft' || status === 'pending_approval' || status === 'approved'),
+        canEdit: Boolean(server?.can_edit),
+        canSubmit: Boolean(server?.can_submit),
+        canApprove: Boolean(server?.can_approve),
+        canReceive: Boolean(server?.can_receive),
+        canInvoice: Boolean(server?.can_invoice),
+        canReturn: Boolean(server?.can_return),
+        canCancel: Boolean(server?.can_cancel),
         canClose: server?.can_close ?? false,
-        canDelete: server?.can_delete ?? status === 'draft',
+        canDelete: Boolean(server?.can_delete),
         isReadOnly: ['closed', 'cancelled'].includes(status ?? ''),
     };
 }

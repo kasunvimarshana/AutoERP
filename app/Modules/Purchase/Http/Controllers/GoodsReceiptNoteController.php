@@ -48,6 +48,7 @@ final class GoodsReceiptNoteController
                 $query->where($filter, $request->input($filter));
             }
         }
+        $this->applyProgressFilters($query, $request);
         if ($request->filled('date_from')) {
             $query->whereDate('received_date', '>=', $request->input('date_from'));
         }
@@ -116,5 +117,34 @@ final class GoodsReceiptNoteController
     private function relations(): array
     {
         return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'adjustments'];
+    }
+
+    private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void
+    {
+        if ($request->filled('invoice_status')) {
+            match ((string) $request->input('invoice_status')) {
+                'not_invoiced' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0')),
+                'partially_invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - invoiced_quantity) > 0')),
+                'invoiced' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('invoiced_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - invoiced_quantity) > 0')),
+                default => null,
+            };
+        }
+
+        if ($request->filled('return_status')) {
+            match ((string) $request->input('return_status')) {
+                'not_returned' => $query->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0')),
+                'partially_returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - returned_quantity) > 0')),
+                'returned' => $query
+                    ->whereHas('lines', fn (Builder $line) => $line->whereRaw('returned_quantity > 0'))
+                    ->whereDoesntHave('lines', fn (Builder $line) => $line->whereRaw('(accepted_quantity - returned_quantity) > 0')),
+                default => null,
+            };
+        }
     }
 }

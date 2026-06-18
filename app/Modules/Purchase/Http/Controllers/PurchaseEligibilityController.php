@@ -109,7 +109,7 @@ final class PurchaseEligibilityController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
 
-        $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine'])->findOrFail($grn);
+        $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine.order'])->findOrFail($grn);
 
         return response()->json(['data' => $service->invoiceableGoodsReceiptLines($model)]);
     }
@@ -118,7 +118,7 @@ final class PurchaseEligibilityController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_VIEW);
 
-        $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom'])->findOrFail($grn);
+        $model = $this->scope(GoodsReceiptNote::query(), $request)->with(['lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine.order'])->findOrFail($grn);
 
         return response()->json(['data' => $service->returnableGoodsReceiptLines($model)]);
     }

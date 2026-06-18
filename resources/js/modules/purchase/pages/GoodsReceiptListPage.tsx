@@ -50,7 +50,9 @@ export default function GoodsReceiptListPage() {
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'po', header: 'PO', render: (row) => row.purchase_order?.purchase_order_number ?? row.purchase_order?.name ?? '-' },
         { key: 'total', header: 'Total', render: (row) => formatMoney(row.grand_total) },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'workflow', header: 'Workflow', render: (row) => <StatusBadge status={row.workflow_status ?? row.status} /> },
+        { key: 'invoice', header: 'Invoice', render: (row) => row.invoice_status?.replaceAll('_', ' ') ?? '-' },
+        { key: 'return', header: 'Return', render: (row) => row.return_status?.replaceAll('_', ' ') ?? '-' },
         { key: 'actions', header: 'Actions', render: (row) => {
             const capabilities = row.capabilities ?? {};
             return <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'post')}>Post</Button>}{capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'reverse')}>Reverse</Button>}</div>;

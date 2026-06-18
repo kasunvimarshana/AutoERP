@@ -149,20 +149,6 @@ final class PurchaseInvoiceQuantityUpdater
 
     private function goodsReceiptLineStatus(GoodsReceiptNoteLine $line): GoodsReceiptNoteLineStatus
     {
-        if ($this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
-            return $this->math->compare(
-                (string) $line->returned_quantity,
-                (string) $line->accepted_quantity,
-            ) >= 0 ? GoodsReceiptNoteLineStatus::Returned : GoodsReceiptNoteLineStatus::PartiallyReturned;
-        }
-
-        if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
-            return $this->math->compare(
-                (string) $line->invoiced_quantity,
-                (string) $line->accepted_quantity,
-            ) >= 0 ? GoodsReceiptNoteLineStatus::Invoiced : GoodsReceiptNoteLineStatus::PartiallyInvoiced;
-        }
-
         return GoodsReceiptNoteLineStatus::Posted;
     }
 

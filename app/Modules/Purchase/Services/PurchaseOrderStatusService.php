@@ -27,6 +27,7 @@ final class PurchaseOrderStatusService
         private readonly DecimalMath $math,
         private readonly PurchaseStatusService $transitions,
         private readonly PurchaseDocumentLockService $locks,
+        private readonly PurchaseProcurementBalanceService $balances,
     ) {}
 
     public function submit(PurchaseOrder $order, ?int $submittedBy = null): PurchaseOrder
@@ -104,12 +105,12 @@ final class PurchaseOrderStatusService
     private function assertClosable(PurchaseOrder $order): void
     {
         foreach ($order->lines as $line) {
-            if ($this->math->compare((string) $line->remaining_receivable_quantity, '0.000000') > 0) {
+            if ($this->math->compare($this->balances->remainingReceivableForPurchaseOrderLine($line), '0.000000') > 0) {
                 throw new InvalidArgumentException(
                     'Purchase orders with remaining receivable quantities cannot be closed.',
                 );
             }
-            if ($this->math->compare((string) $line->remaining_invoiceable_quantity, '0.000000') > 0) {
+            if ($this->math->compare($this->balances->remainingInvoiceableForPurchaseOrderLine($line), '0.000000') > 0) {
                 throw new InvalidArgumentException(
                     'Purchase orders with remaining invoiceable quantities cannot be closed.',
                 );

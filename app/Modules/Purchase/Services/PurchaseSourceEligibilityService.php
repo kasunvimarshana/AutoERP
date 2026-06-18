@@ -34,7 +34,7 @@ final class PurchaseSourceEligibilityService
     ): LengthAwarePaginator {
         return $this->orderQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', PurchaseOrderStatus::Approved->value)
-            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('remaining_receivable_quantity > 0'))
+            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('(ordered_quantity - cancelled_quantity - received_quantity) > 0'))
             ->latest('purchase_order_date')
             ->paginate($perPage);
     }
@@ -62,7 +62,16 @@ final class PurchaseSourceEligibilityService
     ): LengthAwarePaginator {
         return $this->goodsReceiptQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', GoodsReceiptNoteStatus::Posted->value)
-            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('(accepted_quantity - invoiced_quantity) > 0'))
+            ->whereHas('lines', function (Builder $query): void {
+                $query->whereRaw('(accepted_quantity - invoiced_quantity) > 0')
+                    ->where(function (Builder $scope): void {
+                        $scope->whereNull('purchase_order_line_id')
+                            ->orWhereHas('purchaseOrderLine', fn (Builder $poLine): Builder => $poLine
+                                ->whereRaw('(ordered_quantity - cancelled_quantity - invoiced_quantity) > 0')
+                                ->whereDoesntHave('order', fn (Builder $order): Builder => $order
+                                    ->whereIn('status', [PurchaseOrderStatus::Closed->value, PurchaseOrderStatus::Cancelled->value])));
+                    });
+            })
             ->latest('received_date')
             ->paginate($perPage);
     }
@@ -76,7 +85,15 @@ final class PurchaseSourceEligibilityService
     ): LengthAwarePaginator {
         return $this->goodsReceiptQuery($tenantId, $organizationUnitId, $supplierId, $search)
             ->where('status', GoodsReceiptNoteStatus::Posted->value)
-            ->whereHas('lines', fn (Builder $query) => $query->whereRaw('(accepted_quantity - returned_quantity) > 0'))
+            ->whereHas('lines', function (Builder $query): void {
+                $query->whereRaw('(accepted_quantity - returned_quantity) > 0')
+                    ->where(function (Builder $scope): void {
+                        $scope->whereNull('purchase_order_line_id')
+                            ->orWhereHas('purchaseOrderLine', fn (Builder $poLine): Builder => $poLine
+                                ->whereDoesntHave('order', fn (Builder $order): Builder => $order
+                                    ->whereIn('status', [PurchaseOrderStatus::Closed->value, PurchaseOrderStatus::Cancelled->value])));
+                    });
+            })
             ->latest('received_date')
             ->paginate($perPage);
     }
@@ -108,8 +125,12 @@ final class PurchaseSourceEligibilityService
      */
     public function receivableLines(PurchaseOrder $order): array
     {
+        if ($this->statusValue($order->status) !== PurchaseOrderStatus::Approved->value) {
+            return [];
+        }
+
         return $order->lines
-            ->filter(fn (PurchaseOrderLine $line): bool => $this->math->compare((string) $line->remaining_receivable_quantity, '0.000000') > 0)
+            ->filter(fn (PurchaseOrderLine $line): bool => $this->math->compare($this->balances->remainingReceivableForPurchaseOrderLine($line), '0.000000') > 0)
             ->values()
             ->map(fn (PurchaseOrderLine $line): array => [
                 'id' => (int) $line->getKey(),
@@ -122,7 +143,7 @@ final class PurchaseSourceEligibilityService
                 'uom' => $this->summary($line->uom, ['code', 'name', 'symbol']),
                 'ordered_quantity' => (string) $line->ordered_quantity,
                 'received_quantity' => (string) $line->received_quantity,
-                'remaining_quantity' => (string) $line->remaining_receivable_quantity,
+                'remaining_quantity' => $this->balances->remainingReceivableForPurchaseOrderLine($line),
                 'unit_price' => (string) $line->unit_price,
             ])
             ->all();
@@ -133,6 +154,10 @@ final class PurchaseSourceEligibilityService
      */
     public function invoiceableOrderLines(PurchaseOrder $order): array
     {
+        if ($this->statusValue($order->status) !== PurchaseOrderStatus::Approved->value) {
+            return [];
+        }
+
         return $order->lines
             ->map(function (PurchaseOrderLine $line): array {
                 $remaining = $this->balances->remainingInvoiceableForPurchaseOrderLine($line);
@@ -164,9 +189,15 @@ final class PurchaseSourceEligibilityService
      */
     public function invoiceableGoodsReceiptLines(GoodsReceiptNote $grn): array
     {
+        if ($this->statusValue($grn->status) !== GoodsReceiptNoteStatus::Posted->value) {
+            return [];
+        }
+
         return $grn->lines
             ->map(function (GoodsReceiptNoteLine $line): array {
                 $remaining = $this->balances->remainingInvoiceableForGoodsReceiptLine($line);
+                $blockedByOrder = $this->linkedPurchaseOrderClosed($line);
+                $canInvoice = ! $blockedByOrder && $this->math->compare($remaining, '0.000000') > 0;
 
                 return [
                     'id' => (int) $line->getKey(),
@@ -180,8 +211,10 @@ final class PurchaseSourceEligibilityService
                     'accepted_quantity' => (string) $line->accepted_quantity,
                     'invoiced_quantity' => (string) $line->invoiced_quantity,
                     'remaining_invoiceable_quantity' => $remaining,
-                    'can_invoice' => $this->math->compare($remaining, '0.000000') > 0,
-                    'block_reason' => $this->math->compare($remaining, '0.000000') > 0 ? null : 'Fully invoiced through linked procurement quantity.',
+                    'can_invoice' => $canInvoice,
+                    'block_reason' => $canInvoice
+                        ? null
+                        : ($blockedByOrder ? 'Linked purchase order is closed or cancelled.' : 'Fully invoiced through linked procurement quantity.'),
                     'unit_price' => (string) $line->unit_price,
                 ];
             })
@@ -195,9 +228,15 @@ final class PurchaseSourceEligibilityService
      */
     public function returnableGoodsReceiptLines(GoodsReceiptNote $grn): array
     {
+        if ($this->statusValue($grn->status) !== GoodsReceiptNoteStatus::Posted->value) {
+            return [];
+        }
+
         return $grn->lines
             ->map(function (GoodsReceiptNoteLine $line): array {
                 $remaining = $this->balances->remainingReturnableForGoodsReceiptLine($line);
+                $blockedByOrder = $this->linkedPurchaseOrderClosed($line);
+                $canReturn = ! $blockedByOrder && $this->math->compare($remaining, '0.000000') > 0;
 
                 return [
                     'id' => (int) $line->getKey(),
@@ -211,8 +250,10 @@ final class PurchaseSourceEligibilityService
                     'accepted_quantity' => (string) $line->accepted_quantity,
                     'returned_quantity' => (string) $line->returned_quantity,
                     'remaining_returnable_quantity' => $remaining,
-                    'can_return' => $this->math->compare($remaining, '0.000000') > 0,
-                    'block_reason' => $this->math->compare($remaining, '0.000000') > 0 ? null : 'Fully returned.',
+                    'can_return' => $canReturn,
+                    'block_reason' => $canReturn
+                        ? null
+                        : ($blockedByOrder ? 'Linked purchase order is closed or cancelled.' : 'Fully returned.'),
                     'unit_price' => (string) $line->unit_price,
                 ];
             })
@@ -237,7 +278,7 @@ final class PurchaseSourceEligibilityService
     private function goodsReceiptQuery(int $tenantId, ?int $organizationUnitId, ?int $supplierId, string $search): Builder
     {
         return GoodsReceiptNote::query()
-            ->with(['supplier', 'purchaseOrder', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine'])
+            ->with(['supplier', 'purchaseOrder', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine.order'])
             ->where('tenant_id', $tenantId)
             ->when($organizationUnitId === null, fn (Builder $query) => $query->whereNull('organization_unit_id'), fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId))
             ->when($supplierId !== null, fn (Builder $query) => $query->where('supplier_id', $supplierId))
@@ -261,5 +302,21 @@ final class PurchaseSourceEligibilityService
         }
 
         return $summary;
+    }
+
+    private function linkedPurchaseOrderClosed(GoodsReceiptNoteLine $line): bool
+    {
+        if (! $line->purchaseOrderLine instanceof PurchaseOrderLine) {
+            return false;
+        }
+
+        $status = $this->statusValue($line->purchaseOrderLine->order?->status);
+
+        return in_array($status, [PurchaseOrderStatus::Closed->value, PurchaseOrderStatus::Cancelled->value], true);
+    }
+
+    private function statusValue(mixed $status): ?string
+    {
+        return $status instanceof \BackedEnum ? (string) $status->value : ($status !== null ? (string) $status : null);
     }
 }

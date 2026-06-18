@@ -28,7 +28,8 @@ export default function PurchaseDebitNoteListPage() {
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'amount', header: 'Amount', render: (row) => formatMoney(row.amount) },
         { key: 'remaining', header: 'Remaining', render: (row) => formatMoney(row.remaining_amount) },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'workflow', header: 'Workflow', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'allocation', header: 'Allocation', render: (row) => row.allocation_status?.replaceAll('_', ' ') ?? '-' },
         { key: 'actions', header: 'Actions', render: (row) => <LinkButton to={`/purchase/debit-notes/${row.id}`} variant="ghost">View</LinkButton> },
     ];
     const actions = hasPurchasePermission(auth.permissions, purchasePermissions.debitNotesCreate)

@@ -191,6 +191,11 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$id.'?tenant_id='.$context['tenant_id'])
             ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.receipt_status', 'partially_received')
+            ->assertJsonPath('data.invoice_status', 'partially_invoiced')
+            ->assertJsonPath('data.return_status', 'partially_returned')
+            ->assertJsonPath('data.capabilities.can_receive', true)
             ->assertJsonPath('data.received_quantity', '1.000000')
             ->assertJsonPath('data.invoiced_quantity', '0.500000')
             ->assertJsonPath('data.returned_quantity', '0.250000');
@@ -358,6 +363,17 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $crossScopePayload)
             ->assertUnprocessable();
+    }
+
+    public function test_manual_supplier_return_rejects_client_controlled_supplier_type(): void
+    {
+        $context = $this->context('RTNSPOOF', [PurchaseAuthorizationService::RETURNS_CREATE_MANUAL]);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $this->manualReturnPayload($context, [
+            'supplier_type' => 'local',
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['supplier_type']);
     }
 
     public function test_multi_line_manual_supplier_return_does_not_require_fake_source_ids(): void
@@ -781,7 +797,6 @@ final class PurchaseOrderApiTest extends TestCase
             'return_date' => '2026-06-19',
             'return_type' => 'manual_supplier_return',
             'warehouse_id' => $context['warehouse_id'],
-            'supplier_type' => 'supplier',
             'supplier_id' => $context['supplier_id'],
             'reason' => 'Manual supplier return',
             'lines' => [[

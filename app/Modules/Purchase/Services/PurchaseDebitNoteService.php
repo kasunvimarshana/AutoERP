@@ -110,7 +110,6 @@ final class PurchaseDebitNoteService
             $this->assertAllocationScope($lockedNote, $lockedInvoice);
             if (! in_array($lockedNote->status, [
                 PurchaseDebitNoteStatus::Posted,
-                PurchaseDebitNoteStatus::Allocated,
             ], true)) {
                 throw new InvalidArgumentException(
                     'Only posted purchase debit notes can be allocated.',
@@ -139,9 +138,7 @@ final class PurchaseDebitNoteService
                 (string) $lockedNote->amount,
                 (string) $lockedNote->allocated_amount,
             );
-            $lockedNote->status = $this->math->isZero((string) $lockedNote->remaining_amount)
-                ? PurchaseDebitNoteStatus::Allocated
-                : PurchaseDebitNoteStatus::Posted;
+            $lockedNote->status = PurchaseDebitNoteStatus::Posted;
             $lockedNote->save();
 
             return $lockedNote->refresh();
