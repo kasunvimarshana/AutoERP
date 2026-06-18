@@ -46,6 +46,22 @@ final class PurchaseReturnAdjustmentService
             return '0.000000';
         }
 
+        if ($mutate) {
+            $adjustmentIds = $grn->adjustments
+                ->filter(fn ($adjustment): bool => $adjustment instanceof PurchaseHeaderAdjustment)
+                ->map(fn (PurchaseHeaderAdjustment $adjustment): int => (int) $adjustment->getKey())
+                ->values()
+                ->all();
+
+            if ($adjustmentIds !== []) {
+                PurchaseReturnAdjustmentAllocation::query()
+                    ->whereIn('purchase_header_adjustment_id', $adjustmentIds)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+            }
+        }
+
         $lineRatio = $this->math->div($this->math->mul($returnedQuantity, (string) $sourceLine->unit_price), (string) $grn->subtotal, 12);
         $isFinalReceiptReturn = $this->isFinalReceiptReturn($return, $sourceLine, $returnedQuantity, $grn->lines);
         $netReturn = '0.000000';

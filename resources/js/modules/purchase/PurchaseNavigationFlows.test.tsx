@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiCollection } from '@/shared/types/api';
 import type { Payment } from '@/modules/payment/paymentApi';
+import { PermissionRoute } from '@/modules/auth/PermissionRoute';
 import GoodsReceiptDetailPage from './pages/GoodsReceiptDetailPage';
 import PurchaseDebitNoteListPage from './pages/PurchaseDebitNoteListPage';
 import PurchasePaymentWorkspacePage from './pages/PurchasePaymentWorkspacePage';
@@ -111,6 +112,40 @@ describe('Purchase navigation flows', () => {
 
         expect(await screen.findByRole('heading', { name: 'Purchase debit notes' })).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'New debit note' })).not.toBeInTheDocument();
+    });
+
+    it('guards direct purchase create routes with permissions', () => {
+        authMock.permissions = [];
+        cleanup();
+        render(
+            <MemoryRouter initialEntries={['/purchase/manual-supplier-returns/create']}>
+                <Routes>
+                    <Route path="/dashboard" element={<div>Dashboard target</div>} />
+                    <Route
+                        path="/purchase/manual-supplier-returns/create"
+                        element={<PermissionRoute permission="purchase.returns.create_manual"><div>Manual return create</div></PermissionRoute>}
+                    />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByText('Dashboard target')).toBeInTheDocument();
+
+        authMock.permissions = ['purchase.returns.create_manual'];
+        cleanup();
+        render(
+            <MemoryRouter initialEntries={['/purchase/manual-supplier-returns/create']}>
+                <Routes>
+                    <Route path="/dashboard" element={<div>Dashboard target</div>} />
+                    <Route
+                        path="/purchase/manual-supplier-returns/create"
+                        element={<PermissionRoute permission="purchase.returns.create_manual"><div>Manual return create</div></PermissionRoute>}
+                    />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByText('Manual return create')).toBeInTheDocument();
     });
 });
 

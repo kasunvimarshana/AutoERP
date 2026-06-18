@@ -79,7 +79,7 @@ export default function PurchaseReturnDetailPage() {
                         { label: 'Grand total', value: formatMoney(row.grand_total) },
                         { label: 'Reason', value: row.reason ?? '-' },
                     ]} />}
-                    {tab === 'lines' && <DataTable rows={row.lines ?? []} columns={columns} rowKey={(line) => line.id ?? `${line.source_line_type}-${line.source_line_id}`} />}
+                    {tab === 'lines' && <DataTable rows={row.lines ?? []} columns={columns} rowKey={(line) => line.id ?? line.line_number ?? line.client_line_key ?? `${line.source_line_type ?? 'manual'}-${line.source_line_id ?? 'line'}`} />}
                     {tab === 'adjustments' && <DataTable rows={row.adjustment_allocations ?? []} columns={[
                         { key: 'type', header: 'Type', render: (allocation) => String(allocation.adjustment_type ?? '-') },
                         { key: 'effect', header: 'Effect', render: (allocation) => String(allocation.effect ?? '-') },

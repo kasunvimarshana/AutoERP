@@ -3,11 +3,12 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
     InventoryAdjustmentRequestPayload,
+    ManualPurchaseReturnPayload,
     PurchaseDebitNote,
     PurchaseDebitNoteAllocationPayload,
     PurchaseDebitNotePayload,
     PurchaseReturn,
-    PurchaseReturnPayload,
+    ReferencedPurchaseReturnPayload,
 } from '../purchaseTypes';
 
 export async function listPurchaseReturns(params: ListParams, signal?: AbortSignal) {
@@ -20,7 +21,7 @@ export async function getPurchaseReturn(id: number, signal?: AbortSignal) {
     return response.data.data;
 }
 
-export async function createPurchaseReturn(payload: PurchaseReturnPayload) {
+export async function createPurchaseReturn(payload: ReferencedPurchaseReturnPayload) {
     const response = await apiClient.post<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/returns`, payload);
     return response.data.data;
 }
@@ -40,7 +41,7 @@ export async function cancelPurchaseReturn(id: number) {
     return response.data.data;
 }
 
-export async function createManualSupplierReturn(payload: PurchaseReturnPayload) {
+export async function createManualSupplierReturn(payload: ManualPurchaseReturnPayload) {
     const response = await apiClient.post<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/manual-supplier-returns`, payload);
     return response.data.data;
 }

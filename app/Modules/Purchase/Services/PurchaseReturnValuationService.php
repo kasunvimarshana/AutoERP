@@ -19,6 +19,7 @@ final class PurchaseReturnValuationService
         GoodsReceiptNoteLine $sourceLine,
         string $returnedQuantity,
         ?int $currentReturnId = null,
+        ?array $postedLineSums = null,
     ): PurchaseReturnLineValuationData
     {
         $sourceQuantity = $this->math->normalize((string) $sourceLine->accepted_quantity);
@@ -35,7 +36,7 @@ final class PurchaseReturnValuationService
             : $this->math->div($returnedQuantity, $sourceQuantity, 12);
 
         if ($isFinalReturn) {
-            $posted = $this->postedReturnLineSums((int) $sourceLine->getKey(), $currentReturnId);
+            $posted = $postedLineSums ?? $this->postedReturnLineSums((int) $sourceLine->getKey(), $currentReturnId);
             $baseAmount = $this->residual((string) $sourceLine->line_subtotal, $posted['base_amount'], 'base amount');
             $discountAmount = $this->residual((string) $sourceLine->discount_amount, $posted['discount_amount'], 'discount amount');
             $taxAmount = $this->residual((string) $sourceLine->tax_amount, $posted['tax_amount'], 'tax amount');

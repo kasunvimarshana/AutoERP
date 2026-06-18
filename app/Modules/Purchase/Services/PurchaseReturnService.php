@@ -68,6 +68,9 @@ final class PurchaseReturnService
             }
 
             $sourceHeader = $referenced['header'] ?? null;
+            $headerCostBasis = $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                ? ($data->costBasis ?? $this->firstManualLineCostBasis($data))
+                : null;
             $return = PurchaseReturn::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -92,7 +95,7 @@ final class PurchaseReturnService
                 'reason' => $data->reason,
                 'approval_required' => $policy['approval_required'],
                 'affects_supplier_balance' => $policy['affects_supplier_balance'],
-                'cost_basis' => $data->returnType === PurchaseReturnType::ManualSupplierReturn ? $data->costBasis : null,
+                'cost_basis' => $headerCostBasis,
                 'audit_metadata' => $data->auditMetadata,
                 'created_by' => $data->createdBy,
             ]);
@@ -100,11 +103,11 @@ final class PurchaseReturnService
             $subtotal = '0.000000';
             $adjustmentReturnTotal = '0.000000';
 
-            foreach ($data->lines as $lineData) {
+            foreach ($data->lines as $lineIndex => $lineData) {
                 if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
                     $valuation = $this->valuations->manual($lineData->returnedQuantity, (string) $lineData->costBasis);
                     $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
-                    $this->createManualLine($return, $lineData, $valuation, $data->reason);
+                    $this->createManualLine($return, $lineData, $valuation, $data->reason, $lineIndex + 1);
 
                     continue;
                 }
@@ -172,7 +175,9 @@ final class PurchaseReturnService
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
             $snapshot = PurchaseReturn::query()->with('lines')->findOrFail($return->getKey());
             $sourceLines = $this->lockReturnSourcesForPost($snapshot);
-            $return = $this->lockReturnForPost($snapshot);
+            $returnContext = $this->lockReturnContextForPost($snapshot, array_keys($sourceLines));
+            $return = $returnContext['return'];
+            $postedLineSums = $returnContext['posted_line_sums'];
             $this->assertPostable($return);
             $this->assertLockedReturnSources($return, $sourceLines);
 
@@ -189,7 +194,12 @@ final class PurchaseReturnService
                     }
 
                     $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
-                    $valuation = $this->valuations->fromReceiptLine($sourceLine, (string) $line->returned_quantity, (int) $return->getKey());
+                    $valuation = $this->valuations->fromReceiptLine(
+                        $sourceLine,
+                        (string) $line->returned_quantity,
+                        (int) $return->getKey(),
+                        $postedLineSums[(int) $sourceLine->getKey()] ?? null,
+                    );
                     $this->applyValuationToLine($line, $valuation);
                     $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
                 } else {
@@ -329,9 +339,9 @@ final class PurchaseReturnService
 
         $lineIds = [];
         foreach ($data->lines as $index => $line) {
-            if (! $line instanceof PurchaseReturnLineData || $line->sourceLineType !== 'goods_receipt_note_line') {
-                throw new InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
-            }
+                if (! $line instanceof PurchaseReturnLineData || $line->sourceLineType !== 'goods_receipt_note_line' || $line->sourceLineId === null) {
+                    throw new InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
+                }
             $this->validator->assertPositiveQuantity($line->returnedQuantity);
             if (isset($lineIds[$line->sourceLineId])) {
                 throw new InvalidArgumentException('Duplicate goods receipt note line selected for return.');
@@ -432,15 +442,18 @@ final class PurchaseReturnService
         PurchaseReturnLineData $lineData,
         PurchaseReturnLineValuationData $valuation,
         ?string $headerReason,
+        int $lineNumber,
     ): void {
         $return->lines()->create([
             'tenant_id' => $return->tenant_id,
             'organization_unit_id' => $return->organization_unit_id,
+            'line_number' => $lineNumber,
+            'client_line_key' => $lineData->clientLineKey,
             'item_id' => $lineData->itemId,
             'item_variant_id' => $lineData->itemVariantId,
             'uom_id' => $lineData->uomId,
-            'source_line_type' => 'manual_supplier_return',
-            'source_line_id' => 0,
+            'source_line_type' => null,
+            'source_line_id' => null,
             'returned_quantity' => $this->math->normalize($lineData->returnedQuantity),
             'source_quantity' => $valuation->sourceQuantity,
             'previously_returned_quantity' => $valuation->previouslyReturnedQuantity,
@@ -462,9 +475,12 @@ final class PurchaseReturnService
         GoodsReceiptNoteLine $sourceLine,
         PurchaseReturnLineValuationData $valuation,
     ): void {
+        $lineNumber = ((int) $return->lines()->max('line_number')) + 1;
         $return->lines()->create([
             'tenant_id' => $return->tenant_id,
             'organization_unit_id' => $return->organization_unit_id,
+            'line_number' => $lineNumber,
+            'client_line_key' => $lineData->clientLineKey,
             'item_id' => $sourceLine->item_id,
             'item_variant_id' => $sourceLine->item_variant_id,
             'uom_id' => $sourceLine->uom_id,
@@ -527,21 +543,82 @@ final class PurchaseReturnService
         return $this->lockReceiptSourcesByLineIds($sourceLineIds);
     }
 
-    private function lockReturnForPost(PurchaseReturn $return): PurchaseReturn
+    /**
+     * @param  list<int>  $sourceLineIds
+     * @return array{return: PurchaseReturn, posted_line_sums: array<int, array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}>}
+     */
+    private function lockReturnContextForPost(PurchaseReturn $return, array $sourceLineIds): array
     {
-        $lockedReturns = $this->locks->purchaseReturns([(int) $return->getKey()]);
-        $locked = $lockedReturns->first();
+        $postedReturnIds = [];
+        if ($sourceLineIds !== []) {
+            $postedReturnIds = PurchaseReturnLine::query()
+                ->where('source_line_type', 'goods_receipt_note_line')
+                ->whereIn('source_line_id', $sourceLineIds)
+                ->where('purchase_return_id', '!=', $return->getKey())
+                ->whereHas('purchaseReturn', fn ($query) => $query->where('status', PurchaseReturnStatus::Posted->value))
+                ->pluck('purchase_return_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $returnIds = array_values(array_unique(array_merge([(int) $return->getKey()], $postedReturnIds)));
+        sort($returnIds);
+
+        $lockedReturns = $this->locks->purchaseReturns($returnIds);
+        $locked = $lockedReturns->first(fn (PurchaseReturn $candidate): bool => (int) $candidate->getKey() === (int) $return->getKey());
         if (! $locked instanceof PurchaseReturn) {
             throw new InvalidArgumentException('Purchase return was not found.');
         }
 
         $lockedLines = $this->locks
-            ->purchaseReturnLinesForReturns([(int) $locked->getKey()])
-            ->where('purchase_return_id', (int) $locked->getKey())
+            ->purchaseReturnLinesForReturns($returnIds)
             ->values();
-        $locked->setRelation('lines', $lockedLines);
+        $locked->setRelation('lines', $lockedLines
+            ->where('purchase_return_id', (int) $locked->getKey())
+            ->values());
 
-        return $locked;
+        $postedReturnIdMap = array_fill_keys($postedReturnIds, true);
+        $postedLineSums = $this->sumLockedPostedReturnLines($lockedLines, $postedReturnIdMap, $sourceLineIds);
+
+        return ['return' => $locked, 'posted_line_sums' => $postedLineSums];
+    }
+
+    /**
+     * @param  Collection<int, PurchaseReturnLine>  $lockedLines
+     * @param  array<int, bool>  $postedReturnIds
+     * @param  list<int>  $sourceLineIds
+     * @return array<int, array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}>
+     */
+    private function sumLockedPostedReturnLines(Collection $lockedLines, array $postedReturnIds, array $sourceLineIds): array
+    {
+        $sourceLineIdMap = array_fill_keys($sourceLineIds, true);
+        $sums = [];
+        foreach ($lockedLines as $line) {
+            if (! $line instanceof PurchaseReturnLine
+                || $line->source_line_type !== 'goods_receipt_note_line'
+                || $line->source_line_id === null
+                || ! isset($postedReturnIds[(int) $line->purchase_return_id])
+                || ! isset($sourceLineIdMap[(int) $line->source_line_id])
+            ) {
+                continue;
+            }
+
+            $sourceLineId = (int) $line->source_line_id;
+            $sums[$sourceLineId] ??= [
+                'base_amount' => '0.000000',
+                'discount_amount' => '0.000000',
+                'tax_amount' => '0.000000',
+                'charge_amount' => '0.000000',
+                'line_total' => '0.000000',
+            ];
+            foreach (array_keys($sums[$sourceLineId]) as $field) {
+                $sums[$sourceLineId][$field] = $this->math->add($sums[$sourceLineId][$field], (string) $line->{$field});
+            }
+        }
+
+        return $sums;
     }
 
     /**
@@ -662,21 +739,40 @@ final class PurchaseReturnService
         if (trim((string) $data->reason) === '') {
             throw new InvalidArgumentException('Unreferenced supplier return requires reason.');
         }
-        if ($data->costBasis === null) {
-            throw new InvalidArgumentException('Unreferenced supplier return requires explicit cost basis.');
-        }
 
         $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
-        $this->validator->assertNonNegative($data->costBasis, 'Unreferenced supplier return cost basis cannot be negative.');
+        if ($data->costBasis !== null) {
+            $this->validator->assertNonNegative($data->costBasis, 'Unreferenced supplier return cost basis cannot be negative.');
+        }
 
+        $seenClientLineKeys = [];
         foreach ($data->lines as $index => $line) {
             if ($line->itemId === null || $line->uomId === null || $line->costBasis === null) {
                 throw new InvalidArgumentException('Unreferenced supplier return lines require item, UOM, and cost basis.');
             }
+            $clientLineKey = trim((string) $line->clientLineKey);
+            if ($clientLineKey === '') {
+                throw new InvalidArgumentException('Unreferenced supplier return lines require a client line key.');
+            }
+            if (isset($seenClientLineKeys[$clientLineKey])) {
+                throw new InvalidArgumentException('Duplicate manual return line key.');
+            }
+            $seenClientLineKeys[$clientLineKey] = true;
             $this->validator->assertPositiveQuantity($line->returnedQuantity);
             $this->validator->assertNonNegative($line->costBasis, 'Unreferenced supplier return line cost basis cannot be negative.');
             $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId, "lines.{$index}.item_id");
             $this->validator->uom($data->tenantId, $data->organizationUnitId, $line->uomId, "lines.{$index}.uom_id");
         }
+    }
+
+    private function firstManualLineCostBasis(CreatePurchaseReturnData $data): ?string
+    {
+        foreach ($data->lines as $line) {
+            if ($line instanceof PurchaseReturnLineData && $line->costBasis !== null) {
+                return $line->costBasis;
+            }
+        }
+
+        return null;
     }
 }

@@ -1,7 +1,9 @@
-import { lazy } from 'react';
+import { lazy, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
+import { PermissionRoute } from '@/modules/auth/PermissionRoute';
 import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
@@ -151,6 +153,10 @@ const RentalInvoiceCreatePage = lazy(() => import('@/modules/vehicle-rental/page
 const RentalReportsPage = lazy(() => import('@/modules/vehicle-rental/pages/RentalReportsPage'));
 const NotFoundPage = lazy(() => import('@/modules/not-found/NotFoundPage'));
 
+function requirePermission(permission: string, element: ReactNode) {
+    return <PermissionRoute permission={permission}>{element}</PermissionRoute>;
+}
+
 export function AppRouter() {
     return (
         <Routes>
@@ -215,26 +221,26 @@ export function AppRouter() {
                     <Route path="/warehouse-locations/create" element={<WarehouseLocationCreatePage />} />
                     <Route path="/warehouse-locations/:id/edit" element={<WarehouseLocationEditPage />} />
                     <Route path="/warehouse-locations/:id" element={<WarehouseLocationDetailPage />} />
-                    <Route path="/purchase/fast-purchase" element={<FastPurchasePage />} />
-                    <Route path="/purchase/orders" element={<PurchaseOrderListPage />} />
-                    <Route path="/purchase/orders/create" element={<PurchaseOrderFormPage />} />
-                    <Route path="/purchase/orders/:id/edit" element={<PurchaseOrderFormPage />} />
-                    <Route path="/purchase/orders/:id" element={<PurchaseOrderDetailPage />} />
-                    <Route path="/purchase/goods-receipts" element={<GoodsReceiptListPage />} />
-                    <Route path="/purchase/goods-receipts/create" element={<GoodsReceiptCreatePage />} />
-                    <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetailPage />} />
-                    <Route path="/purchase/returns" element={<PurchaseReturnListPage />} />
-                    <Route path="/purchase/returns/create" element={<PurchaseReturnCreatePage />} />
-                    <Route path="/purchase/returns/:id" element={<PurchaseReturnDetailPage />} />
-                    <Route path="/purchase/manual-supplier-returns/create" element={<ManualSupplierReturnCreatePage />} />
-                    <Route path="/purchase/invoices" element={<PurchaseInvoiceListPage />} />
-                    <Route path="/purchase/invoices/create" element={<PurchaseInvoiceCreatePage />} />
-                    <Route path="/purchase/payments" element={<PurchasePaymentWorkspacePage />} />
-                    <Route path="/purchase/payments/create" element={<PurchasePaymentCreatePage />} />
-                    <Route path="/purchase/payments/prepare" element={<PurchasePaymentPreparePage />} />
-                    <Route path="/purchase/debit-notes" element={<PurchaseDebitNoteListPage />} />
-                    <Route path="/purchase/debit-notes/create" element={<PurchaseDebitNoteCreatePage />} />
-                    <Route path="/purchase/debit-notes/:id" element={<PurchaseDebitNoteDetailPage />} />
+                    <Route path="/purchase/fast-purchase" element={requirePermission(purchasePermissions.fastPurchasesExecute, <FastPurchasePage />)} />
+                    <Route path="/purchase/orders" element={requirePermission(purchasePermissions.ordersView, <PurchaseOrderListPage />)} />
+                    <Route path="/purchase/orders/create" element={requirePermission(purchasePermissions.ordersCreate, <PurchaseOrderFormPage />)} />
+                    <Route path="/purchase/orders/:id/edit" element={requirePermission(purchasePermissions.ordersUpdate, <PurchaseOrderFormPage />)} />
+                    <Route path="/purchase/orders/:id" element={requirePermission(purchasePermissions.ordersView, <PurchaseOrderDetailPage />)} />
+                    <Route path="/purchase/goods-receipts" element={requirePermission(purchasePermissions.goodsReceiptsView, <GoodsReceiptListPage />)} />
+                    <Route path="/purchase/goods-receipts/create" element={requirePermission(purchasePermissions.goodsReceiptsCreate, <GoodsReceiptCreatePage />)} />
+                    <Route path="/purchase/goods-receipts/:id" element={requirePermission(purchasePermissions.goodsReceiptsView, <GoodsReceiptDetailPage />)} />
+                    <Route path="/purchase/returns" element={requirePermission(purchasePermissions.returnsView, <PurchaseReturnListPage />)} />
+                    <Route path="/purchase/returns/create" element={requirePermission(purchasePermissions.returnsCreate, <PurchaseReturnCreatePage />)} />
+                    <Route path="/purchase/returns/:id" element={requirePermission(purchasePermissions.returnsView, <PurchaseReturnDetailPage />)} />
+                    <Route path="/purchase/manual-supplier-returns/create" element={requirePermission(purchasePermissions.returnsCreateManual, <ManualSupplierReturnCreatePage />)} />
+                    <Route path="/purchase/invoices" element={requirePermission(purchasePermissions.supplierInvoicesView, <PurchaseInvoiceListPage />)} />
+                    <Route path="/purchase/invoices/create" element={requirePermission(purchasePermissions.supplierInvoicesCreate, <PurchaseInvoiceCreatePage />)} />
+                    <Route path="/purchase/payments" element={requirePermission(purchasePermissions.paymentsView, <PurchasePaymentWorkspacePage />)} />
+                    <Route path="/purchase/payments/create" element={requirePermission(purchasePermissions.paymentsExecute, <PurchasePaymentCreatePage />)} />
+                    <Route path="/purchase/payments/prepare" element={requirePermission(purchasePermissions.paymentsExecute, <PurchasePaymentPreparePage />)} />
+                    <Route path="/purchase/debit-notes" element={requirePermission(purchasePermissions.debitNotesView, <PurchaseDebitNoteListPage />)} />
+                    <Route path="/purchase/debit-notes/create" element={requirePermission(purchasePermissions.debitNotesCreate, <PurchaseDebitNoteCreatePage />)} />
+                    <Route path="/purchase/debit-notes/:id" element={requirePermission(purchasePermissions.debitNotesView, <PurchaseDebitNoteDetailPage />)} />
                     <Route path="/sales/quotations" element={<SalesDocumentListPage kind="quotation" />} />
                     <Route path="/sales/quotations/create" element={<SalesDocumentFormPage kind="quotation" />} />
                     <Route path="/sales/quotations/:id/edit" element={<SalesDocumentFormPage kind="quotation" />} />

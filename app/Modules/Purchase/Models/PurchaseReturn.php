@@ -49,7 +49,9 @@ final class PurchaseReturn extends CoreModel
 
     public function lines(): HasMany
     {
-        return $this->hasMany(PurchaseReturnLine::class, 'purchase_return_id');
+        return $this->hasMany(PurchaseReturnLine::class, 'purchase_return_id')
+            ->orderBy('line_number')
+            ->orderBy('id');
     }
 
     public function supplier(): BelongsTo

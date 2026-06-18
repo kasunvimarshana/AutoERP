@@ -23,6 +23,7 @@ final class PurchaseReturnLine extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'purchase_return_id' => 'integer',
+            'line_number' => 'integer',
             'item_id' => 'integer',
             'item_variant_id' => 'integer',
             'uom_id' => 'integer',

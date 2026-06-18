@@ -35,8 +35,10 @@ final class PurchaseReturnResource extends PurchaseResource
             'debit_note' => $this->whenLoaded('debitNote', fn () => $this->summary($this->debitNote, ['debit_note_number', 'status'])),
             'lines' => $this->whenLoaded('lines', fn () => $this->lines->map(fn ($line): array => [
                 'id' => (int) $line->getKey(),
+                'line_number' => $line->line_number === null ? null : (int) $line->line_number,
+                'client_line_key' => $line->client_line_key,
                 'source_line_type' => $line->source_line_type,
-                'source_line_id' => (int) $line->source_line_id,
+                'source_line_id' => $line->source_line_id === null ? null : (int) $line->source_line_id,
                 'item' => $line->relationLoaded('item') ? $this->summary($line->item, ['code', 'name', 'sku']) : null,
                 'item_variant' => $line->relationLoaded('variant') ? $this->summary($line->variant, ['code', 'name', 'sku']) : null,
                 'uom' => $line->relationLoaded('uom') ? $this->summary($line->uom, ['code', 'name', 'symbol']) : null,
@@ -99,11 +101,10 @@ final class PurchaseReturnResource extends PurchaseResource
         $approvalRequired = (bool) $this->approval_required;
 
         return [
-            'can_edit' => $status === 'draft',
             'can_approve' => $approvalRequired && $status === 'draft',
             'can_post' => ($approvalRequired && $status === 'approved') || (! $approvalRequired && $status === 'draft'),
             'can_cancel' => in_array($status, ['draft', 'approved'], true),
-            'read_only' => in_array($status, ['posted', 'cancelled', 'reversed'], true),
+            'read_only' => in_array($status, ['posted', 'cancelled'], true),
         ];
     }
 }

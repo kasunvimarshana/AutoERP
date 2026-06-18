@@ -7,12 +7,11 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
-use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
+use Modules\Purchase\Http\Requests\StoreManualSupplierReturnRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseReturnRequest;
 use Modules\Purchase\Http\Resources\PurchaseReturnResource;
 use Modules\Purchase\Models\PurchaseReturn;
@@ -98,32 +97,11 @@ final class PurchaseReturnController
             ->load($this->relations()));
     }
 
-    public function manualSupplierReturn(StorePurchaseReturnRequest $request, PurchaseReturnService $service): PurchaseReturnResource
+    public function manualSupplierReturn(StoreManualSupplierReturnRequest $request, PurchaseReturnService $service): PurchaseReturnResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_CREATE_MANUAL);
 
-        $data = $request->toData();
-
-        return new PurchaseReturnResource($service->create(new CreatePurchaseReturnData(
-            tenantId: $data->tenantId,
-            returnDate: $data->returnDate,
-            warehouseId: $data->warehouseId,
-            organizationUnitId: $data->organizationUnitId,
-            returnNumber: $data->returnNumber,
-            warehouseLocationId: $data->warehouseLocationId,
-            supplierType: $data->supplierType,
-            supplierId: $data->supplierId,
-            reason: $data->reason,
-            returnType: PurchaseReturnType::ManualSupplierReturn,
-            sourceType: 'manual_supplier_return',
-            sourceId: $data->sourceId,
-            approvalRequired: true,
-            affectsSupplierBalance: $data->affectsSupplierBalance,
-            costBasis: $data->costBasis,
-            auditMetadata: $data->auditMetadata,
-            createdBy: $data->createdBy,
-            lines: $data->lines,
-        ))->load($this->relations()));
+        return new PurchaseReturnResource($service->create($request->toData())->load($this->relations()));
     }
 
     private function relations(): array

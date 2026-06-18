@@ -8,7 +8,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
-import { createPurchaseReturn, getGoodsReceipt, getReturnableGoodsReceiptLines, type PurchaseReturnPayload, type ReturnableLine } from '../purchaseApi';
+import { createPurchaseReturn, getGoodsReceipt, getReturnableGoodsReceiptLines, type ReferencedPurchaseReturnPayload, type ReturnableLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { GoodsReceiptLookupSelect } from './PurchaseLookups';
 import { PurchaseReturnLineEditor, type EditableReturnLine } from './PurchaseReturnLineEditor';
@@ -57,13 +57,13 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
         return () => controller.abort();
     }, [source?.id]);
 
-    const payload = (): PurchaseReturnPayload => ({
+    const payload = (): ReferencedPurchaseReturnPayload => ({
         return_date: returnDate,
         reason: reason || undefined,
         return_type: 'referenced',
         source_id: source?.id,
         lines: lines.filter((line) => line.include && isPositiveDecimal(line.returned_quantity)).map((line) => ({
-            source_line_type: line.source.source_line_type,
+            source_line_type: 'goods_receipt_note_line',
             source_line_id: line.source.source_line_id,
             returned_quantity: decimalOr(line.returned_quantity),
             reason: line.reason || undefined,

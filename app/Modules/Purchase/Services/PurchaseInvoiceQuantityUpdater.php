@@ -26,7 +26,7 @@ final class PurchaseInvoiceQuantityUpdater
      */
     public function apply(array $lineQuantities, Collection $goodsReceipts): void
     {
-        foreach ($lineQuantities as $lineKey => $quantity) {
+        foreach ($this->orderedLineQuantities($lineQuantities) as $lineKey => $quantity) {
             [$lineType, $lineId] = explode(':', (string) $lineKey, 2);
 
             if ($lineType === 'goods_receipt_note_line') {
@@ -37,7 +37,7 @@ final class PurchaseInvoiceQuantityUpdater
 
             if ($lineType === 'purchase_order_line') {
                 $this->orderQuantities->applyInvoiced(
-                    PurchaseOrderLine::query()->findOrFail((int) $lineId),
+                    PurchaseOrderLine::query()->lockForUpdate()->findOrFail((int) $lineId),
                     $quantity,
                 );
             }
@@ -52,7 +52,7 @@ final class PurchaseInvoiceQuantityUpdater
      */
     public function reverse(array $lineQuantities, Collection $goodsReceipts): void
     {
-        foreach ($lineQuantities as $lineKey => $quantity) {
+        foreach ($this->orderedLineQuantities($lineQuantities) as $lineKey => $quantity) {
             [$lineType, $lineId] = explode(':', (string) $lineKey, 2);
 
             if ($lineType === 'goods_receipt_note_line') {
@@ -72,10 +72,16 @@ final class PurchaseInvoiceQuantityUpdater
 
     private function applyGoodsReceiptQuantity(int $lineId, string $quantity): void
     {
+        $snapshot = GoodsReceiptNoteLine::query()->findOrFail($lineId, ['id', 'purchase_order_line_id']);
+        $lockedOrderLine = $snapshot->purchase_order_line_id === null
+            ? null
+            : PurchaseOrderLine::query()->lockForUpdate()->findOrFail((int) $snapshot->purchase_order_line_id);
         $line = GoodsReceiptNoteLine::query()
-            ->with('purchaseOrderLine')
             ->lockForUpdate()
             ->findOrFail($lineId);
+        if ($lockedOrderLine instanceof PurchaseOrderLine) {
+            $line->setRelation('purchaseOrderLine', $lockedOrderLine);
+        }
         $remainingInvoiceable = $this->math->sub(
             (string) $line->accepted_quantity,
             (string) $line->invoiced_quantity,
@@ -102,10 +108,16 @@ final class PurchaseInvoiceQuantityUpdater
 
     private function reverseGoodsReceiptQuantity(int $lineId, string $quantity): void
     {
+        $snapshot = GoodsReceiptNoteLine::query()->findOrFail($lineId, ['id', 'purchase_order_line_id']);
+        $lockedOrderLine = $snapshot->purchase_order_line_id === null
+            ? null
+            : PurchaseOrderLine::query()->lockForUpdate()->findOrFail((int) $snapshot->purchase_order_line_id);
         $line = GoodsReceiptNoteLine::query()
-            ->with('purchaseOrderLine')
             ->lockForUpdate()
             ->findOrFail($lineId);
+        if ($lockedOrderLine instanceof PurchaseOrderLine) {
+            $line->setRelation('purchaseOrderLine', $lockedOrderLine);
+        }
         if ($this->math->compare($quantity, (string) $line->invoiced_quantity) > 0) {
             throw new InvalidArgumentException('Cannot reverse more invoiced quantity than currently applied.');
         }
@@ -152,6 +164,27 @@ final class PurchaseInvoiceQuantityUpdater
         }
 
         return GoodsReceiptNoteLineStatus::Posted;
+    }
+
+    /**
+     * @param  array<string, string>  $lineQuantities
+     * @return array<string, string>
+     */
+    private function orderedLineQuantities(array $lineQuantities): array
+    {
+        uksort($lineQuantities, static function (string $left, string $right): int {
+            [$leftType, $leftId] = explode(':', $left, 2);
+            [$rightType, $rightId] = explode(':', $right, 2);
+            $typeOrder = [
+                'purchase_order_line' => 1,
+                'goods_receipt_note_line' => 2,
+            ];
+
+            return [$typeOrder[$leftType] ?? 99, (int) $leftId]
+                <=> [$typeOrder[$rightType] ?? 99, (int) $rightId];
+        });
+
+        return $lineQuantities;
     }
 
 }

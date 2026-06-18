@@ -27,6 +27,7 @@ use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
+use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
 
@@ -43,6 +44,7 @@ final class PurchaseInvoiceDtoFactory
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseProcurementBalanceService $balances,
+        private readonly PurchaseDocumentLockService $locks,
     ) {}
 
     public function prepare(
@@ -64,6 +66,7 @@ final class PurchaseInvoiceDtoFactory
             'source_types_by_po_line' => [],
             'requested_by_po_line' => [],
         ];
+        $lockedSources = $lockSources ? $this->lockInvoiceSources($data->sources) : null;
 
         foreach ($data->sources as $index => $source) {
             if (! $source instanceof PurchaseInvoiceSourceData) {
@@ -92,6 +95,7 @@ final class PurchaseInvoiceDtoFactory
                     $resolvedSupplierType,
                     $resolvedSupplierId,
                     "sources.{$index}.source_id",
+                    $lockedSources,
                 );
 
                 continue;
@@ -119,6 +123,7 @@ final class PurchaseInvoiceDtoFactory
                 $resolvedSupplierType,
                 $resolvedSupplierId,
                 "sources.{$index}.source_id",
+                $lockedSources,
             );
         }
 
@@ -151,6 +156,169 @@ final class PurchaseInvoiceDtoFactory
         );
     }
 
+    /**
+     * @param  list<PurchaseInvoiceSourceData>  $sources
+     * @return array{
+     *     purchase_orders: array<int, PurchaseOrder>,
+     *     goods_receipts: array<int, GoodsReceiptNote>
+     * }
+     */
+    private function lockInvoiceSources(array $sources): array
+    {
+        $purchaseOrderIds = [];
+        $purchaseOrderLineIds = [];
+        $goodsReceiptIds = [];
+        $goodsReceiptLineIds = [];
+        $sourcePairs = [];
+
+        foreach ($sources as $source) {
+            if (! $source instanceof PurchaseInvoiceSourceData) {
+                throw new InvalidArgumentException('Purchase supplier invoice sources are invalid.');
+            }
+
+            if ($source->sourceType === self::PURCHASE_ORDER) {
+                $purchaseOrderIds[] = $source->sourceId;
+                $sourcePairs[] = [self::PURCHASE_ORDER, $source->sourceId];
+
+                continue;
+            }
+
+            if ($source->sourceType === self::GOODS_RECEIPT) {
+                $goodsReceiptIds[] = $source->sourceId;
+                $sourcePairs[] = [self::GOODS_RECEIPT, $source->sourceId];
+
+                continue;
+            }
+
+            throw new InvalidArgumentException(
+                'Purchase supplier invoices require purchase order or goods receipt note sources.',
+            );
+        }
+
+        $orderSnapshots = $purchaseOrderIds === []
+            ? collect()
+            : PurchaseOrder::query()
+                ->with('lines')
+                ->whereIn('id', array_values(array_unique($purchaseOrderIds)))
+                ->get();
+        foreach ($orderSnapshots as $order) {
+            if (! $order instanceof PurchaseOrder) {
+                continue;
+            }
+            foreach ($order->lines as $line) {
+                if ($line instanceof PurchaseOrderLine) {
+                    $purchaseOrderLineIds[] = (int) $line->getKey();
+                }
+            }
+        }
+
+        $receiptSnapshots = $goodsReceiptIds === []
+            ? collect()
+            : GoodsReceiptNote::query()
+                ->with('lines.purchaseOrderLine')
+                ->whereIn('id', array_values(array_unique($goodsReceiptIds)))
+                ->get();
+        foreach ($receiptSnapshots as $receipt) {
+            if (! $receipt instanceof GoodsReceiptNote) {
+                continue;
+            }
+            foreach ($receipt->lines as $line) {
+                if (! $line instanceof GoodsReceiptNoteLine) {
+                    continue;
+                }
+                $goodsReceiptLineIds[] = (int) $line->getKey();
+                if ($line->purchase_order_line_id !== null) {
+                    $purchaseOrderLineIds[] = (int) $line->purchase_order_line_id;
+                }
+                if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
+                    $purchaseOrderIds[] = (int) $line->purchaseOrderLine->purchase_order_id;
+                }
+            }
+        }
+
+        $lockedOrders = $this->locks->purchaseOrders($purchaseOrderIds)
+            ->keyBy(fn (PurchaseOrder $order): int => (int) $order->getKey());
+        $lockedOrderLines = $this->locks->purchaseOrderLines($purchaseOrderLineIds)
+            ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
+        $lockedReceipts = $this->locks->goodsReceipts($goodsReceiptIds)
+            ->keyBy(fn (GoodsReceiptNote $receipt): int => (int) $receipt->getKey());
+        $lockedReceiptLines = $this->locks->goodsReceiptLines($goodsReceiptLineIds)
+            ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+
+        if ($sourcePairs !== []) {
+            PurchaseInvoiceLink::query()
+                ->where(function ($query) use ($sourcePairs): void {
+                    foreach ($sourcePairs as [$sourceType, $sourceId]) {
+                        $query->orWhere(function ($scope) use ($sourceType, $sourceId): void {
+                            $scope->where('source_type', $sourceType)
+                                ->where('source_id', $sourceId);
+                        });
+                    }
+                })
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+
+        $adjustments = ($purchaseOrderIds === [] && $goodsReceiptIds === [])
+            ? collect()
+            : PurchaseHeaderAdjustment::query()
+                ->where(function ($query) use ($purchaseOrderIds, $goodsReceiptIds): void {
+                    if ($purchaseOrderIds !== []) {
+                        $query->orWhere(function ($scope) use ($purchaseOrderIds): void {
+                            $scope->where('source_type', self::PURCHASE_ORDER)
+                                ->whereIn('source_id', array_values(array_unique($purchaseOrderIds)));
+                        });
+                    }
+                    if ($goodsReceiptIds !== []) {
+                        $query->orWhere(function ($scope) use ($goodsReceiptIds): void {
+                            $scope->where('source_type', self::GOODS_RECEIPT)
+                                ->whereIn('source_id', array_values(array_unique($goodsReceiptIds)));
+                        });
+                    }
+                })
+                ->orderBy('source_type')
+                ->orderBy('source_id')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->groupBy(fn (PurchaseHeaderAdjustment $adjustment): string => $adjustment->source_type.':'.$adjustment->source_id);
+
+        foreach ($lockedOrderLines as $line) {
+            $order = $lockedOrders->get((int) $line->purchase_order_id);
+            if ($order instanceof PurchaseOrder) {
+                $line->setRelation('order', $order);
+            }
+        }
+        foreach ($lockedOrders as $order) {
+            $order->setRelation('lines', $lockedOrderLines
+                ->where('purchase_order_id', (int) $order->getKey())
+                ->values());
+            $order->setRelation('adjustments', $adjustments->get(self::PURCHASE_ORDER.':'.$order->getKey(), collect())->values());
+        }
+
+        foreach ($lockedReceiptLines as $line) {
+            if ($line->purchase_order_line_id !== null) {
+                $orderLine = $lockedOrderLines->get((int) $line->purchase_order_line_id);
+                if ($orderLine instanceof PurchaseOrderLine) {
+                    $line->setRelation('purchaseOrderLine', $orderLine);
+                }
+            }
+        }
+        foreach ($lockedReceipts as $receipt) {
+            $receipt->setRelation('lines', $lockedReceiptLines
+                ->where('goods_receipt_note_id', (int) $receipt->getKey())
+                ->values());
+            $receipt->setRelation('adjustments', $adjustments->get(self::GOODS_RECEIPT.':'.$receipt->getKey(), collect())->values());
+        }
+
+        return [
+            'purchase_orders' => $lockedOrders->all(),
+            'goods_receipts' => $lockedReceipts->all(),
+        ];
+    }
+
     private function appendGoodsReceiptSource(
         CreatePurchaseInvoiceData $data,
         PurchaseInvoiceSourceData $source,
@@ -167,11 +335,11 @@ final class PurchaseInvoiceDtoFactory
         ?string &$resolvedSupplierType,
         ?int &$resolvedSupplierId,
         string $field,
+        ?array $lockedSources,
     ): int {
-        $grn = GoodsReceiptNote::query()
-            ->with(['lines.purchaseOrderLine.order', 'adjustments'])
-            ->when($lockSources, fn ($query) => $query->lockForUpdate())
-            ->find($source->sourceId);
+        $grn = $lockedSources === null
+            ? GoodsReceiptNote::query()->with(['lines.purchaseOrderLine.order', 'adjustments'])->find($source->sourceId)
+            : ($lockedSources['goods_receipts'][$source->sourceId] ?? null);
         if (! $grn instanceof GoodsReceiptNote) {
             $this->invalidReference($field, 'goods receipt');
         }
@@ -185,13 +353,6 @@ final class PurchaseInvoiceDtoFactory
         );
         if (! $this->isInvoiceableGoodsReceiptStatus($grn)) {
             throw new InvalidArgumentException('Purchase invoices can only use posted goods receipts.');
-        }
-        if ($lockSources) {
-            $grn->setRelation('lines', GoodsReceiptNoteLine::query()
-                ->with('purchaseOrderLine.order')
-                ->where('goods_receipt_note_id', $grn->getKey())
-                ->lockForUpdate()
-                ->get());
         }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,
@@ -390,11 +551,11 @@ final class PurchaseInvoiceDtoFactory
         ?string &$resolvedSupplierType,
         ?int &$resolvedSupplierId,
         string $field,
+        ?array $lockedSources,
     ): int {
-        $order = PurchaseOrder::query()
-            ->with(['lines', 'adjustments'])
-            ->when($lockSources, fn ($query) => $query->lockForUpdate())
-            ->find($source->sourceId);
+        $order = $lockedSources === null
+            ? PurchaseOrder::query()->with(['lines', 'adjustments'])->find($source->sourceId)
+            : ($lockedSources['purchase_orders'][$source->sourceId] ?? null);
         if (! $order instanceof PurchaseOrder) {
             $this->invalidReference($field, 'purchase order');
         }
@@ -408,12 +569,6 @@ final class PurchaseInvoiceDtoFactory
         );
         if (! $this->isInvoiceablePurchaseOrderStatus($order)) {
             throw new InvalidArgumentException('Purchase invoices can only use approved purchase orders.');
-        }
-        if ($lockSources) {
-            $order->setRelation('lines', PurchaseOrderLine::query()
-                ->where('purchase_order_id', $order->getKey())
-                ->lockForUpdate()
-                ->get());
         }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,

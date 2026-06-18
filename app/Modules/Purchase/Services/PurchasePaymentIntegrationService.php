@@ -282,7 +282,9 @@ final class PurchasePaymentIntegrationService
         }
 
         $invoiceIds = array_map(static fn (PaymentAllocationData $allocation): int => $allocation->invoiceId, $allocations);
-        $query = Invoice::query()->whereIn('id', $invoiceIds);
+        $query = Invoice::query()
+            ->whereIn('id', $invoiceIds)
+            ->orderBy('id');
         if ($lockSources) {
             $query->lockForUpdate();
         }

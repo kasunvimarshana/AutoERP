@@ -466,7 +466,7 @@ final class PurchaseEngineTest extends TestCase
             returnType: PurchaseReturnType::ManualSupplierReturn,
             costBasis: '10.000000',
             approvalRequired: false,
-            lines: [new PurchaseReturnLineData('manual_supplier_return', 0, '1.000000', itemId: (int) $item->getKey(), uomId: $uomId, costBasis: '10.000000')],
+            lines: [new PurchaseReturnLineData(null, null, '1.000000', itemId: (int) $item->getKey(), uomId: $uomId, costBasis: '10.000000', clientLineKey: 'manual-approval-line')],
         ));
 
         try {
@@ -1042,7 +1042,7 @@ final class PurchaseEngineTest extends TestCase
             approvalRequired: false,
             affectsSupplierBalance: false,
             costBasis: '10.000000',
-            lines: [new PurchaseReturnLineData('manual_supplier_return', 0, '1.000000', itemId: (int) $item->getKey(), uomId: $uomId, costBasis: '10.000000')],
+            lines: [new PurchaseReturnLineData(null, null, '1.000000', itemId: (int) $item->getKey(), uomId: $uomId, costBasis: '10.000000', clientLineKey: 'manual-boundary-line')],
         ));
         $this->assertTrue((bool) $manualReturn->approval_required);
         $this->assertTrue((bool) $manualReturn->affects_supplier_balance);

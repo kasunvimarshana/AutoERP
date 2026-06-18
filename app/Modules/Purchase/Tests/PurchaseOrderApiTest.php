@@ -16,6 +16,7 @@ use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\User\Services\UserAccessResolver;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -291,6 +292,135 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.approval_required', false)
             ->assertJsonPath('data.affects_supplier_balance', true)
             ->assertJsonMissingPath('data.capabilities.can_reverse');
+    }
+
+    public function test_manual_supplier_return_requires_manual_permission_and_separate_route(): void
+    {
+        $context = $this->context('RTNSEC', [PurchaseAuthorizationService::ORDERS_VIEW]);
+        $manualPayload = $this->manualReturnPayload($context);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $manualPayload)
+            ->assertForbidden();
+
+        $this->grantPurchasePermission($context, PurchaseAuthorizationService::RETURNS_CREATE);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $manualPayload)
+            ->assertForbidden();
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/returns', $manualPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['return_type', 'warehouse_id', 'supplier_id']);
+
+        $this->grantPurchasePermission($context, PurchaseAuthorizationService::RETURNS_CREATE_MANUAL);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $manualPayload)
+            ->assertCreated()
+            ->assertJsonPath('data.return_type', 'manual_supplier_return')
+            ->assertJsonPath('data.approval_required', true)
+            ->assertJsonPath('data.affects_supplier_balance', true)
+            ->assertJsonPath('data.lines.0.client_line_key', 'manual-line-1')
+            ->assertJsonPath('data.lines.0.source_line_id', null);
+    }
+
+    public function test_manual_supplier_return_contract_rejects_mixed_sources_and_cross_scope_records(): void
+    {
+        $context = $this->context('RTNSCOPE', [PurchaseAuthorizationService::RETURNS_CREATE_MANUAL]);
+        $other = $this->context('RTNFOREIGN', [PurchaseAuthorizationService::RETURNS_CREATE_MANUAL]);
+
+        $mixedPayload = $this->manualReturnPayload($context, [
+            'return_type' => 'referenced',
+            'lines' => [[
+                'client_line_key' => 'manual-line-1',
+                'source_line_type' => 'goods_receipt_note_line',
+                'source_line_id' => 1,
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'returned_quantity' => '1.000000',
+                'cost_basis' => '10.000000',
+            ]],
+        ]);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $mixedPayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['return_type', 'lines.0.source_line_type', 'lines.0.source_line_id']);
+
+        $crossScopePayload = $this->manualReturnPayload($context, [
+            'supplier_id' => $other['supplier_id'],
+            'warehouse_id' => $other['warehouse_id'],
+            'lines' => [[
+                'client_line_key' => 'manual-line-1',
+                'item_id' => $other['item_id'],
+                'uom_id' => $other['uom_id'],
+                'returned_quantity' => '1.000000',
+                'cost_basis' => '10.000000',
+            ]],
+        ]);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $crossScopePayload)
+            ->assertUnprocessable();
+    }
+
+    public function test_multi_line_manual_supplier_return_does_not_require_fake_source_ids(): void
+    {
+        $context = $this->context('RTNMULTI', [PurchaseAuthorizationService::RETURNS_CREATE_MANUAL]);
+        $payload = $this->manualReturnPayload($context, [
+            'lines' => [
+                [
+                    'client_line_key' => 'manual-line-1',
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'returned_quantity' => '1.000000',
+                    'cost_basis' => '10.000000',
+                ],
+                [
+                    'client_line_key' => 'manual-line-2',
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'returned_quantity' => '2.000000',
+                    'cost_basis' => '11.000000',
+                    'reason' => 'Different cost batch',
+                ],
+            ],
+        ]);
+
+        $response = $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $payload)
+            ->assertCreated()
+            ->assertJsonCount(2, 'data.lines')
+            ->assertJsonPath('data.lines.0.line_number', 1)
+            ->assertJsonPath('data.lines.1.line_number', 2)
+            ->assertJsonPath('data.lines.0.source_line_type', null)
+            ->assertJsonPath('data.lines.1.source_line_id', null);
+
+        $this->assertDatabaseHas('purchase_return_lines', [
+            'purchase_return_id' => $response->json('data.id'),
+            'line_number' => 2,
+            'client_line_key' => 'manual-line-2',
+            'source_line_type' => null,
+            'source_line_id' => null,
+        ]);
+
+        $duplicatePayload = $this->manualReturnPayload($context, [
+            'lines' => [
+                [
+                    'client_line_key' => 'duplicate',
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'returned_quantity' => '1.000000',
+                    'cost_basis' => '10.000000',
+                ],
+                [
+                    'client_line_key' => 'duplicate',
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'returned_quantity' => '1.000000',
+                    'cost_basis' => '10.000000',
+                ],
+            ],
+        ]);
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/manual-supplier-returns', $duplicatePayload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['lines.1.client_line_key']);
     }
 
     public function test_item_purchase_context_uses_item_scoped_uom_and_purchase_price(): void
@@ -643,6 +773,28 @@ final class PurchaseOrderApiTest extends TestCase
         ], $overrides);
     }
 
+    private function manualReturnPayload(array $context, array $overrides = []): array
+    {
+        return array_replace_recursive([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'return_date' => '2026-06-19',
+            'return_type' => 'manual_supplier_return',
+            'warehouse_id' => $context['warehouse_id'],
+            'supplier_type' => 'supplier',
+            'supplier_id' => $context['supplier_id'],
+            'reason' => 'Manual supplier return',
+            'lines' => [[
+                'client_line_key' => 'manual-line-1',
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'returned_quantity' => '1.000000',
+                'cost_basis' => '10.000000',
+                'reason' => 'Manual line',
+            ]],
+        ], $overrides);
+    }
+
     private function createTenant(string $suffix): int
     {
         return (int) DB::table('tenants')->insertGetId([
@@ -828,6 +980,8 @@ final class PurchaseOrderApiTest extends TestCase
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'token' => $user['token'],
+            'user_id' => $user['user_id'],
+            'role_id' => $user['role_id'],
             'uom_id' => $uomId,
             'uom_code' => $uomCode,
             'supplier_id' => $this->createSupplier($tenantId, $organizationUnitId, $supplierCode),
@@ -842,7 +996,7 @@ final class PurchaseOrderApiTest extends TestCase
     /**
      * @param  list<string>|null  $permissions
      *
-     * @return array{token: string}
+     * @return array{token: string, user_id: int, role_id: int}
      */
     private function createAuthContext(int $tenantId, int $organizationUnitId, string $suffix, ?array $permissions = null): array
     {
@@ -926,7 +1080,50 @@ final class PurchaseOrderApiTest extends TestCase
             'password' => 'secret-password',
         ])->assertOk()->json('token');
 
-        return ['token' => $token];
+        return ['token' => $token, 'user_id' => $userId, 'role_id' => $roleId];
+    }
+
+    private function grantPurchasePermission(array $context, string $permission): void
+    {
+        $permissionId = (int) DB::table('permissions')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('name', $permission)
+            ->where('guard_name', 'web')
+            ->value('id');
+
+        if ($permissionId < 1) {
+            $permissionId = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => null,
+                'name' => $permission,
+                'guard_name' => 'web',
+                'module' => 'Purchase',
+                'description' => PurchaseAuthorizationService::descriptions()[$permission] ?? 'Purchase test permission',
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $exists = DB::table('role_permissions')
+            ->where('tenant_id', $context['tenant_id'])
+            ->where('role_id', $context['role_id'])
+            ->where('permission_id', $permissionId)
+            ->exists();
+
+        if (! $exists) {
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => null,
+                'role_id' => $context['role_id'],
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        app(UserAccessResolver::class)->forgetForUserTenant((int) $context['user_id'], (int) $context['tenant_id']);
     }
 
     /**

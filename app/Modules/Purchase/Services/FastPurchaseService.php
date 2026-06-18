@@ -11,43 +11,21 @@ use Modules\Audit\Models\AuditLogModel;
 use Modules\Audit\Services\AuditLogs\LogActivityService;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Contracts\FinancePostingInterface;
-use Modules\Finance\DTOs\FinancePostingLine;
-use Modules\Finance\DTOs\FinancePostingRequest;
-use Modules\Finance\DTOs\PostingResultData;
-use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Invoice\DTOs\InvoiceAdjustmentData;
-use Modules\Invoice\DTOs\InvoiceLineData;
-use Modules\Invoice\Enums\AdjustmentEffect;
-use Modules\Invoice\Enums\AdjustmentType;
-use Modules\Invoice\Enums\AllocationMethod;
-use Modules\Invoice\Enums\InvoiceLineType;
-use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Invoice\Models\Invoice;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
-use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
-use Modules\Payment\Enums\PaymentStatus;
-use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
-use Modules\Payment\Services\PaymentCreationService;
-use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
-use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
-use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
-use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
-use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierItemMapping;
@@ -61,23 +39,17 @@ use Modules\Warehouse\Services\WarehouseDefaultResolver;
 
 final class FastPurchaseService
 {
-    private const SUPPLIER_TYPE = 'supplier';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseValidationService $validator,
         private readonly PurchaseUomService $uoms,
         private readonly TaxCalculationService $taxes,
-        private readonly GoodsReceiptNoteService $goodsReceipts,
-        private readonly PurchaseInvoiceIntegrationService $purchaseInvoices,
-        private readonly PurchasePaymentIntegrationService $purchasePayments,
-        private readonly PaymentCreationService $payments,
-        private readonly FinancePostingInterface $financePostings,
         private readonly LogActivityService $audit,
         private readonly WarehouseDefaultResolver $warehouses,
         private readonly PurchaseDocumentContextService $documentContexts,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
         private readonly PurchaseOrderCalculationService $purchaseCalculator,
+        private readonly FastPurchasePostingCoordinator $postingCoordinator,
         private readonly FastPurchaseResponseBuilder $responses,
     ) {}
 
@@ -160,7 +132,7 @@ final class FastPurchaseService
                 }
             }
 
-            $documents = $this->createDocuments($resolved);
+            $documents = $this->postingCoordinator->createDocuments($resolved);
             $response = $this->responses->created($resolved, $documents);
             $this->writeAuditLog($resolved, $referenceHash, $requestHash, $response);
 
@@ -245,322 +217,6 @@ final class FastPurchaseService
             'summary' => $summary,
             'payment' => $payment,
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return array<string, mixed>
-     */
-    private function createDocuments(array $resolved): array
-    {
-        $goodsReceipt = null;
-        $invoice = null;
-        $payment = null;
-        $financePostings = [];
-
-        if ((bool) $resolved['options']['receive_stock_now']) {
-            $goodsReceipt = $this->createGoodsReceipt($resolved);
-            $financePostings = array_merge($financePostings, $this->postInventoryFinance($resolved, $goodsReceipt));
-        }
-
-        if ((bool) $resolved['options']['create_supplier_invoice_now']) {
-            $invoice = $this->createSupplierInvoice($resolved, $goodsReceipt);
-            $financePostings = array_merge($financePostings, $this->postInvoiceFinance($resolved, $invoice));
-        }
-
-        if ((bool) $resolved['options']['record_payment_now']) {
-            if (! $invoice instanceof Invoice) {
-                throw new InvalidArgumentException('Supplier payment requires a supplier invoice.');
-            }
-
-            $payment = $this->createSupplierPayment($resolved, $invoice);
-            $financePostings = array_merge($financePostings, $this->postPaymentFinance($resolved, $payment));
-        }
-
-        return [
-            'goods_receipt' => $goodsReceipt,
-            'supplier_invoice' => $invoice,
-            'supplier_payment' => $payment,
-            'finance_postings' => $financePostings,
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
-    private function createGoodsReceipt(array $resolved): GoodsReceiptNote
-    {
-        $lines = [];
-        foreach ($resolved['lines'] as $line) {
-            if (! (bool) $line['is_stock']) {
-                continue;
-            }
-
-            $lines[] = new GoodsReceiptNoteLineData(
-                itemId: (int) $line['item_id'],
-                receivedQuantity: $line['quantity'],
-                acceptedQuantity: $line['quantity'],
-                unitPrice: $line['unit_cost'],
-                itemVariantId: $line['item_variant_id'],
-                description: $line['description'],
-                uomId: $line['uom_id'],
-                orderedUomId: $line['uom_id'],
-                baseUomId: $line['base_uom_id'],
-                uomConversionFactor: $line['uom_conversion_factor'],
-                baseReceivedQuantity: $line['base_quantity'],
-                baseAcceptedQuantity: $line['base_quantity'],
-                orderedQuantity: $line['quantity'],
-                discountAmount: $line['discount_amount'],
-                taxAmount: $line['non_withholding_tax_amount'],
-            );
-        }
-
-        $grn = $this->goodsReceipts->create(new CreateGoodsReceiptNoteData(
-            tenantId: (int) $resolved['tenant_id'],
-            receivedDate: (string) $resolved['purchase_date'],
-            warehouseId: (int) $resolved['warehouse_id'],
-            organizationUnitId: $resolved['organization_unit_id'],
-            warehouseLocationId: $resolved['warehouse_location_id'],
-            supplierType: self::SUPPLIER_TYPE,
-            supplierId: (int) $resolved['supplier']->getKey(),
-            notes: $resolved['notes'],
-            receivedBy: $resolved['current_user_id'],
-            lines: $lines,
-        ));
-
-        return $this->goodsReceipts->post($grn, $resolved['current_user_id'])
-            ->load(['lines.inventoryMovement', 'supplier', 'warehouse', 'warehouseLocation']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
-    private function createSupplierInvoice(array $resolved, ?GoodsReceiptNote $goodsReceipt): Invoice
-    {
-        $directLines = [];
-        foreach ($resolved['lines'] as $line) {
-            if ((bool) $line['is_stock']) {
-                continue;
-            }
-
-            $directLines[] = new InvoiceLineData(
-                lineNumber: count($directLines) + 1,
-                description: $line['description'],
-                quantity: $line['quantity'],
-                unitPrice: $line['unit_cost'],
-                lineType: InvoiceLineType::Item,
-                itemId: (int) $line['item_id'],
-                uomId: $line['uom_id'],
-                discountAmount: $line['discount_amount'],
-                taxAmount: $line['non_withholding_tax_amount'],
-                metadata: [
-                    'fast_purchase' => true,
-                    'supplier_reference' => $resolved['supplier_reference'],
-                    'tax_group_id' => $line['tax_group_id'],
-                    'is_stock' => false,
-                ],
-            );
-        }
-
-        $sources = $goodsReceipt instanceof GoodsReceiptNote
-            ? [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $goodsReceipt->getKey())]
-            : [];
-
-        $adjustments = array_map(
-            fn (array $adjustment): InvoiceAdjustmentData => $this->invoiceAdjustmentData($adjustment),
-            $resolved['adjustments'],
-        );
-        if ($this->math->compare($resolved['summary']['line_withholding_total'], '0.000000') > 0) {
-            $adjustments[] = new InvoiceAdjustmentData(
-                name: 'Withholding',
-                adjustmentType: AdjustmentType::Withholding,
-                effect: AdjustmentEffect::Decrease,
-                amount: $resolved['summary']['line_withholding_total'],
-                calculationType: 'fixed',
-                rate: '0.000000',
-                sourceAmount: $resolved['summary']['line_withholding_total'],
-                allocationMethod: AllocationMethod::Manual,
-                isSystemGenerated: true,
-                description: 'Fast purchase withholding',
-            );
-        }
-
-        return $this->purchaseInvoices->createSupplierInvoice(new CreatePurchaseInvoiceData(
-            tenantId: (int) $resolved['tenant_id'],
-            invoiceDate: (string) $resolved['purchase_date'],
-            organizationUnitId: $resolved['organization_unit_id'],
-            supplierType: self::SUPPLIER_TYPE,
-            supplierId: (int) $resolved['supplier']->getKey(),
-            dueDate: $resolved['due_date'],
-            currencyId: $resolved['currency_id'],
-            exchangeRate: (string) $resolved['exchange_rate'],
-            notes: $resolved['notes'],
-            createdBy: $resolved['current_user_id'],
-            sources: $sources,
-            status: InvoiceStatus::Posted,
-            directLines: $directLines,
-            adjustments: $adjustments,
-        ))->load(['lines', 'sources', 'sourceLines', 'adjustments', 'balance', 'supplier']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
-    private function createSupplierPayment(array $resolved, Invoice $invoice): Payment
-    {
-        $payment = $resolved['payment'];
-        $amount = (string) $payment['amount'];
-
-        $data = $this->purchasePayments->prepareSupplierPayment(
-            tenantId: (int) $resolved['tenant_id'],
-            paymentDate: (string) $resolved['purchase_date'],
-            amount: $amount,
-            organizationUnitId: $resolved['organization_unit_id'],
-            supplierType: self::SUPPLIER_TYPE,
-            supplierId: (int) $resolved['supplier']->getKey(),
-            currencyId: $resolved['currency_id'],
-            exchangeRate: (string) $resolved['exchange_rate'],
-            referenceNumber: $payment['reference'] ?? $resolved['supplier_reference'],
-            lines: $payment['lines'],
-            allocations: [
-                new PaymentAllocationData(
-                    invoiceId: (int) $invoice->getKey(),
-                    allocatedAmount: $amount,
-                    allocationDate: (string) $resolved['purchase_date'],
-                    allowOverpayment: false,
-                    metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
-                ),
-            ],
-            status: PaymentStatus::Posted,
-            createdBy: $resolved['current_user_id'],
-            notes: $resolved['notes'],
-            bankAccountId: $payment['header_bank_account_id'],
-            metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
-        );
-
-        return $this->payments->create($data)->load(['lines', 'allocations']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return list<PostingResultData>
-     */
-    private function postInventoryFinance(array $resolved, GoodsReceiptNote $goodsReceipt): array
-    {
-        $amount = $resolved['summary']['stock_taxable_total'];
-        if ($this->math->isZero($amount)) {
-            return [];
-        }
-
-        return [$this->financePostings->post(new FinancePostingRequest(
-            source: new PostingSourceData(
-                sourceType: 'goods_receipt_note',
-                sourceId: (int) $goodsReceipt->getKey(),
-                tenantId: (int) $resolved['tenant_id'],
-                organizationUnitId: $resolved['organization_unit_id'],
-                sourceModule: 'purchase',
-                sourceNumber: (string) $goodsReceipt->grn_number,
-                sourceDate: $goodsReceipt->received_date?->toDateString() ?? (string) $resolved['purchase_date'],
-            ),
-            postingDate: (string) $resolved['purchase_date'],
-            currencyId: $resolved['currency_id'],
-            exchangeRate: (string) $resolved['exchange_rate'],
-            lines: [
-                new FinancePostingLine(null, 'Inventory', debit: $amount, profileKey: 'inventory'),
-                new FinancePostingLine(null, 'Goods received payable', credit: $amount, profileKey: 'payable'),
-            ],
-            description: 'Fast purchase stock receipt '.$goodsReceipt->grn_number,
-            postingProfileCode: 'inventory_receipt',
-        ), $resolved['current_user_id'])];
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return list<PostingResultData>
-     */
-    private function postInvoiceFinance(array $resolved, Invoice $invoice): array
-    {
-        $directTaxable = $resolved['summary']['non_stock_taxable_total'];
-        $tax = $resolved['summary']['tax_total'];
-        $withholding = $resolved['summary']['withholding_total'];
-        $nonTaxAdjustments = $this->nonTaxAdjustmentFinanceLines($resolved);
-        if ($this->math->isZero($directTaxable) && $this->math->isZero($tax) && $this->math->isZero($withholding) && $nonTaxAdjustments === []) {
-            return [];
-        }
-
-        $creditPayable = $this->math->sub($this->math->add($directTaxable, $tax), $withholding);
-        $lines = [];
-        if (! $this->math->isZero($directTaxable)) {
-            $lines[] = new FinancePostingLine(null, 'Purchase expense', debit: $directTaxable, profileKey: 'expense');
-        }
-        if (! $this->math->isZero($tax)) {
-            $lines[] = new FinancePostingLine(null, 'Input tax', debit: $tax, profileKey: 'tax_receivable');
-        }
-        if (! $this->math->isZero($creditPayable)) {
-            $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $creditPayable, profileKey: 'payable');
-        }
-        if (! $this->math->isZero($withholding)) {
-            $lines[] = new FinancePostingLine(null, 'Withholding payable', credit: $withholding, profileKey: 'payable');
-        }
-        $lines = array_merge($lines, $nonTaxAdjustments);
-
-        return [$this->financePostings->post(new FinancePostingRequest(
-            source: new PostingSourceData(
-                sourceType: 'purchase_invoice',
-                sourceId: (int) $invoice->getKey(),
-                tenantId: (int) $invoice->tenant_id,
-                organizationUnitId: $invoice->organization_unit_id,
-                sourceModule: 'purchase',
-                sourceNumber: (string) $invoice->invoice_number,
-                sourceDate: $invoice->invoice_date?->toDateString() ?? (string) $resolved['purchase_date'],
-            ),
-            postingDate: (string) $resolved['purchase_date'],
-            currencyId: $invoice->currency_id,
-            exchangeRate: (string) $invoice->exchange_rate,
-            lines: $lines,
-            description: 'Fast purchase supplier invoice '.$invoice->invoice_number,
-            postingProfileCode: 'purchase_invoice',
-        ), $resolved['current_user_id'])];
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return list<PostingResultData>
-     */
-    private function postPaymentFinance(array $resolved, Payment $payment): array
-    {
-        $lines = [
-            new FinancePostingLine(null, 'Supplier payable', debit: (string) $payment->total_amount, profileKey: 'payable'),
-        ];
-
-        foreach ($resolved['payment']['source_accounts'] as $row) {
-            /** @var FinanceAccount $account */
-            $account = $row['account'];
-            $lines[] = new FinancePostingLine(
-                accountCode: (string) $account->code,
-                accountName: (string) $account->name,
-                credit: (string) $row['amount'],
-                description: 'Fast purchase payment source',
-            );
-        }
-
-        return [$this->financePostings->post(new FinancePostingRequest(
-            source: new PostingSourceData(
-                sourceType: 'payment_made',
-                sourceId: (int) $payment->getKey(),
-                tenantId: (int) $payment->tenant_id,
-                organizationUnitId: $payment->organization_unit_id,
-                sourceModule: 'payment',
-                sourceNumber: (string) $payment->payment_number,
-                sourceDate: $payment->payment_date?->toDateString() ?? (string) $resolved['purchase_date'],
-            ),
-            postingDate: (string) $resolved['purchase_date'],
-            currencyId: $payment->currency_id,
-            exchangeRate: (string) $payment->exchange_rate,
-            lines: $lines,
-            description: 'Fast purchase supplier payment '.$payment->payment_number,
-            postingProfileCode: 'payment_made',
-        ), $resolved['current_user_id'])];
     }
 
     /**
@@ -912,72 +568,6 @@ final class FastPurchaseService
             $adjustments,
             $amounts,
         );
-    }
-
-    /**
-     * @param  array{data: PurchaseHeaderAdjustmentData, amount: string}  $adjustment
-     */
-    private function invoiceAdjustmentData(array $adjustment): InvoiceAdjustmentData
-    {
-        $data = $adjustment['data'];
-
-        return new InvoiceAdjustmentData(
-            name: $data->name,
-            adjustmentType: $this->invoiceAdjustmentType($data->adjustmentType),
-            effect: $data->effect === PurchaseAdjustmentEffect::Increase ? AdjustmentEffect::Increase : AdjustmentEffect::Decrease,
-            amount: $adjustment['amount'],
-            calculationType: $data->calculationType->value,
-            rate: $data->rate,
-            sourceAmount: $adjustment['amount'],
-            allocationMethod: AllocationMethod::Manual,
-            isSystemGenerated: false,
-            description: $data->description,
-        );
-    }
-
-    private function invoiceAdjustmentType(PurchaseAdjustmentType $type): AdjustmentType
-    {
-        return match ($type) {
-            PurchaseAdjustmentType::Discount => AdjustmentType::Discount,
-            PurchaseAdjustmentType::Tax => AdjustmentType::Tax,
-            PurchaseAdjustmentType::Freight => AdjustmentType::Freight,
-            PurchaseAdjustmentType::CreditNote => AdjustmentType::CreditNote,
-            PurchaseAdjustmentType::DebitNote => AdjustmentType::DebitNote,
-            PurchaseAdjustmentType::Withholding => AdjustmentType::Withholding,
-            PurchaseAdjustmentType::Rounding => AdjustmentType::Rounding,
-            PurchaseAdjustmentType::Other,
-            PurchaseAdjustmentType::Custom => AdjustmentType::Other,
-            default => AdjustmentType::Charge,
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return list<FinancePostingLine>
-     */
-    private function nonTaxAdjustmentFinanceLines(array $resolved): array
-    {
-        $lines = [];
-        foreach ($resolved['adjustments'] as $adjustment) {
-            /** @var PurchaseHeaderAdjustmentData $data */
-            $data = $adjustment['data'];
-            $amount = $adjustment['amount'];
-            if ($this->math->isZero($amount)
-                || in_array($data->adjustmentType, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)
-            ) {
-                continue;
-            }
-
-            if ($data->effect === PurchaseAdjustmentEffect::Increase) {
-                $lines[] = new FinancePostingLine(null, $data->name, debit: $amount, profileKey: 'expense');
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
-            } else {
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine(null, $data->name, credit: $amount, profileKey: 'expense');
-            }
-        }
-
-        return $lines;
     }
 
     /**
