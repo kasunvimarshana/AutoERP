@@ -346,7 +346,7 @@ final class PurchaseEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Purchase invoice quantity cannot exceed GRN remaining quantity.',
+            'Purchase invoice quantity cannot exceed GRN remaining procurement quantity.',
         );
 
         app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(

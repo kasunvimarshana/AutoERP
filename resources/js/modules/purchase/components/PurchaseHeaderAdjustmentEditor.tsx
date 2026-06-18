@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { FormDrawer } from '@/shared/components/Drawer';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PurchaseHeaderAdjustmentForm } from './PurchaseHeaderAdjustmentForm';
+import { getPurchaseAdjustmentCatalogue } from '../purchaseApi';
+import type { PurchaseAdjustmentCatalogueEntry } from '../purchaseTypes';
 import {
     emptyHeaderAdjustment,
     formatAdjustmentAmount,
@@ -24,7 +26,17 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
     errorFor: (field: string) => string | undefined;
 }) {
     const [dialog, setDialog] = useState<AdjustmentDialog | null>(null);
+    const [catalogue, setCatalogue] = useState<PurchaseAdjustmentCatalogueEntry[]>([]);
     const { confirm, confirmDialog } = useConfirmDialog();
+
+    useEffect(() => {
+        const controller = new AbortController();
+        void getPurchaseAdjustmentCatalogue(controller.signal)
+            .then(setCatalogue)
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, []);
 
     const saveAdjustment = (adjustment: EditableHeaderAdjustment) => {
         if (dialog?.mode === 'edit') {
@@ -59,6 +71,7 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
                         key={dialog.mode === 'edit' ? `edit-${dialog.index}` : 'create'}
                         adjustment={dialog.adjustment}
                         mode={dialog.mode}
+                        catalogue={catalogue}
                         errorFor={(field) => dialog.mode === 'edit' ? errorFor(`adjustments.${dialog.index}.${field}`) : undefined}
                         onCancel={() => setDialog(null)}
                         onSave={saveAdjustment}
@@ -83,6 +96,7 @@ function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError 
         { key: 'type', header: 'Type', render: (row) => row.adjustment_type.replaceAll('_', ' ') },
         { key: 'effect', header: 'Effect', render: formatAdjustmentEffect },
         { key: 'calculation', header: 'Calculation', render: formatAdjustmentCalculation },
+        { key: 'mapping', header: 'Finance Mapping', render: (row) => row.finance_mapping_label ?? row.cost_treatment ?? '-' },
         { key: 'amount', header: 'Amount', render: formatAdjustmentAmount, className: 'tabular-nums' },
         { key: 'allocation', header: 'Allocation', render: (row) => row.allocation_method.replaceAll('_', ' ') },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (row) => <AdjustmentActions onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} /> },

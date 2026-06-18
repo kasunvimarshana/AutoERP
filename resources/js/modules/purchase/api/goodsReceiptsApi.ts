@@ -3,7 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import type { GoodsReceipt, GoodsReceiptPayload, ReturnableLine } from '../purchaseTypes';
+import type { GoodsReceipt, GoodsReceiptPayload, InvoiceableGoodsReceiptLine, ReturnableLine } from '../purchaseTypes';
 
 export async function listGoodsReceipts(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<GoodsReceipt>>(`${endpoints.purchase}/goods-receipts`, { params, signal });
@@ -33,6 +33,14 @@ export async function reverseGoodsReceipt(id: number) {
 export async function getReturnableGoodsReceiptLines(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<ReturnableLine[]>>(
         `${endpoints.purchase}/goods-receipts/${id}/returnable-lines`,
+        { signal },
+    );
+    return response.data.data;
+}
+
+export async function getInvoiceableGoodsReceiptLines(id: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<InvoiceableGoodsReceiptLine[]>>(
+        `${endpoints.purchase}/goods-receipts/${id}/invoiceable-lines`,
         { signal },
     );
     return response.data.data;

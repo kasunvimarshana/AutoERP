@@ -7,12 +7,13 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
+import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createPurchaseReturn, getGoodsReceipt, getReturnableGoodsReceiptLines, type PurchaseReturnPayload, type ReturnableLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { GoodsReceiptLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
 import { PurchaseReturnLineEditor, type EditableReturnLine } from './PurchaseReturnLineEditor';
 
-export function PurchaseReturnForm() {
+export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceiptId?: number }) {
     const navigate = useNavigate();
     const [source, setSource] = useState<NamedResource | null>(null);
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
@@ -24,6 +25,12 @@ export function PurchaseReturnForm() {
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const errorFor = (field: string) => fieldError(error, field);
+
+    useEffect(() => {
+        if (sourceGoodsReceiptId && !source) {
+            setSource({ id: sourceGoodsReceiptId, name: `Goods Receipt #${sourceGoodsReceiptId}` });
+        }
+    }, [sourceGoodsReceiptId, source]);
 
     useEffect(() => {
         if (!source?.id) {
@@ -39,7 +46,7 @@ export function PurchaseReturnForm() {
                 setSupplier(grn.supplier ?? null);
                 setWarehouse(grn.warehouse ?? null);
                 setWarehouseLocation(grn.warehouse_location ?? null);
-                setLines(rows.map((row: ReturnableLine) => ({ source: row, returned_quantity: row.returnable_quantity, reason: '' })));
+                setLines(rows.map((row: ReturnableLine) => ({ source: row, returned_quantity: '0.000000', reason: '' })));
             })
             .catch((requestError) => {
                 if (!controller.signal.aborted) setError(toApiError(requestError));
@@ -61,7 +68,7 @@ export function PurchaseReturnForm() {
         source_type: 'goods_receipt_note',
         source_id: source?.id,
         affects_supplier_balance: true,
-        lines: lines.map((line) => ({
+        lines: lines.filter((line) => isPositiveDecimal(line.returned_quantity)).map((line) => ({
             source_line_type: line.source.source_line_type,
             source_line_id: line.source.source_line_id,
             returned_quantity: decimalOr(line.returned_quantity),

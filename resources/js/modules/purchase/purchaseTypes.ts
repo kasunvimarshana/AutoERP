@@ -61,6 +61,19 @@ export interface PurchaseHeaderAdjustment {
     remaining_amount?: string;
     allocation_method: string;
     is_allocatable?: boolean;
+    finance_posting_profile_id?: number | null;
+    finance_account_id?: number | null;
+    cost_treatment?: string | null;
+    tax_treatment?: string | null;
+    mapping_source?: string | null;
+    override_reason?: string | null;
+    finance_mapping?: {
+        posting_profile_id?: number | null;
+        account_id?: number | null;
+        cost_treatment?: string | null;
+        tax_treatment?: string | null;
+        source?: string | null;
+    } | null;
     sort_order?: number;
     description?: string | null;
 }
@@ -107,8 +120,26 @@ export interface PurchaseOrder {
     notes?: string | null;
     lines?: PurchaseOrderLine[];
     adjustments?: PurchaseHeaderAdjustment[];
+    related_documents?: PurchaseRelatedDocuments;
     approved_at?: string | null;
     closed_at?: string | null;
+}
+
+export interface PurchaseRelatedDocument {
+    id: number;
+    type: string;
+    number?: string | null;
+    date?: string | null;
+    status?: string | null;
+    url?: string | null;
+}
+
+export interface PurchaseRelatedDocuments {
+    goods_receipts: PurchaseRelatedDocument[];
+    supplier_invoices: PurchaseRelatedDocument[];
+    payments: PurchaseRelatedDocument[];
+    returns: PurchaseRelatedDocument[];
+    debit_notes: PurchaseRelatedDocument[];
 }
 
 export interface PurchaseOrderPayload {
@@ -149,9 +180,98 @@ export interface PurchaseOrderPayload {
         amount: string;
         allocation_method?: string;
         is_allocatable?: boolean;
+        finance_posting_profile_id?: number;
+        finance_account_id?: number;
+        cost_treatment?: string;
+        tax_treatment?: string;
+        mapping_source?: 'catalogue' | 'override';
+        override_reason?: string;
         sort_order?: number;
         description?: string;
     }>;
+}
+
+export interface PurchaseOrderCreateContext {
+    defaults: {
+        purchase_order_date: string;
+        expected_delivery_date?: string | null;
+        currency_id?: number | null;
+        currency?: NamedResource | null;
+        currency_source?: string;
+        exchange_rate: string;
+        exchange_rate_source?: string;
+        warehouse_id?: number | null;
+        warehouse?: NamedResource | null;
+        warehouse_source?: string;
+        warehouse_location_id?: number | null;
+        warehouse_location?: NamedResource | null;
+        warehouse_location_source?: string;
+    };
+    exchange_rate_context: {
+        base_currency_id?: number | null;
+        selected_currency_id?: number | null;
+        base_currency_uses_rate_one: boolean;
+        foreign_currency_behavior: 'manual_required';
+        override_allowed: boolean;
+    };
+    payment_terms: {
+        options: Array<Record<string, unknown>>;
+        default: unknown | null;
+    };
+    allowed_overrides: Record<string, boolean>;
+}
+
+export interface PurchaseSupplierContext {
+    supplier: NamedResource;
+    currency_id?: number | null;
+    currency?: NamedResource | null;
+    currency_source?: string;
+    payment_term_id?: number | null;
+    payment_terms_source?: string;
+    tax_profile?: Record<string, unknown> | null;
+    delivery_terms?: string | null;
+    purchasing_contact?: NamedResource | null;
+    supplier_item_mapping_context?: Record<string, unknown>;
+    warning?: string;
+}
+
+export interface PurchaseItemContext {
+    item: NamedResource;
+    variants: NamedResource[];
+    default_purchase_uom_id?: number | null;
+    allowed_purchase_uoms: Array<{
+        id: number;
+        item_unit_id: number;
+        unit_role: string;
+        is_default: boolean;
+        conversion_factor: string;
+        quantity_precision: number;
+        uom: NamedResource | null;
+    }>;
+    quantity_precision: number;
+    unit_price?: string | null;
+    price_source: string;
+    price_source_label: string;
+    tax_defaults: Record<string, unknown>;
+    description?: string | null;
+    supplier_mapping?: Record<string, unknown> | null;
+    eligible: boolean;
+    block_reason?: string | null;
+}
+
+export interface PurchaseAdjustmentCatalogueEntry {
+    type: string;
+    default_name: string;
+    allowed_effects: Array<'increase' | 'decrease'>;
+    default_effect: 'increase' | 'decrease';
+    allowed_calculation_types: Array<'fixed' | 'percentage'>;
+    default_calculation_type: 'fixed' | 'percentage';
+    allowed_calculation_bases: string[];
+    default_calculation_base: string;
+    cost_treatment?: string;
+    tax_treatment?: string;
+    finance_mapping_label?: string;
+    override_allowed: boolean;
 }
 
 export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed' | 'partially_invoiced' | 'invoiced' | 'partially_returned' | 'returned' | 'cancelled';
@@ -177,6 +297,8 @@ export interface GoodsReceiptLine {
     invoiced_quantity?: string;
     returned_quantity?: string;
     remaining_quantity?: string;
+    remaining_invoiceable_quantity?: string;
+    remaining_returnable_quantity?: string;
     unit_price: string;
     line_subtotal?: string;
     line_total?: string;
@@ -235,6 +357,12 @@ export interface ReturnableLine {
     unit_price: string;
 }
 
+export interface InvoiceableGoodsReceiptLine extends GoodsReceiptLine {
+    remaining_invoiceable_quantity: string;
+    can_invoice?: boolean;
+    block_reason?: string | null;
+}
+
 export interface PurchaseReturnLine {
     id?: number;
     source_line_type: string;
@@ -262,6 +390,14 @@ export interface PurchaseReturn {
     source_id?: number | null;
     source?: SourceSummary | null;
     status?: PurchaseReturnStatus | string;
+    capabilities?: {
+        can_edit?: boolean;
+        can_approve?: boolean;
+        can_post?: boolean;
+        can_cancel?: boolean;
+        can_reverse?: boolean;
+        read_only?: boolean;
+    };
     supplier?: NamedResource | null;
     warehouse?: NamedResource | null;
     warehouse_location?: NamedResource | null;

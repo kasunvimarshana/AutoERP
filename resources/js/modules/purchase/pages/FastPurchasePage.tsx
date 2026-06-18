@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -22,6 +22,15 @@ const paymentTerms = [
     { value: 'net_30', label: 'Net 30' },
 ];
 
+type FastPurchasePreset = 'expense_only' | 'purchase_receive' | 'purchase_receive_invoice' | 'purchase_receive_invoice_pay';
+
+const presetOptions: Array<{ value: FastPurchasePreset; label: string }> = [
+    { value: 'expense_only', label: 'Expense Only' },
+    { value: 'purchase_receive', label: 'Purchase + Receive' },
+    { value: 'purchase_receive_invoice', label: 'Purchase + Receive + Invoice' },
+    { value: 'purchase_receive_invoice_pay', label: 'Purchase + Receive + Invoice + Pay' },
+];
+
 export default function FastPurchasePage() {
     const context = useApi((signal) => getFastPurchaseContext(signal), []);
     const defaults = context.data?.defaults;
@@ -34,9 +43,7 @@ export default function FastPurchasePage() {
     const [terms, setTerms] = useState('due_on_receipt');
     const [supplierReference, setSupplierReference] = useState('');
     const [notes, setNotes] = useState('');
-    const [receiveStock, setReceiveStock] = useState(true);
-    const [createInvoice, setCreateInvoice] = useState(true);
-    const [recordPayment, setRecordPayment] = useState(false);
+    const [preset, setPreset] = useState<FastPurchasePreset>('purchase_receive_invoice');
     const [lines, setLines] = useState<FastPurchaseLineRow[]>([blankFastPurchaseLine()]);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethodId, setPaymentMethodId] = useState('');
@@ -49,10 +56,21 @@ export default function FastPurchasePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [previewing, setPreviewing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const purchaseDateTouched = useRef(false);
+    const exchangeRateTouched = useRef(false);
+    const receiveStock = preset !== 'expense_only';
+    const createInvoice = preset === 'purchase_receive_invoice' || preset === 'purchase_receive_invoice_pay';
+    const recordPayment = preset === 'purchase_receive_invoice_pay';
 
     const dirty = Boolean(supplier || supplierReference || notes || lines.some((line) => line.item || line.unit_cost || line.discount_amount !== '0.000000'));
     useUnsavedChanges(dirty && !result && !submitting);
     const errorFor = (field: string) => fieldError(error, field);
+
+    useEffect(() => {
+        if (!defaults) return;
+        if (!purchaseDateTouched.current) setPurchaseDate(defaults.purchase_date ?? todayDate());
+        if (!exchangeRateTouched.current) setExchangeRate(defaults.exchange_rate ?? '1.000000');
+    }, [defaults]);
 
     const canSubmit = useMemo(() => Boolean(
         supplier?.id
@@ -137,41 +155,21 @@ export default function FastPurchasePage() {
                     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
-                            <Input label="Purchase date" type="date" value={purchaseDate} error={errorFor('purchase_date')} onChange={(event) => setPurchaseDate(event.target.value)} />
+                            <Input label="Purchase date" type="date" value={purchaseDate} error={errorFor('purchase_date')} onChange={(event) => { purchaseDateTouched.current = true; setPurchaseDate(event.target.value); }} />
                             <Input label="Supplier reference" value={supplierReference} error={errorFor('supplier_reference')} onChange={(event) => setSupplierReference(event.target.value)} />
                             <Select label="Payment terms" value={terms} options={paymentTerms} onChange={(event) => setTerms(event.target.value)} />
                             <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
                             <WarehouseLocationLookupSelect warehouseId={warehouse?.id} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                             <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
-                            <DecimalInput label="Exchange rate" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => setExchangeRate(event.target.value)} />
+                            <DecimalInput label="Exchange rate" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => { exchangeRateTouched.current = true; setExchangeRate(event.target.value); }} />
                         </div>
-                        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                                <input type="checkbox" checked={receiveStock} onChange={(event) => setReceiveStock(event.target.checked)} />
-                                Receive stock now
-                            </label>
-                            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                                <input
-                                    type="checkbox"
-                                    checked={createInvoice}
-                                    onChange={(event) => {
-                                        setCreateInvoice(event.target.checked);
-                                        if (!event.target.checked) setRecordPayment(false);
-                                    }}
-                                />
-                                Create supplier invoice now
-                            </label>
-                            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-                                <input
-                                    type="checkbox"
-                                    checked={recordPayment}
-                                    onChange={(event) => {
-                                        setRecordPayment(event.target.checked);
-                                        if (event.target.checked) setCreateInvoice(true);
-                                    }}
-                                />
-                                Record supplier payment now
-                            </label>
+                        <div className="mt-4 grid gap-2 md:grid-cols-4">
+                            {presetOptions.map((option) => (
+                                <label key={option.value} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${preset === option.value ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-slate-200 text-slate-700'}`}>
+                                    <input type="radio" name="fast_purchase_preset" checked={preset === option.value} onChange={() => setPreset(option.value)} />
+                                    {option.label}
+                                </label>
+                            ))}
                         </div>
                     </section>
 
@@ -198,7 +196,7 @@ export default function FastPurchasePage() {
                                     error={errorFor('payment.source_account_id')}
                                 />
                                 <Input label="Reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} error={errorFor('payment.reference')} />
-                                <Input label="Cheque / card no." value={chequeNumber} onChange={(event) => setChequeNumber(event.target.value)} error={errorFor('payment.cheque_number')} />
+                                <Input label="Instrument number" value={chequeNumber} onChange={(event) => setChequeNumber(event.target.value)} error={errorFor('payment.cheque_number')} />
                                 <Input label="Instrument date" type="date" value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} error={errorFor('payment.cheque_date')} />
                             </div>
                         </section>

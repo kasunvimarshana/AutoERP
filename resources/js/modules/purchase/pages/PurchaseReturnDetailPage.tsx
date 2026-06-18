@@ -14,7 +14,6 @@ import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, getPurchaseReturn, postPurchaseReturn, type PurchaseReturnLine } from '../purchaseApi';
-import { purchaseReturnCapabilities } from '../purchaseCapabilities';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
@@ -26,7 +25,7 @@ export default function PurchaseReturnDetailPage() {
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const row = result.data;
-    const capabilities = purchaseReturnCapabilities(row.status);
+    const capabilities = row.capabilities ?? {};
     const run = async (action: 'approve' | 'post' | 'cancel') => {
         setActionError(null);
         try {
@@ -54,7 +53,7 @@ export default function PurchaseReturnDetailPage() {
             <ContentHeader
                 title={row.return_number ?? 'Purchase return'}
                 description={formatDate(row.return_date)}
-                actions={<>{capabilities.canApprove && <Button onClick={() => run('approve')}>Approve</Button>}{capabilities.canPost && <Button variant="secondary" onClick={() => run('post')}>Post</Button>}{capabilities.canCancel && <Button variant="ghost" onClick={() => run('cancel')}>Cancel</Button>}</>}
+                actions={<>{capabilities.can_approve && <Button onClick={() => run('approve')}>Approve</Button>}{capabilities.can_post && <Button variant="secondary" onClick={() => run('post')}>Post</Button>}{capabilities.can_cancel && <Button variant="ghost" onClick={() => run('cancel')}>Cancel</Button>}</>}
             />
             <ErrorAlert error={result.error ?? actionError} />
             <Panel>

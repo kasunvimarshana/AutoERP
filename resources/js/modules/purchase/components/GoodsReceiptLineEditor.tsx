@@ -24,6 +24,11 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
         onChange(lines.map((current, currentIndex) => currentIndex === index ? line : current));
         setDialog(null);
     };
+    const receiveAll = () => onChange(lines.map((line) => {
+        const remaining = remainingQuantity(line);
+        return { ...line, received_quantity: remaining, accepted_quantity: remaining, rejected_quantity: '0.000000' };
+    }));
+    const clearQuantities = () => onChange(lines.map((line) => ({ ...line, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' })));
     const columns: DataColumn<EditableGoodsReceiptLine & { rowIndex: number }>[] = [
         { key: 'item', header: 'Item', render: formatGoodsReceiptItem },
         { key: 'quantity', header: 'Qty', render: (line) => line.received_quantity, className: 'tabular-nums' },
@@ -38,6 +43,10 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
 
     return (
         <>
+            <div className="mb-3 flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={receiveAll}>Receive All Remaining</Button>
+                <Button type="button" variant="ghost" onClick={clearQuantities}>Clear Quantities</Button>
+            </div>
             <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit receipt line" onClose={() => setDialog(null)}>
                 {dialog && (

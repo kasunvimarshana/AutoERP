@@ -33,6 +33,7 @@ final class PurchaseAuthorizationService
 
     public const RETURNS_VIEW = 'purchase.returns.view';
     public const RETURNS_CREATE = 'purchase.returns.create';
+    public const RETURNS_CREATE_MANUAL = 'purchase.returns.create_manual';
     public const RETURNS_UPDATE = 'purchase.returns.update';
     public const RETURNS_APPROVE = 'purchase.returns.approve';
     public const RETURNS_POST = 'purchase.returns.post';
@@ -81,6 +82,7 @@ final class PurchaseAuthorizationService
             self::SUPPLIER_INVOICES_CANCEL => 'Cancel supplier invoices owned by Purchase.',
             self::RETURNS_VIEW => 'View purchase returns.',
             self::RETURNS_CREATE => 'Create draft purchase returns.',
+            self::RETURNS_CREATE_MANUAL => 'Create restricted manual supplier returns.',
             self::RETURNS_UPDATE => 'Update draft purchase returns.',
             self::RETURNS_APPROVE => 'Approve purchase returns.',
             self::RETURNS_POST => 'Post purchase returns.',

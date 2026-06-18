@@ -28,6 +28,12 @@ return new class extends Migration
             $table->decimal('remaining_amount', 20, 6);
             $table->string('allocation_method')->default('proportional');
             $table->boolean('is_allocatable')->default(true);
+            $table->foreignId('finance_posting_profile_id')->nullable()->constrained('finance_posting_profiles', 'id')->nullOnDelete();
+            $table->foreignId('finance_account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
+            $table->string('cost_treatment', 80)->nullable();
+            $table->string('tax_treatment', 80)->nullable();
+            $table->string('mapping_source', 80)->default('catalogue');
+            $table->text('override_reason')->nullable();
             $table->integer('sort_order')->default(0);
             $table->text('description')->nullable();
             $table->timestamps();
@@ -36,6 +42,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'purchase_header_adjustments_tenant_org_idx');
             $table->index(['source_type', 'source_id'], 'purchase_header_adjustments_source_idx');
             $table->index('adjustment_type', 'purchase_header_adjustments_type_idx');
+            $table->index('finance_posting_profile_id', 'purchase_header_adjustments_profile_idx');
+            $table->index('finance_account_id', 'purchase_header_adjustments_account_idx');
         });
     }
 

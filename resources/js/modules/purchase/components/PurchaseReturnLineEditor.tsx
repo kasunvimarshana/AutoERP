@@ -24,6 +24,8 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
         onChange(lines.map((current, currentIndex) => currentIndex === index ? line : current));
         setDialog(null);
     };
+    const returnAll = () => onChange(lines.map((line) => ({ ...line, returned_quantity: line.source.returnable_quantity })));
+    const clearQuantities = () => onChange(lines.map((line) => ({ ...line, returned_quantity: '0.000000' })));
     const columns: DataColumn<EditableReturnLine & { rowIndex: number }>[] = [
         { key: 'item', header: 'Item', render: formatReturnItem },
         { key: 'quantity', header: 'Qty', render: (line) => line.returned_quantity, className: 'tabular-nums' },
@@ -37,6 +39,10 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
 
     return (
         <>
+            <div className="mb-3 flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={returnAll}>Return All</Button>
+                <Button type="button" variant="ghost" onClick={clearQuantities}>Clear Quantities</Button>
+            </div>
             <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
                 {dialog && (

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { isNonNegativeDecimal, isPositiveDecimal } from '@/shared/utils/decimal';
-import { ItemLookupSelect, UomLookupSelect } from './PurchaseLookups';
+import { getPurchaseItemContext } from '../purchaseApi';
+import type { PurchaseItemContext } from '../purchaseTypes';
+import { ItemLookupSelect } from './PurchaseLookups';
 import {
     previewLineAmounts,
     type EditablePurchaseLine,
@@ -17,14 +19,18 @@ const calculationOptions = [
     { value: 'percentage', label: 'Percentage' },
 ];
 
-export function PurchaseOrderLineForm({ line, mode, errorFor, onSave, onCancel }: {
+export function PurchaseOrderLineForm({ line, mode, supplierId, currencyId, warehouseId, errorFor, onSave, onCancel }: {
     line: EditablePurchaseLine;
     mode: 'create' | 'edit';
+    supplierId?: number;
+    currencyId?: number;
+    warehouseId?: number;
     errorFor: (field: string) => string | undefined;
     onSave: (line: EditablePurchaseLine) => void;
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(line);
+    const [context, setContext] = useState<PurchaseItemContext | null>(null);
     const [errors, setErrors] = useState<LineFormErrors>({});
     const set = <K extends keyof EditablePurchaseLine>(key: K, value: EditablePurchaseLine[K]) => {
         setDraft((current) => ({ ...current, [key]: value }));
@@ -32,6 +38,49 @@ export function PurchaseOrderLineForm({ line, mode, errorFor, onSave, onCancel }
     };
     const formError = (field: keyof LineFormErrors) => errors[field] ?? errorFor(field);
     const preview = previewLineAmounts(draft);
+
+    useEffect(() => {
+        if (!draft.item?.id) {
+            setContext(null);
+            return;
+        }
+
+        const controller = new AbortController();
+        void getPurchaseItemContext(draft.item.id, {
+            supplier_id: supplierId,
+            item_variant_id: draft.item_variant_id ?? undefined,
+            currency_id: currencyId,
+            warehouse_id: warehouseId,
+        }, controller.signal)
+            .then((nextContext) => {
+                if (controller.signal.aborted) return;
+                setContext(nextContext);
+                setDraft((current) => {
+                    if (current.item?.id !== nextContext.item.id) return current;
+                    const defaultUom = nextContext.allowed_purchase_uoms.find((row) => row.id === nextContext.default_purchase_uom_id);
+
+                    return {
+                        ...current,
+                        description: current.description || nextContext.description || '',
+                        uom: current.auto_uom && defaultUom?.uom ? defaultUom.uom : current.uom,
+                        unit_price: current.auto_price && nextContext.unit_price ? nextContext.unit_price : current.unit_price,
+                        price_source_label: nextContext.price_source_label,
+                    };
+                });
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [draft.item?.id, draft.item_variant_id, supplierId, currencyId, warehouseId]);
+
+    const variantOptions = context?.variants.map((variant) => ({
+        value: variant.id,
+        label: [variant.code, variant.name].filter(Boolean).join(' - ') || `Variant #${variant.id}`,
+    })) ?? [];
+    const uomOptions = context?.allowed_purchase_uoms.map((row) => ({
+        value: row.id,
+        label: [row.uom?.code, row.uom?.name].filter(Boolean).join(' - ') || `UOM #${row.id}`,
+    })) ?? [];
 
     return (
         <form className="space-y-5" onSubmit={(event) => {
@@ -47,12 +96,43 @@ export function PurchaseOrderLineForm({ line, mode, errorFor, onSave, onCancel }
                     <p className="text-sm text-slate-500">Item, quantity, UOM, and price are enough for most lines.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <ItemLookupSelect value={draft.item} onChange={(item) => set('item', item)} error={formError('item') ?? errorFor('item_id')} />
+                    <ItemLookupSelect
+                        value={draft.item}
+                        onChange={(item) => {
+                            setDraft((current) => ({ ...current, item, item_variant: null, item_variant_id: null, auto_price: true, auto_uom: true }));
+                            setErrors((current) => ({ ...current, item: undefined }));
+                        }}
+                        error={formError('item') ?? errorFor('item_id')}
+                    />
+                    <Select
+                        label="Variant"
+                        value={draft.item_variant_id ?? ''}
+                        options={variantOptions}
+                        disabled={!draft.item || variantOptions.length === 0}
+                        error={errorFor('item_variant_id')}
+                        onChange={(event) => {
+                            const variantId = event.target.value ? Number(event.target.value) : null;
+                            const variant = context?.variants.find((row) => row.id === variantId) ?? null;
+                            setDraft((current) => ({ ...current, item_variant: variant, item_variant_id: variantId, auto_price: true, auto_uom: true }));
+                        }}
+                    />
                     <DecimalInput label="Quantity" value={draft.ordered_quantity} error={formError('ordered_quantity')} onChange={(event) => set('ordered_quantity', event.target.value)} />
-                    <UomLookupSelect value={draft.uom} onChange={(uom) => set('uom', uom)} error={formError('uom') ?? errorFor('uom_id')} />
-                    <DecimalInput label="Unit price" value={draft.unit_price} error={formError('unit_price')} onChange={(event) => set('unit_price', event.target.value)} />
+                    <Select
+                        label="UOM"
+                        value={draft.uom?.id ?? ''}
+                        options={uomOptions}
+                        disabled={!context}
+                        error={formError('uom') ?? errorFor('uom_id')}
+                        onChange={(event) => {
+                            const uomId = event.target.value ? Number(event.target.value) : null;
+                            const selected = context?.allowed_purchase_uoms.find((row) => row.id === uomId)?.uom ?? null;
+                            setDraft((current) => ({ ...current, uom: selected, auto_uom: false }));
+                        }}
+                    />
+                    <DecimalInput label="Unit price" value={draft.unit_price} error={formError('unit_price')} onChange={(event) => setDraft((current) => ({ ...current, unit_price: event.target.value, auto_price: false }))} />
                     <Input className="sm:col-span-2" label="Description" value={draft.description} onChange={(event) => set('description', event.target.value)} />
                 </div>
+                {draft.price_source_label && <p className="text-xs text-slate-500">{draft.price_source_label}</p>}
             </section>
 
             <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">

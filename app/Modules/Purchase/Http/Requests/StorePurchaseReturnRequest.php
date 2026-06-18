@@ -27,7 +27,7 @@ final class StorePurchaseReturnRequest extends PurchaseRequest
             'affects_supplier_balance' => ['nullable', 'boolean'],
             'cost_basis' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.source_line_type' => ['required', 'in:goods_receipt_note_line,purchase_order_line,supplier_invoice_line,manual_supplier_return'],
+            'lines.*.source_line_type' => ['required', 'in:goods_receipt_note_line,manual_supplier_return'],
             'lines.*.source_line_id' => ['required', 'integer', 'min:0'],
             'lines.*.returned_quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.item_id' => ['nullable', 'integer', 'min:1'],

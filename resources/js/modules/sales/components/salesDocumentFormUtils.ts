@@ -31,8 +31,14 @@ export function asResource(value: NamedResource | null | undefined): NamedResour
 export function lineFromDocument(
     line: NonNullable<SalesDocument['lines']>[number],
 ): EditableSalesLine {
+    const itemVariantId = 'item_variant_id' in line && typeof line.item_variant_id === 'number'
+        ? line.item_variant_id
+        : null;
+
     return {
         item: asResource(line.item),
+        item_variant: asResource('item_variant' in line ? line.item_variant : null),
+        item_variant_id: itemVariantId,
         uom: asResource(line.uom),
         description: line.description ?? '',
         ordered_quantity: line.quantity ?? line.ordered_quantity ?? '1.000000',

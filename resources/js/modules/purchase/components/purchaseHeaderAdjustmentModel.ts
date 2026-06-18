@@ -7,6 +7,11 @@ export interface EditableHeaderAdjustment {
     rate: string;
     amount: string;
     allocation_method: string;
+    finance_mapping_label?: string;
+    cost_treatment?: string;
+    tax_treatment?: string;
+    mapping_source?: 'catalogue' | 'override';
+    override_reason?: string;
     description: string;
 }
 
@@ -20,6 +25,11 @@ export function emptyHeaderAdjustment(): EditableHeaderAdjustment {
         rate: '0.000000',
         amount: '0.000000',
         allocation_method: 'proportional',
+        finance_mapping_label: 'Freight-in / landed cost',
+        cost_treatment: 'landed_cost_or_expense',
+        tax_treatment: 'none',
+        mapping_source: 'catalogue',
+        override_reason: '',
         description: '',
     };
 }

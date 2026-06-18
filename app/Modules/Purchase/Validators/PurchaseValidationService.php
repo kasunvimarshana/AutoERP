@@ -178,10 +178,8 @@ final class PurchaseValidationService
         }
 
         $warehouse = WarehouseModel::query()->find($warehouseId);
-        if (! $warehouse instanceof WarehouseModel
-            || (int) $location->tenant_id !== (int) $warehouse->tenant_id
-            || $this->nullableScopeId($location->organization_unit_id ?? null) !== $this->nullableScopeId($warehouse->organization_unit_id ?? null)) {
-            $this->invalidReference($field, 'warehouse location', 'The selected warehouse location scope does not match the selected warehouse.');
+        if (! $warehouse instanceof WarehouseModel || (int) $location->tenant_id !== (int) $warehouse->tenant_id) {
+            $this->invalidReference($field, 'warehouse location', 'The selected warehouse location does not match the selected warehouse scope.');
         }
 
         if (isset($location->is_active) && ! (bool) $location->is_active) {

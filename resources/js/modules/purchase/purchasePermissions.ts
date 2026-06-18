@@ -15,6 +15,7 @@ export const purchasePermissions = {
     supplierInvoicesCreate: 'purchase.supplier_invoices.create',
     returnsView: 'purchase.returns.view',
     returnsCreate: 'purchase.returns.create',
+    returnsCreateManual: 'purchase.returns.create_manual',
     returnsApprove: 'purchase.returns.approve',
     returnsPost: 'purchase.returns.post',
     returnsCancel: 'purchase.returns.cancel',
@@ -30,5 +31,5 @@ export const purchasePermissions = {
 } as const;
 
 export function hasPurchasePermission(permissions: string[], permission: string): boolean {
-    return permissions.length === 0 || permissions.includes(permission);
+    return permissions.includes(permission);
 }

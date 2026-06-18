@@ -25,6 +25,15 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
     const active = result ?? preview;
     const summary = active?.summary ?? emptySummary;
     const mode = active?.mode ? active.mode.replaceAll('_', ' ') : 'draft';
+    const options = active?.options;
+    const impact = [
+        options?.receive_stock_now ? 'Goods Receipt' : null,
+        options?.create_supplier_invoice_now ? 'Supplier Invoice' : null,
+        options?.record_payment_now ? 'Payment' : null,
+        options?.receive_stock_now ? 'Inventory Movement' : null,
+        options?.create_supplier_invoice_now || options?.receive_stock_now ? 'Tax Posting' : null,
+        options?.create_supplier_invoice_now || options?.record_payment_now ? 'Finance Entries' : null,
+    ].filter(Boolean);
     const documents = result?.documents;
     const links = [
         documents?.goods_receipt,
@@ -56,6 +65,14 @@ export function FastPurchaseSummary({ preview, result, submitting, previewing, c
                     </div>
                 ))}
             </dl>
+            {impact.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <div className="font-semibold text-slate-900">This transaction will create</div>
+                    <ul className="mt-2 space-y-1 text-slate-700">
+                        {impact.map((label) => <li key={label}>✓ {label}</li>)}
+                    </ul>
+                </div>
+            )}
             <Button type="submit" className="w-full" loading={submitting} disabled={!canSubmit}>Create fast purchase</Button>
             {links.length > 0 && (
                 <div className="border-t border-slate-200 pt-3 text-sm">

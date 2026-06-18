@@ -3,7 +3,15 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderPayload } from '../purchaseTypes';
+import type {
+    PurchaseAdjustmentCatalogueEntry,
+    PurchaseItemContext,
+    PurchaseOrder,
+    PurchaseOrderCreateContext,
+    PurchaseOrderLine,
+    PurchaseOrderPayload,
+    PurchaseSupplierContext,
+} from '../purchaseTypes';
 
 export async function listPurchaseOrders(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<PurchaseOrder>>(`${endpoints.purchase}/orders`, { params, signal });
@@ -12,6 +20,36 @@ export async function listPurchaseOrders(params: ListParams, signal?: AbortSigna
 
 export async function getPurchaseOrder(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function getPurchaseOrderCreateContext(signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<PurchaseOrderCreateContext>>(`${endpoints.purchase}/orders/create-context`, { signal });
+    return response.data.data;
+}
+
+export async function getPurchaseSupplierContext(supplierId: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<PurchaseSupplierContext>>(`${endpoints.purchase}/suppliers/${supplierId}/purchase-context`, { signal });
+    return response.data.data;
+}
+
+export async function getPurchaseItemContext(itemId: number, params: {
+    supplier_id?: number;
+    item_variant_id?: number;
+    currency_id?: number;
+    warehouse_id?: number;
+} = {}, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<PurchaseItemContext>>(`${endpoints.purchase}/items/${itemId}/purchase-context`, { params, signal });
+    return response.data.data;
+}
+
+export async function getPurchaseAdjustmentCatalogue(signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<PurchaseAdjustmentCatalogueEntry[]>>(`${endpoints.purchase}/adjustments/catalogue`, { signal });
+    return response.data.data;
+}
+
+export async function getPurchaseWarehouseLocations(warehouseId: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<NamedResource[]>>(`${endpoints.purchase}/warehouses/${warehouseId}/locations`, { params: { per_page: 50 }, signal });
     return response.data.data;
 }
 

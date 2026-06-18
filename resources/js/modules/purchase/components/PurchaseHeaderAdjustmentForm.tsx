@@ -8,10 +8,11 @@ import {
     formatAdjustmentSummary,
     type EditableHeaderAdjustment,
 } from './purchaseHeaderAdjustmentModel';
+import type { PurchaseAdjustmentCatalogueEntry } from '../purchaseTypes';
 
 type AdjustmentFormErrors = Partial<Record<'name' | 'amount' | 'rate', string>>;
 
-const adjustmentTypes = [
+const fallbackAdjustmentTypes = [
     'discount',
     'tax',
     'freight',
@@ -43,9 +44,10 @@ const calculationBases = [
     { value: 'subtotal_after_line_adjustments', label: 'After line adjustments' },
 ];
 
-export function PurchaseHeaderAdjustmentForm({ adjustment, mode, errorFor, onSave, onCancel }: {
+export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, errorFor, onSave, onCancel }: {
     adjustment: EditableHeaderAdjustment;
     mode: 'create' | 'edit';
+    catalogue: PurchaseAdjustmentCatalogueEntry[];
     errorFor: (field: string) => string | undefined;
     onSave: (adjustment: EditableHeaderAdjustment) => void;
     onCancel: () => void;
@@ -57,6 +59,35 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, errorFor, onSav
         setErrors((current) => ({ ...current, [key]: undefined }));
     };
     const formError = (field: keyof AdjustmentFormErrors) => errors[field] ?? errorFor(field);
+    const selectedCatalogue = catalogue.find((entry) => entry.type === draft.adjustment_type);
+    const adjustmentTypes = catalogue.length
+        ? catalogue.map((entry) => ({ value: entry.type, label: entry.default_name }))
+        : fallbackAdjustmentTypes;
+    const effectChoices = selectedCatalogue?.allowed_effects.length
+        ? selectedCatalogue.allowed_effects.map((value) => ({ value, label: value === 'increase' ? 'Increase' : 'Decrease' }))
+        : effectOptions;
+    const effectReadonly = effectChoices.length === 1;
+
+    const applyCatalogue = (type: string) => {
+        const entry = catalogue.find((row) => row.type === type);
+        if (!entry) {
+            set('adjustment_type', type);
+            return;
+        }
+
+        setDraft((current) => ({
+            ...current,
+            adjustment_type: type,
+            name: current.name.trim() === '' || current.name === selectedCatalogue?.default_name ? entry.default_name : current.name,
+            effect: entry.default_effect,
+            calculation_type: entry.default_calculation_type,
+            calculation_base: entry.default_calculation_base as EditableHeaderAdjustment['calculation_base'],
+            finance_mapping_label: entry.finance_mapping_label,
+            cost_treatment: entry.cost_treatment,
+            tax_treatment: entry.tax_treatment,
+            mapping_source: 'catalogue',
+        }));
+    };
 
     return (
         <form className="space-y-5" onSubmit={(event) => {
@@ -73,8 +104,8 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, errorFor, onSav
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Input label="Name" value={draft.name} error={formError('name')} onChange={(event) => set('name', event.target.value)} />
-                    <Select label="Type" value={draft.adjustment_type} options={adjustmentTypes} error={errorFor('adjustment_type')} onChange={(event) => set('adjustment_type', event.target.value)} />
-                    <Select label="Effect" value={draft.effect} options={effectOptions} error={errorFor('effect')} onChange={(event) => set('effect', event.target.value as 'increase' | 'decrease')} />
+                    <Select label="Type" value={draft.adjustment_type} options={adjustmentTypes} error={errorFor('adjustment_type')} onChange={(event) => applyCatalogue(event.target.value)} />
+                    <Select label="Effect" value={draft.effect} options={effectChoices} disabled={effectReadonly} error={errorFor('effect')} onChange={(event) => set('effect', event.target.value as 'increase' | 'decrease')} />
                     <Select label="Calculation" value={draft.calculation_type} options={calculationOptions} error={errorFor('calculation_type')} onChange={(event) => set('calculation_type', event.target.value as 'fixed' | 'percentage')} />
                     {draft.calculation_type === 'percentage' && <Select label="Base" value={draft.calculation_base} options={calculationBases} error={errorFor('calculation_base')} onChange={(event) => set('calculation_base', event.target.value as EditableHeaderAdjustment['calculation_base'])} />}
                     {draft.calculation_type === 'percentage'
@@ -94,6 +125,7 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, errorFor, onSav
             <div className="rounded-lg border border-slate-200 p-4 text-sm">
                 <h3 className="font-semibold text-slate-900">Adjustment Preview</h3>
                 <div className="mt-2 text-slate-700">{formatAdjustmentSummary(draft)}</div>
+                {draft.finance_mapping_label && <div className="mt-2 text-slate-600">Finance mapping: {draft.finance_mapping_label}</div>}
             </div>
 
             <div className="flex justify-end gap-2">

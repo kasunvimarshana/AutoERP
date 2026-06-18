@@ -7,6 +7,7 @@ namespace Modules\Purchase\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Services\PurchaseRelatedDocumentService;
 
 final class PurchaseOrderResource extends PurchaseResource
 {
@@ -62,6 +63,15 @@ final class PurchaseOrderResource extends PurchaseResource
             'returned_quantity' => (string) ($this->returned_quantity ?? '0.000000'),
             'lines' => $this->whenLoaded('lines', fn () => PurchaseOrderLineResource::collection($this->lines)->resolve($request), []),
             'adjustments' => $this->whenLoaded('adjustments', fn () => PurchaseHeaderAdjustmentResource::collection($this->adjustments)->resolve($request), []),
+            'related_documents' => $request->routeIs('api.v1.purchase.orders.show')
+                ? app(PurchaseRelatedDocumentService::class)->forPurchaseOrder($this->resource)
+                : [
+                    'goods_receipts' => [],
+                    'supplier_invoices' => [],
+                    'payments' => [],
+                    'returns' => [],
+                    'debit_notes' => [],
+                ],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

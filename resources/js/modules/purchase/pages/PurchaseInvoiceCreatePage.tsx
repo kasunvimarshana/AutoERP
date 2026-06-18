@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -10,7 +10,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
-import { createPurchaseInvoice, getGoodsReceipt, getInvoiceablePurchaseOrderLines, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
+import { createPurchaseInvoice, getInvoiceableGoodsReceiptLines, getInvoiceablePurchaseOrderLines, getPurchaseOrder, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, GoodsReceiptLookupSelect, PurchaseOrderLookupSelect, SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseInvoicePreview } from '../components/PurchaseInvoicePreview';
@@ -22,6 +22,7 @@ import {
 
 export default function PurchaseInvoiceCreatePage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [sourceType, setSourceType] = useState<PurchaseInvoiceSourceType>('goods_receipt_note');
     const [source, setSource] = useState<NamedResource | null>(null);
     const [sources, setSources] = useState<Array<{ type: PurchaseInvoiceSourceType; id: number; label: string }>>([]);
@@ -58,9 +59,8 @@ export default function PurchaseInvoiceCreatePage() {
                     quantity: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
                 }))]);
             } else {
-                const grn = await getGoodsReceipt(source.id);
-                if (!supplier && grn.supplier) setSupplier(grn.supplier);
-                setLines((current) => [...current, ...(grn.lines ?? []).filter((row) => row.remaining_quantity !== '0.000000').map((row: GoodsReceiptLine) => ({
+                const rows = await getInvoiceableGoodsReceiptLines(source.id);
+                setLines((current) => [...current, ...rows.map((row: GoodsReceiptLine) => ({
                     sourceType,
                     sourceId: source.id,
                     sourceLabel: source.name,
@@ -68,8 +68,8 @@ export default function PurchaseInvoiceCreatePage() {
                     itemName: row.item?.name ?? '-',
                     sourceQty: row.accepted_quantity,
                     previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
-                    remainingQty: row.remaining_quantity ?? '0.000000',
-                    quantity: row.remaining_quantity ?? '0.000000',
+                    remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
+                    quantity: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
                 }))]);
             }
             setSources((current) => [...current, { type: sourceType, id: source.id, label: source.name }]);
@@ -80,6 +80,30 @@ export default function PurchaseInvoiceCreatePage() {
         } finally {
             setBusy(false);
         }
+    };
+
+    useEffect(() => {
+        const poId = Number(searchParams.get('purchase_order_id'));
+        const grnId = Number(searchParams.get('goods_receipt_id') ?? searchParams.get('grn_id'));
+        if (Number.isFinite(poId) && poId > 0 && sources.length === 0 && !source) {
+            void getPurchaseOrder(poId)
+                .then((order) => {
+                    setSourceType('purchase_order');
+                    setSource({ id: order.id, code: order.purchase_order_number, name: order.purchase_order_number ?? `Purchase Order #${order.id}` });
+                    if (order.supplier) setSupplier(order.supplier);
+                    if (order.currency) setCurrency(order.currency);
+                })
+                .catch((requestError) => setError(toApiError(requestError)));
+        } else if (Number.isFinite(grnId) && grnId > 0 && sources.length === 0 && !source) {
+            setSourceType('goods_receipt_note');
+            setSource({ id: grnId, name: `Goods Receipt #${grnId}` });
+        }
+    }, [searchParams, source, sources.length]);
+
+    const removeSource = (item: { type: PurchaseInvoiceSourceType; id: number }) => {
+        setSources((current) => current.filter((sourceItem) => sourceItem.type !== item.type || sourceItem.id !== item.id));
+        setLines((current) => current.filter((line) => line.sourceType !== item.type || line.sourceId !== item.id));
+        setPreview(null);
     };
 
     const payload = (): PurchaseInvoicePayload => ({
@@ -130,7 +154,7 @@ export default function PurchaseInvoiceCreatePage() {
                     {sourceType === 'goods_receipt_note' ? <GoodsReceiptLookupSelect value={source} onChange={setSource} /> : <PurchaseOrderLookupSelect value={source} onChange={setSource} />}
                     <Button type="button" variant="secondary" loading={busy} onClick={addSource}>Add source</Button>
                 </div>
-                {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}</span>)}</div>}
+                {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}<button type="button" className="font-semibold text-rose-600" onClick={() => removeSource(item)}>Remove</button></span>)}</div>}
             </Panel>
             <Panel title="Invoiceable lines">
                 <PurchaseInvoiceLineTable

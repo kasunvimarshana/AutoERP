@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -8,15 +8,23 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
-import { addDecimal, nonNegativeDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { addDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import type { PurchaseOrder, PurchaseOrderPayload } from '../purchaseApi';
-import { createPurchaseOrder, updatePurchaseOrder } from '../purchaseApi';
+import {
+    createPurchaseOrder,
+    getPurchaseOrderCreateContext,
+    getPurchaseSupplierContext,
+    getPurchaseWarehouseLocations,
+    updatePurchaseOrder,
+} from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { PurchaseHeaderAdjustmentEditor, type EditableHeaderAdjustment } from './PurchaseHeaderAdjustmentEditor';
 import { PurchaseOrderLineEditor, previewLineAmounts, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderSummaryPanel';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
-import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
+import { PurchaseDocumentShell, PurchasePageHeader } from './PurchaseDocumentShell';
+import { PurchaseTabs, type PurchaseTabItem } from './PurchaseTabs';
 
 interface HeaderState {
     purchase_order_date: string;
@@ -25,6 +33,13 @@ interface HeaderState {
     notes: string;
 }
 
+const tabs: PurchaseTabItem[] = [
+    { id: 'details', label: 'Order Details' },
+    { id: 'lines', label: 'Lines' },
+    { id: 'adjustments', label: 'Adjustments' },
+    { id: 'attachments', label: 'Attachments' },
+];
+
 function resourceOrNull(resource: NamedResource | null | undefined): NamedResource | null {
     return resource?.id ? resource : null;
 }
@@ -32,6 +47,8 @@ function resourceOrNull(resource: NamedResource | null | undefined): NamedResour
 function lineFromOrder(line: NonNullable<PurchaseOrder['lines']>[number]): EditablePurchaseLine {
     return {
         item: resourceOrNull(line.item),
+        item_variant: resourceOrNull(line.item_variant),
+        item_variant_id: line.item_variant_id ?? line.item_variant?.id ?? null,
         uom: resourceOrNull(line.uom),
         description: line.description ?? '',
         ordered_quantity: line.ordered_quantity,
@@ -45,6 +62,8 @@ function lineFromOrder(line: NonNullable<PurchaseOrder['lines']>[number]): Edita
         charge_calculation_type: line.charge_calculation_type ?? 'fixed',
         charge_rate: line.charge_rate ?? '0.000000',
         charge_amount: line.charge_amount,
+        auto_price: false,
+        auto_uom: false,
     };
 }
 
@@ -58,6 +77,13 @@ function adjustmentFromOrder(adjustment: NonNullable<PurchaseOrder['adjustments'
         rate: adjustment.rate,
         amount: adjustment.amount,
         allocation_method: adjustment.allocation_method,
+        finance_mapping_label: adjustment.finance_mapping
+            ? [adjustment.finance_mapping.cost_treatment, adjustment.finance_mapping.tax_treatment].filter(Boolean).join(' / ')
+            : undefined,
+        cost_treatment: adjustment.cost_treatment ?? undefined,
+        tax_treatment: adjustment.tax_treatment ?? undefined,
+        mapping_source: (adjustment.mapping_source as 'catalogue' | 'override' | undefined) ?? 'catalogue',
+        override_reason: adjustment.override_reason ?? '',
         description: adjustment.description ?? '',
     };
 }
@@ -90,50 +116,156 @@ function calculatePreview(lines: EditablePurchaseLine[], adjustments: EditableHe
         charge_total: charge,
         header_increase_total: increases,
         header_decrease_total: decreases,
-        grand_total: nonNegativeDecimal(grand),
+        grand_total: grand,
     };
 }
 
 export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const navigate = useNavigate();
-    const [header, setHeader] = useState<HeaderState>({
+    const [searchParams] = useSearchParams();
+    const requestedTab = searchParams.get('tab') ?? tabs[0].id;
+    const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab : tabs[0].id;
+    const [header, setHeaderState] = useState<HeaderState>({
         purchase_order_date: order?.purchase_order_date ?? todayDate(),
         expected_delivery_date: order?.expected_delivery_date ?? '',
         exchange_rate: order?.exchange_rate ?? '1.000000',
         notes: order?.notes ?? '',
     });
-    const [supplier, setSupplier] = useState<NamedResource | null>(resourceOrNull(order?.supplier));
-    const [warehouse, setWarehouse] = useState<NamedResource | null>(resourceOrNull(order?.warehouse));
-    const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(resourceOrNull(order?.warehouse_location));
-    const [currency, setCurrency] = useState<NamedResource | null>(resourceOrNull(order?.currency));
-    const [lines, setLines] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(lineFromOrder) : []);
-    const [adjustments, setAdjustments] = useState<EditableHeaderAdjustment[]>(order?.adjustments?.length ? order.adjustments.map(adjustmentFromOrder) : []);
+    const [supplier, setSupplierState] = useState<NamedResource | null>(resourceOrNull(order?.supplier));
+    const [warehouse, setWarehouseState] = useState<NamedResource | null>(resourceOrNull(order?.warehouse));
+    const [warehouseLocation, setWarehouseLocationState] = useState<NamedResource | null>(resourceOrNull(order?.warehouse_location));
+    const [currency, setCurrencyState] = useState<NamedResource | null>(resourceOrNull(order?.currency));
+    const [baseCurrencyId, setBaseCurrencyId] = useState<number | null>(null);
+    const [currencySource, setCurrencySource] = useState('');
+    const [exchangeRateSource, setExchangeRateSource] = useState('');
+    const [warehouseSource, setWarehouseSource] = useState('');
+    const [locationSource, setLocationSource] = useState('');
+    const [lines, setLinesState] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(lineFromOrder) : []);
+    const [adjustments, setAdjustmentsState] = useState<EditableHeaderAdjustment[]>(order?.adjustments?.length ? order.adjustments.map(adjustmentFromOrder) : []);
     const [submitting, setSubmitting] = useState(false);
+    const [dirty, setDirty] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const totals = useMemo(() => calculatePreview(lines, adjustments), [lines, adjustments]);
     const errorFor = (field: string) => fieldError(error, field);
+    const supplierTouched = useRef(Boolean(order?.supplier));
     const warehouseTouched = useRef(Boolean(order?.warehouse));
     const locationTouched = useRef(Boolean(order?.warehouse_location));
+    const currencyTouched = useRef(Boolean(order?.currency));
+    const exchangeTouched = useRef(Boolean(order?.exchange_rate));
+
+    useUnsavedChanges(dirty && !submitting);
+
+    const setHeader = (next: HeaderState) => {
+        setDirty(true);
+        setHeaderState(next);
+    };
+    const setSupplier = (next: NamedResource | null) => {
+        setDirty(true);
+        supplierTouched.current = true;
+        setSupplierState(next);
+    };
+    const setWarehouse = (next: NamedResource | null) => {
+        setDirty(true);
+        warehouseTouched.current = true;
+        locationTouched.current = false;
+        setWarehouseState(next);
+        setWarehouseLocationState(null);
+        setLocationSource('');
+    };
+    const setWarehouseLocation = (next: NamedResource | null) => {
+        setDirty(true);
+        locationTouched.current = true;
+        setWarehouseLocationState(next);
+        setLocationSource(next ? 'manual' : '');
+    };
+    const setCurrency = (next: NamedResource | null) => {
+        setDirty(true);
+        currencyTouched.current = true;
+        setCurrencyState(next);
+        setCurrencySource(next ? 'manual' : '');
+        if (next?.id && baseCurrencyId === next.id) {
+            setHeaderState((current) => ({ ...current, exchange_rate: '1.000000' }));
+            setExchangeRateSource('tenant_default');
+        }
+    };
+    const setLines = (next: EditablePurchaseLine[]) => {
+        setDirty(true);
+        setLinesState(next);
+    };
+    const setAdjustments = (next: EditableHeaderAdjustment[]) => {
+        setDirty(true);
+        setAdjustmentsState(next);
+    };
 
     useEffect(() => {
-        if (order || warehouseTouched.current || warehouse || warehouseLocation) return;
+        if (order) return;
 
         const controller = new AbortController();
-        void getDefaultWarehouse(controller.signal)
-            .then(async (defaultWarehouse) => {
-                if (controller.signal.aborted || warehouseTouched.current || warehouse || !defaultWarehouse) return;
-                setWarehouse(defaultWarehouse);
-
-                if (locationTouched.current || warehouseLocation) return;
-                const defaultLocation = await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
-                if (!controller.signal.aborted && !locationTouched.current && !warehouseLocation && defaultLocation) {
-                    setWarehouseLocation(defaultLocation);
+        void getPurchaseOrderCreateContext(controller.signal)
+            .then((context) => {
+                if (controller.signal.aborted) return;
+                setBaseCurrencyId(context.exchange_rate_context.base_currency_id ?? null);
+                if (!currencyTouched.current && context.defaults.currency) {
+                    setCurrencyState(context.defaults.currency);
+                    setCurrencySource(context.defaults.currency_source ?? 'tenant_default');
+                }
+                if (!exchangeTouched.current) {
+                    setHeaderState((current) => ({
+                        ...current,
+                        purchase_order_date: context.defaults.purchase_order_date ?? current.purchase_order_date,
+                        expected_delivery_date: context.defaults.expected_delivery_date ?? current.expected_delivery_date,
+                        exchange_rate: context.defaults.exchange_rate ?? current.exchange_rate,
+                    }));
+                    setExchangeRateSource(context.defaults.exchange_rate_source ?? 'tenant_default');
+                }
+                if (!warehouseTouched.current && context.defaults.warehouse) {
+                    setWarehouseState(context.defaults.warehouse);
+                    setWarehouseSource(context.defaults.warehouse_source ?? 'organization_unit_default');
+                }
+                if (!locationTouched.current && context.defaults.warehouse_location) {
+                    setWarehouseLocationState(context.defaults.warehouse_location);
+                    setLocationSource(context.defaults.warehouse_location_source ?? 'warehouse_default');
                 }
             })
             .catch(() => undefined);
 
         return () => controller.abort();
-    }, [order, warehouse, warehouseLocation]);
+    }, [order]);
+
+    useEffect(() => {
+        if (!warehouse?.id || locationTouched.current) return;
+        const controller = new AbortController();
+        void getPurchaseWarehouseLocations(warehouse.id, controller.signal)
+            .then((locations) => {
+                if (controller.signal.aborted || locationTouched.current) return;
+                const defaultLocation = locations.find((location) => Boolean((location as NamedResource & { is_default?: boolean }).is_default)) ?? locations[0] ?? null;
+                setWarehouseLocationState(defaultLocation);
+                setLocationSource(defaultLocation ? 'warehouse_default' : '');
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [warehouse?.id]);
+
+    useEffect(() => {
+        if (!supplier?.id || !supplierTouched.current) return;
+        const controller = new AbortController();
+        void getPurchaseSupplierContext(supplier.id, controller.signal)
+            .then((context) => {
+                if (controller.signal.aborted) return;
+                if (!currencyTouched.current && context.currency) {
+                    setCurrencyState(context.currency);
+                    setCurrencySource(context.currency_source ?? 'supplier_default');
+                    if (context.currency.id === baseCurrencyId && !exchangeTouched.current) {
+                        setHeaderState((current) => ({ ...current, exchange_rate: '1.000000' }));
+                        setExchangeRateSource('tenant_default');
+                    }
+                }
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [supplier?.id, baseCurrencyId]);
 
     const payload = (): PurchaseOrderPayload => ({
         purchase_order_date: header.purchase_order_date,
@@ -147,6 +279,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         notes: header.notes || undefined,
         lines: lines.map((line) => ({
             item_id: line.item?.id ?? 0,
+            item_variant_id: line.item_variant_id ?? line.item_variant?.id ?? undefined,
             uom_id: line.uom?.id ?? 0,
             description: line.description || undefined,
             ordered_quantity: decimalOr(line.ordered_quantity),
@@ -170,56 +303,102 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
             rate: decimalOr(adjustment.rate),
             amount: decimalOr(adjustment.amount),
             allocation_method: adjustment.allocation_method,
+            cost_treatment: adjustment.cost_treatment,
+            tax_treatment: adjustment.tax_treatment,
+            mapping_source: adjustment.mapping_source,
+            override_reason: adjustment.override_reason || undefined,
             sort_order: index,
             description: adjustment.description || undefined,
         })),
     });
 
+    const submit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (submitting) return;
+        setSubmitting(true);
+        setError(null);
+        try {
+            const saved = order ? await updatePurchaseOrder(order.id, payload()) : await createPurchaseOrder(payload());
+            setDirty(false);
+            navigate(`/purchase/orders/${saved.id}`);
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const tabItems = tabs.map((tab) => ({
+        ...tab,
+        count: tab.id === 'lines' ? lines.length : tab.id === 'adjustments' ? adjustments.length : undefined,
+        error: tab.id === 'lines'
+            ? lines.some((_, index) => Boolean(errorFor(`lines.${index}.item_id`) || errorFor(`lines.${index}.uom_id`)))
+            : tab.id === 'adjustments'
+                ? adjustments.some((_, index) => Boolean(errorFor(`adjustments.${index}.effect`) || errorFor(`adjustments.${index}.adjustment_type`)))
+                : false,
+    }));
+
     return (
-        <form className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]" onSubmit={async (event) => {
-            event.preventDefault();
-            if (submitting) return;
-            setSubmitting(true);
-            setError(null);
-            try {
-                const saved = order ? await updatePurchaseOrder(order.id, payload()) : await createPurchaseOrder(payload());
-                navigate(`/purchase/orders/${saved.id}`);
-            } catch (requestError) {
-                setError(toApiError(requestError));
-            } finally {
-                setSubmitting(false);
-            }
-        }}>
-            <div className="space-y-5">
+        <form onSubmit={submit}>
+            <PurchaseDocumentShell
+                header={<PurchasePageHeader
+                    title={order ? 'Edit Purchase Order' : 'Create Purchase Order'}
+                    description="Prepare supplier, warehouse, line, adjustment, and attachment details before submitting the order."
+                    status={<span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{order?.status ?? 'draft'}</span>}
+                    actions={<>
+                        <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
+                        <Button type="submit" loading={submitting}>{order ? 'Save Draft' : 'Save Draft'}</Button>
+                    </>}
+                />}
+                tabs={<PurchaseTabs tabs={tabItems} activeTab={activeTab} />}
+                summary={<PurchaseOrderSummaryPanel totals={totals} />}
+            >
                 <ErrorAlert error={error} />
-                <Panel title="Order header">
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
-                        <WarehouseLookupSelect value={warehouse} onChange={(value) => { warehouseTouched.current = true; setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
-                        <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={(value) => { locationTouched.current = true; setWarehouseLocation(value); }} error={errorFor('warehouse_location_id')} />
-                        <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
-                        <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
-                        <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />
-                        <DecimalInput label="Exchange rate" value={header.exchange_rate} error={errorFor('exchange_rate')} onChange={(event) => setHeader({ ...header, exchange_rate: event.target.value })} />
-                    </div>
-                    <div className="mt-4">
-                        <Textarea label="Notes" value={header.notes} error={errorFor('notes')} onChange={(event) => setHeader({ ...header, notes: event.target.value })} />
-                    </div>
-                </Panel>
-                <Panel title="Lines">
-                    <PurchaseOrderLineEditor lines={lines} onChange={setLines} errorFor={errorFor} />
-                </Panel>
-                <Panel title="Header adjustments">
-                    <PurchaseHeaderAdjustmentEditor adjustments={adjustments} onChange={setAdjustments} errorFor={errorFor} />
-                </Panel>
-                <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>{order ? 'Save order' : 'Create order'}</Button>
-                </div>
-            </div>
-            <div className="xl:sticky xl:top-20 xl:self-start">
-                <PurchaseOrderSummaryPanel totals={totals} />
-            </div>
+                {activeTab === 'details' && (
+                    <Panel title="Order Details">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
+                            <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
+                            <WarehouseLookupSelect value={warehouse} onChange={setWarehouse} error={errorFor('warehouse_id')} />
+                            <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
+                            <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
+                            <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />
+                            <DecimalInput label="Exchange rate" value={header.exchange_rate} error={errorFor('exchange_rate')} onChange={(event) => { exchangeTouched.current = true; setExchangeRateSource('manual'); setHeader({ ...header, exchange_rate: event.target.value }); }} />
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                <div>Currency: {currencySource ? currencySource.replaceAll('_', ' ') : 'Manual'}</div>
+                                <div>Exchange rate: {exchangeRateSource ? exchangeRateSource.replaceAll('_', ' ') : 'Manual required for foreign currency'}</div>
+                                <div>Warehouse: {warehouseSource ? warehouseSource.replaceAll('_', ' ') : 'Manual'}</div>
+                                <div>Location: {locationSource ? locationSource.replaceAll('_', ' ') : 'Manual'}</div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <Textarea label="Notes" value={header.notes} error={errorFor('notes')} onChange={(event) => setHeader({ ...header, notes: event.target.value })} />
+                            </div>
+                        </div>
+                    </Panel>
+                )}
+                {activeTab === 'lines' && (
+                    <Panel title="Lines">
+                        <PurchaseOrderLineEditor
+                            lines={lines}
+                            onChange={setLines}
+                            errorFor={errorFor}
+                            supplierId={supplier?.id}
+                            currencyId={currency?.id}
+                            warehouseId={warehouse?.id}
+                        />
+                    </Panel>
+                )}
+                {activeTab === 'adjustments' && (
+                    <Panel title="Adjustments">
+                        <PurchaseHeaderAdjustmentEditor adjustments={adjustments} onChange={setAdjustments} errorFor={errorFor} />
+                    </Panel>
+                )}
+                {activeTab === 'attachments' && (
+                    <Panel title="Attachments">
+                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">Purchase attachment upload and preview will use the backend attachment endpoints for this document.</div>
+                    </Panel>
+                )}
+            </PurchaseDocumentShell>
         </form>
     );
 }

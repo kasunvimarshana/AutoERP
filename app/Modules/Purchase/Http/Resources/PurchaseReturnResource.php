@@ -24,6 +24,7 @@ final class PurchaseReturnResource extends PurchaseResource
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
             'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),
             'approval_required' => (bool) $this->approval_required,
+            'capabilities' => $this->capabilities(),
             'affects_supplier_balance' => (bool) $this->affects_supplier_balance,
             'cost_basis' => $this->cost_basis === null ? null : (string) $this->cost_basis,
             'reason' => $this->reason,
@@ -82,6 +83,24 @@ final class PurchaseReturnResource extends PurchaseResource
             'id' => $this->source_id === null ? null : (int) $this->source_id,
             'number' => null,
             'date' => null,
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function capabilities(): array
+    {
+        $status = $this->enumValue($this->status);
+        $approvalRequired = (bool) $this->approval_required;
+
+        return [
+            'can_edit' => $status === 'draft',
+            'can_approve' => $approvalRequired && $status === 'draft',
+            'can_post' => ($approvalRequired && $status === 'approved') || (! $approvalRequired && $status === 'draft'),
+            'can_cancel' => in_array($status, ['draft', 'approved'], true),
+            'can_reverse' => $status === 'posted',
+            'read_only' => in_array($status, ['posted', 'cancelled', 'reversed'], true),
         ];
     }
 }

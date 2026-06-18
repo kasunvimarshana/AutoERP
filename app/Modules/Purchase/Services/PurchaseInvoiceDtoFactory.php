@@ -25,6 +25,7 @@ use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
@@ -39,7 +40,10 @@ final class PurchaseInvoiceDtoFactory
 
     private const PURCHASE_ORDER_LINE = 'purchase_order_line';
 
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PurchaseProcurementBalanceService $balances,
+    ) {}
 
     public function prepare(
         CreatePurchaseInvoiceData $data,
@@ -175,6 +179,13 @@ final class PurchaseInvoiceDtoFactory
         if ($grn->status !== GoodsReceiptNoteStatus::Posted) {
             throw new InvalidArgumentException('Purchase invoices can only use posted goods receipts.');
         }
+        if ($lockSources) {
+            $grn->setRelation('lines', GoodsReceiptNoteLine::query()
+                ->with('purchaseOrderLine')
+                ->where('goods_receipt_note_id', $grn->getKey())
+                ->lockForUpdate()
+                ->get());
+        }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,
             $resolvedSupplierId,
@@ -190,10 +201,7 @@ final class PurchaseInvoiceDtoFactory
         $seenRequestedLineIds = [];
 
         foreach ($grn->lines as $sourceLine) {
-            $remainingInvoiceable = $this->math->sub(
-                (string) $sourceLine->accepted_quantity,
-                (string) $sourceLine->invoiced_quantity,
-            );
+            $remainingInvoiceable = $this->balances->remainingInvoiceableForGoodsReceiptLine($sourceLine);
             if ($this->math->isNegative($remainingInvoiceable)) {
                 throw new InvalidArgumentException('GRN invoiceable quantity is negative.');
             }
@@ -209,7 +217,7 @@ final class PurchaseInvoiceDtoFactory
             }
             if ($this->math->compare($quantity, $remainingInvoiceable) > 0) {
                 throw new InvalidArgumentException(
-                    'Purchase invoice quantity cannot exceed GRN remaining quantity.',
+                    'Purchase invoice quantity cannot exceed GRN remaining procurement quantity.',
                 );
             }
             $selectedLines++;
@@ -378,6 +386,12 @@ final class PurchaseInvoiceDtoFactory
         if ($order->status !== PurchaseOrderStatus::Approved) {
             throw new InvalidArgumentException('Purchase invoices can only use approved purchase orders.');
         }
+        if ($lockSources) {
+            $order->setRelation('lines', PurchaseOrderLine::query()
+                ->where('purchase_order_id', $order->getKey())
+                ->lockForUpdate()
+                ->get());
+        }
         [$resolvedSupplierType, $resolvedSupplierId] = $this->resolveSupplier(
             $resolvedSupplierType,
             $resolvedSupplierId,
@@ -392,11 +406,7 @@ final class PurchaseInvoiceDtoFactory
         $seenRequestedLineIds = [];
         foreach ($order->lines as $sourceLine) {
             /** @var PurchaseOrderLine $sourceLine */
-            $remaining = $this->math->sub(
-                (string) $sourceLine->ordered_quantity,
-                (string) $sourceLine->invoiced_quantity,
-            );
-            $remaining = $this->math->sub($remaining, (string) $sourceLine->cancelled_quantity);
+            $remaining = $this->balances->remainingInvoiceableForPurchaseOrderLine($sourceLine);
             if ($this->math->isNegative($remaining)) {
                 throw new InvalidArgumentException('PO invoiceable quantity is negative.');
             }

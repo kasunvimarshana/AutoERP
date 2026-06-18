@@ -17,10 +17,13 @@ type LineDialog =
     | { mode: 'create'; line: EditablePurchaseLine }
     | { mode: 'edit'; index: number; line: EditablePurchaseLine };
 
-export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
+export function PurchaseOrderLineEditor({ lines, onChange, errorFor, supplierId, currencyId, warehouseId }: {
     lines: EditablePurchaseLine[];
     onChange: (lines: EditablePurchaseLine[]) => void;
     errorFor: (field: string) => string | undefined;
+    supplierId?: number;
+    currencyId?: number;
+    warehouseId?: number;
 }) {
     const [dialog, setDialog] = useState<LineDialog | null>(null);
     const { confirm, confirmDialog } = useConfirmDialog();
@@ -58,6 +61,9 @@ export function PurchaseOrderLineEditor({ lines, onChange, errorFor }: {
                         key={dialog.mode === 'edit' ? `edit-${dialog.index}` : 'create'}
                         line={dialog.line}
                         mode={dialog.mode}
+                        supplierId={supplierId}
+                        currencyId={currencyId}
+                        warehouseId={warehouseId}
                         errorFor={(field) => dialog.mode === 'edit' ? errorFor(`lines.${dialog.index}.${field}`) : undefined}
                         onCancel={() => setDialog(null)}
                         onSave={saveLine}
@@ -79,6 +85,7 @@ function PurchaseLineTable({ lines, onAdd, onEdit, onRemove, hasError }: {
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
     const columns: DataColumn<EditablePurchaseLine & { rowIndex: number }>[] = [
         { key: 'item', header: 'Item', render: formatItemLabel },
+        { key: 'variant', header: 'Variant', render: (line) => line.item_variant?.code ?? line.item_variant?.name ?? '-' },
         { key: 'quantity', header: 'Qty', render: (line) => line.ordered_quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.uom?.code ?? line.uom?.name ?? '-' },
         { key: 'price', header: 'Unit price', render: (line) => line.unit_price, className: 'tabular-nums' },
@@ -94,7 +101,7 @@ function PurchaseLineTable({ lines, onAdd, onEdit, onRemove, hasError }: {
                 rows={rows}
                 columns={columns}
                 rowKey={(line) => line.rowIndex}
-                emptyMessage="No lines added yet. Click Add line to start."
+                emptyMessage="No purchase lines added. Add the first item to this order."
                 mobileSummary={formatItemLabel}
                 mobileDetails={(line) => <LineMobileDetails line={line} />}
                 mobileActions={(line) => <LineActions onEdit={() => onEdit(line, line.rowIndex)} onRemove={() => onRemove(line.rowIndex)} />}

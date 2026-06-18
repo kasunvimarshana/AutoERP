@@ -189,6 +189,135 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.returned_quantity', '0.250000');
     }
 
+    public function test_purchase_order_create_context_uses_tenant_currency_and_warehouse_defaults(): void
+    {
+        $context = $this->context();
+        $currencyId = $this->createCurrency('BASE-'.Str::upper(Str::random(4)));
+        $locationId = $this->createWarehouseLocation(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            $context['warehouse_id'],
+            'DEFAULT-'.Str::upper(Str::random(4)),
+            isDefault: true,
+        );
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['currency_id' => $currencyId]);
+        DB::table('warehouses')->where('id', $context['warehouse_id'])->update(['is_default' => true]);
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/orders/create-context')
+            ->assertOk()
+            ->assertJsonPath('data.defaults.currency_id', $currencyId)
+            ->assertJsonPath('data.defaults.currency_source', 'tenant_default')
+            ->assertJsonPath('data.defaults.exchange_rate', '1.000000')
+            ->assertJsonPath('data.exchange_rate_context.foreign_currency_behavior', 'manual_required')
+            ->assertJsonPath('data.defaults.warehouse_id', $context['warehouse_id'])
+            ->assertJsonPath('data.defaults.warehouse_location_id', $locationId)
+            ->assertJsonPath('data.defaults.warehouse_location_source', 'warehouse_default');
+    }
+
+    public function test_item_purchase_context_uses_item_scoped_uom_and_purchase_price(): void
+    {
+        $context = $this->context();
+        $currencyId = $this->createCurrency('PRC-'.Str::upper(Str::random(4)));
+        $purchaseUomId = $this->createUom(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'BOX-'.Str::upper(Str::random(4)),
+        );
+        $this->createItemUnit($context['tenant_id'], $context['organization_unit_id'], $context['item_id'], $context['uom_id'], 'base');
+        $this->createItemUnit($context['tenant_id'], $context['organization_unit_id'], $context['item_id'], $purchaseUomId, 'purchase', true);
+
+        DB::table('supplier_item_mappings')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'supplier_id' => $context['supplier_id'],
+            'item_id' => $context['item_id'],
+            'default_purchase_uom_id' => $purchaseUomId,
+            'minimum_order_quantity' => '0.000000',
+            'is_preferred' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('item_prices')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'item_id' => $context['item_id'],
+            'price_type' => 'purchase',
+            'currency_id' => $currencyId,
+            'uom_id' => $purchaseUomId,
+            'amount' => '12.500000',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withAuth($context)->getJson(sprintf(
+            '/api/v1/purchase/items/%d/purchase-context?supplier_id=%d&currency_id=%d',
+            $context['item_id'],
+            $context['supplier_id'],
+            $currencyId,
+        ));
+
+        $response->assertOk()
+            ->assertJsonPath('data.default_purchase_uom_id', $purchaseUomId)
+            ->assertJsonPath('data.unit_price', '12.500000')
+            ->assertJsonPath('data.price_source', 'purchase_price_list')
+            ->assertJsonPath('data.supplier_mapping.default_purchase_uom_id', $purchaseUomId);
+
+        $this->assertSame(
+            [$purchaseUomId, $context['uom_id']],
+            collect($response->json('data.allowed_purchase_uoms'))->pluck('id')->all(),
+        );
+    }
+
+    public function test_adjustment_catalogue_and_effect_matrix_are_authoritative(): void
+    {
+        $context = $this->context();
+
+        $catalogue = $this->withAuth($context)->getJson('/api/v1/purchase/adjustments/catalogue')
+            ->assertOk()
+            ->json('data');
+        $discount = collect($catalogue)->firstWhere('type', 'discount');
+        $freight = collect($catalogue)->firstWhere('type', 'freight');
+
+        $this->assertSame('Order Discount', $discount['default_name'] ?? null);
+        $this->assertSame(['decrease'], $discount['allowed_effects'] ?? null);
+        $this->assertSame('Freight-in / landed cost', $freight['finance_mapping_label'] ?? null);
+
+        $response = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'adjustments' => [[
+                'name' => 'Invalid discount',
+                'adjustment_type' => 'discount',
+                'effect' => 'increase',
+                'amount' => '1.000000',
+            ]],
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['adjustments.0.effect']);
+        $this->assertSame(
+            'Order Discount adjustments cannot use the increase effect.',
+            $response->json('errors')['adjustments.0.effect'][0] ?? null,
+        );
+    }
+
+    public function test_tenant_base_currency_requires_exchange_rate_one(): void
+    {
+        $context = $this->context();
+        $currencyId = $this->createCurrency('RTE-'.Str::upper(Str::random(4)));
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['currency_id' => $currencyId]);
+
+        $response = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'currency_id' => $currencyId,
+            'exchange_rate' => '1.250000',
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['exchange_rate']);
+        $this->assertSame(
+            'Tenant base currency must use an exchange rate of 1.000000.',
+            $response->json('errors.exchange_rate.0'),
+        );
+    }
+
     public function test_active_global_currency_can_be_used_without_frontend_tenant_override(): void
     {
         $context = $this->context();
@@ -533,7 +662,7 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createWarehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, string $code, bool $active = true): int
+    private function createWarehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, string $code, bool $active = true, bool $isDefault = false): int
     {
         return (int) DB::table('warehouse_locations')->insertGetId([
             'tenant_id' => $tenantId,
@@ -544,6 +673,7 @@ final class PurchaseOrderApiTest extends TestCase
             'code' => $code,
             'type' => 'bin',
             'is_active' => $active,
+            'is_default' => $isDefault,
             'is_pickable' => true,
             'is_receivable' => true,
             'created_at' => now(),
@@ -564,6 +694,22 @@ final class PurchaseOrderApiTest extends TestCase
             'base_uom_id' => $uomId,
             'is_stockable' => true,
             'is_combo' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createItemUnit(int $tenantId, ?int $organizationUnitId, int $itemId, int $uomId, string $unitRole, bool $isDefault = false): int
+    {
+        return (int) DB::table('item_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'item_id' => $itemId,
+            'uom_id' => $uomId,
+            'unit_role' => $unitRole,
+            'conversion_factor' => '1.000000',
+            'is_default' => $isDefault,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),

@@ -7,6 +7,7 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
+import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createGoodsReceipt, getPurchaseOrder, getReceivablePurchaseOrderLines, type GoodsReceiptPayload, type PurchaseOrder, type PurchaseOrderLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { PurchaseOrderLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
@@ -21,11 +22,10 @@ function orderLabel(order: PurchaseOrder): NamedResource {
 }
 
 function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine {
-    const remaining = line.remaining_receivable_quantity ?? line.remaining_quantity ?? '0.000000';
-    return { source: line, received_quantity: remaining, accepted_quantity: remaining, rejected_quantity: '0.000000' };
+    return { source: line, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' };
 }
 
-export function GoodsReceiptForm() {
+export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrderId?: number }) {
     const navigate = useNavigate();
     const [purchaseOrder, setPurchaseOrder] = useState<NamedResource | null>(null);
     const [sourceOrder, setSourceOrder] = useState<PurchaseOrder | null>(null);
@@ -37,6 +37,12 @@ export function GoodsReceiptForm() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const errorFor = (field: string) => fieldError(error, field);
+
+    useEffect(() => {
+        if (sourcePurchaseOrderId && !purchaseOrder) {
+            setPurchaseOrder({ id: sourcePurchaseOrderId, name: `Purchase Order #${sourcePurchaseOrderId}` });
+        }
+    }, [sourcePurchaseOrderId, purchaseOrder]);
 
     useEffect(() => {
         if (!purchaseOrder?.id) {
@@ -77,7 +83,7 @@ export function GoodsReceiptForm() {
         supplier_type: 'supplier',
         supplier_id: sourceOrder?.supplier?.id ?? sourceOrder?.supplier_id ?? undefined,
         notes: notes || undefined,
-        lines: lines.map((line) => ({
+        lines: lines.filter((line) => isPositiveDecimal(line.received_quantity)).map((line) => ({
             item_id: line.source.item?.id ?? line.source.item_id ?? 0,
             item_variant_id: line.source.item_variant?.id ?? line.source.item_variant_id ?? undefined,
             uom_id: line.source.uom?.id ?? line.source.uom_id ?? undefined,

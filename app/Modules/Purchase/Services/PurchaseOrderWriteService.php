@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
@@ -14,6 +15,7 @@ use Modules\Purchase\Enums\PurchaseOrderLineStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Validators\PurchaseValidationService;
+use Modules\Tenant\Models\TenantModel;
 
 final class PurchaseOrderWriteService
 {
@@ -24,6 +26,7 @@ final class PurchaseOrderWriteService
         private readonly PurchaseHeaderAdjustmentService $adjustments,
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
+        private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
     ) {}
 
     public function create(CreatePurchaseOrderData $data): PurchaseOrder
@@ -150,6 +153,7 @@ final class PurchaseOrderWriteService
 
         if ($data->currencyId !== null) {
             $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId, 'currency_id');
+            $this->assertExchangeRateAllowed($data);
         }
 
         $seenLines = [];
@@ -164,7 +168,7 @@ final class PurchaseOrderWriteService
             $seenLines[$key] = true;
         }
 
-        foreach ($data->adjustments as $adjustment) {
+        foreach ($data->adjustments as $index => $adjustment) {
             $this->validator->assertNonNegative(
                 $adjustment->amount,
                 'Purchase header adjustment amount cannot be negative.',
@@ -174,6 +178,23 @@ final class PurchaseOrderWriteService
                 'Purchase header adjustment rate cannot be negative.',
             );
             $this->assertPercentageRate($adjustment->calculationType, $adjustment->rate);
+            $this->adjustmentCatalogue->validate($adjustment, $data->tenantId, $data->organizationUnitId, "adjustments.{$index}");
+        }
+    }
+
+    private function assertExchangeRateAllowed(CreatePurchaseOrderData $data): void
+    {
+        $tenantCurrencyId = TenantModel::query()
+            ->whereKey($data->tenantId)
+            ->value('currency_id');
+
+        if ($tenantCurrencyId !== null
+            && (int) $tenantCurrencyId === $data->currencyId
+            && $this->math->compare($data->exchangeRate, '1.000000') !== 0
+        ) {
+            throw ValidationException::withMessages([
+                'exchange_rate' => ['Tenant base currency must use an exchange rate of 1.000000.'],
+            ]);
         }
     }
 

@@ -68,7 +68,9 @@ const PurchaseReturnListPage = lazy(() => import('@/modules/purchase/pages/Purch
 const PurchaseReturnCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseReturnCreatePage'));
 const PurchaseReturnDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseReturnDetailPage'));
 const ManualSupplierReturnCreatePage = lazy(() => import('@/modules/purchase/pages/ManualSupplierReturnCreatePage'));
+const PurchaseInvoiceListPage = lazy(() => import('@/modules/purchase/pages/PurchaseInvoiceListPage'));
 const PurchaseInvoiceCreatePage = lazy(() => import('@/modules/purchase/pages/PurchaseInvoiceCreatePage'));
+const PurchasePaymentWorkspacePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentWorkspacePage'));
 const PurchasePaymentPreparePage = lazy(() => import('@/modules/purchase/pages/PurchasePaymentPreparePage'));
 const PurchaseDebitNoteListPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteListPage'));
 const PurchaseDebitNoteDetailPage = lazy(() => import('@/modules/purchase/pages/PurchaseDebitNoteDetailPage'));
@@ -223,7 +225,9 @@ export function AppRouter() {
                     <Route path="/purchase/returns/create" element={<PurchaseReturnCreatePage />} />
                     <Route path="/purchase/returns/:id" element={<PurchaseReturnDetailPage />} />
                     <Route path="/purchase/manual-supplier-returns/create" element={<ManualSupplierReturnCreatePage />} />
+                    <Route path="/purchase/invoices" element={<PurchaseInvoiceListPage />} />
                     <Route path="/purchase/invoices/create" element={<PurchaseInvoiceCreatePage />} />
+                    <Route path="/purchase/payments" element={<PurchasePaymentWorkspacePage />} />
                     <Route path="/purchase/payments/prepare" element={<PurchasePaymentPreparePage />} />
                     <Route path="/purchase/debit-notes" element={<PurchaseDebitNoteListPage />} />
                     <Route path="/purchase/debit-notes/:id" element={<PurchaseDebitNoteDetailPage />} />

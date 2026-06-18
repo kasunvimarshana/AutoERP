@@ -37,6 +37,8 @@ final class PurchaseHeaderAdjustment extends CoreModel
             'returned_amount' => 'decimal:6',
             'remaining_amount' => 'decimal:6',
             'is_allocatable' => 'boolean',
+            'finance_posting_profile_id' => 'integer',
+            'finance_account_id' => 'integer',
             'sort_order' => 'integer',
         ]);
     }

@@ -10,7 +10,10 @@ use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 
 final class PurchaseHeaderAdjustmentService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PurchaseAdjustmentCatalogueService $catalogue,
+    ) {}
 
     public function create(
         int $tenantId,
@@ -21,6 +24,7 @@ final class PurchaseHeaderAdjustmentService
         ?string $amount = null,
     ): PurchaseHeaderAdjustment {
         $value = $this->math->normalize($amount ?? $data->amount);
+        $defaults = $this->catalogue->defaultsFor($data->adjustmentType);
 
         return PurchaseHeaderAdjustment::query()->create([
             'tenant_id' => $tenantId,
@@ -39,6 +43,12 @@ final class PurchaseHeaderAdjustmentService
             'remaining_amount' => $value,
             'allocation_method' => $data->allocationMethod,
             'is_allocatable' => $data->isAllocatable,
+            'finance_posting_profile_id' => $data->financePostingProfileId,
+            'finance_account_id' => $data->financeAccountId,
+            'cost_treatment' => $data->costTreatment ?? (string) $defaults['cost_treatment'],
+            'tax_treatment' => $data->taxTreatment ?? (string) $defaults['tax_treatment'],
+            'mapping_source' => $data->mappingSource ?? 'catalogue',
+            'override_reason' => $data->overrideReason,
             'sort_order' => $data->sortOrder,
             'description' => $data->description,
         ]);
@@ -65,6 +75,12 @@ final class PurchaseHeaderAdjustmentService
             'remaining_amount' => $amount,
             'allocation_method' => $adjustment->allocation_method,
             'is_allocatable' => $adjustment->is_allocatable,
+            'finance_posting_profile_id' => $adjustment->finance_posting_profile_id,
+            'finance_account_id' => $adjustment->finance_account_id,
+            'cost_treatment' => $adjustment->cost_treatment,
+            'tax_treatment' => $adjustment->tax_treatment,
+            'mapping_source' => $adjustment->mapping_source,
+            'override_reason' => $adjustment->override_reason,
             'sort_order' => $adjustment->sort_order,
             'description' => $adjustment->description,
         ]);

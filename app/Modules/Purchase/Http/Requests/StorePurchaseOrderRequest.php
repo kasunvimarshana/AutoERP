@@ -57,6 +57,12 @@ class StorePurchaseOrderRequest extends PurchaseRequest
             'adjustments.*.amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'adjustments.*.allocation_method' => ['nullable', Rule::enum(PurchaseAdjustmentAllocationMethod::class)],
             'adjustments.*.is_allocatable' => ['nullable', 'boolean'],
+            'adjustments.*.finance_posting_profile_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments.*.finance_account_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments.*.cost_treatment' => ['nullable', 'string', 'max:80'],
+            'adjustments.*.tax_treatment' => ['nullable', 'string', 'max:80'],
+            'adjustments.*.mapping_source' => ['nullable', 'in:catalogue,override'],
+            'adjustments.*.override_reason' => ['nullable', 'string', 'max:1000'],
             'adjustments.*.sort_order' => ['nullable', 'integer'],
             'adjustments.*.description' => ['nullable', 'string'],
         ]);
@@ -109,6 +115,12 @@ class StorePurchaseOrderRequest extends PurchaseRequest
                 isAllocatable: (bool) ($row['is_allocatable'] ?? true),
                 sortOrder: (int) ($row['sort_order'] ?? 0),
                 description: $row['description'] ?? null,
+                financePostingProfileId: isset($row['finance_posting_profile_id']) ? (int) $row['finance_posting_profile_id'] : null,
+                financeAccountId: isset($row['finance_account_id']) ? (int) $row['finance_account_id'] : null,
+                costTreatment: $row['cost_treatment'] ?? null,
+                taxTreatment: $row['tax_treatment'] ?? null,
+                mappingSource: $row['mapping_source'] ?? null,
+                overrideReason: $row['override_reason'] ?? null,
             ), $this->input('adjustments', [])),
         );
     }

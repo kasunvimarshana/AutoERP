@@ -1,5 +1,4 @@
-import { Panel } from '@/shared/components/Panel';
-import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { PurchaseTotalsSummary } from './PurchaseTotalsSummary';
 
 export interface PurchaseTotals {
     subtotal: string;
@@ -12,26 +11,13 @@ export interface PurchaseTotals {
 }
 
 export function PurchaseOrderSummaryPanel({ totals }: { totals: PurchaseTotals }) {
-    const rows = [
-        ['Subtotal', totals.subtotal],
-        ['Line discounts', totals.discount_total],
-        ['Line tax', totals.tax_total],
-        ['Line charges', totals.charge_total],
-        ['Header increases', totals.header_increase_total],
-        ['Header decreases', totals.header_decrease_total],
-        ['Grand total', totals.grand_total],
-    ] as const;
-
-    return (
-        <Panel title="Summary">
-            <dl className="space-y-3 text-sm">
-                {rows.map(([label, value], index) => (
-                    <div key={label} className={`flex items-center justify-between gap-4 ${index === rows.length - 1 ? 'border-t border-slate-200 pt-3 font-semibold text-slate-950' : 'text-slate-700'}`}>
-                        <dt>{label}</dt>
-                        <dd><MoneyDisplay value={value} /></dd>
-                    </div>
-                ))}
-            </dl>
-        </Panel>
-    );
+    return <PurchaseTotalsSummary rows={[
+        { label: 'Subtotal', value: totals.subtotal },
+        { label: 'Line Discounts', value: totals.discount_total },
+        { label: 'Taxes', value: totals.tax_total },
+        { label: 'Freight / Charges', value: totals.charge_total },
+        { label: 'Header Increases', value: totals.header_increase_total },
+        { label: 'Header Discounts', value: totals.header_decrease_total },
+        { label: 'Grand Total', value: totals.grand_total, strong: true },
+    ]} />;
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
+use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
 final class GoodsReceiptNoteResource extends PurchaseResource
 {
@@ -45,10 +46,7 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'invoiced_quantity' => (string) $line->invoiced_quantity,
                 'returned_quantity' => (string) $line->returned_quantity,
                 'remaining_quantity' => (string) $line->remaining_quantity,
-                'remaining_invoiceable_quantity' => $this->add(
-                    (string) $line->accepted_quantity,
-                    '-'.(string) $line->invoiced_quantity,
-                ),
+                'remaining_invoiceable_quantity' => app(PurchaseProcurementBalanceService::class)->remainingInvoiceableForGoodsReceiptLine($line),
                 'remaining_returnable_quantity' => $this->add(
                     (string) $line->accepted_quantity,
                     '-'.(string) $line->returned_quantity,

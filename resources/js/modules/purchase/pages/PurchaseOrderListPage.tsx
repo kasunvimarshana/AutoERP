@@ -54,6 +54,7 @@ export default function PurchaseOrderListPage() {
 
     const canCreate = hasPurchasePermission(auth.permissions, purchasePermissions.ordersCreate);
     const runAction = async (order: PurchaseOrder, action: 'submit' | 'approve' | 'cancel' | 'close') => {
+        if (!window.confirm(`Confirm ${action} for ${order.purchase_order_number ?? 'this purchase order'}?`)) return;
         setBusyId(order.id);
         setActionError(null);
         try {
@@ -99,7 +100,7 @@ export default function PurchaseOrderListPage() {
 
     return (
         <>
-            <ContentHeader title="Purchase orders" description="Server-paginated purchase order workspace." actions={canCreate ? <LinkButton to="/purchase/orders/create">New purchase order</LinkButton> : undefined} />
+            <ContentHeader title="Purchase Orders" description="Server-paginated purchase order workspace." actions={canCreate ? <LinkButton to="/purchase/orders/create">Create Purchase Order</LinkButton> : undefined} />
             <div className="mb-4 grid gap-4 lg:grid-cols-5">
                 <Input type="search" label="Search" placeholder="PO number or supplier" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

@@ -2,14 +2,18 @@ import type { NamedResource } from '@/shared/types/common';
 import {
     addDecimal,
     multiplyDecimal,
-    nonNegativeDecimal,
     percentageOfDecimal,
     subtractDecimal,
 } from '@/shared/utils/decimal';
 
 export interface EditablePurchaseLine {
     item: NamedResource | null;
+    item_variant: NamedResource | null;
+    item_variant_id?: number | null;
     uom: NamedResource | null;
+    price_source_label?: string;
+    auto_price?: boolean;
+    auto_uom?: boolean;
     description: string;
     ordered_quantity: string;
     unit_price: string;
@@ -37,7 +41,7 @@ export function previewLineAmounts(line: EditablePurchaseLine): PurchaseLinePrev
     const discount = line.discount_calculation_type === 'percentage'
         ? percentageOfDecimal(subtotal, line.discount_rate)
         : line.discount_amount;
-    const taxBase = nonNegativeDecimal(subtractDecimal(subtotal, discount));
+    const taxBase = subtractDecimal(subtotal, discount);
     const tax = line.tax_calculation_type === 'percentage'
         ? percentageOfDecimal(taxBase, line.tax_rate)
         : line.tax_amount;
@@ -50,7 +54,7 @@ export function previewLineAmounts(line: EditablePurchaseLine): PurchaseLinePrev
         discount,
         tax,
         charge,
-        total: nonNegativeDecimal(addDecimal(addDecimal(subtractDecimal(subtotal, discount), tax), charge)),
+        total: addDecimal(addDecimal(subtractDecimal(subtotal, discount), tax), charge),
     };
 }
 
@@ -61,7 +65,12 @@ export function previewLineTotal(line: EditablePurchaseLine): string {
 export function emptyPurchaseLine(): EditablePurchaseLine {
     return {
         item: null,
+        item_variant: null,
+        item_variant_id: null,
         uom: null,
+        price_source_label: undefined,
+        auto_price: true,
+        auto_uom: true,
         description: '',
         ordered_quantity: '1.000000',
         unit_price: '0.000000',
