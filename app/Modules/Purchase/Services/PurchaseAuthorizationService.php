@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\DB;
+use Modules\User\Services\UserAccessResolver;
 
 final class PurchaseAuthorizationService
 {
@@ -54,6 +54,8 @@ final class PurchaseAuthorizationService
 
     public const FAST_PURCHASE_VIEW = 'purchase.fast_purchases.view';
     public const FAST_PURCHASE_EXECUTE = 'purchase.fast_purchases.execute';
+
+    public function __construct(private readonly UserAccessResolver $access) {}
 
     /**
      * @return array<string, string>
@@ -112,44 +114,6 @@ final class PurchaseAuthorizationService
 
     public function can(int $userId, int $tenantId, string $permission): bool
     {
-        if (! array_key_exists($permission, self::descriptions())) {
-            return false;
-        }
-
-        $roleIds = DB::table('user_roles')
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
-            ->pluck('role_id');
-
-        if ($roleIds->isNotEmpty() && DB::table('roles')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', $roleIds)
-            ->where('name', 'Super Admin')
-            ->whereNull('deleted_at')
-            ->exists()) {
-            return true;
-        }
-
-        if (DB::table('user_permissions')
-            ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
-            ->where('user_permissions.tenant_id', $tenantId)
-            ->where('user_permissions.user_id', $userId)
-            ->where('permissions.name', $permission)
-            ->whereNull('permissions.deleted_at')
-            ->exists()) {
-            return true;
-        }
-
-        if ($roleIds->isEmpty()) {
-            return false;
-        }
-
-        return DB::table('role_permissions')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('role_permissions.tenant_id', $tenantId)
-            ->whereIn('role_permissions.role_id', $roleIds)
-            ->where('permissions.name', $permission)
-            ->whereNull('permissions.deleted_at')
-            ->exists();
+        return $this->access->can($userId, $tenantId, $permission);
     }
 }

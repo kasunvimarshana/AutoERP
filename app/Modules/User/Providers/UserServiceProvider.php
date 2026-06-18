@@ -41,6 +41,7 @@ use Modules\User\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Services\AuthenticatedUserProvider;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Modules\User\Services\Rules\UserDomainService;
+use Modules\User\Services\UserAccessResolver;
 
 final class UserServiceProvider extends ServiceProvider
 {
@@ -49,6 +50,7 @@ final class UserServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/user.php', 'user');
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
+        $this->app->scoped(UserAccessResolver::class);
 
         $this->app->singleton(UserDomainServiceInterface::class, UserDomainService::class);
         $this->app->singleton(
