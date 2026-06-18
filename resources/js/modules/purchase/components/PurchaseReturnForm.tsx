@@ -63,13 +63,9 @@ export function PurchaseReturnForm({ sourceGoodsReceiptId }: { sourceGoodsReceip
         return_date: returnDate,
         warehouse_id: warehouse?.id ?? 0,
         warehouse_location_id: warehouseLocation?.id,
-        supplier_type: 'supplier',
-        supplier_id: supplier?.id,
         reason: reason || undefined,
         return_type: 'referenced',
-        source_type: 'goods_receipt_note',
         source_id: source?.id,
-        affects_supplier_balance: true,
         lines: lines.filter((line) => line.include && isPositiveDecimal(line.returned_quantity)).map((line) => ({
             source_line_type: line.source.source_line_type,
             source_line_id: line.source.source_line_id,

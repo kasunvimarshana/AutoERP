@@ -18,7 +18,7 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
             'grn_number' => ['nullable', 'string', 'max:100'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'supplier_type' => ['nullable', 'string', 'max:150'],
-            'supplier_id' => ['nullable', 'integer', 'min:1'],
+            'supplier_id' => ['required_without:purchase_order_id', 'nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', 'min:1'],

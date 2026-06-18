@@ -10,23 +10,31 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, getPurchaseReturn, postPurchaseReturn, type PurchaseReturnLine } from '../purchaseApi';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
 export default function PurchaseReturnDetailPage() {
     const id = Number(useParams().id);
+    const auth = useAuth();
     const result = useApi((signal) => getPurchaseReturn(id, signal), [id]);
     const [tab, setTab] = useState<Tab>('summary');
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [busy, setBusy] = useState(false);
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const row = result.data;
     const capabilities = row.capabilities ?? {};
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'approve' | 'post' | 'cancel') => {
+        if (busy) return;
+        if (!window.confirm(`Confirm ${action} for this purchase return?`)) return;
+        setBusy(true);
         setActionError(null);
         try {
             if (action === 'approve') result.setData(await approvePurchaseReturn(row.id));
@@ -37,6 +45,8 @@ export default function PurchaseReturnDetailPage() {
             if (action === 'cancel') result.setData(await cancelPurchaseReturn(row.id));
         } catch (requestError) {
             setActionError(toApiError(requestError));
+        } finally {
+            setBusy(false);
         }
     };
     const columns: DataColumn<PurchaseReturnLine>[] = [
@@ -53,7 +63,7 @@ export default function PurchaseReturnDetailPage() {
             header={<PurchasePageHeader
                 title={row.return_number ?? 'Purchase return'}
                 description={formatDate(row.return_date)}
-                actions={<>{capabilities.can_approve && <Button onClick={() => run('approve')}>Approve</Button>}{capabilities.can_post && <Button variant="secondary" onClick={() => run('post')}>Post</Button>}{capabilities.can_cancel && <Button variant="ghost" onClick={() => run('cancel')}>Cancel</Button>}</>}
+                actions={<>{capabilities.can_approve && can(purchasePermissions.returnsApprove) && <Button loading={busy} onClick={() => void run('approve')}>Approve</Button>}{capabilities.can_post && can(purchasePermissions.returnsPost) && <Button loading={busy} variant="secondary" onClick={() => void run('post')}>Post</Button>}{capabilities.can_cancel && can(purchasePermissions.returnsCancel) && <Button loading={busy} variant="ghost" onClick={() => void run('cancel')}>Cancel</Button>}</>}
             />}
         >
             <ErrorAlert error={result.error ?? actionError} />

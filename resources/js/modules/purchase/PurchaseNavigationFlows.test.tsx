@@ -20,6 +20,15 @@ const paymentApiMocks = vi.hoisted(() => ({
 
 vi.mock('./purchaseApi', () => purchaseApiMocks);
 vi.mock('@/modules/payment/paymentApi', () => paymentApiMocks);
+vi.mock('@/modules/auth/AuthProvider', () => ({
+    useAuth: () => ({
+        permissions: [
+            'purchase.supplier_invoices.create',
+            'purchase.returns.create',
+            'purchase.debit_notes.create',
+        ],
+    }),
+}));
 
 describe('Purchase navigation flows', () => {
     beforeEach(() => {
@@ -75,6 +84,7 @@ function goodsReceipt() {
         grn_number: 'GRN-77',
         received_date: '2026-06-18',
         status: 'posted',
+        capabilities: { can_invoice: true, can_return: true, can_post: false, can_reverse: true },
         supplier: { id: 11, name: 'Supplier A' },
         warehouse: { id: 21, name: 'Main Warehouse' },
         purchase_order: { id: 31, purchase_order_number: 'PO-31', name: 'PO-31' },

@@ -47,6 +47,8 @@ return new class extends Migration
             $table->index('item_id', 'goods_receipt_note_lines_item_idx');
             $table->index('inventory_movement_id', 'goods_receipt_note_lines_movement_idx');
             $table->index('status', 'goods_receipt_note_lines_status_idx');
+            $table->index(['goods_receipt_note_id', 'purchase_order_line_id'], 'goods_receipt_note_lines_grn_po_line_idx');
+            $table->index(['goods_receipt_note_id', 'status'], 'goods_receipt_note_lines_grn_status_idx');
         });
     }
 

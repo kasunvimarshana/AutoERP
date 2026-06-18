@@ -3,7 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
 import type { Payment } from '@/modules/payment/paymentApi';
-import type { FastPurchaseOptionResource, PurchaseInvoicePayload, PurchasePaymentCreatePayload } from '../purchaseTypes';
+import type { FastPurchaseOptionResource, PurchaseInvoicePayload, PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
 
 export async function previewPurchaseInvoice(payload: PurchaseInvoicePayload) {
     const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
@@ -22,7 +22,7 @@ export async function createPurchaseInvoice(payload: PurchaseInvoicePayload) {
 }
 
 export async function preparePurchasePayment(payload: PurchasePaymentCreatePayload) {
-    const response = await apiClient.post<ApiResource<Payment>>(
+    const response = await apiClient.post<ApiResource<PurchasePaymentPreview>>(
         `${endpoints.purchase}/payments/prepare`,
         payload,
     );

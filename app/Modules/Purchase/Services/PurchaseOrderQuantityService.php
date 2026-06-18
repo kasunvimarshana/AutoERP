@@ -7,11 +7,15 @@ namespace Modules\Purchase\Services;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
+use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
 
 final class PurchaseOrderQuantityService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PurchaseStatusService $statuses,
+    ) {}
 
     public function applyReceived(PurchaseOrderLine $line, string $quantity): void
     {
@@ -36,6 +40,7 @@ final class PurchaseOrderQuantityService
             ? PurchaseOrderLineStatus::Received
             : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
+        $this->refreshOrderFor($line);
     }
 
     public function applyInvoiced(PurchaseOrderLine $line, string $quantity): void
@@ -59,6 +64,7 @@ final class PurchaseOrderQuantityService
         }
 
         $line->save();
+        $this->refreshOrderFor($line);
     }
 
     public function reverseInvoiced(PurchaseOrderLine $line, string $quantity): void
@@ -79,6 +85,7 @@ final class PurchaseOrderQuantityService
         );
         $line->status = $this->lineStatus($line);
         $line->save();
+        $this->refreshOrderFor($line);
     }
 
     public function applyReturned(PurchaseOrderLine $line, string $quantity): void
@@ -91,6 +98,7 @@ final class PurchaseOrderQuantityService
         );
         $this->assertNonNegative((string) $line->remaining_returnable_quantity, 'Purchase order returnable quantity cannot be negative.');
         $line->save();
+        $this->refreshOrderFor($line);
     }
 
     public function reverseReceived(PurchaseOrderLine $line, string $quantity): void
@@ -121,6 +129,7 @@ final class PurchaseOrderQuantityService
             ? PurchaseOrderLineStatus::Open
             : PurchaseOrderLineStatus::PartiallyReceived;
         $line->save();
+        $this->refreshOrderFor($line);
     }
 
     public function isReceivable(PurchaseOrderLine $line): bool
@@ -174,5 +183,13 @@ final class PurchaseOrderQuantityService
     private function lockLine(PurchaseOrderLine $line): PurchaseOrderLine
     {
         return PurchaseOrderLine::query()->lockForUpdate()->findOrFail($line->getKey());
+    }
+
+    private function refreshOrderFor(PurchaseOrderLine $line): void
+    {
+        $order = PurchaseOrder::query()->with('lines')->find($line->purchase_order_id);
+        if ($order instanceof PurchaseOrder) {
+            $this->statuses->refreshPurchaseOrder($order);
+        }
     }
 }

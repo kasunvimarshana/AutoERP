@@ -310,6 +310,13 @@ export interface GoodsReceipt {
     grn_number?: string;
     received_date?: string;
     status?: GoodsReceiptStatus | string;
+    capabilities?: {
+        can_post?: boolean;
+        can_invoice?: boolean;
+        can_return?: boolean;
+        can_reverse?: boolean;
+        read_only?: boolean;
+    };
     purchase_order?: NamedResource & { purchase_order_number?: string; status?: string } | null;
     supplier?: NamedResource | null;
     warehouse?: NamedResource | null;
@@ -518,6 +525,37 @@ export interface PurchasePaymentCreatePayload {
 }
 
 export type PurchasePaymentPreparePayload = PurchasePaymentCreatePayload;
+
+export interface PurchasePaymentPreview {
+    tenant_id: number;
+    organization_unit_id?: number | null;
+    payment_date: string;
+    amount: string;
+    line_total: string;
+    allocation_total: string;
+    unapplied_amount: string;
+    supplier_type: string;
+    supplier_id: number;
+    currency_id?: number | null;
+    exchange_rate: string;
+    reference_number?: string | null;
+    lines: Array<{
+        amount: string;
+        payment_method_id?: number | null;
+        source_account_id?: number | null;
+        reference_number?: string | null;
+    }>;
+    allocations: Array<{
+        invoice_id: number;
+        invoice_number?: string | null;
+        invoice_total: string;
+        invoice_balance_before: string;
+        allocated_amount: string;
+        invoice_balance_after: string;
+        allocation_date: string;
+        allocation_method: string;
+    }>;
+}
 
 export interface InventoryAdjustmentRequestPayload {
     adjustment_date: string;

@@ -20,7 +20,9 @@ import {
     getPurchaseOrder,
     getPurchasePaymentContext,
     listOutstandingSupplierInvoices,
+    preparePurchasePayment,
 } from '../purchaseApi';
+import type { PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
 import { todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, SupplierLookupSelect } from './PurchaseLookups';
 import {
@@ -39,7 +41,7 @@ function balanceOf(invoice: Invoice): string {
     return String(invoice.balance_due ?? invoice.balance?.remaining_amount ?? invoice.grand_total ?? '0.000000');
 }
 
-export function PurchasePaymentCreateForm() {
+export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create' | 'prepare' }) {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const requestedTab = searchParams.get('tab') as PaymentTab | null;
@@ -56,6 +58,7 @@ export function PurchasePaymentCreateForm() {
     const [invoiceSearch, setInvoiceSearch] = useState('');
     const [invoicePage, setInvoicePage] = useState(1);
     const [sourceNotice, setSourceNotice] = useState<string | null>(null);
+    const [preview, setPreview] = useState<PurchasePaymentPreview | null>(null);
     const [error, setError] = useState<ApiErrorType | null>(null);
     const [busy, setBusy] = useState(false);
     const debouncedInvoiceSearch = useDebounce(invoiceSearch);
@@ -199,37 +202,45 @@ export function PurchasePaymentCreateForm() {
         && !busy
     );
 
-    const createPayment = async () => {
+    const paymentPayload = (): PurchasePaymentCreatePayload => ({
+        payment_date: paymentDate,
+        amount: amount || '0.000000',
+        supplier_type: 'supplier',
+        supplier_id: supplier?.id,
+        currency_id: currency?.id,
+        reference_number: referenceNumber || undefined,
+        lines: paymentRows.map((row) => ({
+            amount: row.amount,
+            payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
+            source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
+            reference: row.reference || undefined,
+            instrument_direction: 'issued',
+            external_bank_name: row.external_bank_name || undefined,
+            external_bank_branch: row.external_bank_branch || undefined,
+            instrument_number: row.instrument_number || undefined,
+            instrument_date: row.instrument_date || undefined,
+        })),
+        allocations: Object.entries(allocations)
+            .filter(([, value]) => isPositiveDecimal(value))
+            .map(([invoiceId, allocatedAmount]) => ({
+                invoice_id: Number(invoiceId),
+                allocated_amount: allocatedAmount,
+                allocation_date: paymentDate,
+            })),
+    });
+
+    const submitPayment = async () => {
         if (!canCreate) return;
         setBusy(true);
         setError(null);
+        setPreview(null);
         try {
-            const payment = await createPurchasePayment({
-                payment_date: paymentDate,
-                amount: amount || '0.000000',
-                supplier_type: 'supplier',
-                supplier_id: supplier?.id,
-                currency_id: currency?.id,
-                reference_number: referenceNumber || undefined,
-                lines: paymentRows.map((row) => ({
-                    amount: row.amount,
-                    payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
-                    source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
-                    reference: row.reference || undefined,
-                    instrument_direction: 'issued',
-                    external_bank_name: row.external_bank_name || undefined,
-                    external_bank_branch: row.external_bank_branch || undefined,
-                    instrument_number: row.instrument_number || undefined,
-                    instrument_date: row.instrument_date || undefined,
-                })),
-                allocations: Object.entries(allocations)
-                    .filter(([, value]) => isPositiveDecimal(value))
-                    .map(([invoiceId, allocatedAmount]) => ({
-                        invoice_id: Number(invoiceId),
-                        allocated_amount: allocatedAmount,
-                        allocation_date: paymentDate,
-                    })),
-            });
+            if (mode === 'prepare') {
+                setPreview(await preparePurchasePayment(paymentPayload()));
+                return;
+            }
+
+            const payment = await createPurchasePayment(paymentPayload());
             navigate(`/payments/${payment.id}?from=purchase`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -250,6 +261,7 @@ export function PurchasePaymentCreateForm() {
             <ErrorAlert error={error ?? paymentContext.error ?? invoiceResult.error} />
             {sourceNotice && <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">{sourceNotice}</div>}
             <PaymentSummary amount={amount} allocated={allocated} unallocated={unallocated} methodTotal={methodTotal} methodDifference={methodDifference} overAllocated={overAllocated} />
+            {preview && <PaymentPreviewPanel preview={preview} />}
 
             {activeTab === 'details' && (
                 <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -333,9 +345,41 @@ export function PurchasePaymentCreateForm() {
 
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/payments')}>Cancel</Button>
-                <Button type="button" loading={busy} disabled={!canCreate} onClick={() => void createPayment()}>Create Payment</Button>
+                <Button type="button" loading={busy} disabled={!canCreate} onClick={() => void submitPayment()}>{mode === 'prepare' ? 'Preview Payment' : 'Create Payment'}</Button>
             </div>
         </div>
+    );
+}
+
+function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
+    return (
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <h2 className="text-base font-semibold text-emerald-950">Payment Preview</h2>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <Summary label="Payment Total" value={<MoneyDisplay value={preview.line_total} />} />
+                <Summary label="Allocated" value={<MoneyDisplay value={preview.allocation_total} />} />
+                <Summary label="Unapplied" value={<MoneyDisplay value={preview.unapplied_amount} />} />
+            </div>
+            {preview.allocations.length > 0 && (
+                <div className="mt-4 overflow-hidden rounded-lg border border-emerald-200 bg-white">
+                    <table className="min-w-full divide-y divide-emerald-100 text-left text-sm">
+                        <thead className="bg-emerald-50 text-xs uppercase tracking-wide text-emerald-700">
+                            <tr>{['Invoice', 'Before', 'Allocated', 'After'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-100">
+                            {preview.allocations.map((allocation) => (
+                                <tr key={allocation.invoice_id}>
+                                    <td className="px-4 py-3">{allocation.invoice_number ?? `#${allocation.invoice_id}`}</td>
+                                    <td className="px-4 py-3"><MoneyDisplay value={allocation.invoice_balance_before} /></td>
+                                    <td className="px-4 py-3"><MoneyDisplay value={allocation.allocated_amount} /></td>
+                                    <td className="px-4 py-3"><MoneyDisplay value={allocation.invoice_balance_after} /></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
     );
 }
 

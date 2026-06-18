@@ -116,15 +116,24 @@ final class PurchaseOrderResource extends PurchaseResource
         $hasReceivable = $this->compare($this->sumLines('remaining_receivable_quantity'), '0.000000') > 0;
         $hasInvoiceable = $this->compare($this->sumLines('remaining_invoiceable_quantity'), '0.000000') > 0;
         $hasReturnable = $this->compare($this->sumLines('remaining_returnable_quantity'), '0.000000') > 0;
+        $openWorkflow = in_array($workflow, [
+            PurchaseOrderStatus::Approved,
+            PurchaseOrderStatus::PartiallyReceived,
+            PurchaseOrderStatus::Received,
+            PurchaseOrderStatus::PartiallyInvoiced,
+            PurchaseOrderStatus::Invoiced,
+            PurchaseOrderStatus::PartiallyReturned,
+            PurchaseOrderStatus::Returned,
+        ], true);
 
         return [
             'can_edit' => $workflow === PurchaseOrderStatus::Draft,
             'can_submit' => $workflow === PurchaseOrderStatus::Draft,
             'can_approve' => $workflow === PurchaseOrderStatus::PendingApproval,
-            'can_receive' => $workflow === PurchaseOrderStatus::Approved && $hasReceivable,
-            'can_invoice' => $workflow === PurchaseOrderStatus::Approved && $hasInvoiceable,
-            'can_return' => $workflow === PurchaseOrderStatus::Approved && $hasReturnable,
-            'can_close' => $workflow === PurchaseOrderStatus::Approved && ! $hasReceivable,
+            'can_receive' => $openWorkflow && $hasReceivable,
+            'can_invoice' => $openWorkflow && $hasInvoiceable,
+            'can_return' => $openWorkflow && $hasReturnable,
+            'can_close' => $openWorkflow && ! $hasReceivable && ! $hasInvoiceable,
             'can_cancel' => in_array($workflow, [
                 PurchaseOrderStatus::Draft,
                 PurchaseOrderStatus::PendingApproval,

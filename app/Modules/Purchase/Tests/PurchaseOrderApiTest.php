@@ -141,6 +141,7 @@ final class PurchaseOrderApiTest extends TestCase
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', ['tenant_id' => $context['tenant_id']])->assertOk();
         $closeOrder = PurchaseOrder::query()->with('lines')->findOrFail($closeId);
         app(PurchaseOrderService::class)->applyReceived($closeOrder->lines->first(), '2.000000');
+        app(PurchaseOrderService::class)->applyInvoiced($closeOrder->lines->first(), '2.000000');
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/close', ['tenant_id' => $context['tenant_id']])
             ->assertOk()
             ->assertJsonPath('data.status', 'closed');

@@ -60,6 +60,10 @@ final class PurchaseInvoiceDtoFactory
         $resolvedSupplierType = $data->supplierType;
         $resolvedSupplierId = $data->supplierId;
         $seenSources = [];
+        $lineage = [
+            'source_types_by_po_line' => [],
+            'requested_by_po_line' => [],
+        ];
 
         foreach ($data->sources as $index => $source) {
             if (! $source instanceof PurchaseInvoiceSourceData) {
@@ -83,6 +87,7 @@ final class PurchaseInvoiceDtoFactory
                     $adjustments,
                     $sourceTotals,
                     $lineQuantities,
+                    $lineage,
                     $lockSources,
                     $resolvedSupplierType,
                     $resolvedSupplierId,
@@ -108,6 +113,7 @@ final class PurchaseInvoiceDtoFactory
                 $adjustments,
                 $sourceTotals,
                 $lineQuantities,
+                $lineage,
                 $goodsReceipts,
                 $lockSources,
                 $resolvedSupplierType,
@@ -155,6 +161,7 @@ final class PurchaseInvoiceDtoFactory
         array &$adjustments,
         array &$sourceTotals,
         array &$lineQuantities,
+        array &$lineage,
         Collection $goodsReceipts,
         bool $lockSources,
         ?string &$resolvedSupplierType,
@@ -162,7 +169,7 @@ final class PurchaseInvoiceDtoFactory
         string $field,
     ): int {
         $grn = GoodsReceiptNote::query()
-            ->with(['lines', 'adjustments'])
+            ->with(['lines.purchaseOrderLine', 'adjustments'])
             ->when($lockSources, fn ($query) => $query->lockForUpdate())
             ->find($source->sourceId);
         if (! $grn instanceof GoodsReceiptNote) {
@@ -176,7 +183,7 @@ final class PurchaseInvoiceDtoFactory
             $field,
             'goods receipt',
         );
-        if ($grn->status !== GoodsReceiptNoteStatus::Posted) {
+        if (! $this->isInvoiceableGoodsReceiptStatus($grn)) {
             throw new InvalidArgumentException('Purchase invoices can only use posted goods receipts.');
         }
         if ($lockSources) {
@@ -218,6 +225,15 @@ final class PurchaseInvoiceDtoFactory
             if ($this->math->compare($quantity, $remainingInvoiceable) > 0) {
                 throw new InvalidArgumentException(
                     'Purchase invoice quantity cannot exceed GRN remaining procurement quantity.',
+                );
+            }
+            if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine) {
+                $this->trackProcurementLineage(
+                    $lineage,
+                    (int) $sourceLine->purchaseOrderLine->getKey(),
+                    self::GOODS_RECEIPT_LINE,
+                    $quantity,
+                    $this->balances->remainingInvoiceableForPurchaseOrderLine($sourceLine->purchaseOrderLine),
                 );
             }
             $selectedLines++;
@@ -363,6 +379,7 @@ final class PurchaseInvoiceDtoFactory
         array &$adjustments,
         array &$sourceTotals,
         array &$lineQuantities,
+        array &$lineage,
         bool $lockSources,
         ?string &$resolvedSupplierType,
         ?int &$resolvedSupplierId,
@@ -383,7 +400,7 @@ final class PurchaseInvoiceDtoFactory
             $field,
             'purchase order',
         );
-        if ($order->status !== PurchaseOrderStatus::Approved) {
+        if (! $this->isInvoiceablePurchaseOrderStatus($order)) {
             throw new InvalidArgumentException('Purchase invoices can only use approved purchase orders.');
         }
         if ($lockSources) {
@@ -424,6 +441,13 @@ final class PurchaseInvoiceDtoFactory
                     'Purchase invoice quantity cannot exceed PO remaining quantity.',
                 );
             }
+            $this->trackProcurementLineage(
+                $lineage,
+                (int) $sourceLine->getKey(),
+                self::PURCHASE_ORDER_LINE,
+                $quantity,
+                $remaining,
+            );
             $selectedLines++;
 
             $selectedTotal = $this->math->add(
@@ -613,6 +637,68 @@ final class PurchaseInvoiceDtoFactory
             $amount,
             $this->math->div($selectedQuantity, $sourceQuantity, 12),
         );
+    }
+
+    /**
+     * @param  array{source_types_by_po_line: array<int, array<string, bool>>, requested_by_po_line: array<int, string>}  $lineage
+     */
+    private function trackProcurementLineage(
+        array &$lineage,
+        int $purchaseOrderLineId,
+        string $sourceLineType,
+        string $quantity,
+        string $remaining,
+    ): void {
+        $existingTypes = $lineage['source_types_by_po_line'][$purchaseOrderLineId] ?? [];
+        if (($sourceLineType === self::PURCHASE_ORDER_LINE && isset($existingTypes[self::GOODS_RECEIPT_LINE]))
+            || ($sourceLineType === self::GOODS_RECEIPT_LINE && isset($existingTypes[self::PURCHASE_ORDER_LINE]))
+        ) {
+            throw new InvalidArgumentException(
+                'Purchase invoice cannot mix a purchase order line with goods receipt lines derived from the same purchase order line.',
+            );
+        }
+
+        $lineage['source_types_by_po_line'][$purchaseOrderLineId][$sourceLineType] = true;
+        $requested = $this->math->add(
+            $lineage['requested_by_po_line'][$purchaseOrderLineId] ?? '0.000000',
+            $quantity,
+        );
+        if ($this->math->compare($requested, $remaining) > 0) {
+            throw new InvalidArgumentException(
+                'Purchase invoice quantity cannot exceed cumulative procurement remaining quantity.',
+            );
+        }
+        $lineage['requested_by_po_line'][$purchaseOrderLineId] = $requested;
+    }
+
+    private function isInvoiceableGoodsReceiptStatus(GoodsReceiptNote $grn): bool
+    {
+        $status = $grn->status instanceof GoodsReceiptNoteStatus
+            ? $grn->status
+            : GoodsReceiptNoteStatus::from((string) $grn->status);
+
+        return in_array($status, [
+            GoodsReceiptNoteStatus::Posted,
+            GoodsReceiptNoteStatus::PartiallyInvoiced,
+            GoodsReceiptNoteStatus::Invoiced,
+            GoodsReceiptNoteStatus::PartiallyReturned,
+        ], true);
+    }
+
+    private function isInvoiceablePurchaseOrderStatus(PurchaseOrder $order): bool
+    {
+        $status = $order->status instanceof PurchaseOrderStatus
+            ? $order->status
+            : PurchaseOrderStatus::from((string) $order->status);
+
+        return in_array($status, [
+            PurchaseOrderStatus::Approved,
+            PurchaseOrderStatus::PartiallyReceived,
+            PurchaseOrderStatus::Received,
+            PurchaseOrderStatus::PartiallyInvoiced,
+            PurchaseOrderStatus::Invoiced,
+            PurchaseOrderStatus::PartiallyReturned,
+        ], true);
     }
 
     /**

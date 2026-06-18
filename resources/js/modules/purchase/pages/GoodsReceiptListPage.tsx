@@ -11,19 +11,27 @@ import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { listGoodsReceipts, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceipt } from '../purchaseApi';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function GoodsReceiptListPage() {
+    const auth = useAuth();
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
     const debouncedSearch = useDebounce(search);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [busyId, setBusyId] = useState<number | null>(null);
     const result = useApi((signal) => listGoodsReceipts({ page, search: debouncedSearch || undefined, status: status || undefined, per_page: 15 }, signal), [page, debouncedSearch, status]);
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
 
     const run = async (row: GoodsReceipt, action: 'post' | 'reverse') => {
+        if (busyId !== null) return;
+        if (!window.confirm(`Confirm ${action} for this goods receipt?`)) return;
+        setBusyId(row.id);
         setActionError(null);
         try {
             if (action === 'post') await postGoodsReceipt(row.id);
@@ -31,6 +39,8 @@ export default function GoodsReceiptListPage() {
             result.reload();
         } catch (requestError) {
             setActionError(toApiError(requestError));
+        } finally {
+            setBusyId(null);
         }
     };
 
@@ -41,12 +51,15 @@ export default function GoodsReceiptListPage() {
         { key: 'po', header: 'PO', render: (row) => row.purchase_order?.purchase_order_number ?? row.purchase_order?.name ?? '-' },
         { key: 'total', header: 'Total', render: (row) => formatMoney(row.grand_total) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: 'Actions', render: (row) => <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{row.status === 'draft' && <Button type="button" variant="secondary" onClick={() => run(row, 'post')}>Post</Button>}{row.status === 'posted' && <Button type="button" variant="secondary" onClick={() => run(row, 'reverse')}>Reverse</Button>}</div> },
+        { key: 'actions', header: 'Actions', render: (row) => {
+            const capabilities = row.capabilities ?? {};
+            return <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'post')}>Post</Button>}{capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'reverse')}>Reverse</Button>}</div>;
+        } },
     ];
 
     return (
         <div className="space-y-5">
-            <ContentHeader title="Goods receipts" actions={<LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton>} />
+            <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : null} />
             <ErrorAlert error={result.error ?? actionError} />
             <div className="grid gap-3 md:grid-cols-3">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

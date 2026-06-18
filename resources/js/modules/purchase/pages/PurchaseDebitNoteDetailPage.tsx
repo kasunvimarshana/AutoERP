@@ -10,6 +10,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import type { NamedResource } from '@/shared/types/common';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { formatDate } from '@/shared/utils/formatDate';
@@ -22,9 +23,11 @@ import {
 } from '../purchaseApi';
 import { PurchaseInvoiceLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchaseDebitNoteDetailPage() {
     const id = Number(useParams().id);
+    const auth = useAuth();
     const result = useApi((signal) => getPurchaseDebitNote(id, signal), [id]);
     const [busy, setBusy] = useState(false);
     const [allocationOpen, setAllocationOpen] = useState(false);
@@ -34,15 +37,16 @@ export default function PurchaseDebitNoteDetailPage() {
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const note = result.data;
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     return (
         <PurchaseDocumentShell
             header={<PurchasePageHeader
                 title={note.debit_note_number ?? 'Debit note'}
                 description={formatDate(note.debit_note_date)}
                 actions={<div className="flex gap-2">
-                    {note.status === 'draft' && <Button loading={busy} onClick={() => void runAction('approve')}>Approve</Button>}
-                    {note.status === 'approved' && <Button loading={busy} onClick={() => void runAction('post')}>Post</Button>}
-                    {note.status === 'posted' && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button onClick={() => {
+                    {note.status === 'draft' && can(purchasePermissions.debitNotesApprove) && <Button loading={busy} onClick={() => void runAction('approve')}>Approve</Button>}
+                    {note.status === 'approved' && can(purchasePermissions.debitNotesPost) && <Button loading={busy} onClick={() => void runAction('post')}>Post</Button>}
+                    {note.status === 'posted' && can(purchasePermissions.debitNotesAllocate) && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button disabled={busy} onClick={() => {
                         setError(null);
                         setInvoice(null);
                         setAmount(note.remaining_amount ?? '0.000000');
@@ -109,6 +113,7 @@ export default function PurchaseDebitNoteDetailPage() {
 
     async function runAction(action: 'approve' | 'post') {
         if (busy) return;
+        if (!window.confirm(`Confirm ${action} for this debit note?`)) return;
         setBusy(true);
         setError(null);
         try {

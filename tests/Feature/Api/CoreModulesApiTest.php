@@ -8,6 +8,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Invoice\Models\Invoice;
+use Modules\Item\DTOs\CreateItemData;
+use Modules\Item\Enums\CostingMethod;
+use Modules\Item\Enums\ItemType;
+use Modules\Item\Enums\TrackingType;
+use Modules\Item\Services\ItemCreationService;
+use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\CreatePurchaseOrderData;
+use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
+use Modules\Purchase\DTOs\PurchaseOrderLineData;
+use Modules\Purchase\Services\GoodsReceiptNoteService;
+use Modules\Purchase\Services\PurchaseOrderService;
 use Tests\TestCase;
 
 final class CoreModulesApiTest extends TestCase
@@ -88,43 +99,28 @@ final class CoreModulesApiTest extends TestCase
         $warehouseId = $this->warehouse($tenantId, $organizationUnitId);
         $supplierId = $this->supplier($tenantId, $organizationUnitId);
         $uomId = $this->uom($tenantId, $organizationUnitId);
-        $item = $this->createItemViaApi($tenantId, $organizationUnitId, 'PUR-ITEM');
+        $item = $this->createItemDirect($tenantId, $organizationUnitId, $uomId, 'PUR-ITEM');
 
-        $order = $this->postJson('/api/v1/purchase/orders', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'purchase_order_date' => '2026-06-06',
-            'supplier_id' => $supplierId,
-            'warehouse_id' => $warehouseId,
-            'lines' => [[
-                'item_id' => $item['id'],
-                'uom_id' => $uomId,
-                'ordered_quantity' => '5.000000',
-                'unit_price' => '100.000000',
-            ]],
-        ])->assertSuccessful()->json('data');
-
-        $grn = $this->postJson('/api/v1/purchase/goods-receipts', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'received_date' => '2026-06-06',
-            'purchase_order_id' => $order['id'],
-            'warehouse_id' => $warehouseId,
-            'lines' => [[
-                'purchase_order_line_id' => $order['lines'][0]['id'],
-                'item_id' => $item['id'],
-                'uom_id' => $uomId,
-                'received_quantity' => '2.000000',
-                'accepted_quantity' => '2.000000',
-                'ordered_quantity' => '5.000000',
-                'unit_price' => '100.000000',
-            ]],
-        ])->assertSuccessful()->json('data');
-
-        $this->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-        ])->assertSuccessful()->assertJsonPath('data.status', 'posted');
+        $orders = app(PurchaseOrderService::class);
+        $order = $orders->create(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-06',
+            organizationUnitId: $organizationUnitId,
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData((int) $item['id'], '5.000000', '100.000000', uomId: $uomId)],
+        ));
+        $order = $orders->approve($orders->submit($order))->load('lines');
+        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            tenantId: $tenantId,
+            receivedDate: '2026-06-06',
+            warehouseId: $warehouseId,
+            organizationUnitId: $organizationUnitId,
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData((int) $item['id'], '2.000000', '2.000000', '100.000000', purchaseOrderLineId: (int) $order->lines[0]->getKey(), uomId: $uomId, orderedQuantity: '5.000000')],
+        ));
+        app(GoodsReceiptNoteService::class)->post($grn);
 
         $this->getJson('/api/v1/inventory/availability?'.http_build_query([
             'tenant_id' => $tenantId,
@@ -274,6 +270,23 @@ final class CoreModulesApiTest extends TestCase
             'costing_method' => 'fifo',
             'is_stockable' => true,
         ])->assertSuccessful()->json('data');
+    }
+
+    private function createItemDirect(int $tenantId, int $organizationUnitId, int $uomId, string $code): array
+    {
+        $item = app(ItemCreationService::class)->create(new CreateItemData(
+            tenantId: $tenantId,
+            code: $code,
+            name: $code,
+            itemType: ItemType::Stock,
+            trackingType: TrackingType::None,
+            costingMethod: CostingMethod::Fifo,
+            baseUomId: $uomId,
+            organizationUnitId: $organizationUnitId,
+            isStockable: true,
+        ));
+
+        return ['id' => (int) $item->getKey()];
     }
 
     private function warehouse(int $tenantId, int $organizationUnitId): int

@@ -23,6 +23,7 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'invoice_status_label' => $this->statusLabel($this->invoiceStatus()),
             'return_status' => $this->returnStatus(),
             'return_status_label' => $this->statusLabel($this->returnStatus()),
+            'capabilities' => $this->capabilities(),
             'purchase_order' => $this->whenLoaded('purchaseOrder', fn () => $this->summary($this->purchaseOrder, ['purchase_order_number', 'status'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
@@ -96,5 +97,45 @@ final class GoodsReceiptNoteResource extends PurchaseResource
         }
 
         return $this->compare($progress, $basis) >= 0 ? $complete : $partial;
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function capabilities(): array
+    {
+        $status = (string) $this->enumValue($this->status);
+        $remainingInvoiceable = '0.000000';
+        $remainingReturnable = '0.000000';
+        $invoiced = '0.000000';
+        $returned = '0.000000';
+
+        $lines = $this->whenLoaded('lines');
+        if ($lines instanceof \Illuminate\Support\Collection) {
+            foreach ($lines as $line) {
+                $remainingInvoiceable = $this->add(
+                    $remainingInvoiceable,
+                    app(PurchaseProcurementBalanceService::class)->remainingInvoiceableForGoodsReceiptLine($line),
+                );
+                $remainingReturnable = $this->add(
+                    $remainingReturnable,
+                    $this->add((string) $line->accepted_quantity, '-'.(string) $line->returned_quantity),
+                );
+                $invoiced = $this->add($invoiced, (string) $line->invoiced_quantity);
+                $returned = $this->add($returned, (string) $line->returned_quantity);
+            }
+        }
+
+        $open = in_array($status, ['posted', 'partially_invoiced', 'invoiced', 'partially_returned'], true);
+
+        return [
+            'can_post' => $status === 'draft',
+            'can_invoice' => $open && $this->compare($remainingInvoiceable, '0.000000') > 0,
+            'can_return' => $open && $this->compare($remainingReturnable, '0.000000') > 0,
+            'can_reverse' => $status === 'posted'
+                && $this->compare($invoiced, '0.000000') === 0
+                && $this->compare($returned, '0.000000') === 0,
+            'read_only' => in_array($status, ['posted', 'partially_invoiced', 'invoiced', 'partially_returned', 'returned', 'cancelled', 'reversed'], true),
+        ];
     }
 }

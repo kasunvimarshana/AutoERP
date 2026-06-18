@@ -98,6 +98,11 @@ final class PurchaseOrderStatusService
                     'Purchase orders with remaining receivable quantities cannot be closed.',
                 );
             }
+            if ($this->math->compare((string) $line->remaining_invoiceable_quantity, '0.000000') > 0) {
+                throw new InvalidArgumentException(
+                    'Purchase orders with remaining invoiceable quantities cannot be closed.',
+                );
+            }
         }
     }
 

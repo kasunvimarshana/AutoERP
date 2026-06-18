@@ -38,6 +38,7 @@ return new class extends Migration
 
             $table->index('purchase_return_id', 'purchase_return_adjustment_allocations_return_idx');
             $table->index('purchase_header_adjustment_id', 'purchase_return_adjustment_allocations_adjustment_idx');
+            $table->unique(['purchase_return_id', 'purchase_header_adjustment_id'], 'purchase_return_adj_alloc_return_header_uk');
         });
     }
 

@@ -9,6 +9,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import type { NamedResource } from '@/shared/types/common';
 import { compareDecimalStrings, isPositiveDecimal } from '@/shared/utils/decimal';
 import {
@@ -33,6 +34,7 @@ import {
     PurchasePaymentMethodsEditor,
     type PurchasePaymentMethodRow,
 } from '../components/PurchasePaymentMethodsEditor';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 const paymentTerms = [
     { value: 'due_on_receipt', label: 'Due on receipt' },
@@ -54,6 +56,7 @@ const presets: Array<{ value: FastPurchasePreset; label: string; description: st
 const tabIds: FastPurchaseTab[] = ['details', 'lines', 'adjustments', 'payment', 'impact'];
 
 export default function FastPurchasePage() {
+    const auth = useAuth();
     const context = useApi((signal) => getFastPurchaseContext(signal), []);
     const defaults = context.data?.defaults;
     const [searchParams] = useSearchParams();
@@ -237,6 +240,7 @@ export default function FastPurchasePage() {
     const currentPayload = useMemo(() => buildPayload(), [buildPayload]);
     const payloadKey = useMemo(() => JSON.stringify(currentPayload), [currentPayload]);
     const previewStale = Boolean(preview && !result && lastPreviewKey.current !== payloadKey);
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
 
     const canSubmit = useMemo(() => {
         const hasLine = lines.some((line) => line.item?.id);
@@ -255,6 +259,8 @@ export default function FastPurchasePage() {
             && !submitting
         );
     }, [lines, paymentRows, paymentTotal, purchaseDate, receiveStock, recordPayment, submitting, supplier?.id, supplierReference, warehouse?.id]);
+    const canPreview = canSubmit && can(purchasePermissions.fastPurchasesView);
+    const canExecute = canSubmit && can(purchasePermissions.fastPurchasesExecute);
 
     const dirty = Boolean(
         supplier
@@ -267,7 +273,7 @@ export default function FastPurchasePage() {
     useUnsavedChanges(dirty && !result && !submitting);
 
     const runPreview = async () => {
-        if (previewing) return;
+        if (previewing || !canPreview) return;
         previewController.current?.abort();
         const controller = new AbortController();
         previewController.current = controller;
@@ -287,7 +293,7 @@ export default function FastPurchasePage() {
     };
 
     const submit = async () => {
-        if (submitting || !canSubmit || previewStale) return;
+        if (submitting || !canExecute || previewStale) return;
         setSubmitting(true);
         setError(null);
         try {
@@ -338,8 +344,8 @@ export default function FastPurchasePage() {
             ) : (
                 <>
                     <Button type="button" variant="secondary" onClick={resetForm} disabled={submitting || previewing}>Reset</Button>
-                    <Button type="button" variant="secondary" loading={previewing} disabled={!canSubmit || previewing} onClick={() => void runPreview()}>Preview</Button>
-                    <Button type="submit" loading={submitting} disabled={!canSubmit || previewStale}>Create Fast Purchase</Button>
+                    <Button type="button" variant="secondary" loading={previewing} disabled={!canPreview || previewing} onClick={() => void runPreview()}>Preview</Button>
+                    <Button type="submit" loading={submitting} disabled={!canExecute || previewStale}>Create Fast Purchase</Button>
                 </>
             )}
         />

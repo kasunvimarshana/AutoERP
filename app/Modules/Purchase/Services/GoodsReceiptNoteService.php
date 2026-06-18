@@ -12,6 +12,7 @@ use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
@@ -59,7 +60,16 @@ final class GoodsReceiptNoteService
                 'purchase_order_id',
                 'purchase order',
             );
-            if ($order->status !== \Modules\Purchase\Enums\PurchaseOrderStatus::Approved) {
+            $orderStatus = $order->status instanceof PurchaseOrderStatus
+                ? $order->status
+                : PurchaseOrderStatus::from((string) $order->status);
+            if (! in_array($orderStatus, [
+                PurchaseOrderStatus::Approved,
+                PurchaseOrderStatus::PartiallyReceived,
+                PurchaseOrderStatus::Received,
+                PurchaseOrderStatus::PartiallyInvoiced,
+                PurchaseOrderStatus::Invoiced,
+            ], true)) {
                 throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
             }
             if ($data->supplierId !== null && (int) $data->supplierId !== (int) $order->supplier_id) {
@@ -68,6 +78,8 @@ final class GoodsReceiptNoteService
             if ($data->supplierType !== null && $data->supplierType !== $order->supplier_type) {
                 throw new InvalidArgumentException('GRN supplier type must match the selected purchase order.');
             }
+        } elseif ($data->supplierId === null) {
+            throw new InvalidArgumentException('Standalone Purchase GRNs require a supplier.');
         } elseif ($data->supplierId !== null) {
             $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
         }
@@ -272,6 +284,8 @@ final class GoodsReceiptNoteService
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
                     $this->orderQuantities->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
                 }
+                $line->status = GoodsReceiptNoteLineStatus::Reversed;
+                $line->save();
             }
 
             $this->taxDocuments->reverseGoodsReceiptNote($locked);

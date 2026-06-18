@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
@@ -20,12 +21,16 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Validators\PaymentValidationService;
+use Modules\Purchase\DTOs\PurchasePaymentPreviewData;
 
 final class PurchasePaymentIntegrationService
 {
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentCreationService $payments,
+        private readonly PaymentValidationService $paymentValidator,
+        private readonly InvoiceBalanceProviderInterface $invoiceBalances,
     ) {}
 
     /**
@@ -104,6 +109,7 @@ final class PurchasePaymentIntegrationService
         ?string $notes = null,
     ): Payment {
         $this->assertLineTotalMatchesAmount($amount, $lines);
+        $supplierType = $supplierType ?? 'supplier';
 
         return DB::transaction(function () use (
             $tenantId,
@@ -120,21 +126,23 @@ final class PurchasePaymentIntegrationService
             $createdBy,
             $notes,
         ): Payment {
-            $currencyId = $this->assertAllocationsBelongToSupplier(
+            $allocationResolution = $this->resolveSupplierAllocations(
                 $tenantId,
                 $organizationUnitId,
-                $supplierType ?? 'supplier',
+                $supplierType,
                 $supplierId,
                 $currencyId,
                 $allocations,
+                true,
             );
+            $currencyId = $allocationResolution['currency_id'];
 
             $data = $this->prepareSupplierPayment(
                 tenantId: $tenantId,
                 paymentDate: $paymentDate,
                 amount: $amount,
                 organizationUnitId: $organizationUnitId,
-                supplierType: $supplierType ?? 'supplier',
+                supplierType: $supplierType,
                 supplierId: $supplierId,
                 currencyId: $currencyId,
                 exchangeRate: $exchangeRate,
@@ -149,6 +157,85 @@ final class PurchasePaymentIntegrationService
 
             return $this->payments->create($data);
         });
+    }
+
+    /**
+     * Validate and calculate a supplier payment preview without creating payment, allocations,
+     * invoice settlements, audit rows, ledger rows, or balance changes.
+     *
+     * @param  list<PaymentLineData>  $lines
+     * @param  list<PaymentAllocationData>  $allocations
+     */
+    public function previewSupplierPayment(
+        int $tenantId,
+        string $paymentDate,
+        string $amount,
+        ?int $organizationUnitId = null,
+        ?string $supplierType = null,
+        ?int $supplierId = null,
+        ?int $currencyId = null,
+        string $exchangeRate = '1.000000',
+        ?string $referenceNumber = null,
+        array $lines = [],
+        array $allocations = [],
+        ?int $createdBy = null,
+        ?string $notes = null,
+    ): PurchasePaymentPreviewData {
+        $this->assertLineTotalMatchesAmount($amount, $lines);
+
+        $supplierType = $supplierType ?? 'supplier';
+        $allocationResolution = $this->resolveSupplierAllocations(
+            $tenantId,
+            $organizationUnitId,
+            $supplierType,
+            $supplierId,
+            $currencyId,
+            $allocations,
+            false,
+        );
+        $currencyId = $allocationResolution['currency_id'];
+
+        $data = $this->prepareSupplierPayment(
+            tenantId: $tenantId,
+            paymentDate: $paymentDate,
+            amount: $amount,
+            organizationUnitId: $organizationUnitId,
+            supplierType: $supplierType,
+            supplierId: $supplierId,
+            currencyId: $currencyId,
+            exchangeRate: $exchangeRate,
+            referenceNumber: $referenceNumber,
+            lines: $lines,
+            allocations: $allocations,
+            status: PaymentStatus::Draft,
+            createdBy: $createdBy,
+            notes: $notes,
+            metadata: ['source_module' => 'purchase', 'preview' => true],
+        );
+        $this->paymentValidator->validateForCreation($data);
+
+        $lineTotal = $this->sumLineAmounts($data->lines);
+        $allocationTotal = $this->sumAllocationAmounts($data->allocations);
+        if ($this->math->compare($allocationTotal, $lineTotal) > 0) {
+            throw new InvalidArgumentException('Payment allocation total cannot exceed payment total.');
+        }
+
+        return new PurchasePaymentPreviewData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            paymentDate: $paymentDate,
+            amount: $this->math->normalize($amount),
+            lineTotal: $lineTotal,
+            allocationTotal: $allocationTotal,
+            unappliedAmount: $this->math->sub($lineTotal, $allocationTotal),
+            supplierType: $supplierType,
+            supplierId: (int) $supplierId,
+            currencyId: $currencyId,
+            exchangeRate: $this->math->normalize($exchangeRate),
+            referenceNumber: $referenceNumber,
+            lines: $this->paymentLinePreviewRows($data->lines),
+            allocations: $allocationResolution['allocations'],
+        );
     }
 
     /**
@@ -175,34 +262,44 @@ final class PurchasePaymentIntegrationService
 
     /**
      * @param  list<PaymentAllocationData>  $allocations
+     * @return array{currency_id: int|null, allocations: list<array<string, mixed>>}
      */
-    private function assertAllocationsBelongToSupplier(
+    private function resolveSupplierAllocations(
         int $tenantId,
         ?int $organizationUnitId,
         string $supplierType,
         ?int $supplierId,
         ?int $currencyId,
         array $allocations,
-    ): ?int {
+        bool $lockSources,
+    ): array {
         if ($supplierId === null) {
             throw new InvalidArgumentException('Supplier payment requires a supplier.');
         }
 
         if ($allocations === []) {
-            return $currencyId;
+            return ['currency_id' => $currencyId, 'allocations' => []];
         }
 
         $invoiceIds = array_map(static fn (PaymentAllocationData $allocation): int => $allocation->invoiceId, $allocations);
-        $invoices = Invoice::query()
-            ->whereIn('id', $invoiceIds)
-            ->lockForUpdate()
-            ->get()
+        $query = Invoice::query()->whereIn('id', $invoiceIds);
+        if ($lockSources) {
+            $query->lockForUpdate();
+        }
+
+        $invoices = $query->get()
             ->keyBy(fn (Invoice $invoice): int => (int) $invoice->getKey());
 
+        $seenInvoices = [];
+        $resolved = [];
         foreach ($allocations as $allocation) {
             if (! $allocation instanceof PaymentAllocationData) {
                 throw new InvalidArgumentException('Supplier payment allocations are invalid.');
             }
+            if (isset($seenInvoices[$allocation->invoiceId])) {
+                throw new InvalidArgumentException('Payment can only allocate once to the same supplier invoice.');
+            }
+            $seenInvoices[$allocation->invoiceId] = true;
 
             $invoice = $invoices->get($allocation->invoiceId);
             if (! $invoice instanceof Invoice) {
@@ -224,9 +321,75 @@ final class PurchasePaymentIntegrationService
             } elseif ($invoiceCurrencyId !== null && $invoiceCurrencyId !== $currencyId) {
                 throw new InvalidArgumentException('Selected supplier invoice currency does not match the payment currency.');
             }
+
+            $balance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
+            if ($balance->tenantId !== $tenantId || $balance->organizationUnitId !== $organizationUnitId) {
+                throw new InvalidArgumentException('Selected supplier invoice balance is outside the payment scope.');
+            }
+            if (! $allocation->allowOverpayment
+                && $this->math->compare($allocation->allocatedAmount, $balance->remainingAmount) > 0
+            ) {
+                throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
+            }
+
+            $resolved[] = [
+                'invoice_id' => $allocation->invoiceId,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_total' => $this->math->normalize($balance->totalAmount),
+                'invoice_balance_before' => $this->math->normalize($balance->remainingAmount),
+                'allocated_amount' => $this->math->normalize($allocation->allocatedAmount),
+                'invoice_balance_after' => $this->math->sub($balance->remainingAmount, $allocation->allocatedAmount),
+                'allocation_date' => $allocation->allocationDate,
+                'allocation_method' => $allocation->allocationMethod,
+            ];
         }
 
-        return $currencyId;
+        return ['currency_id' => $currencyId, 'allocations' => $resolved];
+    }
+
+    /**
+     * @param  list<PaymentLineData>  $lines
+     */
+    private function sumLineAmounts(array $lines): string
+    {
+        $total = '0.000000';
+        foreach ($lines as $line) {
+            $total = $this->math->add($total, $line->amount);
+        }
+
+        return $total;
+    }
+
+    /**
+     * @param  list<PaymentAllocationData>  $allocations
+     */
+    private function sumAllocationAmounts(array $allocations): string
+    {
+        $total = '0.000000';
+        foreach ($allocations as $allocation) {
+            $total = $this->math->add($total, $allocation->allocatedAmount);
+        }
+
+        return $total;
+    }
+
+    /**
+     * @param  list<PaymentLineData>  $lines
+     * @return list<array<string, mixed>>
+     */
+    private function paymentLinePreviewRows(array $lines): array
+    {
+        return array_map(fn (PaymentLineData $line): array => [
+            'amount' => $this->math->normalize($line->amount),
+            'payment_method_id' => $line->paymentMethodId,
+            'reference_number' => $line->referenceNumber,
+            'source_account_id' => $line->metadata['source_account_id'] ?? null,
+            'internal_bank_account_id' => $line->internalBankAccountId,
+            'instrument_direction' => $line->instrumentDirection,
+            'instrument_number' => $line->instrumentNumber,
+            'instrument_date' => $line->instrumentDate,
+            'notes' => $line->notes,
+        ], $lines);
     }
 
     public function assertPaymentSourceAccount(int $tenantId, ?int $organizationUnitId, int $accountId): FinanceAccount

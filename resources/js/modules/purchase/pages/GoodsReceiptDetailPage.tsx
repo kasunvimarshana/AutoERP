@@ -10,15 +10,18 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getGoodsReceipt, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceiptLine } from '../purchaseApi';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
+import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
 export default function GoodsReceiptDetailPage() {
     const id = Number(useParams().id);
+    const auth = useAuth();
     const result = useApi((signal) => getGoodsReceipt(id, signal), [id]);
     const [tab, setTab] = useState<Tab>('summary');
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -28,6 +31,8 @@ export default function GoodsReceiptDetailPage() {
     if (!result.data) return <ErrorAlert error={result.error} />;
 
     const grn = result.data;
+    const capabilities = grn.capabilities ?? {};
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'post' | 'reverse') => {
         if (!window.confirm(`Confirm ${action} for this goods receipt?`)) return;
         setBusy(true);
@@ -56,10 +61,10 @@ export default function GoodsReceiptDetailPage() {
                 title={grn.grn_number ?? 'Goods receipt'}
                 description={formatDate(grn.received_date)}
                 actions={<div className="flex flex-wrap justify-end gap-2">
-                    {grn.status === 'posted' && <LinkButton to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`} variant="secondary">Create invoice</LinkButton>}
-                    {grn.status === 'posted' && <LinkButton to={`/purchase/returns/create?goods_receipt_id=${grn.id}`} variant="secondary">Create return</LinkButton>}
-                    {grn.status === 'draft' && <Button loading={busy} onClick={() => void run('post')}>Post</Button>}
-                    {grn.status === 'posted' && <Button loading={busy} variant="secondary" onClick={() => void run('reverse')}>Reverse</Button>}
+                    {capabilities.can_invoice && can(purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`} variant="secondary">Create invoice</LinkButton>}
+                    {capabilities.can_return && can(purchasePermissions.returnsCreate) && <LinkButton to={`/purchase/returns/create?goods_receipt_id=${grn.id}`} variant="secondary">Create return</LinkButton>}
+                    {capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button loading={busy} onClick={() => void run('post')}>Post</Button>}
+                    {capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button loading={busy} variant="secondary" onClick={() => void run('reverse')}>Reverse</Button>}
                 </div>}
             />}
         >
@@ -85,8 +90,8 @@ export default function GoodsReceiptDetailPage() {
                     ]} rowKey={(row) => row.id ?? row.name} />}
                     {tab === 'linked' && <DetailGrid items={[
                         { label: 'Purchase order', value: grn.purchase_order?.id ? <Link className="text-sky-700 hover:underline" to={`/purchase/orders/${grn.purchase_order.id}`}>{grn.purchase_order.purchase_order_number ?? grn.purchase_order.name}</Link> : '-' },
-                        { label: 'Returns', value: <Link className="text-sky-700 hover:underline" to={`/purchase/returns/create?goods_receipt_id=${grn.id}`}>Create referenced return</Link> },
-                        { label: 'Invoices', value: <Link className="text-sky-700 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link> },
+                        { label: 'Returns', value: capabilities.can_return && can(purchasePermissions.returnsCreate) ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/create?goods_receipt_id=${grn.id}`}>Create referenced return</Link> : '-' },
+                        { label: 'Invoices', value: capabilities.can_invoice && can(purchasePermissions.supplierInvoicesCreate) ? <Link className="text-sky-700 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link> : '-' },
                     ]} />}
                 </div>
             </Panel>

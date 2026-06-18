@@ -10,6 +10,7 @@ use Modules\Inventory\Services\InventoryFacade;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Http\Resources\PaymentResource;
+use Modules\Purchase\Http\Resources\PurchasePaymentPreviewResource;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PreparePurchasePaymentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInventoryAdjustmentRequest;
@@ -72,11 +73,7 @@ final class PurchaseIntegrationController
             exchangeRate: (string) $request->input('exchange_rate', '1.000000'),
             referenceNumber: $request->filled('reference_number') ? (string) $request->input('reference_number') : null,
             lines: $this->paymentLines($request, $service),
-            allocations: array_map(static fn (array $row): PaymentAllocationData => new PaymentAllocationData(
-                invoiceId: (int) $row['invoice_id'],
-                allocatedAmount: (string) $row['allocated_amount'],
-                allocationDate: (string) ($row['allocation_date'] ?? $request->input('payment_date')),
-            ), $request->input('allocations', [])),
+            allocations: $this->paymentAllocations($request),
             createdBy: $request->currentUserId(),
             notes: $request->filled('notes') ? (string) $request->input('notes') : null,
         );
@@ -84,9 +81,27 @@ final class PurchaseIntegrationController
         return new PaymentResource($payment);
     }
 
-    public function preparePayment(PreparePurchasePaymentRequest $request, PurchasePaymentIntegrationService $service): PaymentResource
+    public function preparePayment(PreparePurchasePaymentRequest $request, PurchasePaymentIntegrationService $service): PurchasePaymentPreviewResource
     {
-        return $this->createPayment($request, $service);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::PAYMENTS_VIEW);
+
+        $preview = $service->previewSupplierPayment(
+            tenantId: $request->tenantId(),
+            paymentDate: (string) $request->input('payment_date'),
+            amount: (string) $request->input('amount'),
+            organizationUnitId: $request->organizationUnitId(),
+            supplierType: $request->filled('supplier_type') ? (string) $request->input('supplier_type') : null,
+            supplierId: $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
+            currencyId: $request->filled('currency_id') ? (int) $request->input('currency_id') : null,
+            exchangeRate: (string) $request->input('exchange_rate', '1.000000'),
+            referenceNumber: $request->filled('reference_number') ? (string) $request->input('reference_number') : null,
+            lines: $this->paymentLines($request, $service),
+            allocations: $this->paymentAllocations($request),
+            createdBy: $request->currentUserId(),
+            notes: $request->filled('notes') ? (string) $request->input('notes') : null,
+        );
+
+        return new PurchasePaymentPreviewResource($preview);
     }
 
     /**
@@ -123,5 +138,17 @@ final class PurchaseIntegrationController
         }
 
         return $lines;
+    }
+
+    /**
+     * @return list<PaymentAllocationData>
+     */
+    private function paymentAllocations(PreparePurchasePaymentRequest $request): array
+    {
+        return array_map(static fn (array $row): PaymentAllocationData => new PaymentAllocationData(
+            invoiceId: (int) $row['invoice_id'],
+            allocatedAmount: (string) $row['allocated_amount'],
+            allocationDate: (string) ($row['allocation_date'] ?? $request->input('payment_date')),
+        ), $request->input('allocations', []));
     }
 }

@@ -4,17 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseReturnData;
 use Modules\Purchase\DTOs\PurchasePostingResult;
+use Modules\Purchase\DTOs\PurchaseReturnLineData;
+use Modules\Purchase\DTOs\PurchaseReturnLineValuationData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
+use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
+use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Purchase\Models\PurchaseReturnLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxReturnAllocationService;
 
@@ -28,132 +35,109 @@ final class PurchaseReturnService
         private readonly PurchaseDebitNoteService $debitNotes,
         private readonly PurchaseNumberService $numbers,
         private readonly PurchaseOrderQuantityService $orderQuantities,
+        private readonly PurchaseReturnValuationService $valuations,
+        private readonly PurchaseStatusService $statuses,
         private readonly TaxReturnAllocationService $taxReturns,
     ) {}
 
     public function create(CreatePurchaseReturnData $data): PurchaseReturn
     {
-        $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
-        if ($data->warehouseLocationId !== null) {
-            $this->validator->warehouseLocation(
-                $data->tenantId,
-                $data->organizationUnitId,
-                $data->warehouseId,
-                $data->warehouseLocationId,
-                'warehouse_location_id',
-            );
-        }
-
-        if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
-            $this->validateManualSupplierReturn($data);
-        } else {
-            foreach ($data->lines as $index => $line) {
-                if ($line->sourceLineType !== 'goods_receipt_note_line') {
-                    throw new \InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
-                }
-                $sourceLine = GoodsReceiptNoteLine::query()->findOrFail($line->sourceLineId);
-                $this->validator->assertTenantOrg(
-                    $sourceLine->tenant_id !== null ? (int) $sourceLine->tenant_id : null,
-                    $sourceLine->organization_unit_id !== null ? (int) $sourceLine->organization_unit_id : null,
-                    $data->tenantId,
-                    $data->organizationUnitId,
-                    "lines.{$index}.source_line_id",
-                    'goods receipt line',
-                );
-                $this->validator->assertReturnWithinReceipt($sourceLine, $line->returnedQuantity);
-            }
-        }
-
         return DB::transaction(function () use ($data): PurchaseReturn {
-            $sourceHeader = null;
-            if ($data->returnType === PurchaseReturnType::Referenced && isset($data->lines[0])) {
-                $sourceHeader = GoodsReceiptNoteLine::query()
-                    ->with('goodsReceiptNote')
-                    ->find($data->lines[0]->sourceLineId)
-                    ?->goodsReceiptNote;
+            $policy = $this->serverPolicy($data);
+            $referenced = null;
+
+            if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
+                $this->validateManualSupplierReturn($data);
+                $this->validator->warehouse($data->tenantId, $data->organizationUnitId, $data->warehouseId, 'warehouse_id');
+                if ($data->warehouseLocationId !== null) {
+                    $this->validator->warehouseLocation(
+                        $data->tenantId,
+                        $data->organizationUnitId,
+                        $data->warehouseId,
+                        $data->warehouseLocationId,
+                        'warehouse_location_id',
+                    );
+                }
+            } else {
+                $referenced = $this->resolveReferencedSource($data, lockSources: true);
             }
 
+            $sourceHeader = $referenced['header'] ?? null;
             $return = PurchaseReturn::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
-                'supplier_type' => $data->supplierType ?? $sourceHeader?->supplier_type,
-                'supplier_id' => $data->supplierId ?? $sourceHeader?->supplier_id,
-                'warehouse_id' => $data->warehouseId,
-                'warehouse_location_id' => $data->warehouseLocationId,
+                'supplier_type' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                    ? ($data->supplierType ?? 'supplier')
+                    : $sourceHeader?->supplier_type,
+                'supplier_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                    ? $data->supplierId
+                    : $sourceHeader?->supplier_id,
+                'warehouse_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                    ? $data->warehouseId
+                    : $sourceHeader?->warehouse_id,
+                'warehouse_location_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                    ? $data->warehouseLocationId
+                    : $sourceHeader?->warehouse_location_id,
                 'return_number' => $data->returnNumber ?? $this->numbers->next($data->tenantId, 'PRET', 'purchase_returns', 'return_number'),
                 'return_type' => $data->returnType,
-                'source_type' => $data->sourceType ?? ($data->returnType === PurchaseReturnType::ManualSupplierReturn ? 'manual_supplier_return' : null),
-                'source_id' => $data->sourceId,
+                'source_type' => $policy['source_type'],
+                'source_id' => $sourceHeader?->getKey(),
                 'return_date' => $data->returnDate,
                 'status' => PurchaseReturnStatus::Draft,
                 'reason' => $data->reason,
-                'approval_required' => $data->approvalRequired,
-                'affects_supplier_balance' => $data->affectsSupplierBalance,
-                'cost_basis' => $data->costBasis,
+                'approval_required' => $policy['approval_required'],
+                'affects_supplier_balance' => $policy['affects_supplier_balance'],
+                'cost_basis' => $data->returnType === PurchaseReturnType::ManualSupplierReturn ? $data->costBasis : null,
                 'audit_metadata' => $data->auditMetadata,
                 'created_by' => $data->createdBy,
             ]);
 
             $subtotal = '0.000000';
             $adjustmentReturnTotal = '0.000000';
+
             foreach ($data->lines as $lineData) {
                 if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
-                    $lineTotal = $this->math->mul($lineData->returnedQuantity, (string) $lineData->costBasis);
-                    $subtotal = $this->math->add($subtotal, $lineTotal);
-                    $return->lines()->create([
-                        'tenant_id' => $return->tenant_id,
-                        'organization_unit_id' => $return->organization_unit_id,
-                        'item_id' => $lineData->itemId,
-                        'item_variant_id' => $lineData->itemVariantId,
-                        'uom_id' => $lineData->uomId,
-                        'source_line_type' => 'manual_supplier_return',
-                        'source_line_id' => 0,
-                        'returned_quantity' => $this->math->normalize($lineData->returnedQuantity),
-                        'source_quantity' => $this->math->normalize($lineData->returnedQuantity),
-                        'previously_returned_quantity' => '0.000000',
-                        'remaining_quantity' => '0.000000',
-                        'unit_price' => $this->math->normalize((string) $lineData->costBasis),
-                        'cost_basis' => $this->math->normalize((string) $lineData->costBasis),
-                        'line_total' => $lineTotal,
-                        'reason' => $lineData->reason ?? $data->reason,
-                    ]);
+                    $valuation = $this->valuations->manual($lineData->returnedQuantity, (string) $lineData->costBasis);
+                    $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
+                    $this->createManualLine($return, $lineData, $valuation, $data->reason);
 
                     continue;
                 }
 
-                $sourceLine = GoodsReceiptNoteLine::query()->with('goodsReceiptNote')->findOrFail($lineData->sourceLineId);
-                $lineTotal = $this->math->mul($lineData->returnedQuantity, (string) $sourceLine->unit_price);
-                $subtotal = $this->math->add($subtotal, $lineTotal);
-                $adjustmentReturnTotal = $this->math->add($adjustmentReturnTotal, $this->adjustments->previewFromReceiptLine($return, $sourceLine, $lineData->returnedQuantity));
+                /** @var array<int, GoodsReceiptNoteLine> $sourceLines */
+                $sourceLines = $referenced['lines'];
+                $sourceLine = $sourceLines[$lineData->sourceLineId] ?? null;
+                if (! $sourceLine instanceof GoodsReceiptNoteLine) {
+                    throw new InvalidArgumentException('Selected goods receipt line was not found for this return.');
+                }
 
-                $return->lines()->create([
-                    'tenant_id' => $return->tenant_id,
-                    'organization_unit_id' => $return->organization_unit_id,
-                    'item_id' => $sourceLine->item_id,
-                    'item_variant_id' => $sourceLine->item_variant_id,
-                    'uom_id' => $sourceLine->uom_id,
-                    'source_line_type' => $lineData->sourceLineType,
-                    'source_line_id' => $lineData->sourceLineId,
-                    'returned_quantity' => $this->math->normalize($lineData->returnedQuantity),
-                    'source_quantity' => $sourceLine->accepted_quantity,
-                    'previously_returned_quantity' => $sourceLine->returned_quantity,
-                    'remaining_quantity' => $this->math->sub((string) $sourceLine->accepted_quantity, $this->math->add((string) $sourceLine->returned_quantity, $lineData->returnedQuantity)),
-                    'unit_price' => $sourceLine->unit_price,
-                    'cost_basis' => $sourceLine->unit_price,
-                    'discount_amount' => '0.000000',
-                    'tax_amount' => '0.000000',
-                    'charge_amount' => '0.000000',
-                    'line_total' => $lineTotal,
-                    'reason' => $lineData->reason,
-                ]);
+                $valuation = $this->valuations->fromReceiptLine($sourceLine, $lineData->returnedQuantity);
+                $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
+                $adjustmentReturnTotal = $this->math->add(
+                    $adjustmentReturnTotal,
+                    $this->adjustments->previewFromReceiptLine($return, $sourceLine, $lineData->returnedQuantity),
+                );
+                $this->createReferencedLine($return, $lineData, $sourceLine, $valuation);
             }
 
             $return->subtotal = $subtotal;
             $return->adjustment_return_total = $adjustmentReturnTotal;
-            $return->grand_total = $data->affectsSupplierBalance ? $this->math->add($subtotal, $adjustmentReturnTotal) : '0.000000';
+            $return->grand_total = $policy['affects_supplier_balance']
+                ? $this->math->add($subtotal, $adjustmentReturnTotal)
+                : '0.000000';
             $return->save();
 
-            return $return->refresh()->load(['supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustmentAllocations']);
+            return $return->refresh()->load([
+                'supplier',
+                'warehouse',
+                'warehouseLocation',
+                'sourceGoodsReceipt',
+                'lines.item',
+                'lines.variant',
+                'lines.uom',
+                'adjustmentAllocations',
+                'debitNote',
+            ]);
         });
     }
 
@@ -163,10 +147,10 @@ final class PurchaseReturnService
             $return = PurchaseReturn::query()->lockForUpdate()->findOrFail($return->getKey());
 
             if (! (bool) $return->approval_required) {
-                throw new \InvalidArgumentException('Purchase return does not require approval.');
+                throw new InvalidArgumentException('Purchase return does not require approval.');
             }
             if ($return->status !== PurchaseReturnStatus::Draft) {
-                throw new \InvalidArgumentException('Only draft purchase returns can be approved.');
+                throw new InvalidArgumentException('Only draft purchase returns can be approved.');
             }
 
             $return->status = PurchaseReturnStatus::Approved;
@@ -180,24 +164,34 @@ final class PurchaseReturnService
 
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
     {
-        if ((bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Approved) {
-            throw new \InvalidArgumentException('Purchase return must be approved before posting.');
-        }
-        if (! (bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Draft) {
-            throw new \InvalidArgumentException('Only draft purchase returns can be posted without approval.');
-        }
-
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
             $return = PurchaseReturn::query()->with('lines')->lockForUpdate()->findOrFail($return->getKey());
-            if ((bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Approved) {
-                throw new \InvalidArgumentException('Purchase return must be approved before posting.');
-            }
-            if (! (bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Draft) {
-                throw new \InvalidArgumentException('Only draft purchase returns can be posted without approval.');
+            $this->assertPostable($return);
+
+            $sourceLines = $this->lockReturnSourceLines($return);
+            $movementIds = [];
+            $subtotal = '0.000000';
+            $adjustmentReturnTotal = '0.000000';
+            $touchedGoodsReceipts = [];
+
+            foreach ($return->lines as $line) {
+                if ($line->source_line_type === 'goods_receipt_note_line') {
+                    $sourceLine = $sourceLines[(int) $line->source_line_id] ?? null;
+                    if (! $sourceLine instanceof GoodsReceiptNoteLine) {
+                        throw new InvalidArgumentException('Selected goods receipt line was not found for this return.');
+                    }
+
+                    $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
+                    $valuation = $this->valuations->fromReceiptLine($sourceLine, (string) $line->returned_quantity);
+                    $this->applyValuationToLine($line, $valuation);
+                    $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
+                } else {
+                    $valuation = $this->valuations->manual((string) $line->returned_quantity, (string) $line->cost_basis);
+                    $this->applyValuationToLine($line, $valuation);
+                    $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
+                }
             }
 
-            $movementIds = [];
-            $adjustmentReturnTotal = '0.000000';
             foreach ($return->lines as $line) {
                 $movement = $this->inventory->returnOut($return, $line, $postedBy);
                 if ($movement !== null) {
@@ -207,10 +201,10 @@ final class PurchaseReturnService
                 $line->save();
 
                 $sourceLine = $line->source_line_type === 'goods_receipt_note_line'
-                    ? GoodsReceiptNoteLine::query()->with('purchaseOrderLine')->lockForUpdate()->find((int) $line->source_line_id)
+                    ? ($sourceLines[(int) $line->source_line_id] ?? null)
                     : null;
+
                 if ($sourceLine instanceof GoodsReceiptNoteLine) {
-                    $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
                     $adjustmentReturnTotal = $this->math->add(
                         $adjustmentReturnTotal,
                         $this->adjustments->allocateFromReceiptLine($return, $sourceLine, (string) $line->returned_quantity),
@@ -221,17 +215,24 @@ final class PurchaseReturnService
                         ? GoodsReceiptNoteLineStatus::Returned
                         : GoodsReceiptNoteLineStatus::PartiallyReturned;
                     $sourceLine->save();
+                    $touchedGoodsReceipts[(int) $sourceLine->goods_receipt_note_id] = true;
+
                     if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine) {
                         $this->orderQuantities->applyReturned($sourceLine->purchaseOrderLine, (string) $line->returned_quantity);
                     }
                 }
             }
 
+            $return->subtotal = $subtotal;
             $return->adjustment_return_total = $adjustmentReturnTotal;
             $return->grand_total = (bool) $return->affects_supplier_balance
-                ? $this->math->add((string) $return->subtotal, $adjustmentReturnTotal)
+                ? $this->math->add($subtotal, $adjustmentReturnTotal)
                 : '0.000000';
             $return->save();
+
+            foreach (array_keys($touchedGoodsReceipts) as $goodsReceiptId) {
+                $this->statuses->refreshGoodsReceipt(GoodsReceiptNote::query()->with('lines')->findOrFail((int) $goodsReceiptId));
+            }
 
             $debitNote = null;
             if ((bool) $return->affects_supplier_balance && ! $this->math->isZero((string) $return->grand_total)) {
@@ -247,8 +248,6 @@ final class PurchaseReturnService
                     sourceId: (int) $return->getKey(),
                     reason: $return->reason ?: 'Purchase return '.$return->return_number,
                 ));
-                $debitNote = $this->debitNotes->approve($debitNote, $postedBy);
-                $debitNote = $this->debitNotes->post($debitNote);
             }
 
             $return->status = PurchaseReturnStatus::Posted;
@@ -256,16 +255,23 @@ final class PurchaseReturnService
             $return->posted_at = now();
             $return->debit_note_id = $debitNote?->getKey();
             $return->save();
+
             $this->taxReturns->reversePurchaseReturn($return->refresh()->load('lines'), $debitNote === null ? null : (int) $debitNote->getKey());
 
-            return new PurchasePostingResult((int) $return->getKey(), (string) $return->return_number, $return->status->value, $movementIds, debitNoteId: $debitNote === null ? null : (int) $debitNote->getKey());
+            return new PurchasePostingResult(
+                (int) $return->getKey(),
+                (string) $return->return_number,
+                $return->status->value,
+                $movementIds,
+                debitNoteId: $debitNote === null ? null : (int) $debitNote->getKey(),
+            );
         });
     }
 
     public function cancel(PurchaseReturn $return): PurchaseReturn
     {
         if ($return->status === PurchaseReturnStatus::Posted) {
-            throw new \InvalidArgumentException('Posted purchase returns cannot be cancelled.');
+            throw new InvalidArgumentException('Posted purchase returns cannot be cancelled.');
         }
 
         $return->status = PurchaseReturnStatus::Cancelled;
@@ -274,19 +280,273 @@ final class PurchaseReturnService
         return $return->refresh();
     }
 
+    /**
+     * @return array{approval_required: bool, affects_supplier_balance: bool, source_type: string}
+     */
+    private function serverPolicy(CreatePurchaseReturnData $data): array
+    {
+        if ($data->returnType === PurchaseReturnType::ManualSupplierReturn) {
+            return [
+                'approval_required' => true,
+                'affects_supplier_balance' => true,
+                'source_type' => 'manual_supplier_return',
+            ];
+        }
+
+        return [
+            'approval_required' => false,
+            'affects_supplier_balance' => true,
+            'source_type' => 'goods_receipt_note',
+        ];
+    }
+
+    /**
+     * @return array{header: GoodsReceiptNote, lines: array<int, GoodsReceiptNoteLine>}
+     */
+    private function resolveReferencedSource(CreatePurchaseReturnData $data, bool $lockSources): array
+    {
+        if ($data->lines === []) {
+            throw new InvalidArgumentException('Purchase return requires at least one source line.');
+        }
+        if ($data->sourceType !== null && $data->sourceType !== 'goods_receipt_note') {
+            throw new InvalidArgumentException('Referenced purchase returns can only use a goods receipt note source.');
+        }
+
+        $lineIds = [];
+        foreach ($data->lines as $index => $line) {
+            if (! $line instanceof PurchaseReturnLineData || $line->sourceLineType !== 'goods_receipt_note_line') {
+                throw new InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
+            }
+            $this->validator->assertPositiveQuantity($line->returnedQuantity);
+            if (isset($lineIds[$line->sourceLineId])) {
+                throw new InvalidArgumentException('Duplicate goods receipt note line selected for return.');
+            }
+            $lineIds[$line->sourceLineId] = "lines.{$index}.source_line_id";
+        }
+
+        $query = GoodsReceiptNoteLine::query()
+            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
+            ->whereIn('id', array_keys($lineIds));
+        if ($lockSources) {
+            $query->lockForUpdate();
+        }
+
+        /** @var Collection<int, GoodsReceiptNoteLine> $lines */
+        $lines = $query->get()->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+        if ($lines->count() !== count($lineIds)) {
+            throw new InvalidArgumentException('One or more selected goods receipt note lines were not found.');
+        }
+
+        $sourceHeader = null;
+        $resolvedLines = [];
+        foreach ($data->lines as $index => $lineData) {
+            $sourceLine = $lines->get($lineData->sourceLineId);
+            if (! $sourceLine instanceof GoodsReceiptNoteLine || ! $sourceLine->goodsReceiptNote instanceof GoodsReceiptNote) {
+                throw new InvalidArgumentException('Selected goods receipt note line was not found.');
+            }
+
+            $this->validator->assertTenantOrg(
+                $sourceLine->tenant_id !== null ? (int) $sourceLine->tenant_id : null,
+                $sourceLine->organization_unit_id !== null ? (int) $sourceLine->organization_unit_id : null,
+                $data->tenantId,
+                $data->organizationUnitId,
+                "lines.{$index}.source_line_id",
+                'goods receipt line',
+            );
+
+            $header = $sourceLine->goodsReceiptNote;
+            $this->validator->assertTenantOrg(
+                $header->tenant_id !== null ? (int) $header->tenant_id : null,
+                $header->organization_unit_id !== null ? (int) $header->organization_unit_id : null,
+                $data->tenantId,
+                $data->organizationUnitId,
+                'source_id',
+                'goods receipt note',
+            );
+
+            if ($sourceHeader === null) {
+                $sourceHeader = $header;
+            } elseif ((int) $sourceHeader->getKey() !== (int) $header->getKey()) {
+                throw new InvalidArgumentException('Purchase return lines must belong to the same goods receipt note.');
+            }
+
+            if ($data->sourceId !== null && (int) $data->sourceId !== (int) $header->getKey()) {
+                throw new InvalidArgumentException('Purchase return source does not match the selected goods receipt note lines.');
+            }
+            if ($header->supplier_id === null) {
+                throw new InvalidArgumentException('Referenced purchase returns require a supplier-backed goods receipt note.');
+            }
+            if (! $this->isReturnableReceiptStatus($header)) {
+                throw new InvalidArgumentException('Purchase returns can only reference posted goods receipt notes.');
+            }
+
+            $this->validator->assertReturnWithinReceipt($sourceLine, $lineData->returnedQuantity);
+            $resolvedLines[(int) $sourceLine->getKey()] = $sourceLine;
+        }
+
+        if (! $sourceHeader instanceof GoodsReceiptNote) {
+            throw new InvalidArgumentException('Purchase return source goods receipt note was not found.');
+        }
+
+        return ['header' => $sourceHeader, 'lines' => $resolvedLines];
+    }
+
+    private function isReturnableReceiptStatus(GoodsReceiptNote $header): bool
+    {
+        $status = $header->status instanceof GoodsReceiptNoteStatus
+            ? $header->status
+            : GoodsReceiptNoteStatus::from((string) $header->status);
+
+        return in_array($status, [
+            GoodsReceiptNoteStatus::Posted,
+            GoodsReceiptNoteStatus::PartiallyReturned,
+            GoodsReceiptNoteStatus::PartiallyInvoiced,
+            GoodsReceiptNoteStatus::Invoiced,
+        ], true);
+    }
+
+    private function createManualLine(
+        PurchaseReturn $return,
+        PurchaseReturnLineData $lineData,
+        PurchaseReturnLineValuationData $valuation,
+        ?string $headerReason,
+    ): void {
+        $return->lines()->create([
+            'tenant_id' => $return->tenant_id,
+            'organization_unit_id' => $return->organization_unit_id,
+            'item_id' => $lineData->itemId,
+            'item_variant_id' => $lineData->itemVariantId,
+            'uom_id' => $lineData->uomId,
+            'source_line_type' => 'manual_supplier_return',
+            'source_line_id' => 0,
+            'returned_quantity' => $this->math->normalize($lineData->returnedQuantity),
+            'source_quantity' => $valuation->sourceQuantity,
+            'previously_returned_quantity' => $valuation->previouslyReturnedQuantity,
+            'remaining_quantity' => $valuation->remainingQuantity,
+            'unit_price' => $valuation->unitPrice,
+            'cost_basis' => $valuation->costBasis,
+            'discount_amount' => $valuation->discountAmount,
+            'tax_amount' => $valuation->taxAmount,
+            'charge_amount' => $valuation->chargeAmount,
+            'line_total' => $valuation->lineTotal,
+            'reason' => $lineData->reason ?? $headerReason,
+        ]);
+    }
+
+    private function createReferencedLine(
+        PurchaseReturn $return,
+        PurchaseReturnLineData $lineData,
+        GoodsReceiptNoteLine $sourceLine,
+        PurchaseReturnLineValuationData $valuation,
+    ): void {
+        $return->lines()->create([
+            'tenant_id' => $return->tenant_id,
+            'organization_unit_id' => $return->organization_unit_id,
+            'item_id' => $sourceLine->item_id,
+            'item_variant_id' => $sourceLine->item_variant_id,
+            'uom_id' => $sourceLine->uom_id,
+            'source_line_type' => 'goods_receipt_note_line',
+            'source_line_id' => $sourceLine->getKey(),
+            'returned_quantity' => $this->math->normalize($lineData->returnedQuantity),
+            'source_quantity' => $valuation->sourceQuantity,
+            'previously_returned_quantity' => $valuation->previouslyReturnedQuantity,
+            'remaining_quantity' => $valuation->remainingQuantity,
+            'unit_price' => $valuation->unitPrice,
+            'cost_basis' => $valuation->costBasis,
+            'discount_amount' => $valuation->discountAmount,
+            'tax_amount' => $valuation->taxAmount,
+            'charge_amount' => $valuation->chargeAmount,
+            'line_total' => $valuation->lineTotal,
+            'reason' => $lineData->reason,
+        ]);
+    }
+
+    private function applyValuationToLine(PurchaseReturnLine $line, PurchaseReturnLineValuationData $valuation): void
+    {
+        $line->source_quantity = $valuation->sourceQuantity;
+        $line->previously_returned_quantity = $valuation->previouslyReturnedQuantity;
+        $line->remaining_quantity = $valuation->remainingQuantity;
+        $line->unit_price = $valuation->unitPrice;
+        $line->cost_basis = $valuation->costBasis;
+        $line->discount_amount = $valuation->discountAmount;
+        $line->tax_amount = $valuation->taxAmount;
+        $line->charge_amount = $valuation->chargeAmount;
+        $line->line_total = $valuation->lineTotal;
+    }
+
+    private function assertPostable(PurchaseReturn $return): void
+    {
+        if ((bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Approved) {
+            throw new InvalidArgumentException('Purchase return must be approved before posting.');
+        }
+        if (! (bool) $return->approval_required && $return->status !== PurchaseReturnStatus::Draft) {
+            throw new InvalidArgumentException('Only draft purchase returns can be posted without approval.');
+        }
+    }
+
+    /**
+     * @return array<int, GoodsReceiptNoteLine>
+     */
+    private function lockReturnSourceLines(PurchaseReturn $return): array
+    {
+        $sourceLineIds = $return->lines
+            ->filter(fn (PurchaseReturnLine $line): bool => $line->source_line_type === 'goods_receipt_note_line')
+            ->map(fn (PurchaseReturnLine $line): int => (int) $line->source_line_id)
+            ->values()
+            ->all();
+
+        if ($sourceLineIds === []) {
+            return [];
+        }
+
+        /** @var Collection<int, GoodsReceiptNoteLine> $sourceLines */
+        $sourceLines = GoodsReceiptNoteLine::query()
+            ->with(['goodsReceiptNote', 'purchaseOrderLine'])
+            ->whereIn('id', $sourceLineIds)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey());
+
+        $resolved = [];
+        $seen = [];
+        foreach ($return->lines as $line) {
+            if ($line->source_line_type !== 'goods_receipt_note_line') {
+                continue;
+            }
+            if (isset($seen[(int) $line->source_line_id])) {
+                throw new InvalidArgumentException('Duplicate goods receipt note line selected for return.');
+            }
+            $seen[(int) $line->source_line_id] = true;
+
+            $sourceLine = $sourceLines->get((int) $line->source_line_id);
+            if (! $sourceLine instanceof GoodsReceiptNoteLine || ! $sourceLine->goodsReceiptNote instanceof GoodsReceiptNote) {
+                throw new InvalidArgumentException('Selected goods receipt note line was not found for this return.');
+            }
+            if ((int) $sourceLine->tenant_id !== (int) $return->tenant_id
+                || $sourceLine->organization_unit_id !== $return->organization_unit_id
+                || (int) $sourceLine->goods_receipt_note_id !== (int) $return->source_id
+                || (int) $sourceLine->goodsReceiptNote->supplier_id !== (int) $return->supplier_id
+                || (int) $sourceLine->goodsReceiptNote->warehouse_id !== (int) $return->warehouse_id
+            ) {
+                throw new InvalidArgumentException('Purchase return source line is outside the return scope.');
+            }
+
+            $resolved[(int) $sourceLine->getKey()] = $sourceLine;
+        }
+
+        return $resolved;
+    }
+
     private function validateManualSupplierReturn(CreatePurchaseReturnData $data): void
     {
         if ($data->supplierId === null) {
-            throw new \InvalidArgumentException('Unreferenced supplier return requires supplier.');
+            throw new InvalidArgumentException('Unreferenced supplier return requires supplier.');
         }
         if (trim((string) $data->reason) === '') {
-            throw new \InvalidArgumentException('Unreferenced supplier return requires reason.');
-        }
-        if (! $data->approvalRequired) {
-            throw new \InvalidArgumentException('Unreferenced supplier return requires approval.');
+            throw new InvalidArgumentException('Unreferenced supplier return requires reason.');
         }
         if ($data->costBasis === null) {
-            throw new \InvalidArgumentException('Unreferenced supplier return requires explicit cost basis.');
+            throw new InvalidArgumentException('Unreferenced supplier return requires explicit cost basis.');
         }
 
         $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
@@ -294,7 +554,7 @@ final class PurchaseReturnService
 
         foreach ($data->lines as $index => $line) {
             if ($line->itemId === null || $line->uomId === null || $line->costBasis === null) {
-                throw new \InvalidArgumentException('Unreferenced supplier return lines require item, UOM, and cost basis.');
+                throw new InvalidArgumentException('Unreferenced supplier return lines require item, UOM, and cost basis.');
             }
             $this->validator->assertPositiveQuantity($line->returnedQuantity);
             $this->validator->assertNonNegative($line->costBasis, 'Unreferenced supplier return line cost basis cannot be negative.');
@@ -302,5 +562,4 @@ final class PurchaseReturnService
             $this->validator->uom($data->tenantId, $data->organizationUnitId, $line->uomId, "lines.{$index}.uom_id");
         }
     }
-
 }

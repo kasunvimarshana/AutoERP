@@ -23,7 +23,6 @@ export function ManualSupplierReturnForm() {
     const [quantity, setQuantity] = useState('1.000000');
     const [costBasis, setCostBasis] = useState('0.000000');
     const [reason, setReason] = useState('');
-    const [affectsSupplierBalance, setAffectsSupplierBalance] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const errorFor = (field: string) => fieldError(error, field);
@@ -36,9 +35,6 @@ export function ManualSupplierReturnForm() {
         supplier_id: supplier?.id,
         reason,
         return_type: 'manual_supplier_return',
-        source_type: 'manual_supplier_return',
-        approval_required: true,
-        affects_supplier_balance: affectsSupplierBalance,
         cost_basis: decimalOr(costBasis),
         lines: [{
             source_line_type: 'manual_supplier_return',
@@ -78,7 +74,6 @@ export function ManualSupplierReturnForm() {
                     <UomLookupSelect value={uom} onChange={setUom} error={errorFor('lines.0.uom_id')} />
                     <DecimalInput label="Quantity" value={quantity} error={errorFor('lines.0.returned_quantity')} onChange={(event) => setQuantity(event.target.value)} />
                     <DecimalInput label="Cost basis" value={costBasis} error={errorFor('cost_basis') ?? errorFor('lines.0.cost_basis')} onChange={(event) => setCostBasis(event.target.value)} />
-                    <label className="mt-7 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={affectsSupplierBalance} onChange={(event) => setAffectsSupplierBalance(event.target.checked)} /> Creates debit note impact</label>
                 </div>
                 <div className="mt-4">
                     <Textarea label="Reason" value={reason} error={errorFor('reason')} onChange={(event) => setReason(event.target.value)} />

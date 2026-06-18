@@ -42,6 +42,7 @@ return new class extends Migration
             $table->index('purchase_order_id', 'goods_receipt_notes_po_idx');
             $table->index('status', 'goods_receipt_notes_status_idx');
             $table->index('received_date', 'goods_receipt_notes_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'goods_receipt_notes_scope_status_idx');
         });
     }
 

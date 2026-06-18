@@ -59,18 +59,30 @@ final class PurchaseReturnAdjustmentService
             }
 
             if ($mutate) {
-                PurchaseReturnAdjustmentAllocation::query()->create([
-                    'tenant_id' => $return->tenant_id,
-                    'organization_unit_id' => $return->organization_unit_id,
-                    'purchase_return_id' => $return->getKey(),
-                    'purchase_header_adjustment_id' => $adjustment->getKey(),
-                    'adjustment_type' => $adjustment->adjustment_type,
-                    'effect' => $adjustment->effect,
-                    'source_amount' => $adjustment->amount,
-                    'previously_returned_amount' => $previouslyReturned,
-                    'returned_amount' => $returnedAmount,
-                    'remaining_amount' => $remaining,
-                ]);
+                $allocation = PurchaseReturnAdjustmentAllocation::query()
+                    ->where('purchase_return_id', $return->getKey())
+                    ->where('purchase_header_adjustment_id', $adjustment->getKey())
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($allocation instanceof PurchaseReturnAdjustmentAllocation) {
+                    $allocation->returned_amount = $this->math->add((string) $allocation->returned_amount, $returnedAmount);
+                    $allocation->remaining_amount = $remaining;
+                    $allocation->save();
+                } else {
+                    PurchaseReturnAdjustmentAllocation::query()->create([
+                        'tenant_id' => $return->tenant_id,
+                        'organization_unit_id' => $return->organization_unit_id,
+                        'purchase_return_id' => $return->getKey(),
+                        'purchase_header_adjustment_id' => $adjustment->getKey(),
+                        'adjustment_type' => $adjustment->adjustment_type,
+                        'effect' => $adjustment->effect,
+                        'source_amount' => $adjustment->amount,
+                        'previously_returned_amount' => $previouslyReturned,
+                        'returned_amount' => $returnedAmount,
+                        'remaining_amount' => $remaining,
+                    ]);
+                }
 
                 $adjustment->returned_amount = $this->math->add($previouslyReturned, $returnedAmount);
                 $adjustment->remaining_amount = $remaining;

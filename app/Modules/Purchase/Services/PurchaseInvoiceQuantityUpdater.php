@@ -7,6 +7,7 @@ namespace Modules\Purchase\Services;
 use InvalidArgumentException;
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
+use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
@@ -16,6 +17,7 @@ final class PurchaseInvoiceQuantityUpdater
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseOrderQuantityService $orderQuantities,
+        private readonly PurchaseStatusService $statuses,
     ) {}
 
     /**
@@ -90,6 +92,7 @@ final class PurchaseInvoiceQuantityUpdater
             (string) $line->accepted_quantity,
             (string) $line->invoiced_quantity,
         );
+        $line->status = $this->goodsReceiptLineStatus($line);
         $line->save();
 
         if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
@@ -125,26 +128,30 @@ final class PurchaseInvoiceQuantityUpdater
      */
     private function refreshGoodsReceiptStatuses(Collection $goodsReceipts): void
     {
-        $goodsReceipts->each->refresh();
+        foreach ($goodsReceipts as $goodsReceipt) {
+            if ($goodsReceipt instanceof GoodsReceiptNote) {
+                $this->statuses->refreshGoodsReceipt($goodsReceipt->refresh()->load('lines'));
+            }
+        }
     }
 
-    private function goodsReceiptLineStatus(GoodsReceiptNoteLine $line): string
+    private function goodsReceiptLineStatus(GoodsReceiptNoteLine $line): GoodsReceiptNoteLineStatus
     {
         if ($this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
             return $this->math->compare(
                 (string) $line->returned_quantity,
                 (string) $line->accepted_quantity,
-            ) >= 0 ? 'returned' : 'partially_returned';
+            ) >= 0 ? GoodsReceiptNoteLineStatus::Returned : GoodsReceiptNoteLineStatus::PartiallyReturned;
         }
 
         if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0) {
             return $this->math->compare(
                 (string) $line->invoiced_quantity,
                 (string) $line->accepted_quantity,
-            ) >= 0 ? 'invoiced' : 'partially_invoiced';
+            ) >= 0 ? GoodsReceiptNoteLineStatus::Invoiced : GoodsReceiptNoteLineStatus::PartiallyInvoiced;
         }
 
-        return 'posted';
+        return GoodsReceiptNoteLineStatus::Posted;
     }
 
 }

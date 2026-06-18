@@ -37,6 +37,7 @@ return new class extends Migration
             $table->index('purchase_return_id', 'purchase_return_lines_return_idx');
             $table->index('item_id', 'purchase_return_lines_item_idx');
             $table->index(['source_line_type', 'source_line_id'], 'purchase_return_lines_source_line_idx');
+            $table->index(['purchase_return_id', 'source_line_type', 'source_line_id'], 'purchase_return_lines_return_source_idx');
             $table->index('inventory_movement_id', 'purchase_return_lines_movement_idx');
         });
     }

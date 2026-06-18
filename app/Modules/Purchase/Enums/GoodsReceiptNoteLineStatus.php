@@ -13,4 +13,5 @@ enum GoodsReceiptNoteLineStatus: string
     case PartiallyInvoiced = 'partially_invoiced';
     case Invoiced = 'invoiced';
     case Cancelled = 'cancelled';
+    case Reversed = 'reversed';
 }

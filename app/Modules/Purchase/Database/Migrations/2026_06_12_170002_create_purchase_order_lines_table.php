@@ -51,6 +51,8 @@ return new class extends Migration
             $table->index('purchase_order_id', 'purchase_order_lines_order_idx');
             $table->index('item_id', 'purchase_order_lines_item_idx');
             $table->index('status', 'purchase_order_lines_status_idx');
+            $table->unique(['purchase_order_id', 'line_number'], 'purchase_order_lines_order_line_number_uk');
+            $table->index(['purchase_order_id', 'status'], 'purchase_order_lines_order_status_idx');
         });
     }
 
