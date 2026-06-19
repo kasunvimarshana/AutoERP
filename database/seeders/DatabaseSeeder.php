@@ -24,6 +24,9 @@ use Modules\User\Database\Seeders\UserSeeder;
 use Modules\Vehicle\Database\Seeders\VehicleSeeder;
 use Modules\VehicleRental\Database\Seeders\VehicleRentalSeeder;
 use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
+use Modules\User\Models\PermissionModel;
+use Modules\User\Models\RoleModel;
+use Modules\User\Models\RolePermissionModel;
 
 class DatabaseSeeder extends Seeder
 {
@@ -56,5 +59,25 @@ class DatabaseSeeder extends Seeder
             VehicleRentalSeeder::class,
             HrSeeder::class,
         ]);
+
+        //
+        $superAdmin = RoleModel::query()
+            ->where('name', 'Super Admin')
+            ->firstOrFail();
+
+        $rows = PermissionModel::query()
+            ->where('tenant_id', $superAdmin->tenant_id)
+            ->pluck('id')
+            ->map(fn (int $permissionId): array => [
+                'tenant_id' => $superAdmin->tenant_id,
+                'role_id' => $superAdmin->id,
+                'permission_id' => $permissionId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all();
+
+        RolePermissionModel::query()->insertOrIgnore($rows);
+        //
     }
 }
