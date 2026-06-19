@@ -6,7 +6,6 @@ namespace Modules\Sales\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Sales\Enums\SalesOrderLineStatus;
-use Modules\Sales\Enums\SalesOrderStatus;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
 
@@ -27,7 +26,7 @@ final class SalesOrderQuantityService
             : SalesOrderLineStatus::PartiallyAllocated;
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function applyDelivered(SalesOrderLine $line, string $quantity): void
@@ -50,7 +49,7 @@ final class SalesOrderQuantityService
             : SalesOrderLineStatus::PartiallyDelivered;
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function reverseDelivered(SalesOrderLine $line, string $quantity): void
@@ -78,7 +77,7 @@ final class SalesOrderQuantityService
             : SalesOrderLineStatus::PartiallyDelivered;
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function applyInvoiced(SalesOrderLine $line, string $quantity): void
@@ -94,7 +93,7 @@ final class SalesOrderQuantityService
             : SalesOrderLineStatus::PartiallyInvoiced;
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function reverseInvoiced(SalesOrderLine $line, string $quantity): void
@@ -110,7 +109,7 @@ final class SalesOrderQuantityService
         $line->status = $this->lineStatus($line);
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function applyReturned(SalesOrderLine $line, string $quantity): void
@@ -125,7 +124,7 @@ final class SalesOrderQuantityService
             : SalesOrderLineStatus::PartiallyReturned;
         $line->save();
 
-        $this->refreshOrder($line->order);
+        $this->refreshOrderTotals($line->order);
     }
 
     public function isAllocatable(SalesOrderLine $line): bool
@@ -145,31 +144,13 @@ final class SalesOrderQuantityService
         );
     }
 
-    private function refreshOrder(?SalesOrder $order): void
+    private function refreshOrderTotals(?SalesOrder $order): void
     {
-        if (! $order instanceof SalesOrder
-            || in_array($order->status, [SalesOrderStatus::Closed, SalesOrderStatus::Cancelled], true)) {
+        if (! $order instanceof SalesOrder) {
             return;
         }
 
         $order->load('lines');
-        $ordered = $this->math->sum($order->lines->pluck('ordered_quantity')->all());
-        $allocated = $this->math->sum($order->lines->pluck('allocated_quantity')->all());
-        $delivered = $this->math->sum($order->lines->pluck('delivered_quantity')->all());
-        $invoiced = $this->math->sum($order->lines->pluck('invoiced_quantity')->all());
-        $returned = $this->math->sum($order->lines->pluck('returned_quantity')->all());
-
-        $order->status = match (true) {
-            $this->math->compare($returned, $ordered) >= 0 => SalesOrderStatus::Returned,
-            $this->isPositive($returned) => SalesOrderStatus::PartiallyReturned,
-            $this->math->compare($invoiced, $ordered) >= 0 => SalesOrderStatus::Invoiced,
-            $this->isPositive($invoiced) => SalesOrderStatus::PartiallyInvoiced,
-            $this->math->compare($delivered, $ordered) >= 0 => SalesOrderStatus::Delivered,
-            $this->isPositive($delivered) => SalesOrderStatus::PartiallyDelivered,
-            $this->math->compare($allocated, $ordered) >= 0 => SalesOrderStatus::Allocated,
-            $this->isPositive($allocated) => SalesOrderStatus::PartiallyAllocated,
-            default => $this->openStatus($order->status),
-        };
         $order->allocated_total = $this->amountForQuantity($order, 'allocated_quantity');
         $order->delivered_total = $this->amountForQuantity($order, 'delivered_quantity');
         $order->invoiced_total = $this->amountForQuantity($order, 'invoiced_quantity');
@@ -256,14 +237,5 @@ final class SalesOrderQuantityService
     private function isPositive(string $value): bool
     {
         return $this->math->compare($value, '0.000000') > 0;
-    }
-
-    private function openStatus(SalesOrderStatus $status): SalesOrderStatus
-    {
-        return in_array($status, [
-            SalesOrderStatus::Draft,
-            SalesOrderStatus::PendingApproval,
-            SalesOrderStatus::Approved,
-        ], true) ? $status : SalesOrderStatus::Approved;
     }
 }

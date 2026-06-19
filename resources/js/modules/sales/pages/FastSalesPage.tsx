@@ -39,6 +39,14 @@ const workflowOptions: Array<{ value: FastSalesWorkflowMode; label: string; hint
     { value: 'direct_sale_paid', label: 'Direct service + receipt', hint: 'Invoice and receipt for non-stock lines' },
 ];
 
+function newIdempotencyKey() {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+
+    return `fast-sales-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function FastSalesPage() {
     const context = useApi((signal) => getFastSalesContext(signal), []);
     const defaults = context.data?.defaults;
@@ -61,6 +69,7 @@ export default function FastSalesPage() {
     const [instrumentDate, setInstrumentDate] = useState('');
     const [preview, setPreview] = useState<FastSalesResult | null>(null);
     const [result, setResult] = useState<FastSalesResult | null>(null);
+    const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
     const [error, setError] = useState<ApiError | null>(null);
     const [previewing, setPreviewing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -104,6 +113,7 @@ export default function FastSalesPage() {
     ), [customer, customerReference, lines, needsWarehouse, paymentAccountId, paymentAmount, recordReceipt, warehouse]);
 
     const payload = (): FastSalesPayload => ({
+        idempotency_key: idempotencyKey,
         customer_id: customer?.id ?? 0,
         customer_reference: customerReference.trim() || undefined,
         transaction_date: transactionDate,
@@ -179,6 +189,7 @@ export default function FastSalesPage() {
                     const created = await createFastSales(payload());
                     setResult(created);
                     setPreview(created);
+                    setIdempotencyKey(newIdempotencyKey());
                     applyPreviewToLines(created);
                 } catch (requestError) {
                     setError(toApiError(requestError));

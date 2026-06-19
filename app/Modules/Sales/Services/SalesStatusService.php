@@ -51,20 +51,11 @@ final class SalesStatusService
             $to instanceof SalesOrderStatus => [
                 'draft' => ['pending_approval', 'approved', 'cancelled'],
                 'pending_approval' => ['approved', 'cancelled'],
-                'approved' => ['partially_allocated', 'allocated', 'closed', 'cancelled'],
-                'partially_allocated' => ['allocated', 'partially_delivered', 'closed'],
-                'allocated' => ['partially_delivered', 'delivered', 'closed'],
-                'partially_delivered' => ['delivered', 'partially_invoiced', 'partially_returned', 'closed'],
-                'delivered' => ['partially_invoiced', 'invoiced', 'partially_returned', 'returned', 'closed'],
-                'partially_invoiced' => ['invoiced', 'partially_returned', 'returned', 'closed'],
-                'invoiced' => ['partially_returned', 'returned', 'closed'],
-                'partially_returned' => ['returned', 'closed'],
+                'approved' => ['closed', 'cancelled'],
             ],
             $to instanceof SalesDeliveryStatus => [
                 'draft' => ['posted', 'cancelled'],
-                'posted' => ['partially_returned', 'returned', 'partially_invoiced', 'invoiced', 'reversed'],
-                'partially_returned' => ['returned', 'partially_invoiced', 'invoiced'],
-                'partially_invoiced' => ['invoiced', 'partially_returned', 'returned'],
+                'posted' => ['reversed'],
             ],
             $to instanceof SalesReturnStatus => [
                 'draft' => ['approved', 'posted', 'cancelled'],

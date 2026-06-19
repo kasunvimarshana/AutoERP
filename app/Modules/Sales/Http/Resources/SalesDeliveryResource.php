@@ -7,6 +7,9 @@ namespace Modules\Sales\Http\Resources;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
+use Modules\Sales\Services\SalesDocumentCapabilityService;
+use Modules\Sales\Services\SalesFulfilmentBalanceService;
+use Modules\Sales\Services\SalesRelatedDocumentService;
 
 final class SalesDeliveryResource extends ModuleResource
 {
@@ -20,6 +23,12 @@ final class SalesDeliveryResource extends ModuleResource
             'delivery_date' => $this->delivery_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'progress' => [
+                'invoice' => app(SalesFulfilmentBalanceService::class)->salesDeliveryInvoiceStatus($this->whenLoaded('lines', fn () => $this->lines, collect())),
+                'return' => app(SalesFulfilmentBalanceService::class)->salesDeliveryReturnStatus($this->whenLoaded('lines', fn () => $this->lines, collect())),
+            ],
+            'capabilities' => app(SalesDocumentCapabilityService::class)->forSalesDelivery($this->resource),
+            'related_documents' => app(SalesRelatedDocumentService::class)->forSalesDelivery($this->resource),
             'sales_order' => $this->whenLoaded('salesOrder', fn () => $this->summary($this->salesOrder, ['sales_order_number', 'status'])),
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),

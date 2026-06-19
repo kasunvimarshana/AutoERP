@@ -7,6 +7,8 @@ namespace Modules\Sales\Http\Resources;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
+use Modules\Sales\Services\SalesDocumentCapabilityService;
+use Modules\Sales\Services\SalesRelatedDocumentService;
 
 final class SalesReturnResource extends ModuleResource
 {
@@ -21,6 +23,8 @@ final class SalesReturnResource extends ModuleResource
             'return_type' => $this->enumValue($this->return_type),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'capabilities' => app(SalesDocumentCapabilityService::class)->forSalesReturn($this->resource),
+            'related_documents' => app(SalesRelatedDocumentService::class)->forSalesReturn($this->resource),
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
             'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),

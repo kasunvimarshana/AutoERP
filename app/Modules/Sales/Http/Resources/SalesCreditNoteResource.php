@@ -7,6 +7,8 @@ namespace Modules\Sales\Http\Resources;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
+use Modules\Sales\Services\SalesDocumentCapabilityService;
+use Modules\Sales\Services\SalesRelatedDocumentService;
 
 final class SalesCreditNoteResource extends ModuleResource
 {
@@ -20,6 +22,8 @@ final class SalesCreditNoteResource extends ModuleResource
             'credit_note_date' => $this->credit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'capabilities' => app(SalesDocumentCapabilityService::class)->forCreditNote($this->resource),
+            'related_documents' => app(SalesRelatedDocumentService::class)->forCreditNote($this->resource),
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'sales_return' => $this->whenLoaded('salesReturn', fn () => $this->summary($this->salesReturn, ['return_number', 'return_date', 'status'])),
             'amount' => (string) $this->amount,

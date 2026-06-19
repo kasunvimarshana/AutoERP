@@ -39,6 +39,7 @@ final class ItemBaseUomUsageAuditService
             'sales' => [
                 'quotations' => $this->count('sales_quotation_lines', $item),
                 'sales_orders' => $this->count('sales_order_lines', $item),
+                'sales_allocations' => $this->count('sales_allocation_lines', $item),
                 'deliveries' => $this->count('sales_delivery_lines', $item),
                 'sales_returns' => $this->count('sales_return_lines', $item),
             ],

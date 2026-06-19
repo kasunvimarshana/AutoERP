@@ -310,7 +310,8 @@ export const navigationSections: NavigationSection[] = [
                 children: [
                     { id: 'fast-sales', type: 'link', label: 'Fast Sales', to: '/sales/fast-sales', match: ['/sales/fast-sales'], access: operationalAccess(['sales']) },
                     { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders', match: ['/sales/orders'], access: operationalAccess(['sales']) },
-                    { id: 'goods-deliveries', type: 'link', label: 'Goods Deliveries', to: '/sales/deliveries', match: ['/sales/deliveries'], access: operationalAccess(['sales']) },
+                    { id: 'sales-allocations', type: 'link', label: 'Stock Allocations', to: '/sales/allocations', match: ['/sales/allocations'], access: operationalAccess(['sales']) },
+                    { id: 'sales-deliveries', type: 'link', label: 'Sales Deliveries', to: '/sales/deliveries', match: ['/sales/deliveries'], access: operationalAccess(['sales']) },
                     { id: 'sales-returns', type: 'link', label: 'Sales Returns', to: '/sales/returns', match: ['/sales/returns'], access: operationalAccess(['sales']) },
                     { id: 'customer-invoices', type: 'link', label: 'Customer Invoices', to: '/invoices?view=customer', match: ['/invoices'], access: operationalAccess(['invoice', 'sales']) },
                     { id: 'customer-receipts', type: 'link', label: 'Customer Receipts', to: '/payments?view=customer', match: ['/payments'], exclude: ['/payments/create', '/payments/cheque-templates'], access: operationalAccess(['payment', 'sales']) },

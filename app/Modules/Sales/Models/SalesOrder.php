@@ -84,4 +84,10 @@ final class SalesOrder extends CoreModel
     {
         return $this->hasMany(SalesDelivery::class);
     }
+
+    public function invoiceLinks(): HasMany
+    {
+        return $this->hasMany(SalesInvoiceLink::class, 'source_id')
+            ->where('source_type', 'sales_order');
+    }
 }

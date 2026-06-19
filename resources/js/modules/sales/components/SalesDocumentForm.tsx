@@ -117,6 +117,7 @@ export function SalesDocumentForm({
             notes: notes || undefined,
             lines: lines.map((line) => ({
                 item_id: line.item?.id ?? 0,
+                item_variant_id: line.item_variant_id ?? line.item_variant?.id ?? undefined,
                 uom_id: line.uom?.id ?? 0,
                 description: line.description || undefined,
                 quantity: line.quantity,
@@ -190,6 +191,9 @@ export function SalesDocumentForm({
                     lines={lines}
                     onChange={setLines}
                     errorFor={errorFor}
+                    currencyId={currency?.id}
+                    warehouseId={warehouse?.id}
+                    salesDate={documentDate}
                 />
                 <SalesDocumentAdjustmentSection
                     adjustments={adjustments}

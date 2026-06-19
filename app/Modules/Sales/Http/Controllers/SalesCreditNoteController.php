@@ -15,6 +15,7 @@ use Modules\Sales\Http\Requests\SalesActionRequest;
 use Modules\Sales\Http\Requests\StoreSalesCreditNoteRequest;
 use Modules\Sales\Http\Resources\SalesCreditNoteResource;
 use Modules\Sales\Models\SalesCreditNote;
+use Modules\Sales\Services\SalesAuthorizationService;
 use Modules\Sales\Services\SalesCreditNoteService;
 
 final class SalesCreditNoteController
@@ -22,8 +23,12 @@ final class SalesCreditNoteController
     use FiltersSalesQueries;
     use ScopesSalesRequests;
 
+    public function __construct(private readonly SalesAuthorizationService $authorization) {}
+
     public function index(ListSalesRequest $request): AnonymousResourceCollection
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_VIEW);
+
         $query = $this->scope(SalesCreditNote::query(), $request)->with(['customer', 'salesReturn']);
         $this->applySalesFilters(
             $query,
@@ -37,11 +42,15 @@ final class SalesCreditNoteController
 
     public function store(StoreSalesCreditNoteRequest $request, SalesCreditNoteService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_CREATE);
+
         return (new SalesCreditNoteResource($service->create($request->toData())->load(['customer', 'salesReturn'])))->response()->setStatusCode(201);
     }
 
     public function show(ListSalesRequest $request, int $creditNote): SalesCreditNoteResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_VIEW);
+
         return new SalesCreditNoteResource($this->scope(SalesCreditNote::query(), $request)->with(['customer', 'salesReturn'])->findOrFail($creditNote));
     }
 
@@ -50,6 +59,8 @@ final class SalesCreditNoteController
         int $creditNote,
         SalesCreditNoteService $service,
     ): SalesCreditNoteResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_APPROVE);
+
         return new SalesCreditNoteResource(
             $service->approve($this->find($request, $creditNote))->load(['customer', 'salesReturn']),
         );
@@ -60,6 +71,8 @@ final class SalesCreditNoteController
         int $creditNote,
         SalesCreditNoteService $service,
     ): SalesCreditNoteResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_POST);
+
         return new SalesCreditNoteResource(
             $service->post($this->find($request, $creditNote))->load(['customer', 'salesReturn']),
         );
@@ -70,6 +83,8 @@ final class SalesCreditNoteController
         int $creditNote,
         SalesCreditNoteService $service,
     ): SalesCreditNoteResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CREDIT_NOTES_ALLOCATE);
+
         $invoice = $this->scope(Invoice::query(), $request)
             ->findOrFail($request->invoiceId());
 

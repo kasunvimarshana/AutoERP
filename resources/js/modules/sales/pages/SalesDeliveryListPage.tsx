@@ -56,8 +56,8 @@ export default function SalesDeliveryListPage() {
             key: 'actions',
             header: 'Actions',
             render: (row) => <div className="flex gap-2">
-                {row.status === 'draft' && <Button loading={busyId === row.id} onClick={() => action(row, 'post')}>Post</Button>}
-                {row.status === 'posted' && <Button variant="danger" loading={busyId === row.id} onClick={() => action(row, 'reverse')}>Reverse</Button>}
+                {row.capabilities?.can_post && <Button loading={busyId === row.id} onClick={() => action(row, 'post')}>Post</Button>}
+                {row.capabilities?.can_reverse && <Button variant="danger" loading={busyId === row.id} onClick={() => action(row, 'reverse')}>Reverse</Button>}
             </div>,
         },
     ];
@@ -67,7 +67,7 @@ export default function SalesDeliveryListPage() {
             <ContentHeader title="Sales deliveries" description="Dispatch approved order quantities and post Inventory issues for stockable items." actions={<LinkButton to="/sales/deliveries/create">New delivery</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Input type="search" label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Select label="Status" value={status} options={['draft', 'posted', 'partially_returned', 'returned', 'partially_invoiced', 'invoiced', 'reversed'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                <Select label="Status" value={status} options={['draft', 'posted', 'cancelled', 'reversed'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
             <ErrorAlert error={actionError ?? result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} mobileSummary={(row) => row.delivery_number ?? 'Delivery'} />}

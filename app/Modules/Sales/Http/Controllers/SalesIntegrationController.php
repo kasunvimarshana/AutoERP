@@ -8,23 +8,32 @@ use Illuminate\Http\JsonResponse;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Sales\Http\Requests\PrepareSalesPaymentRequest;
 use Modules\Sales\Http\Requests\StoreSalesInvoiceRequest;
+use Modules\Sales\Services\SalesAuthorizationService;
 use Modules\Sales\Services\SalesInvoiceIntegrationService;
 use Modules\Sales\Services\SalesPaymentPreparationService;
 
 final class SalesIntegrationController
 {
+    public function __construct(private readonly SalesAuthorizationService $authorization) {}
+
     public function previewInvoice(StoreSalesInvoiceRequest $request, SalesInvoiceIntegrationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CUSTOMER_INVOICES_VIEW);
+
         return response()->json(['data' => get_object_vars($service->previewCustomerInvoice($request->toData()))]);
     }
 
     public function createInvoice(StoreSalesInvoiceRequest $request, SalesInvoiceIntegrationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::CUSTOMER_INVOICES_CREATE);
+
         return response()->json(['data' => $service->createCustomerInvoice($request->toData())], 201);
     }
 
     public function preparePayment(PrepareSalesPaymentRequest $request, SalesPaymentPreparationService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), SalesAuthorizationService::RECEIPTS_VIEW);
+
         $data = $service->prepareCustomerReceipt(
             tenantId: $request->tenantId(),
             paymentDate: (string) $request->input('payment_date'),

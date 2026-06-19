@@ -11,9 +11,9 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Payment\Models\Payment;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Sales\Models\SalesDelivery;
+use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
-use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxPostingContext;
 use Modules\Tax\Models\TaxDocumentSnapshot;
 use Modules\Tax\Models\TaxTransaction;
@@ -285,6 +285,67 @@ final class TaxDocumentIntegrationService
                 'party_id' => $delivery->customer_id,
             ],
         );
+    }
+
+    /**
+     * @return list<TaxDocumentSnapshot>
+     */
+    public function reverseSalesDelivery(SalesDelivery $delivery): array
+    {
+        $tenantId = (int) $delivery->tenant_id;
+        $sourceType = 'sales_delivery_reversal';
+        $sourceId = (int) $delivery->getKey();
+
+        if (TaxDocumentSnapshot::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->exists()) {
+            return [];
+        }
+
+        $originals = TaxDocumentSnapshot::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', 'sales_delivery')
+            ->where('source_id', $sourceId)
+            ->where('posted', true)
+            ->orderBy('sequence')
+            ->get();
+
+        $created = [];
+        foreach ($originals as $original) {
+            $snapshot = $this->snapshots->createReversalSnapshot(
+                original: $original,
+                source: [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $delivery->organization_unit_id,
+                    'source_module' => 'sales',
+                    'source_type' => $sourceType,
+                    'source_id' => $sourceId,
+                    'source_number' => (string) $delivery->delivery_number,
+                    'source_date' => now()->toDateString(),
+                ],
+                line: [
+                    'line_type' => 'sales_delivery_reversal',
+                    'line_id' => $original->line_id,
+                    'line_number' => is_array($original->metadata) ? ($original->metadata['line_number'] ?? null) : null,
+                ],
+                ratio: '1.000000000000',
+                metadata: ['reversed_source_type' => 'sales_delivery', 'reversed_source_id' => $sourceId],
+            );
+
+            $this->snapshots->recordTransaction($snapshot, [
+                'transaction_date' => now()->toDateString(),
+                'party_type' => $delivery->customer_id !== null ? 'customer' : null,
+                'party_id' => $delivery->customer_id,
+                'metadata' => $snapshot->metadata,
+            ]);
+            $created[] = $snapshot;
+        }
+
+        $this->snapshots->markPosted($tenantId, $sourceType, $sourceId);
+
+        return $created;
     }
 
     public function withholdingPostingContextForInvoice(

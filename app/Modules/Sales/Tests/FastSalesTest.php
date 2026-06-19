@@ -299,11 +299,14 @@ final class FastSalesTest extends TestCase
         ]));
     }
 
-    public function test_customer_reference_is_idempotent_and_rejects_different_payloads(): void
+    public function test_idempotency_key_replays_same_payload_and_rejects_different_payloads(): void
     {
         $context = $this->context();
         $this->seedStock($context, '10.000000');
-        $payload = $this->payload($context, ['customer_reference' => 'FS-IDEMPOTENT']);
+        $payload = $this->payload($context, [
+            'customer_reference' => 'FS-IDEMPOTENT',
+            'idempotency_key' => 'idem-fast-sales-test',
+        ]);
         $first = app(FastSalesService::class)->create($payload);
         $second = app(FastSalesService::class)->create($payload);
 
@@ -314,6 +317,7 @@ final class FastSalesTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         app(FastSalesService::class)->create($this->payload($context, [
             'customer_reference' => 'FS-IDEMPOTENT',
+            'idempotency_key' => 'idem-fast-sales-test',
             'lines' => [[
                 'item_id' => $context['stock_item_id'],
                 'uom_id' => $context['uom_id'],
@@ -435,6 +439,7 @@ final class FastSalesTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $context['organization_unit_id'] ?? null,
             'current_user_id' => null,
+            'idempotency_key' => 'idem-'.Str::lower((string) Str::uuid()),
             'customer_id' => $context['customer_id'],
             'customer_reference' => 'FS-'.Str::upper(Str::random(8)),
             'transaction_date' => '2026-06-16',

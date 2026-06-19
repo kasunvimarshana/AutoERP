@@ -84,6 +84,9 @@ const SalesDocumentDetailPage = lazy(() => import('@/modules/sales/pages/SalesDo
 const FastSalesPage = lazy(() => import('@/modules/sales/pages/FastSalesPage'));
 const SalesDeliveryListPage = lazy(() => import('@/modules/sales/pages/SalesDeliveryListPage'));
 const SalesDeliveryCreatePage = lazy(() => import('@/modules/sales/pages/SalesDeliveryCreatePage'));
+const SalesAllocationListPage = lazy(() => import('@/modules/sales/pages/SalesAllocationListPage'));
+const SalesAllocationCreatePage = lazy(() => import('@/modules/sales/pages/SalesAllocationCreatePage'));
+const SalesAllocationDetailPage = lazy(() => import('@/modules/sales/pages/SalesAllocationDetailPage'));
 const SalesInvoiceCreatePage = lazy(() => import('@/modules/sales/pages/SalesInvoiceCreatePage'));
 const SalesPaymentPreparePage = lazy(() => import('@/modules/sales/pages/SalesPaymentPreparePage'));
 const SalesReturnListPage = lazy(() => import('@/modules/sales/pages/SalesReturnListPage'));
@@ -250,6 +253,9 @@ export function AppRouter() {
                     <Route path="/sales/orders/create" element={<SalesDocumentFormPage kind="order" />} />
                     <Route path="/sales/orders/:id/edit" element={<SalesDocumentFormPage kind="order" />} />
                     <Route path="/sales/orders/:id" element={<SalesDocumentDetailPage kind="order" />} />
+                    <Route path="/sales/allocations" element={<SalesAllocationListPage />} />
+                    <Route path="/sales/allocations/create" element={<SalesAllocationCreatePage />} />
+                    <Route path="/sales/allocations/:id" element={<SalesAllocationDetailPage />} />
                     <Route path="/sales/deliveries" element={<SalesDeliveryListPage />} />
                     <Route path="/sales/deliveries/create" element={<SalesDeliveryCreatePage />} />
                     <Route path="/sales/invoices/create" element={<SalesInvoiceCreatePage />} />

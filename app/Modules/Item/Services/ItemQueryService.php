@@ -147,6 +147,7 @@ final class ItemQueryService
             'goods_receipt_note_lines' => ['item_id'],
             'purchase_return_lines' => ['item_id'],
             'sales_order_lines' => ['item_id'],
+            'sales_allocation_lines' => ['item_id'],
             'sales_delivery_lines' => ['item_id'],
             'sales_return_lines' => ['item_id'],
             'invoice_lines' => ['item_id'],

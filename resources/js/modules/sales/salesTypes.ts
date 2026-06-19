@@ -5,17 +5,12 @@ export type SalesOrderStatus =
     | 'draft'
     | 'pending_approval'
     | 'approved'
-    | 'partially_allocated'
-    | 'allocated'
-    | 'partially_delivered'
-    | 'delivered'
-    | 'partially_invoiced'
-    | 'invoiced'
-    | 'partially_returned'
-    | 'returned'
     | 'closed'
     | 'cancelled';
-export type SalesDeliveryStatus = 'draft' | 'posted' | 'partially_returned' | 'returned' | 'partially_invoiced' | 'invoiced' | 'cancelled' | 'reversed';
+export type SalesProgressStatus = 'none' | 'partial' | 'complete';
+export type SalesPaymentProgressStatus = 'unpaid' | 'partial' | 'paid';
+export type SalesDeliveryStatus = 'draft' | 'posted' | 'cancelled' | 'reversed';
+export type SalesAllocationStatus = 'active' | 'partially_released' | 'released' | 'issued' | 'cancelled';
 export type SalesReturnStatus = 'draft' | 'approved' | 'posted' | 'cancelled' | 'reversed';
 export type SalesReturnType =
     | 'referenced_customer_return'
@@ -42,6 +37,89 @@ export interface SalesHeaderAdjustment {
     is_allocatable?: boolean;
     sort_order?: number;
     description?: string | null;
+}
+
+export interface SalesItemContext {
+    item: NamedResource;
+    variants: NamedResource[];
+    default_sales_uom_id?: number | null;
+    allowed_sales_uoms: Array<{
+        id: number;
+        item_unit_id: number;
+        unit_role: string;
+        is_default: boolean;
+        conversion_factor: string;
+        quantity_precision: number;
+        uom: NamedResource | null;
+    }>;
+    quantity_precision: number;
+    unit_price?: string | null;
+    pricing_mode?: 'auto' | 'manual';
+    price_source: string;
+    price_source_id?: number | null;
+    price_source_label: string;
+    currency_id?: number | null;
+    uom_id?: number | null;
+    pricing_context_hash?: string | null;
+    tax_defaults: Record<string, unknown>;
+    description?: string | null;
+    eligible: boolean;
+    block_reason?: string | null;
+}
+
+export interface SalesAdjustmentCatalogueEntry {
+    type: string;
+    default_name: string;
+    allowed_effects: Array<'increase' | 'decrease'>;
+    default_effect: 'increase' | 'decrease';
+    allowed_calculation_types: Array<'fixed' | 'percentage'>;
+    default_calculation_type: 'fixed' | 'percentage';
+    allowed_calculation_bases: string[];
+    default_calculation_base: string;
+    revenue_treatment?: string;
+    tax_treatment?: string;
+    finance_mapping_label?: string;
+    override_allowed: boolean;
+}
+
+export interface SalesCapabilityDetail {
+    allowed: boolean;
+    code: string | null;
+    reason: string | null;
+}
+
+export interface SalesCapabilities {
+    details?: Record<string, SalesCapabilityDetail>;
+    can_edit?: boolean;
+    can_submit?: boolean;
+    can_approve?: boolean;
+    can_allocate?: boolean;
+    can_release_allocation?: boolean;
+    can_deliver?: boolean;
+    can_invoice?: boolean;
+    can_receive_payment?: boolean;
+    can_return?: boolean;
+    can_cancel?: boolean;
+    can_close?: boolean;
+    can_delete?: boolean;
+    can_post?: boolean;
+    can_reverse?: boolean;
+    read_only?: boolean;
+}
+
+export interface SalesRelatedDocument {
+    type: string;
+    id: number;
+    number?: string | null;
+    status?: string | null;
+}
+
+export interface SalesOrderProgress {
+    allocation: SalesProgressStatus;
+    delivery: SalesProgressStatus;
+    invoice: SalesProgressStatus;
+    payment: SalesPaymentProgressStatus;
+    return: SalesProgressStatus;
 }
 
 export interface SalesLine {
@@ -116,6 +194,52 @@ export interface SalesOrder extends Omit<SalesQuotation, 'quotation_number' | 'q
     delivered_total?: string;
     invoiced_total?: string;
     returned_total?: string;
+    workflow_status?: SalesOrderStatus;
+    progress?: SalesOrderProgress;
+    capabilities?: SalesCapabilities;
+    related_documents?: SalesRelatedDocument[];
+}
+
+export interface SalesAllocationLine {
+    id: number;
+    sales_order_line_id: number;
+    line_number?: number;
+    item?: NamedResource | null;
+    variant?: NamedResource | null;
+    uom?: NamedResource | null;
+    requested_quantity: string;
+    allocated_quantity: string;
+    released_quantity: string;
+    issued_quantity: string;
+    inventory_allocation_id?: number | null;
+    status?: SalesAllocationStatus;
+}
+
+export interface SalesAllocation {
+    id: number;
+    allocation_number?: string;
+    allocation_date?: string;
+    status?: SalesAllocationStatus;
+    sales_order?: NamedResource | null;
+    customer?: NamedResource | null;
+    warehouse?: NamedResource | null;
+    warehouse_location?: NamedResource | null;
+    notes?: string | null;
+    released_at?: string | null;
+    lines?: SalesAllocationLine[];
+}
+
+export interface SalesAllocationPayload {
+    allocation_date: string;
+    allocation_number?: string;
+    sales_order_id: number;
+    warehouse_id: number;
+    warehouse_location_id?: number;
+    notes?: string;
+    lines: Array<{
+        sales_order_line_id: number;
+        quantity: string;
+    }>;
 }
 
 export interface SalesDocumentPayload {
@@ -187,6 +311,12 @@ export interface SalesDelivery {
     warehouse_location?: NamedResource | null;
     notes?: string | null;
     lines?: SalesDeliveryLine[];
+    progress?: {
+        invoice: SalesProgressStatus;
+        return: SalesProgressStatus;
+    };
+    capabilities?: SalesCapabilities;
+    related_documents?: SalesRelatedDocument[];
 }
 
 export interface SalesDeliveryPayload {
@@ -260,6 +390,7 @@ export interface FastSalesContext {
 }
 
 export interface FastSalesPayload {
+    idempotency_key?: string;
     customer_id: number;
     customer_reference?: string;
     transaction_date: string;
@@ -403,6 +534,8 @@ export interface SalesReturn {
     credit_note_id?: number | null;
     credit_note?: NamedResource | null;
     lines?: SalesReturnLine[];
+    capabilities?: SalesCapabilities;
+    related_documents?: SalesRelatedDocument[];
 }
 
 export interface SalesReturnPayload {
@@ -441,6 +574,8 @@ export interface SalesCreditNote {
     allocated_amount?: string;
     remaining_amount?: string;
     reason?: string | null;
+    capabilities?: SalesCapabilities;
+    related_documents?: SalesRelatedDocument[];
 }
 
 export interface SalesCreditNotePayload {

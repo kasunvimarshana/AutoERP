@@ -8,10 +8,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Audit\DTOs\AuditLogActivityData;
-use Modules\Audit\Models\AuditLogModel;
 use Modules\Audit\Services\AuditLogs\LogActivityService;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
+use Modules\Core\Services\IdempotencyService;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCreditProfile;
 use Modules\Finance\Contracts\FinancePostingInterface;
@@ -75,6 +75,8 @@ final class FastSalesService
 {
     private const CUSTOMER_TYPE = 'customer';
 
+    private const IDEMPOTENCY_OPERATION = 'sales.fast_sales';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly SalesValidationService $validator,
@@ -90,6 +92,8 @@ final class FastSalesService
         private readonly FinancePostingInterface $financePostings,
         private readonly LogActivityService $audit,
         private readonly WarehouseDefaultResolver $warehouses,
+        private readonly IdempotencyService $idempotency,
+        private readonly FastSalesIdempotencyNormalizer $idempotencyNormalizer,
     ) {}
 
     /**
@@ -143,24 +147,35 @@ final class FastSalesService
 
         return DB::transaction(function () use ($payload): array {
             $resolved = $this->resolve($payload, lockRecords: true);
-            $referenceHash = $this->referenceHash($resolved);
-            $requestHash = $this->requestHash($payload);
-            $existing = $this->completedReference($resolved, $referenceHash);
+            $idempotencyKey = trim((string) ($payload['idempotency_key'] ?? ''));
+            if ($idempotencyKey === '') {
+                throw new InvalidArgumentException('Fast sales requires an Idempotency-Key header or idempotency_key payload value.');
+            }
+            $referenceHash = hash('sha256', mb_strtolower($idempotencyKey));
+            $requestHash = $this->idempotencyNormalizer->hash($payload);
+            $idempotency = $this->idempotency->acquire(
+                (int) $resolved['tenant_id'],
+                $resolved['organization_unit_id'],
+                self::IDEMPOTENCY_OPERATION,
+                $referenceHash,
+                $requestHash,
+                $idempotencyKey,
+                $resolved['current_user_id'],
+            );
 
-            if ($existing instanceof AuditLogModel) {
-                $metadata = is_array($existing->metadata) ? $existing->metadata : [];
-                if (($metadata['request_hash'] ?? null) !== $requestHash) {
-                    throw new InvalidArgumentException('Customer reference was already used for a different fast sale.');
-                }
-
-                $values = is_array($existing->new_values) ? $existing->new_values : [];
-                if (is_array($values['response'] ?? null)) {
-                    return $values['response'];
-                }
+            if ((string) $idempotency->status === 'completed' && is_array($idempotency->result)) {
+                return $idempotency->result;
+            }
+            if (! $idempotency->wasRecentlyCreated && (string) $idempotency->status === 'in_progress') {
+                throw new InvalidArgumentException('Fast sales request is already in progress for this idempotency key.');
+            }
+            if ((string) $idempotency->status !== 'in_progress') {
+                throw new InvalidArgumentException('Fast sales idempotency record is not executable.');
             }
 
             $documents = $this->createDocuments($resolved);
             $response = $this->createResponse($resolved, $documents);
+            $this->idempotency->complete($idempotency, $response, $this->documentIds($documents));
             $this->writeAuditLog($resolved, $referenceHash, $requestHash, $response);
 
             return $response;
@@ -1219,26 +1234,6 @@ final class FastSalesService
 
     /**
      * @param  array<string, mixed>  $resolved
-     */
-    private function completedReference(array $resolved, string $referenceHash): ?AuditLogModel
-    {
-        return AuditLogModel::query()
-            ->where('tenant_id', $resolved['tenant_id'])
-            ->when(
-                $resolved['organization_unit_id'] === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $resolved['organization_unit_id']),
-            )
-            ->where('event', 'fast_sales.completed')
-            ->where('auditable_type', 'fast_sales_reference')
-            ->where('auditable_id', $referenceHash)
-            ->lockForUpdate()
-            ->latest('id')
-            ->first();
-    }
-
-    /**
-     * @param  array<string, mixed>  $resolved
      * @return array<string, mixed>
      */
     private function previewResponse(array $resolved): array
@@ -1453,45 +1448,17 @@ final class FastSalesService
     }
 
     /**
-     * @param  array<string, mixed>  $resolved
+     * @param  array<string, mixed>  $documents
+     * @return array<string, mixed>
      */
-    private function referenceHash(array $resolved): string
+    private function documentIds(array $documents): array
     {
-        $reference = trim((string) $resolved['customer_reference']);
-        if ($reference === '') {
-            throw new InvalidArgumentException('Customer reference is required for fast sales submission.');
-        }
-
-        return hash('sha256', implode('|', [
-            (string) $resolved['tenant_id'],
-            (string) ($resolved['organization_unit_id'] ?? 'none'),
-            (string) $resolved['customer']->getKey(),
-            mb_strtolower($reference),
-        ]));
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function requestHash(array $payload): string
-    {
-        unset($payload['current_user_id']);
-        $this->recursiveSort($payload);
-
-        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function recursiveSort(array &$payload): void
-    {
-        ksort($payload);
-        foreach ($payload as &$value) {
-            if (is_array($value)) {
-                $this->recursiveSort($value);
-            }
-        }
+        return [
+            'sales_order_id' => $documents['sales_order'] instanceof SalesOrder ? (int) $documents['sales_order']->getKey() : null,
+            'sales_delivery_id' => $documents['goods_delivery'] instanceof SalesDelivery ? (int) $documents['goods_delivery']->getKey() : null,
+            'customer_invoice_id' => $documents['customer_invoice'] instanceof Invoice ? (int) $documents['customer_invoice']->getKey() : null,
+            'customer_receipt_id' => $documents['customer_receipt'] instanceof Payment ? (int) $documents['customer_receipt']->getKey() : null,
+        ];
     }
 
     /**

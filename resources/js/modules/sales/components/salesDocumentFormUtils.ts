@@ -1,9 +1,3 @@
-import type { EditableHeaderAdjustment } from '@/modules/purchase/components/PurchaseHeaderAdjustmentEditor';
-import {
-    previewLineAmounts,
-    type EditablePurchaseLine,
-} from '@/modules/purchase/components/PurchaseOrderLineEditor';
-import type { PurchaseTotals } from '@/modules/purchase/components/PurchaseOrderSummaryPanel';
 import type { NamedResource } from '@/shared/types/common';
 import {
     addDecimal,
@@ -14,10 +8,22 @@ import {
 } from '@/shared/utils/decimal';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import type { SalesOrder, SalesQuotation } from '../salesTypes';
+import { previewLineAmounts, type EditableSalesLine } from './salesLineModel';
+import type { EditableSalesAdjustment } from './salesHeaderAdjustmentModel';
 
-export type EditableSalesLine = EditablePurchaseLine;
-export type EditableSalesAdjustment = EditableHeaderAdjustment;
-export type SalesDocumentTotals = PurchaseTotals;
+export type { EditableSalesAdjustment } from './salesHeaderAdjustmentModel';
+export type { EditableSalesLine } from './salesLineModel';
+
+export interface SalesDocumentTotals {
+    subtotal: string;
+    discount_total: string;
+    tax_total: string;
+    charge_total: string;
+    header_increase_total: string;
+    header_decrease_total: string;
+    grand_total: string;
+}
+
 export type SalesDocument = SalesQuotation | SalesOrder;
 
 export function todayDate(): string {

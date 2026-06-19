@@ -7,6 +7,9 @@ namespace Modules\Sales\Http\Resources;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
+use Modules\Sales\Services\SalesDocumentCapabilityService;
+use Modules\Sales\Services\SalesProgressService;
+use Modules\Sales\Services\SalesRelatedDocumentService;
 
 final class SalesOrderResource extends ModuleResource
 {
@@ -21,6 +24,10 @@ final class SalesOrderResource extends ModuleResource
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
+            'workflow_status' => $this->enumValue($this->status),
+            'progress' => app(SalesProgressService::class)->forSalesOrder($this->resource),
+            'capabilities' => app(SalesDocumentCapabilityService::class)->forSalesOrder($this->resource),
+            'related_documents' => app(SalesRelatedDocumentService::class)->forSalesOrder($this->resource),
             'customer_id' => $this->customer_id,
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name', 'payment_term_id', 'default_currency_id'])),
             'quotation' => $this->whenLoaded('quotation', fn () => $this->summary($this->quotation, ['quotation_number', 'quotation_date', 'status'])),

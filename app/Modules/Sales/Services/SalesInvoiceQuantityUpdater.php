@@ -6,7 +6,6 @@ namespace Modules\Sales\Services;
 
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
-use Modules\Sales\Enums\SalesDeliveryStatus;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesDeliveryLine;
 use Modules\Sales\Models\SalesOrderLine;
@@ -41,7 +40,7 @@ final class SalesInvoiceQuantityUpdater
             }
         }
 
-        $this->refreshDeliveryStatuses($deliveries);
+        $this->refreshDeliveryTimestamps($deliveries);
     }
 
     /**
@@ -65,7 +64,7 @@ final class SalesInvoiceQuantityUpdater
             }
         }
 
-        $this->refreshDeliveryStatuses($deliveries);
+        $this->refreshDeliveryTimestamps($deliveries);
     }
 
     private function applyDeliveryQuantity(int $lineId, string $quantity): void
@@ -116,20 +115,10 @@ final class SalesInvoiceQuantityUpdater
     /**
      * @param  Collection<int, SalesDelivery>  $deliveries
      */
-    private function refreshDeliveryStatuses(Collection $deliveries): void
+    private function refreshDeliveryTimestamps(Collection $deliveries): void
     {
         foreach ($deliveries as $delivery) {
-            $delivery->load('lines');
-            $delivered = $this->math->sum($delivery->lines->pluck('delivered_quantity')->all());
-            $invoiced = $this->math->sum($delivery->lines->pluck('invoiced_quantity')->all());
-            $returned = $this->math->sum($delivery->lines->pluck('returned_quantity')->all());
-            $delivery->status = match (true) {
-                $this->math->compare($returned, $delivered) >= 0 => SalesDeliveryStatus::Returned,
-                $this->math->compare($returned, '0.000000') > 0 => SalesDeliveryStatus::PartiallyReturned,
-                $this->math->compare($invoiced, $delivered) >= 0 => SalesDeliveryStatus::Invoiced,
-                $this->math->compare($invoiced, '0.000000') > 0 => SalesDeliveryStatus::PartiallyInvoiced,
-                default => SalesDeliveryStatus::Posted,
-            };
+            $delivery->updated_at = now();
             $delivery->save();
         }
     }

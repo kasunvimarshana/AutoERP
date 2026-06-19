@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import { sumDecimals } from '@/shared/utils/decimal';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
-import { CustomerLookupSelect } from '@/modules/sales/components/SalesLookups';
 import { SupplierLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
 import { createPayment, listPaymentMethods, type PaymentLinePayload, type PaymentMethod } from '../paymentApi';
 import { PaymentLineTable, type PaymentLineDraft } from '../components/PaymentLineTable';
@@ -78,6 +79,13 @@ function linePayload(line: PaymentLineDraft, method?: PaymentMethod, direction?:
     }
 
     return payload;
+}
+
+function CustomerLookupSelect({ value, onChange }: {
+    value: NamedResource | null;
+    onChange: (value: NamedResource | null) => void;
+}) {
+    return <LookupSelect label="Customer" search={lookupApi.customers} placeholder="Search customers..." value={value} onChange={onChange} />;
 }
 
 export default function PaymentEntryPage() {

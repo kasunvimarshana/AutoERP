@@ -59,7 +59,7 @@ final class SalesInvoiceDtoFactory
                     ->when($lockSources, fn ($query) => $query->lockForUpdate())
                     ->findOrFail($source->sourceId);
                 $this->assertScope($delivery, $data);
-                if (! in_array($delivery->status, [SalesDeliveryStatus::Posted, SalesDeliveryStatus::PartiallyInvoiced], true)) {
+                if ($delivery->status !== SalesDeliveryStatus::Posted) {
                     throw new InvalidArgumentException('Only posted sales deliveries can be invoiced.');
                 }
 

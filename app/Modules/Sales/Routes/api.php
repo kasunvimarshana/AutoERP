@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Sales\Http\Controllers\FastSalesController;
+use Modules\Sales\Http\Controllers\SalesAllocationController;
+use Modules\Sales\Http\Controllers\SalesContextController;
 use Modules\Sales\Http\Controllers\SalesCreditNoteController;
 use Modules\Sales\Http\Controllers\SalesDeliveryController;
+use Modules\Sales\Http\Controllers\SalesEligibilityController;
 use Modules\Sales\Http\Controllers\SalesIntegrationController;
 use Modules\Sales\Http\Controllers\SalesOrderController;
 use Modules\Sales\Http\Controllers\SalesQuotationController;
@@ -23,6 +26,20 @@ Route::prefix('api/v1/sales')->middleware($middleware)->name('api.v1.sales.')->g
     Route::get('fast-sales/context', [FastSalesController::class, 'context'])->name('fast-sales.context');
     Route::post('fast-sales/preview', [FastSalesController::class, 'preview'])->name('fast-sales.preview');
     Route::post('fast-sales', [FastSalesController::class, 'store'])->name('fast-sales.store');
+
+    Route::get('orders/create-context', [SalesContextController::class, 'orderCreateContext'])->name('orders.create-context');
+    Route::get('items/{item}/sales-context', [SalesContextController::class, 'itemContext'])->whereNumber('item')->name('items.sales-context');
+    Route::get('adjustments/catalogue', [SalesContextController::class, 'adjustmentCatalogue'])->name('adjustments.catalogue');
+    Route::get('warehouses', [SalesContextController::class, 'warehouses'])->name('warehouses.index');
+    Route::get('warehouses/{warehouse}/locations', [SalesContextController::class, 'warehouseLocations'])->whereNumber('warehouse')->name('warehouses.locations');
+    Route::get('tax-groups', [SalesContextController::class, 'taxGroups'])->name('tax-groups.index');
+
+    Route::get('eligible/allocatable-sales-orders', [SalesEligibilityController::class, 'allocatableSalesOrders'])->name('eligible.allocatable-sales-orders');
+    Route::get('eligible/deliverable-sales-orders', [SalesEligibilityController::class, 'deliverableSalesOrders'])->name('eligible.deliverable-sales-orders');
+    Route::get('eligible/invoiceable-sales-orders', [SalesEligibilityController::class, 'invoiceableSalesOrders'])->name('eligible.invoiceable-sales-orders');
+    Route::get('eligible/invoiceable-sales-deliveries', [SalesEligibilityController::class, 'invoiceableSalesDeliveries'])->name('eligible.invoiceable-sales-deliveries');
+    Route::get('eligible/returnable-sales-deliveries', [SalesEligibilityController::class, 'returnableSalesDeliveries'])->name('eligible.returnable-sales-deliveries');
+    Route::get('eligible/outstanding-customer-invoices', [SalesEligibilityController::class, 'outstandingCustomerInvoices'])->name('eligible.outstanding-customer-invoices');
 
     Route::get('quotations', [SalesQuotationController::class, 'index'])->name('quotations.index');
     Route::post('quotations', [SalesQuotationController::class, 'store'])->name('quotations.store');
@@ -46,6 +63,11 @@ Route::prefix('api/v1/sales')->middleware($middleware)->name('api.v1.sales.')->g
     Route::get('orders/{order}/allocatable-lines', [SalesOrderController::class, 'allocatableLines'])->whereNumber('order')->name('orders.allocatable-lines');
     Route::get('orders/{order}/deliverable-lines', [SalesOrderController::class, 'deliverableLines'])->whereNumber('order')->name('orders.deliverable-lines');
     Route::get('orders/{order}/invoiceable-lines', [SalesOrderController::class, 'invoiceableLines'])->whereNumber('order')->name('orders.invoiceable-lines');
+
+    Route::get('allocations', [SalesAllocationController::class, 'index'])->name('allocations.index');
+    Route::post('allocations', [SalesAllocationController::class, 'store'])->name('allocations.store');
+    Route::get('allocations/{allocation}', [SalesAllocationController::class, 'show'])->whereNumber('allocation')->name('allocations.show');
+    Route::patch('allocations/{allocation}/release', [SalesAllocationController::class, 'release'])->whereNumber('allocation')->name('allocations.release');
 
     Route::get('deliveries', [SalesDeliveryController::class, 'index'])->name('deliveries.index');
     Route::post('deliveries', [SalesDeliveryController::class, 'store'])->name('deliveries.store');

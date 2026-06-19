@@ -178,7 +178,7 @@ describe('navigation access and matching', () => {
             { section: 'Operations', items: [
                 { label: 'Warehouses', children: ['Warehouses', 'Create Warehouse', 'Warehouse Locations', 'Create Warehouse Location'] },
                 { label: 'Purchase', children: ['Purchase Orders', 'Goods Receipts', 'Supplier Invoices', 'Supplier Payments', 'Purchase Returns', 'Debit Notes', 'Fast Purchase'] },
-                { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Goods Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
+                { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Stock Allocations', 'Sales Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Service', children: ['Service Jobs', 'Service Invoices', 'Customer Receipts'] },
                 { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Customer Running Charts', 'Owner / Supplier Running Charts', 'Linked Running Charts', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
             ] },

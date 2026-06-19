@@ -14,6 +14,8 @@ export async function previewFastSales(payload: FastSalesPayload, signal?: Abort
 }
 
 export async function createFastSales(payload: FastSalesPayload) {
-    const response = await apiClient.post<ApiResource<FastSalesResult>>(`${endpoints.sales}/fast-sales`, payload);
+    const response = await apiClient.post<ApiResource<FastSalesResult>>(`${endpoints.sales}/fast-sales`, payload, {
+        headers: payload.idempotency_key ? { 'Idempotency-Key': payload.idempotency_key } : undefined,
+    });
     return response.data.data;
 }

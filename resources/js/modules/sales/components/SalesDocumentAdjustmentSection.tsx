@@ -1,5 +1,5 @@
-import { PurchaseHeaderAdjustmentEditor } from '@/modules/purchase/components/PurchaseHeaderAdjustmentEditor';
 import { Panel } from '@/shared/components/Panel';
+import { SalesHeaderAdjustmentEditor } from './SalesHeaderAdjustmentEditor';
 import type { EditableSalesAdjustment } from './salesDocumentFormUtils';
 
 interface Props {
@@ -15,7 +15,7 @@ export function SalesDocumentAdjustmentSection({
 }: Props) {
     return (
         <Panel title="Header adjustments">
-            <PurchaseHeaderAdjustmentEditor
+            <SalesHeaderAdjustmentEditor
                 adjustments={adjustments}
                 onChange={onChange}
                 errorFor={errorFor}

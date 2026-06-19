@@ -104,7 +104,6 @@ final class SalesValidationService
     public function currency(int $tenantId, ?int $organizationUnitId, int $currencyId): CurrencyModel
     {
         $currency = CurrencyModel::query()->findOrFail($currencyId);
-        $this->assertTenantOrg((int) $currency->tenant_id, $currency->organization_unit_id ?? null, $tenantId, $organizationUnitId);
         if (! (bool) $currency->is_active) {
             throw new InvalidArgumentException('Sales currency must be active.');
         }
@@ -155,6 +154,9 @@ final class SalesValidationService
     {
         if ($actualTenantId !== null && $actualTenantId !== $tenantId) {
             throw new InvalidArgumentException('Sales reference belongs to a different tenant.');
+        }
+        if ($organizationUnitId === null && $actualOrgId !== null) {
+            throw new InvalidArgumentException('Sales reference belongs to an organization unit but no organization unit was selected.');
         }
         if ($organizationUnitId !== null && $actualOrgId !== null && $actualOrgId !== $organizationUnitId) {
             throw new InvalidArgumentException('Sales reference belongs to a different organization unit.');

@@ -9,7 +9,6 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Sales\DTOs\CreateSalesDeliveryData;
 use Modules\Sales\Enums\SalesDeliveryStatus;
-use Modules\Sales\Enums\SalesOrderStatus;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesHeaderAdjustment;
 use Modules\Sales\Models\SalesOrder;
@@ -28,6 +27,8 @@ final class SalesDeliveryService
         private readonly SalesNumberService $numbers,
         private readonly SalesStatusService $statuses,
         private readonly TaxDocumentIntegrationService $taxDocuments,
+        private readonly SalesDocumentLockService $locks,
+        private readonly SalesDocumentBlockerService $blockers,
     ) {}
 
     public function create(CreateSalesDeliveryData $data): SalesDelivery
@@ -49,12 +50,8 @@ final class SalesDeliveryService
             if ((int) $order->customer_id !== $data->customerId) {
                 throw new InvalidArgumentException('Sales delivery customer must match the sales order customer.');
             }
-            if (! in_array($order->status, [
-                SalesOrderStatus::Approved,
-                SalesOrderStatus::PartiallyAllocated,
-                SalesOrderStatus::Allocated,
-                SalesOrderStatus::PartiallyDelivered,
-            ], true)) {
+            $status = $order->status instanceof \BackedEnum ? $order->status->value : (string) $order->status;
+            if ($status !== 'approved') {
                 throw new InvalidArgumentException('Sales delivery requires an approved open sales order.');
             }
         }
@@ -142,15 +139,24 @@ final class SalesDeliveryService
                 throw new InvalidArgumentException('Only draft sales deliveries can be posted.');
             }
             $delivery->load('lines.salesOrderLine');
+            $lineIds = $delivery->lines
+                ->pluck('sales_order_line_id')
+                ->filter()
+                ->map(static fn ($id): int => (int) $id)
+                ->values()
+                ->all();
+            $this->locks->salesOrderLines($lineIds);
             foreach ($delivery->lines as $line) {
-                $allocation = $this->inventory->allocateForDelivery($delivery, $line);
-                $movement = $this->inventory->issueAllocation($allocation);
-                $line->inventory_movement_id = $movement?->getKey();
+                $issue = $this->inventory->issueForDelivery($delivery, $line, $userId);
+                $allocation = $issue['allocation'];
+                $line->inventory_movement_id = $issue['movement']?->getKey();
                 $line->status = 'posted';
                 $line->save();
 
                 if ($line->salesOrderLine instanceof SalesOrderLine) {
-                    $this->orders->applyAllocated($line->salesOrderLine, (string) $line->delivered_quantity, $allocation?->getKey());
+                    if ($issue['allocated_now']) {
+                        $this->orders->applyAllocated($line->salesOrderLine, (string) $line->delivered_quantity, $allocation?->getKey());
+                    }
                     $this->orders->applyDelivered($line->salesOrderLine, (string) $line->delivered_quantity);
                 }
             }
@@ -172,6 +178,17 @@ final class SalesDeliveryService
                 throw new InvalidArgumentException('Only posted sales deliveries can be reversed.');
             }
             $delivery->load(['lines.inventoryMovement', 'lines.salesOrderLine']);
+            $lineIds = $delivery->lines
+                ->pluck('sales_order_line_id')
+                ->filter()
+                ->map(static fn ($id): int => (int) $id)
+                ->values()
+                ->all();
+            $this->locks->salesOrderLines($lineIds);
+            $blocker = $this->blockers->salesDeliveryReverseBlocker($delivery);
+            if ($blocker !== null) {
+                throw new InvalidArgumentException($blocker['reason']);
+            }
             foreach ($delivery->lines as $line) {
                 if ($this->math->compare((string) $line->invoiced_quantity, '0.000000') > 0
                     || $this->math->compare((string) $line->returned_quantity, '0.000000') > 0) {
@@ -188,6 +205,7 @@ final class SalesDeliveryService
             $delivery->reversed_by = $userId;
             $delivery->reversed_at = now();
             $delivery->save();
+            $this->taxDocuments->reverseSalesDelivery($delivery->refresh()->load(['lines.salesOrderLine']));
 
             return $this->load($delivery);
         });

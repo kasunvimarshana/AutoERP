@@ -25,11 +25,13 @@ use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Sales\DTOs\CreateSalesAllocationData;
 use Modules\Sales\DTOs\CreateSalesDeliveryData;
 use Modules\Sales\DTOs\CreateSalesInvoiceData;
 use Modules\Sales\DTOs\CreateSalesOrderData;
 use Modules\Sales\DTOs\CreateSalesQuotationData;
 use Modules\Sales\DTOs\CreateSalesReturnData;
+use Modules\Sales\DTOs\SalesAllocationLineData;
 use Modules\Sales\DTOs\SalesCreditNoteData;
 use Modules\Sales\DTOs\SalesDeliveryLineData;
 use Modules\Sales\DTOs\SalesHeaderAdjustmentData;
@@ -51,6 +53,8 @@ use Modules\Sales\Models\SalesInvoiceLink;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesReturn;
 use Modules\Sales\Models\SalesStatusHistory;
+use Modules\Sales\Services\SalesAllocationService;
+use Modules\Sales\Services\SalesAuthorizationService;
 use Modules\Sales\Services\SalesCreditNoteService;
 use Modules\Sales\Services\SalesDeliveryService;
 use Modules\Sales\Services\SalesInvoiceIntegrationService;
@@ -137,8 +141,53 @@ final class SalesEngineTest extends TestCase
         $this->assertSame('posted', $posted->status->value);
         $this->assertSame(1, InventoryAllocation::query()->where('source_type', 'sales_delivery')->count());
         $this->assertSame(1, InventoryMovement::query()->where('source_type', 'sales_delivery')->count());
-        $this->assertSame(SalesOrderStatus::Delivered, $order->refresh()->status);
+        $this->assertSame(SalesOrderStatus::Approved, $order->refresh()->status);
         $this->assertSame('75.000000', (string) $order->refresh()->delivered_total);
+    }
+
+    public function test_sales_allocation_reserves_releases_and_delivery_consumes_existing_stock(): void
+    {
+        $context = $this->context();
+        $this->seedStock($context, '20.000000');
+
+        $releaseOrder = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '3.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($releaseOrder);
+        $releaseLine = $releaseOrder->refresh()->load('lines')->lines->first();
+        $allocation = app(SalesAllocationService::class)->create(new CreateSalesAllocationData(
+            tenantId: $context['tenant_id'],
+            allocationDate: '2026-06-11',
+            salesOrderId: (int) $releaseOrder->getKey(),
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesAllocationLineData((int) $releaseLine->getKey(), '3.000000')],
+        ));
+
+        $this->assertSame('3.000000', (string) $releaseLine->refresh()->allocated_quantity);
+        $this->assertSame('sales_order', InventoryAllocation::query()->find($allocation->lines->first()->inventory_allocation_id)?->source_type);
+
+        app(SalesAllocationService::class)->release($allocation);
+        $this->assertSame('0.000000', (string) $releaseLine->refresh()->allocated_quantity);
+        $this->assertSame('released', $allocation->refresh()->status->value);
+
+        $deliveryOrder = $this->createOrder($context, [
+            new SalesLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id']),
+        ]);
+        app(SalesOrderService::class)->approve($deliveryOrder);
+        $deliveryLine = $deliveryOrder->refresh()->load('lines')->lines->first();
+        app(SalesAllocationService::class)->create(new CreateSalesAllocationData(
+            tenantId: $context['tenant_id'],
+            allocationDate: '2026-06-11',
+            salesOrderId: (int) $deliveryOrder->getKey(),
+            warehouseId: $context['warehouse_id'],
+            lines: [new SalesAllocationLineData((int) $deliveryLine->getKey(), '2.000000')],
+        ));
+
+        $this->deliver($context, $deliveryOrder, '2.000000');
+
+        $this->assertSame(0, InventoryAllocation::query()->where('source_type', 'sales_delivery')->count());
+        $this->assertSame('2.000000', app(DecimalMath::class)->normalize((string) DB::table('sales_allocation_lines')->where('sales_order_line_id', $deliveryLine->getKey())->value('issued_quantity')));
+        $this->assertSame('2.000000', (string) $deliveryLine->refresh()->delivered_quantity);
     }
 
     public function test_non_base_uom_sales_return_restores_base_cost_once(): void
@@ -266,7 +315,7 @@ final class SalesEngineTest extends TestCase
                 (string) $followup->grand_total,
             ),
         );
-        $this->assertSame('invoiced', $second->refresh()->status->value);
+        $this->assertSame('posted', $second->refresh()->status->value);
         $this->assertSame('4.000000', (string) $first->lines->first()->refresh()->invoiced_quantity);
         $this->assertSame($firstLineId, $invoice->lines->first()->source_line_id);
     }
@@ -281,7 +330,7 @@ final class SalesEngineTest extends TestCase
         app(SalesOrderService::class)->approve($order);
         $delivery = $this->deliver($context, $order, '2.000000');
 
-        $this->assertSame(SalesOrderStatus::Delivered, $order->refresh()->status);
+        $this->assertSame(SalesOrderStatus::Approved, $order->refresh()->status);
 
         app(SalesDeliveryService::class)->reverse($delivery);
 
@@ -390,7 +439,7 @@ final class SalesEngineTest extends TestCase
             ));
             $this->fail('Expected duplicate invoice prevention to fail.');
         } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Only posted sales deliveries can be invoiced.', $exception->getMessage());
+            $this->assertSame('No sales source quantities remain to invoice.', $exception->getMessage());
         }
     }
 
@@ -429,7 +478,7 @@ final class SalesEngineTest extends TestCase
         $this->assertSame('posted', $delivery->status->value);
         $this->assertSame('0.000000', (string) $delivery->lines->first()->invoiced_quantity);
         $this->assertSame('2.000000', (string) $delivery->lines->first()->remaining_quantity);
-        $this->assertSame(SalesOrderStatus::Delivered, $order->status);
+        $this->assertSame(SalesOrderStatus::Approved, $order->status);
         $this->assertSame('0.000000', (string) $order->lines->first()->invoiced_quantity);
         $this->assertSame('2.000000', (string) $order->lines->first()->remaining_invoiceable_quantity);
         $this->assertSame(
@@ -499,7 +548,7 @@ final class SalesEngineTest extends TestCase
         $warrantyResult = app(SalesReturnService::class)->post($warranty);
         $this->assertSame(2, SalesCreditNote::query()->count());
         $this->assertCount(2, $warrantyResult->inventoryMovementIds);
-        $this->assertSame(SalesOrderStatus::Delivered, $replacement->refresh()->status);
+        $this->assertSame(SalesOrderStatus::Approved, $replacement->refresh()->status);
 
         $exchangeItemId = $this->createItem($context['tenant_id'], 'EXCHANGE-'.Str::upper(Str::random(4)), $context['uom_id']);
         $this->seedStock($context, '5.000000', $exchangeItemId);
@@ -510,7 +559,7 @@ final class SalesEngineTest extends TestCase
         $exchangeResult = app(SalesReturnService::class)->post($exchange);
         $this->assertSame(3, SalesCreditNote::query()->count());
         $this->assertCount(2, $exchangeResult->inventoryMovementIds);
-        $this->assertSame(SalesOrderStatus::Delivered, $exchangeOrder->refresh()->status);
+        $this->assertSame(SalesOrderStatus::Approved, $exchangeOrder->refresh()->status);
 
         $damaged = app(SalesReturnService::class)->create(new CreateSalesReturnData(
             tenantId: $context['tenant_id'],
@@ -557,6 +606,44 @@ final class SalesEngineTest extends TestCase
             warehouseId: $context['warehouse_id'],
             lines: [new SalesLineData($context['item_id'], '1.000000', '1.000000', uomId: $context['uom_id'])],
         ));
+    }
+
+    public function test_sales_authorization_is_tenant_scoped_and_action_specific(): void
+    {
+        $tenantId = $this->createTenant('AUTH'.Str::upper(Str::random(2)));
+        $otherTenantId = $this->createTenant('AUTH'.Str::upper(Str::random(2)));
+        $userId = (int) DB::table('users')->insertGetId([
+            'tenant_id' => $tenantId,
+            'first_name' => 'Sales',
+            'last_name' => 'Auth',
+            'email' => 'sales-auth-'.Str::lower(Str::random(6)).'@example.test',
+            'password' => 'secret',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $permissionId = $this->insertSalesPermission($tenantId, SalesAuthorizationService::ORDERS_VIEW);
+        $roleId = $this->insertRole($tenantId, 'Sales Order Viewer');
+        DB::table('role_permissions')->insert([
+            'tenant_id' => $tenantId,
+            'role_id' => $roleId,
+            'permission_id' => $permissionId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $authorization = app(SalesAuthorizationService::class);
+
+        $this->assertTrue($authorization->can($userId, $tenantId, SalesAuthorizationService::ORDERS_VIEW));
+        $this->assertFalse($authorization->can($userId, $tenantId, SalesAuthorizationService::ORDERS_APPROVE));
+        $this->assertFalse($authorization->can($userId, $otherTenantId, SalesAuthorizationService::ORDERS_VIEW));
     }
 
     public function test_sales_credit_note_allocation_updates_invoice_balance(): void
@@ -915,6 +1002,31 @@ final class SalesEngineTest extends TestCase
             'is_stockable' => $stockable,
             'is_combo' => false,
             'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function insertSalesPermission(int $tenantId, string $name): int
+    {
+        return (int) DB::table('permissions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $name,
+            'guard_name' => 'web',
+            'module' => 'Sales',
+            'description' => SalesAuthorizationService::descriptions()[$name] ?? $name,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function insertRole(int $tenantId, string $name): int
+    {
+        return (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $name,
+            'guard_name' => 'web',
+            'description' => $name,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

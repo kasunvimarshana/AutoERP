@@ -84,7 +84,7 @@ final class IdempotencyService
     private function assertPayloadHash(IdempotencyRecord $record, string $payloadHash): IdempotencyRecord
     {
         if ((string) $record->payload_hash !== $payloadHash) {
-            throw new InvalidArgumentException('Supplier reference was already used for a different fast purchase.');
+            throw new InvalidArgumentException('Idempotency key was already used for a different request payload.');
         }
 
         return $record;

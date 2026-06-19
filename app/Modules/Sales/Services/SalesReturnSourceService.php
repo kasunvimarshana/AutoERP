@@ -10,7 +10,6 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Models\InvoiceLine;
 use Modules\Sales\DTOs\ResolvedSalesReturnSource;
 use Modules\Sales\DTOs\SalesReturnLineData;
-use Modules\Sales\Enums\SalesDeliveryStatus;
 use Modules\Sales\Enums\SalesReturnStatus;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesDeliveryLine;
@@ -216,8 +215,7 @@ final class SalesReturnSourceService
         int $lineId,
         string $quantity,
         int $salesReturnId,
-    ): void
-    {
+    ): void {
         $line = InvoiceLine::query()->lockForUpdate()->findOrFail($lineId);
         $returnQuantity = (string) SalesReturnLine::query()
             ->where('sales_return_id', $salesReturnId)
@@ -273,12 +271,7 @@ final class SalesReturnSourceService
 
     private function refreshDeliveryStatus(SalesDelivery $delivery): void
     {
-        $delivery->load('lines');
-        $delivered = $this->math->sum($delivery->lines->pluck('delivered_quantity')->all());
-        $returned = $this->math->sum($delivery->lines->pluck('returned_quantity')->all());
-        $delivery->status = $this->math->compare($returned, $delivered) >= 0
-            ? SalesDeliveryStatus::Returned
-            : SalesDeliveryStatus::PartiallyReturned;
+        $delivery->updated_at = now();
         $delivery->save();
     }
 }

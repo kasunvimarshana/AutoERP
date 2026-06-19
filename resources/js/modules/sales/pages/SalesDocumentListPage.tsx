@@ -32,12 +32,14 @@ import {
 } from '../salesApi';
 import type { SalesOrder, SalesQuotation } from '../salesTypes';
 import { CustomerLookupSelect } from '../components/SalesLookups';
+import { salesOrderCapabilities } from '../salesCapabilities';
+import { SalesStatusBadge } from '../components/SalesStatusBadge';
 
 type Kind = 'quotation' | 'order';
 type Row = SalesQuotation | SalesOrder;
 
 const quotationStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted', 'cancelled'];
-const orderStatuses = ['draft', 'pending_approval', 'approved', 'partially_allocated', 'allocated', 'partially_delivered', 'delivered', 'partially_invoiced', 'invoiced', 'closed', 'cancelled'];
+const orderStatuses = ['draft', 'pending_approval', 'approved', 'closed', 'cancelled'];
 
 export default function SalesDocumentListPage({ kind }: { kind: Kind }) {
     const navigate = useNavigate();
@@ -94,24 +96,29 @@ export default function SalesDocumentListPage({ kind }: { kind: Kind }) {
         { key: 'date', header: 'Date', render: (row) => formatDate(dateFor(row, kind)) },
         { key: 'customer', header: 'Customer', render: (row) => readableRelation(row.customer) },
         { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total} currency={row.currency?.code ?? undefined} /> },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'status', header: 'Status', render: (row) => kind === 'order' ? <SalesStatusBadge status={row.status} /> : <StatusBadge status={row.status} /> },
         {
             key: 'actions',
             header: 'Actions',
-            render: (row) => (
-                <div className="flex flex-wrap gap-2">
-                    <LinkButton to={`/sales/${segment}/${row.id}`} variant="ghost">View</LinkButton>
-                    {row.status === 'draft' && <LinkButton to={`/sales/${segment}/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
-                    {kind === 'quotation' && row.status === 'draft' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'send')}>Send</Button>}
-                    {kind === 'quotation' && row.status === 'sent' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'accept')}>Accept</Button>}
-                    {kind === 'quotation' && row.status === 'sent' && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'reject')}>Reject</Button>}
-                    {kind === 'quotation' && row.status === 'accepted' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'convert')}>Convert to order</Button>}
-                    {kind === 'order' && row.status === 'draft' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'submit')}>Submit</Button>}
-                    {kind === 'order' && row.status === 'pending_approval' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
-                    {kind === 'order' && ['draft', 'pending_approval', 'approved'].includes(row.status ?? '') && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
-                    {kind === 'order' && ['approved', 'delivered', 'invoiced'].includes(row.status ?? '') && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
-                </div>
-            ),
+            render: (row) => {
+                const orderCaps = kind === 'order' ? salesOrderCapabilities(row as SalesOrder) : null;
+
+                return (
+                    <div className="flex flex-wrap gap-2">
+                        <LinkButton to={`/sales/${segment}/${row.id}`} variant="ghost">View</LinkButton>
+                        {kind === 'quotation' && row.status === 'draft' && <LinkButton to={`/sales/${segment}/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
+                        {kind === 'order' && orderCaps?.canEdit && <LinkButton to={`/sales/${segment}/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
+                        {kind === 'quotation' && row.status === 'draft' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'send')}>Send</Button>}
+                        {kind === 'quotation' && row.status === 'sent' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'accept')}>Accept</Button>}
+                        {kind === 'quotation' && row.status === 'sent' && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'reject')}>Reject</Button>}
+                        {kind === 'quotation' && row.status === 'accepted' && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'convert')}>Convert to order</Button>}
+                        {kind === 'order' && orderCaps?.canSubmit && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'submit')}>Submit</Button>}
+                        {kind === 'order' && orderCaps?.canApprove && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
+                        {kind === 'order' && orderCaps?.canCancel && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
+                        {kind === 'order' && orderCaps?.canClose && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
+                    </div>
+                );
+            },
         },
     ];
 

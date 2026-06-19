@@ -1,4 +1,5 @@
 export * from './api/fastSalesApi';
+export * from './salesAllocationApi';
 export * from './salesDeliveryApi';
 export * from './salesInvoiceApi';
 export * from './salesOrderApi';

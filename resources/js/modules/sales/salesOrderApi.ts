@@ -3,7 +3,13 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import type { SalesDocumentPayload, SalesLineSummary, SalesOrder } from './salesTypes';
+import type {
+    SalesAdjustmentCatalogueEntry,
+    SalesDocumentPayload,
+    SalesItemContext,
+    SalesLineSummary,
+    SalesOrder,
+} from './salesTypes';
 
 const base = `${endpoints.sales}/orders`;
 
@@ -65,6 +71,22 @@ export async function getInvoiceableSalesOrderLines(id: number, signal?: AbortSi
             signal,
         })
     ).data.data;
+}
+
+export async function getSalesItemContext(itemId: number, params: {
+    item_variant_id?: number;
+    currency_id?: number;
+    warehouse_id?: number;
+    uom_id?: number;
+    sales_date?: string;
+} = {}, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<SalesItemContext>>(`${endpoints.sales}/items/${itemId}/sales-context`, { params, signal });
+    return response.data.data;
+}
+
+export async function getSalesAdjustmentCatalogue(signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<SalesAdjustmentCatalogueEntry[]>>(`${endpoints.sales}/adjustments/catalogue`, { signal });
+    return response.data.data;
 }
 
 export async function searchSalesOrders({

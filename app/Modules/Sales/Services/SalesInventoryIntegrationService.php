@@ -16,6 +16,8 @@ use Modules\Inventory\Services\InventoryFacade;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemBaseUomConversionService;
+use Modules\Sales\Enums\SalesAllocationStatus;
+use Modules\Sales\Models\SalesAllocationLine;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesDeliveryLine;
 use Modules\Sales\Models\SalesReturn;
@@ -64,13 +66,44 @@ final class SalesInventoryIntegrationService
         return $allocation->issues()->with('movement')->latest('id')->first()?->movement;
     }
 
+    /**
+     * @return array{allocation: InventoryAllocation|null, movement: InventoryMovement|null, allocated_now: bool}
+     */
+    public function issueForDelivery(SalesDelivery $delivery, SalesDeliveryLine $line, ?int $userId = null): array
+    {
+        if (! $this->affectsStock((int) $line->item_id)) {
+            return ['allocation' => null, 'movement' => null, 'allocated_now' => false];
+        }
+
+        $allocation = $this->existingOrderAllocation($line, (string) $line->delivered_quantity);
+        $allocatedNow = false;
+        if (! $allocation instanceof InventoryAllocation) {
+            $allocation = $this->allocateForDelivery($delivery, $line);
+            $allocatedNow = true;
+        }
+
+        $allocation = $this->inventory->issueAllocation($allocation, (string) $line->delivered_quantity, $userId);
+        $this->markSalesAllocationIssued($allocation, (string) $line->delivered_quantity);
+
+        return [
+            'allocation' => $allocation,
+            'movement' => $allocation->issues()->with('movement')->latest('id')->first()?->movement,
+            'allocated_now' => $allocatedNow,
+        ];
+    }
+
     public function reverseDelivery(SalesDeliveryLine $line, ?int $userId = null): ?InventoryMovement
     {
         $issues = InventoryAllocationIssue::query()
-            ->whereHas('allocation', fn ($query) => $query
-                ->where('source_line_type', 'sales_delivery_line')
-                ->where('source_line_id', $line->getKey()))
-            ->with('movement')
+            ->where(function ($query) use ($line): void {
+                $query->whereHas('allocation', fn ($allocation) => $allocation
+                    ->where('source_line_type', 'sales_delivery_line')
+                    ->where('source_line_id', $line->getKey()));
+                if ($line->inventory_movement_id !== null) {
+                    $query->orWhere('movement_id', $line->inventory_movement_id);
+                }
+            })
+            ->with(['movement', 'allocation'])
             ->orderBy('id')
             ->get();
         if ($issues->isEmpty()) {
@@ -83,6 +116,9 @@ final class SalesInventoryIntegrationService
         foreach ($issues as $issue) {
             if ($issue->movement instanceof InventoryMovement) {
                 $reversal = $this->inventory->reverse($issue->movement, $userId);
+                if ($issue->allocation instanceof InventoryAllocation) {
+                    $this->markSalesAllocationUnissued($issue->allocation, (string) $issue->quantity_issued);
+                }
                 $first ??= $reversal;
             }
         }
@@ -145,5 +181,78 @@ final class SalesInventoryIntegrationService
 
         return (bool) $item->is_stockable
             && ! in_array($item->item_type, [ItemType::Service, ItemType::Labour, ItemType::NonStock], true);
+    }
+
+    private function existingOrderAllocation(SalesDeliveryLine $line, string $quantity): ?InventoryAllocation
+    {
+        if ($line->sales_order_line_id === null) {
+            return null;
+        }
+
+        return InventoryAllocation::query()
+            ->where('tenant_id', $line->tenant_id)
+            ->where('source_type', 'sales_order')
+            ->where('source_line_type', 'sales_order_line')
+            ->where('source_line_id', $line->sales_order_line_id)
+            ->whereRaw('quantity_remaining >= ?', [$quantity])
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function markSalesAllocationIssued(InventoryAllocation $allocation, string $quantity): void
+    {
+        $line = SalesAllocationLine::query()
+            ->where('inventory_allocation_id', $allocation->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if (! $line instanceof SalesAllocationLine) {
+            return;
+        }
+
+        $line->issued_quantity = $this->math->add((string) $line->issued_quantity, $quantity);
+        $line->status = $this->math->compare((string) $line->issued_quantity, (string) $line->allocated_quantity) >= 0
+            ? SalesAllocationStatus::Issued
+            : SalesAllocationStatus::Active;
+        $line->save();
+
+        $allocationHeader = $line->allocation;
+        if ($allocationHeader !== null) {
+            $allocationHeader->load('lines');
+            $allIssued = $allocationHeader->lines->every(
+                fn (SalesAllocationLine $row): bool => $this->math->compare((string) $row->issued_quantity, (string) $row->allocated_quantity) >= 0,
+            );
+            if ($allIssued) {
+                $allocationHeader->status = SalesAllocationStatus::Issued;
+                $allocationHeader->save();
+            }
+        }
+    }
+
+    private function markSalesAllocationUnissued(InventoryAllocation $allocation, string $quantity): void
+    {
+        $line = SalesAllocationLine::query()
+            ->where('inventory_allocation_id', $allocation->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if (! $line instanceof SalesAllocationLine) {
+            return;
+        }
+
+        $line->issued_quantity = $this->math->sub((string) $line->issued_quantity, $quantity);
+        if ($this->math->isNegative((string) $line->issued_quantity)) {
+            $line->issued_quantity = '0.000000';
+        }
+        $line->status = SalesAllocationStatus::Active;
+        $line->save();
+
+        $allocationHeader = $line->allocation;
+        if ($allocationHeader !== null && $allocationHeader->status === SalesAllocationStatus::Issued) {
+            $allocationHeader->status = SalesAllocationStatus::Active;
+            $allocationHeader->save();
+        }
     }
 }

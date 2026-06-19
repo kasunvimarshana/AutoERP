@@ -20,6 +20,7 @@ final class FastSalesRequest extends SalesRequest
 
         $rules = array_merge($this->scopeRules(), [
             'customer_id' => ['required', 'integer', 'min:1'],
+            'idempotency_key' => ['nullable', 'string', 'max:150'],
             'customer_reference' => [$this->is('*/fast-sales') ? 'required' : 'nullable', 'string', 'max:150'],
             'transaction_date' => ['required', 'date'],
             'warehouse_id' => ['nullable', 'integer', 'min:1'],
@@ -82,6 +83,7 @@ final class FastSalesRequest extends SalesRequest
             'tenant_id' => $this->tenantId(),
             'organization_unit_id' => $this->organizationUnitId(),
             'current_user_id' => $this->currentUserId(),
+            'idempotency_key' => $this->input('idempotency_key') ?: $this->header('Idempotency-Key'),
         ]);
     }
 
