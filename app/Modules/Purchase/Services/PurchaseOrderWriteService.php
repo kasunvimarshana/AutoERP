@@ -236,6 +236,9 @@ final class PurchaseOrderWriteService
         $this->assertPercentageRate($line->discountCalculationType, $line->discountRate);
         $this->assertPercentageRate($line->taxCalculationType, $line->taxRate);
         $this->assertPercentageRate($line->chargeCalculationType, $line->chargeRate);
+        if ($line->taxGroupId !== null) {
+            $this->validator->taxGroup($data->tenantId, $data->organizationUnitId, $line->taxGroupId, "lines.{$index}.tax_group_id");
+        }
     }
 
     private function assertPercentageRate(
@@ -294,6 +297,7 @@ final class PurchaseOrderWriteService
                 'tax_calculation_type' => $line->taxCalculationType,
                 'tax_rate' => $this->math->normalize($line->taxRate),
                 'tax_amount' => $amounts['tax'],
+                'tax_group_id' => $line->taxGroupId,
                 'charge_calculation_type' => $line->chargeCalculationType,
                 'charge_rate' => $this->math->normalize($line->chargeRate),
                 'charge_amount' => $amounts['charge'],

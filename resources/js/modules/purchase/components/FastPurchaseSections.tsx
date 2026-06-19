@@ -41,7 +41,6 @@ export function FastPurchaseDetailsSection({
     currency,
     exchangeRate,
     exchangeRateHint,
-    receiveStock,
     warehouse,
     warehouseLocation,
     purchaseDate,
@@ -65,7 +64,6 @@ export function FastPurchaseDetailsSection({
     currency: NamedResource | null;
     exchangeRate: string;
     exchangeRateHint?: string;
-    receiveStock: boolean;
     warehouse: NamedResource | null;
     warehouseLocation: NamedResource | null;
     purchaseDate: string;
@@ -97,8 +95,8 @@ export function FastPurchaseDetailsSection({
                     error={errorFor('exchange_rate')}
                     onChange={(event) => onExchangeRateChange(event.target.value)}
                 />
-                {receiveStock && <WarehouseLookupSelect value={warehouse} onChange={onWarehouseChange} error={errorFor('warehouse_id')} />}
-                {receiveStock && <WarehouseLocationLookupSelect warehouseId={warehouse?.id} value={warehouseLocation} onChange={onWarehouseLocationChange} error={errorFor('warehouse_location_id')} />}
+                <WarehouseLookupSelect value={warehouse} onChange={onWarehouseChange} error={errorFor('warehouse_id')} />
+                <WarehouseLocationLookupSelect warehouseId={warehouse?.id} value={warehouseLocation} onChange={onWarehouseLocationChange} error={errorFor('warehouse_location_id')} />
                 <Input
                     label="Purchase date"
                     type="date"
@@ -165,7 +163,11 @@ export function FastPurchaseImpactSection({ preset, result }: { preset: FastPurc
     const createInvoice = result?.options.create_supplier_invoice_now ?? preset !== 'purchase_receive';
     const recordPayment = result?.options.record_payment_now ?? preset === 'purchase_receive_invoice_pay';
     const rows = [
-        { label: 'Purchase Order', produced: false, detail: 'Not created by Fast Purchase' },
+        {
+            label: 'Purchase Order',
+            produced: true,
+            detail: result?.documents.purchase_order?.number ?? 'Will be created and approved',
+        },
         {
             label: 'GRN / inventory receipt',
             produced: receiveStock,
@@ -206,6 +208,7 @@ export function FastPurchaseImpactSection({ preset, result }: { preset: FastPurc
 
 export function FastPurchaseCompletedSummary({ result }: { result: FastPurchaseResult }) {
     const documents = [
+        result.documents.purchase_order,
         result.documents.goods_receipt,
         result.documents.supplier_invoice,
         result.documents.supplier_payment,

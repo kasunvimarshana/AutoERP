@@ -6,6 +6,7 @@ namespace Modules\Purchase\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\Models\InventoryMovement;
 use Modules\Purchase\DTOs\PurchaseReturnLineValuationData;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
@@ -103,12 +104,14 @@ final class PurchaseReturnValuationService
             );
         }
 
+        $costBasis = $this->costBasis($sourceLine, $allowReadQueries);
+
         return new PurchaseReturnLineValuationData(
             sourceQuantity: $sourceQuantity,
             previouslyReturnedQuantity: $previouslyReturned,
             remainingQuantity: $remainingQuantity,
             unitPrice: $this->math->normalize((string) $sourceLine->unit_price),
-            costBasis: $this->math->normalize((string) $sourceLine->unit_price),
+            costBasis: $costBasis,
             baseAmount: $baseAmount,
             discountAmount: $discountAmount,
             taxAmount: $taxAmount,
@@ -170,5 +173,20 @@ final class PurchaseReturnValuationService
         }
 
         return $amount;
+    }
+
+    private function costBasis(GoodsReceiptNoteLine $sourceLine, bool $allowReadQueries): string
+    {
+        if ($allowReadQueries) {
+            $sourceLine->loadMissing('inventoryMovement');
+        }
+
+        if ($sourceLine->relationLoaded('inventoryMovement')
+            && $sourceLine->inventoryMovement instanceof InventoryMovement
+            && $sourceLine->inventoryMovement->unit_cost !== null) {
+            return $this->math->normalize((string) $sourceLine->inventoryMovement->unit_cost);
+        }
+
+        return $this->math->normalize((string) $sourceLine->unit_price);
     }
 }

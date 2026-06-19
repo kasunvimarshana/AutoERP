@@ -22,13 +22,14 @@ const calculationOptions = [
     { value: 'percentage', label: 'Percentage' },
 ];
 
-export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, warehouseId, errorFor, onSave, onCancel }: {
+export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, warehouseId, purchaseDate, errorFor, onSave, onCancel }: {
     line: EditablePurchaseLine;
     mode: 'create' | 'edit';
     config: PurchaseLineEditorConfig;
     supplierId?: number;
     currencyId?: number;
     warehouseId?: number;
+    purchaseDate?: string;
     errorFor: (field: PurchaseLineField) => string | undefined;
     onSave: (line: EditablePurchaseLine) => void;
     onCancel: () => void;
@@ -59,13 +60,16 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
             item_variant_id: draft.item_variant_id ?? undefined,
             currency_id: currencyId,
             warehouse_id: warehouseId,
+            uom_id: draft.uom?.id,
+            purchase_date: purchaseDate,
         }, controller.signal)
             .then((nextContext) => {
                 if (controller.signal.aborted) return;
                 setContext(nextContext);
                 setDraft((current) => {
                     if (current.item?.id !== nextContext.item.id) return current;
-                    const defaultUom = nextContext.allowed_purchase_uoms.find((row) => row.id === nextContext.default_purchase_uom_id);
+                    const resolvedUomId = nextContext.uom_id ?? nextContext.default_purchase_uom_id;
+                    const defaultUom = nextContext.allowed_purchase_uoms.find((row) => row.id === resolvedUomId);
 
                     return {
                         ...current,
@@ -76,13 +80,16 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                             ? String(nextContext.tax_defaults.tax_group_id)
                             : current.tax_group_id,
                         price_source_label: nextContext.price_source_label,
+                        price_source: nextContext.price_source,
+                        price_source_id: nextContext.price_source_id ?? null,
+                        pricing_context_hash: nextContext.pricing_context_hash ?? null,
                     };
                 });
             })
             .catch(() => undefined);
 
         return () => controller.abort();
-    }, [config.taxMode, draft.item?.id, draft.item_variant_id, supplierId, currencyId, warehouseId]);
+    }, [config.taxMode, draft.item?.id, draft.item_variant_id, draft.uom?.id, supplierId, currencyId, warehouseId, purchaseDate]);
 
     useEffect(() => {
         if (Object.keys(errors).length === 0) return;
@@ -129,6 +136,11 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                                 uom: null,
                                 unit_price: current.auto_price === false ? current.unit_price : config.defaultLine?.unit_price ?? current.unit_price,
                                 tax_group_id: '',
+                                price_source_label: undefined,
+                                price_source: null,
+                                price_source_id: null,
+                                pricing_context_hash: null,
+                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
                                 auto_price: current.auto_price !== false,
                                 auto_uom: true,
                             }));
@@ -145,7 +157,18 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                         onChange={(event) => {
                             const variantId = event.target.value ? Number(event.target.value) : null;
                             const variant = context?.variants.find((row) => row.id === variantId) ?? null;
-                            setDraft((current) => ({ ...current, item_variant: variant, item_variant_id: variantId, auto_price: current.auto_price !== false, auto_uom: true }));
+                            setDraft((current) => ({
+                                ...current,
+                                item_variant: variant,
+                                item_variant_id: variantId,
+                                price_source_label: undefined,
+                                price_source: null,
+                                price_source_id: null,
+                                pricing_context_hash: null,
+                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
+                                auto_price: current.auto_price !== false,
+                                auto_uom: true,
+                            }));
                         }}
                     />
                     <DecimalInput label="Quantity" value={draft.quantity} error={formError('quantity')} onChange={(event) => set('quantity', event.target.value)} />
@@ -158,14 +181,29 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                         onChange={(event) => {
                             const uomId = event.target.value ? Number(event.target.value) : null;
                             const selected = context?.allowed_purchase_uoms.find((row) => row.id === uomId)?.uom ?? null;
-                            setDraft((current) => ({ ...current, uom: selected, auto_uom: false }));
+                            setDraft((current) => ({
+                                ...current,
+                                uom: selected,
+                                auto_uom: false,
+                                price_source_label: undefined,
+                                price_source: null,
+                                price_source_id: null,
+                                pricing_context_hash: null,
+                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
+                            }));
                         }}
                     />
                     <DecimalInput
                         label={config.unitLabel}
                         value={draft.unit_price}
                         error={formError('unit_price')}
-                        onChange={(event) => setDraft((current) => ({ ...current, unit_price: event.target.value, auto_price: false }))}
+                        onChange={(event) => setDraft((current) => ({
+                            ...current,
+                            unit_price: event.target.value,
+                            auto_price: false,
+                            manual_price_confirmed: true,
+                            pricing_context_hash: context?.pricing_context_hash ?? current.pricing_context_hash ?? null,
+                        }))}
                     />
                     <Input className="sm:col-span-2" label="Description" value={draft.description} onChange={(event) => set('description', event.target.value)} />
                 </div>
@@ -277,6 +315,9 @@ function validateLineForm(line: EditablePurchaseLine, config: PurchaseLineEditor
         if (!isPositiveDecimal(line.unit_price)) errors.unit_price = `${config.unitLabel} must be greater than zero.`;
     } else if (!isNonNegativeDecimal(line.unit_price)) {
         errors.unit_price = `${config.unitLabel} cannot be negative.`;
+    }
+    if (line.auto_price === false && !line.manual_price_confirmed) {
+        errors.unit_price = 'Manual price must be confirmed for the current line context.';
     }
     return errors;
 }

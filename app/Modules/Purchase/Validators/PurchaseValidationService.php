@@ -13,6 +13,7 @@ use Modules\Item\Models\ItemVariant;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Supplier\Models\Supplier;
+use Modules\Tax\Models\TaxGroup;
 use Modules\Warehouse\Models\WarehouseModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -201,6 +202,29 @@ final class PurchaseValidationService
         }
 
         return $currency;
+    }
+
+    public function taxGroup(int $tenantId, ?int $organizationUnitId, int $taxGroupId, string $field = 'tax_group_id'): TaxGroup
+    {
+        $group = TaxGroup::query()->find($taxGroupId);
+        if (! $group instanceof TaxGroup) {
+            $this->invalidReference($field, 'tax group');
+        }
+
+        $this->assertTenantOrg(
+            $this->nullableScopeId($group->tenant_id),
+            $this->nullableScopeId($group->organization_unit_id),
+            $tenantId,
+            $organizationUnitId,
+            $field,
+            'tax group',
+        );
+
+        if (! (bool) $group->active) {
+            $this->invalidReference($field, 'tax group', 'The selected tax group is not active.');
+        }
+
+        return $group;
     }
 
     public function assertTenantOrg(

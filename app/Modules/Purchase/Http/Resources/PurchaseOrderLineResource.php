@@ -41,6 +41,7 @@ final class PurchaseOrderLineResource extends PurchaseResource
             'tax_calculation_type' => $this->tax_calculation_type,
             'tax_rate' => (string) $this->tax_rate,
             'tax_amount' => (string) $this->tax_amount,
+            'tax_group_id' => $this->tax_group_id,
             'charge_calculation_type' => $this->charge_calculation_type,
             'charge_rate' => (string) $this->charge_rate,
             'charge_amount' => (string) $this->charge_amount,

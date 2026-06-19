@@ -25,6 +25,7 @@ final class FastPurchasePostingCoordinator
         private readonly DecimalMath $math,
         private readonly FinancePostingInterface $financePostings,
         private readonly FastPurchaseDocumentBuilder $documents,
+        private readonly PurchaseAcquisitionCostAllocator $costs,
     ) {}
 
     /**
@@ -33,18 +34,19 @@ final class FastPurchasePostingCoordinator
      */
     public function createDocuments(array $resolved): array
     {
+        $purchaseOrder = $this->documents->createPurchaseOrder($resolved);
         $goodsReceipt = null;
         $invoice = null;
         $payment = null;
         $financePostings = [];
 
         if ((bool) $resolved['options']['receive_stock_now']) {
-            $goodsReceipt = $this->documents->createGoodsReceipt($resolved);
+            $goodsReceipt = $this->documents->createGoodsReceipt($resolved, $purchaseOrder);
             $financePostings = array_merge($financePostings, $this->postInventoryFinance($resolved, $goodsReceipt));
         }
 
         if ((bool) $resolved['options']['create_supplier_invoice_now']) {
-            $invoice = $this->documents->createSupplierInvoice($resolved, $goodsReceipt);
+            $invoice = $this->documents->createSupplierInvoice($resolved, $purchaseOrder, $goodsReceipt);
             $financePostings = array_merge($financePostings, $this->postInvoiceFinance($resolved, $invoice));
         }
 
@@ -58,6 +60,7 @@ final class FastPurchasePostingCoordinator
         }
 
         return [
+            'purchase_order' => $purchaseOrder,
             'goods_receipt' => $goodsReceipt,
             'supplier_invoice' => $invoice,
             'supplier_payment' => $payment,
@@ -71,7 +74,7 @@ final class FastPurchasePostingCoordinator
      */
     private function postInventoryFinance(array $resolved, GoodsReceiptNote $goodsReceipt): array
     {
-        $amount = $resolved['summary']['stock_taxable_total'];
+        $amount = $this->costs->goodsReceiptStockValue($goodsReceipt);
         if ($this->math->isZero($amount)) {
             return [];
         }

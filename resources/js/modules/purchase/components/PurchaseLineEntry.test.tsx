@@ -168,7 +168,12 @@ describe('Purchase line entry', () => {
     });
 
     it('maps shared editable lines to PO and Fast Purchase payload fields explicitly', () => {
-        const line = purchaseOrderLine();
+        const line = {
+            ...purchaseOrderLine(),
+            auto_price: false,
+            manual_price_confirmed: true,
+            pricing_context_hash: 'a'.repeat(64),
+        };
 
         expect(purchaseOrderLineToPayload(line)).toMatchObject({
             item_id: 1,
@@ -187,6 +192,9 @@ describe('Purchase line entry', () => {
             quantity: '2.000000',
             uom_id: 21,
             unit_cost: '10.000000',
+            pricing_mode: 'manual',
+            manual_price_confirmed: true,
+            pricing_context_hash: 'a'.repeat(64),
             charge_amount: '0.000000',
         });
         expect(fastPurchasePayload).not.toHaveProperty('tax_amount');

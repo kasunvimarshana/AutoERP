@@ -15,6 +15,7 @@ interface FastPurchaseLinesProps {
     supplierId?: number;
     currencyId?: number;
     warehouseId?: number;
+    purchaseDate?: string;
     previewLines?: FastPurchaseLinePreview[];
     errorFor: (field: string) => string | undefined;
     errorIndexForLine?: (line: FastPurchaseLineRow, index: number) => number;
@@ -28,6 +29,9 @@ const fastPurchaseFieldMap: Record<PurchaseLineField, string> = {
     description: 'description',
     quantity: 'quantity',
     unit_price: 'unit_cost',
+    pricing_mode: 'pricing_mode',
+    manual_price_confirmed: 'manual_price_confirmed',
+    pricing_context_hash: 'pricing_context_hash',
     discount_calculation_type: 'discount_calculation_type',
     discount_rate: 'discount_rate',
     discount_amount: 'discount_amount',
@@ -44,7 +48,7 @@ export function blankFastPurchaseLine(): FastPurchaseLineRow {
     return emptyPurchaseLine({ unit_price: '' });
 }
 
-export function FastPurchaseLines({ rows, context, supplierId, currencyId, warehouseId, previewLines = [], errorFor, errorIndexForLine, onChange }: FastPurchaseLinesProps) {
+export function FastPurchaseLines({ rows, context, supplierId, currencyId, warehouseId, purchaseDate, previewLines = [], errorFor, errorIndexForLine, onChange }: FastPurchaseLinesProps) {
     const config: PurchaseLineEditorConfig = {
         unitLabel: 'Unit cost',
         taxMode: 'tax_group',
@@ -62,6 +66,7 @@ export function FastPurchaseLines({ rows, context, supplierId, currencyId, wareh
             supplierId={supplierId}
             currencyId={currencyId}
             warehouseId={warehouseId}
+            purchaseDate={purchaseDate}
             amountForLine={(line, index) => previewForLine(previewLines, line, index)?.line_total}
             errorForLineField={(line, index, field) => errorFor(`lines.${errorIndexForLine?.(line, index) ?? indexOfError(previewLines, line, index)}.${fastPurchaseFieldMap[field]}`)}
         />

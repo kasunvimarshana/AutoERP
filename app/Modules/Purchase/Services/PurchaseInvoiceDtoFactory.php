@@ -383,8 +383,9 @@ final class PurchaseInvoiceDtoFactory
             if (array_key_exists((int) $sourceLine->getKey(), $source->lineQuantities)) {
                 $seenRequestedLineIds[] = (int) $sourceLine->getKey();
             }
-            $quantity = $source->lineQuantities[(int) $sourceLine->getKey()]
-                ?? $remainingInvoiceable;
+            $quantity = $source->lineQuantities === []
+                ? $remainingInvoiceable
+                : ($source->lineQuantities[(int) $sourceLine->getKey()] ?? '0.000000');
             $quantity = $this->math->normalize($quantity);
             if ($this->math->isZero($quantity)) {
                 continue;
@@ -436,6 +437,10 @@ final class PurchaseInvoiceDtoFactory
                 ),
                 sourceLineType: self::GOODS_RECEIPT_LINE,
                 sourceLineId: (int) $sourceLine->getKey(),
+                metadata: [
+                    'tax_group_id' => $sourceLine->tax_group_id,
+                    'purchase_order_line_id' => $sourceLine->purchase_order_line_id,
+                ],
             );
 
             $sourceLines[] = new InvoiceSourceLineData(
@@ -591,7 +596,9 @@ final class PurchaseInvoiceDtoFactory
             if (array_key_exists((int) $sourceLine->getKey(), $source->lineQuantities)) {
                 $seenRequestedLineIds[] = (int) $sourceLine->getKey();
             }
-            $quantity = $source->lineQuantities[(int) $sourceLine->getKey()] ?? $remaining;
+            $quantity = $source->lineQuantities === []
+                ? $remaining
+                : ($source->lineQuantities[(int) $sourceLine->getKey()] ?? '0.000000');
             $quantity = $this->math->normalize($quantity);
 
             if ($this->math->isZero($quantity)) {
@@ -642,6 +649,9 @@ final class PurchaseInvoiceDtoFactory
                 ),
                 sourceLineType: self::PURCHASE_ORDER_LINE,
                 sourceLineId: (int) $sourceLine->getKey(),
+                metadata: [
+                    'tax_group_id' => $sourceLine->tax_group_id,
+                ],
             );
 
             $sourceLines[] = new InvoiceSourceLineData(
@@ -737,18 +747,20 @@ final class PurchaseInvoiceDtoFactory
         int $sourceId,
         string $sourceType,
     ): InvoiceAdjustmentData {
+        $amount = (string) $adjustment->amount;
+
         return new InvoiceAdjustmentData(
             name: (string) $adjustment->name,
             adjustmentType: $this->toInvoiceAdjustmentType($adjustment),
             effect: AdjustmentEffect::from($adjustment->effect->value),
-            amount: (string) $adjustment->amount,
+            amount: $amount,
             sourceAdjustmentType: 'purchase_header_adjustment',
             sourceAdjustmentId: (int) $adjustment->getKey(),
             sourceType: $sourceType,
             sourceId: $sourceId,
             calculationType: $adjustment->calculation_type->value,
             rate: (string) $adjustment->rate,
-            sourceAmount: (string) $adjustment->amount,
+            sourceAmount: $amount,
             allocationMethod: AllocationMethod::from($adjustment->allocation_method->value),
             isSystemGenerated: true,
             description: $adjustment->description,
@@ -762,9 +774,10 @@ final class PurchaseInvoiceDtoFactory
             if (! $adjustment instanceof PurchaseHeaderAdjustment) {
                 continue;
             }
+            $amount = (string) $adjustment->amount;
             $total = $adjustment->effect->value === 'increase'
-                ? $this->math->add($total, (string) $adjustment->amount)
-                : $this->math->sub($total, (string) $adjustment->amount);
+                ? $this->math->add($total, $amount)
+                : $this->math->sub($total, $amount);
         }
 
         return $total;

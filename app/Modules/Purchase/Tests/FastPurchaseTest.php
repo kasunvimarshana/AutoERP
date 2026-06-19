@@ -40,7 +40,9 @@ use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
+use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\FastPurchaseService;
+use Modules\Purchase\Services\PurchasePricingService;
 use Modules\Supplier\Models\Supplier;
 use Tests\TestCase;
 
@@ -57,10 +59,18 @@ final class FastPurchaseTest extends TestCase
             'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => false, 'record_payment_now' => false],
         ]));
 
+        $this->assertNotNull($result['documents']['purchase_order']);
         $this->assertNotNull($result['documents']['goods_receipt']);
         $this->assertNull($result['documents']['supplier_invoice']);
         $this->assertNull($result['documents']['supplier_payment']);
+        $this->assertSame(1, PurchaseOrder::query()->count());
+        $this->assertSame('approved', PurchaseOrder::query()->firstOrFail()->status->value);
         $this->assertSame(1, GoodsReceiptNote::query()->count());
+        $this->assertSame(
+            PurchaseOrder::query()->firstOrFail()->getKey(),
+            GoodsReceiptNote::query()->firstOrFail()->purchase_order_id,
+        );
+        $this->assertNotNull(DB::table('goods_receipt_note_lines')->value('purchase_order_line_id'));
         $this->assertSame(1, InventoryMovement::query()->count());
         $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
         $this->assertSame(1, FinanceJournalEntry::query()->count());
@@ -75,9 +85,11 @@ final class FastPurchaseTest extends TestCase
             'supplier_reference' => 'FP-CREDIT',
         ]));
 
+        $this->assertNotNull($result['documents']['purchase_order']);
         $this->assertNotNull($result['documents']['goods_receipt']);
         $this->assertNotNull($result['documents']['supplier_invoice']);
         $this->assertSame('500.000000', $result['summary']['grand_total']);
+        $this->assertSame('2026-07-16', (string) Invoice::query()->firstOrFail()->due_date->toDateString());
         $invoice = Invoice::query()->firstOrFail();
         $this->assertSame('500.000000', (string) $invoice->balance_due);
         $this->assertSame(1, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->count());
@@ -146,6 +158,17 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame('530.000000', (string) Invoice::query()->firstOrFail()->grand_total);
         $this->assertSame('530.000000', (string) Payment::query()->firstOrFail()->total_amount);
         $this->assertSame('530.000000', (string) PaymentAllocation::query()->firstOrFail()->allocated_amount);
+        $movement = InventoryMovement::query()->firstOrFail();
+        $this->assertSame('106.000000', (string) $movement->unit_cost);
+        $inventoryDebit = (string) DB::table('finance_journal_lines')
+            ->join('finance_journal_entries', 'finance_journal_entries.id', '=', 'finance_journal_lines.journal_entry_id')
+            ->where('finance_journal_entries.source_type', 'goods_receipt_note')
+            ->where('finance_journal_entries.source_id', GoodsReceiptNote::query()->firstOrFail()->getKey())
+            ->sum('finance_journal_lines.debit');
+        $this->assertSame(
+            app(DecimalMath::class)->mul((string) $movement->quantity, (string) $movement->unit_cost),
+            app(DecimalMath::class)->normalize($inventoryDebit),
+        );
         $this->assertSame(2, DB::table('invoice_adjustments')->count());
         $this->assertSame(2, PaymentLine::query()->count());
         $this->assertSame(3, FinanceJournalEntry::query()->count());
@@ -157,7 +180,6 @@ final class FastPurchaseTest extends TestCase
 
         $result = app(FastPurchaseService::class)->create($this->payload($context, [
             'supplier_reference' => 'FP-DIRECT',
-            'warehouse_id' => null,
             'options' => ['receive_stock_now' => false, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
             'lines' => [[
                 'item_id' => $context['expense_item_id'],
@@ -173,10 +195,12 @@ final class FastPurchaseTest extends TestCase
             ],
         ]));
 
+        $this->assertNotNull($result['documents']['purchase_order']);
         $this->assertNull($result['documents']['goods_receipt']);
         $this->assertNotNull($result['documents']['supplier_invoice']);
         $this->assertNotNull($result['documents']['supplier_payment']);
         $this->assertSame(0, InventoryMovement::query()->count());
+        $this->assertSame(1, PurchaseOrder::query()->count());
         $this->assertSame(1, Invoice::query()->count());
         $this->assertSame(1, Payment::query()->count());
     }
@@ -196,6 +220,10 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(1, GoodsReceiptNote::query()->firstOrFail()->lines()->count());
         $this->assertSame(1, InventoryMovement::query()->count());
         $this->assertSame(2, Invoice::query()->firstOrFail()->lines()->count());
+        $this->assertSame(
+            ['goods_receipt_note_line', 'purchase_order_line'],
+            DB::table('invoice_source_lines')->orderBy('source_line_type')->pluck('source_line_type')->all(),
+        );
     }
 
     public function test_uom_conversion_tax_withholding_partial_and_multiple_payment_lines(): void
@@ -375,6 +403,28 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(1, Invoice::query()->count());
     }
 
+    public function test_idempotency_hash_normalizes_decimal_strings(): void
+    {
+        $context = $this->context();
+        $payload = $this->payload($context, [
+            'supplier_reference' => 'FP-DECIMAL-IDEMPOTENT',
+        ]);
+        $payload['lines'][0]['quantity'] = '5';
+        $payload['lines'][0]['unit_cost'] = '100.0';
+        $payload['lines'][0]['discount_amount'] = '0';
+
+        $first = app(FastPurchaseService::class)->create($payload);
+
+        $secondPayload = $this->payload($context, [
+            'supplier_reference' => 'FP-DECIMAL-IDEMPOTENT',
+        ]);
+        $second = app(FastPurchaseService::class)->create($secondPayload);
+
+        $this->assertSame($first['documents']['purchase_order']['id'], $second['documents']['purchase_order']['id']);
+        $this->assertSame(1, DB::table('idempotency_records')->count());
+        $this->assertNotNull(DB::table('idempotency_records')->value('document_ids'));
+    }
+
     public function test_transaction_rolls_back_when_finance_posting_fails(): void
     {
         $context = $this->context();
@@ -453,7 +503,7 @@ final class FastPurchaseTest extends TestCase
      */
     private function payload(array $context, array $overrides = []): array
     {
-        return array_replace_recursive([
+        $payload = array_replace_recursive([
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => null,
             'current_user_id' => null,
@@ -473,6 +523,40 @@ final class FastPurchaseTest extends TestCase
                 'discount_amount' => '0.000000',
             ]],
         ], $overrides);
+
+        foreach ($payload['lines'] as $index => &$line) {
+            if (! is_array($line)) {
+                continue;
+            }
+
+            $line['client_line_key'] ??= 'line-'.$index;
+            $line['pricing_mode'] ??= 'manual';
+            $line['manual_price_confirmed'] ??= true;
+            $line['pricing_context_hash'] ??= $this->pricingContextHash($payload, $line);
+        }
+        unset($line);
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $line
+     */
+    private function pricingContextHash(array $payload, array $line): string
+    {
+        $pricing = app(PurchasePricingService::class)->resolve(
+            (int) $payload['tenant_id'],
+            $payload['organization_unit_id'] === null ? null : (int) $payload['organization_unit_id'],
+            Item::query()->findOrFail((int) $line['item_id']),
+            (int) $payload['supplier_id'],
+            isset($line['item_variant_id']) && $line['item_variant_id'] !== null ? (int) $line['item_variant_id'] : null,
+            isset($payload['currency_id']) && $payload['currency_id'] !== null ? (int) $payload['currency_id'] : null,
+            isset($line['uom_id']) && $line['uom_id'] !== null ? (int) $line['uom_id'] : null,
+            (string) $payload['purchase_date'],
+        );
+
+        return (string) $pricing['pricing_context_hash'];
     }
 
     /**

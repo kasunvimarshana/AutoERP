@@ -22,6 +22,7 @@ final class PurchaseInventoryIntegrationService
     public function __construct(
         private readonly InventoryFacade $inventory,
         private readonly DecimalMath $math,
+        private readonly PurchaseAcquisitionCostAllocator $costs,
     ) {}
 
     public function receipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
@@ -34,6 +35,8 @@ final class PurchaseInventoryIntegrationService
             return null;
         }
 
+        $unitCost = $this->costs->unitCostForReceiptLine($grn, $line);
+
         return $this->inventory->receive(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
             movementDate: $grn->received_date->toDateString(),
@@ -45,7 +48,7 @@ final class PurchaseInventoryIntegrationService
             organizationUnitId: $grn->organization_unit_id,
             itemVariantId: $line->item_variant_id,
             warehouseLocationId: $grn->warehouse_location_id,
-            unitCost: (string) $line->unit_price,
+            unitCost: $unitCost,
             sourceType: 'goods_receipt_note',
             sourceId: (int) $grn->getKey(),
             sourceLineType: 'goods_receipt_note_line',

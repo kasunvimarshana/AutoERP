@@ -25,5 +25,6 @@ final readonly class GoodsReceiptNoteLineData
         public string $discountAmount = '0.000000',
         public string $taxAmount = '0.000000',
         public string $chargeAmount = '0.000000',
+        public ?int $taxGroupId = null,
     ) {}
 }

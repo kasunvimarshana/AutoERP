@@ -259,8 +259,14 @@ export interface PurchaseItemContext {
     }>;
     quantity_precision: number;
     unit_price?: string | null;
+    pricing_mode?: 'auto' | 'manual';
     price_source: string;
+    price_source_id?: number | null;
     price_source_label: string;
+    effective_date?: string | null;
+    currency_id?: number | null;
+    uom_id?: number | null;
+    pricing_context_hash?: string | null;
     tax_defaults: Record<string, unknown>;
     description?: string | null;
     supplier_mapping?: Record<string, unknown> | null;
@@ -567,13 +573,16 @@ export interface FastPurchasePayload {
         record_payment_now: boolean;
     };
     lines: Array<{
-        client_line_key?: string;
+        client_line_key: string;
         item_id: number;
         item_variant_id?: number;
         description?: string;
         uom_id?: number;
         quantity: string;
         unit_cost?: string;
+        pricing_mode: 'auto' | 'manual';
+        manual_price_confirmed?: boolean;
+        pricing_context_hash?: string;
         discount_calculation_type?: 'fixed' | 'percentage';
         discount_rate?: string;
         discount_amount?: string;
@@ -642,6 +651,10 @@ export interface FastPurchaseLinePreview {
     quantity: string;
     base_quantity?: string;
     unit_cost: string;
+    pricing_mode?: 'auto' | 'manual';
+    price_source?: string | null;
+    price_source_id?: number | null;
+    pricing_context_hash?: string | null;
     line_subtotal?: string;
     discount_calculation_type?: 'fixed' | 'percentage';
     discount_rate?: string;
@@ -679,7 +692,9 @@ export interface FastPurchaseResult {
     };
     adjustments?: Array<Record<string, unknown>>;
     lines: FastPurchaseLinePreview[];
+    document_plan?: Record<string, unknown>;
     documents: {
+        purchase_order?: FastPurchaseDocumentReference | null;
         goods_receipt?: FastPurchaseDocumentReference | null;
         inventory_transaction?: FastPurchaseDocumentReference | null;
         inventory_transactions?: FastPurchaseDocumentReference[];

@@ -35,6 +35,7 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
             'lines.*.rejected_quantity' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.discount_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.tax_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.tax_group_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
         ]);
     }
@@ -69,6 +70,7 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
                 discountAmount: (string) ($row['discount_amount'] ?? '0.000000'),
                 taxAmount: (string) ($row['tax_amount'] ?? '0.000000'),
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
+                taxGroupId: isset($row['tax_group_id']) ? (int) $row['tax_group_id'] : null,
             ), $this->input('lines')),
         );
     }

@@ -125,6 +125,9 @@ final class GoodsReceiptNoteService
                 : "lines.{$index}.uom_id";
             $this->validator->uom($data->tenantId, $data->organizationUnitId, $uomId, $uomField);
             $this->validator->assertNonNegative($line->unitPrice, 'GRN line unit price cannot be negative.');
+            if ($line->taxGroupId !== null) {
+                $this->validator->taxGroup($data->tenantId, $data->organizationUnitId, $line->taxGroupId, "lines.{$index}.tax_group_id");
+            }
             $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->acceptedQuantity);
         }
 
@@ -229,6 +232,7 @@ final class GoodsReceiptNoteService
                     'line_subtotal' => $amounts['subtotal'],
                     'discount_amount' => $this->math->normalize($discountAmount),
                     'tax_amount' => $this->math->normalize($taxAmount),
+                    'tax_group_id' => $poLine instanceof PurchaseOrderLine ? $poLine->tax_group_id : $line->taxGroupId,
                     'charge_amount' => $this->math->normalize($chargeAmount),
                     'line_total' => $calculation->lineTotals[$index],
                     'status' => GoodsReceiptNoteLineStatus::Open,

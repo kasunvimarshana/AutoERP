@@ -28,5 +28,6 @@ final readonly class PurchaseOrderLineData
         public PurchaseAdjustmentCalculationType $chargeCalculationType = PurchaseAdjustmentCalculationType::Fixed,
         public string $chargeRate = '0.000000',
         public string $chargeAmount = '0.000000',
+        public ?int $taxGroupId = null,
     ) {}
 }

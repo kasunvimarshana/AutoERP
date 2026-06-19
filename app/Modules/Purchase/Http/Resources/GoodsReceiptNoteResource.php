@@ -53,6 +53,7 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'remaining_returnable_quantity' => app(PurchaseProcurementBalanceService::class)->remainingReturnableForGoodsReceiptLine($line),
                 'unit_price' => (string) $line->unit_price,
                 'line_subtotal' => (string) $line->line_subtotal,
+                'tax_group_id' => $line->tax_group_id,
                 'line_total' => (string) $line->line_total,
                 'status' => $this->enumValue($line->status),
             ])->all(), []),

@@ -43,6 +43,7 @@ final class GoodsReceiptNoteLine extends CoreModel
             'unit_price' => 'decimal:6',
             'line_subtotal' => 'decimal:6',
             'discount_amount' => 'decimal:6',
+            'tax_group_id' => 'integer',
             'tax_amount' => 'decimal:6',
             'charge_amount' => 'decimal:6',
             'line_total' => 'decimal:6',

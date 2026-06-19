@@ -126,6 +126,7 @@ final class TaxDocumentIntegrationService
                 quantity: (string) $line->accepted_quantity,
                 unitPrice: (string) $line->unit_price,
                 itemId: $line->item_id !== null ? (int) $line->item_id : null,
+                taxGroupId: $line->tax_group_id !== null ? (int) $line->tax_group_id : null,
                 discountBeforeTax: (string) $line->discount_amount,
                 chargeAfterTax: (string) $line->charge_amount,
             );

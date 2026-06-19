@@ -8,17 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Audit\DTOs\AuditLogActivityData;
-use Modules\Audit\Models\AuditLogModel;
 use Modules\Audit\Services\AuditLogs\LogActivityService;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
+use Modules\Core\Services\IdempotencyService;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
-use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
-use Modules\Item\Models\ItemPrice;
-use Modules\Item\Models\ItemUnit;
+use Modules\Item\Models\ItemVariant;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
@@ -34,12 +31,15 @@ use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Tax\Services\TaxCalculationService;
+use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 use Modules\Warehouse\Services\WarehouseDefaultResolver;
 
 final class FastPurchaseService
 {
+    private const IDEMPOTENCY_OPERATION = 'purchase.fast_purchase';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseValidationService $validator,
@@ -50,6 +50,10 @@ final class FastPurchaseService
         private readonly PurchaseDocumentContextService $documentContexts,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
         private readonly PurchaseOrderCalculationService $purchaseCalculator,
+        private readonly PurchasePricingService $pricing,
+        private readonly PaymentTermsResolver $paymentTerms,
+        private readonly IdempotencyService $idempotency,
+        private readonly FastPurchaseIdempotencyNormalizer $idempotencyNormalizer,
         private readonly FastPurchasePostingCoordinator $postingCoordinator,
         private readonly FastPurchaseResponseBuilder $responses,
     ) {}
@@ -118,24 +122,31 @@ final class FastPurchaseService
         return DB::transaction(function () use ($payload): array {
             $resolved = $this->resolve($payload, lockRecords: true);
             $referenceHash = $this->referenceHash($resolved);
-            $requestHash = $this->requestHash($payload);
-            $existing = $this->completedReference($resolved, $referenceHash);
+            $payloadHash = $this->idempotencyNormalizer->hash($payload);
+            $idempotency = $this->idempotency->acquire(
+                (int) $resolved['tenant_id'],
+                $resolved['organization_unit_id'],
+                self::IDEMPOTENCY_OPERATION,
+                $referenceHash,
+                $payloadHash,
+                $resolved['supplier_reference'],
+                $resolved['current_user_id'],
+            );
 
-            if ($existing instanceof AuditLogModel) {
-                $metadata = is_array($existing->metadata) ? $existing->metadata : [];
-                if (($metadata['request_hash'] ?? null) !== $requestHash) {
-                    throw new InvalidArgumentException('Supplier reference was already used for a different fast purchase.');
-                }
-
-                $values = is_array($existing->new_values) ? $existing->new_values : [];
-                if (is_array($values['response'] ?? null)) {
-                    return $values['response'];
-                }
+            if ((string) $idempotency->status === 'completed' && is_array($idempotency->result)) {
+                return $idempotency->result;
+            }
+            if (! $idempotency->wasRecentlyCreated && (string) $idempotency->status === 'in_progress') {
+                throw new InvalidArgumentException('Fast purchase request is already in progress for this supplier reference.');
+            }
+            if ((string) $idempotency->status !== 'in_progress') {
+                throw new InvalidArgumentException('Fast purchase idempotency record is not executable.');
             }
 
             $documents = $this->postingCoordinator->createDocuments($resolved);
             $response = $this->responses->created($resolved, $documents);
-            $this->writeAuditLog($resolved, $referenceHash, $requestHash, $response);
+            $this->idempotency->complete($idempotency, $response, $this->documentIds($documents));
+            $this->writeAuditLog($resolved, $referenceHash, $payloadHash, $response);
 
             return $response;
         });
@@ -150,6 +161,9 @@ final class FastPurchaseService
         $tenantId = (int) $payload['tenant_id'];
         $organizationUnitId = $this->nullableInt($payload['organization_unit_id'] ?? null);
         $purchaseDate = (string) $payload['purchase_date'];
+        if ($lockRecords) {
+            $this->lockPayloadReferences($payload);
+        }
         $supplier = $this->supplier($tenantId, $organizationUnitId, (int) $payload['supplier_id'], $lockRecords);
         $supplierReference = trim((string) ($payload['supplier_reference'] ?? ''));
         $currencyId = $this->currencyId($payload, $supplier, $tenantId, $organizationUnitId, $lockRecords);
@@ -172,15 +186,12 @@ final class FastPurchaseService
         );
         $this->validateMode($lines, $receiveStock, $createInvoice, $recordPayment);
 
-        if ($receiveStock) {
-            if ($warehouseId === null) {
-                throw new InvalidArgumentException('Warehouse is required when receiving stock.');
-            }
-
-            $this->warehouse($tenantId, $organizationUnitId, $warehouseId, $lockRecords, 'warehouse_id');
-            if ($warehouseLocationId !== null) {
-                $this->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId, $lockRecords, 'warehouse_location_id');
-            }
+        if ($warehouseId === null) {
+            throw new InvalidArgumentException('Warehouse is required for fast purchase purchase order creation.');
+        }
+        $this->warehouse($tenantId, $organizationUnitId, $warehouseId, $lockRecords, 'warehouse_id');
+        if ($warehouseLocationId !== null) {
+            $this->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId, $lockRecords, 'warehouse_location_id');
         }
 
         $adjustments = $this->resolveAdjustments(
@@ -188,6 +199,7 @@ final class FastPurchaseService
             $lines,
             $tenantId,
             $organizationUnitId,
+            $createInvoice,
         );
         $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
@@ -241,12 +253,51 @@ final class FastPurchaseService
             }
 
             $quantity = $this->math->normalize((string) $line['quantity']);
-            $uomId = $this->resolveUomId($tenantId, $organizationUnitId, (int) $supplier->getKey(), $item, $line);
+            $requestedUomId = $this->nullableInt($line['uom_id'] ?? null);
+            $pricing = $this->pricing->resolve(
+                $tenantId,
+                $organizationUnitId,
+                $item,
+                (int) $supplier->getKey(),
+                $variantId,
+                $currencyId,
+                $requestedUomId,
+                $purchaseDate,
+            );
+            $uomId = (int) $pricing['uom_id'];
             $uom = $this->validator->uom($tenantId, $organizationUnitId, $uomId, "lines.{$index}.uom_id");
             $uomBasis = $this->uoms->resolveLineUom($tenantId, $item, $uomId, $quantity);
-            $unitCost = array_key_exists('unit_cost', $line) && $line['unit_cost'] !== null
-                ? $this->math->normalize((string) $line['unit_cost'])
-                : $this->resolveUnitCost($tenantId, $organizationUnitId, $item, $currencyId, $uomId, $purchaseDate);
+            $pricingMode = (string) ($line['pricing_mode'] ?? 'manual');
+            if (! in_array($pricingMode, ['auto', 'manual'], true)) {
+                throw ValidationException::withMessages([
+                    "lines.{$index}.pricing_mode" => ['Pricing mode must be auto or manual.'],
+                ]);
+            }
+            if ($pricingMode === 'auto') {
+                if ($pricing['amount'] === null) {
+                    throw ValidationException::withMessages([
+                        "lines.{$index}.unit_cost" => ['No automatic purchase price is available for this item, supplier, UOM, currency, and date.'],
+                    ]);
+                }
+                $unitCost = (string) $pricing['amount'];
+            } else {
+                if (! array_key_exists('unit_cost', $line) || $line['unit_cost'] === null) {
+                    throw ValidationException::withMessages([
+                        "lines.{$index}.unit_cost" => ['Manual pricing requires a unit cost.'],
+                    ]);
+                }
+                if (! (bool) ($line['manual_price_confirmed'] ?? false)) {
+                    throw ValidationException::withMessages([
+                        "lines.{$index}.manual_price_confirmed" => ['Manual pricing must be confirmed for the current item, supplier, UOM, currency, and date.'],
+                    ]);
+                }
+                if ((string) ($line['pricing_context_hash'] ?? '') !== (string) $pricing['pricing_context_hash']) {
+                    throw ValidationException::withMessages([
+                        "lines.{$index}.pricing_context_hash" => ['Manual pricing is stale for the current item, supplier, UOM, currency, and date.'],
+                    ]);
+                }
+                $unitCost = $this->math->normalize((string) $line['unit_cost']);
+            }
             if ($this->math->compare($unitCost, '0.000000') <= 0) {
                 throw new InvalidArgumentException('Purchase unit cost must be greater than zero.');
             }
@@ -300,6 +351,12 @@ final class FastPurchaseService
                 'uom_conversion_factor' => $uomBasis['conversion_factor'],
                 'base_quantity' => $uomBasis['base_quantity'],
                 'unit_cost' => $unitCost,
+                'pricing_mode' => $pricingMode,
+                'price_source' => $pricing['source'],
+                'price_source_id' => $pricing['price_source_id'],
+                'pricing_context_hash' => $pricing['pricing_context_hash'],
+                'pricing_effective_date' => $pricing['effective_date'],
+                'pricing_currency_id' => $pricing['currency_id'],
                 'discount_calculation_type' => $discountCalculationType,
                 'discount_rate' => $discountRate,
                 'discount_amount' => $discount,
@@ -544,9 +601,6 @@ final class FastPurchaseService
         if ($hasStock && ! $receiveStock) {
             throw new InvalidArgumentException('Stock lines require receiving stock now.');
         }
-        if ($hasNonStock && ! $createInvoice) {
-            throw new InvalidArgumentException('Service and expense lines require supplier invoice creation.');
-        }
         if (! $hasStock && $receiveStock) {
             throw new InvalidArgumentException('Receive stock now requires at least one stock item.');
         }
@@ -560,7 +614,7 @@ final class FastPurchaseService
      * @param  list<array<string, mixed>>  $lines
      * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string}>
      */
-    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId): array
+    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId, bool $createInvoice): array
     {
         $adjustments = [];
         foreach (array_values($payloads) as $index => $row) {
@@ -591,6 +645,9 @@ final class FastPurchaseService
             $this->validator->assertNonNegative($data->amount, 'Fast purchase adjustment amount cannot be negative.');
             $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
             $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
+            if (! $createInvoice) {
+                $this->assertReceiveOnlyAdjustmentSupported($data, "adjustments.{$index}.adjustment_type");
+            }
             $adjustments[] = $data;
         }
 
@@ -643,6 +700,30 @@ final class FastPurchaseService
         }
     }
 
+    private function assertReceiveOnlyAdjustmentSupported(PurchaseHeaderAdjustmentData $data, string $field): void
+    {
+        $costTreatment = mb_strtolower((string) $data->costTreatment);
+        $capitalizable = str_contains($costTreatment, 'landed')
+            || str_contains($costTreatment, 'inventory')
+            || str_contains($costTreatment, 'capital');
+
+        $safeType = $data->adjustmentType === PurchaseAdjustmentType::Discount
+            || in_array($data->adjustmentType, [
+                PurchaseAdjustmentType::Freight,
+                PurchaseAdjustmentType::Insurance,
+                PurchaseAdjustmentType::Duty,
+                PurchaseAdjustmentType::Levy,
+            ], true);
+
+        if ($safeType || $capitalizable) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $field => ['This adjustment requires a supplier invoice and cannot be used in receive-only Fast Purchase.'],
+        ]);
+    }
+
     private function assertPercentageRate(PurchaseAdjustmentCalculationType $calculationType, string $rate, string $field): void
     {
         if ($calculationType === PurchaseAdjustmentCalculationType::Percentage
@@ -661,88 +742,49 @@ final class FastPurchaseService
     }
 
     /**
-     * @param  array<string, mixed>  $line
+     * @param  array<string, mixed>  $payload
      */
-    private function resolveUomId(int $tenantId, ?int $organizationUnitId, int $supplierId, Item $item, array $line): int
+    private function lockPayloadReferences(array $payload): void
     {
-        $requested = $this->nullableInt($line['uom_id'] ?? null);
-        if ($requested !== null) {
-            return $requested;
-        }
+        $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
+        $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
+        $paymentLines = is_array($payment['lines'] ?? null) && $payment['lines'] !== []
+            ? $payment['lines']
+            : [$payment];
 
-        $mapping = SupplierItemMapping::query()
-            ->where('tenant_id', $tenantId)
-            ->where('supplier_id', $supplierId)
-            ->where('item_id', $item->getKey())
-            ->where('is_active', true)
-            ->whereNotNull('default_purchase_uom_id')
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
-            ->orderByDesc('is_preferred')
-            ->first();
-        if ($mapping instanceof SupplierItemMapping) {
-            return (int) $mapping->default_purchase_uom_id;
-        }
-
-        $unit = ItemUnit::query()
-            ->where('tenant_id', $tenantId)
-            ->where('item_id', $item->getKey())
-            ->where('unit_role', ItemUnitRole::Purchase->value)
-            ->where('is_active', true)
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
-            ->orderByDesc('is_default')
-            ->first();
-        if ($unit instanceof ItemUnit) {
-            return (int) $unit->uom_id;
-        }
-
-        $baseUomId = (int) ($item->base_uom_id ?: 0);
-        if ($baseUomId < 1) {
-            throw new InvalidArgumentException('Purchase item requires a UOM.');
-        }
-
-        return $baseUomId;
+        $this->lockModelIds(Supplier::class, [$payload['supplier_id'] ?? null]);
+        $this->lockModelIds(CurrencyModel::class, [$payload['currency_id'] ?? null]);
+        $this->lockModelIds(WarehouseModel::class, [$payload['warehouse_id'] ?? null]);
+        $this->lockModelIds(WarehouseLocationModel::class, [$payload['warehouse_location_id'] ?? null]);
+        $this->lockModelIds(Item::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['item_id'] ?? null) : null, $lines));
+        $this->lockModelIds(ItemVariant::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['item_variant_id'] ?? null) : null, $lines));
+        $this->lockModelIds(UnitOfMeasureModel::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['uom_id'] ?? null) : null, $lines));
+        $this->lockModelIds(TaxGroup::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['tax_group_id'] ?? null) : null, $lines));
+        $this->lockModelIds(PaymentMethod::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['payment_method_id'] ?? null) : null, $paymentLines));
+        $this->lockModelIds(FinanceAccount::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['source_account_id'] ?? null) : null, $paymentLines));
     }
 
-    private function resolveUnitCost(int $tenantId, ?int $organizationUnitId, Item $item, ?int $currencyId, int $uomId, string $purchaseDate): string
+    /**
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     * @param  array<int, mixed>  $values
+     */
+    private function lockModelIds(string $modelClass, array $values): void
     {
-        $price = ItemPrice::query()
-            ->where('tenant_id', $tenantId)
-            ->where('item_id', $item->getKey())
-            ->where('price_type', ItemPriceType::Purchase->value)
-            ->where('is_active', true)
-            ->when(
-                $currencyId === null,
-                fn ($query) => $query->whereNull('currency_id'),
-                fn ($query) => $query->where(function ($scope) use ($currencyId): void {
-                    $scope->whereNull('currency_id')->orWhere('currency_id', $currencyId);
-                }),
-            )
-            ->where(function ($query) use ($uomId): void {
-                $query->whereNull('uom_id')->orWhere('uom_id', $uomId);
-            })
-            ->where(function ($query) use ($purchaseDate): void {
-                $query->whereNull('effective_from')->orWhere('effective_from', '<=', $purchaseDate);
-            })
-            ->where(function ($query) use ($purchaseDate): void {
-                $query->whereNull('effective_to')->orWhere('effective_to', '>=', $purchaseDate);
-            })
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
-            ->when($currencyId !== null, fn ($query) => $query->orderByRaw('case when currency_id = ? then 0 else 1 end', [$currencyId]))
-            ->orderByRaw('case when uom_id = ? then 0 else 1 end', [$uomId])
-            ->latest('effective_from')
-            ->latest('id')
-            ->first();
-        if ($price instanceof ItemPrice) {
-            return $this->math->normalize((string) $price->amount);
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $value): int => $value === null || $value === '' ? 0 : (int) $value, $values),
+            static fn (int $id): bool => $id > 0,
+        )));
+        sort($ids, SORT_NUMERIC);
+
+        if ($ids === []) {
+            return;
         }
 
-        return '0.000000';
+        $modelClass::query()
+            ->whereKey($ids)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
     }
 
     private function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId, bool $lockRecords): Supplier
@@ -859,29 +901,23 @@ final class FastPurchaseService
         return $account;
     }
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
-    private function completedReference(array $resolved, string $referenceHash): ?AuditLogModel
-    {
-        return AuditLogModel::query()
-            ->where('tenant_id', $resolved['tenant_id'])
-            ->when(
-                $resolved['organization_unit_id'] === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $resolved['organization_unit_id']),
-            )
-            ->where('event', 'fast_purchase.completed')
-            ->where('auditable_type', 'fast_purchase_reference')
-            ->where('auditable_id', $referenceHash)
-            ->lockForUpdate()
-            ->latest('id')
-            ->first();
-    }
-
     private function enumValue(mixed $value): mixed
     {
         return $value instanceof \BackedEnum ? $value->value : $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $documents
+     * @return array<string, int|null>
+     */
+    private function documentIds(array $documents): array
+    {
+        return [
+            'purchase_order_id' => $documents['purchase_order']?->getKey() !== null ? (int) $documents['purchase_order']->getKey() : null,
+            'goods_receipt_id' => $documents['goods_receipt']?->getKey() !== null ? (int) $documents['goods_receipt']->getKey() : null,
+            'supplier_invoice_id' => $documents['supplier_invoice']?->getKey() !== null ? (int) $documents['supplier_invoice']->getKey() : null,
+            'supplier_payment_id' => $documents['supplier_payment']?->getKey() !== null ? (int) $documents['supplier_payment']->getKey() : null,
+        ];
     }
 
     /**
@@ -938,63 +974,6 @@ final class FastPurchaseService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function requestHash(array $payload): string
-    {
-        unset($payload['current_user_id']);
-        $this->removeClientLineKeys($payload);
-        $this->recursiveSort($payload);
-
-        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function removeClientLineKeys(array &$payload): void
-    {
-        if (! isset($payload['lines']) || ! is_array($payload['lines'])) {
-            return;
-        }
-
-        foreach ($payload['lines'] as &$line) {
-            if (is_array($line)) {
-                unset($line['client_line_key']);
-                foreach (['discount_rate', 'discount_amount', 'charge_rate', 'charge_amount'] as $decimalKey) {
-                    if (array_key_exists($decimalKey, $line)) {
-                        $line[$decimalKey] = $this->math->normalize((string) $line[$decimalKey]);
-                    }
-                }
-                foreach (['discount_calculation_type', 'charge_calculation_type'] as $typeKey) {
-                    if (! array_key_exists($typeKey, $line)) {
-                        $line[$typeKey] = PurchaseAdjustmentCalculationType::Fixed->value;
-                    }
-                }
-                foreach (['discount_rate', 'discount_amount', 'charge_rate', 'charge_amount'] as $decimalKey) {
-                    if (! array_key_exists($decimalKey, $line)) {
-                        $line[$decimalKey] = '0.000000';
-                    }
-                }
-            }
-        }
-        unset($line);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function recursiveSort(array &$payload): void
-    {
-        ksort($payload);
-        foreach ($payload as &$value) {
-            if (is_array($value)) {
-                $this->recursiveSort($value);
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
     private function rejectClientAuthorityFields(array $payload): void
     {
         foreach (['subtotal', 'discount_total', 'tax_total', 'withholding_total', 'grand_total', 'paid_total', 'balance_due', 'status', 'posting_status', 'approval_status', 'finance_account_id', 'payable_account_id', 'inventory_account_id', 'base_quantity', 'base_uom_quantity'] as $key) {
@@ -1017,11 +996,7 @@ final class FastPurchaseService
 
     private function dueDate(string $purchaseDate, string $paymentTerms, mixed $explicitDueDate): string
     {
-        if ($explicitDueDate !== null && trim((string) $explicitDueDate) !== '') {
-            return (string) $explicitDueDate;
-        }
-
-        return $purchaseDate;
+        return $this->paymentTerms->resolve($purchaseDate, $paymentTerms, $explicitDueDate);
     }
 
     /**

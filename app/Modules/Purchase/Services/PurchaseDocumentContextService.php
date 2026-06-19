@@ -10,7 +10,6 @@ use Modules\Configuration\Models\CurrencyModel;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUnit;
-use Modules\Item\Services\ItemPriceResolutionService;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
@@ -27,7 +26,7 @@ final class PurchaseDocumentContextService
     public function __construct(
         private readonly WarehouseDefaultResolver $warehouseDefaults,
         private readonly PurchaseValidationService $validator,
-        private readonly ItemPriceResolutionService $prices,
+        private readonly PurchasePricingService $prices,
     ) {}
 
     /**
@@ -136,6 +135,8 @@ final class PurchaseDocumentContextService
         ?int $supplierId,
         ?int $variantId,
         ?int $currencyId,
+        ?string $purchaseDate = null,
+        ?int $uomId = null,
     ): array {
         $item = $this->validator->item($tenantId, $organizationUnitId, $itemId, 'item_id')
             ->load(['baseUom', 'purchaseTaxGroup', 'defaultTaxGroup', 'variants', 'units.uom']);
@@ -145,9 +146,19 @@ final class PurchaseDocumentContextService
         }
 
         $allowedUnits = $this->allowedPurchaseUnits($item, $organizationUnitId);
-        $mapping = $supplierId === null ? null : $this->supplierMapping($tenantId, $organizationUnitId, $supplierId, $itemId, $variantId);
-        $defaultUomId = $this->defaultPurchaseUomId($item, $allowedUnits, $mapping);
-        $price = $this->resolvePrice($item, $organizationUnitId, $currencyId, $variantId, $defaultUomId, $supplierId);
+        $price = $this->prices->resolve(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            item: $item,
+            supplierId: $supplierId,
+            variantId: $variantId,
+            currencyId: $currencyId,
+            uomId: $uomId,
+            purchaseDate: $purchaseDate ?? CarbonImmutable::now()->toDateString(),
+            allowedUnits: $allowedUnits,
+        );
+        $mapping = $price['supplier_mapping'];
+        $defaultUomId = $price['uom_id'];
 
         return [
             'item' => $this->itemSummary($item),
@@ -169,6 +180,12 @@ final class PurchaseDocumentContextService
             'unit_price' => $price['amount'],
             'price_source' => $price['source'],
             'price_source_label' => $price['label'],
+            'pricing_mode' => $price['amount'] === null ? 'manual' : 'auto',
+            'price_source_id' => $price['price_source_id'],
+            'effective_date' => $price['effective_date'],
+            'currency_id' => $price['currency_id'],
+            'uom_id' => $price['uom_id'],
+            'pricing_context_hash' => $price['pricing_context_hash'],
             'tax_defaults' => [
                 'tax_group_id' => $item->purchase_tax_group_id ?? $item->default_tax_group_id,
                 'source' => $item->purchase_tax_group_id === null ? 'item_default_tax' : 'item_purchase_tax',
@@ -315,70 +332,6 @@ final class PurchaseDocumentContextService
             ->orderByDesc('is_preferred')
             ->orderBy('id')
             ->first();
-    }
-
-    /**
-     * @return array{amount: ?string, source: string, label: string}
-     */
-    private function resolvePrice(
-        Item $item,
-        ?int $organizationUnitId,
-        ?int $currencyId,
-        ?int $variantId,
-        ?int $uomId,
-        ?int $supplierId,
-    ): array {
-        $resolved = $this->prices->resolvePrice(
-            $item,
-            ItemPriceResolutionService::CONTEXT_PURCHASE,
-            $uomId,
-            $organizationUnitId,
-            $currencyId,
-            CarbonImmutable::now()->toDateString(),
-            $variantId,
-        );
-
-        if ($resolved->amount !== null) {
-            return [
-                'amount' => $resolved->amount,
-                'source' => 'purchase_price_list',
-                'label' => 'Purchase price list',
-            ];
-        }
-
-        $last = PurchaseOrderLine::query()
-            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_lines.purchase_order_id')
-            ->where('purchase_order_lines.tenant_id', $item->tenant_id)
-            ->where('purchase_order_lines.item_id', $item->getKey())
-            ->where('purchase_order_lines.uom_id', $uomId)
-            ->when($supplierId !== null, fn ($query) => $query->where('purchase_orders.supplier_id', $supplierId))
-            ->when($variantId === null, fn ($query) => $query->whereNull('purchase_order_lines.item_variant_id'), fn ($query) => $query->where('purchase_order_lines.item_variant_id', $variantId))
-            ->when($currencyId === null, fn ($query) => $query->whereNull('purchase_orders.currency_id'), fn ($query) => $query->where('purchase_orders.currency_id', $currencyId))
-            ->whereNotIn('purchase_orders.status', [
-                PurchaseOrderStatus::Draft->value,
-                PurchaseOrderStatus::Cancelled->value,
-            ])
-            ->orderByDesc('purchase_orders.purchase_order_date')
-            ->orderByDesc('purchase_order_lines.id')
-            ->first(['purchase_order_lines.unit_price', 'purchase_orders.purchase_order_date']);
-
-        if ($last instanceof PurchaseOrderLine) {
-            $date = $last->purchase_order_date === null
-                ? 'previous purchase'
-                : CarbonImmutable::parse((string) $last->purchase_order_date)->format('d M Y');
-
-            return [
-                'amount' => (string) $last->unit_price,
-                'source' => 'last_purchase_price',
-                'label' => 'Last purchased on '.$date,
-            ];
-        }
-
-        return [
-            'amount' => null,
-            'source' => 'manual',
-            'label' => 'Manual price required',
-        ];
     }
 
     private function quantityPrecision(array $allowedUnits, ?int $defaultUomId): int

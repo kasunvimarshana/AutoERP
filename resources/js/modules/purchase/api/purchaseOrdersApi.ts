@@ -54,6 +54,8 @@ export async function getPurchaseItemContext(itemId: number, params: {
     item_variant_id?: number;
     currency_id?: number;
     warehouse_id?: number;
+    uom_id?: number;
+    purchase_date?: string;
 } = {}, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PurchaseItemContext>>(`${endpoints.purchase}/items/${itemId}/purchase-context`, { params, signal });
     return response.data.data;

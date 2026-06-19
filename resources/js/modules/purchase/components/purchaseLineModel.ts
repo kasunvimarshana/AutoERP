@@ -16,6 +16,10 @@ export interface EditablePurchaseLine {
     item_variant_id?: number | null;
     uom: NamedResource | null;
     price_source_label?: string;
+    price_source?: string | null;
+    price_source_id?: number | null;
+    pricing_context_hash?: string | null;
+    manual_price_confirmed?: boolean;
     auto_price?: boolean;
     auto_uom?: boolean;
     description: string;
@@ -48,6 +52,9 @@ export type PurchaseLineField =
     | 'description'
     | 'quantity'
     | 'unit_price'
+    | 'pricing_mode'
+    | 'manual_price_confirmed'
+    | 'pricing_context_hash'
     | 'discount_calculation_type'
     | 'discount_rate'
     | 'discount_amount'
@@ -88,6 +95,10 @@ export function emptyPurchaseLine(overrides: Partial<EditablePurchaseLine> = {})
         item_variant_id: null,
         uom: null,
         price_source_label: undefined,
+        price_source: null,
+        price_source_id: null,
+        pricing_context_hash: null,
+        manual_price_confirmed: false,
         auto_price: true,
         auto_uom: true,
         description: '',

@@ -44,6 +44,7 @@ class StorePurchaseOrderRequest extends PurchaseRequest
             'lines.*.tax_calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
             'lines.*.tax_rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
             'lines.*.tax_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.tax_group_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.charge_calculation_type' => ['nullable', Rule::enum(PurchaseAdjustmentCalculationType::class)],
             'lines.*.charge_rate' => ['nullable', 'decimal:0,6', 'min:0', 'max:100'],
             'lines.*.charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
@@ -102,6 +103,7 @@ class StorePurchaseOrderRequest extends PurchaseRequest
                 chargeCalculationType: PurchaseAdjustmentCalculationType::from((string) ($row['charge_calculation_type'] ?? 'fixed')),
                 chargeRate: (string) ($row['charge_rate'] ?? '0.000000'),
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
+                taxGroupId: isset($row['tax_group_id']) ? (int) $row['tax_group_id'] : null,
             ), $this->input('lines')),
             adjustments: array_map(static fn (array $row): PurchaseHeaderAdjustmentData => new PurchaseHeaderAdjustmentData(
                 name: (string) $row['name'],

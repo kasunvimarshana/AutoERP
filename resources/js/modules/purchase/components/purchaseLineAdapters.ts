@@ -61,6 +61,8 @@ export function purchaseOrderLineToPayload(line: EditablePurchaseLine): Purchase
 }
 
 export function fastPurchaseLineToPayload(line: EditablePurchaseLine): FastPurchasePayloadLine {
+    const pricingMode = line.auto_price === false ? 'manual' : 'auto';
+
     return {
         client_line_key: line.client_key,
         item_id: line.item?.id ?? 0,
@@ -68,7 +70,10 @@ export function fastPurchaseLineToPayload(line: EditablePurchaseLine): FastPurch
         description: line.description || undefined,
         uom_id: line.uom?.id,
         quantity: decimalOr(line.quantity),
-        unit_cost: line.unit_price ? decimalOr(line.unit_price) : undefined,
+        unit_cost: pricingMode === 'manual' && line.unit_price ? decimalOr(line.unit_price) : undefined,
+        pricing_mode: pricingMode,
+        manual_price_confirmed: pricingMode === 'manual' ? Boolean(line.manual_price_confirmed) : undefined,
+        pricing_context_hash: line.pricing_context_hash ?? undefined,
         discount_calculation_type: line.discount_calculation_type,
         discount_rate: decimalOr(line.discount_rate),
         discount_amount: decimalOr(line.discount_amount),

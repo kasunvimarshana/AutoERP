@@ -67,7 +67,6 @@ export default function FastPurchasePage() {
         result,
         previewing,
         submitting,
-        receiveStock,
         recordPayment,
         paymentTotal,
         previewStale,
@@ -132,7 +131,6 @@ export default function FastPurchasePage() {
                             currency={currency}
                             exchangeRate={exchangeRate}
                             exchangeRateHint={defaults?.exchange_rate_source}
-                            receiveStock={receiveStock}
                             warehouse={warehouse}
                             warehouseLocation={warehouseLocation}
                             purchaseDate={purchaseDate}
@@ -160,7 +158,8 @@ export default function FastPurchasePage() {
                             supplierId={supplier?.id}
                             currencyId={currency?.id}
                             warehouseId={warehouse?.id}
-                            previewLines={preview?.lines ?? []}
+                            purchaseDate={purchaseDate}
+                            previewLines={!previewStale ? preview?.lines ?? [] : []}
                             errorFor={errorFor}
                             errorIndexForLine={errorIndexForLine}
                             onChange={setLines}

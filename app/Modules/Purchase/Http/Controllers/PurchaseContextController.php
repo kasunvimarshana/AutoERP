@@ -44,6 +44,8 @@ final class PurchaseContextController
                 $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
                 $request->filled('item_variant_id') ? (int) $request->input('item_variant_id') : null,
                 $request->filled('currency_id') ? (int) $request->input('currency_id') : null,
+                $request->filled('purchase_date') ? (string) $request->input('purchase_date') : null,
+                $request->filled('uom_id') ? (int) $request->input('uom_id') : null,
             ),
         ]);
     }

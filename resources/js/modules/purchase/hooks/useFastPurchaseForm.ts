@@ -112,6 +112,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             if (!confirmed) return;
         }
         setSupplierState(next);
+        setLines((current) => current.map(invalidatePricingContext));
     };
 
     const setWarehouse = (next: NamedResource | null) => {
@@ -130,11 +131,13 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
     const setCurrency = (next: NamedResource | null) => {
         currencyTouched.current = true;
         setCurrencyState(next);
+        setLines((current) => current.map(invalidatePricingContext));
     };
 
     const setPurchaseDate = (next: string) => {
         purchaseDateTouched.current = true;
         setPurchaseDateState(next);
+        setLines((current) => current.map(invalidatePricingContext));
     };
 
     const setExchangeRate = (next: string) => {
@@ -146,8 +149,8 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         supplier_id: supplier?.id ?? 0,
         supplier_reference: supplierReference.trim() || undefined,
         purchase_date: purchaseDate,
-        warehouse_id: receiveStock ? warehouse?.id : undefined,
-        warehouse_location_id: receiveStock ? warehouseLocation?.id : undefined,
+        warehouse_id: warehouse?.id,
+        warehouse_location_id: warehouseLocation?.id,
         currency_id: currency?.id,
         exchange_rate: exchangeRate || undefined,
         payment_terms: terms || undefined,
@@ -210,6 +213,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
 
     const canSubmit = useMemo(() => {
         const hasLine = lines.length > 0;
+        const pricingReady = lines.every((line) => line.auto_price !== false || (line.manual_price_confirmed && line.pricing_context_hash));
         const paymentReady = !recordPayment || (
             isPositiveDecimal(paymentTotal)
             && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
@@ -220,14 +224,16 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             && supplierReference.trim()
             && purchaseDate
             && hasLine
-            && (!receiveStock || warehouse?.id)
+            && pricingReady
+            && warehouse?.id
             && paymentReady
+            && !previewing
             && !submitting
         );
-    }, [lines, paymentRows, paymentTotal, purchaseDate, receiveStock, recordPayment, submitting, supplier?.id, supplierReference, warehouse?.id]);
+    }, [lines, paymentRows, paymentTotal, previewing, purchaseDate, recordPayment, submitting, supplier?.id, supplierReference, warehouse?.id]);
 
     const canPreview = canSubmit && canPreviewPermission;
-    const canExecute = canSubmit && canExecutePermission;
+    const canExecute = canSubmit && canExecutePermission && !previewStale && !previewing;
     const dirty = Boolean(
         supplier
         || supplierReference
@@ -263,6 +269,8 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
 
     const submit = async () => {
         if (submitting || !canExecute || previewStale) return;
+        previewController.current?.abort();
+        setPreviewing(false);
         submittedLineKeys.current = lines.map((line) => line.client_key);
         submittedPaymentKeys.current = paymentRows.map((row) => row.key);
         setSubmitting(true);
@@ -358,5 +366,16 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         resetForm,
         errorIndexForLine,
         errorIndexForPaymentRow,
+    };
+}
+
+function invalidatePricingContext(line: FastPurchaseLineRow): FastPurchaseLineRow {
+    return {
+        ...line,
+        price_source_label: undefined,
+        price_source: null,
+        price_source_id: null,
+        pricing_context_hash: null,
+        manual_price_confirmed: line.auto_price === false ? false : line.manual_price_confirmed,
     };
 }

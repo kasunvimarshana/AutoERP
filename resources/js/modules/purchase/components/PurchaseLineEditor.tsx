@@ -20,7 +20,7 @@ type LineDialog =
     | { mode: 'create'; line: EditablePurchaseLine }
     | { mode: 'edit'; index: number; line: EditablePurchaseLine };
 
-export function PurchaseLineEditor({ lines, onChange, config, errorForLineField, amountForLine, supplierId, currencyId, warehouseId }: {
+export function PurchaseLineEditor({ lines, onChange, config, errorForLineField, amountForLine, supplierId, currencyId, warehouseId, purchaseDate }: {
     lines: EditablePurchaseLine[];
     onChange: (lines: EditablePurchaseLine[]) => void;
     config: PurchaseLineEditorConfig;
@@ -29,6 +29,7 @@ export function PurchaseLineEditor({ lines, onChange, config, errorForLineField,
     supplierId?: number;
     currencyId?: number;
     warehouseId?: number;
+    purchaseDate?: string;
 }) {
     const [dialog, setDialog] = useState<LineDialog | null>(null);
     const { confirm, confirmDialog } = useConfirmDialog();
@@ -72,6 +73,7 @@ export function PurchaseLineEditor({ lines, onChange, config, errorForLineField,
                         supplierId={supplierId}
                         currencyId={currencyId}
                         warehouseId={warehouseId}
+                        purchaseDate={purchaseDate}
                         errorFor={(field) => dialog.mode === 'edit' ? errorForLineField(dialog.line, dialog.index, field) : undefined}
                         onCancel={() => setDialog(null)}
                         onSave={saveLine}
@@ -135,6 +137,9 @@ function lineHasError(
         'uom_id',
         'quantity',
         'unit_price',
+        'pricing_mode',
+        'manual_price_confirmed',
+        'pricing_context_hash',
         'discount_calculation_type',
         'discount_rate',
         'discount_amount',

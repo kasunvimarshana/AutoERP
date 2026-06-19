@@ -11,6 +11,7 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Payment\Models\Payment;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\PurchaseOrder;
 
 final class FastPurchaseResponseBuilder
 {
@@ -29,6 +30,7 @@ final class FastPurchaseResponseBuilder
             'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
             'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
             'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
+            'document_plan' => $this->documentPlan($resolved),
             'documents' => [],
         ];
     }
@@ -40,6 +42,8 @@ final class FastPurchaseResponseBuilder
      */
     public function created(array $resolved, array $documents): array
     {
+        /** @var PurchaseOrder|null $purchaseOrder */
+        $purchaseOrder = $documents['purchase_order'];
         /** @var GoodsReceiptNote|null $goodsReceipt */
         $goodsReceipt = $documents['goods_receipt'];
         /** @var Invoice|null $invoice */
@@ -59,7 +63,9 @@ final class FastPurchaseResponseBuilder
             'supplier' => $this->modelSummary($resolved['supplier'], ['supplier_number', 'code', 'name', 'display_name']),
             'adjustments' => $this->adjustmentPreview($resolved['adjustments']),
             'lines' => array_map(fn (array $line): array => $this->linePreview($line), $resolved['lines']),
+            'document_plan' => $this->documentPlan($resolved),
             'documents' => [
+                'purchase_order' => $purchaseOrder instanceof PurchaseOrder ? $this->purchaseOrderRef($purchaseOrder) : null,
                 'goods_receipt' => $goodsReceipt instanceof GoodsReceiptNote ? $this->goodsReceiptRef($goodsReceipt) : null,
                 'supplier_invoice' => $invoice instanceof Invoice ? $this->invoiceRef($invoice) : null,
                 'supplier_payment' => $payment instanceof Payment ? $this->paymentRef($payment) : null,
@@ -104,6 +110,10 @@ final class FastPurchaseResponseBuilder
             'quantity' => $line['quantity'],
             'base_quantity' => $line['base_quantity'],
             'unit_cost' => $line['unit_cost'],
+            'pricing_mode' => $line['pricing_mode'] ?? 'manual',
+            'price_source' => $line['price_source'] ?? null,
+            'price_source_id' => $line['price_source_id'] ?? null,
+            'pricing_context_hash' => $line['pricing_context_hash'] ?? null,
             'line_subtotal' => $line['line_subtotal'],
             'discount_calculation_type' => $this->enumValue($line['discount_calculation_type'] ?? null),
             'discount_rate' => $line['discount_rate'] ?? '0.000000',
@@ -145,6 +155,45 @@ final class FastPurchaseResponseBuilder
                 ],
             ];
         }, $adjustments);
+    }
+
+    /**
+     * @param  array<string, mixed>  $resolved
+     * @return array<string, mixed>
+     */
+    private function documentPlan(array $resolved): array
+    {
+        $stockLines = array_values(array_filter($resolved['lines'], static fn (array $line): bool => (bool) $line['is_stock']));
+        $nonStockLines = array_values(array_filter($resolved['lines'], static fn (array $line): bool => ! (bool) $line['is_stock']));
+
+        return [
+            'purchase_order' => [
+                'will_create' => true,
+                'line_keys' => array_map(static fn (array $line): ?string => $line['client_line_key'] ?? null, $resolved['lines']),
+            ],
+            'goods_receipt' => [
+                'will_create' => (bool) $resolved['options']['receive_stock_now'] && $stockLines !== [],
+                'source' => 'purchase_order',
+                'line_keys' => array_map(static fn (array $line): ?string => $line['client_line_key'] ?? null, $stockLines),
+            ],
+            'supplier_invoice' => [
+                'will_create' => (bool) $resolved['options']['create_supplier_invoice_now'],
+                'sources' => [
+                    'stock_lines' => $stockLines === [] ? null : 'goods_receipt_note',
+                    'non_stock_lines' => $nonStockLines === [] ? null : 'purchase_order',
+                ],
+                'line_keys' => array_map(static fn (array $line): ?string => $line['client_line_key'] ?? null, $resolved['lines']),
+            ],
+            'supplier_payment' => [
+                'will_create' => (bool) $resolved['options']['record_payment_now'],
+                'allocation_target' => (bool) $resolved['options']['record_payment_now'] ? 'supplier_invoice' : null,
+            ],
+        ];
+    }
+
+    private function purchaseOrderRef(PurchaseOrder $purchaseOrder): array
+    {
+        return ['id' => (int) $purchaseOrder->getKey(), 'number' => (string) $purchaseOrder->purchase_order_number, 'status' => $this->enumValue($purchaseOrder->status), 'url' => '/purchase/orders/'.$purchaseOrder->getKey()];
     }
 
     private function goodsReceiptRef(GoodsReceiptNote $goodsReceipt): array
