@@ -15,12 +15,14 @@ import { ChequePreviewCanvas } from './ChequePreviewCanvas';
 import { coordinateFields, type ChequeCoordinateKey, type ChequeTemplate } from './chequePrintTypes';
 
 export default function ChequePrintPreviewPage() {
-    const paymentId = Number(useParams().id);
+    const params = useParams();
+    const paymentId = Number(params.paymentId);
+    const lineId = Number(params.lineId);
     const templates = useApi((signal) => listChequeTemplates(true, signal), []);
     const [templateId, setTemplateId] = useState<number | null>(null);
     const preview = useApi(
-        (signal) => previewCheque(paymentId, templateId ?? undefined, signal),
-        [paymentId, templateId],
+        (signal) => previewCheque(paymentId, lineId, templateId ?? undefined, signal),
+        [paymentId, lineId, templateId],
         templateId !== null,
     );
     const [adjustedTemplate, setAdjustedTemplate] = useState<ChequeTemplate | null>(null);
@@ -70,7 +72,7 @@ export default function ChequePrintPreviewPage() {
         setActionError(null);
         setMessage('');
         try {
-            const log = await markChequePrinted(paymentId, adjustedTemplate.id, notes);
+            const log = await markChequePrinted(paymentId, lineId, adjustedTemplate.id, notes);
             setMessage(`Marked as printed at ${new Date(log.printed_at).toLocaleString()}.`);
         } catch (error) {
             setActionError(toApiError(error));

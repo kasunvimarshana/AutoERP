@@ -32,12 +32,14 @@ return new class extends Migration
             $table->string('font_family')->nullable();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
+            $table->string('default_scope_key', 160)->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'cheque_templates_tenant_org_idx');
             $table->index(['tenant_id', 'is_active', 'is_default'], 'cheque_templates_active_default_idx');
+            $table->unique('default_scope_key', 'cheque_templates_default_scope_uk');
         });
     }
 

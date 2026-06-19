@@ -1,6 +1,7 @@
 import type { NavigationSection } from './navigationTypes';
 import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { warehousePermissions } from '@/modules/warehouse/warehousePermissions';
 
@@ -356,7 +357,21 @@ export const navigationSections: NavigationSection[] = [
         label: 'Finance',
         items: [
             { id: 'invoices', type: 'link', label: 'Invoices', to: '/invoices', icon: 'invoice', access: tenantAccess(['invoice']) },
-            { id: 'payments', type: 'link', label: 'Payments', to: '/payments', icon: 'payment', exclude: ['/payments/create', '/payments/cheque-templates'], access: tenantAccess(['payment']) },
+            {
+                id: 'payments',
+                type: 'module',
+                label: 'Payments',
+                icon: 'payment',
+                access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.view, paymentPermissions.create, paymentPermissions.methodsView, paymentPermissions.templatesView] },
+                children: [
+                    { id: 'payments-list', type: 'link', label: 'Payments', to: '/payments', match: ['/payments'], exclude: ['/payments/create', '/payments/methods', '/payments/cheque-templates'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.view] } },
+                    { id: 'payments-create', type: 'link', label: 'Create Payment', to: '/payments/create', match: ['/payments/create'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.create] } },
+                    { id: 'payment-methods', type: 'link', label: 'Payment Methods', to: '/payments/methods', match: ['/payments/methods'], exclude: ['/payments/methods/create'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.methodsView] } },
+                    { id: 'payment-methods-create', type: 'link', label: 'Create Payment Method', to: '/payments/methods/create', match: ['/payments/methods/create'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.methodsCreate] } },
+                    { id: 'cheque-templates', type: 'link', label: 'Cheque Templates', to: '/payments/cheque-templates', match: ['/payments/cheque-templates'], exclude: ['/payments/cheque-templates/create'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.templatesView] } },
+                    { id: 'cheque-templates-create', type: 'link', label: 'Create Cheque Template', to: '/payments/cheque-templates/create', match: ['/payments/cheque-templates/create'], access: { ...tenantAccess(['payment']), permissions: [paymentPermissions.templatesCreate] } },
+                ],
+            },
             { id: 'vouchers', type: 'link', label: 'Vouchers', to: '/vouchers', icon: 'voucher', access: tenantAccess(['voucher']) },
         ],
     },

@@ -24,6 +24,7 @@ final class PaymentRefund extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
+            'refund_payment_id' => 'integer',
             'refund_date' => 'date',
             'party_id' => 'integer',
             'payment_method_id' => 'integer',
@@ -35,6 +36,11 @@ final class PaymentRefund extends CoreModel
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
+    }
+
+    public function refundPayment(): BelongsTo
+    {
+        return $this->belongsTo(Payment::class, 'refund_payment_id');
     }
 
     public function paymentMethod(): BelongsTo

@@ -36,6 +36,19 @@ final class PaymentMethod extends CoreModel
         ]);
     }
 
+    protected static function booted(): void
+    {
+        self::saving(function (PaymentMethod $method): void {
+            if (trim((string) $method->scope_key) === '') {
+                $tenantId = $method->tenant_id === null ? null : (int) $method->tenant_id;
+                $organizationUnitId = $method->organization_unit_id === null ? null : (int) $method->organization_unit_id;
+                $method->scope_key = $tenantId === null
+                    ? 'global'
+                    : ($organizationUnitId === null ? 'tenant:'.$tenantId : 'org:'.$tenantId.':'.$organizationUnitId);
+            }
+        });
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');

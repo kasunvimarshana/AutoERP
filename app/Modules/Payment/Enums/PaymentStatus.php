@@ -10,11 +10,12 @@ enum PaymentStatus: string
     case PendingApproval = 'pending_approval';
     case Approved = 'approved';
     case Posted = 'posted';
+    case Voided = 'voided';
+    case Reversed = 'reversed';
+    case Cancelled = 'cancelled';
     case PartiallyAllocated = 'partially_allocated';
     case FullyAllocated = 'fully_allocated';
     case Allocated = 'allocated';
     case Refunded = 'refunded';
     case Void = 'void';
-    case Reversed = 'reversed';
-    case Cancelled = 'cancelled';
 }

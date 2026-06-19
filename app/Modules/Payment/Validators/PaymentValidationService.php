@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace Modules\Payment\Validators;
 
 use InvalidArgumentException;
+use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
+use Modules\Customer\Models\Customer;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\DTOs\BalanceResultData;
+use Modules\Invoice\Models\Invoice;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
+use Modules\Supplier\Models\Supplier;
 
 final class PaymentValidationService
 {
@@ -36,9 +42,9 @@ final class PaymentValidationService
             throw new InvalidArgumentException('Payment date is required.');
         }
 
-        if ($this->math->isNegative($data->exchangeRate) || $this->math->isZero($data->exchangeRate)) {
-            throw new InvalidArgumentException('Payment exchange rate must be greater than zero.');
-        }
+        $this->validateTypeDirectionParty($data);
+        $this->validateCurrency($data->currencyId, $data->exchangeRate);
+        $this->validateBankAccount($data->bankAccountId, $data->tenantId, $data->organizationUnitId, requireBank: false);
 
         if ($data->lines === []) {
             throw new InvalidArgumentException('Payment requires at least one payment line.');
@@ -61,6 +67,7 @@ final class PaymentValidationService
                 $line->referenceNumber ?? $data->referenceNumber,
                 $this->lineBankAccountId($line, $data->bankAccountId),
             );
+            $this->validateBankAccount($line->internalBankAccountId, $data->tenantId, $data->organizationUnitId, requireBank: true);
         }
 
         foreach ($data->allocations as $allocation) {
@@ -79,6 +86,14 @@ final class PaymentValidationService
 
         if ($payment->organization_unit_id !== $invoiceBalance->organizationUnitId) {
             throw new InvalidArgumentException('Payment invoice organization unit must match payment organization unit.');
+        }
+
+        $invoice = Invoice::query()->findOrFail($allocation->invoiceId);
+        if ($payment->party_type !== $invoice->party_type || (int) $payment->party_id !== (int) $invoice->party_id) {
+            throw new InvalidArgumentException('Payment invoice party must match payment party.');
+        }
+        if ($payment->currency_id !== null && $invoice->currency_id !== null && (int) $payment->currency_id !== (int) $invoice->currency_id) {
+            throw new InvalidArgumentException('Cross-currency payment allocation is not supported.');
         }
 
         $this->assertPositive($allocation->allocatedAmount, 'Payment allocation amount');
@@ -113,6 +128,87 @@ final class PaymentValidationService
     {
         if ($this->math->isNegative($amount)) {
             throw new InvalidArgumentException($label.' cannot be negative.');
+        }
+    }
+
+    private function validateTypeDirectionParty(CreatePaymentData $data): void
+    {
+        $expectedDirection = match ($data->paymentType) {
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt, PaymentType::RentalReceipt => PaymentDirection::Inbound,
+            PaymentType::SupplierPayment => PaymentDirection::Outbound,
+            PaymentType::Refund, PaymentType::Advance, PaymentType::Manual => $data->direction,
+        };
+
+        if ($data->direction !== $expectedDirection) {
+            throw new InvalidArgumentException('Payment type is not valid for the selected direction.');
+        }
+
+        $expectedParty = match ($data->paymentType) {
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt => 'customer',
+            PaymentType::SupplierPayment => 'supplier',
+            default => $data->partyType,
+        };
+
+        if ($expectedParty !== null && $data->partyType !== $expectedParty) {
+            throw new InvalidArgumentException('Payment party type is not valid for the selected payment type.');
+        }
+
+        if ($data->partyType !== null || $data->partyId !== null) {
+            if ($data->partyType === null || $data->partyId === null) {
+                throw new InvalidArgumentException('Payment party type and party id must be provided together.');
+            }
+            $this->validateParty($data->partyType, $data->partyId, $data->tenantId, $data->organizationUnitId);
+        }
+    }
+
+    private function validateParty(string $partyType, int $partyId, int $tenantId, ?int $organizationUnitId): void
+    {
+        $model = match ($partyType) {
+            'customer' => Customer::query()->find($partyId),
+            'supplier' => Supplier::query()->find($partyId),
+            default => throw new InvalidArgumentException('Unsupported payment party type.'),
+        };
+
+        if ($model === null || (int) $model->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Payment party was not found in the active tenant.');
+        }
+
+        if ($model->organization_unit_id !== null && (int) $model->organization_unit_id !== (int) $organizationUnitId) {
+            throw new InvalidArgumentException('Payment party organization unit must match payment organization unit.');
+        }
+    }
+
+    private function validateCurrency(?int $currencyId, string $exchangeRate): void
+    {
+        if ($this->math->isNegative($exchangeRate) || $this->math->isZero($exchangeRate)) {
+            throw new InvalidArgumentException('Payment exchange rate must be greater than zero.');
+        }
+
+        if ($currencyId === null) {
+            return;
+        }
+
+        $currency = CurrencyModel::query()->find($currencyId);
+        if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
+            throw new InvalidArgumentException('Payment currency must be active.');
+        }
+    }
+
+    private function validateBankAccount(?int $accountId, int $tenantId, ?int $organizationUnitId, bool $requireBank): void
+    {
+        if ($accountId === null) {
+            return;
+        }
+
+        $account = FinanceAccount::query()->find($accountId);
+        if (! $account instanceof FinanceAccount
+            || (int) $account->tenant_id !== $tenantId
+            || ($account->organization_unit_id !== null && (int) $account->organization_unit_id !== (int) $organizationUnitId)
+            || ! (bool) $account->is_active
+            || ! (bool) $account->is_posting_account
+            || ($requireBank && ! (bool) $account->is_bank_account)
+        ) {
+            throw new InvalidArgumentException('Payment bank account is not available for this tenant and organization.');
         }
     }
 

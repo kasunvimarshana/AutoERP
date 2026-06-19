@@ -23,6 +23,12 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::put('cheque-templates/{id}', [ChequeTemplateController::class, 'update'])->whereNumber('id')->name('cheque-templates.update');
     Route::delete('cheque-templates/{id}', [ChequeTemplateController::class, 'destroy'])->whereNumber('id')->name('cheque-templates.destroy');
     Route::get('methods', [PaymentMethodController::class, 'index'])->name('methods.index');
+    Route::post('methods', [PaymentMethodController::class, 'store'])->name('methods.store');
+    Route::get('methods/{id}', [PaymentMethodController::class, 'show'])->whereNumber('id')->name('methods.show');
+    Route::put('methods/{id}', [PaymentMethodController::class, 'update'])->whereNumber('id')->name('methods.update');
+    Route::post('methods/{id}/activate', [PaymentMethodController::class, 'activate'])->whereNumber('id')->name('methods.activate');
+    Route::post('methods/{id}/deactivate', [PaymentMethodController::class, 'deactivate'])->whereNumber('id')->name('methods.deactivate');
+    Route::delete('methods/{id}', [PaymentMethodController::class, 'destroy'])->whereNumber('id')->name('methods.destroy');
     Route::get('/', [PaymentController::class, 'index'])->name('index');
     Route::post('/', [PaymentController::class, 'store'])->name('store');
     Route::get('{payment}', [PaymentController::class, 'show'])->whereNumber('payment')->name('show');
@@ -39,6 +45,12 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
         ->whereNumber('line')
         ->name('lines.settlement');
     Route::post('{payment}/refunds', [PaymentController::class, 'refund'])->whereNumber('payment')->name('refunds.store');
-    Route::get('{payment}/cheque-print/preview', [ChequePrintController::class, 'preview'])->whereNumber('payment')->name('cheque-print.preview');
-    Route::post('{payment}/cheque-print/mark-printed', [ChequePrintController::class, 'markPrinted'])->whereNumber('payment')->name('cheque-print.mark-printed');
+    Route::get('{payment}/lines/{line}/cheque-print/preview', [ChequePrintController::class, 'preview'])
+        ->whereNumber('payment')
+        ->whereNumber('line')
+        ->name('lines.cheque-print.preview');
+    Route::post('{payment}/lines/{line}/cheque-print', [ChequePrintController::class, 'markPrinted'])
+        ->whereNumber('payment')
+        ->whereNumber('line')
+        ->name('lines.cheque-print.print');
 });

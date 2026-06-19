@@ -12,6 +12,7 @@ use InvalidArgumentException;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
@@ -39,6 +40,9 @@ final class Payment extends CoreModel
             'source_id' => 'integer',
             'currency_id' => 'integer',
             'bank_account_id' => 'integer',
+            'finance_journal_entry_id' => 'integer',
+            'reversal_payment_id' => 'integer',
+            'original_payment_id' => 'integer',
             'payment_type' => PaymentType::class,
             'direction' => PaymentDirection::class,
             'document_status' => PaymentDocumentStatus::class,
@@ -60,6 +64,8 @@ final class Payment extends CoreModel
             'posted_at' => 'datetime',
             'voided_by' => 'integer',
             'voided_at' => 'datetime',
+            'reversed_by' => 'integer',
+            'reversed_at' => 'datetime',
         ]);
     }
 
@@ -94,6 +100,26 @@ final class Payment extends CoreModel
     public function bankAccount(): BelongsTo
     {
         return $this->belongsTo(FinanceAccount::class, 'bank_account_id');
+    }
+
+    public function financeJournalEntry(): BelongsTo
+    {
+        return $this->belongsTo(FinanceJournalEntry::class, 'finance_journal_entry_id');
+    }
+
+    public function originalPayment(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'original_payment_id');
+    }
+
+    public function reversalPayment(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_payment_id');
+    }
+
+    public function refundPayments(): HasMany
+    {
+        return $this->hasMany(self::class, 'original_payment_id');
     }
 
     public function lines(): HasMany

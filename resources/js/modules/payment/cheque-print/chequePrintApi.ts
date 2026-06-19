@@ -30,14 +30,17 @@ export const updateChequeTemplate = (id: number, payload: Partial<ChequeTemplate
 
 export const deleteChequeTemplate = (id: number) => apiClient.delete(`${templatesPath}/${id}`);
 
-export const previewCheque = (paymentId: number, templateId?: number, signal?: AbortSignal) =>
-    apiClient.get<ApiResource<ChequePrintPreview>>(`${endpoints.payments}/${paymentId}/cheque-print/preview`, {
+export const previewCheque = (paymentId: number, lineId: number, templateId?: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<ChequePrintPreview & { line?: ChequePrintPreview['payment'] }>>(`${endpoints.payments}/${paymentId}/lines/${lineId}/cheque-print/preview`, {
         params: templateId ? { cheque_template_id: templateId } : undefined,
         signal,
-    }).then((response) => response.data.data);
+    }).then((response) => {
+        const data = response.data.data;
+        return data.line ? { ...data, payment: { ...data.payment, ...data.line } } : data;
+    });
 
-export const markChequePrinted = (paymentId: number, templateId: number, notes?: string) =>
-    apiClient.post<ApiResource<ChequePrintLog>>(`${endpoints.payments}/${paymentId}/cheque-print/mark-printed`, {
+export const markChequePrinted = (paymentId: number, lineId: number, templateId: number, notes?: string) =>
+    apiClient.post<ApiResource<ChequePrintLog>>(`${endpoints.payments}/${paymentId}/lines/${lineId}/cheque-print`, {
         cheque_template_id: templateId,
         notes: notes || undefined,
     }).then((response) => response.data.data);

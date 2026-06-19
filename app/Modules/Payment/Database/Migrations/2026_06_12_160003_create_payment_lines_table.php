@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->foreignId('payment_id')->constrained('payments', 'id')->cascadeOnDelete();
-            $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods', 'id')->nullOnDelete();
+            $table->foreignId('payment_method_id')->constrained('payment_methods', 'id')->restrictOnDelete();
             $table->foreignId('internal_bank_account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
             $table->string('reference_number')->nullable();
             $table->decimal('amount', 20, 6);

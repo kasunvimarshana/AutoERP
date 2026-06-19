@@ -4,6 +4,7 @@ import { AppLayout } from './layout/AppLayout';
 import { PermissionRoute } from '@/modules/auth/PermissionRoute';
 import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
 const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
@@ -97,6 +98,8 @@ const InvoiceDetailPage = lazy(() => import('@/modules/invoice/pages/InvoiceDeta
 const PaymentListPage = lazy(() => import('@/modules/payment/pages/PaymentListPage'));
 const PaymentEntryPage = lazy(() => import('@/modules/payment/pages/PaymentEntryPage'));
 const PaymentDetailPage = lazy(() => import('@/modules/payment/pages/PaymentDetailPage'));
+const PaymentMethodListPage = lazy(() => import('@/modules/payment/pages/PaymentMethodListPage'));
+const PaymentMethodFormPage = lazy(() => import('@/modules/payment/pages/PaymentMethodFormPage'));
 const ChequeTemplateListPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateListPage'));
 const ChequeTemplateFormPage = lazy(() => import('@/modules/payment/cheque-print/ChequeTemplateFormPage'));
 const ChequePrintPreviewPage = lazy(() => import('@/modules/payment/cheque-print/ChequePrintPreviewPage'));
@@ -265,13 +268,16 @@ export function AppRouter() {
                     <Route path="/sales/credit-notes" element={<SalesCreditNotePage />} />
                     <Route path="/invoices" element={<InvoiceListPage />} />
                     <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
-                    <Route path="/payments" element={<PaymentListPage />} />
-                    <Route path="/payments/create" element={<PaymentEntryPage />} />
-                    <Route path="/payments/cheque-templates" element={<ChequeTemplateListPage />} />
-                    <Route path="/payments/cheque-templates/create" element={<ChequeTemplateFormPage />} />
-                    <Route path="/payments/cheque-templates/:id/edit" element={<ChequeTemplateFormPage />} />
-                    <Route path="/payments/:id/cheque-print" element={<ChequePrintPreviewPage />} />
-                    <Route path="/payments/:id" element={<PaymentDetailPage />} />
+                    <Route path="/payments" element={requirePermission(paymentPermissions.view, <PaymentListPage />)} />
+                    <Route path="/payments/create" element={requirePermission(paymentPermissions.create, <PaymentEntryPage />)} />
+                    <Route path="/payments/methods" element={requirePermission(paymentPermissions.methodsView, <PaymentMethodListPage />)} />
+                    <Route path="/payments/methods/create" element={requirePermission(paymentPermissions.methodsCreate, <PaymentMethodFormPage />)} />
+                    <Route path="/payments/methods/:id/edit" element={requirePermission(paymentPermissions.methodsUpdate, <PaymentMethodFormPage />)} />
+                    <Route path="/payments/cheque-templates" element={requirePermission(paymentPermissions.templatesView, <ChequeTemplateListPage />)} />
+                    <Route path="/payments/cheque-templates/create" element={requirePermission(paymentPermissions.templatesCreate, <ChequeTemplateFormPage />)} />
+                    <Route path="/payments/cheque-templates/:id/edit" element={requirePermission(paymentPermissions.templatesUpdate, <ChequeTemplateFormPage />)} />
+                    <Route path="/payments/:paymentId/lines/:lineId/cheque-print" element={requirePermission(paymentPermissions.chequesPreview, <ChequePrintPreviewPage />)} />
+                    <Route path="/payments/:id" element={requirePermission(paymentPermissions.view, <PaymentDetailPage />)} />
                     <Route path="/vouchers" element={<VoucherListPage />} />
                     <Route path="/vouchers/:voucherType/:sourceId" element={<VoucherDetailPage />} />
                     <Route path="/finance/accounts" element={<FinanceAccountsPage />} />

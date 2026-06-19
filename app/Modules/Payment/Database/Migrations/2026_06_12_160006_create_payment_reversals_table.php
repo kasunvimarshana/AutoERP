@@ -21,6 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->decimal('original_amount', 20, 6);
             $table->decimal('reversed_amount', 20, 6);
+            $table->foreignId('finance_reversal_journal_entry_id')->nullable()->constrained('finance_journal_entries', 'id')->nullOnDelete();
             $table->string('status')->default('posted');
             $table->json('metadata')->nullable();
             $table->timestamps();

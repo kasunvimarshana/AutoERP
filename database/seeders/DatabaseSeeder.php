@@ -12,6 +12,7 @@ use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Hr\Database\Seeders\HrSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
 use Modules\OrganizationUnit\Database\Seeders\OrganizationUnitSeeder;
+use Modules\Payment\Database\Seeders\PaymentSeeder;
 use Modules\Purchase\Database\Seeders\PurchaseSeeder;
 use Modules\Sales\Database\Seeders\SalesSeeder;
 use Modules\Sequence\Database\Seeders\SequenceSeeder;
@@ -45,6 +46,7 @@ class DatabaseSeeder extends Seeder
             UomSeeder::class,
             WarehouseSeeder::class,
             FinanceSeeder::class,
+            PaymentSeeder::class,
             ItemSeeder::class,
             SupplierSeeder::class,
             PurchaseSeeder::class,

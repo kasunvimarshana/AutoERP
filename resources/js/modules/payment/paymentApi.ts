@@ -21,6 +21,11 @@ export interface Payment extends Record<string, unknown> {
     source_type?: string | null;
     source_id?: number | null;
     allocation_status?: string;
+    posting_status?: string;
+    instrument_status?: string | null;
+    finance_journal?: { id: number; number?: string | null } | null;
+    capabilities?: Record<string, boolean>;
+    blockers?: Record<string, string[]>;
     metadata?: Record<string, unknown> | null;
     lines?: Array<{
         id?: number;
@@ -48,6 +53,8 @@ export interface PaymentMethod {
     direction_allowed?: string;
     requires_reference?: boolean;
     requires_bank_account?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
     metadata?: Record<string, unknown> | null;
 }
 
@@ -82,6 +89,11 @@ export interface PaymentPayload {
     source_type?: string;
     source_id?: number;
     allocation_status?: string;
+    posting_status?: string;
+    instrument_status?: string | null;
+    finance_journal?: { id: number; number?: string | null } | null;
+    capabilities?: Record<string, boolean>;
+    blockers?: Record<string, string[]>;
     currency_id?: number;
     exchange_rate?: string;
     reference_number?: string;
@@ -109,7 +121,7 @@ export async function getPayment(id: number, signal?: AbortSignal) {
     return response.data.data;
 }
 
-export async function listPaymentMethods(params: ListParams & { direction?: string; method_type?: string; is_active?: boolean }, signal?: AbortSignal) {
+export async function listPaymentMethods(params: ListParams & { direction?: string; method_type?: string; is_active?: boolean; include_overrides?: boolean }, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/methods`, { params, signal });
     return response.data;
 }
@@ -141,5 +153,54 @@ export async function reversePayment(id: number, payload: Record<string, unknown
 
 export async function settlePaymentLine(paymentId: number, lineId: number, status: string, metadata?: Record<string, unknown>) {
     const response = await apiClient.post<ApiResource<Record<string, unknown>>>(`${endpoints.payments}/${paymentId}/lines/${lineId}/settlement`, { status, metadata });
+    return response.data.data;
+}
+
+export async function getPaymentMethod(id: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<PaymentMethod>>(`${endpoints.payments}/methods/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function createPaymentMethod(payload: Partial<PaymentMethod>) {
+    const response = await apiClient.post<ApiResource<PaymentMethod>>(`${endpoints.payments}/methods`, payload);
+    return response.data.data;
+}
+
+export async function updatePaymentMethod(id: number, payload: Partial<PaymentMethod>) {
+    const response = await apiClient.put<ApiResource<PaymentMethod>>(`${endpoints.payments}/methods/${id}`, payload);
+    return response.data.data;
+}
+
+export async function activatePaymentMethod(id: number) {
+    const response = await apiClient.post<ApiResource<PaymentMethod>>(`${endpoints.payments}/methods/${id}/activate`);
+    return response.data.data;
+}
+
+export async function deactivatePaymentMethod(id: number) {
+    const response = await apiClient.post<ApiResource<PaymentMethod>>(`${endpoints.payments}/methods/${id}/deactivate`);
+    return response.data.data;
+}
+
+export async function deletePaymentMethod(id: number) {
+    await apiClient.delete(`${endpoints.payments}/methods/${id}`);
+}
+
+export async function submitPayment(id: number) {
+    const response = await apiClient.post<ApiResource<Payment>>(`${endpoints.payments}/${id}/submit-approval`);
+    return response.data.data;
+}
+
+export async function approvePayment(id: number) {
+    const response = await apiClient.post<ApiResource<Payment>>(`${endpoints.payments}/${id}/approve`);
+    return response.data.data;
+}
+
+export async function postPayment(id: number) {
+    const response = await apiClient.post<ApiResource<Payment>>(`${endpoints.payments}/${id}/post`);
+    return response.data.data;
+}
+
+export async function voidPayment(id: number, reason?: string) {
+    const response = await apiClient.post<ApiResource<Payment>>(`${endpoints.payments}/${id}/void`, { reason });
     return response.data.data;
 }

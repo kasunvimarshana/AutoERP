@@ -19,6 +19,7 @@ final class ListPaymentMethodRequest extends TenantScopedRequest
             'direction' => ['nullable', Rule::enum(PaymentDirection::class)],
             'method_type' => ['nullable', Rule::enum(PaymentMethodType::class)],
             'is_active' => ['nullable', 'boolean'],
+            'include_overrides' => ['nullable', 'boolean'],
             'search' => ['nullable', 'string', 'max:150'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],

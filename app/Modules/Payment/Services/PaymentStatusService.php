@@ -6,7 +6,6 @@ namespace Modules\Payment\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
@@ -17,52 +16,22 @@ final class PaymentStatusService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    /**
-     * @return array<string, list<string>>
-     */
+    /** @return array<string, list<string>> */
     private function transitions(): array
     {
         return [
-            PaymentStatus::Draft->value => [
-                PaymentStatus::PendingApproval->value,
-                PaymentStatus::Approved->value,
-                PaymentStatus::Posted->value,
-                PaymentStatus::Cancelled->value,
-                PaymentStatus::Void->value,
-            ],
-            PaymentStatus::PendingApproval->value => [
-                PaymentStatus::Approved->value,
-                PaymentStatus::Cancelled->value,
-                PaymentStatus::Void->value,
-            ],
-            PaymentStatus::Approved->value => [
-                PaymentStatus::Posted->value,
-                PaymentStatus::Cancelled->value,
-                PaymentStatus::Void->value,
-            ],
-            PaymentStatus::Posted->value => [
-                PaymentStatus::PartiallyAllocated->value,
-                PaymentStatus::FullyAllocated->value,
-                PaymentStatus::Allocated->value,
-                PaymentStatus::Refunded->value,
-                PaymentStatus::Reversed->value,
-            ],
-            PaymentStatus::PartiallyAllocated->value => [
-                PaymentStatus::FullyAllocated->value,
-                PaymentStatus::Allocated->value,
-                PaymentStatus::Refunded->value,
-                PaymentStatus::Reversed->value,
-            ],
-            PaymentStatus::Allocated->value => [
-                PaymentStatus::Reversed->value,
-            ],
-            PaymentStatus::FullyAllocated->value => [
-                PaymentStatus::Reversed->value,
-            ],
-            PaymentStatus::Refunded->value => [],
+            PaymentStatus::Draft->value => [PaymentStatus::PendingApproval->value, PaymentStatus::Approved->value, PaymentStatus::Cancelled->value, PaymentStatus::Voided->value, PaymentStatus::Void->value],
+            PaymentStatus::PendingApproval->value => [PaymentStatus::Approved->value, PaymentStatus::Cancelled->value, PaymentStatus::Voided->value, PaymentStatus::Void->value],
+            PaymentStatus::Approved->value => [PaymentStatus::Cancelled->value, PaymentStatus::Voided->value, PaymentStatus::Void->value],
+            PaymentStatus::Posted->value => [PaymentStatus::Reversed->value],
+            PaymentStatus::Voided->value => [],
             PaymentStatus::Void->value => [],
             PaymentStatus::Reversed->value => [],
             PaymentStatus::Cancelled->value => [],
+            PaymentStatus::PartiallyAllocated->value => [PaymentStatus::Reversed->value],
+            PaymentStatus::Allocated->value => [PaymentStatus::Reversed->value],
+            PaymentStatus::FullyAllocated->value => [PaymentStatus::Reversed->value],
+            PaymentStatus::Refunded->value => [PaymentStatus::Reversed->value],
         ];
     }
 
@@ -78,31 +47,14 @@ final class PaymentStatusService
 
     public function assertAllocatable(Payment $payment): void
     {
-        $status = $payment->status instanceof PaymentStatus
-            ? $payment->status
-            : PaymentStatus::from((string) $payment->status);
+        $status = $this->status($payment);
+        $posting = $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
 
-        if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed, PaymentStatus::Refunded], true)) {
-            throw new InvalidArgumentException('Cancelled, void, refunded, or reversed payments cannot be allocated.');
+        if ($status !== PaymentStatus::Posted || $posting !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('Only posted payments can be allocated.');
         }
-    }
-
-    public function statusForAmounts(string $totalAmount, string $allocatedAmount, string $refundedAmount = '0.000000'): PaymentStatus
-    {
-        if (! $this->math->isZero($refundedAmount)
-            && $this->math->compare($this->math->add($allocatedAmount, $refundedAmount), $totalAmount) >= 0) {
-            return PaymentStatus::Refunded;
-        }
-
-        if ($this->math->isZero($allocatedAmount)) {
-            return PaymentStatus::Posted;
-        }
-
-        if ($this->math->compare($allocatedAmount, $totalAmount) < 0) {
-            return PaymentStatus::PartiallyAllocated;
-        }
-
-        return PaymentStatus::FullyAllocated;
     }
 
     public function allocationStateForAmounts(string $totalAmount, string $allocatedAmount): PaymentAllocationState
@@ -126,44 +78,31 @@ final class PaymentStatusService
         ?int $actorId = null,
         ?string $reason = null,
     ): Payment {
-        $from = $payment->status instanceof PaymentStatus
-            ? $payment->status
-            : PaymentStatus::from((string) $payment->status);
-        $to = $this->statusForAmounts($totalAmount, $allocatedAmount, $refundedAmount);
+        unset($actorId, $reason, $refundedAmount);
 
         $payment->forceFill([
-            'status' => $to->value,
             'allocation_status' => $this->allocationStateForAmounts($totalAmount, $allocatedAmount)->value,
-            'document_status' => $this->documentStatusFor($to)->value,
-            'posting_status' => $this->postingStatusFor($to)->value,
-            'posted_at' => $payment->posted_at ?? now(),
         ])->save();
-
-        if ($from !== $to) {
-            $this->record($payment->refresh(), $from, $to, $actorId, $reason);
-        }
 
         return $payment->refresh();
     }
 
     public function transition(Payment $payment, PaymentStatus $to, ?int $actorId = null, ?string $reason = null): Payment
     {
-        $from = $payment->status instanceof PaymentStatus
-            ? $payment->status
-            : PaymentStatus::from((string) $payment->status);
+        if ($to === PaymentStatus::Posted) {
+            throw new InvalidArgumentException('Use the payment posting service to post payments.');
+        }
+
+        $from = $this->status($payment);
         $this->assertCanTransition($from, $to);
 
         $updates = [
             'status' => $to->value,
             'document_status' => $this->documentStatusFor($to)->value,
-            'posting_status' => $this->postingStatusFor($to)->value,
         ];
         if ($to === PaymentStatus::Approved) {
             $updates['approved_by'] = $actorId;
             $updates['approved_at'] = now();
-        }
-        if ($to === PaymentStatus::Posted) {
-            $updates['posted_at'] = now();
         }
 
         $payment->forceFill($updates)->save();
@@ -172,13 +111,33 @@ final class PaymentStatusService
         return $payment->refresh();
     }
 
+    public function markPosted(Payment $payment, ?int $actorId = null, ?string $reason = null): Payment
+    {
+        $from = $this->status($payment);
+        $payment->forceFill([
+            'status' => PaymentStatus::Posted->value,
+            'document_status' => PaymentDocumentStatus::Approved->value,
+            'posting_status' => PaymentPostingStatus::Posted->value,
+            'posted_at' => now(),
+        ])->save();
+        $this->record($payment->refresh(), $from, PaymentStatus::Posted, $actorId, $reason ?? 'Payment posted.');
+
+        return $payment->refresh();
+    }
+
     public function void(Payment $payment, ?int $voidedBy = null, ?string $reason = null): Payment
     {
-        if ($payment->allocations()->where('status', AllocationStatus::Active->value)->exists()) {
+        $posting = $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
+        if ($posting === PaymentPostingStatus::Posted || $payment->finance_journal_entry_id !== null) {
+            throw new InvalidArgumentException('Posted payments must be reversed, not voided.');
+        }
+        if ($payment->allocations()->where('status', 'active')->exists()) {
             throw new InvalidArgumentException('Allocated payments must be reversed before they can be voided.');
         }
 
-        $payment = $this->transition($payment, PaymentStatus::Void, $voidedBy, $reason);
+        $payment = $this->transition($payment, PaymentStatus::Voided, $voidedBy, $reason);
         $payment->forceFill([
             'voided_by' => $voidedBy,
             'voided_at' => now(),
@@ -190,11 +149,7 @@ final class PaymentStatusService
 
     public function recordInitial(Payment $payment, ?int $actorId = null): void
     {
-        $to = $payment->status instanceof PaymentStatus
-            ? $payment->status
-            : PaymentStatus::from((string) $payment->status);
-
-        $this->record($payment, null, $to, $actorId, 'Payment created.');
+        $this->record($payment, null, $this->status($payment), $actorId, 'Payment created.');
     }
 
     public function record(
@@ -220,33 +175,21 @@ final class PaymentStatusService
         ]);
     }
 
+    private function status(Payment $payment): PaymentStatus
+    {
+        return $payment->status instanceof PaymentStatus
+            ? $payment->status
+            : PaymentStatus::from((string) $payment->status);
+    }
+
     private function documentStatusFor(PaymentStatus $status): PaymentDocumentStatus
     {
         return match ($status) {
             PaymentStatus::PendingApproval => PaymentDocumentStatus::Submitted,
-            PaymentStatus::Approved,
-            PaymentStatus::Posted,
-            PaymentStatus::PartiallyAllocated,
-            PaymentStatus::Allocated,
-            PaymentStatus::FullyAllocated,
-            PaymentStatus::Refunded => PaymentDocumentStatus::Approved,
-            PaymentStatus::Void,
-            PaymentStatus::Cancelled => PaymentDocumentStatus::Voided,
+            PaymentStatus::Approved, PaymentStatus::Posted => PaymentDocumentStatus::Approved,
+            PaymentStatus::Voided, PaymentStatus::Void, PaymentStatus::Cancelled => PaymentDocumentStatus::Voided,
             PaymentStatus::Reversed => PaymentDocumentStatus::Reversed,
             default => PaymentDocumentStatus::Draft,
-        };
-    }
-
-    private function postingStatusFor(PaymentStatus $status): PaymentPostingStatus
-    {
-        return match ($status) {
-            PaymentStatus::Posted,
-            PaymentStatus::PartiallyAllocated,
-            PaymentStatus::Allocated,
-            PaymentStatus::FullyAllocated,
-            PaymentStatus::Refunded => PaymentPostingStatus::Posted,
-            PaymentStatus::Reversed => PaymentPostingStatus::Reversed,
-            default => PaymentPostingStatus::NotPosted,
         };
     }
 }

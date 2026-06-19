@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->foreignId('payment_id')->constrained('payments', 'id')->cascadeOnDelete();
+            $table->foreignId('payment_line_id')->nullable()->constrained('payment_lines', 'id')->nullOnDelete();
             $table->foreignId('cheque_template_id')->constrained('cheque_templates', 'id');
             $table->unsignedBigInteger('printed_by')->nullable();
             $table->timestamp('printed_at');
@@ -24,6 +25,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'organization_unit_id'], 'cheque_print_logs_tenant_org_idx');
             $table->index(['payment_id', 'printed_at'], 'cheque_print_logs_payment_date_idx');
+            $table->index(['payment_line_id', 'printed_at'], 'cheque_print_logs_line_date_idx');
         });
     }
 

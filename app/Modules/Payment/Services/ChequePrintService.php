@@ -13,15 +13,13 @@ use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\ChequePrintLog;
 use Modules\Payment\Models\ChequeTemplate;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentLine;
 
 final class ChequePrintService
 {
     private const PRINTABLE_STATUSES = [
         PaymentStatus::Approved,
         PaymentStatus::Posted,
-        PaymentStatus::PartiallyAllocated,
-        PaymentStatus::FullyAllocated,
-        PaymentStatus::Allocated,
     ];
 
     public function __construct(
@@ -30,32 +28,38 @@ final class ChequePrintService
     ) {}
 
     /**
-     * @return array{payment: array<string, mixed>, template: array<string, mixed>}
+     * @return array{payment: array<string, mixed>, line: array<string, mixed>, template: array<string, mixed>}
      */
-    public function preview(Payment $payment, ChequeTemplate $template): array
+    public function preview(Payment $payment, PaymentLine $line, ChequeTemplate $template): array
     {
-        $this->assertPrintable($payment, $template);
+        $this->assertPrintable($payment, $line, $template);
 
-        $chequeDate = $payment->cheque_date ?? $payment->payment_date;
+        $chequeDate = $line->instrument_date ?? $payment->cheque_date ?? $payment->payment_date;
         $dateFormat = (string) ($template->metadata['date_format'] ?? 'Y-m-d');
         $formattedDate = $chequeDate instanceof CarbonInterface
             ? $chequeDate->format($dateFormat)
             : (string) $chequeDate;
-        $amount = (string) $payment->total_amount;
-        $words = $this->amountInWords->convert($amount);
+        $amount = (string) $line->amount;
+        $metadata = is_array($line->metadata) ? $line->metadata : [];
+        $payeeName = (string) ($metadata['payee_name'] ?? $payment->payee_name);
 
         return [
             'payment' => [
                 'id' => (int) $payment->getKey(),
                 'payment_number' => (string) $payment->payment_number,
+                'status' => $payment->status instanceof PaymentStatus ? $payment->status->value : (string) $payment->status,
+            ],
+            'line' => [
+                'id' => (int) $line->getKey(),
                 'payment_method' => PaymentMethodType::Cheque->value,
-                'payee_name' => (string) $payment->payee_name,
+                'payee_name' => $payeeName,
                 'amount' => $amount,
-                'amount_in_words' => $words,
-                'cheque_number' => $payment->cheque_number,
+                'amount_in_words' => $this->amountInWords->convert($amount),
+                'cheque_number' => $line->instrument_number ?? $payment->cheque_number,
                 'cheque_date' => $chequeDate instanceof CarbonInterface ? $chequeDate->toDateString() : $chequeDate,
                 'formatted_cheque_date' => $formattedDate,
-                'status' => $payment->status instanceof PaymentStatus ? $payment->status->value : (string) $payment->status,
+                'external_bank_name' => $line->external_bank_name,
+                'external_bank_branch' => $line->external_bank_branch,
             ],
             'template' => $template->toArray(),
         ];
@@ -63,16 +67,18 @@ final class ChequePrintService
 
     public function markPrinted(
         Payment $payment,
+        PaymentLine $line,
         ChequeTemplate $template,
         ?int $printedBy = null,
         ?string $notes = null,
     ): ChequePrintLog {
-        $this->assertPrintable($payment, $template);
+        $this->assertPrintable($payment, $line, $template);
 
         return ChequePrintLog::query()->create([
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
             'payment_id' => $payment->getKey(),
+            'payment_line_id' => $line->getKey(),
             'cheque_template_id' => $template->getKey(),
             'printed_by' => $printedBy,
             'printed_at' => now(),
@@ -81,14 +87,16 @@ final class ChequePrintService
         ]);
     }
 
-    private function assertPrintable(Payment $payment, ChequeTemplate $template): void
+    private function assertPrintable(Payment $payment, PaymentLine $line, ChequeTemplate $template): void
     {
+        if ((int) $line->payment_id !== (int) $payment->getKey()) {
+            throw new InvalidArgumentException('Cheque line must belong to the selected payment.');
+        }
         if ((int) $payment->tenant_id !== (int) $template->tenant_id
             || ($template->organization_unit_id !== null
                 && $payment->organization_unit_id !== $template->organization_unit_id)) {
             throw new InvalidArgumentException('Cheque template scope must match the payment scope.');
         }
-
         if (! (bool) $template->is_active) {
             throw new InvalidArgumentException('Cheque template must be active.');
         }
@@ -100,34 +108,31 @@ final class ChequePrintService
             throw new InvalidArgumentException('Only approved or posted cheque payments can be printed.');
         }
 
-        $payment->loadMissing('lines.paymentMethod');
-        if ($payment->lines->isEmpty() || $payment->lines->contains(function ($line): bool {
-            $type = $line->paymentMethod?->method_type;
-            $value = $type instanceof PaymentMethodType ? $type->value : (string) $type;
-
-            return $value !== PaymentMethodType::Cheque->value;
-        })) {
-            throw new InvalidArgumentException('Payment method must be cheque.');
+        $line->loadMissing('paymentMethod', 'internalBankAccount');
+        $type = $line->paymentMethod?->method_type;
+        $value = $type instanceof PaymentMethodType ? $type->value : (string) $type;
+        if ($value !== PaymentMethodType::Cheque->value) {
+            throw new InvalidArgumentException('Selected payment line is not cheque-capable.');
         }
 
-        if (trim((string) $payment->payee_name) === '') {
-            throw new InvalidArgumentException('Cheque payment must have a payee name.');
+        $metadata = is_array($line->metadata) ? $line->metadata : [];
+        if (trim((string) ($metadata['payee_name'] ?? $payment->payee_name)) === '') {
+            throw new InvalidArgumentException('Cheque line requires a payee name.');
+        }
+        if (trim((string) ($line->instrument_number ?? $payment->cheque_number)) === '') {
+            throw new InvalidArgumentException('Cheque line requires an instrument number.');
+        }
+        if ($this->math->compare((string) $line->amount, '0.000000') <= 0) {
+            throw new InvalidArgumentException('Cheque line amount must be greater than zero.');
         }
 
-        if ($this->math->compare((string) $payment->total_amount, '0.000000') <= 0) {
-            throw new InvalidArgumentException('Cheque payment amount must be greater than zero.');
-        }
-
-        if ($payment->bank_account_id !== null) {
-            $payment->loadMissing('bankAccount');
-            $bankAccount = $payment->bankAccount;
-            if ($bankAccount === null
-                || ! (bool) $bankAccount->is_bank_account
+        $bankAccount = $line->internalBankAccount ?? $payment->bankAccount;
+        if ($bankAccount !== null
+            && (! (bool) $bankAccount->is_bank_account
                 || (int) $bankAccount->tenant_id !== (int) $payment->tenant_id
                 || ($bankAccount->organization_unit_id !== null
-                    && $bankAccount->organization_unit_id !== $payment->organization_unit_id)) {
-                throw new InvalidArgumentException('Cheque bank account must match the payment scope.');
-            }
+                    && $bankAccount->organization_unit_id !== $payment->organization_unit_id))) {
+            throw new InvalidArgumentException('Cheque bank account must match the payment scope.');
         }
     }
 }

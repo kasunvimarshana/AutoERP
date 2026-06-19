@@ -7,6 +7,7 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Services\ReversalService as FinanceReversalService;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
@@ -26,6 +27,7 @@ final class PaymentReversalService
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
         private readonly PaymentStatusService $statuses,
         private readonly PaymentReversalNumberService $numbers,
+        private readonly FinanceReversalService $financeReversals,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -43,26 +45,40 @@ final class PaymentReversalService
             if ($payment->reversals()->exists()) {
                 throw new InvalidArgumentException('Payment reversal already exists for this payment.');
             }
-
-            if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed], true)) {
-                throw new InvalidArgumentException('Cancelled, void, or reversed payments cannot be reversed.');
+            if ($status !== PaymentStatus::Posted || $payment->posting_status !== PaymentPostingStatus::Posted) {
+                throw new InvalidArgumentException('Only posted payments can be reversed.');
+            }
+            if ($payment->finance_journal_entry_id === null) {
+                throw new InvalidArgumentException('Payment cannot be reversed without a posted Finance journal.');
             }
 
-            foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->get() as $allocation) {
+            $financeReversal = $this->financeReversals->reversePayment(
+                (int) $payment->tenant_id,
+                $payment->organization_unit_id,
+                (int) $payment->getKey(),
+                $data->reversalDate,
+                $data->reversedBy,
+                $data->reason,
+            );
+
+            foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->orderBy('invoice_id')->orderBy('id')->get() as $allocation) {
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
                     (string) $allocation->allocated_amount,
                 );
 
-                $allocation->forceFill([
-                    'status' => AllocationStatus::Reversed->value,
-                ])->save();
+                $allocation->forceFill(['status' => AllocationStatus::Reversed->value])->save();
+            }
+
+            foreach ($payment->allocations()->where('status', AllocationStatus::Pending->value)->get() as $allocation) {
+                $allocation->forceFill(['status' => AllocationStatus::Void->value])->save();
             }
 
             $reversal = PaymentReversal::query()->create([
                 'tenant_id' => $payment->tenant_id,
                 'organization_unit_id' => $payment->organization_unit_id,
                 'payment_id' => $payment->getKey(),
+                'finance_reversal_journal_entry_id' => $financeReversal->journalId,
                 'reversal_number' => $this->numbers->resolve($data, $payment),
                 'reversal_date' => $data->reversalDate,
                 'reason' => $data->reason,
@@ -81,9 +97,9 @@ final class PaymentReversalService
                 'instrument_status' => PaymentInstrumentStatus::Reversed->value,
                 'allocated_amount' => '0.000000',
                 'unapplied_amount' => '0.000000',
-                'voided_by' => $data->reversedBy,
-                'voided_at' => now(),
-                'void_reason' => $data->reason,
+                'reversed_by' => $data->reversedBy,
+                'reversed_at' => now(),
+                'reversal_reason' => $data->reason,
             ])->save();
             $this->statuses->record($payment->refresh(), $status, PaymentStatus::Reversed, $data->reversedBy, $data->reason);
 

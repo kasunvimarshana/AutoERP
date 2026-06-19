@@ -88,7 +88,7 @@ final class StorePaymentRequest extends TenantScopedRequest
     {
         return [
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.payment_method_id' => ['required', 'integer', 'min:1'],
             'lines.*.reference_number' => ['nullable', 'string', 'max:150'],
             'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.cleared_amount' => ['nullable', 'decimal:0,6', 'min:0'],

@@ -23,6 +23,7 @@ final class ChequePrintLog extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
+            'payment_line_id' => 'integer',
             'cheque_template_id' => 'integer',
             'printed_by' => 'integer',
             'printed_at' => 'datetime',
@@ -43,6 +44,11 @@ final class ChequePrintLog extends CoreModel
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
+    }
+
+    public function paymentLine(): BelongsTo
+    {
+        return $this->belongsTo(PaymentLine::class, 'payment_line_id');
     }
 
     public function chequeTemplate(): BelongsTo

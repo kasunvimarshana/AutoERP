@@ -19,8 +19,11 @@ use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationService;
+use Modules\Payment\Services\PaymentAuthorizationService;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentRefundService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
@@ -28,16 +31,20 @@ use Modules\Payment\Services\PaymentStatusService;
 
 final class PaymentController
 {
+    public function __construct(private readonly PaymentAuthorizationService $authorization) {}
+
     public function index(ListPaymentRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(Payment::query(), $request)->with('currency');
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
+
+        $query = $this->scope(Payment::query(), $request)->with(['currency', 'financeJournalEntry']);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
                 ->where('payment_number', 'like', "%{$search}%")
                 ->orWhere('reference_number', 'like', "%{$search}%"));
         }
-        foreach (['payment_type', 'direction', 'status', 'party_id'] as $filter) {
+        foreach (['payment_type', 'direction', 'status', 'allocation_status', 'posting_status', 'party_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
@@ -54,6 +61,8 @@ final class PaymentController
 
     public function store(StorePaymentRequest $request, PaymentCreationService $service): PaymentResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_CREATE);
+
         return new PaymentResource($service->create($request->toData()));
     }
 
@@ -61,12 +70,13 @@ final class PaymentController
         ListPaymentRequest $request,
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
-    ): PaymentResource
-    {
+    ): PaymentResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
+
         $row = $this->scope(Payment::query(), $request)
             ->with([
-                'currency', 'lines.paymentMethod', 'allocations',
-                'unappliedBalance', 'refunds', 'reversals', 'statusHistory',
+                'currency', 'bankAccount', 'financeJournalEntry', 'lines.paymentMethod', 'lines.internalBankAccount',
+                'allocations', 'unappliedBalance', 'refunds.refundPayment', 'reversals', 'statusHistory',
             ])->findOrFail($payment);
         $this->attachInvoiceReferences($row->allocations, $invoices);
 
@@ -75,11 +85,15 @@ final class PaymentController
 
     public function approve(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_APPROVE);
+
         return new PaymentResource($service->transition($this->find($request, $payment), PaymentStatus::Approved, $request->currentUserId()));
     }
 
     public function submitForApproval(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_SUBMIT);
+
         return new PaymentResource($service->transition(
             $this->find($request, $payment),
             PaymentStatus::PendingApproval,
@@ -87,13 +101,17 @@ final class PaymentController
         ));
     }
 
-    public function post(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
+    public function post(PaymentActionRequest $request, int $payment, PaymentPostingService $service): PaymentResource
     {
-        return new PaymentResource($service->transition($this->find($request, $payment), PaymentStatus::Posted, $request->currentUserId()));
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_POST);
+
+        return new PaymentResource($service->post($this->find($request, $payment), $request->currentUserId()));
     }
 
     public function void(PaymentActionRequest $request, int $payment, PaymentStatusService $service): PaymentResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VOID);
+
         return new PaymentResource($service->void(
             $this->find($request, $payment),
             $request->currentUserId(),
@@ -103,6 +121,7 @@ final class PaymentController
 
     public function reverse(ReversePaymentRequest $request, int $payment, PaymentReversalService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_REVERSE);
         $this->find($request, $payment);
 
         return response()->json(['data' => $service->reverse($request->toData($payment))]);
@@ -110,6 +129,8 @@ final class PaymentController
 
     public function allocate(AllocatePaymentRequest $request, int $payment, PaymentAllocationService $service): PaymentResource
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_ALLOCATE);
+
         return new PaymentResource($service->allocate($this->find($request, $payment), $request->toData()));
     }
 
@@ -117,8 +138,8 @@ final class PaymentController
         PaymentActionRequest $request,
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
-    ): JsonResponse
-    {
+    ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
         $allocations = $this->find($request, $payment)->allocations()->get();
         $this->attachInvoiceReferences($allocations, $invoices);
 
@@ -127,6 +148,8 @@ final class PaymentController
 
     public function unappliedBalance(PaymentActionRequest $request, int $payment): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
+
         return response()->json(['data' => $this->find($request, $payment)->unappliedBalance()->first()]);
     }
 
@@ -136,6 +159,8 @@ final class PaymentController
         int $line,
         PaymentSettlementService $service,
     ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_SETTLE);
+
         return response()->json([
             'data' => $service->transitionLine(
                 $this->find($request, $payment),
@@ -148,6 +173,7 @@ final class PaymentController
 
     public function refund(RefundPaymentRequest $request, int $payment, PaymentRefundService $service): JsonResponse
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_REFUND);
         $this->find($request, $payment);
 
         return response()->json(['data' => $service->refund($request->toData($payment))], 201);
@@ -168,7 +194,7 @@ final class PaymentController
     }
 
     /**
-     * @param  Collection<int, \Modules\Payment\Models\PaymentAllocation>  $allocations
+     * @param  Collection<int, PaymentAllocation>  $allocations
      */
     private function attachInvoiceReferences(
         Collection $allocations,

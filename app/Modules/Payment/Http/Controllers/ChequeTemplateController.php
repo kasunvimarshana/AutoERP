@@ -10,13 +10,18 @@ use Modules\Payment\Http\Requests\ListChequeTemplateRequest;
 use Modules\Payment\Http\Requests\UpsertChequeTemplateRequest;
 use Modules\Payment\Http\Resources\ChequeTemplateResource;
 use Modules\Payment\Services\ChequeTemplateService;
+use Modules\Payment\Services\PaymentAuthorizationService;
 
 final class ChequeTemplateController
 {
+    public function __construct(private readonly PaymentAuthorizationService $authorization) {}
+
     public function index(
         ListChequeTemplateRequest $request,
         ChequeTemplateService $service,
     ): AnonymousResourceCollection {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::TEMPLATES_VIEW);
+
         return ChequeTemplateResource::collection($service->list(
             $request->tenantId(),
             $request->organizationUnitId(),
@@ -28,6 +33,8 @@ final class ChequeTemplateController
         UpsertChequeTemplateRequest $request,
         ChequeTemplateService $service,
     ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::TEMPLATES_CREATE);
+
         return (new ChequeTemplateResource($service->create(
             $request->validated(),
             $request->tenantId(),
@@ -40,6 +47,8 @@ final class ChequeTemplateController
         int $id,
         ChequeTemplateService $service,
     ): ChequeTemplateResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::TEMPLATES_VIEW);
+
         return new ChequeTemplateResource($service->find(
             $id,
             $request->tenantId(),
@@ -52,6 +61,7 @@ final class ChequeTemplateController
         int $id,
         ChequeTemplateService $service,
     ): ChequeTemplateResource {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::TEMPLATES_UPDATE);
         $template = $service->find($id, $request->tenantId(), $request->organizationUnitId());
 
         return new ChequeTemplateResource($service->update($template, $request->validated()));
@@ -62,6 +72,7 @@ final class ChequeTemplateController
         int $id,
         ChequeTemplateService $service,
     ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::TEMPLATES_DELETE);
         $service->delete($service->find($id, $request->tenantId(), $request->organizationUnitId()));
 
         return response()->json(status: 204);

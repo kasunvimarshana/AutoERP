@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->foreignId('payment_id')->constrained('payments', 'id')->cascadeOnDelete();
+            $table->foreignId('refund_payment_id')->nullable()->constrained('payments', 'id')->nullOnDelete();
             $table->string('refund_number', 100);
             $table->date('refund_date');
             $table->string('party_type')->nullable();
@@ -28,6 +29,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'refund_number'], 'payment_refunds_tenant_number_uk');
+            $table->unique('refund_payment_id', 'payment_refunds_refund_payment_uk');
             $table->index('payment_id', 'payment_refunds_payment_idx');
         });
     }

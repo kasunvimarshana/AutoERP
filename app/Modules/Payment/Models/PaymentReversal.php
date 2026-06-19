@@ -6,6 +6,7 @@ namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\CoreModel;
+use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -25,6 +26,7 @@ final class PaymentReversal extends CoreModel
             'reversed_by' => 'integer',
             'original_amount' => 'decimal:6',
             'reversed_amount' => 'decimal:6',
+            'finance_reversal_journal_entry_id' => 'integer',
             'metadata' => 'array',
         ]);
     }
@@ -32,6 +34,11 @@ final class PaymentReversal extends CoreModel
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
+    }
+
+    public function financeReversalJournalEntry(): BelongsTo
+    {
+        return $this->belongsTo(FinanceJournalEntry::class, 'finance_reversal_journal_entry_id');
     }
 
     public function tenant(): BelongsTo

@@ -8,34 +8,42 @@ use Illuminate\Http\JsonResponse;
 use Modules\Payment\Http\Requests\ChequePrintRequest;
 use Modules\Payment\Http\Resources\ChequePrintLogResource;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Services\ChequePrintService;
 use Modules\Payment\Services\ChequeTemplateService;
+use Modules\Payment\Services\PaymentAuthorizationService;
 
 final class ChequePrintController
 {
+    public function __construct(private readonly PaymentAuthorizationService $authorization) {}
+
     public function preview(
         ChequePrintRequest $request,
         int $payment,
+        int $line,
         ChequeTemplateService $templates,
         ChequePrintService $prints,
     ): JsonResponse {
-        $row = $this->payment($request, $payment);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::CHEQUES_PREVIEW);
+        [$row, $paymentLine] = $this->paymentLine($request, $payment, $line);
         $template = $templates->resolveActive(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->filled('cheque_template_id') ? (int) $request->input('cheque_template_id') : null,
         );
 
-        return response()->json(['data' => $prints->preview($row, $template)]);
+        return response()->json(['data' => $prints->preview($row, $paymentLine, $template)]);
     }
 
     public function markPrinted(
         ChequePrintRequest $request,
         int $payment,
+        int $line,
         ChequeTemplateService $templates,
         ChequePrintService $prints,
     ): JsonResponse {
-        $row = $this->payment($request, $payment);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::CHEQUES_PRINT);
+        [$row, $paymentLine] = $this->paymentLine($request, $payment, $line);
         $template = $templates->resolveActive(
             $request->tenantId(),
             $request->organizationUnitId(),
@@ -43,6 +51,7 @@ final class ChequePrintController
         );
         $log = $prints->markPrinted(
             $row,
+            $paymentLine,
             $template,
             $request->currentUserId(),
             $request->filled('notes') ? (string) $request->input('notes') : null,
@@ -51,16 +60,23 @@ final class ChequePrintController
         return (new ChequePrintLogResource($log))->response()->setStatusCode(201);
     }
 
-    private function payment(ChequePrintRequest $request, int $payment): Payment
+    /** @return array{0: Payment, 1: PaymentLine} */
+    private function paymentLine(ChequePrintRequest $request, int $payment, int $line): array
     {
         $query = Payment::query()
             ->where('tenant_id', $request->tenantId())
-            ->with(['lines.paymentMethod', 'bankAccount']);
+            ->with(['lines.paymentMethod', 'lines.internalBankAccount', 'bankAccount']);
 
         $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $request->organizationUnitId());
 
-        return $query->findOrFail($payment);
+        $row = $query->findOrFail($payment);
+        $paymentLine = $row->lines->firstWhere('id', $line);
+        if (! $paymentLine instanceof PaymentLine) {
+            abort(404);
+        }
+
+        return [$row, $paymentLine];
     }
 }

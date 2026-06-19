@@ -47,18 +47,26 @@ return new class extends Migration
                 'pending_approval',
                 'approved',
                 'posted',
+                'voided',
+                'reversed',
+                'cancelled',
                 'partially_allocated',
                 'fully_allocated',
                 'allocated',
                 'refunded',
                 'void',
-                'reversed',
-                'cancelled',
             ])->default('draft');
             $table->decimal('total_amount', 20, 6)->default('0');
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('unapplied_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');
+            $table->foreignId('finance_journal_entry_id')->nullable()->constrained('finance_journal_entries', 'id')->nullOnDelete();
+            $table->string('posting_correlation_key', 160)->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('reversed_at')->nullable();
+            $table->text('reversal_reason')->nullable();
+            $table->foreignId('reversal_payment_id')->nullable()->constrained('payments', 'id')->nullOnDelete();
+            $table->foreignId('original_payment_id')->nullable()->constrained('payments', 'id')->nullOnDelete();
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -79,6 +87,9 @@ return new class extends Migration
             $table->index(['source_type', 'source_id'], 'payments_source_idx');
             $table->index('cheque_number', 'payments_cheque_number_idx');
             $table->index('payment_date', 'payments_date_idx');
+            $table->unique('posting_correlation_key', 'payments_posting_correlation_uk');
+            $table->index('finance_journal_entry_id', 'payments_finance_journal_idx');
+            $table->index('original_payment_id', 'payments_original_payment_idx');
         });
     }
 
