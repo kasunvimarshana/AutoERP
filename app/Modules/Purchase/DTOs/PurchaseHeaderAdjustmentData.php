@@ -30,5 +30,7 @@ final readonly class PurchaseHeaderAdjustmentData
         public ?string $taxTreatment = null,
         public ?string $mappingSource = null,
         public ?string $overrideReason = null,
+        /** @var list<array{client_line_key?: string|null, purchase_order_line_id?: int|null, amount: string}> */
+        public array $manualAllocations = [],
     ) {}
 }

@@ -12,7 +12,7 @@ final class PurchaseHeaderAdjustmentService
 {
     public function __construct(
         private readonly DecimalMath $math,
-        private readonly PurchaseAdjustmentCatalogueService $catalogue,
+        private readonly PurchaseAdjustmentPolicyResolver $policies,
     ) {}
 
     public function create(
@@ -22,11 +22,13 @@ final class PurchaseHeaderAdjustmentService
         int $sourceId,
         PurchaseHeaderAdjustmentData $data,
         ?string $amount = null,
+        ?int $userId = null,
+        string $fieldPrefix = 'adjustments',
     ): PurchaseHeaderAdjustment {
         $value = $this->math->normalize($amount ?? $data->amount);
-        $defaults = $this->catalogue->defaultsFor($data->adjustmentType);
+        $policy = $this->policies->resolveForData($data, $tenantId, $organizationUnitId, $fieldPrefix, $userId);
 
-        return PurchaseHeaderAdjustment::query()->create([
+        $model = PurchaseHeaderAdjustment::query()->create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'source_type' => $sourceType,
@@ -43,15 +45,21 @@ final class PurchaseHeaderAdjustmentService
             'remaining_amount' => $value,
             'allocation_method' => $data->allocationMethod,
             'is_allocatable' => $data->isAllocatable,
-            'finance_posting_profile_id' => $data->financePostingProfileId,
-            'finance_account_id' => $data->financeAccountId,
-            'cost_treatment' => $data->costTreatment ?? (string) $defaults['cost_treatment'],
-            'tax_treatment' => $data->taxTreatment ?? (string) $defaults['tax_treatment'],
-            'mapping_source' => $data->mappingSource ?? 'catalogue',
+            'finance_posting_profile_id' => $policy['finance_posting_profile_id'],
+            'finance_account_id' => $policy['finance_account_id'],
+            'cost_treatment' => $policy['cost_treatment'],
+            'tax_treatment' => $policy['tax_treatment'],
+            'mapping_source' => $policy['mapping_source'],
             'override_reason' => $data->overrideReason,
             'sort_order' => $data->sortOrder,
             'description' => $data->description,
         ]);
+
+        if ($data->manualAllocations !== []) {
+            $model->setAttribute('manual_allocation_payload', $data->manualAllocations);
+        }
+
+        return $model;
     }
 
     public function cloneProportionally(PurchaseHeaderAdjustment $adjustment, string $sourceType, int $sourceId, string $ratio): PurchaseHeaderAdjustment

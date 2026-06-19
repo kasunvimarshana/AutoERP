@@ -7,6 +7,7 @@ export interface EditableHeaderAdjustment {
     rate: string;
     amount: string;
     allocation_method: string;
+    allocations?: Array<{ client_line_key: string; amount: string }>;
     finance_mapping_label?: string;
     cost_treatment?: string;
     tax_treatment?: string;
@@ -25,6 +26,7 @@ export function emptyHeaderAdjustment(): EditableHeaderAdjustment {
         rate: '0.000000',
         amount: '0.000000',
         allocation_method: 'proportional',
+        allocations: [],
         finance_mapping_label: 'Freight-in / landed cost',
         cost_treatment: 'landed_cost_or_expense',
         tax_treatment: 'none',

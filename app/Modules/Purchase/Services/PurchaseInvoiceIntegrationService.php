@@ -21,6 +21,7 @@ final class PurchaseInvoiceIntegrationService
         private readonly InvoiceCreationService $invoices,
         private readonly PurchaseInvoiceDtoFactory $invoiceData,
         private readonly PurchaseInvoiceQuantityUpdater $quantities,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
         private readonly PurchaseValidationService $validator,
     ) {}
 
@@ -32,6 +33,7 @@ final class PurchaseInvoiceIntegrationService
             $invoice = $this->invoices->create($prepared->invoiceData);
 
             $this->createPurchaseLinks($data, $prepared, $invoice);
+            $this->adjustmentAllocations->recordInvoiceAllocationsForInvoice($invoice, $prepared);
             $this->quantities->apply($prepared->lineQuantities, $prepared->goodsReceipts);
 
             return $invoice;

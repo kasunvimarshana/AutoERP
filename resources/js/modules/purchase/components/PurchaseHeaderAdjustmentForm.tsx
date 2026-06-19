@@ -12,6 +12,11 @@ import type { PurchaseAdjustmentCatalogueEntry } from '../purchaseTypes';
 
 type AdjustmentFormErrors = Partial<Record<'name' | 'amount' | 'rate', string>>;
 
+export interface HeaderAdjustmentAllocationLine {
+    clientLineKey: string;
+    label: string;
+}
+
 const fallbackAdjustmentTypes = [
     'discount',
     'tax',
@@ -44,10 +49,11 @@ const calculationBases = [
     { value: 'subtotal_after_line_adjustments', label: 'After line adjustments' },
 ];
 
-export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, errorFor, onSave, onCancel }: {
+export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, allocationLines = [], errorFor, onSave, onCancel }: {
     adjustment: EditableHeaderAdjustment;
     mode: 'create' | 'edit';
     catalogue: PurchaseAdjustmentCatalogueEntry[];
+    allocationLines?: HeaderAdjustmentAllocationLine[];
     errorFor: (field: string) => string | undefined;
     onSave: (adjustment: EditableHeaderAdjustment) => void;
     onCancel: () => void;
@@ -67,6 +73,15 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, erro
         ? selectedCatalogue.allowed_effects.map((value) => ({ value, label: value === 'increase' ? 'Increase' : 'Decrease' }))
         : effectOptions;
     const effectReadonly = effectChoices.length === 1;
+    const updateAllocation = (clientLineKey: string, amount: string) => {
+        setDraft((current) => {
+            const rows = (current.allocations ?? []).filter((row) => row.client_line_key !== clientLineKey);
+            if (amount.trim() !== '') rows.push({ client_line_key: clientLineKey, amount });
+
+            return { ...current, allocations: rows };
+        });
+    };
+    const allocationAmount = (clientLineKey: string) => draft.allocations?.find((row) => row.client_line_key === clientLineKey)?.amount ?? '';
 
     const applyCatalogue = (type: string) => {
         const entry = catalogue.find((row) => row.type === type);
@@ -113,6 +128,21 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, erro
                         : <DecimalInput label="Amount" value={draft.amount} error={formError('amount')} onChange={(event) => set('amount', event.target.value)} />}
                     <Select label="Allocation" value={draft.allocation_method} options={allocationOptions} error={errorFor('allocation_method')} onChange={(event) => set('allocation_method', event.target.value)} />
                 </div>
+                {draft.allocation_method === 'manual' && allocationLines.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 p-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {allocationLines.map((line, index) => (
+                                <DecimalInput
+                                    key={line.clientLineKey}
+                                    label={line.label}
+                                    value={allocationAmount(line.clientLineKey)}
+                                    error={errorFor(`allocations.${index}.amount`) ?? errorFor(`allocations.${index}.client_line_key`)}
+                                    onChange={(event) => updateAllocation(line.clientLineKey, event.target.value)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </section>
 
             <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -141,5 +171,9 @@ function validateAdjustmentForm(adjustment: EditableHeaderAdjustment): Adjustmen
     if (!adjustment.name.trim()) errors.name = 'Enter an adjustment name.';
     if (adjustment.calculation_type === 'percentage' && !isNonNegativeDecimal(adjustment.rate)) errors.rate = 'Rate cannot be negative.';
     if (adjustment.calculation_type === 'fixed' && !isNonNegativeDecimal(adjustment.amount)) errors.amount = 'Amount cannot be negative.';
+    if (adjustment.allocation_method === 'manual') {
+        const invalid = (adjustment.allocations ?? []).some((row) => !isNonNegativeDecimal(row.amount));
+        if (invalid) errors.amount = 'Manual allocation amounts cannot be negative.';
+    }
     return errors;
 }

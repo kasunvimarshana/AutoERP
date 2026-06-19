@@ -61,6 +61,21 @@ final class PurchaseAcquisitionCostAllocator
             $signed = $adjustment->effect === PurchaseAdjustmentEffect::Decrease
                 ? '-'.$this->math->normalize((string) $adjustment->amount)
                 : $this->math->normalize((string) $adjustment->amount);
+            $manualShares = $this->adjustmentAllocations->manualReceiptLineShares($adjustment, $grn);
+            if ($manualShares !== []) {
+                foreach ($manualShares as $lineId => $share) {
+                    if (! array_key_exists($lineId, $amounts)) {
+                        continue;
+                    }
+                    $signedShare = $adjustment->effect === PurchaseAdjustmentEffect::Decrease
+                        ? '-'.$this->math->normalize($share)
+                        : $this->math->normalize($share);
+                    $amounts[$lineId] = $this->math->add($amounts[$lineId], $signedShare);
+                }
+
+                continue;
+            }
+
             $allocated = '0.000000';
             $lastIndex = $lines->count() - 1;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -13,6 +14,7 @@ use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\IdempotencyService;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -26,7 +28,6 @@ use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Supplier\Models\Supplier;
-use Modules\Supplier\Models\SupplierItemMapping;
 use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
 use Modules\Tax\Models\TaxGroup;
@@ -49,6 +50,7 @@ final class FastPurchaseService
         private readonly WarehouseDefaultResolver $warehouses,
         private readonly PurchaseDocumentContextService $documentContexts,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
+        private readonly PurchaseAdjustmentPolicyResolver $adjustmentPolicies,
         private readonly PurchaseOrderCalculationService $purchaseCalculator,
         private readonly PurchasePricingService $pricing,
         private readonly PaymentTermsResolver $paymentTerms,
@@ -161,6 +163,7 @@ final class FastPurchaseService
     {
         $tenantId = (int) $payload['tenant_id'];
         $organizationUnitId = $this->nullableInt($payload['organization_unit_id'] ?? null);
+        $currentUserId = $this->nullableInt($payload['current_user_id'] ?? null);
         $purchaseDate = (string) $payload['purchase_date'];
         if ($lockRecords) {
             $this->lockPayloadReferences($payload);
@@ -201,6 +204,8 @@ final class FastPurchaseService
             $tenantId,
             $organizationUnitId,
             $createInvoice,
+            $currentUserId,
+            $lockRecords,
         );
         $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
@@ -209,7 +214,7 @@ final class FastPurchaseService
         return [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'current_user_id' => $this->nullableInt($payload['current_user_id'] ?? null),
+            'current_user_id' => $currentUserId,
             'supplier' => $supplier,
             'supplier_reference' => $supplierReference,
             'purchase_date' => $purchaseDate,
@@ -613,9 +618,9 @@ final class FastPurchaseService
     /**
      * @param  list<array<string, mixed>>  $payloads
      * @param  list<array<string, mixed>>  $lines
-     * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string}>
+     * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string, accounting: array<string, mixed>}>
      */
-    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId, bool $createInvoice): array
+    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId, bool $createInvoice, ?int $userId, bool $lockRecords): array
     {
         $adjustments = [];
         foreach (array_values($payloads) as $index => $row) {
@@ -643,11 +648,18 @@ final class FastPurchaseService
                 taxTreatment: $this->nullableString($row['tax_treatment'] ?? null) ?? (string) $defaults['tax_treatment'],
                 mappingSource: $this->nullableString($row['mapping_source'] ?? null) ?? 'catalogue',
                 overrideReason: $this->nullableString($row['override_reason'] ?? null),
+                manualAllocations: $this->manualAllocationsFromPayload($row['allocations'] ?? [], "adjustments.{$index}"),
             );
 
             $this->validator->assertNonNegative($data->amount, 'Fast purchase adjustment amount cannot be negative.');
             $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
             $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
+            $accounting = $this->adjustmentPolicies->resolveForData($data, $tenantId, $organizationUnitId, "adjustments.{$index}", $userId, $lockRecords);
+            if ($accounting['final_treatment'] === 'unsupported') {
+                throw ValidationException::withMessages([
+                    "adjustments.{$index}.cost_treatment" => ['This adjustment accounting treatment is not supported for Fast Purchase.'],
+                ]);
+            }
             if (! $createInvoice) {
                 if (collect($lines)->contains(fn (array $line): bool => ! (bool) $line['is_stock'])) {
                     throw ValidationException::withMessages([
@@ -656,7 +668,7 @@ final class FastPurchaseService
                 }
                 $this->assertReceiveOnlyAdjustmentSupported($data, "adjustments.{$index}.adjustment_type");
             }
-            $adjustments[] = $data;
+            $adjustments[] = ['data' => $data, 'accounting' => $accounting];
         }
 
         $amounts = $this->purchaseCalculator->headerAdjustmentAmounts(
@@ -670,11 +682,17 @@ final class FastPurchaseService
                 'chargeCalculationType' => PurchaseAdjustmentCalculationType::Fixed,
                 'chargeAmount' => $line['charge_amount'],
             ], $lines),
-            $adjustments,
+            array_map(static fn (array $row): PurchaseHeaderAdjustmentData => $row['data'], $adjustments),
         );
 
+        foreach ($adjustments as $index => $row) {
+            /** @var PurchaseHeaderAdjustmentData $data */
+            $data = $row['data'];
+            $this->assertManualAdjustmentAllocations($data, $lines, $amounts[$index] ?? '0.000000', "adjustments.{$index}");
+        }
+
         return array_map(
-            static fn (PurchaseHeaderAdjustmentData $data, string $amount): array => ['data' => $data, 'amount' => $amount],
+            static fn (array $row, string $amount): array => ['data' => $row['data'], 'amount' => $amount, 'accounting' => $row['accounting']],
             $adjustments,
             $amounts,
         );
@@ -705,6 +723,97 @@ final class FastPurchaseService
     {
         if ($createInvoice && $this->math->compare($paidTotal, $grandTotal) < 0 && ! (bool) $supplier->is_credit_allowed) {
             throw new InvalidArgumentException('Supplier is not enabled for credit purchases.');
+        }
+    }
+
+    /**
+     * @return list<array{client_line_key?: string|null, purchase_order_line_id?: int|null, amount: string}>
+     */
+    private function manualAllocationsFromPayload(mixed $payload, string $fieldPrefix): array
+    {
+        if ($payload === null || $payload === []) {
+            return [];
+        }
+        if (! is_array($payload)) {
+            throw ValidationException::withMessages(["{$fieldPrefix}.allocations" => ['Manual allocations must be an array.']]);
+        }
+
+        $allocations = [];
+        foreach (array_values($payload) as $index => $row) {
+            if (! is_array($row)) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}" => ['Manual allocation rows are invalid.']]);
+            }
+            $clientKey = $this->nullableString($row['client_line_key'] ?? null);
+            $lineId = $this->nullableInt($row['purchase_order_line_id'] ?? null);
+            if ($clientKey === null && $lineId === null) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.client_line_key" => ['Manual allocation rows must reference a purchase line.']]);
+            }
+            $amount = $this->math->normalize((string) ($row['amount'] ?? '0.000000'));
+            if ($this->math->isNegative($amount)) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.amount" => ['Manual allocation amount cannot be negative.']]);
+            }
+            $allocations[] = [
+                'client_line_key' => $clientKey,
+                'purchase_order_line_id' => $lineId,
+                'amount' => $amount,
+            ];
+        }
+
+        return $allocations;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     */
+    private function assertManualAdjustmentAllocations(PurchaseHeaderAdjustmentData $data, array $lines, string $requiredAmount, string $fieldPrefix): void
+    {
+        if ($data->allocationMethod !== PurchaseAdjustmentAllocationMethod::Manual) {
+            if ($data->manualAllocations !== []) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations" => ['Manual allocation rows are only valid when allocation_method is manual.']]);
+            }
+
+            return;
+        }
+
+        if (! $data->isAllocatable) {
+            throw ValidationException::withMessages(["{$fieldPrefix}.is_allocatable" => ['Manual allocation requires an allocatable adjustment.']]);
+        }
+        if ($data->manualAllocations === []) {
+            throw ValidationException::withMessages(["{$fieldPrefix}.allocations" => ['Manual allocation requires explicit line allocations.']]);
+        }
+
+        $linesByKey = [];
+        foreach ($lines as $line) {
+            $key = $this->nullableString($line['client_line_key'] ?? null);
+            if ($key !== null) {
+                $linesByKey[$key] = $line;
+            }
+        }
+
+        $seen = [];
+        $total = '0.000000';
+        foreach ($data->manualAllocations as $index => $allocation) {
+            $clientKey = $this->nullableString($allocation['client_line_key'] ?? null);
+            if ($clientKey === null) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.client_line_key" => ['Fast Purchase manual allocations must use client line keys.']]);
+            }
+            if (! array_key_exists($clientKey, $linesByKey)) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.client_line_key" => ['Manual allocation references an unknown purchase line.']]);
+            }
+            if (isset($seen[$clientKey])) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.client_line_key" => ['Manual allocation cannot reference the same purchase line more than once.']]);
+            }
+            $seen[$clientKey] = true;
+
+            $amount = $this->math->normalize((string) $allocation['amount']);
+            if ($this->math->isNegative($amount)) {
+                throw ValidationException::withMessages(["{$fieldPrefix}.allocations.{$index}.amount" => ['Manual allocation amount cannot be negative.']]);
+            }
+            $total = $this->math->add($total, $amount);
+        }
+
+        if ($this->math->compare($total, $requiredAmount) !== 0) {
+            throw ValidationException::withMessages(["{$fieldPrefix}.allocations" => ['Manual allocation total must equal the calculated adjustment amount.']]);
         }
     }
 
@@ -742,6 +851,7 @@ final class FastPurchaseService
     private function lockPayloadReferences(array $payload): void
     {
         $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
+        $adjustments = is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [];
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
         $paymentLines = is_array($payment['lines'] ?? null) && $payment['lines'] !== []
             ? $payment['lines']
@@ -756,11 +866,15 @@ final class FastPurchaseService
         $this->lockModelIds(UnitOfMeasureModel::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['uom_id'] ?? null) : null, $lines));
         $this->lockModelIds(TaxGroup::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['tax_group_id'] ?? null) : null, $lines));
         $this->lockModelIds(PaymentMethod::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['payment_method_id'] ?? null) : null, $paymentLines));
-        $this->lockModelIds(FinanceAccount::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['source_account_id'] ?? null) : null, $paymentLines));
+        $this->lockModelIds(FinancePostingProfile::class, array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_posting_profile_id'] ?? null) : null, $adjustments));
+        $this->lockModelIds(FinanceAccount::class, array_merge(
+            array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['source_account_id'] ?? null) : null, $paymentLines),
+            array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_account_id'] ?? null) : null, $adjustments),
+        ));
     }
 
     /**
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     * @param  class-string<Model>  $modelClass
      * @param  array<int, mixed>  $values
      */
     private function lockModelIds(string $modelClass, array $values): void

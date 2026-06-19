@@ -45,6 +45,7 @@ final class PurchaseInvoiceDtoFactory
         private readonly DecimalMath $math,
         private readonly PurchaseProcurementBalanceService $balances,
         private readonly PurchaseDocumentLockService $locks,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
     ) {}
 
     public function prepare(
@@ -65,6 +66,7 @@ final class PurchaseInvoiceDtoFactory
         $lineage = [
             'source_types_by_po_line' => [],
             'requested_by_po_line' => [],
+            'invoice_adjustments_seen' => [],
         ];
         $lockedSources = $lockSources ? $this->lockInvoiceSources($data->sources) : null;
 
@@ -367,6 +369,7 @@ final class PurchaseInvoiceDtoFactory
         $selectedLines = 0;
         $requestedLineIds = array_map('intval', array_keys($source->lineQuantities));
         $seenRequestedLineIds = [];
+        $currentInvoiceQuantities = [];
 
         foreach ($grn->lines as $sourceLine) {
             if ($sourceLine->purchaseOrderLine instanceof PurchaseOrderLine
@@ -411,6 +414,8 @@ final class PurchaseInvoiceDtoFactory
                 $this->math->mul($quantity, (string) $sourceLine->unit_price),
             );
             $lineQuantities[self::GOODS_RECEIPT_LINE.':'.$sourceLine->getKey()] = $quantity;
+            $currentInvoiceQuantities[self::GOODS_RECEIPT_LINE.':'.$sourceLine->getKey()] = $quantity;
+            $lineage['current_invoice_quantities'][self::GOODS_RECEIPT_LINE.':'.$sourceLine->getKey()] = $quantity;
 
             $invoiceLines[] = new InvoiceLineData(
                 lineNumber: $lineNumber++,
@@ -468,7 +473,30 @@ final class PurchaseInvoiceDtoFactory
             throw new InvalidArgumentException('Purchase invoice source has no invoiceable lines.');
         }
 
-        $sourceAdjustmentTotal = $this->adjustmentTotal($grn->adjustments);
+        $sourceAdjustmentTotal = $this->appendAdjustments(
+            $grn->adjustments,
+            $adjustments,
+            (int) $grn->getKey(),
+            self::GOODS_RECEIPT,
+            null,
+            [],
+            $lineage,
+        );
+        $sourceOrder = $this->sourceOrderForReceipt($grn);
+        if ($sourceOrder instanceof PurchaseOrder) {
+            $sourceAdjustmentTotal = $this->math->add(
+                $sourceAdjustmentTotal,
+                $this->appendAdjustments(
+                    $this->orderAdjustmentsNotClonedToReceipt($sourceOrder, $grn),
+                    $adjustments,
+                    (int) $grn->getKey(),
+                    self::GOODS_RECEIPT,
+                    $sourceOrder,
+                    $currentInvoiceQuantities,
+                    $lineage,
+                ),
+            );
+        }
         $sourceTotals[self::GOODS_RECEIPT.':'.$grn->getKey()] = [
             'line_total' => $selectedTotal,
             'adjustment_total' => $sourceAdjustmentTotal,
@@ -483,12 +511,6 @@ final class PurchaseInvoiceDtoFactory
             sourceSubtotal: (string) $grn->subtotal,
             sourceAdjustmentTotal: $sourceAdjustmentTotal,
             sourceGrandTotal: (string) $grn->grand_total,
-        );
-        $this->appendAdjustments(
-            $grn->adjustments,
-            $adjustments,
-            (int) $grn->getKey(),
-            self::GOODS_RECEIPT,
         );
 
         return $lineNumber;
@@ -587,6 +609,7 @@ final class PurchaseInvoiceDtoFactory
         $selectedLines = 0;
         $requestedLineIds = array_map('intval', array_keys($source->lineQuantities));
         $seenRequestedLineIds = [];
+        $currentInvoiceQuantities = [];
         foreach ($order->lines as $sourceLine) {
             /** @var PurchaseOrderLine $sourceLine */
             $remaining = $this->balances->remainingInvoiceableForPurchaseOrderLine($sourceLine);
@@ -623,6 +646,8 @@ final class PurchaseInvoiceDtoFactory
                 $this->math->mul($quantity, (string) $sourceLine->unit_price),
             );
             $lineQuantities[self::PURCHASE_ORDER_LINE.':'.$sourceLine->getKey()] = $quantity;
+            $currentInvoiceQuantities[self::PURCHASE_ORDER_LINE.':'.$sourceLine->getKey()] = $quantity;
+            $lineage['current_invoice_quantities'][self::PURCHASE_ORDER_LINE.':'.$sourceLine->getKey()] = $quantity;
 
             $invoiceLines[] = new InvoiceLineData(
                 lineNumber: $lineNumber++,
@@ -676,7 +701,15 @@ final class PurchaseInvoiceDtoFactory
             throw new InvalidArgumentException('Purchase invoice source has no invoiceable lines.');
         }
 
-        $sourceAdjustmentTotal = $this->adjustmentTotal($order->adjustments);
+        $sourceAdjustmentTotal = $this->appendAdjustments(
+            $order->adjustments,
+            $adjustments,
+            (int) $order->getKey(),
+            self::PURCHASE_ORDER,
+            $order,
+            $currentInvoiceQuantities,
+            $lineage,
+        );
         $sourceTotals[self::PURCHASE_ORDER.':'.$order->getKey()] = [
             'line_total' => $selectedTotal,
             'adjustment_total' => $sourceAdjustmentTotal,
@@ -691,12 +724,6 @@ final class PurchaseInvoiceDtoFactory
             sourceSubtotal: (string) $order->subtotal,
             sourceAdjustmentTotal: $sourceAdjustmentTotal,
             sourceGrandTotal: (string) $order->grand_total,
-        );
-        $this->appendAdjustments(
-            $order->adjustments,
-            $adjustments,
-            (int) $order->getKey(),
-            self::PURCHASE_ORDER,
         );
 
         return $lineNumber;
@@ -725,29 +752,64 @@ final class PurchaseInvoiceDtoFactory
         ]);
     }
 
+    /**
+     * @param  array<string, string>  $currentInvoiceQuantities
+     * @param  array<string, mixed>  $lineage
+     */
     private function appendAdjustments(
         Collection $sourceAdjustments,
         array &$invoiceAdjustments,
         int $sourceId,
         string $sourceType,
-    ): void {
+        ?PurchaseOrder $order = null,
+        array $currentInvoiceQuantities = [],
+        array &$lineage = [],
+    ): string {
+        $total = '0.000000';
         foreach ($sourceAdjustments as $adjustment) {
-            if ($adjustment instanceof PurchaseHeaderAdjustment && (bool) $adjustment->is_allocatable) {
-                $invoiceAdjustments[] = $this->toInvoiceAdjustment(
-                    $adjustment,
-                    $sourceId,
-                    $sourceType,
-                );
+            if (! $adjustment instanceof PurchaseHeaderAdjustment || ! (bool) $adjustment->is_allocatable) {
+                continue;
             }
+
+            $origin = $this->adjustmentAllocations->origin($adjustment);
+            $method = $this->adjustmentAllocations->allocationMethodValue($adjustment);
+            $seenKey = (string) $origin->getKey().':'.$method;
+            if (in_array($method, ['first_invoice', 'last_invoice'], true) && isset($lineage['invoice_adjustments_seen'][$seenKey])) {
+                continue;
+            }
+
+            $allocationQuantities = $method === 'last_invoice'
+                ? ($lineage['current_invoice_quantities'] ?? $currentInvoiceQuantities)
+                : $currentInvoiceQuantities;
+            $amount = $order instanceof PurchaseOrder
+                ? $this->adjustmentAllocations->invoiceShare($adjustment, $order, $allocationQuantities)
+                : (string) $adjustment->amount;
+            if ($this->math->isZero($amount)) {
+                continue;
+            }
+
+            $lineage['invoice_adjustments_seen'][$seenKey] = true;
+            $invoiceAdjustments[] = $this->toInvoiceAdjustment(
+                $adjustment,
+                $sourceId,
+                $sourceType,
+                $amount,
+            );
+            $total = $adjustment->effect->value === 'increase'
+                ? $this->math->add($total, $amount)
+                : $this->math->sub($total, $amount);
         }
+
+        return $total;
     }
 
     private function toInvoiceAdjustment(
         PurchaseHeaderAdjustment $adjustment,
         int $sourceId,
         string $sourceType,
+        string $amount,
     ): InvoiceAdjustmentData {
-        $amount = (string) $adjustment->amount;
+        $amount = $this->math->normalize($amount);
 
         return new InvoiceAdjustmentData(
             name: (string) $adjustment->name,
@@ -761,10 +823,36 @@ final class PurchaseInvoiceDtoFactory
             calculationType: $adjustment->calculation_type->value,
             rate: (string) $adjustment->rate,
             sourceAmount: $amount,
-            allocationMethod: AllocationMethod::from($adjustment->allocation_method->value),
+            allocationMethod: AllocationMethod::Manual,
             isSystemGenerated: true,
             description: $adjustment->description,
         );
+    }
+
+    private function sourceOrderForReceipt(GoodsReceiptNote $grn): ?PurchaseOrder
+    {
+        if ($grn->purchase_order_id === null) {
+            return null;
+        }
+
+        return PurchaseOrder::query()
+            ->with('adjustments')
+            ->find((int) $grn->purchase_order_id);
+    }
+
+    private function orderAdjustmentsNotClonedToReceipt(PurchaseOrder $order, GoodsReceiptNote $grn): Collection
+    {
+        $grn->loadMissing('adjustments');
+        $clonedOriginIds = $grn->adjustments
+            ->filter(fn ($adjustment): bool => $adjustment instanceof PurchaseHeaderAdjustment && $adjustment->origin_purchase_header_adjustment_id !== null)
+            ->map(fn (PurchaseHeaderAdjustment $adjustment): int => (int) $adjustment->origin_purchase_header_adjustment_id)
+            ->all();
+
+        $order->loadMissing('adjustments');
+
+        return $order->adjustments
+            ->filter(fn ($adjustment): bool => $adjustment instanceof PurchaseHeaderAdjustment && ! in_array((int) $adjustment->getKey(), $clonedOriginIds, true))
+            ->values();
     }
 
     private function adjustmentTotal(Collection $adjustments): string

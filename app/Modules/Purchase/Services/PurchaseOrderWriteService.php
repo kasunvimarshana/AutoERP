@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
+use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
@@ -27,6 +28,7 @@ final class PurchaseOrderWriteService
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
     ) {}
 
     public function create(CreatePurchaseOrderData $data): PurchaseOrder
@@ -260,6 +262,7 @@ final class PurchaseOrderWriteService
         array $lineTotals,
     ): void {
         $adjustmentAmounts = $this->calculator->headerAdjustmentAmounts($data->lines, $data->adjustments);
+        $createdLineIdsByClientKey = [];
 
         foreach ($data->lines as $index => $line) {
             $item = Item::query()->findOrFail($line->itemId);
@@ -272,7 +275,7 @@ final class PurchaseOrderWriteService
             );
             $amounts = $this->calculator->lineAmounts($line);
 
-            $order->lines()->create([
+            $createdLine = $order->lines()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'line_number' => $index + 1,
@@ -304,18 +307,75 @@ final class PurchaseOrderWriteService
                 'line_total' => $lineTotals[$index],
                 'status' => PurchaseOrderLineStatus::Open,
             ]);
+
+            if ($line->clientLineKey !== null && trim($line->clientLineKey) !== '') {
+                $createdLineIdsByClientKey[$line->clientLineKey] = (int) $createdLine->getKey();
+            }
         }
 
         foreach ($data->adjustments as $index => $adjustment) {
-            $this->adjustments->create(
+            $adjustment = $this->withPersistedManualAllocationLines($adjustment, $createdLineIdsByClientKey, "adjustments.{$index}");
+            $createdAdjustment = $this->adjustments->create(
                 $data->tenantId,
                 $data->organizationUnitId,
                 'purchase_order',
                 (int) $order->getKey(),
                 $adjustment,
                 $adjustmentAmounts[$index] ?? null,
+                $data->createdBy,
+                "adjustments.{$index}",
             );
+            $this->adjustmentAllocations->recordManualPlanForOrder($createdAdjustment, $order, "adjustments.{$index}");
         }
+    }
+
+    /**
+     * @param  array<string, int>  $lineIdsByClientKey
+     */
+    private function withPersistedManualAllocationLines(PurchaseHeaderAdjustmentData $adjustment, array $lineIdsByClientKey, string $fieldPrefix): PurchaseHeaderAdjustmentData
+    {
+        if ($adjustment->manualAllocations === []) {
+            return $adjustment;
+        }
+
+        $allocations = [];
+        foreach ($adjustment->manualAllocations as $index => $row) {
+            $lineId = $row['purchase_order_line_id'] ?? null;
+            if ($lineId === null) {
+                $clientKey = trim((string) ($row['client_line_key'] ?? ''));
+                $lineId = $lineIdsByClientKey[$clientKey] ?? null;
+                if ($lineId === null) {
+                    throw ValidationException::withMessages([
+                        "{$fieldPrefix}.allocations.{$index}.client_line_key" => ['Manual allocation references an unknown purchase line.'],
+                    ]);
+                }
+            }
+            $allocations[] = [
+                'purchase_order_line_id' => (int) $lineId,
+                'amount' => (string) $row['amount'],
+            ];
+        }
+
+        return new PurchaseHeaderAdjustmentData(
+            name: $adjustment->name,
+            adjustmentType: $adjustment->adjustmentType,
+            effect: $adjustment->effect,
+            amount: $adjustment->amount,
+            calculationType: $adjustment->calculationType,
+            calculationBase: $adjustment->calculationBase,
+            rate: $adjustment->rate,
+            allocationMethod: $adjustment->allocationMethod,
+            isAllocatable: $adjustment->isAllocatable,
+            sortOrder: $adjustment->sortOrder,
+            description: $adjustment->description,
+            financePostingProfileId: $adjustment->financePostingProfileId,
+            financeAccountId: $adjustment->financeAccountId,
+            costTreatment: $adjustment->costTreatment,
+            taxTreatment: $adjustment->taxTreatment,
+            mappingSource: $adjustment->mappingSource,
+            overrideReason: $adjustment->overrideReason,
+            manualAllocations: $allocations,
+        );
     }
 
     private function assertEditable(PurchaseOrder $order): void

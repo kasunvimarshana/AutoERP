@@ -288,6 +288,8 @@ final class GoodsReceiptNoteService
                 }
             }
 
+            $this->recordReceiptAdjustmentAllocations($locked);
+
             $locked->status = GoodsReceiptNoteStatus::Posted;
             $locked->posted_by = $postedBy;
             $locked->posted_at = now();
@@ -333,6 +335,7 @@ final class GoodsReceiptNoteService
             }
 
             $this->taxDocuments->reverseGoodsReceiptNote($locked);
+            $this->adjustmentAllocations->releaseForTarget('goods_receipt_note', (int) $locked->getKey(), 'goods_receipt_reverse');
 
             $locked->status = GoodsReceiptNoteStatus::Reversed;
             $locked->reversed_by = $reversedBy;
@@ -401,15 +404,26 @@ final class GoodsReceiptNoteService
                     continue;
                 }
 
-                $clone = $this->adjustments->cloneForAmount(
+                $this->adjustments->cloneForAmount(
                     $adjustment,
                     'goods_receipt_note',
                     (int) $grn->getKey(),
                     $amount,
                     (int) $adjustment->getKey(),
                 );
-                $this->adjustmentAllocations->recordReceiptAllocation($adjustment, $clone, $grn, $amount);
             }
+        }
+    }
+
+    private function recordReceiptAdjustmentAllocations(GoodsReceiptNote $grn): void
+    {
+        $grn->loadMissing('adjustments');
+        foreach ($grn->adjustments as $target) {
+            if (! $target instanceof PurchaseHeaderAdjustment) {
+                continue;
+            }
+            $origin = $this->adjustmentAllocations->origin($target);
+            $this->adjustmentAllocations->recordReceiptAllocation($origin, $target, $grn, (string) $target->amount);
         }
     }
 

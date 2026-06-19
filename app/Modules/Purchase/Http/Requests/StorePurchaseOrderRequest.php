@@ -30,6 +30,7 @@ class StorePurchaseOrderRequest extends PurchaseRequest
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
+            'lines.*.client_line_key' => ['nullable', 'string', 'max:100', 'distinct'],
             'lines.*.item_id' => ['required', 'integer', 'min:1'],
             'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.description' => ['nullable', 'string'],
@@ -66,6 +67,10 @@ class StorePurchaseOrderRequest extends PurchaseRequest
             'adjustments.*.override_reason' => ['nullable', 'string', 'max:1000'],
             'adjustments.*.sort_order' => ['nullable', 'integer'],
             'adjustments.*.description' => ['nullable', 'string'],
+            'adjustments.*.allocations' => ['nullable', 'array'],
+            'adjustments.*.allocations.*.client_line_key' => ['nullable', 'string', 'max:100'],
+            'adjustments.*.allocations.*.purchase_order_line_id' => ['nullable', 'integer', 'min:1'],
+            'adjustments.*.allocations.*.amount' => ['required_with:adjustments.*.allocations', 'decimal:0,6', 'min:0'],
         ]);
     }
 
@@ -104,6 +109,7 @@ class StorePurchaseOrderRequest extends PurchaseRequest
                 chargeRate: (string) ($row['charge_rate'] ?? '0.000000'),
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
                 taxGroupId: isset($row['tax_group_id']) ? (int) $row['tax_group_id'] : null,
+                clientLineKey: isset($row['client_line_key']) ? (string) $row['client_line_key'] : null,
             ), $this->input('lines')),
             adjustments: array_map(static fn (array $row): PurchaseHeaderAdjustmentData => new PurchaseHeaderAdjustmentData(
                 name: (string) $row['name'],
@@ -123,6 +129,11 @@ class StorePurchaseOrderRequest extends PurchaseRequest
                 taxTreatment: $row['tax_treatment'] ?? null,
                 mappingSource: $row['mapping_source'] ?? null,
                 overrideReason: $row['override_reason'] ?? null,
+                manualAllocations: array_map(static fn (array $allocation): array => [
+                    'client_line_key' => $allocation['client_line_key'] ?? null,
+                    'purchase_order_line_id' => isset($allocation['purchase_order_line_id']) ? (int) $allocation['purchase_order_line_id'] : null,
+                    'amount' => (string) $allocation['amount'],
+                ], $row['allocations'] ?? []),
             ), $this->input('adjustments', [])),
         );
     }

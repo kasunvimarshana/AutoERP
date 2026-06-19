@@ -23,6 +23,7 @@ final class PurchaseAdjustmentAllocation extends CoreModel
             'source_id' => 'integer',
             'target_id' => 'integer',
             'target_line_id' => 'integer',
+            'reversal_of_id' => 'integer',
             'basis_amount' => 'decimal:6',
             'source_amount' => 'decimal:6',
             'signed_amount' => 'decimal:6',
@@ -44,5 +45,10 @@ final class PurchaseAdjustmentAllocation extends CoreModel
     public function targetAdjustment(): BelongsTo
     {
         return $this->belongsTo(PurchaseHeaderAdjustment::class, 'target_purchase_header_adjustment_id');
+    }
+
+    public function reversalOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_of_id');
     }
 }

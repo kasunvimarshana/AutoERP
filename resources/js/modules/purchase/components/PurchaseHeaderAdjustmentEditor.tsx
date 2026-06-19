@@ -3,7 +3,7 @@ import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { FormDrawer } from '@/shared/components/Drawer';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
-import { PurchaseHeaderAdjustmentForm } from './PurchaseHeaderAdjustmentForm';
+import { PurchaseHeaderAdjustmentForm, type HeaderAdjustmentAllocationLine } from './PurchaseHeaderAdjustmentForm';
 import { getPurchaseAdjustmentCatalogue } from '../purchaseApi';
 import type { PurchaseAdjustmentCatalogueEntry } from '../purchaseTypes';
 import {
@@ -20,8 +20,9 @@ type AdjustmentDialog =
     | { mode: 'create'; adjustment: EditableHeaderAdjustment }
     | { mode: 'edit'; index: number; adjustment: EditableHeaderAdjustment };
 
-export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor }: {
+export function PurchaseHeaderAdjustmentEditor({ adjustments, allocationLines = [], onChange, errorFor }: {
     adjustments: EditableHeaderAdjustment[];
+    allocationLines?: HeaderAdjustmentAllocationLine[];
     onChange: (adjustments: EditableHeaderAdjustment[]) => void;
     errorFor: (field: string) => string | undefined;
 }) {
@@ -72,6 +73,7 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, onChange, errorFor
                         adjustment={dialog.adjustment}
                         mode={dialog.mode}
                         catalogue={catalogue}
+                        allocationLines={allocationLines}
                         errorFor={(field) => dialog.mode === 'edit' ? errorFor(`adjustments.${dialog.index}.${field}`) : undefined}
                         onCancel={() => setDialog(null)}
                         onSave={saveAdjustment}
@@ -120,7 +122,7 @@ function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError 
 }
 
 function adjustmentHasError(index: number, errorFor: (field: string) => string | undefined): boolean {
-    return ['name', 'adjustment_type', 'effect', 'calculation_type', 'calculation_base', 'rate', 'amount', 'allocation_method']
+    return ['name', 'adjustment_type', 'effect', 'calculation_type', 'calculation_base', 'rate', 'amount', 'allocation_method', 'allocations']
         .some((field) => Boolean(errorFor(`adjustments.${index}.${field}`)));
 }
 

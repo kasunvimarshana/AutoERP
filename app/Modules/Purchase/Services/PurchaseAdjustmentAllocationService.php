@@ -6,12 +6,12 @@ namespace Modules\Purchase\Services;
 
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
+use Modules\Purchase\DTOs\PreparedPurchaseInvoiceData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
-use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
-use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseAdjustmentAllocation;
@@ -23,52 +23,48 @@ final class PurchaseAdjustmentAllocationService
 {
     public function __construct(
         private readonly DecimalMath $math,
-        private readonly PurchaseAdjustmentCatalogueService $catalogue,
+        private readonly PurchaseAdjustmentPolicyResolver $policies,
+        private readonly PurchaseAdjustmentAllocator $allocator,
+        private readonly PurchaseAdjustmentAllocationLedger $ledger,
+        private readonly PurchaseProgressService $progress,
     ) {}
 
     public function receiptShare(PurchaseHeaderAdjustment $adjustment, PurchaseOrder $order, GoodsReceiptNote $grn): string
     {
+        if (! $this->policies->recognizesAtGoodsReceipt($adjustment)) {
+            return '0.000000';
+        }
+
         $amount = $this->math->normalize((string) $adjustment->amount);
         if ($this->math->isZero($amount)) {
             return '0.000000';
         }
 
-        $method = $adjustment->allocation_method instanceof PurchaseAdjustmentAllocationMethod
-            ? $adjustment->allocation_method
-            : PurchaseAdjustmentAllocationMethod::from((string) $adjustment->allocation_method);
+        $method = $this->method($adjustment);
+        if (in_array($method, [PurchaseAdjustmentAllocationMethod::FirstInvoice, PurchaseAdjustmentAllocationMethod::LastInvoice], true)) {
+            return '0.000000';
+        }
+
+        $remaining = $this->ledger->remaining($adjustment);
+        $isFinalReceipt = $this->progress->receiptCompletesOrder($order, $grn);
 
         if ($method === PurchaseAdjustmentAllocationMethod::Manual) {
-            if ($this->receiptCompletesOrder($order, $grn)) {
-                return $amount;
+            $plan = $this->ledger->manualPlanAmounts($adjustment);
+            if ($plan === []) {
+                throw ValidationException::withMessages([
+                    'adjustments' => ['Manual purchase adjustment allocations require explicit line allocations.'],
+                ]);
             }
 
-            throw ValidationException::withMessages([
-                'adjustments' => ['Manual purchase adjustment allocations require explicit line allocations for partial receipts.'],
-            ]);
+            return $this->allocator->manual($plan, $this->receiptLineQuantities($grn), $remaining, $isFinalReceipt);
         }
 
-        if ($method === PurchaseAdjustmentAllocationMethod::FirstInvoice) {
-            return $this->math->isZero($this->previouslyAllocated($adjustment))
-                ? $amount
-                : '0.000000';
-        }
-
-        if ($method === PurchaseAdjustmentAllocationMethod::LastInvoice) {
-            return $this->receiptCompletesOrder($order, $grn)
-                ? $this->math->sub($amount, $this->previouslyAllocated($adjustment))
-                : '0.000000';
-        }
-
-        $totalBasis = $this->orderBasis($order, $adjustment);
-        if ($this->math->isZero($totalBasis)) {
-            throw ValidationException::withMessages([
-                'adjustments' => ['Source subtotal must be greater than zero for proportional purchase adjustment allocation.'],
-            ]);
-        }
-
-        return $this->math->mul(
+        return $this->allocator->proportional(
             $amount,
-            $this->math->div($this->receiptBasis($grn, $adjustment), $totalBasis, 12),
+            $this->receiptBasis($grn, $adjustment),
+            $this->orderBasis($order, $adjustment),
+            $remaining,
+            $isFinalReceipt,
         );
     }
 
@@ -77,45 +73,17 @@ final class PurchaseAdjustmentAllocationService
         PurchaseHeaderAdjustment $target,
         GoodsReceiptNote $grn,
         string $allocatedAmount,
-    ): PurchaseAdjustmentAllocation {
-        $allocatedAmount = $this->math->normalize($allocatedAmount);
-        $previouslyAllocated = $this->previouslyAllocated($origin);
-        $remaining = $this->math->sub(
-            (string) $origin->amount,
-            $this->math->add($previouslyAllocated, $allocatedAmount),
-        );
+    ): ?PurchaseAdjustmentAllocation {
         $recognized = $this->recognizesAtGoodsReceipt($target) ? $allocatedAmount : '0.000000';
 
-        return PurchaseAdjustmentAllocation::query()->create([
-            'tenant_id' => (int) $origin->tenant_id,
-            'organization_unit_id' => $origin->organization_unit_id,
-            'purchase_header_adjustment_id' => (int) $origin->getKey(),
-            'target_purchase_header_adjustment_id' => (int) $target->getKey(),
-            'stage' => 'grn_recognition',
-            'source_type' => $origin->source_type,
-            'source_id' => $origin->source_id,
-            'target_type' => 'goods_receipt_note',
-            'target_id' => (int) $grn->getKey(),
-            'allocation_method' => $this->enumValue($target->allocation_method),
-            'calculation_base' => $this->enumValue($target->calculation_base),
-            'basis_amount' => $this->receiptBasis($grn, $origin),
-            'source_amount' => (string) $origin->amount,
-            'signed_amount' => $this->signedAmount($target, $allocatedAmount),
-            'allocated_amount' => $allocatedAmount,
-            'recognized_at_grn_amount' => $recognized,
-            'recognized_at_invoice_amount' => '0.000000',
-            'remaining_amount' => $remaining,
-            'cost_treatment' => $target->cost_treatment,
-            'tax_treatment' => $target->tax_treatment,
-            'finance_posting_profile_id' => $target->finance_posting_profile_id,
-            'finance_account_id' => $target->finance_account_id,
-            'provenance' => [
-                'origin_adjustment_id' => (int) $origin->getKey(),
-                'target_adjustment_id' => (int) $target->getKey(),
-                'target_document' => 'goods_receipt_note',
-                'target_document_id' => (int) $grn->getKey(),
-            ],
-        ]);
+        return $this->ledger->recordReceiptAllocation(
+            $this->origin($origin),
+            $target,
+            $grn,
+            $allocatedAmount,
+            $recognized,
+            $this->receiptBasis($grn, $origin),
+        );
     }
 
     public function recordInvoiceAllocation(
@@ -123,61 +91,59 @@ final class PurchaseAdjustmentAllocationService
         InvoiceAdjustment $invoiceAdjustment,
         string $allocatedAmount,
         string $recognizedAmount,
-    ): PurchaseAdjustmentAllocation {
-        $origin = $this->origin($source);
-        $allocatedAmount = $this->math->normalize($allocatedAmount);
-        $recognizedAmount = $this->math->normalize($recognizedAmount);
-        $remaining = $this->math->sub(
-            (string) $origin->amount,
-            $this->math->add($this->previouslyAllocated($origin), $allocatedAmount),
-        );
+    ): ?PurchaseAdjustmentAllocation {
+        return $this->ledger->recordInvoiceAllocation($source, $invoiceAdjustment, $allocatedAmount, $recognizedAmount);
+    }
 
-        return PurchaseAdjustmentAllocation::query()->create([
-            'tenant_id' => (int) $origin->tenant_id,
-            'organization_unit_id' => $origin->organization_unit_id,
-            'purchase_header_adjustment_id' => (int) $origin->getKey(),
-            'target_purchase_header_adjustment_id' => (int) $source->getKey(),
-            'stage' => 'invoice_recognition',
-            'source_type' => $source->source_type,
-            'source_id' => $source->source_id,
-            'target_type' => 'purchase_invoice',
-            'target_id' => (int) $invoiceAdjustment->invoice_id,
-            'allocation_method' => $this->enumValue($source->allocation_method),
-            'calculation_base' => $this->enumValue($source->calculation_base),
-            'basis_amount' => '0.000000',
-            'source_amount' => (string) $origin->amount,
-            'signed_amount' => $this->signedAmount($source, $allocatedAmount),
-            'allocated_amount' => $allocatedAmount,
-            'recognized_at_grn_amount' => '0.000000',
-            'recognized_at_invoice_amount' => $recognizedAmount,
-            'remaining_amount' => $remaining,
-            'cost_treatment' => $source->cost_treatment,
-            'tax_treatment' => $source->tax_treatment,
-            'finance_posting_profile_id' => $source->finance_posting_profile_id,
-            'finance_account_id' => $source->finance_account_id,
-            'provenance' => [
-                'origin_adjustment_id' => (int) $origin->getKey(),
-                'source_adjustment_id' => (int) $source->getKey(),
-                'invoice_adjustment_id' => (int) $invoiceAdjustment->getKey(),
-                'target_document' => 'purchase_invoice',
-                'target_document_id' => (int) $invoiceAdjustment->invoice_id,
-            ],
-        ]);
+    public function recordInvoiceAllocationsForInvoice(Invoice $invoice, PreparedPurchaseInvoiceData $prepared): void
+    {
+        $invoice->loadMissing('adjustments');
+        foreach ($invoice->adjustments as $adjustment) {
+            if (! $adjustment instanceof InvoiceAdjustment
+                || $adjustment->source_adjustment_type !== 'purchase_header_adjustment'
+                || $adjustment->source_adjustment_id === null
+            ) {
+                continue;
+            }
+
+            $source = PurchaseHeaderAdjustment::query()
+                ->lockForUpdate()
+                ->find((int) $adjustment->source_adjustment_id);
+            if (! $source instanceof PurchaseHeaderAdjustment) {
+                continue;
+            }
+
+            $amount = $this->invoiceLedgerAmount($source, (string) $adjustment->amount, $prepared);
+            $this->recordInvoiceAllocation($source, $adjustment, $amount, $amount);
+        }
+    }
+
+    public function recognizedAtInvoiceForAdjustment(PurchaseHeaderAdjustment $source, InvoiceAdjustment $invoiceAdjustment): string
+    {
+        return $this->ledger->effectiveRecognizedForInvoiceAdjustment($source, $invoiceAdjustment);
+    }
+
+    public function releaseForTarget(string $targetType, int $targetId, string $eventType): void
+    {
+        $this->ledger->reverseForTarget($targetType, $targetId, $eventType);
+    }
+
+    public function recordManualPlanForOrder(PurchaseHeaderAdjustment $origin, PurchaseOrder $order, string $fieldPrefix): void
+    {
+        $data = $origin->getAttribute('manual_allocation_payload');
+        if (! is_array($data)) {
+            return;
+        }
+        if ($this->method($origin) !== PurchaseAdjustmentAllocationMethod::Manual) {
+            throw ValidationException::withMessages(["{$fieldPrefix}.allocations" => ['Manual allocation rows are only valid when allocation_method is manual.']]);
+        }
+
+        $this->ledger->recordManualPlan($origin, $order, $data, $fieldPrefix);
     }
 
     public function origin(PurchaseHeaderAdjustment $adjustment): PurchaseHeaderAdjustment
     {
-        if ($adjustment->origin_purchase_header_adjustment_id !== null) {
-            $origin = $adjustment->relationLoaded('originAdjustment')
-                ? $adjustment->originAdjustment
-                : $adjustment->originAdjustment()->first();
-
-            if ($origin instanceof PurchaseHeaderAdjustment) {
-                return $origin;
-            }
-        }
-
-        return $adjustment;
+        return $this->ledger->origin($adjustment);
     }
 
     public function recognizesAtGoodsReceipt(PurchaseHeaderAdjustment $adjustment): bool
@@ -186,15 +152,7 @@ final class PurchaseAdjustmentAllocationService
             return false;
         }
 
-        $type = $adjustment->adjustment_type instanceof PurchaseAdjustmentType
-            ? $adjustment->adjustment_type
-            : PurchaseAdjustmentType::from((string) $adjustment->adjustment_type);
-
-        if (in_array($type, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)) {
-            return false;
-        }
-
-        return $this->isCapitalizableCostTreatment((string) $adjustment->cost_treatment);
+        return $this->policies->recognizesAtGoodsReceipt($adjustment);
     }
 
     public function isCapitalizable(PurchaseHeaderAdjustment $adjustment): bool
@@ -204,100 +162,252 @@ final class PurchaseAdjustmentAllocationService
 
     public function receiveOnlySupported(PurchaseHeaderAdjustmentData $data): bool
     {
-        $defaults = $this->catalogue->defaultsFor($data->adjustmentType);
-        $costTreatment = (string) ($data->costTreatment ?? $defaults['cost_treatment']);
-        $taxTreatment = (string) ($data->taxTreatment ?? $defaults['tax_treatment']);
-
-        if ($data->allocationMethod !== PurchaseAdjustmentAllocationMethod::Proportional) {
+        if (! in_array($data->allocationMethod, [PurchaseAdjustmentAllocationMethod::Proportional, PurchaseAdjustmentAllocationMethod::Manual], true)) {
             return false;
         }
 
-        if (in_array($data->adjustmentType, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)) {
-            return false;
+        return $this->policies->receiveOnlySupported($data);
+    }
+
+    /**
+     * @param  array<string, string>  $currentInvoiceQuantities  keyed as source_line_type:id
+     */
+    public function invoiceShare(PurchaseHeaderAdjustment $adjustment, PurchaseOrder $order, array $currentInvoiceQuantities): string
+    {
+        $amount = $this->math->normalize((string) $adjustment->amount);
+        if ($this->math->isZero($amount)) {
+            return '0.000000';
         }
 
-        if (! in_array($taxTreatment, ['', 'none'], true)) {
-            return false;
+        $origin = $this->origin($adjustment);
+        $method = $this->method($adjustment);
+        $remaining = $this->ledger->remaining($origin);
+        $isFinalInvoice = $this->progress->invoiceCompletesOrder($order, $currentInvoiceQuantities);
+
+        if ($method === PurchaseAdjustmentAllocationMethod::FirstInvoice) {
+            return $this->math->compare($this->ledger->effectiveRecognizedAtInvoice($origin), '0.000000') > 0
+                ? '0.000000'
+                : $remaining;
         }
 
-        return $this->isCapitalizableCostTreatment($costTreatment);
+        if ($method === PurchaseAdjustmentAllocationMethod::LastInvoice) {
+            return $isFinalInvoice ? $remaining : '0.000000';
+        }
+
+        if ($method === PurchaseAdjustmentAllocationMethod::Manual) {
+            $plan = $this->ledger->manualPlanAmounts($origin);
+            if ($plan === []) {
+                throw ValidationException::withMessages([
+                    'adjustments' => ['Manual purchase adjustment allocations require explicit line allocations.'],
+                ]);
+            }
+
+            return $this->allocator->manual($plan, $this->invoiceLineQuantities($order, $currentInvoiceQuantities), $remaining, $isFinalInvoice);
+        }
+
+        return $this->allocator->proportional(
+            (string) $origin->amount,
+            $this->invoiceBasis($order, $adjustment, $currentInvoiceQuantities),
+            $this->orderBasis($order, $adjustment),
+            $remaining,
+            $isFinalInvoice,
+        );
     }
 
     public function recognizedAtGoodsReceiptFor(PurchaseHeaderAdjustment $adjustment): string
     {
         $origin = $this->origin($adjustment);
+        if ((int) $origin->getKey() === (int) $adjustment->getKey()) {
+            return $this->ledger->effectiveRecognizedAtGoodsReceipt($origin);
+        }
 
-        return $this->math->normalize((string) PurchaseAdjustmentAllocation::query()
-            ->where('purchase_header_adjustment_id', (int) $origin->getKey())
-            ->where('stage', 'grn_recognition')
-            ->where(function ($query) use ($adjustment): void {
-                $query->where('target_purchase_header_adjustment_id', (int) $adjustment->getKey())
-                    ->orWhere(function ($scope) use ($adjustment): void {
-                        $scope->whereNull('target_purchase_header_adjustment_id')
-                            ->where('target_type', $adjustment->source_type)
-                            ->where('target_id', $adjustment->source_id);
-                    });
-            })
-            ->sum('recognized_at_grn_amount'));
+        return $this->ledger->effectiveRecognizedAtGoodsReceipt($origin, $adjustment);
+    }
+
+    private function invoiceLedgerAmount(PurchaseHeaderAdjustment $source, string $invoiceAdjustmentAmount, PreparedPurchaseInvoiceData $prepared): string
+    {
+        $method = $this->method($source);
+        $origin = $this->origin($source);
+
+        if ($method === PurchaseAdjustmentAllocationMethod::FirstInvoice
+            && $this->math->compare($this->ledger->effectiveRecognizedAtInvoice($origin), '0.000000') > 0) {
+            return '0.000000';
+        }
+
+        if ($method === PurchaseAdjustmentAllocationMethod::LastInvoice
+            && ! $this->invoiceCompletesAdjustmentSource($origin, $prepared)) {
+            return '0.000000';
+        }
+
+        $amount = $this->invoiceResidualAmount($source, $invoiceAdjustmentAmount);
+        $remaining = $this->ledger->remaining($origin);
+
+        return $this->math->compare($amount, $remaining) > 0 ? $remaining : $amount;
+    }
+
+    private function invoiceCompletesAdjustmentSource(PurchaseHeaderAdjustment $origin, PreparedPurchaseInvoiceData $prepared): bool
+    {
+        if ((string) $origin->source_type !== 'purchase_order' || $origin->source_id === null) {
+            return false;
+        }
+
+        $order = PurchaseOrder::query()->with('lines')->find((int) $origin->source_id);
+
+        return $order instanceof PurchaseOrder && $this->progress->invoiceCompletesOrder($order, $prepared->lineQuantities);
+    }
+
+    public function invoiceResidualAmount(PurchaseHeaderAdjustment $source, string $invoiceAdjustmentAmount): string
+    {
+        $amount = $this->math->normalize($invoiceAdjustmentAmount);
+        if (! $this->isCapitalizable($source)) {
+            return $amount;
+        }
+
+        if ($source->origin_purchase_header_adjustment_id === null && $source->source_type === 'purchase_order') {
+            return $amount;
+        }
+
+        $recognizedAtGrn = $this->recognizedAtGoodsReceiptFor($source);
+        if ($this->math->compare($recognizedAtGrn, $amount) >= 0) {
+            return '0.000000';
+        }
+
+        return $this->math->sub($amount, $recognizedAtGrn);
+    }
+
+    public function allocationMethodValue(PurchaseHeaderAdjustment $adjustment): string
+    {
+        return $this->method($adjustment)->value;
+    }
+
+    /**
+     * @return array<int, string> keyed by goods receipt line id
+     */
+    public function manualReceiptLineShares(PurchaseHeaderAdjustment $adjustment, GoodsReceiptNote $grn): array
+    {
+        if ($this->method($adjustment) !== PurchaseAdjustmentAllocationMethod::Manual) {
+            return [];
+        }
+
+        $origin = $this->origin($adjustment);
+        $plan = $this->ledger->manualPlanAmounts($origin);
+        if ($plan === []) {
+            return [];
+        }
+
+        $grn->loadMissing('lines.purchaseOrderLine');
+        $lines = $grn->lines
+            ->filter(fn (GoodsReceiptNoteLine $line): bool => $line->purchaseOrderLine instanceof PurchaseOrderLine)
+            ->sortBy(fn (GoodsReceiptNoteLine $line): int => (int) $line->getKey())
+            ->values();
+        $shares = [];
+        $allocated = '0.000000';
+        $lastIndex = $lines->count() - 1;
+        foreach ($lines as $index => $line) {
+            $sourceLine = $line->purchaseOrderLine;
+            if (! $sourceLine instanceof PurchaseOrderLine) {
+                continue;
+            }
+            if ($index === $lastIndex) {
+                $share = $this->math->sub((string) $adjustment->amount, $allocated);
+            } else {
+                $planAmount = $plan[(int) $sourceLine->getKey()] ?? '0.000000';
+                $ratio = $this->math->isZero((string) $sourceLine->ordered_quantity)
+                    ? '0.000000'
+                    : $this->math->div((string) $line->accepted_quantity, (string) $sourceLine->ordered_quantity, 12);
+                $share = $this->math->mul($planAmount, $ratio);
+                $allocated = $this->math->add($allocated, $share);
+            }
+            if (! $this->math->isZero($share)) {
+                $shares[(int) $line->getKey()] = $share;
+            }
+        }
+
+        return $shares;
     }
 
     public function financeProfileKey(PurchaseHeaderAdjustment $adjustment): string
     {
-        $treatment = mb_strtolower(trim((string) $adjustment->cost_treatment));
-
-        return match ($treatment) {
-            'input_tax', 'recoverable_tax' => 'tax_receivable',
-            'withholding' => 'payable',
-            default => 'expense',
-        };
+        return $this->policies->resolveForModel($adjustment)['profile_key'] ?? 'expense';
     }
 
-    private function isCapitalizableCostTreatment(string $costTreatment): bool
+    private function method(PurchaseHeaderAdjustment $adjustment): PurchaseAdjustmentAllocationMethod
     {
-        $treatment = mb_strtolower(trim($costTreatment));
-
-        return in_array($treatment, [
-            'landed_cost',
-            'inventory_cost_reduction',
-        ], true)
-            || str_contains($treatment, 'inventory')
-            || str_contains($treatment, 'landed');
+        return $adjustment->allocation_method instanceof PurchaseAdjustmentAllocationMethod
+            ? $adjustment->allocation_method
+            : PurchaseAdjustmentAllocationMethod::from((string) $adjustment->allocation_method);
     }
 
-    private function previouslyAllocated(PurchaseHeaderAdjustment $adjustment): string
+    /**
+     * @return array<int, array{event_quantity: string, source_quantity: string}>
+     */
+    private function receiptLineQuantities(GoodsReceiptNote $grn): array
     {
-        $origin = $this->origin($adjustment);
-
-        return $this->math->normalize((string) PurchaseAdjustmentAllocation::query()
-            ->where('purchase_header_adjustment_id', (int) $origin->getKey())
-            ->sum('allocated_amount'));
-    }
-
-    private function receiptCompletesOrder(PurchaseOrder $order, GoodsReceiptNote $grn): bool
-    {
-        $receiptByLine = [];
-        $grn->loadMissing('lines');
+        $quantities = [];
+        $grn->loadMissing('lines.purchaseOrderLine');
         foreach ($grn->lines as $line) {
-            if (! $line instanceof GoodsReceiptNoteLine || $line->purchase_order_line_id === null) {
+            if (! $line instanceof GoodsReceiptNoteLine || ! $line->purchaseOrderLine instanceof PurchaseOrderLine) {
                 continue;
             }
-            $receiptByLine[(int) $line->purchase_order_line_id] = $this->math->add(
-                $receiptByLine[(int) $line->purchase_order_line_id] ?? '0.000000',
-                (string) $line->accepted_quantity,
-            );
+            $quantities[(int) $line->purchaseOrderLine->getKey()] = [
+                'event_quantity' => (string) $line->accepted_quantity,
+                'source_quantity' => (string) $line->purchaseOrderLine->ordered_quantity,
+            ];
         }
 
+        return $quantities;
+    }
+
+    /**
+     * @param  array<string, string>  $currentInvoiceQuantities  keyed as source_line_type:id
+     * @return array<int, array{event_quantity: string, source_quantity: string}>
+     */
+    private function invoiceLineQuantities(PurchaseOrder $order, array $currentInvoiceQuantities): array
+    {
+        $quantities = [];
         $order->loadMissing('lines');
-        foreach ($order->lines as $line) {
+        foreach ($currentInvoiceQuantities as $lineKey => $quantity) {
+            [$type, $id] = explode(':', (string) $lineKey, 2);
+            $line = null;
+            if ($type === 'purchase_order_line') {
+                $line = $order->lines->firstWhere('id', (int) $id);
+            } elseif ($type === 'goods_receipt_note_line') {
+                $receiptLine = GoodsReceiptNoteLine::query()->with('purchaseOrderLine')->find((int) $id);
+                $line = $receiptLine instanceof GoodsReceiptNoteLine ? $receiptLine->purchaseOrderLine : null;
+            }
             if (! $line instanceof PurchaseOrderLine) {
                 continue;
             }
-            if ($this->math->compare($receiptByLine[(int) $line->getKey()] ?? '0.000000', (string) $line->ordered_quantity) !== 0) {
-                return false;
-            }
+            $lineId = (int) $line->getKey();
+            $quantities[$lineId] = [
+                'event_quantity' => $this->math->add($quantities[$lineId]['event_quantity'] ?? '0.000000', $quantity),
+                'source_quantity' => (string) $line->ordered_quantity,
+            ];
         }
 
-        return true;
+        return $quantities;
+    }
+
+    /**
+     * @param  array<string, string>  $currentInvoiceQuantities  keyed as source_line_type:id
+     */
+    private function invoiceBasis(PurchaseOrder $order, PurchaseHeaderAdjustment $adjustment, array $currentInvoiceQuantities): string
+    {
+        $basis = '0.000000';
+        $order->loadMissing('lines');
+        foreach ($this->invoiceLineQuantities($order, $currentInvoiceQuantities) as $lineId => $quantities) {
+            $line = $order->lines->firstWhere('id', $lineId);
+            if (! $line instanceof PurchaseOrderLine) {
+                continue;
+            }
+            $lineBasis = $this->lineBasis($line, $adjustment);
+            $ratio = $this->math->isZero($quantities['source_quantity'])
+                ? '0.000000'
+                : $this->math->div($quantities['event_quantity'], $quantities['source_quantity'], 12);
+            $basis = $this->math->add($basis, $this->math->mul($lineBasis, $ratio));
+        }
+
+        return $basis;
     }
 
     private function orderBasis(PurchaseOrder $order, PurchaseHeaderAdjustment $adjustment): string
@@ -348,21 +458,5 @@ final class PurchaseAdjustmentAllocationService
                 (string) $line->charge_amount,
             ),
         };
-    }
-
-    private function signedAmount(PurchaseHeaderAdjustment $adjustment, string $amount): string
-    {
-        $effect = $adjustment->effect instanceof PurchaseAdjustmentEffect
-            ? $adjustment->effect
-            : PurchaseAdjustmentEffect::from((string) $adjustment->effect);
-
-        return $effect === PurchaseAdjustmentEffect::Decrease
-            ? '-'.$this->math->normalize($amount)
-            : $this->math->normalize($amount);
-    }
-
-    private function enumValue(mixed $value): string
-    {
-        return $value instanceof \BackedEnum ? (string) $value->value : (string) $value;
     }
 }

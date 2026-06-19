@@ -10,6 +10,7 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Models\Invoice;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
+use Modules\Purchase\Services\PurchaseAdjustmentAllocationService;
 use Modules\Purchase\Services\PurchaseInvoiceQuantityUpdater;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesInvoiceLink;
@@ -22,6 +23,7 @@ final class InvoiceSourceRestorationService
         private readonly DecimalMath $math,
         private readonly SalesInvoiceQuantityUpdater $salesQuantities,
         private readonly PurchaseInvoiceQuantityUpdater $purchaseQuantities,
+        private readonly PurchaseAdjustmentAllocationService $purchaseAdjustmentAllocations,
     ) {}
 
     public function restore(Invoice $invoice): void
@@ -86,6 +88,7 @@ final class InvoiceSourceRestorationService
                 $purchaseLineQuantities,
                 $this->goodsReceipts($invoice, $goodsReceiptIds),
             );
+            $this->purchaseAdjustmentAllocations->releaseForTarget('purchase_invoice', (int) $invoice->getKey(), 'purchase_invoice_cancel');
         }
 
         SalesInvoiceLink::query()

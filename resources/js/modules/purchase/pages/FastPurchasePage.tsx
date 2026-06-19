@@ -167,7 +167,15 @@ export default function FastPurchasePage() {
                     </FastPurchaseSection>}
 
                     {activeTab === 'adjustments' && <FastPurchaseSection title="Adjustments">
-                        <PurchaseHeaderAdjustmentEditor adjustments={adjustments} onChange={setAdjustments} errorFor={errorFor} />
+                        <PurchaseHeaderAdjustmentEditor
+                            adjustments={adjustments}
+                            allocationLines={lines.map((line, index) => ({
+                                clientLineKey: line.client_key,
+                                label: line.item?.name ?? line.description ?? `Line ${index + 1}`,
+                            }))}
+                            onChange={setAdjustments}
+                            errorFor={errorFor}
+                        />
                     </FastPurchaseSection>}
 
                     {activeTab === 'payment' && (

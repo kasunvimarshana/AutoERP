@@ -16,8 +16,8 @@ use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
-use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
+use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\DTOs\PurchaseInvoiceSourceData;
@@ -64,6 +64,7 @@ final class FastPurchaseDocumentBuilder
                 chargeRate: $line['charge_rate'],
                 chargeAmount: $line['charge_amount'],
                 taxGroupId: $line['tax_group_id'],
+                clientLineKey: $line['client_line_key'] ?? null,
             ),
             $resolved['lines'],
         );

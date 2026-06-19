@@ -29,5 +29,6 @@ final readonly class PurchaseOrderLineData
         public string $chargeRate = '0.000000',
         public string $chargeAmount = '0.000000',
         public ?int $taxGroupId = null,
+        public ?string $clientLineKey = null,
     ) {}
 }

@@ -174,6 +174,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             tax_treatment: adjustment.tax_treatment,
             mapping_source: adjustment.mapping_source,
             override_reason: adjustment.override_reason || undefined,
+            allocations: adjustment.allocation_method === 'manual' ? adjustment.allocations ?? [] : undefined,
             description: adjustment.description || undefined,
         })),
         payment: recordPayment ? {

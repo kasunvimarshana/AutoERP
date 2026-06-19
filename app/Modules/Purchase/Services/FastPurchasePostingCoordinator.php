@@ -27,6 +27,7 @@ final class FastPurchasePostingCoordinator
         private readonly FastPurchaseDocumentBuilder $documents,
         private readonly PurchaseAcquisitionCostAllocator $costs,
         private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
+        private readonly PurchaseAdjustmentPolicyResolver $adjustmentPolicies,
     ) {}
 
     /**
@@ -221,14 +222,12 @@ final class FastPurchasePostingCoordinator
                 continue;
             }
 
-            $recognizedAtGrn = $this->adjustmentAllocations->recognizedAtGoodsReceiptFor($sourceAdjustment);
-            if ($this->adjustmentAllocations->isCapitalizable($sourceAdjustment)
-                && $this->math->compare($recognizedAtGrn, '0.000000') > 0
-            ) {
-                if ($this->math->compare($recognizedAtGrn, $amount) >= 0) {
-                    continue;
-                }
-                $amount = $this->math->sub($amount, $recognizedAtGrn);
+            $recognizedAtInvoice = $this->adjustmentAllocations->recognizedAtInvoiceForAdjustment($sourceAdjustment, $adjustment);
+            $amount = $this->math->isZero($recognizedAtInvoice)
+                ? $this->adjustmentAllocations->invoiceResidualAmount($sourceAdjustment, $amount)
+                : $recognizedAtInvoice;
+            if ($this->math->isZero($amount)) {
+                continue;
             }
 
             $account = $this->configuredAccount($sourceAdjustment, $invoice);
@@ -236,9 +235,7 @@ final class FastPurchasePostingCoordinator
             $accountName = $account instanceof FinanceAccount ? (string) $account->name : (string) $adjustment->name;
             $profileKey = $account instanceof FinanceAccount
                 ? null
-                : $this->adjustmentAllocations->financeProfileKey($sourceAdjustment);
-
-            $this->adjustmentAllocations->recordInvoiceAllocation($sourceAdjustment, $adjustment, $amount, $amount);
+                : 'expense';
 
             if ($adjustment->effect->value === 'increase') {
                 $lines[] = new FinancePostingLine($accountCode, $accountName, debit: $amount, profileKey: $profileKey);
@@ -254,18 +251,6 @@ final class FastPurchasePostingCoordinator
 
     private function configuredAccount(PurchaseHeaderAdjustment $adjustment, Invoice $invoice): ?FinanceAccount
     {
-        if ($adjustment->finance_account_id === null) {
-            return null;
-        }
-
-        return FinanceAccount::query()
-            ->whereKey((int) $adjustment->finance_account_id)
-            ->where('tenant_id', (int) $invoice->tenant_id)
-            ->when(
-                $invoice->organization_unit_id === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $invoice->organization_unit_id),
-            )
-            ->first();
+        return $this->adjustmentPolicies->accountForAdjustment($adjustment, lock: true);
     }
 }

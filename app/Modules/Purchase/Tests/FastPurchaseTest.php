@@ -249,6 +249,128 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(2, DB::table('invoice_adjustments')->count());
     }
 
+    public function test_manual_adjustment_allocations_are_validated_applied_and_persisted(): void
+    {
+        $context = $this->context();
+        $secondStock = $this->item($context['tenant_id'], 'ITEM-STOCK-ALT', ItemType::Stock, true, $context['uom_id']);
+
+        app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-MANUAL-ALLOC',
+            'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
+            'lines' => [
+                ['client_line_key' => 'stock-a', 'item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '6.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                ['client_line_key' => 'stock-b', 'item_id' => (int) $secondStock->getKey(), 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+            ],
+            'adjustments' => [[
+                'name' => 'Freight',
+                'adjustment_type' => 'freight',
+                'effect' => 'increase',
+                'amount' => '100.000000',
+                'allocation_method' => 'manual',
+                'allocations' => [
+                    ['client_line_key' => 'stock-a', 'amount' => '70.000000'],
+                    ['client_line_key' => 'stock-b', 'amount' => '30.000000'],
+                ],
+            ]],
+            'payment' => [
+                'amount' => '200.000000',
+                'payment_method_id' => $context['cash_method_id'],
+                'source_account_id' => $context['cash_account_id'],
+            ],
+        ]));
+
+        $this->assertSame('200.000000', (string) Invoice::query()->firstOrFail()->grand_total);
+        $this->assertSame('200.000000', $this->accountDebit($context['inventory_account_id']));
+        $this->assertSame('0.000000', $this->accountNetDebit($context['payable_account_id']));
+        $this->assertSame(2, DB::table('purchase_adjustment_allocations')->where('stage', 'manual_plan')->count());
+        $this->assertSame('100.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->where('stage', 'grn_recognition')->sum('recognized_at_grn_amount')));
+        $this->assertSame('0.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->where('stage', 'invoice_recognition')->sum('recognized_at_invoice_amount')));
+    }
+
+    public function test_manual_adjustment_allocation_validation_returns_field_errors(): void
+    {
+        $context = $this->context();
+        $base = [
+            'adjustments' => [[
+                'name' => 'Freight',
+                'adjustment_type' => 'freight',
+                'effect' => 'increase',
+                'amount' => '100.000000',
+                'allocation_method' => 'manual',
+                'allocations' => [
+                    ['client_line_key' => 'line-0', 'amount' => '99.000000'],
+                ],
+            ]],
+        ];
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, $base));
+            $this->fail('Expected manual allocation total validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Manual allocation total must equal the calculated adjustment amount.', $exception->errors()['adjustments.0.allocations'][0] ?? null);
+        }
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, array_replace_recursive($base, [
+                'adjustments' => [[
+                    'allocations' => [
+                        ['client_line_key' => 'line-0', 'amount' => '50.000000'],
+                        ['client_line_key' => 'line-0', 'amount' => '50.000000'],
+                    ],
+                ]],
+            ])));
+            $this->fail('Expected duplicate manual allocation validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Manual allocation cannot reference the same purchase line more than once.', $exception->errors()['adjustments.0.allocations.1.client_line_key'][0] ?? null);
+        }
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, array_replace_recursive($base, [
+                'adjustments' => [[
+                    'allocations' => [
+                        ['client_line_key' => 'missing-line', 'amount' => '100.000000'],
+                    ],
+                ]],
+            ])));
+            $this->fail('Expected unknown manual allocation validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Manual allocation references an unknown purchase line.', $exception->errors()['adjustments.0.allocations.0.client_line_key'][0] ?? null);
+        }
+    }
+
+    public function test_first_and_last_invoice_adjustments_are_allocated_at_invoice_stage(): void
+    {
+        foreach (['first_invoice' => 'FP-FIRST-INVOICE', 'last_invoice' => 'FP-LAST-INVOICE'] as $method => $reference) {
+            $context = $this->context();
+
+            app(FastPurchaseService::class)->create($this->payload($context, [
+                'supplier_reference' => $reference,
+                'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
+                'lines' => [
+                    ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '6.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                    ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                ],
+                'adjustments' => [[
+                    'name' => 'Freight',
+                    'adjustment_type' => 'freight',
+                    'effect' => 'increase',
+                    'amount' => '100.000000',
+                    'allocation_method' => $method,
+                ]],
+                'payment' => [
+                    'amount' => '200.000000',
+                    'payment_method_id' => $context['cash_method_id'],
+                    'source_account_id' => $context['cash_account_id'],
+                ],
+            ]));
+
+            $this->assertSame('0.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->where('tenant_id', $context['tenant_id'])->where('stage', 'grn_recognition')->sum('recognized_at_grn_amount')));
+            $this->assertSame('100.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->where('tenant_id', $context['tenant_id'])->where('stage', 'invoice_recognition')->sum('recognized_at_invoice_amount')));
+            $this->assertSame('0.000000', (string) Invoice::query()->latest('id')->firstOrFail()->balance_due);
+            $this->assertSame('0.000000', $this->accountNetDebit($context['payable_account_id']));
+        }
+    }
+
     public function test_direct_non_stock_purchase_has_invoice_payment_and_no_inventory(): void
     {
         $context = $this->context();
