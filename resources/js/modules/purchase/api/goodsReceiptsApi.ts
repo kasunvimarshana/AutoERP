@@ -10,6 +10,22 @@ export async function listGoodsReceipts(params: ListParams, signal?: AbortSignal
     return response.data;
 }
 
+export async function listInvoiceableGoodsReceipts(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<GoodsReceipt>>(
+        `${endpoints.purchase}/eligible/invoiceable-goods-receipts`,
+        { params, signal },
+    );
+    return response.data;
+}
+
+export async function listReturnableGoodsReceipts(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<GoodsReceipt>>(
+        `${endpoints.purchase}/eligible/returnable-goods-receipts`,
+        { params, signal },
+    );
+    return response.data;
+}
+
 export async function getGoodsReceipt(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<GoodsReceipt>>(`${endpoints.purchase}/goods-receipts/${id}`, { signal });
     return response.data.data;
@@ -53,6 +69,38 @@ export async function searchGoodsReceipts({
     signal,
 }: LookupLoadParams): Promise<LookupResult<NamedResource>> {
     const response = await listGoodsReceipts({ search, page, per_page: perPage }, signal);
+    return {
+        data: response.data.map((grn) => ({
+            id: grn.id,
+            code: grn.grn_number,
+            name: `${grn.grn_number ?? 'Goods receipt'}${grn.supplier?.name ? ` - ${grn.supplier.name}` : ''}`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
+}
+
+export async function searchInvoiceableGoodsReceipts({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listInvoiceableGoodsReceipts({ search, page, per_page: perPage }, signal);
+    return goodsReceiptLookupResult(response);
+}
+
+export async function searchReturnableGoodsReceipts({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listReturnableGoodsReceipts({ search, page, per_page: perPage }, signal);
+    return goodsReceiptLookupResult(response);
+}
+
+function goodsReceiptLookupResult(response: ApiCollection<GoodsReceipt>): LookupResult<NamedResource> {
     return {
         data: response.data.map((grn) => ({
             id: grn.id,

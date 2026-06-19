@@ -11,6 +11,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     placeholder?: string;
     error?: string;
     excludeId?: number | null;
+    excludeIds?: Array<number | string>;
     disabled?: boolean;
     required?: boolean;
     id?: string;
@@ -24,6 +25,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     placeholder = 'Search...',
     error,
     excludeId,
+    excludeIds,
     disabled,
     required,
     id,
@@ -46,6 +48,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             placeholder={placeholder}
             error={error}
             excludeId={excludeId}
+            excludeIds={excludeIds}
             disabled={disabled}
             required={required}
             minSearchLength={minSearchLength}

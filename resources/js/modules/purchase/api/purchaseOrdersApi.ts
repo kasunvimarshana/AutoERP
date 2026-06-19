@@ -18,6 +18,22 @@ export async function listPurchaseOrders(params: ListParams, signal?: AbortSigna
     return response.data;
 }
 
+export async function listReceivablePurchaseOrders(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PurchaseOrder>>(
+        `${endpoints.purchase}/eligible/receivable-purchase-orders`,
+        { params, signal },
+    );
+    return response.data;
+}
+
+export async function listInvoiceablePurchaseOrders(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PurchaseOrder>>(
+        `${endpoints.purchase}/eligible/invoiceable-purchase-orders`,
+        { params, signal },
+    );
+    return response.data;
+}
+
 export async function getPurchaseOrder(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}`, { signal });
     return response.data.data;
@@ -112,6 +128,38 @@ export async function searchPurchaseOrders({
     signal,
 }: LookupLoadParams): Promise<LookupResult<NamedResource>> {
     const response = await listPurchaseOrders({ search, page, per_page: perPage }, signal);
+    return {
+        data: response.data.map((order) => ({
+            id: order.id,
+            code: order.purchase_order_number,
+            name: `${order.purchase_order_number ?? 'Purchase order'}${order.supplier?.name ? ` - ${order.supplier.name}` : ''}`,
+        })),
+        links: response.links,
+        meta: response.meta,
+    };
+}
+
+export async function searchReceivablePurchaseOrders({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listReceivablePurchaseOrders({ search, page, per_page: perPage }, signal);
+    return purchaseOrderLookupResult(response);
+}
+
+export async function searchInvoiceablePurchaseOrders({
+    search,
+    page,
+    perPage,
+    signal,
+}: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    const response = await listInvoiceablePurchaseOrders({ search, page, per_page: perPage }, signal);
+    return purchaseOrderLookupResult(response);
+}
+
+function purchaseOrderLookupResult(response: ApiCollection<PurchaseOrder>): LookupResult<NamedResource> {
     return {
         data: response.data.map((order) => ({
             id: order.id,

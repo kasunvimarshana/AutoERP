@@ -17,6 +17,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     search: LookupLoader<T>;
     formatLabel: (resource: T) => string;
     excludeId?: number | null;
+    excludeIds?: Array<number | string>;
     error?: string;
     placeholder?: string;
     disabled?: boolean;
@@ -31,6 +32,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     search,
     formatLabel,
     excludeId,
+    excludeIds,
     error,
     placeholder = 'Search by code or name',
     disabled = false,
@@ -49,6 +51,8 @@ export function GenericLookupSelect<T extends NamedResource>({
     const requestSeqRef = useRef(0);
     const inFlightKeyRef = useRef<string | null>(null);
     const skipNextValueSyncRef = useRef(false);
+    const excludedKey = normalizeExcludedIds(excludeId, excludeIds).join('|');
+    const excludedIds = useMemo(() => new Set(excludedKey ? excludedKey.split('|') : []), [excludedKey]);
 
     const selectedLabel = useMemo(() => value ? formatLabel(value) : '', [formatLabel, value]);
     const [inputValue, setInputValue] = useState(selectedLabel);
@@ -139,7 +143,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 const result = await search({ search: term, page, perPage, signal: controller.signal });
                 if (controller.signal.aborted || requestSeqRef.current !== requestSeq) return;
 
-                const filtered = filterExcluded(result.data, excludeId);
+                const filtered = dedupeById(filterExcluded(result.data, excludedIds));
                 setOptions((current) => mode === 'append' ? dedupeById([...current, ...filtered]) : filtered);
                 setMeta(result.meta);
                 setLoadedSearch(term);
@@ -167,7 +171,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 }
             }
         })();
-    }, [excludeId, perPage, search]);
+    }, [excludedIds, perPage, search]);
 
     useEffect(() => {
         if (skipNextValueSyncRef.current && value === null) {
@@ -181,18 +185,9 @@ export function GenericLookupSelect<T extends NamedResource>({
     }, [selectedLabel, value]);
 
     useEffect(() => {
-        if (value && excludeId != null && Number(value.id) === Number(excludeId)) {
-            onChange(null);
-            setInputValue('');
-            setHasUserInput(false);
-            clearResults();
-        }
-    }, [clearResults, excludeId, onChange, value]);
-
-    useEffect(() => {
         abortRequest();
         clearResults();
-    }, [abortRequest, clearResults, excludeId, search]);
+    }, [abortRequest, clearResults, excludedKey, search]);
 
     useEffect(() => {
         if (!open || disabled) return;
@@ -389,18 +384,34 @@ function charactersRequiredMessage(required: number): string {
         : `Enter ${safeRequired} more characters to search.`;
 }
 
-function filterExcluded<T extends NamedResource>(options: T[], excludeId?: number | null): T[] {
-    return options.filter((option) => excludeId == null || Number(option.id) !== Number(excludeId));
+function normalizeExcludedIds(excludeId?: number | null, excludeIds: Array<number | string> = []): string[] {
+    const ids = [
+        ...(excludeId == null ? [] : [excludeId]),
+        ...excludeIds,
+    ];
+    const normalized = ids
+        .map((id) => String(id).trim())
+        .filter((id) => id !== '');
+
+    return Array.from(new Set(normalized)).sort();
+}
+
+function filterExcluded<T extends NamedResource>(options: T[], excludedIds: Set<string>): T[] {
+    return options.filter((option) => !excludedIds.has(normalizeLookupId(option.id)));
 }
 
 function dedupeById<T extends NamedResource>(options: T[]): T[] {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     return options.filter((option) => {
-        const id = Number(option.id);
+        const id = normalizeLookupId(option.id);
         if (seen.has(id)) return false;
         seen.add(id);
         return true;
     });
+}
+
+function normalizeLookupId(id: number | string): string {
+    return String(id).trim();
 }
 
 function LookupMessage({

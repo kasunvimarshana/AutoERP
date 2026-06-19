@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, fieldError, toApiError, type ApiError as ApiErrorType } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -24,6 +24,8 @@ import {
 } from '../purchaseApi';
 import type { PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
 import { todayDate } from '../purchaseFormUtils';
+import { sourceKey } from '../sourceIdentity';
+import { useInitialSourceParam, type InitialSourceCommand, type InitialSourceParamDefinition } from '../hooks/useInitialSourceParam';
 import { CurrencyLookupSelect, SupplierLookupSelect } from './PurchaseLookups';
 import {
     blankPaymentMethodRow,
@@ -34,8 +36,13 @@ import {
 import { PurchaseTabs, type PurchaseTabItem } from './PurchaseTabs';
 
 type PaymentTab = 'details' | 'allocations' | 'methods';
+type PaymentInitialSourceType = 'supplier_invoice' | 'purchase_order';
 
 const paymentTabs: PaymentTab[] = ['details', 'allocations', 'methods'];
+const initialSourceParams: Array<InitialSourceParamDefinition<PaymentInitialSourceType>> = [
+    { sourceType: 'supplier_invoice', paramNames: ['invoice_id', 'supplier_invoice_id'] },
+    { sourceType: 'purchase_order', paramNames: ['purchase_order_id'] },
+];
 
 function balanceOf(invoice: Invoice): string {
     return String(invoice.balance_due ?? invoice.balance?.remaining_amount ?? invoice.grand_total ?? '0.000000');
@@ -43,10 +50,13 @@ function balanceOf(invoice: Invoice): string {
 
 export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create' | 'prepare' }) {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const requestedTab = searchParams.get('tab') as PaymentTab | null;
     const activeTab = requestedTab && paymentTabs.includes(requestedTab) ? requestedTab : 'details';
-    const sourceLoaded = useRef(false);
+    const sourceRequestRef = useRef<{ key: string; controller: AbortController; generation: number } | null>(null);
+    const sourceGenerationRef = useRef(0);
+    const mountedRef = useRef(true);
+    const unmountCancelTimerRef = useRef<number | null>(null);
     const [supplier, setSupplierState] = useState<NamedResource | null>(null);
     const [currency, setCurrencyState] = useState<NamedResource | null>(null);
     const [paymentDate, setPaymentDate] = useState(todayDate());
@@ -82,43 +92,84 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.source_account_id || row.reference));
     useUnsavedChanges(dirty && !busy);
 
-    useEffect(() => {
-        if (sourceLoaded.current) return;
-        sourceLoaded.current = true;
+    const cancelSourceRequest = useCallback((resetBusy = true) => {
+        sourceGenerationRef.current += 1;
+        sourceRequestRef.current?.controller.abort();
+        sourceRequestRef.current = null;
+        if (resetBusy && mountedRef.current) setBusy(false);
+    }, []);
 
-        const invoiceId = Number(searchParams.get('invoice_id') ?? searchParams.get('supplier_invoice_id'));
-        const purchaseOrderId = Number(searchParams.get('purchase_order_id'));
-        if (Number.isFinite(invoiceId) && invoiceId > 0) {
-            setBusy(true);
-            void getInvoice(invoiceId)
-                .then((invoice) => {
-                    const balance = balanceOf(invoice);
-                    if (!isPositiveDecimal(balance)) {
-                        setError(new ApiError('The selected supplier invoice has no payable balance.', 422));
-                        return;
-                    }
-                    setAllocations({ [invoice.id]: balance });
-                    setAllocatedInvoices({ [invoice.id]: invoice });
-                    setAmount(balance);
-                    setPaymentRows([blankPaymentMethodRow(balance)]);
-                    setSupplierState(invoice.party ?? null);
-                    setCurrencyState(invoice.currency ?? null);
-                    setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? `#${invoice.id}`}.`);
-                })
-                .catch((requestError) => setError(toApiError(requestError)))
-                .finally(() => setBusy(false));
-        } else if (Number.isFinite(purchaseOrderId) && purchaseOrderId > 0) {
-            setBusy(true);
-            void getPurchaseOrder(purchaseOrderId)
-                .then((order) => {
-                    setSupplierState(order.supplier ?? null);
-                    setCurrencyState(order.currency ?? null);
-                    setSourceNotice(`${order.purchase_order_number ?? `Purchase order #${order.id}`} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
-                })
-                .catch((requestError) => setError(toApiError(requestError)))
-                .finally(() => setBusy(false));
+    const loadInitialSource = useCallback(async (command: InitialSourceCommand<PaymentInitialSourceType>) => {
+        cancelSourceRequest(false);
+
+        const controller = new AbortController();
+        const generation = sourceGenerationRef.current;
+        sourceRequestRef.current = { key: command.key, controller, generation };
+        setBusy(true);
+        setError(null);
+
+        try {
+            if (command.sourceType === 'supplier_invoice') {
+                const invoice = await getInvoice(command.sourceId, controller.signal);
+                if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
+
+                const balance = balanceOf(invoice);
+                if (!isPositiveDecimal(balance)) {
+                    setError(new ApiError('The selected supplier invoice has no payable balance.', 422));
+                    return;
+                }
+
+                setAllocations({ [invoice.id]: balance });
+                setAllocatedInvoices({ [invoice.id]: invoice });
+                setAmount(balance);
+                setPaymentRows([blankPaymentMethodRow(balance)]);
+                setSupplierState(invoice.party ?? null);
+                setCurrencyState(invoice.currency ?? null);
+                setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? `#${invoice.id}`}.`);
+                return;
+            }
+
+            const order = await getPurchaseOrder(command.sourceId, controller.signal);
+            if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
+
+            setSupplierState(order.supplier ?? null);
+            setCurrencyState(order.currency ?? null);
+            setSourceNotice(`${order.purchase_order_number ?? `Purchase order #${order.id}`} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
+        } catch (requestError) {
+            if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
+            setError(toApiError(requestError));
+        } finally {
+            if (sourceRequestRef.current?.controller === controller) {
+                sourceRequestRef.current = null;
+                if (mountedRef.current) setBusy(false);
+            }
         }
-    }, [searchParams]);
+    }, [cancelSourceRequest]);
+
+    const allocatedInvoiceKeys = useMemo(() => new Set(Object.keys(allocatedInvoices)
+        .map((invoiceId) => sourceKey('supplier_invoice', invoiceId))
+        .filter(isString)), [allocatedInvoices]);
+
+    useInitialSourceParam({
+        searchParams,
+        setSearchParams,
+        definitions: initialSourceParams,
+        isUnavailable: (key) => sourceRequestRef.current?.key === key || allocatedInvoiceKeys.has(key),
+        onProcess: loadInitialSource,
+    });
+
+    useEffect(() => {
+        mountedRef.current = true;
+        if (unmountCancelTimerRef.current !== null) {
+            window.clearTimeout(unmountCancelTimerRef.current);
+            unmountCancelTimerRef.current = null;
+        }
+
+        return () => {
+            mountedRef.current = false;
+            unmountCancelTimerRef.current = window.setTimeout(() => cancelSourceRequest(false), 0);
+        };
+    }, [cancelSourceRequest]);
 
     const updateAmount = (next: string) => {
         setAmount(next);
@@ -131,6 +182,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (supplier?.id && next?.id !== supplier.id && hasAllocatedInvoices && !window.confirm('Changing supplier clears selected invoice allocations.')) {
             return;
         }
+        if (next?.id !== supplier?.id) cancelSourceRequest();
         setSupplierState(next);
         setInvoicePage(1);
         setInvoiceSearch('');
@@ -145,8 +197,11 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const setCurrency = (next: NamedResource | null) => {
         if (currencyLocked && next?.id !== currency?.id) {
             if (!window.confirm('Changing currency clears invoice allocations that established the current currency.')) return;
+            cancelSourceRequest();
             setAllocations({});
             setAllocatedInvoices({});
+        } else if (next?.id !== currency?.id) {
+            cancelSourceRequest();
         }
         setCurrencyState(next);
     };
@@ -431,4 +486,22 @@ function PaymentSummary({ amount, allocated, unallocated, methodTotal, methodDif
 
 function Summary({ label, value }: { label: string; value: ReactNode }) {
     return <div><dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt><dd className="mt-1 text-slate-800">{value}</dd></div>;
+}
+
+function isString(value: string | null): value is string {
+    return value !== null;
+}
+
+function isStaleSourceRequest(
+    current: { key: string; controller: AbortController; generation: number } | null,
+    key: string,
+    controller: AbortController,
+    generation: number,
+    currentGeneration: number,
+): boolean {
+    return controller.signal.aborted
+        || current?.key !== key
+        || current.controller !== controller
+        || current.generation !== generation
+        || currentGeneration !== generation;
 }

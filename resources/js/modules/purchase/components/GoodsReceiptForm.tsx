@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -10,8 +10,14 @@ import type { NamedResource } from '@/shared/types/common';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createGoodsReceipt, getPurchaseOrder, getReceivablePurchaseOrderLines, type GoodsReceiptPayload, type PurchaseOrder, type PurchaseOrderLine } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
+import { normalizeSourceId, sourceKey } from '../sourceIdentity';
+import { useInitialSourceParam, type InitialSourceCommand, type InitialSourceParamDefinition } from '../hooks/useInitialSourceParam';
 import { PurchaseOrderLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
 import { GoodsReceiptLineEditor, type EditableGoodsReceiptLine } from './GoodsReceiptLineEditor';
+
+const initialSourceParams: Array<InitialSourceParamDefinition<'purchase_order'>> = [
+    { sourceType: 'purchase_order', paramNames: ['purchase_order_id', 'source_id'] },
+];
 
 function orderLabel(order: PurchaseOrder): NamedResource {
     return {
@@ -21,21 +27,31 @@ function orderLabel(order: PurchaseOrder): NamedResource {
     };
 }
 
-function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine {
+function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine | null {
+    if (normalizeSourceId(line.id) === null) return null;
+
     return { source: line, include: false, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' };
 }
 
-export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrderId?: number }) {
+export function GoodsReceiptForm() {
     const navigate = useNavigate();
-    const [purchaseOrder, setPurchaseOrder] = useState<NamedResource | null>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [purchaseOrder, setPurchaseOrderState] = useState<NamedResource | null>(null);
     const [sourceOrder, setSourceOrder] = useState<PurchaseOrder | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [receivedDate, setReceivedDate] = useState(todayDate());
     const [notes, setNotes] = useState('');
     const [lines, setLines] = useState<EditableGoodsReceiptLine[]>([]);
     const [loadingLines, setLoadingLines] = useState(false);
+    const [loadingKey, setLoadingKey] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const selectedKeyRef = useRef<string | null>(null);
+    const loadingKeyRef = useRef<string | null>(null);
+    const requestRef = useRef<{ key: string; controller: AbortController; generation: number } | null>(null);
+    const generationRef = useRef(0);
+    const mountedRef = useRef(true);
+    const unmountCancelTimerRef = useRef<number | null>(null);
     const errorFor = (field: string) => fieldError(error, field);
     const hasEnteredLines = lines.some((line) => (
         line.include ||
@@ -44,42 +60,104 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
         || isPositiveDecimal(line.rejected_quantity)
     ));
 
-    useEffect(() => {
-        if (sourcePurchaseOrderId && !purchaseOrder) {
-            setPurchaseOrder({ id: sourcePurchaseOrderId, name: `Purchase Order #${sourcePurchaseOrderId}` });
-        }
-    }, [sourcePurchaseOrderId, purchaseOrder]);
+    const setPurchaseOrder = useCallback((next: NamedResource | null) => {
+        selectedKeyRef.current = next?.id ? sourceKey('purchase_order', next.id) : null;
+        setPurchaseOrderState(next);
+    }, []);
 
-    useEffect(() => {
-        if (!purchaseOrder?.id) {
-            setSourceOrder(null);
-            setLines([]);
-            return;
+    const cancelSourceRequest = useCallback((resetLoading = true) => {
+        generationRef.current += 1;
+        requestRef.current?.controller.abort();
+        requestRef.current = null;
+        loadingKeyRef.current = null;
+        if (resetLoading && mountedRef.current) {
+            setLoadingKey(null);
+            setLoadingLines(false);
         }
+    }, []);
+
+    const clearSource = useCallback(() => {
+        cancelSourceRequest();
+        setPurchaseOrder(null);
+        setSourceOrder(null);
+        setWarehouseLocation(null);
+        setLines([]);
+    }, [cancelSourceRequest, setPurchaseOrder]);
+
+    const loadPurchaseOrderSource = useCallback(async (rawSourceId: number, _fallbackLabel: string): Promise<boolean> => {
+        const sourceId = normalizeSourceId(rawSourceId);
+        const key = sourceKey('purchase_order', sourceId);
+        if (sourceId === null || !key || loadingKeyRef.current === key) return false;
+
+        cancelSourceRequest();
 
         const controller = new AbortController();
+        const generation = generationRef.current;
+        requestRef.current = { key, controller, generation };
+        loadingKeyRef.current = key;
+        setLoadingKey(key);
         setLoadingLines(true);
         setError(null);
-        Promise.all([
-            getPurchaseOrder(Number(purchaseOrder.id), controller.signal),
-            getReceivablePurchaseOrderLines(Number(purchaseOrder.id), controller.signal),
-        ])
-            .then(([order, receivableLines]) => {
-                if (controller.signal.aborted) return;
-                setSourceOrder(order);
-                setPurchaseOrder(orderLabel(order));
-                setWarehouseLocation(order.warehouse_location ?? null);
-                setLines(receivableLines.map(editableLine));
-            })
-            .catch((requestError) => {
-                if (!controller.signal.aborted) setError(toApiError(requestError));
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setLoadingLines(false);
-            });
+        setSourceOrder(null);
+        setLines([]);
 
-        return () => controller.abort();
-    }, [purchaseOrder?.id]);
+        try {
+            const [order, receivableLines] = await Promise.all([
+                getPurchaseOrder(sourceId, controller.signal),
+                getReceivablePurchaseOrderLines(sourceId, controller.signal),
+            ]);
+            if (!mountedRef.current || isStaleSourceRequest(requestRef.current, key, controller, generation, generationRef.current)) return false;
+
+            setSourceOrder(order);
+            setPurchaseOrder(orderLabel(order));
+            setWarehouseLocation(order.warehouse_location ?? null);
+            setLines(dedupeReceiptLines(receivableLines.map(editableLine).filter(isReceiptLine)));
+
+            return true;
+        } catch (requestError) {
+            if (!mountedRef.current || isStaleSourceRequest(requestRef.current, key, controller, generation, generationRef.current)) return false;
+            setError(toApiError(requestError));
+            setPurchaseOrder(null);
+            setSourceOrder(null);
+            setWarehouseLocation(null);
+            setLines([]);
+            return false;
+        } finally {
+            if (requestRef.current?.controller === controller) {
+                requestRef.current = null;
+                loadingKeyRef.current = null;
+                if (mountedRef.current) {
+                    setLoadingKey(null);
+                    setLoadingLines(false);
+                }
+            }
+        }
+    }, [cancelSourceRequest, setPurchaseOrder]);
+
+    const processInitialSource = useCallback(async (command: InitialSourceCommand<'purchase_order'>) => {
+        await loadPurchaseOrderSource(command.sourceId, `Purchase Order #${command.sourceId}`);
+    }, [loadPurchaseOrderSource]);
+
+    useInitialSourceParam({
+        searchParams,
+        setSearchParams,
+        definitions: initialSourceParams,
+        isUnavailable: (key) => selectedKeyRef.current === key || loadingKeyRef.current === key,
+        onProcess: processInitialSource,
+    });
+
+    useEffect(() => {
+        mountedRef.current = true;
+        if (unmountCancelTimerRef.current !== null) {
+            window.clearTimeout(unmountCancelTimerRef.current);
+            unmountCancelTimerRef.current = null;
+        }
+
+        return () => {
+            mountedRef.current = false;
+            unmountCancelTimerRef.current = window.setTimeout(() => cancelSourceRequest(false), 0);
+        };
+    }, [cancelSourceRequest]);
 
     const payload = (): GoodsReceiptPayload => ({
         received_date: receivedDate,
@@ -106,13 +184,28 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
         if (purchaseOrder?.id && next?.id !== purchaseOrder.id && hasEnteredLines && !window.confirm('Changing the purchase order clears entered receipt quantities.')) {
             return;
         }
+
+        if (!next?.id) {
+            clearSource();
+            return;
+        }
+
         setPurchaseOrder(next);
+        setSourceOrder(null);
+        setWarehouseLocation(null);
+        setLines([]);
+        void loadPurchaseOrderSource(next.id, next.name);
     };
+
+    const excludedPurchaseOrderIds = [
+        ...(purchaseOrder?.id ? [purchaseOrder.id] : []),
+        ...(loadingKey ? loadingKeyId(loadingKey, 'purchase_order') : []),
+    ];
 
     return (
         <form className="space-y-5" onSubmit={async (event) => {
             event.preventDefault();
-            if (submitting) return;
+            if (submitting || loadingLines) return;
             setSubmitting(true);
             setError(null);
             try {
@@ -127,7 +220,7 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
             <ErrorAlert error={error} />
             <Panel title="Source">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <PurchaseOrderLookupSelect value={purchaseOrder} onChange={changePurchaseOrder} error={errorFor('purchase_order_id')} />
+                    <PurchaseOrderLookupSelect eligibility="receivable" value={purchaseOrder} onChange={changePurchaseOrder} excludeIds={excludedPurchaseOrderIds} error={errorFor('purchase_order_id')} />
                     <Input label="Received date" type="date" value={receivedDate} error={errorFor('received_date')} onChange={(event) => setReceivedDate(event.target.value)} />
                     <WarehouseLocationLookupSelect warehouseId={sourceOrder?.warehouse?.id ?? sourceOrder?.warehouse_id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                 </div>
@@ -147,8 +240,43 @@ export function GoodsReceiptForm({ sourcePurchaseOrderId }: { sourcePurchaseOrde
             </Panel>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/goods-receipts')}>Cancel</Button>
-                <Button type="submit" loading={submitting}>Create GRN</Button>
+                <Button type="submit" loading={submitting} disabled={loadingLines}>Create GRN</Button>
             </div>
         </form>
     );
+}
+
+function dedupeReceiptLines(lines: EditableGoodsReceiptLine[]): EditableGoodsReceiptLine[] {
+    const seen = new Set<number>();
+
+    return lines.filter((line) => {
+        const lineId = normalizeSourceId(line.source.id);
+        if (lineId === null || seen.has(lineId)) return false;
+        seen.add(lineId);
+        return true;
+    });
+}
+
+function isReceiptLine(line: EditableGoodsReceiptLine | null): line is EditableGoodsReceiptLine {
+    return line !== null;
+}
+
+function loadingKeyId(key: string, type: string): number[] {
+    const [sourceType, rawId] = key.split(':');
+    const id = normalizeSourceId(rawId);
+    return sourceType === type && id !== null ? [id] : [];
+}
+
+function isStaleSourceRequest(
+    current: { key: string; controller: AbortController; generation: number } | null,
+    key: string,
+    controller: AbortController,
+    generation: number,
+    currentGeneration: number,
+): boolean {
+    return controller.signal.aborted
+        || current?.key !== key
+        || current.controller !== controller
+        || current.generation !== generation
+        || currentGeneration !== generation;
 }

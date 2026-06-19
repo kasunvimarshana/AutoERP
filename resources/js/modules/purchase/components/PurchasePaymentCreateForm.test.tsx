@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiCollection } from '@/shared/types/api';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
@@ -13,11 +14,12 @@ const purchaseApiMocks = vi.hoisted(() => ({
     listOutstandingSupplierInvoices: vi.fn(),
     preparePurchasePayment: vi.fn(),
 }));
-
-vi.mock('../purchaseApi', () => purchaseApiMocks);
-vi.mock('@/modules/invoice/invoiceApi', () => ({
+const invoiceApiMocks = vi.hoisted(() => ({
     getInvoice: vi.fn(),
 }));
+
+vi.mock('../purchaseApi', () => purchaseApiMocks);
+vi.mock('@/modules/invoice/invoiceApi', () => invoiceApiMocks);
 vi.mock('./PurchaseLookups', () => ({
     SupplierLookupSelect: ({ value, onChange }: { value: { name?: string } | null; onChange: (value: { id: number; name: string }) => void }) => (
         <button type="button" onClick={() => onChange({ id: 11, name: 'Supplier A' })}>
@@ -62,6 +64,7 @@ describe('PurchasePaymentCreateForm', () => {
                 allocation_method: 'specific_invoice',
             }],
         });
+        invoiceApiMocks.getInvoice.mockResolvedValue(invoice());
     });
 
     it('auto-loads paginated outstanding invoices after selecting a supplier', async () => {
@@ -115,22 +118,94 @@ describe('PurchasePaymentCreateForm', () => {
         expect(await screen.findByText('Payment Preview')).toBeInTheDocument();
         expect(screen.getByText('SI-42')).toBeInTheDocument();
     });
+
+    it('loads an initial invoice source once under StrictMode', async () => {
+        render(
+            <StrictMode>
+                <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+                    <PurchasePaymentCreateForm />
+                </MemoryRouter>
+            </StrictMode>,
+        );
+
+        expect(await screen.findByText('Loaded supplier invoice SI-42.')).toBeInTheDocument();
+        expect(invoiceApiMocks.getInvoice).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Supplier A')).toBeInTheDocument();
+        expect(screen.getByText('USD')).toBeInTheDocument();
+    });
+
+    it('loads a different query source once in the same mounted payment form', async () => {
+        invoiceApiMocks.getInvoice
+            .mockResolvedValueOnce(invoice(42, 'SI-42', '100.000000'))
+            .mockResolvedValueOnce(invoice(43, 'SI-43', '200.000000'));
+
+        render(
+            <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+                <Routes>
+                    <Route path="/purchase/payments/create" element={<PaymentQueryHarness />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByText('Loaded supplier invoice SI-42.')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'Load invoice 43' }));
+
+        expect(await screen.findByText('Loaded supplier invoice SI-43.')).toBeInTheDocument();
+        expect(invoiceApiMocks.getInvoice).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores stale payment source responses after a different query source is selected', async () => {
+        const first = deferred<Invoice>();
+        invoiceApiMocks.getInvoice
+            .mockReturnValueOnce(first.promise)
+            .mockResolvedValueOnce(invoice(43, 'SI-43', '200.000000'));
+
+        render(
+            <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+                <Routes>
+                    <Route path="/purchase/payments/create" element={<PaymentQueryHarness />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        await userEvent.click(screen.getByRole('button', { name: 'Load invoice 43' }));
+        expect(await screen.findByText('Loaded supplier invoice SI-43.')).toBeInTheDocument();
+
+        await act(async () => {
+            first.resolve(invoice(42, 'SI-42', '100.000000'));
+            await first.promise;
+        });
+
+        expect(screen.queryByText('Loaded supplier invoice SI-42.')).not.toBeInTheDocument();
+        expect(screen.getByText('Loaded supplier invoice SI-43.')).toBeInTheDocument();
+    });
 });
 
-function invoice(): Invoice {
+function PaymentQueryHarness() {
+    const navigate = useNavigate();
+
+    return (
+        <>
+            <button type="button" onClick={() => navigate('/purchase/payments/create?invoice_id=43')}>Load invoice 43</button>
+            <PurchasePaymentCreateForm />
+        </>
+    );
+}
+
+function invoice(id = 42, invoiceNumber = 'SI-42', balance = '100.000000'): Invoice {
     return {
-        id: 42,
-        invoice_number: 'SI-42',
+        id,
+        invoice_number: invoiceNumber,
         invoice_date: '2026-06-18',
         invoice_type: 'purchase',
         direction: 'inbound',
         status: 'posted',
         party: { id: 11, name: 'Supplier A' },
         currency: { id: 5, code: 'USD', name: 'USD' },
-        subtotal: '100.000000',
-        grand_total: '100.000000',
+        subtotal: balance,
+        grand_total: balance,
         paid_amount: '0.000000',
-        balance_due: '100.000000',
+        balance_due: balance,
     } as Invoice;
 }
 
@@ -140,4 +215,15 @@ function collection<T>(data: T[]): ApiCollection<T> {
         links: {},
         meta: { current_page: 1, from: data.length ? 1 : null, last_page: 2, path: '/', per_page: 10, to: data.length || null, total: 2 },
     };
+}
+
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((promiseResolve, promiseReject) => {
+        resolve = promiseResolve;
+        reject = promiseReject;
+    });
+
+    return { promise, resolve, reject };
 }

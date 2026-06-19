@@ -1,16 +1,25 @@
 import { useCallback } from 'react';
-import { listInvoices } from '@/modules/invoice/invoiceApi';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { listUoms, searchCurrencies, searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupBehaviorOptions, LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import { searchGoodsReceipts, searchPurchaseOrders } from '../purchaseApi';
+import {
+    searchGoodsReceipts,
+    searchInvoiceableGoodsReceipts,
+    searchInvoiceablePurchaseOrders,
+    searchOutstandingSupplierInvoices,
+    searchPurchaseOrders,
+    searchReceivablePurchaseOrders,
+    searchReturnableGoodsReceipts,
+} from '../purchaseApi';
 
 interface LookupProps extends LookupBehaviorOptions {
     value: NamedResource | null;
     onChange: (value: NamedResource | null) => void;
     error?: string;
+    excludeId?: number | null;
+    excludeIds?: Array<number | string>;
     disabled?: boolean;
     required?: boolean;
 }
@@ -58,35 +67,36 @@ export function CurrencyLookupSelect(props: LookupProps) {
     return <LookupSelect label="Currency" search={searchCurrencies} placeholder="Search currency code..." loadOnOpen minSearchLength={0} {...props} />;
 }
 
-export function PurchaseOrderLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Purchase order" search={searchPurchaseOrders} placeholder="Search PO number or supplier..." {...props} />;
+export function PurchaseOrderLookupSelect({ eligibility = 'all', ...props }: LookupProps & { eligibility?: 'all' | 'receivable' | 'invoiceable' }) {
+    const search = eligibility === 'receivable'
+        ? searchReceivablePurchaseOrders
+        : eligibility === 'invoiceable'
+            ? searchInvoiceablePurchaseOrders
+            : searchPurchaseOrders;
+
+    return <LookupSelect label="Purchase order" search={search} placeholder="Search PO number or supplier..." {...props} />;
 }
 
-export function GoodsReceiptLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Goods receipt" search={searchGoodsReceipts} placeholder="Search GRN number or supplier..." {...props} />;
+export function GoodsReceiptLookupSelect({ eligibility = 'all', ...props }: LookupProps & { eligibility?: 'all' | 'invoiceable' | 'returnable' }) {
+    const search = eligibility === 'invoiceable'
+        ? searchInvoiceableGoodsReceipts
+        : eligibility === 'returnable'
+            ? searchReturnableGoodsReceipts
+            : searchGoodsReceipts;
+
+    return <LookupSelect label="Goods receipt" search={search} placeholder="Search GRN number or supplier..." {...props} />;
 }
 
 export function PurchaseInvoiceLookupSelect({ partyId, ...props }: LookupProps & { partyId?: number | null }) {
     const search = useCallback(
         async ({ search, page, perPage, signal }: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
-            const response = await listInvoices({
+            return searchOutstandingSupplierInvoices({
                 search,
                 page,
-                invoice_type: 'purchase',
-                direction: 'inbound',
-                party_id: partyId ?? undefined,
-                per_page: perPage,
-            }, signal);
-
-            return {
-                data: response.data.map((invoice) => ({
-                    id: invoice.id,
-                    code: invoice.invoice_number,
-                    name: `${invoice.invoice_number ?? 'Invoice'}${invoice.party?.name ? ` - ${invoice.party.name}` : ''}`,
-                })),
-                links: response.links,
-                meta: response.meta,
-            };
+                perPage,
+                signal,
+                supplierId: partyId,
+            });
         },
         [partyId],
     );

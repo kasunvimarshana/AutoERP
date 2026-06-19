@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -9,7 +9,17 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
-import { createPurchaseInvoice, getGoodsReceipt, getInvoiceableGoodsReceiptLines, getInvoiceablePurchaseOrderLines, getPurchaseOrder, previewPurchaseInvoice, type GoodsReceiptLine, type PurchaseInvoicePayload, type PurchaseOrderLine } from '../purchaseApi';
+import {
+    createPurchaseInvoice,
+    getGoodsReceipt,
+    getInvoiceableGoodsReceiptLines,
+    getInvoiceablePurchaseOrderLines,
+    getPurchaseOrder,
+    previewPurchaseInvoice,
+    type GoodsReceiptLine,
+    type PurchaseInvoicePayload,
+    type PurchaseOrderLine,
+} from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { CurrencyLookupSelect, GoodsReceiptLookupSelect, PurchaseOrderLookupSelect, SupplierLookupSelect } from '../components/PurchaseLookups';
 import { PurchaseInvoicePreview } from '../components/PurchaseInvoicePreview';
@@ -19,14 +29,25 @@ import {
     type EditablePurchaseInvoiceLine,
     type PurchaseInvoiceSourceType,
 } from '../components/PurchaseInvoiceLineTable';
+import { useDocumentSources } from '../hooks/useDocumentSources';
+import { useInitialSourceParam, type InitialSourceParamDefinition, type InitialSourceCommand } from '../hooks/useInitialSourceParam';
+import { normalizeSourceId, sourceKey, sourceLineKey } from '../sourceIdentity';
+
+interface InvoiceSourceContext {
+    supplier: NamedResource | null;
+    currency: NamedResource | null;
+}
+
+const initialSourceParams: Array<InitialSourceParamDefinition<PurchaseInvoiceSourceType>> = [
+    { sourceType: 'purchase_order', paramNames: ['purchase_order_id'] },
+    { sourceType: 'goods_receipt_note', paramNames: ['goods_receipt_id', 'grn_id'] },
+];
 
 export default function PurchaseInvoiceCreatePage() {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [sourceType, setSourceType] = useState<PurchaseInvoiceSourceType>('goods_receipt_note');
     const [source, setSource] = useState<NamedResource | null>(null);
-    const [sources, setSources] = useState<Array<{ type: PurchaseInvoiceSourceType; id: number; label: string }>>([]);
-    const [lines, setLines] = useState<EditablePurchaseInvoiceLine[]>([]);
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [invoiceDate, setInvoiceDate] = useState(todayDate());
@@ -39,86 +60,123 @@ export default function PurchaseInvoiceCreatePage() {
     const [busy, setBusy] = useState(false);
     const errorFor = (field: string) => fieldError(error, field);
 
-    const appendSource = async (type: PurchaseInvoiceSourceType, sourceId: number, sourceLabel: string) => {
-        if (sources.some((current) => current.type === type && current.id === sourceId)) return;
-        setBusy(true);
+    const getLineKey = useCallback((line: EditablePurchaseInvoiceLine) => (
+        sourceLineKey(line.sourceType, line.sourceId, line.lineId)
+    ), []);
+    const getLineSourceKey = useCallback((line: EditablePurchaseInvoiceLine) => (
+        sourceKey(line.sourceType, line.sourceId)
+    ), []);
+    const {
+        sources,
+        lines,
+        hasLoadingSources,
+        setLines,
+        addSource,
+        removeSource,
+        clearSources,
+        isSourceUnavailable,
+        excludeIdsForType,
+    } = useDocumentSources<PurchaseInvoiceSourceType, EditablePurchaseInvoiceLine>({
+        getLineKey,
+        getLineSourceKey,
+    });
+
+    const addInvoiceSource = useCallback(async (
+        type: PurchaseInvoiceSourceType,
+        rawSourceId: number,
+        fallbackLabel: string,
+    ): Promise<boolean> => {
+        const sourceId = normalizeSourceId(rawSourceId);
+        if (sourceId === null) return false;
+
         setError(null);
+        setPreview(null);
+
         try {
-            if (type === 'purchase_order') {
-                const rows = await getInvoiceablePurchaseOrderLines(sourceId);
-                setLines((current) => [...current, ...rows.map((row: PurchaseOrderLine) => ({
-                    sourceType: type,
-                    sourceId,
-                    sourceLabel,
-                    lineId: row.id ?? 0,
-                    include: false,
-                    itemName: row.item?.name ?? '-',
-                    sourceQty: row.ordered_quantity,
-                    previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
-                    remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
-                    quantity: '',
-                }))]);
-            } else {
-                const rows = await getInvoiceableGoodsReceiptLines(sourceId);
-                setLines((current) => [...current, ...rows.map((row: GoodsReceiptLine) => ({
-                    sourceType: type,
-                    sourceId,
-                    sourceLabel,
-                    lineId: row.id ?? 0,
-                    include: false,
-                    itemName: row.item?.name ?? '-',
-                    sourceQty: row.accepted_quantity,
-                    previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
-                    remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
-                    quantity: '',
-                }))]);
-            }
-            setSources((current) => [...current, { type, id: sourceId, label: sourceLabel }]);
-            setSource(null);
-            setPreview(null);
+            const added = await addSource<InvoiceSourceContext>({
+                type,
+                id: sourceId,
+                fallbackLabel,
+                load: async (signal) => {
+                    if (type === 'purchase_order') {
+                        const [order, rows] = await Promise.all([
+                            getPurchaseOrder(sourceId, signal),
+                            getInvoiceablePurchaseOrderLines(sourceId, signal),
+                        ]);
+                        const label = order.purchase_order_number ?? `Purchase Order #${order.id}`;
+
+                        return {
+                            source: { type, id: order.id, label },
+                            lines: rows
+                                .map((row) => invoiceLineFromPurchaseOrder(row, order.id, label))
+                                .filter(isInvoiceLine),
+                            context: {
+                                supplier: order.supplier ?? null,
+                                currency: order.currency ?? null,
+                            },
+                        };
+                    }
+
+                    const [grn, rows] = await Promise.all([
+                        getGoodsReceipt(sourceId, signal),
+                        getInvoiceableGoodsReceiptLines(sourceId, signal),
+                    ]);
+                    const label = grn.grn_number ?? `Goods Receipt #${grn.id}`;
+
+                    return {
+                        source: { type, id: grn.id, label },
+                        lines: rows
+                            .map((row) => invoiceLineFromGoodsReceipt(row, grn.id, label))
+                            .filter(isInvoiceLine),
+                        context: {
+                            supplier: grn.supplier ?? null,
+                            currency: null,
+                        },
+                    };
+                },
+                onSuccess: ({ context }) => {
+                    if (context?.supplier) {
+                        setSupplier((current) => current?.id === context.supplier?.id ? current : context.supplier);
+                    }
+                    if (context?.currency) {
+                        setCurrency((current) => current?.id === context.currency?.id ? current : context.currency);
+                    }
+                },
+            });
+
+            if (added) setSource(null);
+            return added;
         } catch (requestError) {
             setError(toApiError(requestError));
-        } finally {
-            setBusy(false);
+            return false;
         }
+    }, [addSource]);
+
+    const processInitialSource = useCallback(async (command: InitialSourceCommand<PurchaseInvoiceSourceType>) => {
+        setSourceType(command.sourceType);
+        await addInvoiceSource(command.sourceType, command.sourceId, fallbackSourceLabel(command.sourceType, command.sourceId));
+    }, [addInvoiceSource]);
+
+    useInitialSourceParam({
+        searchParams,
+        setSearchParams,
+        definitions: initialSourceParams,
+        isUnavailable: isSourceUnavailable,
+        onProcess: processInitialSource,
+    });
+
+    const selectedSourceKey = source?.id ? sourceKey(sourceType, source.id) : null;
+    const canAddSource = Boolean(selectedSourceKey && !isSourceUnavailable(selectedSourceKey) && !busy && !hasLoadingSources);
+    const excludedSourceIds = useMemo(() => excludeIdsForType(sourceType), [excludeIdsForType, sourceType]);
+
+    const clearInvoiceSources = () => {
+        clearSources();
+        setSource(null);
+        setPreview(null);
     };
 
-    const addSource = async () => {
-        if (!source?.id) return;
-        await appendSource(sourceType, source.id, source.name);
-    };
-
-    useEffect(() => {
-        const poId = Number(searchParams.get('purchase_order_id'));
-        const grnId = Number(searchParams.get('goods_receipt_id') ?? searchParams.get('grn_id'));
-        if (Number.isFinite(poId) && poId > 0 && sources.length === 0 && !source) {
-            void getPurchaseOrder(poId)
-                .then((order) => {
-                    setSourceType('purchase_order');
-                    const label = order.purchase_order_number ?? `Purchase Order #${order.id}`;
-                    setSource({ id: order.id, code: order.purchase_order_number, name: label });
-                    if (order.supplier) setSupplier(order.supplier);
-                    if (order.currency) setCurrency(order.currency);
-                    void appendSource('purchase_order', order.id, label);
-                })
-                .catch((requestError) => setError(toApiError(requestError)));
-        } else if (Number.isFinite(grnId) && grnId > 0 && sources.length === 0 && !source) {
-            void getGoodsReceipt(grnId)
-                .then((grn) => {
-                    setSourceType('goods_receipt_note');
-                    const label = grn.grn_number ?? `Goods Receipt #${grn.id}`;
-                    setSource({ id: grn.id, code: grn.grn_number, name: label });
-                    if (grn.supplier) setSupplier(grn.supplier);
-                    void appendSource('goods_receipt_note', grn.id, label);
-                })
-                .catch((requestError) => setError(toApiError(requestError)));
-        }
-        // Query source is consumed only while the form has no selected source.
-    }, [searchParams, source, sources.length]);
-
-    const removeSource = (item: { type: PurchaseInvoiceSourceType; id: number }) => {
-        setSources((current) => current.filter((sourceItem) => sourceItem.type !== item.type || sourceItem.id !== item.id));
-        setLines((current) => current.filter((line) => line.sourceType !== item.type || line.sourceId !== item.id));
+    const removeInvoiceSource = (item: { type: PurchaseInvoiceSourceType; id: number }) => {
+        removeSource(item);
         setPreview(null);
     };
 
@@ -135,16 +193,35 @@ export default function PurchaseInvoiceCreatePage() {
             .map((item) => ({
                 source_type: item.type,
                 source_id: item.id,
-                line_quantities: Object.fromEntries(lines.filter((line) => line.sourceType === item.type && line.sourceId === item.id && line.include && line.quantity !== '').map((line) => [line.lineId, decimalOr(line.quantity)])),
+                line_quantities: Object.fromEntries(lines
+                    .filter((line) => line.sourceType === item.type && line.sourceId === item.id && line.include && line.quantity !== '')
+                    .map((line) => [line.lineId, decimalOr(line.quantity)])),
             }))
             .filter((item) => Object.keys(item.line_quantities).length > 0),
     });
 
     const runPreview = async () => {
+        if (hasLoadingSources) return;
+
         setBusy(true);
         setError(null);
         try {
             setPreview(await previewPurchaseInvoice(payload()));
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const createInvoice = async () => {
+        if (hasLoadingSources) return;
+
+        setBusy(true);
+        setError(null);
+        try {
+            const invoice = await createPurchaseInvoice(payload());
+            navigate(`/invoices/${String(invoice.id ?? '')}?from=purchase`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -165,19 +242,13 @@ export default function PurchaseInvoiceCreatePage() {
                     <SupplierLookupSelect value={supplier} onChange={(value) => {
                         if (sources.length > 0 && value?.id !== supplier?.id && !window.confirm('Changing supplier clears selected invoice sources.')) return;
                         setSupplier(value);
-                        if (value?.id !== supplier?.id) {
-                            setSources([]);
-                            setLines([]);
-                        }
+                        if (value?.id !== supplier?.id) clearInvoiceSources();
                         setPreview(null);
                     }} error={errorFor('supplier_id')} />
                     <CurrencyLookupSelect value={currency} onChange={(value) => {
                         if (sources.length > 0 && value?.id !== currency?.id && !window.confirm('Changing currency clears selected invoice sources.')) return;
                         setCurrency(value);
-                        if (value?.id !== currency?.id) {
-                            setSources([]);
-                            setLines([]);
-                        }
+                        if (value?.id !== currency?.id) clearInvoiceSources();
                         setPreview(null);
                     }} error={errorFor('currency_id')} />
                     <Input label="Invoice date" type="date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => { setInvoiceDate(event.target.value); setPreview(null); }} />
@@ -189,10 +260,32 @@ export default function PurchaseInvoiceCreatePage() {
             <Panel title="Sources">
                 <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
                     <Select label="Source type" value={sourceType} options={[{ value: 'goods_receipt_note', label: 'GRN' }, { value: 'purchase_order', label: 'PO' }]} onChange={(event) => { setSourceType(event.target.value as PurchaseInvoiceSourceType); setSource(null); }} />
-                    {sourceType === 'goods_receipt_note' ? <GoodsReceiptLookupSelect value={source} onChange={setSource} /> : <PurchaseOrderLookupSelect value={source} onChange={setSource} />}
-                    <Button type="button" variant="secondary" loading={busy} onClick={() => void addSource()}>Add source</Button>
+                    {sourceType === 'goods_receipt_note'
+                        ? <GoodsReceiptLookupSelect eligibility="invoiceable" value={source} onChange={setSource} excludeIds={excludedSourceIds} />
+                        : <PurchaseOrderLookupSelect eligibility="invoiceable" value={source} onChange={setSource} excludeIds={excludedSourceIds} />}
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        loading={hasLoadingSources}
+                        disabled={!canAddSource}
+                        onClick={() => {
+                            if (!source?.id) return;
+                            void addInvoiceSource(sourceType, source.id, source.name);
+                        }}
+                    >
+                        Add source
+                    </Button>
                 </div>
-                {sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-sm">{sources.map((item) => <span key={`${item.type}-${item.id}`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-slate-700">{item.label}<button type="button" className="font-semibold text-rose-600" onClick={() => removeSource(item)}>Remove</button></span>)}</div>}
+                {sources.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                        {sources.map((item) => (
+                            <span key={`${item.type}-${item.id}`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                                {item.label}
+                                <button type="button" className="font-semibold text-rose-600" onClick={() => removeInvoiceSource(item)}>Remove</button>
+                            </span>
+                        ))}
+                    </div>
+                )}
             </Panel>
             <Panel title="Invoiceable lines">
                 <PurchaseInvoiceLineTable
@@ -209,20 +302,61 @@ export default function PurchaseInvoiceCreatePage() {
             </Panel>
             <PurchaseInvoicePreview preview={preview} />
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="secondary" loading={busy} onClick={runPreview}>Preview</Button>
-                <Button type="button" loading={busy} onClick={async () => {
-                    setBusy(true);
-                    setError(null);
-                    try {
-                        const invoice = await createPurchaseInvoice(payload());
-                        navigate(`/invoices/${String(invoice.id ?? '')}?from=purchase`);
-                    } catch (requestError) {
-                        setError(toApiError(requestError));
-                    } finally {
-                        setBusy(false);
-                    }
-                }}>Create invoice</Button>
+                <Button type="button" variant="secondary" loading={busy} disabled={hasLoadingSources} onClick={runPreview}>Preview</Button>
+                <Button type="button" loading={busy} disabled={hasLoadingSources} onClick={() => void createInvoice()}>Create invoice</Button>
             </div>
         </PurchaseDocumentShell>
     );
+}
+
+function invoiceLineFromPurchaseOrder(
+    row: PurchaseOrderLine,
+    sourceId: number,
+    sourceLabel: string,
+): EditablePurchaseInvoiceLine | null {
+    const lineId = normalizeSourceId(row.id);
+    if (lineId === null) return null;
+
+    return {
+        sourceType: 'purchase_order',
+        sourceId,
+        sourceLabel,
+        lineId,
+        include: false,
+        itemName: row.item?.name ?? '-',
+        sourceQty: row.ordered_quantity,
+        previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
+        remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
+        quantity: '',
+    };
+}
+
+function invoiceLineFromGoodsReceipt(
+    row: GoodsReceiptLine,
+    sourceId: number,
+    sourceLabel: string,
+): EditablePurchaseInvoiceLine | null {
+    const lineId = normalizeSourceId(row.id);
+    if (lineId === null) return null;
+
+    return {
+        sourceType: 'goods_receipt_note',
+        sourceId,
+        sourceLabel,
+        lineId,
+        include: false,
+        itemName: row.item?.name ?? '-',
+        sourceQty: row.accepted_quantity,
+        previouslyInvoiced: row.invoiced_quantity ?? '0.000000',
+        remainingQty: row.remaining_invoiceable_quantity ?? row.remaining_quantity ?? '0.000000',
+        quantity: '',
+    };
+}
+
+function isInvoiceLine(line: EditablePurchaseInvoiceLine | null): line is EditablePurchaseInvoiceLine {
+    return line !== null;
+}
+
+function fallbackSourceLabel(type: PurchaseInvoiceSourceType, sourceId: number): string {
+    return type === 'purchase_order' ? `Purchase Order #${sourceId}` : `Goods Receipt #${sourceId}`;
 }
