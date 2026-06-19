@@ -3,7 +3,6 @@ import type {
     PurchaseOrder,
     PurchaseOrderStatus,
     PurchaseReturn,
-    PurchaseReturnStatus,
 } from './purchaseTypes';
 
 export function capabilityDetail(
@@ -31,13 +30,12 @@ export function purchaseOrderCapabilities(orderOrStatus?: PurchaseOrder | Purcha
     };
 }
 
-export function purchaseReturnCapabilities(returnOrStatus?: PurchaseReturn | PurchaseReturnStatus | string) {
-    const status = typeof returnOrStatus === 'string' ? returnOrStatus : returnOrStatus?.status;
+export function purchaseReturnCapabilities(returnOrStatus?: PurchaseReturn | string) {
     const server = typeof returnOrStatus === 'string' ? undefined : returnOrStatus?.capabilities;
 
     return {
-        canApprove: Boolean(server?.can_approve ?? status === 'draft'),
-        canPost: Boolean(server?.can_post ?? (status === 'draft' || status === 'approved')),
-        canCancel: Boolean(server?.can_cancel ?? (status !== 'posted' && status !== 'cancelled')),
+        canApprove: Boolean(server?.can_approve),
+        canPost: Boolean(server?.can_post),
+        canCancel: Boolean(server?.can_cancel),
     };
 }

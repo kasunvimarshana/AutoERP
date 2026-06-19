@@ -28,7 +28,10 @@ final class GoodsReceiptNoteController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW);
         $this->assertAllowedStatus($request, GoodsReceiptNoteStatus::cases());
 
-        $query = $this->scope(GoodsReceiptNote::query(), $request)->with($this->relations());
+        $query = $this->scope(GoodsReceiptNote::query(), $request)
+            ->select('goods_receipt_notes.*')
+            ->with($this->relations());
+        $this->addCapabilityProjection($query);
 
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
@@ -101,5 +104,16 @@ final class GoodsReceiptNoteController
                 $balances->applyGoodsReceiptProgressFilter($query, $filter, (string) $request->input($filter));
             }
         }
+    }
+
+    private function addCapabilityProjection(Builder $query): void
+    {
+        $query->selectSub(function ($sub): void {
+            $sub->from('purchase_returns')
+                ->selectRaw('COUNT(*)')
+                ->where('purchase_returns.source_type', 'goods_receipt_note')
+                ->whereColumn('purchase_returns.source_id', 'goods_receipt_notes.id')
+                ->where('purchase_returns.status', '!=', 'cancelled');
+        }, 'unresolved_purchase_returns_count');
     }
 }

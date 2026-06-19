@@ -15,11 +15,58 @@ final class PurchaseReturnValuationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
+    public function previewFromReceiptLine(
+        GoodsReceiptNoteLine $sourceLine,
+        string $returnedQuantity,
+        ?int $currentReturnId = null,
+    ): PurchaseReturnLineValuationData
+    {
+        return $this->calculateFromReceiptLine(
+            $sourceLine,
+            $returnedQuantity,
+            $currentReturnId,
+            null,
+            allowReadQueries: true,
+        );
+    }
+
+    /**
+     * @param  array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}  $postedLineSums
+     */
+    public function fromLockedReceiptLine(
+        GoodsReceiptNoteLine $sourceLine,
+        string $returnedQuantity,
+        int $currentReturnId,
+        array $postedLineSums,
+    ): PurchaseReturnLineValuationData
+    {
+        return $this->calculateFromReceiptLine(
+            $sourceLine,
+            $returnedQuantity,
+            $currentReturnId,
+            $postedLineSums,
+            allowReadQueries: false,
+        );
+    }
+
     public function fromReceiptLine(
         GoodsReceiptNoteLine $sourceLine,
         string $returnedQuantity,
         ?int $currentReturnId = null,
-        ?array $postedLineSums = null,
+    ): PurchaseReturnLineValuationData
+    {
+        return $this->previewFromReceiptLine($sourceLine, $returnedQuantity, $currentReturnId);
+    }
+
+    /**
+     * @param  array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}|null  $postedLineSums
+     */
+    private function calculateFromReceiptLine(
+        GoodsReceiptNoteLine $sourceLine,
+        string $returnedQuantity,
+        ?int $currentReturnId,
+        ?array $postedLineSums,
+        bool $allowReadQueries,
     ): PurchaseReturnLineValuationData
     {
         $sourceQuantity = $this->math->normalize((string) $sourceLine->accepted_quantity);
@@ -36,6 +83,9 @@ final class PurchaseReturnValuationService
             : $this->math->div($returnedQuantity, $sourceQuantity, 12);
 
         if ($isFinalReturn) {
+            if ($postedLineSums === null && ! $allowReadQueries) {
+                throw new InvalidArgumentException('Locked purchase return valuation requires posted return line sums.');
+            }
             $posted = $postedLineSums ?? $this->postedReturnLineSums((int) $sourceLine->getKey(), $currentReturnId);
             $baseAmount = $this->residual((string) $sourceLine->line_subtotal, $posted['base_amount'], 'base amount');
             $discountAmount = $this->residual((string) $sourceLine->discount_amount, $posted['discount_amount'], 'discount amount');

@@ -205,6 +205,144 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.returned_quantity', '0.250000');
     }
 
+    public function test_partial_purchase_order_receipt_http_flow_keeps_remaining_receivable_eligible(): void
+    {
+        $context = $this->context('HTTPRECV');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+        $orderId = (int) $order['id'];
+        $lineId = (int) $order['lines'][0]['id'];
+
+        $this->createPostedHttpGrn($context, $orderId, $lineId, '4.000000');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$orderId.'/receivable-lines')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $lineId)
+            ->assertJsonPath('data.0.remaining_quantity', '6.000000');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/receivable-purchase-orders')
+            ->assertOk()
+            ->json('data');
+        $match = collect($eligible)->firstWhere('id', $orderId);
+        $this->assertNotNull($match);
+        $this->assertSame('partially_received', $match['receipt_status']);
+        $this->assertSame('6.000000', $match['lines'][0]['remaining_receivable_quantity']);
+
+        $this->createPostedHttpGrn($context, $orderId, $lineId, '6.000000');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$orderId.'/receivable-lines')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/receivable-purchase-orders')
+            ->assertOk()
+            ->json('data');
+        $this->assertNull(collect($eligible)->firstWhere('id', $orderId));
+    }
+
+    public function test_partial_grn_invoice_http_flow_keeps_remaining_invoiceable_eligible(): void
+    {
+        $context = $this->context('HTTPINV');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+        $grn = $this->createPostedHttpGrn($context, (int) $order['id'], (int) $order['lines'][0]['id'], '10.000000');
+        $grnId = (int) $grn['id'];
+        $grnLineId = (int) $grn['lines'][0]['id'];
+
+        $this->createHttpInvoiceForGrn($context, $grnId, $grnLineId, '4.000000', 'INV-PART-1');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/goods-receipts/'.$grnId.'/invoiceable-lines')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $grnLineId)
+            ->assertJsonPath('data.0.remaining_invoiceable_quantity', '6.000000');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/invoiceable-goods-receipts')
+            ->assertOk()
+            ->json('data');
+        $match = collect($eligible)->firstWhere('id', $grnId);
+        $this->assertNotNull($match);
+        $this->assertSame('partially_invoiced', $match['invoice_status']);
+        $this->assertSame('6.000000', $match['lines'][0]['remaining_invoiceable_quantity']);
+
+        $this->createHttpInvoiceForGrn($context, $grnId, $grnLineId, '6.000000', 'INV-PART-2');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/goods-receipts/'.$grnId.'/invoiceable-lines')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/invoiceable-goods-receipts')
+            ->assertOk()
+            ->json('data');
+        $this->assertNull(collect($eligible)->firstWhere('id', $grnId));
+    }
+
+    public function test_partial_grn_return_http_flow_keeps_remaining_returnable_eligible(): void
+    {
+        $context = $this->context('HTTPRET');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+        $grn = $this->createPostedHttpGrn($context, (int) $order['id'], (int) $order['lines'][0]['id'], '10.000000');
+        $grnId = (int) $grn['id'];
+        $grnLineId = (int) $grn['lines'][0]['id'];
+
+        $this->createAndPostHttpReturn($context, $grnId, $grnLineId, '3.000000');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/goods-receipts/'.$grnId.'/returnable-lines')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $grnLineId)
+            ->assertJsonPath('data.0.remaining_returnable_quantity', '7.000000');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/returnable-goods-receipts')
+            ->assertOk()
+            ->json('data');
+        $match = collect($eligible)->firstWhere('id', $grnId);
+        $this->assertNotNull($match);
+        $this->assertSame('partially_returned', $match['return_status']);
+        $this->assertSame('7.000000', $match['lines'][0]['remaining_returnable_quantity']);
+
+        $this->createAndPostHttpReturn($context, $grnId, $grnLineId, '7.000000');
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/goods-receipts/'.$grnId.'/returnable-lines')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $eligible = $this->withAuth($context)->getJson('/api/v1/purchase/eligible/returnable-goods-receipts')
+            ->assertOk()
+            ->json('data');
+        $this->assertNull(collect($eligible)->firstWhere('id', $grnId));
+    }
+
+    public function test_purchase_order_index_capabilities_have_bounded_query_count(): void
+    {
+        $context = $this->context('CAPN1');
+        $service = app(PurchaseOrderService::class);
+
+        for ($i = 0; $i < 25; $i++) {
+            $order = $service->create(new CreatePurchaseOrderData(
+                tenantId: $context['tenant_id'],
+                purchaseOrderDate: '2026-06-18',
+                organizationUnitId: $context['organization_unit_id'],
+                supplierType: 'supplier',
+                supplierId: $context['supplier_id'],
+                warehouseId: $context['warehouse_id'],
+                lines: [new PurchaseOrderLineData($context['item_id'], '1.000000', '10.000000', uomId: $context['uom_id'])],
+            ));
+            $order = $service->approve($service->submit($order))->load('lines');
+            $service->applyReceived($order->lines->first(), '1.000000');
+            $service->applyInvoiced($order->lines->first()->refresh(), '1.000000');
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        try {
+            $this->withAuth($context)->getJson('/api/v1/purchase/orders?per_page=25')
+                ->assertOk()
+                ->assertJsonCount(25, 'data');
+            $queryCount = count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+
+        $this->assertLessThan(80, $queryCount, 'Purchase order list capabilities should use aggregate projections, not per-row blocker queries.');
+    }
+
     public function test_purchase_order_create_context_uses_tenant_currency_and_warehouse_defaults(): void
     {
         $context = $this->context();
@@ -338,7 +476,7 @@ final class PurchaseOrderApiTest extends TestCase
             $this->fail('Expected unsupported cancelled GRN line to be reported.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('goods_receipt_note_lines.status=cancelled count=1', $exception->getMessage());
-            $this->assertSame('approved', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
+            $this->assertSame('partially_received', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
         }
 
         DB::table('goods_receipt_notes')->where('id', $grn->getKey())->update(['status' => 'reversed']);
@@ -346,6 +484,39 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->assertSame('approved', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
         $this->assertSame('reversed', (string) DB::table('goods_receipt_note_lines')->where('id', $grn->lines->first()->getKey())->value('status'));
+    }
+
+    public function test_lifecycle_legacy_preflight_does_not_reactivate_dead_state_debit_notes(): void
+    {
+        if (DB::getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('Legacy upgrade preflight fixture must run before lifecycle CHECK constraints are installed.');
+        }
+
+        $context = $this->context('DNLEGACY');
+        $noteId = (int) DB::table('purchase_debit_notes')->insertGetId([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'supplier_type' => 'supplier',
+            'supplier_id' => $context['supplier_id'],
+            'debit_note_number' => 'PDN-DEAD-1',
+            'debit_note_date' => '2026-06-19',
+            'status' => 'cancelled',
+            'amount' => '10.000000',
+            'allocated_amount' => '0.000000',
+            'remaining_amount' => '10.000000',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $migration = require base_path('app/Modules/Purchase/Database/Migrations/2026_06_19_005000_preflight_purchase_lifecycle_legacy_statuses.php');
+
+        try {
+            $migration->up();
+            $this->fail('Expected dead-state Debit Note to block lifecycle preflight.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('purchase_debit_notes.status=cancelled count=1', $exception->getMessage());
+            $this->assertSame('cancelled', (string) DB::table('purchase_debit_notes')->where('id', $noteId)->value('status'));
+        }
     }
 
     public function test_manual_supplier_return_requires_manual_permission_and_separate_route(): void
@@ -813,6 +984,84 @@ final class PurchaseOrderApiTest extends TestCase
         $this->withAuth($viewer)->getJson('/api/v1/purchase/orders')->assertOk();
         $this->withAuth($viewer)->postJson('/api/v1/purchase/orders', $this->payload($viewer))
             ->assertForbidden();
+    }
+
+    private function createApprovedHttpOrder(array $context, string $quantity): array
+    {
+        $order = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'ordered_quantity' => $quantity,
+                'unit_price' => '10.000000',
+            ]],
+        ]))->assertCreated()->json('data');
+
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', ['tenant_id' => $context['tenant_id']])->assertOk();
+
+        return $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', ['tenant_id' => $context['tenant_id']])
+            ->assertOk()
+            ->json('data');
+    }
+
+    private function createPostedHttpGrn(array $context, int $orderId, int $orderLineId, string $quantity): array
+    {
+        $grn = $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'received_date' => '2026-06-18',
+            'warehouse_id' => $context['warehouse_id'],
+            'purchase_order_id' => $orderId,
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'purchase_order_line_id' => $orderLineId,
+                'ordered_quantity' => '10.000000',
+                'received_quantity' => $quantity,
+                'accepted_quantity' => $quantity,
+                'unit_price' => '10.000000',
+            ]],
+        ])->assertCreated()->json('data');
+
+        return $this->withAuth($context)->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', ['tenant_id' => $context['tenant_id']])
+            ->assertOk()
+            ->json('data');
+    }
+
+    private function createHttpInvoiceForGrn(array $context, int $grnId, int $grnLineId, string $quantity, string $invoiceNumber): void
+    {
+        $this->withAuth($context)->postJson('/api/v1/purchase/invoices', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'invoice_date' => '2026-06-19',
+            'invoice_number' => $invoiceNumber,
+            'sources' => [[
+                'source_type' => 'goods_receipt_note',
+                'source_id' => $grnId,
+                'line_quantities' => [
+                    (string) $grnLineId => $quantity,
+                ],
+            ]],
+        ])->assertCreated();
+    }
+
+    private function createAndPostHttpReturn(array $context, int $grnId, int $grnLineId, string $quantity): void
+    {
+        $return = $this->withAuth($context)->postJson('/api/v1/purchase/returns', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'return_date' => '2026-06-19',
+            'return_type' => 'referenced',
+            'source_id' => $grnId,
+            'lines' => [[
+                'source_line_type' => 'goods_receipt_note_line',
+                'source_line_id' => $grnLineId,
+                'returned_quantity' => $quantity,
+            ]],
+        ])->assertCreated()->json('data');
+
+        $this->withAuth($context)->patchJson('/api/v1/purchase/returns/'.$return['id'].'/post', ['tenant_id' => $context['tenant_id']])
+            ->assertOk();
     }
 
     private function payload(array $context, array $overrides = []): array

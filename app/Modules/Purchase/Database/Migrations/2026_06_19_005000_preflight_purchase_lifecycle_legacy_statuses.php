@@ -9,8 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $this->normalizeSafeLegacyStatuses();
         $this->assertNoUnsupportedLegacyStatusRows();
+
+        DB::transaction(function (): void {
+            $this->normalizeSafeLegacyStatuses();
+        });
     }
 
     public function down(): void
@@ -52,8 +55,6 @@ return new class extends Migration
         $this->normalizeSafeCancelledGoodsReceipts();
         $this->normalizeSafeCancelledReceiptLines();
         $this->normalizeSafeReversedReturns();
-        $this->normalizeSafeDeadDebitNotes();
-
         DB::table('purchase_debit_notes')
             ->where('status', 'allocated')
             ->update(['status' => 'posted']);
@@ -61,7 +62,20 @@ return new class extends Migration
 
     private function normalizeSafeCancelledGoodsReceipts(): void
     {
-        $safeIds = DB::table('goods_receipt_notes')
+        $safeIds = $this->safeCancelledGoodsReceiptIds();
+
+        if ($safeIds !== []) {
+            DB::table('goods_receipt_notes')->whereIn('id', $safeIds)->update(['status' => 'draft']);
+            DB::table('goods_receipt_note_lines')->whereIn('goods_receipt_note_id', $safeIds)->where('status', 'cancelled')->update(['status' => 'open']);
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function safeCancelledGoodsReceiptIds(): array
+    {
+        return DB::table('goods_receipt_notes')
             ->where('status', 'cancelled')
             ->whereNull('posted_at')
             ->whereNull('reversed_at')
@@ -78,31 +92,64 @@ return new class extends Migration
             ->pluck('id')
             ->map(static fn ($id): int => (int) $id)
             ->all();
-
-        if ($safeIds !== []) {
-            DB::table('goods_receipt_notes')->whereIn('id', $safeIds)->update(['status' => 'draft']);
-            DB::table('goods_receipt_note_lines')->whereIn('goods_receipt_note_id', $safeIds)->where('status', 'cancelled')->update(['status' => 'open']);
-        }
     }
 
     private function normalizeSafeCancelledReceiptLines(): void
     {
-        $safeReversedIds = DB::table('goods_receipt_note_lines')
-            ->join('goods_receipt_notes', 'goods_receipt_note_lines.goods_receipt_note_id', '=', 'goods_receipt_notes.id')
-            ->where('goods_receipt_note_lines.status', 'cancelled')
-            ->where('goods_receipt_notes.status', 'reversed')
-            ->pluck('goods_receipt_note_lines.id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
+        $safeReversedIds = $this->safeCancelledReceiptLineIdsForReversedReceipts();
 
         if ($safeReversedIds !== []) {
             DB::table('goods_receipt_note_lines')->whereIn('id', $safeReversedIds)->update(['status' => 'reversed']);
         }
     }
 
+    /**
+     * @return list<int>
+     */
+    private function safeCancelledReceiptLineIdsForReversedReceipts(): array
+    {
+        return DB::table('goods_receipt_note_lines')
+            ->join('goods_receipt_notes', 'goods_receipt_note_lines.goods_receipt_note_id', '=', 'goods_receipt_notes.id')
+            ->where('goods_receipt_note_lines.status', 'cancelled')
+            ->where('goods_receipt_notes.status', 'reversed')
+            ->pluck('goods_receipt_note_lines.id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function safeCancelledReceiptLineIdsForSafeCancelledReceipts(): array
+    {
+        $safeReceiptIds = $this->safeCancelledGoodsReceiptIds();
+        if ($safeReceiptIds === []) {
+            return [];
+        }
+
+        return DB::table('goods_receipt_note_lines')
+            ->whereIn('goods_receipt_note_id', $safeReceiptIds)
+            ->where('status', 'cancelled')
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+    }
+
     private function normalizeSafeReversedReturns(): void
     {
-        $safeIds = DB::table('purchase_returns')
+        $safeIds = $this->safeReversedReturnIds();
+
+        if ($safeIds !== []) {
+            DB::table('purchase_returns')->whereIn('id', $safeIds)->update(['status' => 'cancelled']);
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function safeReversedReturnIds(): array
+    {
+        return DB::table('purchase_returns')
             ->where('status', 'reversed')
             ->whereNull('posted_at')
             ->whereNull('debit_note_id')
@@ -115,42 +162,18 @@ return new class extends Migration
             ->pluck('id')
             ->map(static fn ($id): int => (int) $id)
             ->all();
-
-        if ($safeIds !== []) {
-            DB::table('purchase_returns')->whereIn('id', $safeIds)->update(['status' => 'cancelled']);
-        }
-    }
-
-    private function normalizeSafeDeadDebitNotes(): void
-    {
-        $safeIds = DB::table('purchase_debit_notes')
-            ->whereIn('status', ['cancelled', 'reversed'])
-            ->whereRaw('allocated_amount <= 0')
-            ->whereRaw('remaining_amount = amount')
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
-
-        foreach (array_chunk($safeIds, 500) as $chunk) {
-            DB::table('purchase_debit_notes')
-                ->whereIn('id', $chunk)
-                ->whereNull('approved_at')
-                ->update(['status' => 'draft']);
-
-            DB::table('purchase_debit_notes')
-                ->whereIn('id', $chunk)
-                ->whereNotNull('approved_at')
-                ->update(['status' => 'approved']);
-        }
     }
 
     private function assertNoUnsupportedLegacyStatusRows(): void
     {
         $problems = [];
-        $this->appendUnsupported($problems, 'goods_receipt_notes', ['cancelled'], 'Unposted/effect-free cancelled GRNs are mapped to draft automatically; posted or financially active cancelled GRNs must be manually remediated before deploying.');
-        $this->appendUnsupported($problems, 'goods_receipt_note_lines', ['cancelled'], 'Cancelled lines under reversed GRNs are mapped to reversed automatically; all other cancelled GRN lines must be manually remediated.');
-        $this->appendUnsupported($problems, 'purchase_returns', ['reversed'], 'Effect-free reversed Returns are mapped to cancelled automatically; posted or financially active reversed Returns need a supported reversal workflow before deployment.');
-        $this->appendUnsupported($problems, 'purchase_debit_notes', ['cancelled', 'reversed'], 'Unallocated dead-state Debit Notes are mapped to draft/approved automatically; allocated or partially allocated rows must be remediated before deployment.');
+        $this->appendUnsupported($problems, 'goods_receipt_notes', ['cancelled'], 'Unposted/effect-free cancelled GRNs are mapped to draft automatically; posted or financially active cancelled GRNs must be manually remediated before deploying.', $this->safeCancelledGoodsReceiptIds());
+        $this->appendUnsupported($problems, 'goods_receipt_note_lines', ['cancelled'], 'Cancelled lines under reversed GRNs are mapped to reversed, and lines under effect-free cancelled GRNs are mapped to open; all other cancelled GRN lines must be manually remediated.', array_merge(
+            $this->safeCancelledReceiptLineIdsForReversedReceipts(),
+            $this->safeCancelledReceiptLineIdsForSafeCancelledReceipts(),
+        ));
+        $this->appendUnsupported($problems, 'purchase_returns', ['reversed'], 'Effect-free reversed Returns are mapped to cancelled automatically; posted or financially active reversed Returns need a supported reversal workflow before deployment.', $this->safeReversedReturnIds());
+        $this->appendUnsupported($problems, 'purchase_debit_notes', ['cancelled', 'reversed'], 'Dead-state Debit Notes are financial documents and are not reactivated automatically. Remediate, archive, or map them with an audited project-specific recovery before deploying.');
 
         if ($problems !== []) {
             throw new RuntimeException('Cannot normalize Purchase lifecycle legacy statuses: '.implode(' | ', $problems));
@@ -160,18 +183,28 @@ return new class extends Migration
     /**
      * @param  list<string>  $problems
      * @param  list<string>  $statuses
+     * @param  list<int>  $safeIds
      */
-    private function appendUnsupported(array &$problems, string $table, array $statuses, string $remediation): void
+    private function appendUnsupported(array &$problems, string $table, array $statuses, string $remediation, array $safeIds = []): void
     {
-        $rows = DB::table($table)
-            ->select('status', DB::raw('COUNT(*) as aggregate'))
-            ->whereIn('status', $statuses)
-            ->groupBy('status')
-            ->orderBy('status')
-            ->get();
+        foreach ($statuses as $status) {
+            $query = DB::table($table)->where('status', $status);
+            if ($safeIds !== []) {
+                $query->whereNotIn('id', array_values(array_unique($safeIds)));
+            }
 
-        foreach ($rows as $row) {
-            $problems[] = "{$table}.status={$row->status} count={$row->aggregate}. {$remediation}";
+            $count = (clone $query)->count();
+            if ($count < 1) {
+                continue;
+            }
+
+            $sampleIds = (clone $query)
+                ->orderBy('id')
+                ->limit(10)
+                ->pluck('id')
+                ->map(static fn ($id): string => (string) $id)
+                ->implode(',');
+            $problems[] = "{$table}.status={$status} count={$count} sample_ids=[{$sampleIds}]. {$remediation}";
         }
     }
 };

@@ -33,13 +33,16 @@ final class PurchaseOrderController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
         $this->assertAllowedStatus($request, PurchaseOrderStatus::cases());
 
-        $query = $this->scope(PurchaseOrder::query(), $request)->with([
+        $query = $this->scope(PurchaseOrder::query(), $request)
+            ->select('purchase_orders.*')
+            ->with([
             'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
             'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
         ])
             ->withSum('lines as received_quantity', 'received_quantity')
             ->withSum('lines as invoiced_quantity', 'invoiced_quantity')
             ->withSum('lines as returned_quantity', 'returned_quantity');
+        $this->addCapabilityProjection($query);
 
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
@@ -159,5 +162,64 @@ final class PurchaseOrderController
                 $balances->applyPurchaseOrderProgressFilter($query, $filter, (string) $request->input($filter));
             }
         }
+    }
+
+    private function addCapabilityProjection(Builder $query): void
+    {
+        $query
+            ->selectSub(function ($sub): void {
+                $sub->from('goods_receipt_notes')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('goods_receipt_notes.purchase_order_id', 'purchase_orders.id')
+                    ->where('goods_receipt_notes.status', 'draft');
+            }, 'draft_goods_receipts_count')
+            ->selectSub(function ($sub): void {
+                $sub->from('purchase_invoice_links')
+                    ->join('invoices', 'invoices.id', '=', 'purchase_invoice_links.invoice_id')
+                    ->selectRaw('COUNT(DISTINCT invoices.id)')
+                    ->whereIn('invoices.status', ['draft', 'approved'])
+                    ->where(function ($scope): void {
+                        $scope->where(function ($direct): void {
+                            $direct->where('purchase_invoice_links.source_type', 'purchase_order')
+                                ->whereColumn('purchase_invoice_links.source_id', 'purchase_orders.id');
+                        })->orWhere(function ($viaReceipt): void {
+                            $viaReceipt->where('purchase_invoice_links.source_type', 'goods_receipt_note')
+                                ->whereIn('purchase_invoice_links.source_id', function ($receipts): void {
+                                    $receipts->select('id')
+                                        ->from('goods_receipt_notes')
+                                        ->whereColumn('goods_receipt_notes.purchase_order_id', 'purchase_orders.id');
+                                });
+                        });
+                    });
+            }, 'unresolved_purchase_invoices_count')
+            ->selectSub(function ($sub): void {
+                $sub->from('purchase_returns')
+                    ->selectRaw('COUNT(*)')
+                    ->where('purchase_returns.source_type', 'goods_receipt_note')
+                    ->whereIn('purchase_returns.status', ['draft', 'approved'])
+                    ->whereIn('purchase_returns.source_id', function ($receipts): void {
+                        $receipts->select('id')
+                            ->from('goods_receipt_notes')
+                            ->whereColumn('goods_receipt_notes.purchase_order_id', 'purchase_orders.id');
+                    });
+            }, 'unresolved_purchase_returns_count')
+            ->selectSub(function ($sub): void {
+                $sub->from('purchase_debit_notes')
+                    ->join('purchase_returns', 'purchase_returns.id', '=', 'purchase_debit_notes.purchase_return_id')
+                    ->selectRaw('COUNT(*)')
+                    ->where('purchase_returns.source_type', 'goods_receipt_note')
+                    ->whereIn('purchase_returns.source_id', function ($receipts): void {
+                        $receipts->select('id')
+                            ->from('goods_receipt_notes')
+                            ->whereColumn('goods_receipt_notes.purchase_order_id', 'purchase_orders.id');
+                    })
+                    ->where(function ($notes): void {
+                        $notes->whereIn('purchase_debit_notes.status', ['draft', 'approved'])
+                            ->orWhere(function ($posted): void {
+                                $posted->where('purchase_debit_notes.status', 'posted')
+                                    ->whereRaw('purchase_debit_notes.remaining_amount > 0');
+                            });
+                    });
+            }, 'unresolved_purchase_debit_notes_count');
     }
 }

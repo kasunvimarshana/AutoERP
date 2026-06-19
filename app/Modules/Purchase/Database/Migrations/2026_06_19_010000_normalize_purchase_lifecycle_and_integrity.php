@@ -36,6 +36,7 @@ return new class extends Migration
     {
         $unsupported = [
             'goods_receipt_notes' => ['cancelled'],
+            'goods_receipt_note_lines' => ['cancelled'],
             'purchase_returns' => ['reversed'],
             'purchase_debit_notes' => ['cancelled', 'reversed'],
         ];
@@ -140,9 +141,11 @@ return new class extends Migration
     {
         return [
             ['purchase_orders', 'purchase_orders_status_chk', "status IN ('draft','pending_approval','approved','closed','cancelled')"],
+            ['purchase_order_lines', 'purchase_order_lines_status_chk', "status IN ('open','closed','cancelled')"],
             ['purchase_order_lines', 'purchase_order_lines_quantities_chk', 'ordered_quantity >= 0 AND received_quantity >= 0 AND invoiced_quantity >= 0 AND returned_quantity >= 0 AND cancelled_quantity >= 0 AND received_quantity <= ordered_quantity - cancelled_quantity AND invoiced_quantity <= ordered_quantity - cancelled_quantity AND returned_quantity <= received_quantity'],
             ['purchase_order_lines', 'purchase_order_lines_money_chk', 'unit_price >= 0 AND line_subtotal >= 0 AND discount_rate >= 0 AND discount_rate <= 100 AND tax_rate >= 0 AND tax_rate <= 100 AND charge_rate >= 0 AND charge_rate <= 100 AND discount_amount >= 0 AND tax_amount >= 0 AND charge_amount >= 0 AND line_total >= 0'],
             ['goods_receipt_notes', 'goods_receipt_notes_status_chk', "status IN ('draft','posted','reversed')"],
+            ['goods_receipt_note_lines', 'goods_receipt_note_lines_status_chk', "status IN ('open','posted','reversed')"],
             ['goods_receipt_note_lines', 'goods_receipt_note_lines_quantities_chk', 'received_quantity >= 0 AND accepted_quantity >= 0 AND rejected_quantity >= 0 AND invoiced_quantity >= 0 AND returned_quantity >= 0 AND accepted_quantity + rejected_quantity = received_quantity AND invoiced_quantity <= accepted_quantity AND returned_quantity <= accepted_quantity'],
             ['goods_receipt_note_lines', 'goods_receipt_note_lines_money_chk', 'unit_price >= 0 AND line_subtotal >= 0 AND discount_amount >= 0 AND tax_amount >= 0 AND charge_amount >= 0 AND line_total >= 0'],
             ['purchase_returns', 'purchase_returns_status_chk', "status IN ('draft','approved','posted','cancelled')"],
@@ -150,7 +153,7 @@ return new class extends Migration
             ['purchase_return_lines', 'purchase_return_lines_money_chk', 'unit_price >= 0 AND base_amount >= 0 AND discount_amount >= 0 AND tax_amount >= 0 AND charge_amount >= 0 AND line_total >= 0'],
             ['purchase_return_adjustment_allocations', 'purchase_return_adjustment_allocations_amounts_chk', 'source_amount >= 0 AND previously_returned_amount >= 0 AND returned_amount >= 0 AND remaining_amount >= 0'],
             ['purchase_debit_notes', 'purchase_debit_notes_status_chk', "status IN ('draft','approved','posted')"],
-            ['purchase_debit_notes', 'purchase_debit_notes_amounts_chk', 'amount >= 0 AND allocated_amount >= 0 AND remaining_amount >= 0 AND allocated_amount <= amount'],
+            ['purchase_debit_notes', 'purchase_debit_notes_amounts_chk', 'amount >= 0 AND allocated_amount >= 0 AND remaining_amount >= 0 AND allocated_amount <= amount AND remaining_amount <= amount AND allocated_amount + remaining_amount = amount'],
         ];
     }
 

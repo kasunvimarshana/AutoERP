@@ -13,13 +13,11 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
-use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
-use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -36,6 +34,7 @@ final class GoodsReceiptNoteService
         private readonly PurchaseNumberService $numbers,
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly PurchaseDocumentLockService $locks,
+        private readonly PurchaseDocumentBlockerService $blockers,
     ) {}
 
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
@@ -300,7 +299,10 @@ final class GoodsReceiptNoteService
             if ($locked->status !== GoodsReceiptNoteStatus::Posted) {
                 throw new InvalidArgumentException('Only posted GRNs can be reversed.');
             }
-            $this->assertNoBlockingReturnsForReverse($locked);
+            $blocker = $this->blockers->goodsReceiptReverseBlocker($locked, lockReturns: true);
+            if ($blocker !== null) {
+                throw new InvalidArgumentException($blocker['reason']);
+            }
 
             foreach ($locked->lines as $line) {
                 if ($line->status === GoodsReceiptNoteLineStatus::Reversed) {
@@ -373,32 +375,6 @@ final class GoodsReceiptNoteService
         $locked->setRelation('lines', $lines->values());
 
         return $locked;
-    }
-
-    private function assertNoBlockingReturnsForReverse(GoodsReceiptNote $grn): void
-    {
-        $returns = $this->locks->purchaseReturnsForGoodsReceipt((int) $grn->getKey());
-        if ($returns->isEmpty()) {
-            return;
-        }
-
-        $this->locks->purchaseReturnLinesForReturns($returns->pluck('id')->map(fn ($id): int => (int) $id)->all());
-        $blocking = $returns->filter(function (PurchaseReturn $return): bool {
-            $status = $return->status instanceof PurchaseReturnStatus
-                ? $return->status
-                : PurchaseReturnStatus::from((string) $return->status);
-
-            return $status !== PurchaseReturnStatus::Cancelled;
-        });
-        if ($blocking->isEmpty()) {
-            return;
-        }
-
-        $numbers = $blocking
-            ->map(fn (PurchaseReturn $return): string => (string) ($return->return_number ?: '#'.$return->getKey()))
-            ->implode(', ');
-
-        throw new InvalidArgumentException('Cannot reverse GRN while purchase returns are unresolved or impacting: '.$numbers.'.');
     }
 
     private function copyOrderAdjustments(?PurchaseOrder $order, GoodsReceiptNote $grn): void

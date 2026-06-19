@@ -6,8 +6,6 @@ namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Invoice\Models\Invoice;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
@@ -15,17 +13,16 @@ use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseDebitNote;
-use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Models\PurchaseReturn;
-use Modules\Purchase\Models\PurchaseReturnLine;
 
 final class PurchaseDocumentCapabilityService
 {
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseProcurementBalanceService $balances,
+        private readonly PurchaseDocumentBlockerService $blockers,
     ) {}
 
     /**
@@ -43,7 +40,7 @@ final class PurchaseDocumentCapabilityService
         $approved = $status === PurchaseOrderStatus::Approved->value;
         $hasReceivedOrInvoiced = $this->positive($received) || $this->positive($invoiced);
 
-        $closeBlocker = $approved ? $this->purchaseOrderCloseBlocker($order, $remainingReceivable, $remainingInvoiceable) : null;
+        $closeBlocker = $approved ? $this->blockers->purchaseOrderCloseBlocker($order) : null;
 
         return $this->resource([
             'can_edit' => $this->result($status === PurchaseOrderStatus::Draft->value, 'not_draft', 'Only draft purchase orders can be edited.'),
@@ -83,7 +80,7 @@ final class PurchaseDocumentCapabilityService
             $linkedOrderBlocked = $linkedOrderBlocked || $this->linkedPurchaseOrderClosed($line);
         }
 
-        $reverseBlocker = $posted ? $this->goodsReceiptReverseBlocker($grn, $invoiced, $returned) : null;
+        $reverseBlocker = $posted ? $this->blockers->goodsReceiptReverseBlocker($grn) : null;
 
         return $this->resource([
             'can_post' => $this->result($status === GoodsReceiptNoteStatus::Draft->value, 'not_draft', 'Only draft GRNs can be posted.'),
@@ -184,113 +181,6 @@ final class PurchaseDocumentCapabilityService
         }
 
         return $total;
-    }
-
-    /**
-     * @return array{code: string, reason: string}|null
-     */
-    private function purchaseOrderCloseBlocker(PurchaseOrder $order, string $remainingReceivable, string $remainingInvoiceable): ?array
-    {
-        if ($this->positive($remainingReceivable)) {
-            return ['code' => 'remaining_receivable', 'reason' => 'Purchase order has remaining receivable quantities.'];
-        }
-        if ($this->positive($remainingInvoiceable)) {
-            return ['code' => 'remaining_invoiceable', 'reason' => 'Purchase order has remaining invoiceable quantities.'];
-        }
-
-        $goodsReceiptIds = GoodsReceiptNote::query()
-            ->where('purchase_order_id', $order->getKey())
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
-
-        if (GoodsReceiptNote::query()->whereIn('id', $goodsReceiptIds)->where('status', GoodsReceiptNoteStatus::Draft->value)->exists()) {
-            return ['code' => 'draft_goods_receipts', 'reason' => 'Purchase order has unresolved draft GRNs.'];
-        }
-
-        if ($this->hasUnresolvedInvoices((int) $order->getKey(), $goodsReceiptIds)) {
-            return ['code' => 'unresolved_invoices', 'reason' => 'Purchase order has unresolved supplier invoices.'];
-        }
-
-        $returnIds = PurchaseReturn::query()
-            ->where('source_type', 'goods_receipt_note')
-            ->whereIn('source_id', $goodsReceiptIds)
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
-
-        if (PurchaseReturn::query()->whereIn('id', $returnIds)->whereIn('status', [PurchaseReturnStatus::Draft->value, PurchaseReturnStatus::Approved->value])->exists()) {
-            return ['code' => 'unresolved_returns', 'reason' => 'Purchase order has unresolved purchase returns.'];
-        }
-
-        if (PurchaseDebitNote::query()
-            ->whereIn('purchase_return_id', $returnIds)
-            ->where(function ($query): void {
-                $query->whereIn('status', [PurchaseDebitNoteStatus::Draft->value, PurchaseDebitNoteStatus::Approved->value])
-                    ->orWhere(function ($posted): void {
-                        $posted->where('status', PurchaseDebitNoteStatus::Posted->value)
-                            ->whereRaw('remaining_amount > 0');
-                    });
-            })
-            ->exists()) {
-            return ['code' => 'unresolved_debit_notes', 'reason' => 'Purchase order has unresolved purchase debit notes.'];
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  list<int>  $goodsReceiptIds
-     */
-    private function hasUnresolvedInvoices(int $purchaseOrderId, array $goodsReceiptIds): bool
-    {
-        $invoiceIds = PurchaseInvoiceLink::query()
-            ->where(function ($query) use ($purchaseOrderId, $goodsReceiptIds): void {
-                $query->where(function ($scope) use ($purchaseOrderId): void {
-                    $scope->where('source_type', 'purchase_order')
-                        ->where('source_id', $purchaseOrderId);
-                });
-                if ($goodsReceiptIds !== []) {
-                    $query->orWhere(function ($scope) use ($goodsReceiptIds): void {
-                        $scope->where('source_type', 'goods_receipt_note')
-                            ->whereIn('source_id', $goodsReceiptIds);
-                    });
-                }
-            })
-            ->pluck('invoice_id')
-            ->map(static fn ($id): int => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        return $invoiceIds !== []
-            && Invoice::query()
-                ->whereIn('id', $invoiceIds)
-                ->whereIn('status', [InvoiceStatus::Draft->value, InvoiceStatus::Approved->value])
-                ->exists();
-    }
-
-    /**
-     * @return array{code: string, reason: string}|null
-     */
-    private function goodsReceiptReverseBlocker(GoodsReceiptNote $grn, string $invoiced, string $returned): ?array
-    {
-        if ($this->positive($invoiced)) {
-            return ['code' => 'has_invoiced_quantity', 'reason' => 'GRNs with invoiced lines cannot be reversed.'];
-        }
-        if ($this->positive($returned)) {
-            return ['code' => 'has_returned_quantity', 'reason' => 'GRNs with returned lines cannot be reversed.'];
-        }
-
-        if (PurchaseReturn::query()
-            ->where('source_type', 'goods_receipt_note')
-            ->where('source_id', $grn->getKey())
-            ->where('status', '!=', PurchaseReturnStatus::Cancelled->value)
-            ->exists()) {
-            return ['code' => 'unresolved_returns', 'reason' => 'Cannot reverse GRN while purchase returns are unresolved or impacting.'];
-        }
-
-        return null;
     }
 
     private function linkedPurchaseOrderClosed(GoodsReceiptNoteLine $line): bool

@@ -121,7 +121,7 @@ final class PurchaseReturnService
                     throw new InvalidArgumentException('Selected goods receipt line was not found for this return.');
                 }
 
-                $valuation = $this->valuations->fromReceiptLine($sourceLine, $lineData->returnedQuantity);
+                $valuation = $this->valuations->previewFromReceiptLine($sourceLine, $lineData->returnedQuantity);
                 $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
                 $adjustmentReturnTotal = $this->math->add(
                     $adjustmentReturnTotal,
@@ -175,11 +175,10 @@ final class PurchaseReturnService
     public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
     {
         return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
-            $lockedReturn = $this->locks->purchaseReturns([(int) $return->getKey()])->first();
-            if (! $lockedReturn instanceof PurchaseReturn) {
-                throw new InvalidArgumentException('Purchase return was not found.');
-            }
-            $lockedReturn->setRelation('lines', $this->locks->purchaseReturnLinesForReturns([(int) $lockedReturn->getKey()])->values());
+            $returnId = (int) $return->getKey();
+            $sourceLines = $this->lockReceiptSourcesByLineIds($this->sourceLineIdsForReturn($returnId));
+            $returnContext = $this->lockReturnContextForPost($returnId, $sourceLines);
+            $lockedReturn = $returnContext['return'];
 
             if ($lockedReturn->status === PurchaseReturnStatus::Posted) {
                 return new PurchasePostingResult(
@@ -196,8 +195,6 @@ final class PurchaseReturnService
                 );
             }
 
-            $sourceLines = $this->lockReturnSourcesForPost($lockedReturn);
-            $returnContext = $this->lockReturnContextForPost($lockedReturn, $sourceLines);
             $return = $returnContext['return'];
             $postedLineSums = $returnContext['posted_line_sums'];
             $this->assertPostable($return);
@@ -216,11 +213,11 @@ final class PurchaseReturnService
                     }
 
                     $this->validator->assertReturnWithinReceipt($sourceLine, (string) $line->returned_quantity);
-                    $valuation = $this->valuations->fromReceiptLine(
+                    $valuation = $this->valuations->fromLockedReceiptLine(
                         $sourceLine,
                         (string) $line->returned_quantity,
                         (int) $return->getKey(),
-                        $postedLineSums[(int) $sourceLine->getKey()] ?? null,
+                        $postedLineSums[(int) $sourceLine->getKey()] ?? $this->emptyPostedReturnLineSums(),
                     );
                     $this->applyValuationToLine($line, $valuation);
                     $subtotal = $this->math->add($subtotal, $valuation->lineTotal);
@@ -551,21 +548,20 @@ final class PurchaseReturnService
     }
 
     /**
-     * @return array<int, GoodsReceiptNoteLine>
+     * @return list<int>
      */
-    private function lockReturnSourcesForPost(PurchaseReturn $return): array
+    private function sourceLineIdsForReturn(int $returnId): array
     {
-        $sourceLineIds = $return->lines
-            ->filter(fn (PurchaseReturnLine $line): bool => $line->source_line_type === 'goods_receipt_note_line')
-            ->map(fn (PurchaseReturnLine $line): int => (int) $line->source_line_id)
+        return PurchaseReturnLine::query()
+            ->where('purchase_return_id', $returnId)
+            ->where('source_line_type', 'goods_receipt_note_line')
+            ->whereNotNull('source_line_id')
+            ->orderBy('source_line_id')
+            ->pluck('source_line_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
             ->values()
             ->all();
-
-        if ($sourceLineIds === []) {
-            return [];
-        }
-
-        return $this->lockReceiptSourcesByLineIds($sourceLineIds);
     }
 
     /**
@@ -578,7 +574,7 @@ final class PurchaseReturnService
      *     adjustment_allocations: Collection<int, PurchaseReturnAdjustmentAllocation>
      * }
      */
-    private function lockReturnContextForPost(PurchaseReturn $return, array $sourceLines): array
+    private function lockReturnContextForPost(int $returnId, array $sourceLines): array
     {
         $sourceLineIds = array_keys($sourceLines);
         $goodsReceiptIds = array_values(array_unique(array_map(
@@ -588,8 +584,8 @@ final class PurchaseReturnService
         sort($goodsReceiptIds);
 
         $lockedReturns = PurchaseReturn::query()
-            ->where(function ($query) use ($return, $goodsReceiptIds): void {
-                $query->where('id', $return->getKey());
+            ->where(function ($query) use ($returnId, $goodsReceiptIds): void {
+                $query->where('id', $returnId);
                 if ($goodsReceiptIds !== []) {
                     $query->orWhere(function ($scope) use ($goodsReceiptIds): void {
                         $scope->where('source_type', 'goods_receipt_note')
@@ -601,7 +597,7 @@ final class PurchaseReturnService
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
-        $locked = $lockedReturns->first(fn (PurchaseReturn $candidate): bool => (int) $candidate->getKey() === (int) $return->getKey());
+        $locked = $lockedReturns->first(fn (PurchaseReturn $candidate): bool => (int) $candidate->getKey() === $returnId);
         if (! $locked instanceof PurchaseReturn) {
             throw new InvalidArgumentException('Purchase return was not found.');
         }
@@ -706,6 +702,20 @@ final class PurchaseReturnService
         }
 
         return $sums;
+    }
+
+    /**
+     * @return array{base_amount: string, discount_amount: string, tax_amount: string, charge_amount: string, line_total: string}
+     */
+    private function emptyPostedReturnLineSums(): array
+    {
+        return [
+            'base_amount' => '0.000000',
+            'discount_amount' => '0.000000',
+            'tax_amount' => '0.000000',
+            'charge_amount' => '0.000000',
+            'line_total' => '0.000000',
+        ];
     }
 
     /**
