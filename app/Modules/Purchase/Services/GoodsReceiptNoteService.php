@@ -28,6 +28,7 @@ final class GoodsReceiptNoteService
         private readonly PurchaseValidationService $validator,
         private readonly PurchaseOrderCalculationService $calculator,
         private readonly PurchaseHeaderAdjustmentService $adjustments,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
         private readonly PurchaseOrderQuantityService $orderQuantities,
         private readonly PurchaseInventoryIntegrationService $inventory,
         private readonly PurchaseUomService $uoms,
@@ -146,13 +147,19 @@ final class GoodsReceiptNoteService
                     throw new InvalidArgumentException('Goods receipts can only be created from approved purchase orders.');
                 }
 
-                $lockedSourceLines = $this->locks->purchaseOrderLines(array_keys($sourceLines))
+                $allOrderLineIds = PurchaseOrderLine::query()
+                    ->where('purchase_order_id', (int) $lockedOrder->getKey())
+                    ->orderBy('id')
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+                $lockedOrderLines = $this->locks->purchaseOrderLines($allOrderLineIds)
                     ->keyBy(fn (PurchaseOrderLine $line): int => (int) $line->getKey());
                 foreach ($data->lines as $line) {
                     if ($line->purchaseOrderLineId === null) {
                         continue;
                     }
-                    $sourceLine = $lockedSourceLines->get($line->purchaseOrderLineId);
+                    $sourceLine = $lockedOrderLines->get($line->purchaseOrderLineId);
                     if (! $sourceLine instanceof PurchaseOrderLine || (int) $sourceLine->purchase_order_id !== (int) $lockedOrder->getKey()) {
                         throw new InvalidArgumentException('GRN source line must belong to the selected purchase order.');
                     }
@@ -160,7 +167,7 @@ final class GoodsReceiptNoteService
                     $sourceLines[(int) $sourceLine->getKey()] = $sourceLine;
                 }
                 $order = $lockedOrder;
-                $order->setRelation('lines', $lockedSourceLines->values());
+                $order->setRelation('lines', $lockedOrderLines->values());
             }
 
             $calculation = $this->calculator->calculate($this->receiptLinesAsOrderLines($data, $sourceLines), []);
@@ -387,13 +394,21 @@ final class GoodsReceiptNoteService
             return;
         }
 
-        $ratio = $this->math->isZero((string) $order->subtotal)
-            ? '0.000000'
-            : $this->math->div((string) $grn->subtotal, (string) $order->subtotal, 12);
-
         foreach ($order->adjustments as $adjustment) {
             if ($adjustment instanceof PurchaseHeaderAdjustment) {
-                $this->adjustments->cloneProportionally($adjustment, 'goods_receipt_note', (int) $grn->getKey(), $ratio);
+                $amount = $this->adjustmentAllocations->receiptShare($adjustment, $order, $grn);
+                if ($this->math->isZero($amount)) {
+                    continue;
+                }
+
+                $clone = $this->adjustments->cloneForAmount(
+                    $adjustment,
+                    'goods_receipt_note',
+                    (int) $grn->getKey(),
+                    $amount,
+                    (int) $adjustment->getKey(),
+                );
+                $this->adjustmentAllocations->recordReceiptAllocation($adjustment, $clone, $grn, $amount);
             }
         }
     }

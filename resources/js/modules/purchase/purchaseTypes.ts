@@ -605,6 +605,10 @@ export interface FastPurchasePayload {
         tax_treatment?: string;
         mapping_source?: 'catalogue' | 'override';
         override_reason?: string;
+        allocations?: Array<{
+            client_line_key: string;
+            amount: string;
+        }>;
         description?: string;
     }>;
     payment?: {

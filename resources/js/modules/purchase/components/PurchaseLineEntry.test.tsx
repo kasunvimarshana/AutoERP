@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { FastPurchaseLines, blankFastPurchaseLine } from './FastPurchaseLines';
 import { PurchaseOrderLineEditor, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
-import { fastPurchaseLineToPayload, purchaseOrderLineToPayload } from './purchaseLineAdapters';
+import { fastPurchaseLineToPayload, purchaseOrderLineFromResource, purchaseOrderLineToPayload } from './purchaseLineAdapters';
 import type { FastPurchaseContext } from '../purchaseTypes';
 
 vi.mock('./PurchaseLookups', () => ({
@@ -153,6 +153,41 @@ describe('Purchase line entry', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0][0][0].quantity).toBe('3.000000');
         expect(onChange.mock.calls[0][0][0].client_key).toBe('po-line-1');
+    });
+
+    it('saves an unchanged persisted PO line without manual price confirmation', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        const persisted = purchaseOrderLineFromResource({
+            id: 7,
+            item_id: 1,
+            item: { id: 1, code: 'ITEM-1', name: 'Brake pad' },
+            item_variant_id: 12,
+            item_variant: { id: 12, code: 'RED', name: 'Red' },
+            uom_id: 21,
+            uom: { id: 21, code: 'PCS', name: 'Pieces' },
+            description: 'Brake pad',
+            ordered_quantity: '2.000000',
+            unit_price: '10.000000',
+            discount_amount: '1.000000',
+            tax_amount: '2.000000',
+            charge_amount: '0.000000',
+        });
+
+        expect(persisted.pricing_state).toBe('persisted');
+        expect(persisted.manual_price_confirmed).toBe(true);
+
+        renderEditor([persisted], onChange);
+        await user.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
+        const dialog = await screen.findByRole('dialog', { name: 'Edit line' });
+        await user.click(within(dialog).getByRole('button', { name: 'Save line' }));
+
+        expect(screen.queryByText('Manual price must be confirmed for the current line context.')).not.toBeInTheDocument();
+        expect(onChange).toHaveBeenCalledTimes(1);
+        expect(purchaseOrderLineToPayload(onChange.mock.calls[0][0][0])).toMatchObject({
+            item_id: 1,
+            unit_price: '10.000000',
+        });
     });
 
     it('removes a line after confirmation', async () => {

@@ -6,14 +6,16 @@ namespace Modules\Purchase\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
-use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 
 final class PurchaseAcquisitionCostAllocator
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
+    ) {}
 
     public function unitCostForReceiptLine(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line): string
     {
@@ -91,29 +93,13 @@ final class PurchaseAcquisitionCostAllocator
      */
     private function capitalizableAdjustments(GoodsReceiptNote $grn): array
     {
-        $allowedTypes = [
-            PurchaseAdjustmentType::Discount->value => true,
-            PurchaseAdjustmentType::Freight->value => true,
-            PurchaseAdjustmentType::Charge->value => true,
-            PurchaseAdjustmentType::Insurance->value => true,
-            PurchaseAdjustmentType::Duty->value => true,
-            PurchaseAdjustmentType::Levy->value => true,
-        ];
-
         return $grn->adjustments
-            ->filter(function (PurchaseHeaderAdjustment $adjustment) use ($allowedTypes): bool {
+            ->filter(function (PurchaseHeaderAdjustment $adjustment): bool {
                 if ($this->math->isZero((string) $adjustment->amount)) {
                     return false;
                 }
 
-                $type = $adjustment->adjustment_type instanceof \BackedEnum
-                    ? $adjustment->adjustment_type->value
-                    : (string) $adjustment->adjustment_type;
-                $treatment = (string) ($adjustment->cost_treatment ?? '');
-
-                return isset($allowedTypes[$type])
-                    || str_contains($treatment, 'landed_cost')
-                    || $treatment === 'inventory_cost_reduction';
+                return $this->adjustmentAllocations->isCapitalizable($adjustment);
             })
             ->sortBy([
                 ['sort_order', 'asc'],

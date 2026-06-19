@@ -44,6 +44,7 @@ final class PurchaseAuthorizationService
 
     public const FAST_PURCHASE_VIEW = 'purchase.fast_purchases.view';
     public const FAST_PURCHASE_EXECUTE = 'purchase.fast_purchases.execute';
+    public const FAST_PURCHASE_LOOKUPS = 'purchase.fast_purchases.lookups';
 
     public function __construct(private readonly UserAccessResolver $access) {}
 
@@ -82,6 +83,7 @@ final class PurchaseAuthorizationService
             self::PAYMENTS_EXECUTE => 'Create supplier payments through the Payment module.',
             self::FAST_PURCHASE_VIEW => 'View Fast Purchase context and previews.',
             self::FAST_PURCHASE_EXECUTE => 'Execute Fast Purchase workflows.',
+            self::FAST_PURCHASE_LOOKUPS => 'Access focused Fast Purchase lookup and context data.',
         ];
     }
 
@@ -90,6 +92,22 @@ final class PurchaseAuthorizationService
         if ($userId === null || ! $this->can($userId, $tenantId, $permission)) {
             throw new AuthorizationException('This Purchase action requires permission: '.$permission);
         }
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    public function assertAny(?int $userId, int $tenantId, array $permissions): void
+    {
+        if ($userId !== null) {
+            foreach ($permissions as $permission) {
+                if ($this->can($userId, $tenantId, $permission)) {
+                    return;
+                }
+            }
+        }
+
+        throw new AuthorizationException('This Purchase action requires one of: '.implode(', ', $permissions));
     }
 
     public function can(int $userId, int $tenantId, string $permission): bool

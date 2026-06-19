@@ -23,7 +23,11 @@ final class PaymentTermsResolver
                 ]);
             }
 
-            if ($terms !== '' && $terms !== 'explicit') {
+            if ($terms === 'explicit_due_date') {
+                return $due->toDateString();
+            }
+
+            if ($terms !== '') {
                 $termDue = $this->dueDateForTerms($date, $terms);
                 if (! $due->equalTo($termDue)) {
                     throw ValidationException::withMessages([
@@ -35,17 +39,25 @@ final class PaymentTermsResolver
             return $due->toDateString();
         }
 
+        if ($terms === 'explicit_due_date') {
+            throw ValidationException::withMessages([
+                'due_date' => ['Explicit due date is required for explicit payment terms.'],
+            ]);
+        }
+
         return $this->dueDateForTerms($date, $terms)->toDateString();
     }
 
     private function dueDateForTerms(CarbonImmutable $date, string $terms): CarbonImmutable
     {
         return match ($terms) {
-            '', 'due_on_receipt', 'cod', 'cash' => $date,
+            '', 'due_on_receipt' => $date,
             'net_7' => $date->addDays(7),
             'net_15' => $date->addDays(15),
             'net_30' => $date->addDays(30),
-            default => $date,
+            default => throw ValidationException::withMessages([
+                'payment_terms' => ['Unsupported payment terms selected.'],
+            ]),
         };
     }
 }

@@ -134,14 +134,17 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                                 item_variant_id: null,
                                 description: item?.name ?? '',
                                 uom: null,
-                                unit_price: current.auto_price === false ? current.unit_price : config.defaultLine?.unit_price ?? current.unit_price,
+                                unit_price: current.auto_price === false && current.pricing_state !== 'persisted'
+                                    ? current.unit_price
+                                    : config.defaultLine?.unit_price ?? current.unit_price,
                                 tax_group_id: '',
                                 price_source_label: undefined,
                                 price_source: null,
                                 price_source_id: null,
                                 pricing_context_hash: null,
-                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
-                                auto_price: current.auto_price !== false,
+                                manual_price_confirmed: current.auto_price === false && current.pricing_state !== 'persisted' ? false : current.manual_price_confirmed,
+                                auto_price: current.auto_price === false && current.pricing_state !== 'persisted' ? false : true,
+                                pricing_state: current.auto_price === false && current.pricing_state !== 'persisted' ? 'manual_confirmed' : 'auto',
                                 auto_uom: true,
                             }));
                             setErrors((current) => ({ ...current, item: undefined }));
@@ -165,8 +168,9 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                                 price_source: null,
                                 price_source_id: null,
                                 pricing_context_hash: null,
-                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
-                                auto_price: current.auto_price !== false,
+                                manual_price_confirmed: current.auto_price === false && current.pricing_state !== 'persisted' ? false : current.manual_price_confirmed,
+                                auto_price: current.auto_price === false && current.pricing_state !== 'persisted' ? false : true,
+                                pricing_state: current.auto_price === false && current.pricing_state !== 'persisted' ? 'manual_confirmed' : 'auto',
                                 auto_uom: true,
                             }));
                         }}
@@ -189,7 +193,9 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                                 price_source: null,
                                 price_source_id: null,
                                 pricing_context_hash: null,
-                                manual_price_confirmed: current.auto_price === false ? false : current.manual_price_confirmed,
+                                manual_price_confirmed: current.auto_price === false && current.pricing_state !== 'persisted' ? false : current.manual_price_confirmed,
+                                auto_price: current.auto_price === false && current.pricing_state !== 'persisted' ? false : true,
+                                pricing_state: current.auto_price === false && current.pricing_state !== 'persisted' ? 'manual_confirmed' : 'auto',
                             }));
                         }}
                     />
@@ -201,6 +207,7 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                             ...current,
                             unit_price: event.target.value,
                             auto_price: false,
+                            pricing_state: 'manual_confirmed',
                             manual_price_confirmed: true,
                             pricing_context_hash: context?.pricing_context_hash ?? current.pricing_context_hash ?? null,
                         }))}
@@ -316,7 +323,7 @@ function validateLineForm(line: EditablePurchaseLine, config: PurchaseLineEditor
     } else if (!isNonNegativeDecimal(line.unit_price)) {
         errors.unit_price = `${config.unitLabel} cannot be negative.`;
     }
-    if (line.auto_price === false && !line.manual_price_confirmed) {
+    if (line.auto_price === false && line.pricing_state !== 'persisted' && !line.manual_price_confirmed) {
         errors.unit_price = 'Manual price must be confirmed for the current line context.';
     }
     return errors;

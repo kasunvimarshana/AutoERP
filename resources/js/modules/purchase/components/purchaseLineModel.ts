@@ -8,6 +8,7 @@ import {
 
 export type PurchaseLineCalculationType = 'fixed' | 'percentage';
 export type PurchaseLineTaxMode = 'manual' | 'tax_group';
+export type PurchaseLinePricingState = 'auto' | 'manual_confirmed' | 'persisted';
 
 export interface EditablePurchaseLine {
     client_key: string;
@@ -19,6 +20,7 @@ export interface EditablePurchaseLine {
     price_source?: string | null;
     price_source_id?: number | null;
     pricing_context_hash?: string | null;
+    pricing_state?: PurchaseLinePricingState;
     manual_price_confirmed?: boolean;
     auto_price?: boolean;
     auto_uom?: boolean;
@@ -98,6 +100,7 @@ export function emptyPurchaseLine(overrides: Partial<EditablePurchaseLine> = {})
         price_source: null,
         price_source_id: null,
         pricing_context_hash: null,
+        pricing_state: 'auto',
         manual_price_confirmed: false,
         auto_price: true,
         auto_uom: true,

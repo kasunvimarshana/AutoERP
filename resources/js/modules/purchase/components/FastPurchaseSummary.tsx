@@ -25,12 +25,14 @@ export function FastPurchaseSummary({ preview, result, stale }: FastPurchaseSumm
     const mode = active?.mode ? active.mode.replaceAll('_', ' ') : 'draft';
     const options = active?.options;
     const impact = [
+        'Purchase Order',
         options?.receive_stock_now ? 'Goods Receipt' : null,
         options?.create_supplier_invoice_now ? 'Supplier Invoice' : null,
         options?.record_payment_now ? 'Payment' : null,
     ].filter(Boolean);
     const documents = result?.documents;
     const links = [
+        documents?.purchase_order,
         documents?.goods_receipt,
         documents?.supplier_invoice,
         documents?.supplier_payment,

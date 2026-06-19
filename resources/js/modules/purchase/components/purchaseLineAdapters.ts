@@ -36,6 +36,8 @@ export function purchaseOrderLineFromResource(line: NonNullable<PurchaseOrder['l
         charge_rate: line.charge_rate ?? '0.000000',
         charge_amount: line.charge_amount,
         auto_price: false,
+        pricing_state: 'persisted',
+        manual_price_confirmed: true,
         auto_uom: false,
     };
 }
@@ -61,7 +63,7 @@ export function purchaseOrderLineToPayload(line: EditablePurchaseLine): Purchase
 }
 
 export function fastPurchaseLineToPayload(line: EditablePurchaseLine): FastPurchasePayloadLine {
-    const pricingMode = line.auto_price === false ? 'manual' : 'auto';
+    const pricingMode = line.auto_price === false && line.pricing_state !== 'persisted' ? 'manual' : 'auto';
 
     return {
         client_line_key: line.client_key,

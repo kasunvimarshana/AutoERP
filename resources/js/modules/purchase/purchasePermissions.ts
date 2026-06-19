@@ -28,6 +28,7 @@ export const purchasePermissions = {
     paymentsExecute: 'purchase.payments.execute',
     fastPurchasesView: 'purchase.fast_purchases.view',
     fastPurchasesExecute: 'purchase.fast_purchases.execute',
+    fastPurchasesLookups: 'purchase.fast_purchases.lookups',
 } as const;
 
 export function hasPurchasePermission(permissions: string[], permission: string): boolean {

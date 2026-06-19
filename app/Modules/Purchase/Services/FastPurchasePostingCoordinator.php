@@ -13,11 +13,11 @@ use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Payment\Models\Payment;
-use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
-use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 
 final class FastPurchasePostingCoordinator
 {
@@ -26,6 +26,7 @@ final class FastPurchasePostingCoordinator
         private readonly FinancePostingInterface $financePostings,
         private readonly FastPurchaseDocumentBuilder $documents,
         private readonly PurchaseAcquisitionCostAllocator $costs,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
     ) {}
 
     /**
@@ -110,7 +111,7 @@ final class FastPurchasePostingCoordinator
         $directTaxable = $resolved['summary']['non_stock_taxable_total'];
         $tax = $resolved['summary']['tax_total'];
         $withholding = $resolved['summary']['withholding_total'];
-        $nonTaxAdjustments = $this->nonTaxAdjustmentFinanceLines($resolved);
+        $nonTaxAdjustments = $this->invoiceAdjustmentFinanceLines($invoice);
         if ($this->math->isZero($directTaxable) && $this->math->isZero($tax) && $this->math->isZero($withholding) && $nonTaxAdjustments === []) {
             return [];
         }
@@ -191,31 +192,80 @@ final class FastPurchasePostingCoordinator
     }
 
     /**
-     * @param  array<string, mixed>  $resolved
      * @return list<FinancePostingLine>
      */
-    private function nonTaxAdjustmentFinanceLines(array $resolved): array
+    private function invoiceAdjustmentFinanceLines(Invoice $invoice): array
     {
+        $invoice->loadMissing('adjustments');
         $lines = [];
-        foreach ($resolved['adjustments'] as $adjustment) {
-            /** @var PurchaseHeaderAdjustmentData $data */
-            $data = $adjustment['data'];
-            $amount = $adjustment['amount'];
-            if ($this->math->isZero($amount)
-                || in_array($data->adjustmentType, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)
+        foreach ($invoice->adjustments as $adjustment) {
+            if (! $adjustment instanceof InvoiceAdjustment
+                || $adjustment->source_adjustment_type !== 'purchase_header_adjustment'
+                || $adjustment->source_adjustment_id === null
             ) {
                 continue;
             }
 
-            if ($data->effect === PurchaseAdjustmentEffect::Increase) {
-                $lines[] = new FinancePostingLine(null, $data->name, debit: $amount, profileKey: 'expense');
+            $sourceAdjustment = PurchaseHeaderAdjustment::query()->find((int) $adjustment->source_adjustment_id);
+            if (! $sourceAdjustment instanceof PurchaseHeaderAdjustment) {
+                continue;
+            }
+
+            $type = $sourceAdjustment->adjustment_type instanceof PurchaseAdjustmentType
+                ? $sourceAdjustment->adjustment_type
+                : PurchaseAdjustmentType::from((string) $sourceAdjustment->adjustment_type);
+            $amount = $this->math->normalize((string) $adjustment->amount);
+            if ($this->math->isZero($amount)
+                || in_array($type, [PurchaseAdjustmentType::Tax, PurchaseAdjustmentType::Withholding], true)
+            ) {
+                continue;
+            }
+
+            $recognizedAtGrn = $this->adjustmentAllocations->recognizedAtGoodsReceiptFor($sourceAdjustment);
+            if ($this->adjustmentAllocations->isCapitalizable($sourceAdjustment)
+                && $this->math->compare($recognizedAtGrn, '0.000000') > 0
+            ) {
+                if ($this->math->compare($recognizedAtGrn, $amount) >= 0) {
+                    continue;
+                }
+                $amount = $this->math->sub($amount, $recognizedAtGrn);
+            }
+
+            $account = $this->configuredAccount($sourceAdjustment, $invoice);
+            $accountCode = $account instanceof FinanceAccount ? (string) $account->code : null;
+            $accountName = $account instanceof FinanceAccount ? (string) $account->name : (string) $adjustment->name;
+            $profileKey = $account instanceof FinanceAccount
+                ? null
+                : $this->adjustmentAllocations->financeProfileKey($sourceAdjustment);
+
+            $this->adjustmentAllocations->recordInvoiceAllocation($sourceAdjustment, $adjustment, $amount, $amount);
+
+            if ($adjustment->effect->value === 'increase') {
+                $lines[] = new FinancePostingLine($accountCode, $accountName, debit: $amount, profileKey: $profileKey);
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
             } else {
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine(null, $data->name, credit: $amount, profileKey: 'expense');
+                $lines[] = new FinancePostingLine($accountCode, $accountName, credit: $amount, profileKey: $profileKey);
             }
         }
 
         return $lines;
+    }
+
+    private function configuredAccount(PurchaseHeaderAdjustment $adjustment, Invoice $invoice): ?FinanceAccount
+    {
+        if ($adjustment->finance_account_id === null) {
+            return null;
+        }
+
+        return FinanceAccount::query()
+            ->whereKey((int) $adjustment->finance_account_id)
+            ->where('tenant_id', (int) $invoice->tenant_id)
+            ->when(
+                $invoice->organization_unit_id === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where('organization_unit_id', $invoice->organization_unit_id),
+            )
+            ->first();
     }
 }

@@ -25,7 +25,7 @@ final class PurchaseContextController
 
     public function supplierContext(PurchaseContextRequest $request, int $supplier, PurchaseDocumentContextService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertLookupAccess($request);
 
         return response()->json([
             'data' => $service->supplierContext($request->tenantId(), $request->organizationUnitId(), $supplier),
@@ -34,7 +34,7 @@ final class PurchaseContextController
 
     public function itemContext(PurchaseContextRequest $request, int $item, PurchaseDocumentContextService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertLookupAccess($request);
 
         return response()->json([
             'data' => $service->itemPurchaseContext(
@@ -52,14 +52,14 @@ final class PurchaseContextController
 
     public function adjustmentCatalogue(PurchaseContextRequest $request, PurchaseAdjustmentCatalogueService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertLookupAccess($request);
 
         return response()->json(['data' => $service->catalogue()]);
     }
 
     public function warehouses(PurchaseContextRequest $request, PurchaseDocumentContextService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertLookupAccess($request);
 
         return response()->json([
             'data' => $service->warehouses(
@@ -73,7 +73,7 @@ final class PurchaseContextController
 
     public function warehouseLocations(PurchaseContextRequest $request, int $warehouse, PurchaseDocumentContextService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+        $this->assertLookupAccess($request);
 
         return response()->json([
             'data' => $service->warehouseLocations(
@@ -83,6 +83,16 @@ final class PurchaseContextController
                 trim((string) $request->input('search', '')),
                 $request->perPage(),
             ),
+        ]);
+    }
+
+    private function assertLookupAccess(PurchaseContextRequest $request): void
+    {
+        $this->authorization->assertAny($request->currentUserId(), $request->tenantId(), [
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
         ]);
     }
 }

@@ -58,11 +58,27 @@ final class PurchaseHeaderAdjustmentService
     {
         $amount = $this->math->mul((string) $adjustment->amount, $ratio);
 
+        return $this->cloneForAmount($adjustment, $sourceType, $sourceId, $amount);
+    }
+
+    public function cloneForAmount(
+        PurchaseHeaderAdjustment $adjustment,
+        string $sourceType,
+        int $sourceId,
+        string $amount,
+        ?int $originPurchaseHeaderAdjustmentId = null,
+    ): PurchaseHeaderAdjustment {
+        $amount = $this->math->normalize($amount);
+        $originId = $originPurchaseHeaderAdjustmentId
+            ?? $adjustment->origin_purchase_header_adjustment_id
+            ?? (int) $adjustment->getKey();
+
         return PurchaseHeaderAdjustment::query()->create([
             'tenant_id' => $adjustment->tenant_id,
             'organization_unit_id' => $adjustment->organization_unit_id,
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'origin_purchase_header_adjustment_id' => $originId,
             'name' => $adjustment->name,
             'adjustment_type' => $adjustment->adjustment_type,
             'effect' => $adjustment->effect,

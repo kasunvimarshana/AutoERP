@@ -221,7 +221,7 @@ export function AppRouter() {
                     <Route path="/warehouse-locations/create" element={<WarehouseLocationCreatePage />} />
                     <Route path="/warehouse-locations/:id/edit" element={<WarehouseLocationEditPage />} />
                     <Route path="/warehouse-locations/:id" element={<WarehouseLocationDetailPage />} />
-                    <Route path="/purchase/fast-purchase" element={requirePermission(purchasePermissions.fastPurchasesExecute, <FastPurchasePage />)} />
+                    <Route path="/purchase/fast-purchase" element={requirePermission(purchasePermissions.fastPurchasesView, <FastPurchasePage />)} />
                     <Route path="/purchase/orders" element={requirePermission(purchasePermissions.ordersView, <PurchaseOrderListPage />)} />
                     <Route path="/purchase/orders/create" element={requirePermission(purchasePermissions.ordersCreate, <PurchaseOrderFormPage />)} />
                     <Route path="/purchase/orders/:id/edit" element={requirePermission(purchasePermissions.ordersUpdate, <PurchaseOrderFormPage />)} />

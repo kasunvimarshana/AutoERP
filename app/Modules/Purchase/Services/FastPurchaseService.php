@@ -52,6 +52,7 @@ final class FastPurchaseService
         private readonly PurchaseOrderCalculationService $purchaseCalculator,
         private readonly PurchasePricingService $pricing,
         private readonly PaymentTermsResolver $paymentTerms,
+        private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
         private readonly IdempotencyService $idempotency,
         private readonly FastPurchaseIdempotencyNormalizer $idempotencyNormalizer,
         private readonly FastPurchasePostingCoordinator $postingCoordinator,
@@ -622,9 +623,11 @@ final class FastPurchaseService
                 throw new InvalidArgumentException('Fast purchase adjustments are invalid.');
             }
 
+            $adjustmentType = PurchaseAdjustmentType::from((string) $row['adjustment_type']);
+            $defaults = $this->adjustmentCatalogue->defaultsFor($adjustmentType);
             $data = new PurchaseHeaderAdjustmentData(
                 name: trim((string) $row['name']),
-                adjustmentType: PurchaseAdjustmentType::from((string) $row['adjustment_type']),
+                adjustmentType: $adjustmentType,
                 effect: PurchaseAdjustmentEffect::from((string) $row['effect']),
                 amount: $this->math->normalize((string) ($row['amount'] ?? '0.000000')),
                 calculationType: PurchaseAdjustmentCalculationType::from((string) ($row['calculation_type'] ?? PurchaseAdjustmentCalculationType::Fixed->value)),
@@ -636,9 +639,9 @@ final class FastPurchaseService
                 description: $this->nullableString($row['description'] ?? null),
                 financePostingProfileId: $this->nullableInt($row['finance_posting_profile_id'] ?? null),
                 financeAccountId: $this->nullableInt($row['finance_account_id'] ?? null),
-                costTreatment: $this->nullableString($row['cost_treatment'] ?? null),
-                taxTreatment: $this->nullableString($row['tax_treatment'] ?? null),
-                mappingSource: $this->nullableString($row['mapping_source'] ?? null),
+                costTreatment: $this->nullableString($row['cost_treatment'] ?? null) ?? (string) $defaults['cost_treatment'],
+                taxTreatment: $this->nullableString($row['tax_treatment'] ?? null) ?? (string) $defaults['tax_treatment'],
+                mappingSource: $this->nullableString($row['mapping_source'] ?? null) ?? 'catalogue',
                 overrideReason: $this->nullableString($row['override_reason'] ?? null),
             );
 
@@ -646,6 +649,11 @@ final class FastPurchaseService
             $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
             $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
             if (! $createInvoice) {
+                if (collect($lines)->contains(fn (array $line): bool => ! (bool) $line['is_stock'])) {
+                    throw ValidationException::withMessages([
+                        "adjustments.{$index}.adjustment_type" => ['Receive-only Fast Purchase cannot include header adjustments when non-stock lines are present because no invoice exists to recognize the residual.'],
+                    ]);
+                }
                 $this->assertReceiveOnlyAdjustmentSupported($data, "adjustments.{$index}.adjustment_type");
             }
             $adjustments[] = $data;
@@ -702,20 +710,7 @@ final class FastPurchaseService
 
     private function assertReceiveOnlyAdjustmentSupported(PurchaseHeaderAdjustmentData $data, string $field): void
     {
-        $costTreatment = mb_strtolower((string) $data->costTreatment);
-        $capitalizable = str_contains($costTreatment, 'landed')
-            || str_contains($costTreatment, 'inventory')
-            || str_contains($costTreatment, 'capital');
-
-        $safeType = $data->adjustmentType === PurchaseAdjustmentType::Discount
-            || in_array($data->adjustmentType, [
-                PurchaseAdjustmentType::Freight,
-                PurchaseAdjustmentType::Insurance,
-                PurchaseAdjustmentType::Duty,
-                PurchaseAdjustmentType::Levy,
-            ], true);
-
-        if ($safeType || $capitalizable) {
+        if ($this->adjustmentAllocations->receiveOnlySupported($data)) {
             return;
         }
 

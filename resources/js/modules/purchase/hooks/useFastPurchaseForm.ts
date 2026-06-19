@@ -213,7 +213,11 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
 
     const canSubmit = useMemo(() => {
         const hasLine = lines.length > 0;
-        const pricingReady = lines.every((line) => line.auto_price !== false || (line.manual_price_confirmed && line.pricing_context_hash));
+        const pricingReady = lines.every((line) => (
+            line.auto_price !== false
+            || line.pricing_state === 'persisted'
+            || (line.manual_price_confirmed && line.pricing_context_hash)
+        ));
         const paymentReady = !recordPayment || (
             isPositiveDecimal(paymentTotal)
             && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
@@ -370,12 +374,15 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
 }
 
 function invalidatePricingContext(line: FastPurchaseLineRow): FastPurchaseLineRow {
+    const manualRequiresConfirmation = line.auto_price === false && line.pricing_state !== 'persisted';
+
     return {
         ...line,
         price_source_label: undefined,
         price_source: null,
         price_source_id: null,
         pricing_context_hash: null,
-        manual_price_confirmed: line.auto_price === false ? false : line.manual_price_confirmed,
+        manual_price_confirmed: manualRequiresConfirmation ? false : line.manual_price_confirmed,
+        pricing_state: manualRequiresConfirmation ? 'manual_confirmed' : line.pricing_state,
     };
 }

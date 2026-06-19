@@ -96,6 +96,33 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(1, FinanceJournalEntry::query()->count());
     }
 
+    public function test_invalid_payment_terms_are_rejected(): void
+    {
+        $context = $this->context();
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, [
+                'payment_terms' => 'whenever_supplier_calls',
+            ]));
+            $this->fail('Expected invalid payment terms validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Unsupported payment terms selected.', $exception->errors()['payment_terms'][0] ?? null);
+        }
+    }
+
+    public function test_explicit_due_date_payment_terms_are_persisted(): void
+    {
+        $context = $this->context();
+
+        app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-EXPLICIT-DUE',
+            'payment_terms' => 'explicit_due_date',
+            'due_date' => '2026-06-29',
+        ]));
+
+        $this->assertSame('2026-06-29', Invoice::query()->firstOrFail()->due_date->toDateString());
+    }
+
     public function test_cash_purchase_allocates_payment_and_clears_invoice_balance(): void
     {
         $context = $this->context();
@@ -169,9 +196,57 @@ final class FastPurchaseTest extends TestCase
             app(DecimalMath::class)->mul((string) $movement->quantity, (string) $movement->unit_cost),
             app(DecimalMath::class)->normalize($inventoryDebit),
         );
+        $this->assertSame('530.000000', $this->accountDebit($context['inventory_account_id']));
+        $this->assertSame('0.000000', $this->accountDebit($context['purchase_expense_account_id']));
+        $this->assertSame('530.000000', $this->accountCredit($context['payable_account_id']));
+        $this->assertSame('530.000000', $this->accountDebit($context['payable_account_id']));
+        $this->assertSame('0.000000', $this->accountNetDebit($context['payable_account_id']));
+        $this->assertSame('300.000000', $this->accountCredit($context['cash_account_id']));
+        $this->assertSame('230.000000', $this->accountCredit($context['bank_account_id']));
+        $this->assertSame('30.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('signed_amount')));
+        $this->assertSame('50.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_grn_amount')));
+        $this->assertSame('0.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_invoice_amount')));
         $this->assertSame(2, DB::table('invoice_adjustments')->count());
         $this->assertSame(2, PaymentLine::query()->count());
-        $this->assertSame(3, FinanceJournalEntry::query()->count());
+        $this->assertSame(2, FinanceJournalEntry::query()->count());
+    }
+
+    public function test_mixed_adjustment_residual_is_recognized_once_across_grn_and_invoice(): void
+    {
+        $context = $this->context();
+
+        app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-MIXED-ADJ',
+            'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
+            'lines' => [
+                ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '6.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+            ],
+            'adjustments' => [[
+                'name' => 'Freight',
+                'adjustment_type' => 'freight',
+                'effect' => 'increase',
+                'amount' => '100.000000',
+                'allocation_method' => 'proportional',
+            ]],
+            'payment' => [
+                'amount' => '200.000000',
+                'payment_method_id' => $context['cash_method_id'],
+                'source_account_id' => $context['cash_account_id'],
+            ],
+        ]));
+
+        $this->assertSame('200.000000', (string) Invoice::query()->firstOrFail()->grand_total);
+        $this->assertSame('0.000000', (string) Invoice::query()->firstOrFail()->balance_due);
+        $this->assertSame('120.000000', $this->accountDebit($context['inventory_account_id']));
+        $this->assertSame('80.000000', $this->accountDebit($context['purchase_expense_account_id']));
+        $this->assertSame('200.000000', $this->accountCredit($context['payable_account_id']));
+        $this->assertSame('200.000000', $this->accountDebit($context['payable_account_id']));
+        $this->assertSame('0.000000', $this->accountNetDebit($context['payable_account_id']));
+        $this->assertSame('100.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('signed_amount')));
+        $this->assertSame('60.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_grn_amount')));
+        $this->assertSame('40.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_invoice_amount')));
+        $this->assertSame(2, DB::table('invoice_adjustments')->count());
     }
 
     public function test_direct_non_stock_purchase_has_invoice_payment_and_no_inventory(): void
@@ -203,6 +278,56 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(1, PurchaseOrder::query()->count());
         $this->assertSame(1, Invoice::query()->count());
         $this->assertSame(1, Payment::query()->count());
+    }
+
+    public function test_receive_only_rejects_invoice_only_adjustments(): void
+    {
+        $context = $this->context();
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, [
+                'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => false, 'record_payment_now' => false],
+                'adjustments' => [[
+                    'name' => 'Service Charge',
+                    'adjustment_type' => 'service_charge',
+                    'effect' => 'increase',
+                    'amount' => '25.000000',
+                ]],
+            ]));
+            $this->fail('Expected receive-only adjustment validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This adjustment requires a supplier invoice and cannot be used in receive-only Fast Purchase.',
+                $exception->errors()['adjustments.0.adjustment_type'][0] ?? null,
+            );
+        }
+    }
+
+    public function test_receive_only_rejects_header_adjustments_when_non_stock_residual_would_remain(): void
+    {
+        $context = $this->context();
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, [
+                'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => false, 'record_payment_now' => false],
+                'lines' => [
+                    ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '3.000000', 'unit_cost' => '100.000000', 'discount_amount' => '0.000000'],
+                    ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '1.000000', 'unit_cost' => '40.000000', 'discount_amount' => '0.000000'],
+                ],
+                'adjustments' => [[
+                    'name' => 'Freight',
+                    'adjustment_type' => 'freight',
+                    'effect' => 'increase',
+                    'amount' => '20.000000',
+                ]],
+            ]));
+            $this->fail('Expected receive-only mixed adjustment validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Receive-only Fast Purchase cannot include header adjustments when non-stock lines are present because no invoice exists to recognize the residual.',
+                $exception->errors()['adjustments.0.adjustment_type'][0] ?? null,
+            );
+        }
     }
 
     public function test_mixed_lines_receive_only_stock_and_invoice_all_lines(): void
@@ -583,6 +708,10 @@ final class FastPurchaseTest extends TestCase
             'expense_item_id' => (int) $expense->getKey(),
             'cash_account_id' => $accounts['cash'],
             'bank_account_id' => $accounts['bank'],
+            'inventory_account_id' => $accounts['inventory'],
+            'tax_account_id' => $accounts['tax'],
+            'payable_account_id' => $accounts['payable'],
+            'purchase_expense_account_id' => $accounts['purchase_expense'],
             'cash_method_id' => $cashMethodId,
             'bank_method_id' => $bankMethodId,
         ];
@@ -684,7 +813,7 @@ final class FastPurchaseTest extends TestCase
     }
 
     /**
-     * @return array{cash: int, bank: int}
+     * @return array{cash: int, bank: int, inventory: int, tax: int, payable: int, purchase_expense: int}
      */
     private function finance(int $tenantId): array
     {
@@ -719,7 +848,14 @@ final class FastPurchaseTest extends TestCase
             'status' => 'open',
         ]);
 
-        return ['cash' => (int) $cash->getKey(), 'bank' => (int) $bank->getKey()];
+        return [
+            'cash' => (int) $cash->getKey(),
+            'bank' => (int) $bank->getKey(),
+            'inventory' => (int) $inventory->getKey(),
+            'tax' => (int) $tax->getKey(),
+            'payable' => (int) $payable->getKey(),
+            'purchase_expense' => (int) $purchaseExpense->getKey(),
+        ];
     }
 
     private function accountType(int $tenantId, string $code, NormalBalance $normalBalance, StatementType $statementType): FinanceAccountType
@@ -766,6 +902,27 @@ final class FastPurchaseTest extends TestCase
                 'account_id' => $account->getKey(),
             ]);
         }
+    }
+
+    private function accountDebit(int $accountId): string
+    {
+        return app(DecimalMath::class)->normalize((string) DB::table('finance_journal_lines')
+            ->where('account_id', $accountId)
+            ->sum('debit'));
+    }
+
+    private function accountCredit(int $accountId): string
+    {
+        return app(DecimalMath::class)->normalize((string) DB::table('finance_journal_lines')
+            ->where('account_id', $accountId)
+            ->sum('credit'));
+    }
+
+    private function accountNetDebit(int $accountId): string
+    {
+        $math = app(DecimalMath::class);
+
+        return $math->sub($this->accountDebit($accountId), $this->accountCredit($accountId));
     }
 
     private function paymentMethod(int $tenantId, string $code, string $type): int
