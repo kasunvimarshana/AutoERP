@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ------------------------------------------------------------------
+    # Security: Block access to hidden and sensitive files
+    # ------------------------------------------------------------------
+    RewriteRule (^|/)\. - [F,L]
+
+    <FilesMatch "\.(env|log|ini|yaml|yml|json|lock|md)$">
+        Require all denied
+    </FilesMatch>
+
+    # ------------------------------------------------------------------
+    # Redirect all requests to /public (avoid rewrite loops)
+    # ------------------------------------------------------------------
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L,QSA]
+
+</IfModule>
