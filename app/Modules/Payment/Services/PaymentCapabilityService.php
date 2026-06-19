@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Services;
 
 use Modules\Core\Services\DecimalMath;
+use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
@@ -40,8 +41,10 @@ final class PaymentCapabilityService
         $posted = $status === PaymentStatus::Posted && $postingStatus === PaymentPostingStatus::Posted;
         $hasJournal = $payment->finance_journal_entry_id !== null;
         $hasActiveAllocations = $payment->relationLoaded('allocations')
-            ? $payment->allocations->contains(fn ($allocation): bool => (string) $allocation->status === 'active')
-            : $payment->allocations()->where('status', 'active')->exists();
+            ? $payment->allocations->contains(fn ($allocation): bool => $allocation->status instanceof \BackedEnum
+                ? $allocation->status->value === AllocationStatus::Active->value
+                : (string) $allocation->status === AllocationStatus::Active->value)
+            : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
 
         $chequeLines = $payment->relationLoaded('lines')
             ? $payment->lines->filter(fn ($line): bool => $this->isChequeLine($line))
