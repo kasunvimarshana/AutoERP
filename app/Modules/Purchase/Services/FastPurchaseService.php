@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Audit\DTOs\AuditLogActivityData;
 use Modules\Audit\Models\AuditLogModel;
@@ -234,6 +235,11 @@ final class FastPurchaseService
             }
 
             $item = $this->item($tenantId, $organizationUnitId, (int) $line['item_id'], $lockRecords, "lines.{$index}.item_id");
+            $variantId = $this->nullableInt($line['item_variant_id'] ?? null);
+            if ($variantId !== null) {
+                $this->validator->itemVariant($tenantId, $organizationUnitId, (int) $item->getKey(), $variantId, "lines.{$index}.item_variant_id");
+            }
+
             $quantity = $this->math->normalize((string) $line['quantity']);
             $uomId = $this->resolveUomId($tenantId, $organizationUnitId, (int) $supplier->getKey(), $item, $line);
             $uom = $this->validator->uom($tenantId, $organizationUnitId, $uomId, "lines.{$index}.uom_id");
@@ -244,22 +250,48 @@ final class FastPurchaseService
             if ($this->math->compare($unitCost, '0.000000') <= 0) {
                 throw new InvalidArgumentException('Purchase unit cost must be greater than zero.');
             }
-            $discount = $this->math->normalize((string) ($line['discount_amount'] ?? '0.000000'));
+            $discountCalculationType = PurchaseAdjustmentCalculationType::from((string) ($line['discount_calculation_type'] ?? PurchaseAdjustmentCalculationType::Fixed->value));
+            $discountRate = $this->math->normalize((string) ($line['discount_rate'] ?? '0.000000'));
+            $discountAmount = $this->math->normalize((string) ($line['discount_amount'] ?? '0.000000'));
+            $chargeCalculationType = PurchaseAdjustmentCalculationType::from((string) ($line['charge_calculation_type'] ?? PurchaseAdjustmentCalculationType::Fixed->value));
+            $chargeRate = $this->math->normalize((string) ($line['charge_rate'] ?? '0.000000'));
+            $chargeAmount = $this->math->normalize((string) ($line['charge_amount'] ?? '0.000000'));
+            $this->validator->assertNonNegative($discountRate, 'Fast purchase line discount rate cannot be negative.');
+            $this->validator->assertNonNegative($discountAmount, 'Fast purchase line discount cannot be negative.');
+            $this->validator->assertNonNegative($chargeRate, 'Fast purchase line charge rate cannot be negative.');
+            $this->validator->assertNonNegative($chargeAmount, 'Fast purchase line charge cannot be negative.');
+            $this->assertPercentageRate($discountCalculationType, $discountRate, "lines.{$index}.discount_rate");
+            $this->assertPercentageRate($chargeCalculationType, $chargeRate, "lines.{$index}.charge_rate");
             $taxGroupId = $this->nullableInt($line['tax_group_id'] ?? null);
             if ($taxGroupId !== null) {
                 $this->taxGroup($tenantId, $organizationUnitId, $taxGroupId, $lockRecords, "lines.{$index}.tax_group_id");
             }
 
             $lineSubtotal = $this->math->mul($quantity, $unitCost);
+            $discount = $this->purchaseCalculator->calculatedAmount(
+                $lineSubtotal,
+                $discountCalculationType,
+                $discountRate,
+                $discountAmount,
+            );
             if ($this->math->compare($discount, $lineSubtotal) > 0) {
-                throw new InvalidArgumentException('Line discount cannot exceed line subtotal.');
+                throw ValidationException::withMessages([
+                    "lines.{$index}.discount_amount" => ['Line discount cannot exceed line subtotal.'],
+                ]);
             }
+            $charge = $this->purchaseCalculator->calculatedAmount(
+                $lineSubtotal,
+                $chargeCalculationType,
+                $chargeRate,
+                $chargeAmount,
+            );
 
             $resolved[] = [
+                'client_line_key' => $this->nullableString($line['client_line_key'] ?? null),
                 'line_number' => $index + 1,
                 'item' => $item,
                 'item_id' => (int) $item->getKey(),
-                'item_variant_id' => $this->nullableInt($line['item_variant_id'] ?? null),
+                'item_variant_id' => $variantId,
                 'description' => trim((string) ($line['description'] ?? '')) !== '' ? trim((string) $line['description']) : (string) $item->name,
                 'uom_id' => (int) $uom->getKey(),
                 'uom' => $uom,
@@ -268,8 +300,13 @@ final class FastPurchaseService
                 'uom_conversion_factor' => $uomBasis['conversion_factor'],
                 'base_quantity' => $uomBasis['base_quantity'],
                 'unit_cost' => $unitCost,
+                'discount_calculation_type' => $discountCalculationType,
+                'discount_rate' => $discountRate,
                 'discount_amount' => $discount,
                 'tax_group_id' => $taxGroupId,
+                'charge_calculation_type' => $chargeCalculationType,
+                'charge_rate' => $chargeRate,
+                'charge_amount' => $charge,
                 'is_stock' => $this->isStockItem($item),
                 'line_subtotal' => $lineSubtotal,
             ];
@@ -281,6 +318,7 @@ final class FastPurchaseService
                 itemId: (int) $item->getKey(),
                 taxGroupId: $taxGroupId,
                 discountBeforeTax: $discount,
+                chargeBeforeTax: $charge,
             );
         }
 
@@ -338,12 +376,16 @@ final class FastPurchaseService
         ];
 
         foreach ($lines as $line) {
-            $taxable = $this->math->sub($line['line_subtotal'], $line['discount_amount']);
+            $taxable = $this->math->add(
+                $this->math->sub($line['line_subtotal'], $line['discount_amount']),
+                $line['charge_amount'],
+            );
             $summary['subtotal'] = $this->math->add($summary['subtotal'], $line['line_subtotal']);
             $summary['discount_total'] = $this->math->add($summary['discount_total'], $line['discount_amount']);
             $summary['tax_total'] = $this->math->add($summary['tax_total'], $line['non_withholding_tax_amount']);
             $summary['withholding_total'] = $this->math->add($summary['withholding_total'], $line['withholding_amount']);
             $summary['line_withholding_total'] = $this->math->add($summary['line_withholding_total'], $line['withholding_amount']);
+            $summary['charge_total'] = $this->math->add($summary['charge_total'], $line['charge_amount']);
             $summary['grand_total'] = $this->math->add($summary['grand_total'], $line['line_total']);
 
             if ((bool) $line['is_stock']) {
@@ -556,9 +598,12 @@ final class FastPurchaseService
             array_map(fn (array $line): object => (object) [
                 'orderedQuantity' => $line['quantity'],
                 'unitPrice' => $line['unit_cost'],
+                'discountCalculationType' => PurchaseAdjustmentCalculationType::Fixed,
                 'discountAmount' => $line['discount_amount'],
+                'taxCalculationType' => PurchaseAdjustmentCalculationType::Fixed,
                 'taxAmount' => $line['non_withholding_tax_amount'],
-                'chargeAmount' => '0.000000',
+                'chargeCalculationType' => PurchaseAdjustmentCalculationType::Fixed,
+                'chargeAmount' => $line['charge_amount'],
             ], $lines),
             $adjustments,
         );
@@ -595,6 +640,16 @@ final class FastPurchaseService
     {
         if ($createInvoice && $this->math->compare($paidTotal, $grandTotal) < 0 && ! (bool) $supplier->is_credit_allowed) {
             throw new InvalidArgumentException('Supplier is not enabled for credit purchases.');
+        }
+    }
+
+    private function assertPercentageRate(PurchaseAdjustmentCalculationType $calculationType, string $rate, string $field): void
+    {
+        if ($calculationType === PurchaseAdjustmentCalculationType::Percentage
+            && $this->math->compare($rate, '100.000000') > 0) {
+            throw ValidationException::withMessages([
+                $field => ['Fast purchase percentage rates cannot exceed 100.'],
+            ]);
         }
     }
 
@@ -886,9 +941,42 @@ final class FastPurchaseService
     private function requestHash(array $payload): string
     {
         unset($payload['current_user_id']);
+        $this->removeClientLineKeys($payload);
         $this->recursiveSort($payload);
 
         return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function removeClientLineKeys(array &$payload): void
+    {
+        if (! isset($payload['lines']) || ! is_array($payload['lines'])) {
+            return;
+        }
+
+        foreach ($payload['lines'] as &$line) {
+            if (is_array($line)) {
+                unset($line['client_line_key']);
+                foreach (['discount_rate', 'discount_amount', 'charge_rate', 'charge_amount'] as $decimalKey) {
+                    if (array_key_exists($decimalKey, $line)) {
+                        $line[$decimalKey] = $this->math->normalize((string) $line[$decimalKey]);
+                    }
+                }
+                foreach (['discount_calculation_type', 'charge_calculation_type'] as $typeKey) {
+                    if (! array_key_exists($typeKey, $line)) {
+                        $line[$typeKey] = PurchaseAdjustmentCalculationType::Fixed->value;
+                    }
+                }
+                foreach (['discount_rate', 'discount_amount', 'charge_rate', 'charge_amount'] as $decimalKey) {
+                    if (! array_key_exists($decimalKey, $line)) {
+                        $line[$decimalKey] = '0.000000';
+                    }
+                }
+            }
+        }
+        unset($line);
     }
 
     /**
@@ -919,7 +1007,7 @@ final class FastPurchaseService
             if (! is_array($line)) {
                 continue;
             }
-            foreach (['line_total', 'tax_amount', 'withholding_amount', 'base_quantity', 'base_uom_quantity', 'finance_account_id', 'status'] as $key) {
+            foreach (['line_total', 'line_subtotal', 'tax_calculation_type', 'tax_rate', 'tax_amount', 'withholding_amount', 'base_quantity', 'base_uom_quantity', 'finance_account_id', 'status'] as $key) {
                 if (array_key_exists($key, $line)) {
                     throw new InvalidArgumentException('Fast purchase line totals, statuses, base quantities, and finance accounts are server controlled.');
                 }

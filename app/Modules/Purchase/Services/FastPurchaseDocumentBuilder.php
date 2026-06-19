@@ -65,6 +65,7 @@ final class FastPurchaseDocumentBuilder
                 orderedQuantity: $line['quantity'],
                 discountAmount: $line['discount_amount'],
                 taxAmount: $line['non_withholding_tax_amount'],
+                chargeAmount: $line['charge_amount'],
             );
         }
 
@@ -106,6 +107,7 @@ final class FastPurchaseDocumentBuilder
                 uomId: $line['uom_id'],
                 discountAmount: $line['discount_amount'],
                 taxAmount: $line['non_withholding_tax_amount'],
+                chargeAmount: $line['charge_amount'],
                 metadata: [
                     'fast_purchase' => true,
                     'supplier_reference' => $resolved['supplier_reference'],

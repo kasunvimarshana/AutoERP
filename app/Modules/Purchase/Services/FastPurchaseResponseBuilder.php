@@ -95,6 +95,7 @@ final class FastPurchaseResponseBuilder
     private function linePreview(array $line): array
     {
         return [
+            'client_line_key' => $line['client_line_key'] ?? null,
             'line_number' => $line['line_number'],
             'item' => $this->modelSummary($line['item'], ['code', 'sku', 'name']),
             'uom' => $this->modelSummary($line['uom'], ['code', 'name', 'symbol']),
@@ -103,9 +104,16 @@ final class FastPurchaseResponseBuilder
             'quantity' => $line['quantity'],
             'base_quantity' => $line['base_quantity'],
             'unit_cost' => $line['unit_cost'],
+            'line_subtotal' => $line['line_subtotal'],
+            'discount_calculation_type' => $this->enumValue($line['discount_calculation_type'] ?? null),
+            'discount_rate' => $line['discount_rate'] ?? '0.000000',
             'discount_amount' => $line['discount_amount'],
+            'tax_group_id' => $line['tax_group_id'],
             'tax_amount' => $line['non_withholding_tax_amount'],
             'withholding_amount' => $line['withholding_amount'],
+            'charge_calculation_type' => $this->enumValue($line['charge_calculation_type'] ?? null),
+            'charge_rate' => $line['charge_rate'] ?? '0.000000',
+            'charge_amount' => $line['charge_amount'],
             'line_total' => $line['line_total'],
             'taxes' => $line['taxes'],
         ];

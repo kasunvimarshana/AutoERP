@@ -567,14 +567,20 @@ export interface FastPurchasePayload {
         record_payment_now: boolean;
     };
     lines: Array<{
+        client_line_key?: string;
         item_id: number;
         item_variant_id?: number;
         description?: string;
         uom_id?: number;
         quantity: string;
         unit_cost?: string;
+        discount_calculation_type?: 'fixed' | 'percentage';
+        discount_rate?: string;
         discount_amount?: string;
         tax_group_id?: number;
+        charge_calculation_type?: 'fixed' | 'percentage';
+        charge_rate?: string;
+        charge_amount?: string;
     }>;
     adjustments?: Array<{
         name: string;
@@ -627,6 +633,7 @@ export interface FastPurchaseDocumentReference {
 }
 
 export interface FastPurchaseLinePreview {
+    client_line_key?: string | null;
     line_number: number;
     item?: NamedResource | null;
     uom?: NamedResource | null;
@@ -635,10 +642,18 @@ export interface FastPurchaseLinePreview {
     quantity: string;
     base_quantity?: string;
     unit_cost: string;
+    line_subtotal?: string;
+    discount_calculation_type?: 'fixed' | 'percentage';
+    discount_rate?: string;
     discount_amount: string;
+    tax_group_id?: number | null;
     tax_amount: string;
     withholding_amount: string;
+    charge_calculation_type?: 'fixed' | 'percentage';
+    charge_rate?: string;
+    charge_amount?: string;
     line_total: string;
+    taxes?: Array<Record<string, unknown>>;
 }
 
 export interface FastPurchaseResult {

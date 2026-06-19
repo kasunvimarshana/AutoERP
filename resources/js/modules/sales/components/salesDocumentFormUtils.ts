@@ -36,12 +36,13 @@ export function lineFromDocument(
         : null;
 
     return {
+        client_key: `sales-line-${'id' in line && line.id ? line.id : `${Date.now()}-${Math.random()}`}`,
         item: asResource(line.item),
         item_variant: asResource('item_variant' in line ? line.item_variant : null),
         item_variant_id: itemVariantId,
         uom: asResource(line.uom),
         description: line.description ?? '',
-        ordered_quantity: line.quantity ?? line.ordered_quantity ?? '1.000000',
+        quantity: line.quantity ?? line.ordered_quantity ?? '1.000000',
         unit_price: line.unit_price,
         discount_calculation_type: line.discount_calculation_type ?? 'fixed',
         discount_rate: line.discount_rate ?? '0.000000',
@@ -49,6 +50,7 @@ export function lineFromDocument(
         tax_calculation_type: line.tax_calculation_type ?? 'fixed',
         tax_rate: line.tax_rate ?? '0.000000',
         tax_amount: line.tax_amount,
+        tax_group_id: '',
         charge_calculation_type: line.charge_calculation_type ?? 'fixed',
         charge_rate: line.charge_rate ?? '0.000000',
         charge_amount: line.charge_amount,

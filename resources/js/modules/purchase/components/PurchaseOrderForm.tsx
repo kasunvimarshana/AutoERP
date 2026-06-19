@@ -25,6 +25,7 @@ import { PurchaseOrderSummaryPanel, type PurchaseTotals } from './PurchaseOrderS
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
 import { PurchaseDocumentShell, PurchasePageHeader } from './PurchaseDocumentShell';
 import { PurchaseTabs, type PurchaseTabItem } from './PurchaseTabs';
+import { purchaseOrderLineFromResource, purchaseOrderLineToPayload } from './purchaseLineAdapters';
 
 interface HeaderState {
     purchase_order_date: string;
@@ -41,29 +42,6 @@ const tabs: PurchaseTabItem[] = [
 
 function resourceOrNull(resource: NamedResource | null | undefined): NamedResource | null {
     return resource?.id ? resource : null;
-}
-
-function lineFromOrder(line: NonNullable<PurchaseOrder['lines']>[number]): EditablePurchaseLine {
-    return {
-        item: resourceOrNull(line.item),
-        item_variant: resourceOrNull(line.item_variant),
-        item_variant_id: line.item_variant_id ?? line.item_variant?.id ?? null,
-        uom: resourceOrNull(line.uom),
-        description: line.description ?? '',
-        ordered_quantity: line.ordered_quantity,
-        unit_price: line.unit_price,
-        discount_calculation_type: line.discount_calculation_type ?? 'fixed',
-        discount_rate: line.discount_rate ?? '0.000000',
-        discount_amount: line.discount_amount,
-        tax_calculation_type: line.tax_calculation_type ?? 'fixed',
-        tax_rate: line.tax_rate ?? '0.000000',
-        tax_amount: line.tax_amount,
-        charge_calculation_type: line.charge_calculation_type ?? 'fixed',
-        charge_rate: line.charge_rate ?? '0.000000',
-        charge_amount: line.charge_amount,
-        auto_price: false,
-        auto_uom: false,
-    };
 }
 
 function adjustmentFromOrder(adjustment: NonNullable<PurchaseOrder['adjustments']>[number]): EditableHeaderAdjustment {
@@ -139,7 +117,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const [exchangeRateSource, setExchangeRateSource] = useState('');
     const [warehouseSource, setWarehouseSource] = useState('');
     const [locationSource, setLocationSource] = useState('');
-    const [lines, setLinesState] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(lineFromOrder) : []);
+    const [lines, setLinesState] = useState<EditablePurchaseLine[]>(order?.lines?.length ? order.lines.map(purchaseOrderLineFromResource) : []);
     const [adjustments, setAdjustmentsState] = useState<EditableHeaderAdjustment[]>(order?.adjustments?.length ? order.adjustments.map(adjustmentFromOrder) : []);
     const [submitting, setSubmitting] = useState(false);
     const [dirty, setDirty] = useState(false);
@@ -276,23 +254,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         expected_delivery_date: header.expected_delivery_date || undefined,
         exchange_rate: decimalOr(header.exchange_rate, '1.000000'),
         notes: header.notes || undefined,
-        lines: lines.map((line) => ({
-            item_id: line.item?.id ?? 0,
-            item_variant_id: line.item_variant_id ?? line.item_variant?.id ?? undefined,
-            uom_id: line.uom?.id ?? 0,
-            description: line.description || undefined,
-            ordered_quantity: decimalOr(line.ordered_quantity),
-            unit_price: decimalOr(line.unit_price),
-            discount_calculation_type: line.discount_calculation_type,
-            discount_rate: decimalOr(line.discount_rate),
-            discount_amount: decimalOr(line.discount_amount),
-            tax_calculation_type: line.tax_calculation_type,
-            tax_rate: decimalOr(line.tax_rate),
-            tax_amount: decimalOr(line.tax_amount),
-            charge_calculation_type: line.charge_calculation_type,
-            charge_rate: decimalOr(line.charge_rate),
-            charge_amount: decimalOr(line.charge_amount),
-        })),
+        lines: lines.map(purchaseOrderLineToPayload),
         adjustments: adjustments.map((adjustment, index) => ({
             name: adjustment.name,
             adjustment_type: adjustment.adjustment_type,

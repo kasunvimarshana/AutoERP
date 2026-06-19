@@ -119,7 +119,7 @@ export function SalesDocumentForm({
                 item_id: line.item?.id ?? 0,
                 uom_id: line.uom?.id ?? 0,
                 description: line.description || undefined,
-                quantity: line.ordered_quantity,
+                quantity: line.quantity,
                 unit_price: line.unit_price,
                 discount_calculation_type: line.discount_calculation_type,
                 discount_rate: line.discount_rate,

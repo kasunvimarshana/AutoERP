@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Audit\Models\AuditLogModel;
+use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\PostingContext;
@@ -243,6 +244,89 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame('135.000000', (string) InvoiceBalance::query()->firstOrFail()->remaining_amount);
     }
 
+    public function test_preview_recalculates_discount_and_charge_without_persisting_documents(): void
+    {
+        $context = $this->context();
+
+        $result = app(FastPurchaseService::class)->preview($this->payload($context, [
+            'supplier_reference' => 'FP-PREVIEW-PRICING',
+            'lines' => [[
+                'client_line_key' => 'line-preview-1',
+                'item_id' => $context['stock_item_id'],
+                'uom_id' => $context['uom_id'],
+                'quantity' => '2.000000',
+                'unit_cost' => '100.000000',
+                'discount_calculation_type' => 'percentage',
+                'discount_rate' => '10.000000',
+                'discount_amount' => '999.000000',
+                'charge_calculation_type' => 'fixed',
+                'charge_amount' => '5.000000',
+            ]],
+        ]));
+
+        $this->assertSame('line-preview-1', $result['lines'][0]['client_line_key']);
+        $this->assertSame('200.000000', $result['lines'][0]['line_subtotal']);
+        $this->assertSame('20.000000', $result['lines'][0]['discount_amount']);
+        $this->assertSame('5.000000', $result['lines'][0]['charge_amount']);
+        $this->assertSame('185.000000', $result['summary']['grand_total']);
+        $this->assertSame(0, GoodsReceiptNote::query()->count());
+        $this->assertSame(0, Invoice::query()->count());
+        $this->assertSame(0, Payment::query()->count());
+        $this->assertSame(0, AuditLogModel::query()->where('event', 'fast_purchase.completed')->count());
+    }
+
+    public function test_discount_and_charge_contract_matches_created_grn_and_invoice(): void
+    {
+        $context = $this->context();
+
+        $result = app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-LINE-PRICING',
+            'lines' => [[
+                'client_line_key' => 'line-create-1',
+                'item_id' => $context['stock_item_id'],
+                'uom_id' => $context['uom_id'],
+                'quantity' => '2.000000',
+                'unit_cost' => '100.000000',
+                'discount_calculation_type' => 'fixed',
+                'discount_amount' => '10.000000',
+                'charge_calculation_type' => 'percentage',
+                'charge_rate' => '10.000000',
+            ]],
+        ]));
+
+        $this->assertSame('10.000000', $result['summary']['discount_total']);
+        $this->assertSame('20.000000', $result['summary']['charge_total']);
+        $this->assertSame('210.000000', $result['summary']['grand_total']);
+        $math = app(DecimalMath::class);
+        $this->assertSame('20.000000', $math->normalize((string) DB::table('goods_receipt_note_lines')->value('charge_amount')));
+        $this->assertSame('20.000000', $math->normalize((string) DB::table('invoice_lines')->value('charge_amount')));
+    }
+
+    public function test_item_variant_must_match_selected_fast_purchase_item(): void
+    {
+        $context = $this->context();
+        $otherItem = $this->item($context['tenant_id'], 'ITEM-VAR-OTHER', ItemType::Stock, true, $context['uom_id']);
+        $otherVariantId = $this->itemVariant($context['tenant_id'], (int) $otherItem->getKey(), 'VAR-OTHER');
+
+        try {
+            app(FastPurchaseService::class)->preview($this->payload($context, [
+                'lines' => [[
+                    'item_id' => $context['stock_item_id'],
+                    'item_variant_id' => $otherVariantId,
+                    'uom_id' => $context['uom_id'],
+                    'quantity' => '1.000000',
+                    'unit_cost' => '100.000000',
+                ]],
+            ]));
+            $this->fail('Expected item variant validation to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'The selected item variant does not belong to the selected item.',
+                $exception->errors()['lines.0.item_variant_id'][0] ?? null,
+            );
+        }
+    }
+
     public function test_supplier_reference_makes_submission_idempotent_and_rejects_different_payloads(): void
     {
         $context = $this->context();
@@ -265,6 +349,30 @@ final class FastPurchaseTest extends TestCase
                 'discount_amount' => '0.000000',
             ]],
         ]));
+    }
+
+    public function test_client_line_key_does_not_change_fast_purchase_idempotency_hash(): void
+    {
+        $context = $this->context();
+        $payload = $this->payload($context, [
+            'supplier_reference' => 'FP-CLIENT-KEY-IDEMPOTENT',
+            'lines' => [[
+                'client_line_key' => 'first-client-key',
+                'item_id' => $context['stock_item_id'],
+                'uom_id' => $context['uom_id'],
+                'quantity' => '5.000000',
+                'unit_cost' => '100.000000',
+                'discount_amount' => '0.000000',
+            ]],
+        ]);
+
+        $first = app(FastPurchaseService::class)->create($payload);
+        $payload['lines'][0]['client_line_key'] = 'second-client-key';
+        $second = app(FastPurchaseService::class)->create($payload);
+
+        $this->assertSame($first['documents']['goods_receipt']['id'], $second['documents']['goods_receipt']['id']);
+        $this->assertSame(1, GoodsReceiptNote::query()->count());
+        $this->assertSame(1, Invoice::query()->count());
     }
 
     public function test_transaction_rolls_back_when_finance_posting_fails(): void
@@ -476,6 +584,19 @@ final class FastPurchaseTest extends TestCase
             baseUomId: $uomId,
             isStockable: $stockable,
         ));
+    }
+
+    private function itemVariant(int $tenantId, int $itemId, string $code): int
+    {
+        return (int) DB::table('item_variants')->insertGetId([
+            'tenant_id' => $tenantId,
+            'item_id' => $itemId,
+            'code' => $code.'-'.Str::upper(Str::random(4)),
+            'name' => 'Variant '.$code,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**
