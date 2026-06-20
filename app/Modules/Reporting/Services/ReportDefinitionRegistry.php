@@ -13,7 +13,6 @@ final class ReportDefinitionRegistry
         private readonly ReportCatalog $catalog,
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
-        private readonly EmployeeIncentiveReportService $employeeIncentives,
     ) {}
 
     /**
@@ -54,7 +53,6 @@ final class ReportDefinitionRegistry
         return [
             $this->detailedPurchase->definition(),
             $this->detailedVehicleService->definition(),
-            $this->employeeIncentives->definition(),
         ];
     }
 }

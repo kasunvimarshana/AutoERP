@@ -45,25 +45,31 @@ const jobStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced
 const invoiceStatuses = ['draft', 'approved', 'posted', 'partially_paid', 'paid', 'cancelled', 'void'];
 const paymentStatuses = ['draft', 'pending_approval', 'approved', 'posted', 'partially_allocated', 'fully_allocated', 'refunded', 'allocated', 'void', 'reversed', 'cancelled'];
 const commissionTypes = ['none', 'fixed', 'percentage'];
+const commissionSources = ['technician', 'supervisor'];
+const commissionStatuses = ['pending', 'earned', 'cancelled'];
+const roleTypes = ['technician', 'helper', 'inspector', 'custom', 'supervisor'];
 const enumOptions = (values: string[]) => values.map((value) => ({ value, label: humanize(value) }));
 
 const columns: Array<{ key: string; label: string; sort?: string; numeric?: boolean }> = [
     { key: 'employee', label: 'Employee', sort: 'employee' },
     { key: 'department', label: 'Department', sort: 'department' },
     { key: 'designation', label: 'Designation', sort: 'designation' },
+    { key: 'commission_source', label: 'Source', sort: 'commission_source' },
+    { key: 'role_type', label: 'Role', sort: 'role_type' },
     { key: 'job', label: 'Job', sort: 'job_number' },
     { key: 'job_date', label: 'Date', sort: 'job_date' },
     { key: 'customer', label: 'Customer', sort: 'customer' },
     { key: 'vehicle', label: 'Vehicle', sort: 'vehicle' },
-    { key: 'role_type', label: 'Role', sort: 'role_type' },
     { key: 'assigned_hours', label: 'Hours', sort: 'assigned_hours', numeric: true },
     { key: 'rate', label: 'Rate', sort: 'rate', numeric: true },
-    { key: 'labour_amount', label: 'Labour', sort: 'labour_amount', numeric: true },
-    { key: 'commission_type', label: 'Commission type', sort: 'commission_type' },
+    { key: 'labour_amount', label: 'Labour value', sort: 'labour_amount', numeric: true },
+    { key: 'commission_base', label: 'Commission base', sort: 'commission_base', numeric: true },
+    { key: 'commission_type', label: 'Type', sort: 'commission_type' },
     { key: 'commission_value', label: 'Value', sort: 'commission_value', numeric: true },
     { key: 'commission_amount', label: 'Commission', sort: 'commission_amount', numeric: true },
-    { key: 'invoice_status', label: 'Invoice' },
-    { key: 'payment_status', label: 'Payment' },
+    { key: 'commission_status', label: 'Commission status', sort: 'commission_status' },
+    { key: 'invoice_progress', label: 'Invoice progress' },
+    { key: 'payment_progress', label: 'Payment progress' },
     { key: 'job_status', label: 'Job status', sort: 'job_status' },
 ];
 
@@ -167,7 +173,7 @@ export default function EmployeeCommissionReportPage() {
         <>
             <ContentHeader
                 title="Employee Commission Report"
-                description="Vehicle service labour contribution and stored employee commission earnings."
+                description="Technician and supervisor commissions from Vehicle Service jobs, with earned/pending and invoice/payment progress."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} title="Could not load employee commission report" />
@@ -187,6 +193,7 @@ export default function EmployeeCommissionReportPage() {
                                     { value: 'department', label: 'Department' },
                                     { value: 'designation', label: 'Designation' },
                                     { value: 'supervisor', label: 'Supervisor' },
+                                    { value: 'commission_source', label: 'Commission source' },
                                 ]}
                                 onChange={(event) => updateDraft({ group_by: event.target.value as EmployeeCommissionReportParams['group_by'] })}
                             />
@@ -245,7 +252,11 @@ export default function EmployeeCommissionReportPage() {
                             <Select label="Job status" value={draft.job_status ?? ''} options={enumOptions(jobStatuses)} onChange={(event) => updateDraft({ job_status: event.target.value })} />
                             <Select label="Invoice status" value={draft.invoice_status ?? ''} options={enumOptions(invoiceStatuses)} onChange={(event) => updateDraft({ invoice_status: event.target.value })} />
                             <Select label="Payment status" value={draft.payment_status ?? ''} options={enumOptions(paymentStatuses)} onChange={(event) => updateDraft({ payment_status: event.target.value })} />
+                            <Select label="Commission source" value={draft.commission_source ?? ''} options={enumOptions(commissionSources)} onChange={(event) => updateDraft({ commission_source: event.target.value as EmployeeCommissionReportParams['commission_source'] })} />
+                            <Select label="Role" value={draft.role_type ?? ''} options={enumOptions(roleTypes)} onChange={(event) => updateDraft({ role_type: event.target.value })} />
                             <Select label="Commission type" value={draft.commission_type ?? ''} options={enumOptions(commissionTypes)} onChange={(event) => updateDraft({ commission_type: event.target.value })} />
+                            <Select label="Commission status" value={draft.commission_status ?? ''} options={enumOptions(commissionStatuses)} onChange={(event) => updateDraft({ commission_status: event.target.value as EmployeeCommissionReportParams['commission_status'] })} />
+                            <Select label="Include cancelled" value={draft.include_cancelled ? '1' : '0'} options={[{ value: '0', label: 'No' }, { value: '1', label: 'Yes' }]} onChange={(event) => updateDraft({ include_cancelled: event.target.value === '1' })} />
                             <Input label="Organization unit" value={organizationUnit?.name ?? (organizationUnit?.id ? `Organization ${organizationUnit.id}` : 'Global')} disabled />
                             <Select
                                 label="Rows per page"
@@ -265,7 +276,7 @@ export default function EmployeeCommissionReportPage() {
 
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div className="text-sm text-slate-500">
-                        {loading ? 'Refreshing...' : `${result?.meta?.total ?? 0} employee assignments`}
+                        {loading ? 'Refreshing...' : `${result?.meta?.total ?? 0} commission entries`}
                     </div>
                     <ExportActions reportKey={reportKey} params={exportParams} />
                 </div>
@@ -297,17 +308,22 @@ export default function EmployeeCommissionReportPage() {
 function SummaryCards({ result }: { result: EmployeeCommissionReportResult }) {
     const summary = result.summary;
     const cards = [
-        ['Total jobs', String(summary.total_jobs)],
-        ['Total hours', formatQuantity(summary.total_hours)],
-        ['Labour value', formatMoney(summary.total_labour_value)],
+        ['Entries', String(summary.total_entries)],
+        ['Employees', String(summary.total_employees)],
+        ['Jobs', String(summary.total_jobs)],
+        ['Hours', formatQuantity(summary.total_hours)],
+        ['Commission base', formatMoney(summary.total_commission_base)],
+        ['Technician commission', formatMoney(summary.technician_commission)],
+        ['Supervisor commission', formatMoney(summary.supervisor_commission)],
         ['Total commission', formatMoney(summary.total_commission)],
-        ['Avg commission / job', formatMoney(summary.average_commission_per_job)],
-        ['Avg commission / hour', formatMoney(summary.average_commission_per_hour)],
+        ['Earned', formatMoney(summary.earned_commission)],
+        ['Pending', formatMoney(summary.pending_commission)],
+        ['Cancelled (excluded)', formatMoney(summary.cancelled_commission)],
     ];
 
     return (
         <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {cards.map(([label, value]) => (
                     <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
@@ -353,7 +369,7 @@ function GroupedTable({ rows, groups, sortKey, direction, onSort, onEmployee }: 
     return (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-                <table className="min-w-[1850px] divide-y divide-slate-200 text-left text-sm">
+                <table className="min-w-[2250px] divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                         <tr>
                             {columns.map((column) => (
@@ -391,19 +407,22 @@ function GroupedTable({ rows, groups, sortKey, direction, onSort, onEmployee }: 
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-3">{row.department_name || '-'}</td>
                                     <td className="whitespace-nowrap px-3 py-3">{row.designation_name || '-'}</td>
-                                    <td className="whitespace-nowrap px-3 py-3"><Link className="text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job?.id}`}>{row.job_number}</Link></td>
+                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.commission_source)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.role_type)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3"><Link className="text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link></td>
                                     <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
                                     <td className="whitespace-nowrap px-3 py-3">{row.customer_name || '-'}</td>
                                     <td className="whitespace-nowrap px-3 py-3">{row.vehicle_label || '-'}</td>
-                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.role_type)}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-right">{formatQuantity(row.assigned_hours)}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.rate)}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.labour_amount)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.commission_base)}</td>
                                     <td className="whitespace-nowrap px-3 py-3">{humanize(row.commission_type)}</td>
-                                    <td className="whitespace-nowrap px-3 py-3 text-right">{formatQuantity(row.commission_value, 6)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3 text-right">{formatCommissionValue(row)}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatMoney(row.commission_amount)}</td>
-                                    <td className="whitespace-nowrap px-3 py-3">{statusLink(row.invoice, row.invoice_status, 'invoices')}</td>
-                                    <td className="whitespace-nowrap px-3 py-3">{statusLink(row.payment, row.payment_status, 'payments')}</td>
+                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.commission_status)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.invoice_progress)}</td>
+                                    <td className="whitespace-nowrap px-3 py-3">{humanize(row.payment_progress)}</td>
                                     <td className="whitespace-nowrap px-3 py-3">{humanize(row.job_status)}</td>
                                 </tr>,
                             ];
@@ -447,14 +466,18 @@ function EmployeeDrillDown({ row, group, onClose, onFocus }: {
                             </dl>
                         </Panel>
                     )}
-                    <Panel title="Selected assignment">
+                    <Panel title="Selected commission">
                         <dl className="grid gap-3 sm:grid-cols-2">
                             <Detail label="Job" value={row.job_number} />
                             <Detail label="Date" value={formatDate(row.job_date)} />
-                            <Detail label="Labour" value={formatMoney(row.labour_amount)} />
+                            <Detail label="Source" value={humanize(row.commission_source)} />
+                            <Detail label="Commission status" value={humanize(row.commission_status)} />
+                            <Detail label="Labour value" value={formatMoney(row.labour_amount)} />
+                            <Detail label="Commission base" value={formatMoney(row.commission_base)} />
                             <Detail label="Commission" value={formatMoney(row.commission_amount)} />
-                            <Detail label="Invoice" value={humanize(row.invoice_status)} />
-                            <Detail label="Payment" value={humanize(row.payment_status)} />
+                            <Detail label="Invoice progress" value={humanize(row.invoice_progress)} />
+                            <Detail label="Payment progress" value={humanize(row.payment_progress)} />
+                            <Detail label="Balance due" value={formatMoney(row.balance_due)} />
                         </dl>
                     </Panel>
                 </div>
@@ -467,9 +490,11 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
     return <div><dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt><dd className="mt-1 text-slate-900">{value || '-'}</dd></div>;
 }
 
-function statusLink(resource: EmployeeCommissionReportRow['invoice'], status: string | null, path: string) {
-    if (!resource) return humanize(status);
-    return <Link className="text-sky-700 hover:underline" to={`/${path}/${resource.id}`}>{humanize(status)}</Link>;
+
+function formatCommissionValue(row: EmployeeCommissionReportRow): string {
+    if (row.commission_type === 'percentage') return `${formatQuantity(row.commission_value, 6)}%`;
+    if (row.commission_type === 'fixed') return formatMoney(row.commission_value);
+    return '-';
 }
 
 function employeeLookupValue(row: EmployeeCommissionReportRow): EmployeeLookupOption {

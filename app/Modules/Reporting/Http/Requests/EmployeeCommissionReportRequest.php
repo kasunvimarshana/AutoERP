@@ -26,7 +26,7 @@ final class EmployeeCommissionReportRequest extends TenantScopedRequest
             'search' => ['nullable', 'string', 'max:150'],
             'sort' => ['nullable', 'string', 'max:80'],
             'direction' => ['nullable', 'in:asc,desc'],
-            'group_by' => ['nullable', Rule::in(['employee', 'department', 'designation', 'supervisor'])],
+            'group_by' => ['nullable', Rule::in(['employee', 'department', 'designation', 'supervisor', 'commission_source'])],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'employee_id' => ['nullable', 'integer', 'min:1'],
@@ -39,6 +39,10 @@ final class EmployeeCommissionReportRequest extends TenantScopedRequest
             'invoice_status' => ['nullable', Rule::enum(InvoiceStatus::class)],
             'payment_status' => ['nullable', Rule::enum(PaymentStatus::class)],
             'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
+            'commission_source' => ['nullable', Rule::in(['technician', 'supervisor'])],
+            'role_type' => ['nullable', Rule::in(['technician', 'helper', 'inspector', 'custom', 'supervisor'])],
+            'commission_status' => ['nullable', Rule::in(['pending', 'earned', 'cancelled'])],
+            'include_cancelled' => ['nullable', 'boolean'],
         ];
     }
 }

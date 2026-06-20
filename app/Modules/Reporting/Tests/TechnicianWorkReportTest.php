@@ -146,49 +146,64 @@ final class TechnicianWorkReportTest extends TestCase
     {
         $context = $this->context('COM');
         $other = $this->alternateResources($context, 'COM-ALT');
-        $job = $this->createJob($context, date: '2026-06-04');
+        $job = $this->createJob(
+            $context,
+            date: '2026-06-04',
+            supervisorCommissionType: VehicleServiceCommissionType::Fixed,
+            supervisorCommissionValue: '25.000000',
+        );
         $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Commission labour');
         $top = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
         $helper = $this->assignment($job, $line, $other['employee_id'], 'helper', '1.000000', '40.000000', VehicleServiceCommissionType::Fixed, '10.000000');
         $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted, PaymentStatus::Allocated);
 
-        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+        $response = $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
-            'group_by' => 'department',
+            'group_by' => 'employee',
         ]))
             ->assertOk()
-            ->assertJsonPath('data.0.id', (int) $top->getKey())
-            ->assertJsonPath('data.0.employee.code', 'EMP-COM')
-            ->assertJsonPath('data.0.department.name', 'Department COM')
-            ->assertJsonPath('data.0.designation.name', 'Designation COM')
-            ->assertJsonPath('data.0.job.name', (string) $job->job_number)
-            ->assertJsonPath('data.0.customer.name', 'Customer CUS-COM')
-            ->assertJsonPath('data.0.vehicle.name', 'REG-VEH-COM')
-            ->assertJsonPath('data.0.role_type', 'technician')
-            ->assertJsonPath('data.0.assigned_hours', '2.000000')
-            ->assertJsonPath('data.0.rate', '50.000000')
-            ->assertJsonPath('data.0.labour_amount', '100.000000')
-            ->assertJsonPath('data.0.commission_amount', '30.000000')
-            ->assertJsonPath('data.0.invoice_status', 'posted')
-            ->assertJsonPath('data.0.payment_status', 'allocated')
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('summary.total_entries', 3)
+            ->assertJsonPath('summary.total_employees', 3)
             ->assertJsonPath('summary.total_jobs', 1)
             ->assertJsonPath('summary.total_hours', '3.000000')
             ->assertJsonPath('summary.total_labour_value', '140.000000')
-            ->assertJsonPath('summary.total_commission', '40.000000')
-            ->assertJsonPath('summary.average_commission_per_job', '40.000000')
-            ->assertJsonPath('summary.average_commission_per_hour', '13.333333')
+            ->assertJsonPath('summary.total_commission_base', '600.000000')
+            ->assertJsonPath('summary.technician_commission', '40.000000')
+            ->assertJsonPath('summary.supervisor_commission', '25.000000')
+            ->assertJsonPath('summary.total_commission', '65.000000')
+            ->assertJsonPath('summary.average_commission_per_job', '65.000000')
+            ->assertJsonPath('summary.average_commission_per_hour', '21.666667')
             ->assertJsonPath('rankings.top_earning_employee.employee.code', 'EMP-COM')
             ->assertJsonPath('rankings.top_earning_employee.labour_value', '100.000000')
-            ->assertJsonPath('rankings.top_commission_employee.employee.code', 'EMP-COM')
-            ->assertJsonCount(2, 'groups');
+            ->assertJsonPath('rankings.top_commission_employee.employee.code', 'EMP-COM');
+
+        $response->assertJsonFragment([
+            'id' => 'supervisor-'.$job->getKey(),
+            'commission_source' => 'supervisor',
+            'employee_code' => 'SUP-COM',
+            'commission_base' => '200.000000',
+            'commission_amount' => '25.000000',
+        ]);
 
         $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
+            'commission_source' => 'technician',
             'sort' => 'labour_amount',
             'direction' => 'asc',
         ]))
             ->assertOk()
-            ->assertJsonPath('data.0.id', (int) $helper->getKey());
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('data.0.id', 'technician-'.$helper->getKey());
+
+        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context),
+            'commission_source' => 'supervisor',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.employee.code', 'SUP-COM')
+            ->assertJsonPath('data.0.commission_amount', '25.000000');
     }
 
     public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
@@ -232,6 +247,50 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertHeader('content-type', 'text/csv; charset=UTF-8')
             ->assertSee('Employee code')
             ->assertSee('EMP-COM-FILT');
+    }
+
+    public function test_employee_commission_report_excludes_cancelled_work_by_default(): void
+    {
+        $context = $this->context('COM-CANCEL');
+        $job = $this->createJob(
+            $context,
+            supervisorCommissionType: VehicleServiceCommissionType::Fixed,
+            supervisorCommissionValue: '50.000000',
+        );
+        $line = $this->line($job, $context['labour'], '1.000000', '100.000000', 'Cancelled commission');
+        $assignment = $this->assignment(
+            $job,
+            $line,
+            $context['employee_id'],
+            'technician',
+            '1.000000',
+            '100.000000',
+            VehicleServiceCommissionType::Fixed,
+            '20.000000',
+        );
+        $job->forceFill(['status' => VehicleServiceJobStatus::Cancelled])->save();
+
+        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 0)
+            ->assertJsonPath('summary.total_commission', '0.000000');
+
+        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context),
+            'include_cancelled' => true,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('summary.total_commission', '0.000000')
+            ->assertJsonPath('summary.cancelled_commission', '70.000000')
+            ->assertJsonFragment([
+                'id' => 'technician-'.$assignment->getKey(),
+                'commission_status' => 'cancelled',
+            ])
+            ->assertJsonFragment([
+                'id' => 'supervisor-'.$job->getKey(),
+                'commission_status' => 'cancelled',
+            ]);
     }
 
     public function test_existing_generic_and_specialized_pdf_export_endpoints_keep_working(): void

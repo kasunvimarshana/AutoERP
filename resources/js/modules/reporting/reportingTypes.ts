@@ -105,7 +105,7 @@ export type TechnicianWorkReportResult = ApiCollection<TechnicianWorkReportRow> 
     summary: TechnicianWorkReportSummary;
 };
 
-export type EmployeeCommissionGroupBy = 'employee' | 'department' | 'designation' | 'supervisor';
+export type EmployeeCommissionGroupBy = 'employee' | 'department' | 'designation' | 'supervisor' | 'commission_source';
 
 export interface EmployeeCommissionReportParams {
     page?: number;
@@ -126,6 +126,10 @@ export interface EmployeeCommissionReportParams {
     invoice_status?: string;
     payment_status?: string;
     commission_type?: string;
+    commission_source?: 'technician' | 'supervisor' | '';
+    role_type?: string;
+    commission_status?: 'pending' | 'earned' | 'cancelled' | '';
+    include_cancelled?: boolean;
 }
 
 export interface EmployeeCommissionEmployee extends NamedResource {
@@ -134,46 +138,60 @@ export interface EmployeeCommissionEmployee extends NamedResource {
 }
 
 export interface EmployeeCommissionReportRow {
-    id: number;
-    employee: EmployeeCommissionEmployee | null;
+    id: string;
+    commission_source: 'technician' | 'supervisor';
+    employee: EmployeeCommissionEmployee;
     employee_code: string;
     employee_name: string;
     department: NamedResource | null;
     department_name: string;
     designation: NamedResource | null;
     designation_name: string;
-    job: NamedResource | null;
+    job: NamedResource;
     job_number: string;
     job_date: string | null;
     customer: NamedResource | null;
     customer_name: string;
     vehicle: NamedResource | null;
     vehicle_label: string;
-    supervisor: EmployeeCommissionEmployee | null;
+    supervisor: NamedResource | null;
     supervisor_name: string;
     line_description: string;
     role_type: string;
     assigned_hours: string;
     rate: string;
     labour_amount: string;
-    commission_type: string | null;
+    commission_base: string;
+    commission_type: string;
     commission_value: string;
     commission_amount: string;
-    invoice: NamedResource | null;
-    invoice_status: string | null;
-    payment: NamedResource | null;
-    payment_status: string | null;
-    job_status: string | null;
+    commission_status: string;
+    completed_at: string | null;
+    invoice_progress: string;
+    payment_progress: string;
+    invoice_total: string;
+    paid_total: string;
+    balance_due: string;
+    job_status: string;
     group_key: string;
     group_label: string;
 }
 
 export interface EmployeeCommissionSummary {
+    total_entries: number;
+    total_employees: number;
     total_jobs: number;
     total_hours: string;
     total_labour_value: string;
+    total_commission_base: string;
+    technician_commission: string;
+    supervisor_commission: string;
+    earned_commission: string;
+    pending_commission: string;
+    cancelled_commission: string;
     total_commission: string;
     average_commission_per_job: string;
+    average_commission_per_employee: string;
     average_commission_per_hour: string;
 }
 
