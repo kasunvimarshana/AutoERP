@@ -26,7 +26,7 @@ final class TenantDomainSeeder extends Seeder
         }
 
         DB::transaction(function () use ($tenant): void {
-            $domains = ['localhost', '127.0.0.1', 'autoerp.local', 'autoerp.test', 'autoer.tapromall.com', 'attours.tapromall.com'];
+            $domains = ['localhost', '127.0.0.1', 'autoerp.local', 'autoerp.test', 'autoerp.tapromall.com', 'attours.tapromall.com'];
 
             foreach ($domains as $index => $domain) {
                 TenantDomainModel::query()->updateOrCreate(
