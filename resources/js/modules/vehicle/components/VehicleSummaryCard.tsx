@@ -3,8 +3,8 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { Vehicle } from '../vehicleTypes';
 
 export function VehicleSummaryCard({ vehicle }: { vehicle: Vehicle }) {
-    const currentCustomer = vehicle.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner;
-    const currentSupplier = vehicle.current_ownerships?.find((ownership) => ['supplier', 'owner'].includes(ownership.owner_type))?.owner;
+    const currentCustomer = vehicle.current_customer;
+    const currentSupplier = vehicle.current_supplier;
     const hasCompanyOwnership = vehicle.current_ownerships?.some((ownership) => ownership.owner_type === 'company');
     const ownershipLabel = currentCustomer?.name ?? currentSupplier?.name ?? (hasCompanyOwnership ? 'Company Owned' : '-');
 

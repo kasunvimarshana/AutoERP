@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Customer\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Models\CoreModel;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Vehicle\Models\Vehicle;
+
+final class CustomerVehicle extends CoreModel
+{
+    protected $table = 'customer_vehicles';
+
+    protected $guarded = ['id', 'tenant_id', 'organization_unit_id', 'current_guard', 'active_guard'];
+
+    protected function casts(): array
+    {
+        return ['tenant_id' => 'integer', 'organization_unit_id' => 'integer', 'customer_id' => 'integer', 'vehicle_id' => 'integer', 'started_at' => 'datetime', 'ended_at' => 'datetime', 'is_current' => 'boolean'];
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class)->withTrashed();
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class)->withTrashed();
+    }
+
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+    }
+
+    public function scopeCurrent(Builder $query): Builder
+    {
+        return $query->where('is_current', true);
+    }
+}

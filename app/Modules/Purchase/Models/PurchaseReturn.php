@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
@@ -56,7 +56,7 @@ final class PurchaseReturn extends CoreModel
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class, 'supplier_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withTrashed();
     }
 
     public function warehouse(): BelongsTo

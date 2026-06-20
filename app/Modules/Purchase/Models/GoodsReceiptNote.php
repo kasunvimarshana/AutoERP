@@ -45,7 +45,7 @@ final class GoodsReceiptNote extends CoreModel
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class, 'supplier_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withTrashed();
     }
 
     public function warehouse(): BelongsTo

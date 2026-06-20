@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Customer\Models\Customer;
+use Modules\Customer\Models\CustomerVehicle;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
 use Modules\Vehicle\Models\VehicleModel;
-use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\Vehicle\Models\VehicleType;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 
@@ -67,23 +67,23 @@ final class VehicleSeeder extends Seeder
                 ],
             );
 
-            if ($customer !== null && Schema::hasTable('vehicle_ownerships')) {
-                VehicleOwnership::query()->updateOrCreate(
+            if ($customer !== null && Schema::hasTable('customer_vehicles')) {
+                CustomerVehicle::query()->firstOrNew(
                     [
                         'vehicle_id' => $vehicle->getKey(),
-                        'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
-                        'owner_id' => $customer->getKey(),
-                        'is_current' => true,
+                        'customer_id' => $customer->getKey(),
+                        'active_guard' => 1,
                     ],
-                    [
-                        'tenant_id' => $tenantId,
-                        'organization_unit_id' => $organizationUnitId,
-                        'ownership_type' => 'customer_owned',
-                        'started_at' => '2026-01-01 00:00:00',
-                        'ended_at' => null,
-                        'notes' => 'Default customer ownership.',
-                    ],
-                );
+                )->forceFill([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'relationship_type' => 'customer_owned',
+                    'started_at' => '2026-01-01 00:00:00',
+                    'ended_at' => null,
+                    'is_current' => true,
+                    'current_guard' => 1,
+                    'notes' => 'Default customer ownership.',
+                ])->save();
             }
         }, 3);
     }

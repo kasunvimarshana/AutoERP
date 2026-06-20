@@ -108,6 +108,11 @@ final class Supplier extends CoreModel
         return $this->hasMany(SupplierStatusHistory::class, 'supplier_id');
     }
 
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(SupplierVehicle::class, 'supplier_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', SupplierStatus::Active);
@@ -118,7 +123,7 @@ final class Supplier extends CoreModel
         $query->where('tenant_id', $tenantId);
 
         return $organizationUnitId === null
-            ? $query
+            ? $query->whereNull('organization_unit_id')
             : $query->where(function (Builder $scope) use ($organizationUnitId): void {
                 $scope->whereNull('organization_unit_id')
                     ->orWhere('organization_unit_id', $organizationUnitId);

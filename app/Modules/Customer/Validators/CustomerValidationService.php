@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerValidationService
 {
@@ -103,7 +104,7 @@ final class CustomerValidationService
         $query = Customer::query()->withTrashed()->where('tenant_id', $tenantId)->where('code', $code);
         $this->ignoreKey($query, $ignoreId);
         if ($query->exists()) {
-            throw new InvalidArgumentException('Customer code already exists for this tenant.');
+            throw new ConflictHttpException('Customer code already exists for this tenant.');
         }
     }
 
@@ -112,7 +113,7 @@ final class CustomerValidationService
         $query = Customer::query()->withTrashed()->where('tenant_id', $tenantId)->where('customer_number', $number);
         $this->ignoreKey($query, $ignoreId);
         if ($query->exists()) {
-            throw new InvalidArgumentException('Customer number already exists for this tenant.');
+            throw new ConflictHttpException('Customer number already exists for this tenant.');
         }
     }
 
@@ -149,7 +150,8 @@ final class CustomerValidationService
         if ($recordTenantId !== $tenantId) {
             throw new InvalidArgumentException('Customer reference belongs to a different tenant.');
         }
-        if ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
+        if (($organizationUnitId === null && $recordOrganizationUnitId !== null)
+            || ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId)) {
             throw new InvalidArgumentException('Customer reference belongs to a different organization unit.');
         }
     }

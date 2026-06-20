@@ -1,0 +1,5 @@
+import { PartyVehicleListPage } from '@/modules/party-vehicle/PartyVehicleListPage';
+import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
+import { CustomerLookupSelect } from './components/CustomerLookupSelect';
+import { clearCustomerVehicleCurrent, endCustomerVehicle, listCustomerVehicles, setCustomerVehicleCurrent } from './customerApi';
+export default function CustomerVehicleListPage(){return <PartyVehicleListPage partyKey="customer" title="Customer Vehicles" createPath="/customer-vehicles/create" editPath={(id)=>`/customer-vehicles/${id}/edit`} permissions={{create:'customer-vehicles.create',update:'customer-vehicles.update',setCurrent:'customer-vehicles.set-current',clearCurrent:'customer-vehicles.clear-current',delete:'customer-vehicles.delete'}} PartyLookup={CustomerLookupSelect} VehicleLookup={VehicleLookupSelect} list={listCustomerVehicles} setCurrent={setCustomerVehicleCurrent} clearCurrent={clearCustomerVehicleCurrent} end={endCustomerVehicle}/>}

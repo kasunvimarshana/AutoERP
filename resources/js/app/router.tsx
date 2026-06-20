@@ -30,10 +30,14 @@ const SupplierListPage = lazy(() => import('@/modules/supplier/SupplierListPage'
 const SupplierCreatePage = lazy(() => import('@/modules/supplier/SupplierCreatePage'));
 const SupplierEditPage = lazy(() => import('@/modules/supplier/SupplierEditPage'));
 const SupplierDetailPage = lazy(() => import('@/modules/supplier/SupplierDetailPage'));
+const SupplierVehicleListPage = lazy(() => import('@/modules/supplier/SupplierVehicleListPage'));
+const SupplierVehicleFormPage = lazy(() => import('@/modules/supplier/SupplierVehicleFormPage'));
 const CustomerListPage = lazy(() => import('@/modules/customer/CustomerListPage'));
 const CustomerCreatePage = lazy(() => import('@/modules/customer/CustomerCreatePage'));
 const CustomerEditPage = lazy(() => import('@/modules/customer/CustomerEditPage'));
 const CustomerDetailPage = lazy(() => import('@/modules/customer/CustomerDetailPage'));
+const CustomerVehicleListPage = lazy(() => import('@/modules/customer/CustomerVehicleListPage'));
+const CustomerVehicleFormPage = lazy(() => import('@/modules/customer/CustomerVehicleFormPage'));
 const VehicleListPage = lazy(() => import('@/modules/vehicle/VehicleListPage'));
 const VehicleCreatePage = lazy(() => import('@/modules/vehicle/VehicleCreatePage'));
 const VehicleEditPage = lazy(() => import('@/modules/vehicle/VehicleEditPage'));
@@ -190,14 +194,20 @@ export function AppRouter() {
                     <Route path="/uom-conversions/create" element={<UomConversionForm />} />
                     <Route path="/uom-conversions/:id/edit" element={<UomConversionForm />} />
                     <Route path="/uom-convert" element={<UomConvertTool />} />
-                    <Route path="/suppliers" element={<SupplierListPage />} />
-                    <Route path="/suppliers/create" element={<SupplierCreatePage />} />
-                    <Route path="/suppliers/:id/edit" element={<SupplierEditPage />} />
-                    <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
-                    <Route path="/customers" element={<CustomerListPage />} />
-                    <Route path="/customers/create" element={<CustomerCreatePage />} />
-                    <Route path="/customers/:id/edit" element={<CustomerEditPage />} />
-                    <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                    <Route path="/suppliers" element={requirePermission('suppliers.view', <SupplierListPage />)} />
+                    <Route path="/suppliers/create" element={requirePermission('suppliers.create', <SupplierCreatePage />)} />
+                    <Route path="/suppliers/:id/edit" element={requirePermission('suppliers.update', <SupplierEditPage />)} />
+                    <Route path="/suppliers/:id" element={requirePermission('suppliers.view', <SupplierDetailPage />)} />
+                    <Route path="/supplier-vehicles" element={requirePermission('supplier-vehicles.view', <SupplierVehicleListPage />)} />
+                    <Route path="/supplier-vehicles/create" element={requirePermission('supplier-vehicles.create', <SupplierVehicleFormPage />)} />
+                    <Route path="/supplier-vehicles/:id/edit" element={requirePermission('supplier-vehicles.update', <SupplierVehicleFormPage />)} />
+                    <Route path="/customers" element={requirePermission('customers.view', <CustomerListPage />)} />
+                    <Route path="/customers/create" element={requirePermission('customers.create', <CustomerCreatePage />)} />
+                    <Route path="/customers/:id/edit" element={requirePermission('customers.update', <CustomerEditPage />)} />
+                    <Route path="/customers/:id" element={requirePermission('customers.view', <CustomerDetailPage />)} />
+                    <Route path="/customer-vehicles" element={requirePermission('customer-vehicles.view', <CustomerVehicleListPage />)} />
+                    <Route path="/customer-vehicles/create" element={requirePermission('customer-vehicles.create', <CustomerVehicleFormPage />)} />
+                    <Route path="/customer-vehicles/:id/edit" element={requirePermission('customer-vehicles.update', <CustomerVehicleFormPage />)} />
                     <Route path="/vehicles/makes" element={<VehicleMasterDataPage kind="makes" />} />
                     <Route path="/vehicles/types" element={<VehicleMasterDataPage kind="types" />} />
                     <Route path="/vehicles/categories" element={<VehicleMasterDataPage kind="categories" />} />

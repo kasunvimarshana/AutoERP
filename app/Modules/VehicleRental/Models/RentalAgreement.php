@@ -59,12 +59,12 @@ final class RentalAgreement extends CoreModel
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(Customer::class, 'party_id');
+        return $this->belongsTo(Customer::class, 'party_id')->withTrashed();
     }
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class, 'party_id');
+        return $this->belongsTo(Supplier::class, 'party_id')->withTrashed();
     }
 
     public function vehicles(): HasMany

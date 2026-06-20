@@ -19,6 +19,7 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\Supplier\Services\SupplierAuthorizationService;
 use Tests\TestCase;
 
 final class CoreModulesApiTest extends TestCase
@@ -29,6 +30,7 @@ final class CoreModulesApiTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware();
+        $this->mock(SupplierAuthorizationService::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes());
     }
 
     public function test_supplier_crud_lookup_validation_and_tenant_isolation(): void

@@ -6,6 +6,7 @@ namespace Modules\Customer\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Customer\Http\Requests\AssignCustomerCategoryRequest;
 use Modules\Customer\Http\Requests\ListCustomerRequest;
@@ -27,6 +28,7 @@ use Modules\Customer\Http\Resources\CustomerDocumentResource;
 use Modules\Customer\Http\Resources\CustomerStatusHistoryResource;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerAddressService;
+use Modules\Customer\Services\CustomerAuthorizationService;
 use Modules\Customer\Services\CustomerBankAccountService;
 use Modules\Customer\Services\CustomerCategoryService;
 use Modules\Customer\Services\CustomerContactService;
@@ -46,6 +48,7 @@ final class CustomerRelationController
         private readonly CustomerCategoryService $categoriesService,
         private readonly CustomerDocumentService $documentsService,
         private readonly CustomerCreditProfileService $creditProfilesService,
+        private readonly CustomerAuthorizationService $authorization,
     ) {}
 
     public function contacts(ListCustomerRequest $request, int $customer): AnonymousResourceCollection
@@ -64,6 +67,7 @@ final class CustomerRelationController
     public function updateContact(UpdateCustomerContactRequest $request, int $customer, int $contact): CustomerContactResource
     {
         $parent = $this->customer($request, $customer);
+
         return new CustomerContactResource($this->contactsService->update(
             $parent,
             $this->queries->contact($parent, $contact),
@@ -75,6 +79,7 @@ final class CustomerRelationController
     {
         $parent = $this->customer($request, $customer);
         $this->contactsService->delete($parent, $this->queries->contact($parent, $contact));
+
         return response()->json(null, 204);
     }
 
@@ -94,6 +99,7 @@ final class CustomerRelationController
     public function updateAddress(UpdateCustomerAddressRequest $request, int $customer, int $address): CustomerAddressResource
     {
         $parent = $this->customer($request, $customer);
+
         return new CustomerAddressResource($this->addressesService->update(
             $parent,
             $this->queries->address($parent, $address),
@@ -105,6 +111,7 @@ final class CustomerRelationController
     {
         $parent = $this->customer($request, $customer);
         $this->addressesService->delete($parent, $this->queries->address($parent, $address));
+
         return response()->json(null, 204);
     }
 
@@ -116,12 +123,14 @@ final class CustomerRelationController
     public function storeBankAccount(StoreCustomerBankAccountRequest $request, int $customer): JsonResponse
     {
         $account = $this->bankAccountsService->create($this->customer($request, $customer), $request->toData())->load('currency');
+
         return $this->created(new CustomerBankAccountResource($account));
     }
 
     public function updateBankAccount(UpdateCustomerBankAccountRequest $request, int $customer, int $bankAccount): CustomerBankAccountResource
     {
         $parent = $this->customer($request, $customer);
+
         return new CustomerBankAccountResource($this->bankAccountsService->update(
             $parent,
             $this->queries->bankAccount($parent, $bankAccount),
@@ -133,6 +142,7 @@ final class CustomerRelationController
     {
         $parent = $this->customer($request, $customer);
         $this->bankAccountsService->delete($parent, $this->queries->bankAccount($parent, $bankAccount));
+
         return response()->json(null, 204);
     }
 
@@ -152,6 +162,7 @@ final class CustomerRelationController
     public function deleteCategory(ListCustomerRequest $request, int $customer, int $category): JsonResponse
     {
         $this->categoriesService->detach($this->customer($request, $customer), $category);
+
         return response()->json(null, 204);
     }
 
@@ -171,6 +182,7 @@ final class CustomerRelationController
     public function updateDocument(UpdateCustomerDocumentRequest $request, int $customer, int $document): CustomerDocumentResource
     {
         $parent = $this->customer($request, $customer);
+
         return new CustomerDocumentResource($this->documentsService->update(
             $parent,
             $this->queries->document($parent, $document),
@@ -182,12 +194,14 @@ final class CustomerRelationController
     {
         $parent = $this->customer($request, $customer);
         $this->documentsService->delete($parent, $this->queries->document($parent, $document));
+
         return response()->json(null, 204);
     }
 
     public function creditProfile(ListCustomerRequest $request, int $customer): CustomerCreditProfileResource|JsonResponse
     {
         $profile = $this->creditProfilesService->get($this->customer($request, $customer));
+
         return $profile ? new CustomerCreditProfileResource($profile) : response()->json(['data' => null]);
     }
 
@@ -209,10 +223,12 @@ final class CustomerRelationController
 
     private function customer(TenantScopedRequest $request, int $customer): Customer
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), $request->isMethodSafe() ? CustomerAuthorizationService::VIEW : CustomerAuthorizationService::UPDATE);
+
         return $this->customers->customer($customer, $request->tenantId(), $request->organizationUnitId());
     }
 
-    private function created(\Illuminate\Http\Resources\Json\JsonResource $resource): JsonResponse
+    private function created(JsonResource $resource): JsonResponse
     {
         return $resource->response()->setStatusCode(201);
     }

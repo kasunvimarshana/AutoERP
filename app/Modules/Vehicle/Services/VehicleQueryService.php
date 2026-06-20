@@ -15,7 +15,7 @@ final class VehicleQueryService
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)
-            ->with(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner']);
+            ->with(['make', 'model', 'type', 'category', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier']);
         $this->applyCriteria($query, $criteria);
         $sort = in_array(($criteria['sort'] ?? null), ['vehicle_number', 'code', 'registration_number', 'status', 'created_at'], true) ? (string) $criteria['sort'] : 'vehicle_number';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
@@ -50,8 +50,9 @@ final class VehicleQueryService
                 'attributes',
                 'ownerships.customerOwner',
                 'ownerships.supplierOwner',
-                'currentOwnerships.customerOwner',
-                'currentOwnerships.supplierOwner',
+                'currentOwnerships',
+                'currentCustomerVehicles.customer',
+                'currentSupplierVehicles.supplier',
                 'statusHistories',
             ])
             ->findOrFail($id);
@@ -97,8 +98,7 @@ final class VehicleQueryService
             $query->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_CUSTOMER);
         }
         if (($criteria['ownership_scope'] ?? null) === 'supplier') {
-            $query->whereHas('currentOwnerships', fn (Builder $ownership): Builder => $ownership
-                ->whereIn('owner_type', VehicleOwnership::SUPPLIER_OWNER_TYPES));
+            $query->whereHas('currentSupplierVehicles');
         }
         if (($criteria['ownership_scope'] ?? null) === 'company') {
             $query->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_COMPANY);

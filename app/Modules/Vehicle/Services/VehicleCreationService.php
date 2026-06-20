@@ -71,7 +71,7 @@ final class VehicleCreationService
                 }
                 $this->statuses->recordInitial($vehicle, $data->createdBy);
 
-                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customerOwner', 'ownerships.supplierOwner', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner', 'attributes', 'statusHistories']);
+                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier', 'attributes', 'statusHistories']);
             });
         } catch (Throwable $exception) {
             foreach ($storedDocumentPaths as $path) {

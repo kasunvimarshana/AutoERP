@@ -60,7 +60,7 @@ final class VehicleServiceJob extends CoreModel
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(Customer::class, 'customer_id');
+        return $this->belongsTo(Customer::class, 'customer_id')->withTrashed();
     }
 
     public function vehicle(): BelongsTo

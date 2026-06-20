@@ -6,6 +6,7 @@ namespace Modules\Supplier\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Supplier\Http\Requests\AssignSupplierCategoryRequest;
 use Modules\Supplier\Http\Requests\ListSupplierRequest;
@@ -30,6 +31,7 @@ use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
 use Modules\Supplier\Http\Resources\SupplierStatusHistoryResource;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Services\SupplierAddressService;
+use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\Supplier\Services\SupplierBankAccountService;
 use Modules\Supplier\Services\SupplierCategoryService;
 use Modules\Supplier\Services\SupplierContactService;
@@ -51,6 +53,7 @@ final class SupplierRelationController
         private readonly SupplierDocumentService $documentsService,
         private readonly SupplierItemMappingService $itemMappingsService,
         private readonly SupplierCreditProfileService $creditProfilesService,
+        private readonly SupplierAuthorizationService $authorization,
     ) {}
 
     public function contacts(ListSupplierRequest $request, int $supplier): AnonymousResourceCollection
@@ -69,6 +72,7 @@ final class SupplierRelationController
     public function updateContact(UpdateSupplierContactRequest $request, int $supplier, int $contact): SupplierContactResource
     {
         $parent = $this->supplier($request, $supplier);
+
         return new SupplierContactResource($this->contactsService->update(
             $parent,
             $this->queries->contact($parent, $contact),
@@ -80,6 +84,7 @@ final class SupplierRelationController
     {
         $parent = $this->supplier($request, $supplier);
         $this->contactsService->delete($parent, $this->queries->contact($parent, $contact));
+
         return response()->json(null, 204);
     }
 
@@ -99,6 +104,7 @@ final class SupplierRelationController
     public function updateAddress(UpdateSupplierAddressRequest $request, int $supplier, int $address): SupplierAddressResource
     {
         $parent = $this->supplier($request, $supplier);
+
         return new SupplierAddressResource($this->addressesService->update(
             $parent,
             $this->queries->address($parent, $address),
@@ -110,6 +116,7 @@ final class SupplierRelationController
     {
         $parent = $this->supplier($request, $supplier);
         $this->addressesService->delete($parent, $this->queries->address($parent, $address));
+
         return response()->json(null, 204);
     }
 
@@ -121,12 +128,14 @@ final class SupplierRelationController
     public function storeBankAccount(StoreSupplierBankAccountRequest $request, int $supplier): JsonResponse
     {
         $account = $this->bankAccountsService->create($this->supplier($request, $supplier), $request->toData())->load('currency');
+
         return $this->created(new SupplierBankAccountResource($account));
     }
 
     public function updateBankAccount(UpdateSupplierBankAccountRequest $request, int $supplier, int $bankAccount): SupplierBankAccountResource
     {
         $parent = $this->supplier($request, $supplier);
+
         return new SupplierBankAccountResource($this->bankAccountsService->update(
             $parent,
             $this->queries->bankAccount($parent, $bankAccount),
@@ -138,6 +147,7 @@ final class SupplierRelationController
     {
         $parent = $this->supplier($request, $supplier);
         $this->bankAccountsService->delete($parent, $this->queries->bankAccount($parent, $bankAccount));
+
         return response()->json(null, 204);
     }
 
@@ -157,6 +167,7 @@ final class SupplierRelationController
     public function deleteCategory(ListSupplierRequest $request, int $supplier, int $category): JsonResponse
     {
         $this->categoriesService->detach($this->supplier($request, $supplier), $category);
+
         return response()->json(null, 204);
     }
 
@@ -176,6 +187,7 @@ final class SupplierRelationController
     public function updateDocument(UpdateSupplierDocumentRequest $request, int $supplier, int $document): SupplierDocumentResource
     {
         $parent = $this->supplier($request, $supplier);
+
         return new SupplierDocumentResource($this->documentsService->update(
             $parent,
             $this->queries->document($parent, $document),
@@ -187,6 +199,7 @@ final class SupplierRelationController
     {
         $parent = $this->supplier($request, $supplier);
         $this->documentsService->delete($parent, $this->queries->document($parent, $document));
+
         return response()->json(null, 204);
     }
 
@@ -199,12 +212,14 @@ final class SupplierRelationController
     {
         $mapping = $this->itemMappingsService->create($this->supplier($request, $supplier), $request->toData())
             ->load(['item.category', 'item.brand', 'variant', 'defaultPurchaseUom']);
+
         return $this->created(new SupplierItemMappingResource($mapping));
     }
 
     public function updateItemMapping(UpdateSupplierItemMappingRequest $request, int $supplier, int $mapping): SupplierItemMappingResource
     {
         $parent = $this->supplier($request, $supplier);
+
         return new SupplierItemMappingResource($this->itemMappingsService->update(
             $parent,
             $this->queries->itemMapping($parent, $mapping),
@@ -216,12 +231,14 @@ final class SupplierRelationController
     {
         $parent = $this->supplier($request, $supplier);
         $this->itemMappingsService->delete($parent, $this->queries->itemMapping($parent, $mapping));
+
         return response()->json(null, 204);
     }
 
     public function creditProfile(ListSupplierRequest $request, int $supplier): SupplierCreditProfileResource|JsonResponse
     {
         $profile = $this->creditProfilesService->get($this->supplier($request, $supplier));
+
         return $profile ? new SupplierCreditProfileResource($profile) : response()->json(['data' => null]);
     }
 
@@ -243,10 +260,12 @@ final class SupplierRelationController
 
     private function supplier(TenantScopedRequest $request, int $supplier): Supplier
     {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), $request->isMethodSafe() ? SupplierAuthorizationService::VIEW : SupplierAuthorizationService::UPDATE);
+
         return $this->suppliers->supplier($supplier, $request->tenantId(), $request->organizationUnitId());
     }
 
-    private function created(\Illuminate\Http\Resources\Json\JsonResource $resource): JsonResponse
+    private function created(JsonResource $resource): JsonResponse
     {
         return $resource->response()->setStatusCode(201);
     }

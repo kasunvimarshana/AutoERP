@@ -42,6 +42,6 @@ final class PurchaseDebitNote extends CoreModel
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class, 'supplier_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withTrashed();
     }
 }

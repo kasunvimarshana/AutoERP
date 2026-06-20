@@ -26,6 +26,7 @@ use Modules\Customer\Enums\PreferredCommunicationChannel;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Services\CustomerAddressService;
+use Modules\Customer\Services\CustomerAuthorizationService;
 use Modules\Customer\Services\CustomerBankAccountService;
 use Modules\Customer\Services\CustomerCategoryService;
 use Modules\Customer\Services\CustomerContactService;
@@ -34,6 +35,7 @@ use Modules\Customer\Services\CustomerCreditProfileService;
 use Modules\Customer\Services\CustomerDocumentService;
 use Modules\Customer\Services\CustomerLookupService;
 use Modules\Customer\Services\CustomerStatusService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
 final class CustomerEngineTest extends TestCase
@@ -110,11 +112,11 @@ final class CustomerEngineTest extends TestCase
         try {
             $this->createCustomer($tenantId, 'DUP');
             $this->fail('Expected duplicate customer code validation to fail.');
-        } catch (InvalidArgumentException $exception) {
+        } catch (ConflictHttpException $exception) {
             $this->assertSame('Customer code already exists for this tenant.', $exception->getMessage());
         }
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ConflictHttpException::class);
         $this->expectExceptionMessage('Customer number already exists for this tenant.');
         $this->createCustomer($tenantId, 'UNIQUE', 'CUS-CUSTOM-1');
     }
@@ -222,6 +224,7 @@ final class CustomerEngineTest extends TestCase
     public function test_customer_api_crud_lookup_and_readable_resource_response(): void
     {
         $this->withoutMiddleware();
+        $this->mock(CustomerAuthorizationService::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes());
         [$tenantId, $organizationUnitId] = $this->scopeContext();
 
         $create = $this->postJson('/api/v1/customers/with-relations', [

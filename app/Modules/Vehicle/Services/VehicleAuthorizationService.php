@@ -7,15 +7,22 @@ namespace Modules\Vehicle\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Modules\User\Services\UserAccessResolver;
 
-final class VehicleAuthorizationService
+class VehicleAuthorizationService
 {
     public const VIEW = 'vehicle.view';
+
     public const CREATE = 'vehicle.create';
+
     public const UPDATE = 'vehicle.update';
+
     public const DELETE = 'vehicle.delete';
+
     public const MANAGE_DOCUMENTS = 'vehicle.documents.manage';
+
     public const DOWNLOAD_DOCUMENTS = 'vehicle.documents.download';
+
     public const MANAGE_ATTRIBUTES = 'vehicle.attributes.manage';
+
     public const CHANGE_STATUS = 'vehicle.status.change';
 
     public function __construct(private readonly UserAccessResolver $access) {}

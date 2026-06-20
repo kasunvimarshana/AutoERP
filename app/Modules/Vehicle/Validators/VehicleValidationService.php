@@ -7,11 +7,7 @@ namespace Modules\Vehicle\Validators;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Customer\Enums\CustomerStatus;
-use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Supplier\Enums\SupplierStatus;
-use Modules\Supplier\Models\Supplier;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\DTOs\VehicleModelData;
@@ -91,19 +87,15 @@ final class VehicleValidationService
             throw new InvalidArgumentException('Vehicle owner type is not supported.');
         }
 
-        match ($data->ownershipType) {
-            VehicleOwnershipType::CustomerOwned => $this->assertCustomerOwnership($vehicle, $data),
-            VehicleOwnershipType::Owned, VehicleOwnershipType::CompanyOwned => $this->assertCompanyOwnership($data),
-            VehicleOwnershipType::Leased, VehicleOwnershipType::Rented, VehicleOwnershipType::ThirdParty => $this->assertExternalOwnership($vehicle, $data),
-        };
-    }
-
-    private function assertCustomerOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
-    {
-        if ($data->ownerType !== VehicleOwnership::OWNER_TYPE_CUSTOMER || $data->ownerId === null) {
-            throw new InvalidArgumentException('Customer-owned vehicle ownership requires a customer owner.');
+        if ($data->ownerType !== VehicleOwnership::OWNER_TYPE_COMPANY || $data->ownerId !== null) {
+            throw new InvalidArgumentException('Customer and Supplier vehicle relationships must use their dedicated APIs.');
         }
-        $this->assertCustomerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->ownerId);
+
+        match ($data->ownershipType) {
+            VehicleOwnershipType::CustomerOwned => throw new InvalidArgumentException('Customer-owned relationships must use the Customer Vehicle API.'),
+            VehicleOwnershipType::Owned, VehicleOwnershipType::CompanyOwned => $this->assertCompanyOwnership($data),
+            VehicleOwnershipType::Leased, VehicleOwnershipType::Rented, VehicleOwnershipType::ThirdParty => $this->assertExternalOwnership($data),
+        };
     }
 
     private function assertCompanyOwnership(VehicleOwnershipData $data): void
@@ -113,12 +105,11 @@ final class VehicleValidationService
         }
     }
 
-    private function assertExternalOwnership(Vehicle $vehicle, VehicleOwnershipData $data): void
+    private function assertExternalOwnership(VehicleOwnershipData $data): void
     {
-        if ($data->ownerId === null) {
-            throw new InvalidArgumentException('External vehicle ownership requires an owner type and owner id.');
+        if ($data->ownerType !== VehicleOwnership::OWNER_TYPE_COMPANY || $data->ownerId !== null) {
+            throw new InvalidArgumentException('Fleet lease and rental ownership must use the company owner type without a party id.');
         }
-        $this->assertOwnerUsable((int) $vehicle->tenant_id, $vehicle->organization_unit_id, $data->ownerType, $data->ownerId);
     }
 
     public function assertOrganizationUsable(int $tenantId, ?int $organizationUnitId): void
@@ -148,7 +139,8 @@ final class VehicleValidationService
         if ($recordTenantId !== $tenantId) {
             throw new InvalidArgumentException('Vehicle reference belongs to a different tenant.');
         }
-        if ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
+        if (($organizationUnitId === null && $recordOrganizationUnitId !== null)
+            || ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId)) {
             throw new InvalidArgumentException('Vehicle reference belongs to a different organization unit.');
         }
     }
@@ -173,28 +165,6 @@ final class VehicleValidationService
         if ($categoryId !== null) {
             $category = VehicleCategory::query()->findOrFail($categoryId);
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $category, 'Inactive vehicle category cannot be used.');
-        }
-    }
-
-    private function assertCustomerUsable(int $tenantId, ?int $organizationUnitId, int $customerId): void
-    {
-        $customer = Customer::query()->findOrFail($customerId);
-        $this->assertScope($tenantId, $organizationUnitId, (int) $customer->tenant_id, $customer->organization_unit_id);
-        if (enum_exists(CustomerStatus::class) && in_array($customer->status, [CustomerStatus::Inactive, CustomerStatus::Blacklisted], true)) {
-            throw new InvalidArgumentException('Inactive or blacklisted customer cannot be assigned to a vehicle.');
-        }
-    }
-
-    private function assertOwnerUsable(int $tenantId, ?int $organizationUnitId, string $ownerType, int $ownerId): void
-    {
-        if (! in_array($ownerType, VehicleOwnership::SUPPLIER_OWNER_TYPES, true)) {
-            throw new InvalidArgumentException('Vehicle owner type is not supported.');
-        }
-
-        $owner = Supplier::query()->findOrFail($ownerId);
-        $this->assertScope($tenantId, $organizationUnitId, (int) $owner->tenant_id, $owner->organization_unit_id);
-        if (in_array($owner->status, [SupplierStatus::Inactive, SupplierStatus::Blacklisted, SupplierStatus::OnHold], true)) {
-            throw new InvalidArgumentException('Vehicle owner must be an active supplier or owner.');
         }
     }
 

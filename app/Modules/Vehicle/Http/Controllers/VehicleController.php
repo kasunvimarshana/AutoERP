@@ -15,8 +15,8 @@ use Modules\Vehicle\Http\Requests\UpdateVehicleRequest;
 use Modules\Vehicle\Http\Resources\VehicleResource;
 use Modules\Vehicle\Http\Resources\VehicleSummaryResource;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Services\VehicleCreationService;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
+use Modules\Vehicle\Services\VehicleCreationService;
 use Modules\Vehicle\Services\VehicleQueryService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleUpdateService;
@@ -107,7 +107,7 @@ final class VehicleController
 
         $model = $this->queries->vehicle($vehicle, $request->tenantId(), $request->organizationUnitId());
 
-        return new VehicleResource($this->statuses->change($model, $request->toData())->load(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner']));
+        return new VehicleResource($this->statuses->change($model, $request->toData())->load(['make', 'model', 'type', 'category', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier']));
     }
 
     public function lookup(ListVehicleRequest $request, ?string $kind = null): AnonymousResourceCollection
@@ -133,7 +133,7 @@ final class VehicleController
             $model,
             $status,
             $request->currentUserId(),
-        )->load(['make', 'model', 'type', 'category', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner']));
+        )->load(['make', 'model', 'type', 'category', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier']));
     }
 
     private function created(Vehicle $vehicle): JsonResponse

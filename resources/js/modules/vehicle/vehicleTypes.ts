@@ -80,6 +80,8 @@ export interface VehicleSummary {
     type?: NamedResource | null;
     category?: NamedResource | null;
     current_ownerships?: VehicleOwnership[];
+    current_customer?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
+    current_supplier?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
     status: VehicleStatus;
     odometer_reading: string;
     odometer_unit?: string | null;

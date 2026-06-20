@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Item\Services\ItemAuthorizationService;
+use Modules\Supplier\Services\SupplierAuthorizationService;
 use Tests\TestCase;
 
 final class SupplierApiTest extends TestCase
@@ -271,12 +273,12 @@ final class SupplierApiTest extends TestCase
         $supplierId = $this->createSupplier($tenantA);
 
         $this->withAuth($tenantA)->postJson('/api/v1/suppliers', $this->supplierPayload())
-            ->assertUnprocessable()
+            ->assertStatus(409)
             ->assertJsonPath('message', 'Supplier code already exists for this tenant.');
         $this->withAuth($tenantA)->postJson('/api/v1/suppliers', $this->supplierPayload([
             'code' => 'SUP-OTHER',
             'supplier_number' => 'SUP-NO-1',
-        ]))->assertUnprocessable()
+        ]))->assertStatus(409)
             ->assertJsonPath('message', 'Supplier number already exists for this tenant.');
 
         $this->withAuth($tenantB)->getJson('/api/v1/suppliers/'.$supplierId)->assertForbidden();
@@ -445,6 +447,30 @@ final class SupplierApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        $permissions = SupplierAuthorizationService::descriptions();
+        $permissions[ItemAuthorizationService::CREATE] = 'Create items used by Supplier API fixtures.';
+        foreach ($permissions as $name => $description) {
+            $permissionId = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'guard_name' => (string) config('auth.defaults.guard', 'api'),
+                'module' => 'Supplier',
+                'description' => $description,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('user_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'user_id' => $userId,
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
 
         $token = (string) $this->postJson('/api/v1/auth/login', [
             'tenant_id' => $tenantId,

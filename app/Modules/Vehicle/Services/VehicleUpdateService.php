@@ -66,10 +66,14 @@ final class VehicleUpdateService
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                if ($data->ownerships !== null) { $this->ownerships->replace($vehicle, $data->ownerships); }
-                if ($data->attributes !== null) { $this->attributes->replace($vehicle, $data->attributes); }
+                if ($data->ownerships !== null) {
+                    $this->ownerships->replace($vehicle, $data->ownerships);
+                }
+                if ($data->attributes !== null) {
+                    $this->attributes->replace($vehicle, $data->attributes);
+                }
 
-                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships.customerOwner', 'ownerships.supplierOwner', 'currentOwnerships.customerOwner', 'currentOwnerships.supplierOwner', 'attributes']);
+                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier', 'attributes']);
             });
         } catch (Throwable $exception) {
             foreach ($storedDocumentPaths as $path) {

@@ -13,6 +13,8 @@ export interface VehicleLookupResource extends NamedResource {
         owner_id?: number | null;
         owner?: NamedResource | null;
     }>;
+    current_customer?: { id: number; code: string; name: string } | null;
+    current_supplier?: { id: number; code: string; name: string } | null;
     odometer_reading?: string | null;
     odometer_unit?: string | null;
 }
@@ -69,6 +71,8 @@ export const lookupApi = {
             make: resource.make as NamedResource | null | undefined,
             model: resource.model as NamedResource | null | undefined,
             current_ownerships: resource.current_ownerships as VehicleLookupResource['current_ownerships'],
+            current_customer: resource.current_customer as VehicleLookupResource['current_customer'],
+            current_supplier: resource.current_supplier as VehicleLookupResource['current_supplier'],
             odometer_reading: typeof resource.odometer_reading === 'string' ? resource.odometer_reading : null,
             odometer_unit: typeof resource.odometer_unit === 'string' ? resource.odometer_unit : null,
         }),

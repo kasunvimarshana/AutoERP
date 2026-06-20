@@ -38,6 +38,7 @@ use Modules\Supplier\Services\SupplierCreditProfileService;
 use Modules\Supplier\Services\SupplierItemMappingService;
 use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
 final class SupplierEngineTest extends TestCase
@@ -120,11 +121,11 @@ final class SupplierEngineTest extends TestCase
         try {
             $this->createSupplier($tenantId, 'DUP');
             $this->fail('Expected duplicate supplier code validation to fail.');
-        } catch (InvalidArgumentException $exception) {
+        } catch (ConflictHttpException $exception) {
             $this->assertSame('Supplier code already exists for this tenant.', $exception->getMessage());
         }
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ConflictHttpException::class);
         $this->expectExceptionMessage('Supplier number already exists for this tenant.');
         $this->createSupplier($tenantId, 'UNIQUE', 'SUP-CUSTOM-1');
     }
@@ -205,10 +206,10 @@ final class SupplierEngineTest extends TestCase
         ));
 
         $lookup = app(SupplierLookupService::class);
-        $this->assertTrue($lookup->suppliersByCategory($tenantId, (int) $category->getKey())->contains($supplier));
-        $this->assertTrue($lookup->suppliersByItem($tenantId, (int) $item->getKey())->contains($supplier));
-        $this->assertTrue($lookup->preferredSuppliersForItem($tenantId, (int) $item->getKey())->contains($supplier));
-        $this->assertTrue($lookup->suppliersAllowedForCredit($tenantId)->contains($supplier));
+        $this->assertTrue($lookup->suppliersByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($supplier));
+        $this->assertTrue($lookup->suppliersByItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
+        $this->assertTrue($lookup->preferredSuppliersForItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
+        $this->assertTrue($lookup->suppliersAllowedForCredit($tenantId, $organizationUnitId)->contains($supplier));
     }
 
     public function test_status_transition_records_history_and_blacklist_excludes_active_lookup(): void

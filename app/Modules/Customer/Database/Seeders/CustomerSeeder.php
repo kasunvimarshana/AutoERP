@@ -11,6 +11,7 @@ use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Models\CustomerCategoryAssignment;
+use Modules\Customer\Services\CustomerAuthorizationService;
 
 final class CustomerSeeder extends Seeder
 {
@@ -29,6 +30,7 @@ final class CustomerSeeder extends Seeder
         }
 
         DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $this->seedPermissions((int) $tenant->getKey());
             $category = CustomerCategory::query()->updateOrCreate(
                 ['tenant_id' => $tenant->getKey(), 'code' => 'GENERAL'],
                 [
@@ -76,5 +78,16 @@ final class CustomerSeeder extends Seeder
                 );
             }
         }, 3);
+    }
+
+    private function seedPermissions(int $tenantId): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            return;
+        }
+        $guard = (string) config('auth.defaults.guard', 'web');
+        foreach (CustomerAuthorizationService::descriptions() as $name => $description) {
+            DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['organization_unit_id' => null, 'module' => 'Customer', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        }
     }
 }

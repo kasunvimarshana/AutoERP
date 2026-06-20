@@ -76,7 +76,7 @@ describe('navigation access and matching', () => {
             tenantId: 10,
             organizationUnitId: null,
             roles: [],
-            permissions: [purchasePermissions.ordersView],
+            permissions: [purchasePermissions.ordersView, 'suppliers.view'],
             enabledModules: null,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
@@ -167,8 +167,8 @@ describe('navigation access and matching', () => {
         expect(labels).toEqual([
             { section: '', items: [{ label: 'Dashboard', children: [] }] },
             { section: 'Master Data', items: [
-                { label: 'Suppliers', children: ['Supplier List', 'Supplier Vehicles'] },
-                { label: 'Customers', children: ['Customer List', 'Customer Vehicles'] },
+                { label: 'Suppliers', children: ['Supplier List', 'Create Supplier', 'Supplier Vehicles', 'Create Supplier Vehicle'] },
+                { label: 'Customers', children: ['Customer List', 'Create Customer', 'Customer Vehicles', 'Create Customer Vehicle'] },
                 { label: 'Vehicle', children: ['Makes', 'Types', 'Categories', 'Models', 'Vehicles'] },
                 { label: 'Items', children: ['Categories', 'Create Category', 'Brands', 'Create Brand', 'Items', 'Create Item'] },
             ] },
@@ -184,7 +184,7 @@ describe('navigation access and matching', () => {
             ] },
             { section: 'Finance', items: [
                 { label: 'Invoices', children: [] },
-                { label: 'Payments', children: [] },
+                { label: 'Payments', children: ['Payments', 'Create Payment', 'Payment Methods', 'Create Payment Method', 'Cheque Templates', 'Create Cheque Template'] },
                 { label: 'Vouchers', children: [] },
             ] },
             { section: 'Administration', items: [

@@ -17,6 +17,7 @@ use Modules\Supplier\DTOs\UpdateSupplierData;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierCategory;
 use Modules\UOM\Models\UnitOfMeasureModel;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class SupplierValidationService
 {
@@ -156,7 +157,7 @@ final class SupplierValidationService
         $query = Supplier::query()->withTrashed()->where('tenant_id', $tenantId)->where('code', $code);
         $this->ignoreKey($query, $ignoreId);
         if ($query->exists()) {
-            throw new InvalidArgumentException('Supplier code already exists for this tenant.');
+            throw new ConflictHttpException('Supplier code already exists for this tenant.');
         }
     }
 
@@ -165,7 +166,7 @@ final class SupplierValidationService
         $query = Supplier::query()->withTrashed()->where('tenant_id', $tenantId)->where('supplier_number', $number);
         $this->ignoreKey($query, $ignoreId);
         if ($query->exists()) {
-            throw new InvalidArgumentException('Supplier number already exists for this tenant.');
+            throw new ConflictHttpException('Supplier number already exists for this tenant.');
         }
     }
 
@@ -202,7 +203,8 @@ final class SupplierValidationService
         if ($recordTenantId !== $tenantId) {
             throw new InvalidArgumentException('Supplier reference belongs to a different tenant.');
         }
-        if ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
+        if (($organizationUnitId === null && $recordOrganizationUnitId !== null)
+            || ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId)) {
             throw new InvalidArgumentException('Supplier reference belongs to a different organization unit.');
         }
     }

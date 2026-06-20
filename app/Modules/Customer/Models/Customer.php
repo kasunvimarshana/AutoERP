@@ -12,10 +12,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class Customer extends CoreModel
@@ -108,6 +108,11 @@ final class Customer extends CoreModel
         return $this->hasMany(CustomerStatusHistory::class, 'customer_id');
     }
 
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(CustomerVehicle::class, 'customer_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', CustomerStatus::Active);
@@ -118,7 +123,7 @@ final class Customer extends CoreModel
         $query->where('tenant_id', $tenantId);
 
         return $organizationUnitId === null
-            ? $query
+            ? $query->whereNull('organization_unit_id')
             : $query->where(function (Builder $scope) use ($organizationUnitId): void {
                 $scope->whereNull('organization_unit_id')
                     ->orWhere('organization_unit_id', $organizationUnitId);

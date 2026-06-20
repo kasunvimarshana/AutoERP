@@ -21,7 +21,6 @@ final class ListCustomerRequest extends TenantScopedRequest
             'customer_type' => ['nullable', Rule::enum(CustomerType::class)],
             'category_id' => ['nullable', 'integer', 'min:1'],
             'is_credit_allowed' => ['nullable', 'boolean'],
-            'is_active' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['customer_number', 'code', 'name', 'status', 'created_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'page' => ['nullable', 'integer', 'min:1'],

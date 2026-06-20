@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\CoreModel;
+use Modules\Customer\Models\CustomerVehicle;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Supplier\Models\SupplierVehicle;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Enums\VehicleFuelType;
 use Modules\Vehicle\Enums\VehicleStatus;
@@ -20,6 +22,7 @@ final class Vehicle extends CoreModel
     use SoftDeletes;
 
     protected $table = 'vehicles';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -43,17 +46,80 @@ final class Vehicle extends CoreModel
         ]);
     }
 
-    public function tenant(): BelongsTo { return $this->belongsTo(TenantModel::class, 'tenant_id'); }
-    public function organizationUnit(): BelongsTo { return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id'); }
-    public function make(): BelongsTo { return $this->belongsTo(VehicleMake::class, 'vehicle_make_id'); }
-    public function model(): BelongsTo { return $this->belongsTo(VehicleModel::class, 'vehicle_model_id'); }
-    public function type(): BelongsTo { return $this->belongsTo(VehicleType::class, 'vehicle_type_id'); }
-    public function category(): BelongsTo { return $this->belongsTo(VehicleCategory::class, 'vehicle_category_id'); }
-    public function documents(): HasMany { return $this->hasMany(VehicleDocument::class, 'vehicle_id'); }
-    public function statusHistories(): HasMany { return $this->hasMany(VehicleStatusHistory::class, 'vehicle_id'); }
-    public function ownerships(): HasMany { return $this->hasMany(VehicleOwnership::class, 'vehicle_id'); }
-    public function currentOwnerships(): HasMany { return $this->hasMany(VehicleOwnership::class, 'vehicle_id')->current(); }
-    public function attributes(): HasMany { return $this->hasMany(VehicleAttribute::class, 'vehicle_id'); }
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+    }
+
+    public function make(): BelongsTo
+    {
+        return $this->belongsTo(VehicleMake::class, 'vehicle_make_id');
+    }
+
+    public function model(): BelongsTo
+    {
+        return $this->belongsTo(VehicleModel::class, 'vehicle_model_id');
+    }
+
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(VehicleType::class, 'vehicle_type_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(VehicleCategory::class, 'vehicle_category_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(VehicleDocument::class, 'vehicle_id');
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(VehicleStatusHistory::class, 'vehicle_id');
+    }
+
+    public function ownerships(): HasMany
+    {
+        return $this->hasMany(VehicleOwnership::class, 'vehicle_id');
+    }
+
+    public function currentOwnerships(): HasMany
+    {
+        return $this->hasMany(VehicleOwnership::class, 'vehicle_id')->current();
+    }
+
+    public function customerVehicles(): HasMany
+    {
+        return $this->hasMany(CustomerVehicle::class, 'vehicle_id');
+    }
+
+    public function currentCustomerVehicles(): HasMany
+    {
+        return $this->hasMany(CustomerVehicle::class, 'vehicle_id')->current();
+    }
+
+    public function supplierVehicles(): HasMany
+    {
+        return $this->hasMany(SupplierVehicle::class, 'vehicle_id');
+    }
+
+    public function currentSupplierVehicles(): HasMany
+    {
+        return $this->hasMany(SupplierVehicle::class, 'vehicle_id')->current();
+    }
+
+    public function attributes(): HasMany
+    {
+        return $this->hasMany(VehicleAttribute::class, 'vehicle_id');
+    }
 
     public function scopeActive(Builder $query): Builder
     {
@@ -63,17 +129,25 @@ final class Vehicle extends CoreModel
     public function scopeForTenant(Builder $query, int $tenantId, ?int $organizationUnitId = null): Builder
     {
         $query->where('tenant_id', $tenantId);
-        return $organizationUnitId === null ? $query : $query->where(function (Builder $scope) use ($organizationUnitId): void {
+
+        return $organizationUnitId === null ? $query->whereNull('organization_unit_id') : $query->where(function (Builder $scope) use ($organizationUnitId): void {
             $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
         });
     }
 
     public function scopeWhereCurrentOwner(Builder $query, string $ownerType, ?int $ownerId = null): Builder
     {
-        return $query->whereHas('currentOwnerships', function (Builder $ownership) use ($ownerType, $ownerId): void {
-            $ownership->where('owner_type', $ownerType);
+        if ($ownerType === VehicleOwnership::OWNER_TYPE_COMPANY) {
+            return $query->whereHas('currentOwnerships', fn (Builder $ownership): Builder => $ownership->where('owner_type', $ownerType));
+        }
+
+        $isCustomer = $ownerType === VehicleOwnership::OWNER_TYPE_CUSTOMER;
+        $relation = $isCustomer ? 'currentCustomerVehicles' : 'currentSupplierVehicles';
+        $partyColumn = $isCustomer ? 'customer_id' : 'supplier_id';
+
+        return $query->whereHas($relation, function (Builder $ownership) use ($ownerId, $partyColumn): void {
             if ($ownerId !== null) {
-                $ownership->where('owner_id', $ownerId);
+                $ownership->where($partyColumn, $ownerId);
             }
         });
     }

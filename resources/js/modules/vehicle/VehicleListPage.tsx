@@ -26,7 +26,7 @@ import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
 const currentOwnerName = (row: VehicleSummary, ownerType = 'customer') =>
-    row.current_ownerships?.find((ownership) => ownership.owner_type === ownerType)?.owner?.name ?? '-';
+    (ownerType === 'customer' ? row.current_customer?.name : row.current_supplier?.name) ?? '-';
 
 export default function VehicleListPage() {
     const [searchParams] = useSearchParams();

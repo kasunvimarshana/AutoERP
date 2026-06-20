@@ -6,7 +6,6 @@ namespace Modules\VehicleService\Http\Resources;
 
 use Illuminate\Http\Request;
 use Modules\Core\Http\Resources\ModuleResource;
-use Modules\Vehicle\Models\VehicleOwnership;
 
 final class VehicleServiceJobResource extends ModuleResource
 {
@@ -81,7 +80,7 @@ final class VehicleServiceJobResource extends ModuleResource
             'registration_number' => $this->vehicle->registration_number,
             'make' => $this->vehicle->relationLoaded('make') ? $this->namedRelation($this->vehicle->make) : null,
             'model' => $this->vehicle->relationLoaded('model') ? $this->namedRelation($this->vehicle->model) : null,
-            'current_ownerships' => $this->vehicle->relationLoaded('currentOwnerships') ? $this->vehicleCurrentOwnerships() : [],
+            'current_ownerships' => $this->vehicleCurrentOwnerships(),
             'odometer_reading' => (string) $this->vehicle->odometer_reading,
             'odometer_unit' => $this->vehicle->odometer_unit,
         ];
@@ -89,18 +88,15 @@ final class VehicleServiceJobResource extends ModuleResource
 
     private function vehicleCurrentOwnerships(): array
     {
-        return $this->vehicle->currentOwnerships
-            ->map(fn ($ownership): array => [
-                'id' => (int) $ownership->getKey(),
-                'owner_type' => $ownership->owner_type,
-                'owner_id' => $ownership->owner_id,
-                'owner' => $this->ownershipOwner($ownership),
-                'ownership_type' => $this->enum($ownership->ownership_type),
-                'started_at' => $ownership->started_at?->toISOString(),
-                'ended_at' => $ownership->ended_at?->toISOString(),
-                'is_current' => (bool) $ownership->is_current,
-            ])
-            ->all();
+        $rows = [];
+        if ($this->vehicle->relationLoaded('currentCustomerVehicles') && ($relationship = $this->vehicle->currentCustomerVehicles->first())) {
+            $rows[] = ['id' => (int) $relationship->getKey(), 'owner_type' => 'customer', 'owner_id' => (int) $relationship->customer_id, 'owner' => $this->customerRelation($relationship->customer), 'ownership_type' => $relationship->relationship_type, 'started_at' => $relationship->started_at?->toISOString(), 'ended_at' => null, 'is_current' => true];
+        }
+        if ($this->vehicle->relationLoaded('currentSupplierVehicles') && ($relationship = $this->vehicle->currentSupplierVehicles->first())) {
+            $rows[] = ['id' => (int) $relationship->getKey(), 'owner_type' => 'supplier', 'owner_id' => (int) $relationship->supplier_id, 'owner' => $this->namedRelation($relationship->supplier), 'ownership_type' => $relationship->relationship_type, 'started_at' => $relationship->started_at?->toISOString(), 'ended_at' => null, 'is_current' => true];
+        }
+
+        return $rows;
     }
 
     private function employeeSummary(mixed $employee): ?array
@@ -128,14 +124,5 @@ final class VehicleServiceJobResource extends ModuleResource
             'code' => $customer->code,
             'name' => $customer->display_name ?? $customer->name,
         ];
-    }
-
-    private function ownershipOwner(mixed $ownership): ?array
-    {
-        return match ($ownership->owner_type) {
-            VehicleOwnership::OWNER_TYPE_CUSTOMER => $ownership->relationLoaded('customerOwner') ? $this->customerRelation($ownership->customerOwner) : null,
-            VehicleOwnership::OWNER_TYPE_SUPPLIER, VehicleOwnership::OWNER_TYPE_OWNER => $ownership->relationLoaded('supplierOwner') ? $this->namedRelation($ownership->supplierOwner) : null,
-            default => null,
-        };
     }
 }
