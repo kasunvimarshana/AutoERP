@@ -8,6 +8,7 @@ use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Configuration\Database\Seeders\ConfigurationSeeder;
 use Modules\Core\Database\Seeders\CoreSeeder;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
+use Modules\Customer\Database\Seeders\CustomerVehicleSeeder;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Hr\Database\Seeders\HrSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
@@ -20,13 +21,11 @@ use Modules\Supplier\Database\Seeders\SupplierSeeder;
 use Modules\Tenant\Database\Seeders\TenantDomainSeeder;
 use Modules\Tenant\Database\Seeders\TenantSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
+use Modules\User\Database\Seeders\SuperAdminPermissionSeeder;
 use Modules\User\Database\Seeders\UserSeeder;
 use Modules\Vehicle\Database\Seeders\VehicleSeeder;
 use Modules\VehicleRental\Database\Seeders\VehicleRentalSeeder;
 use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
-use Modules\User\Models\PermissionModel;
-use Modules\User\Models\RoleModel;
-use Modules\User\Models\RolePermissionModel;
 use Modules\Reporting\Database\Seeders\ReportingSeeder;
 
 class DatabaseSeeder extends Seeder
@@ -57,29 +56,11 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             SalesSeeder::class,
             VehicleSeeder::class,
+            CustomerVehicleSeeder::class,
             VehicleRentalSeeder::class,
             HrSeeder::class,
             ReportingSeeder::class,
+            SuperAdminPermissionSeeder::class,
         ]);
-
-        //
-        $superAdmin = RoleModel::query()
-            ->where('name', 'Super Admin')
-            ->firstOrFail();
-
-        $rows = PermissionModel::query()
-            ->where('tenant_id', $superAdmin->tenant_id)
-            ->pluck('id')
-            ->map(fn (int $permissionId): array => [
-                'tenant_id' => $superAdmin->tenant_id,
-                'role_id' => $superAdmin->id,
-                'permission_id' => $permissionId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ])
-            ->all();
-
-        RolePermissionModel::query()->insertOrIgnore($rows);
-        //
     }
 }

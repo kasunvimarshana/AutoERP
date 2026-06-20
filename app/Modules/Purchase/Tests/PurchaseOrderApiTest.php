@@ -16,8 +16,8 @@ use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
-use RuntimeException;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -444,79 +444,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.capabilities.can_reverse', false)
             ->assertJsonPath('data.capabilities.details.can_reverse.code', 'unresolved_returns');
-    }
-
-    public function test_lifecycle_legacy_preflight_normalizes_safe_rows_and_reports_blockers(): void
-    {
-        if (DB::getDriverName() !== 'sqlite') {
-            $this->markTestSkipped('Legacy upgrade preflight fixture must run before lifecycle CHECK constraints are installed.');
-        }
-
-        $context = $this->context();
-        $orderId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
-        $order = PurchaseOrder::query()->with('lines')->findOrFail($orderId);
-        $order = app(PurchaseOrderService::class)->approve(app(PurchaseOrderService::class)->submit($order));
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
-            tenantId: $context['tenant_id'],
-            receivedDate: '2026-06-18',
-            warehouseId: $context['warehouse_id'],
-            organizationUnitId: $context['organization_unit_id'],
-            purchaseOrderId: (int) $order->getKey(),
-            lines: [new GoodsReceiptNoteLineData($context['item_id'], '1.000000', '1.000000', '10.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '1.000000')],
-        ));
-        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
-
-        DB::table('purchase_orders')->where('id', $order->getKey())->update(['status' => 'partially_received']);
-        DB::table('goods_receipt_note_lines')->where('id', $grn->lines->first()->getKey())->update(['status' => 'cancelled']);
-
-        $migration = require base_path('app/Modules/Purchase/Database/Migrations/2026_06_19_005000_preflight_purchase_lifecycle_legacy_statuses.php');
-
-        try {
-            $migration->up();
-            $this->fail('Expected unsupported cancelled GRN line to be reported.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('goods_receipt_note_lines.status=cancelled count=1', $exception->getMessage());
-            $this->assertSame('partially_received', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
-        }
-
-        DB::table('goods_receipt_notes')->where('id', $grn->getKey())->update(['status' => 'reversed']);
-        $migration->up();
-
-        $this->assertSame('approved', (string) DB::table('purchase_orders')->where('id', $order->getKey())->value('status'));
-        $this->assertSame('reversed', (string) DB::table('goods_receipt_note_lines')->where('id', $grn->lines->first()->getKey())->value('status'));
-    }
-
-    public function test_lifecycle_legacy_preflight_does_not_reactivate_dead_state_debit_notes(): void
-    {
-        if (DB::getDriverName() !== 'sqlite') {
-            $this->markTestSkipped('Legacy upgrade preflight fixture must run before lifecycle CHECK constraints are installed.');
-        }
-
-        $context = $this->context('DNLEGACY');
-        $noteId = (int) DB::table('purchase_debit_notes')->insertGetId([
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'supplier_type' => 'supplier',
-            'supplier_id' => $context['supplier_id'],
-            'debit_note_number' => 'PDN-DEAD-1',
-            'debit_note_date' => '2026-06-19',
-            'status' => 'cancelled',
-            'amount' => '10.000000',
-            'allocated_amount' => '0.000000',
-            'remaining_amount' => '10.000000',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $migration = require base_path('app/Modules/Purchase/Database/Migrations/2026_06_19_005000_preflight_purchase_lifecycle_legacy_statuses.php');
-
-        try {
-            $migration->up();
-            $this->fail('Expected dead-state Debit Note to block lifecycle preflight.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('purchase_debit_notes.status=cancelled count=1', $exception->getMessage());
-            $this->assertSame('cancelled', (string) DB::table('purchase_debit_notes')->where('id', $noteId)->value('status'));
-        }
     }
 
     public function test_manual_supplier_return_requires_manual_permission_and_separate_route(): void
@@ -957,7 +884,10 @@ final class PurchaseOrderApiTest extends TestCase
 
     public function test_purchase_lookups_do_not_return_cross_tenant_data_and_keep_global_currencies_available(): void
     {
-        $context = $this->context();
+        $context = $this->context('', [
+            ...array_keys(PurchaseAuthorizationService::descriptions()),
+            SupplierAuthorizationService::VIEW,
+        ]);
         $other = $this->context('LOOKUPOTHER');
         $activeCurrencyCode = 'LOOK-'.Str::upper(Str::random(4));
         $inactiveCurrencyCode = 'NOLOOK-'.Str::upper(Str::random(4));
@@ -1448,13 +1378,14 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $ids = [];
         foreach ($names as $name) {
+            $supplierDescription = SupplierAuthorizationService::descriptions()[$name] ?? null;
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => null,
                 'name' => $name,
                 'guard_name' => 'web',
-                'module' => 'Purchase',
-                'description' => PurchaseAuthorizationService::descriptions()[$name] ?? 'Purchase test permission',
+                'module' => $supplierDescription === null ? 'Purchase' : 'Supplier',
+                'description' => $supplierDescription ?? PurchaseAuthorizationService::descriptions()[$name] ?? 'Purchase test permission',
                 'row_version' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),

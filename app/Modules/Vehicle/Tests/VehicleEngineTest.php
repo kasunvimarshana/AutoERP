@@ -284,7 +284,7 @@ final class VehicleEngineTest extends TestCase
         $vehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-DOC', (int) $make->getKey(), (int) $model->getKey());
         $id = (int) $vehicle->getKey();
 
-        $uploaded = File::create('test.pdf', 1, 'application/pdf');
+        $uploaded = File::createWithContent('test.pdf', '%PDF-1.4 test document');
 
         $create = $this->post("/api/v1/vehicles/{$id}/documents", [
             'tenant_id' => $tenantId,
@@ -300,6 +300,7 @@ final class VehicleEngineTest extends TestCase
         $this->putJson("/api/v1/vehicles/{$id}/documents/{$docId}", [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
+            'document_type' => 'insurance',
             'notes' => 'Updated notes',
         ])->assertOk()->assertJsonPath('data.notes', 'Updated notes');
     }

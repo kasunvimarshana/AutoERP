@@ -102,6 +102,7 @@ final class RentalPaymentIntegrationService
             currencyId: $currencyId ?? $invoice?->currency_id ?? $agreement->currency_id,
             exchangeRate: $exchangeRate,
             referenceNumber: $referenceNumber,
+            status: PaymentStatus::Posted,
             notes: str($linkType)->title().' for rental agreement '.$agreement->agreement_number,
             createdBy: $createdBy,
             lines: [new PaymentLineData(

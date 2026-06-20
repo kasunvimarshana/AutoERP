@@ -473,16 +473,16 @@ final class PurchaseInvoiceDtoFactory
             throw new InvalidArgumentException('Purchase invoice source has no invoiceable lines.');
         }
 
+        $sourceOrder = $this->sourceOrderForReceipt($grn);
         $sourceAdjustmentTotal = $this->appendAdjustments(
             $grn->adjustments,
             $adjustments,
             (int) $grn->getKey(),
             self::GOODS_RECEIPT,
-            null,
-            [],
+            $sourceOrder,
+            $currentInvoiceQuantities,
             $lineage,
         );
-        $sourceOrder = $this->sourceOrderForReceipt($grn);
         if ($sourceOrder instanceof PurchaseOrder) {
             $sourceAdjustmentTotal = $this->math->add(
                 $sourceAdjustmentTotal,
@@ -773,7 +773,11 @@ final class PurchaseInvoiceDtoFactory
 
             $origin = $this->adjustmentAllocations->origin($adjustment);
             $method = $this->adjustmentAllocations->allocationMethodValue($adjustment);
-            $seenKey = (string) $origin->getKey().':'.$method;
+            $seenKey = (string) (
+                in_array($method, ['first_invoice', 'last_invoice'], true)
+                    ? $origin->getKey()
+                    : $adjustment->getKey()
+            ).':'.$method;
             if (in_array($method, ['first_invoice', 'last_invoice'], true) && isset($lineage['invoice_adjustments_seen'][$seenKey])) {
                 continue;
             }
@@ -782,19 +786,27 @@ final class PurchaseInvoiceDtoFactory
                 ? ($lineage['current_invoice_quantities'] ?? $currentInvoiceQuantities)
                 : $currentInvoiceQuantities;
             $amount = $order instanceof PurchaseOrder
-                ? $this->adjustmentAllocations->invoiceShare($adjustment, $order, $allocationQuantities)
+                ? $this->adjustmentAllocations->invoiceDocumentShare($adjustment, $order, $allocationQuantities)
                 : (string) $adjustment->amount;
             if ($this->math->isZero($amount)) {
                 continue;
             }
 
-            $lineage['invoice_adjustments_seen'][$seenKey] = true;
-            $invoiceAdjustments[] = $this->toInvoiceAdjustment(
-                $adjustment,
-                $sourceId,
-                $sourceType,
-                $amount,
-            );
+            if (isset($lineage['invoice_adjustments_seen'][$seenKey])) {
+                $index = (int) $lineage['invoice_adjustments_seen'][$seenKey];
+                $invoiceAdjustments[$index] = $this->mergeInvoiceAdjustment(
+                    $invoiceAdjustments[$index],
+                    $amount,
+                );
+            } else {
+                $lineage['invoice_adjustments_seen'][$seenKey] = count($invoiceAdjustments);
+                $invoiceAdjustments[] = $this->toInvoiceAdjustment(
+                    $adjustment,
+                    $sourceId,
+                    $sourceType,
+                    $amount,
+                );
+            }
             $total = $adjustment->effect->value === 'increase'
                 ? $this->math->add($total, $amount)
                 : $this->math->sub($total, $amount);
@@ -822,9 +834,29 @@ final class PurchaseInvoiceDtoFactory
             sourceId: $sourceId,
             calculationType: $adjustment->calculation_type->value,
             rate: (string) $adjustment->rate,
-            sourceAmount: $amount,
+            sourceAmount: (string) $adjustment->amount,
             allocationMethod: AllocationMethod::Manual,
             isSystemGenerated: true,
+            description: $adjustment->description,
+        );
+    }
+
+    private function mergeInvoiceAdjustment(InvoiceAdjustmentData $adjustment, string $amount): InvoiceAdjustmentData
+    {
+        return new InvoiceAdjustmentData(
+            name: $adjustment->name,
+            adjustmentType: $adjustment->adjustmentType,
+            effect: $adjustment->effect,
+            amount: $this->math->add($adjustment->amount, $amount),
+            sourceAdjustmentType: $adjustment->sourceAdjustmentType,
+            sourceAdjustmentId: $adjustment->sourceAdjustmentId,
+            sourceType: $adjustment->sourceType,
+            sourceId: $adjustment->sourceId,
+            calculationType: $adjustment->calculationType,
+            rate: $adjustment->rate,
+            sourceAmount: $adjustment->sourceAmount,
+            allocationMethod: $adjustment->allocationMethod,
+            isSystemGenerated: $adjustment->isSystemGenerated,
             description: $adjustment->description,
         );
     }

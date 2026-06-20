@@ -16,10 +16,13 @@ use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentReversalService;
+use Modules\Payment\Services\PaymentStatusService;
 use Tests\TestCase;
 
 final class VoucherWorkspaceTest extends TestCase
@@ -99,7 +102,13 @@ final class VoucherWorkspaceTest extends TestCase
     public function test_reversal_voucher_resolves_from_payment_reversal_without_duplicate_reversal(): void
     {
         $tenantId = $this->createTenant();
-        $payment = $this->payment($tenantId, PaymentDirection::Inbound, PaymentType::CustomerReceipt, '200.000000');
+        $payment = $this->payment(
+            $tenantId,
+            PaymentDirection::Inbound,
+            PaymentType::CustomerReceipt,
+            '200.000000',
+            post: true,
+        );
 
         $reversal = app(PaymentReversalService::class)->reverse(new PaymentReversalData(
             paymentId: (int) $payment->getKey(),
@@ -137,19 +146,134 @@ final class VoucherWorkspaceTest extends TestCase
         ]))->assertNotFound();
     }
 
-    private function payment(int $tenantId, PaymentDirection $direction, PaymentType $type, string $amount): Payment
+    private function payment(
+        int $tenantId,
+        PaymentDirection $direction,
+        PaymentType $type,
+        string $amount,
+        bool $post = false,
+    ): Payment
     {
-        return app(PaymentCreationService::class)->create(new CreatePaymentData(
+        $partyType = $direction === PaymentDirection::Inbound ? 'customer' : 'supplier';
+        $partyId = $partyType === 'customer'
+            ? $this->customer($tenantId)
+            : $this->supplier($tenantId);
+        $payment = app(PaymentCreationService::class)->create(new CreatePaymentData(
             tenantId: $tenantId,
             paymentType: $type,
             direction: $direction,
             paymentDate: '2026-06-15',
-            partyType: $direction === PaymentDirection::Inbound ? 'customer' : 'supplier',
+            partyType: $partyType,
+            partyId: $partyId,
             payeeName: $direction === PaymentDirection::Inbound ? 'Walk-in customer' : 'Acme Supplier',
             lines: [
-                new PaymentLineData(amount: $amount),
+                new PaymentLineData(amount: $amount, paymentMethodId: $this->paymentMethod($tenantId, $direction)),
             ],
         ));
+
+        if (! $post) {
+            return $payment;
+        }
+
+        $this->paymentFinanceContext($tenantId, $direction);
+        $statuses = app(PaymentStatusService::class);
+        $payment = $statuses->transition($payment, PaymentStatus::PendingApproval);
+        $payment = $statuses->transition($payment, PaymentStatus::Approved);
+
+        return app(PaymentPostingService::class)->post($payment);
+    }
+
+    private function customer(int $tenantId): int
+    {
+        $code = 'CUS-'.Str::upper(Str::random(6));
+
+        return (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => $code,
+            'code' => $code,
+            'name' => 'Voucher Customer',
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function supplier(int $tenantId): int
+    {
+        $code = 'SUP-'.Str::upper(Str::random(6));
+
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_number' => $code,
+            'code' => $code,
+            'name' => 'Voucher Supplier',
+            'supplier_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentMethod(int $tenantId, PaymentDirection $direction): int
+    {
+        return (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
+            'code' => 'CASH-'.Str::upper(Str::random(6)),
+            'name' => 'Cash',
+            'method_type' => 'cash',
+            'direction_allowed' => $direction->value,
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentFinanceContext(int $tenantId, PaymentDirection $direction): void
+    {
+        $assetType = $this->accountType($tenantId, 'PAYMENT-ASSET', 'debit');
+        $liabilityType = $this->accountType($tenantId, 'PAYMENT-LIABILITY', 'credit');
+        $cashId = $this->account($tenantId, $assetType, '1010', 'Cash', 'debit');
+        $counterpartId = $direction === PaymentDirection::Inbound
+            ? $this->account($tenantId, $assetType, '1100', 'Accounts Receivable', 'debit')
+            : $this->account($tenantId, $liabilityType, '2100', 'Accounts Payable', 'credit');
+        $yearId = (int) DB::table('finance_fiscal_years')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_fiscal_periods')->insert([
+            'tenant_id' => $tenantId,
+            'fiscal_year_id' => $yearId,
+            'name' => 'June 2026',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $profileCode = $direction === PaymentDirection::Inbound ? 'payment_received' : 'payment_made';
+        $counterpartKey = $direction === PaymentDirection::Inbound ? 'receivable' : 'payable';
+        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $profileCode,
+            'name' => Str::headline($profileCode),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            ['posting_profile_id' => $profileId, 'line_key' => 'cash', 'account_id' => $cashId, 'created_at' => now(), 'updated_at' => now()],
+            ['posting_profile_id' => $profileId, 'line_key' => $counterpartKey, 'account_id' => $counterpartId, 'created_at' => now(), 'updated_at' => now()],
+        ]);
     }
 
     /**

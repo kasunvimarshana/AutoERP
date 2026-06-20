@@ -19,7 +19,9 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
-use Modules\Vehicle\Models\VehicleOwnership;
+use Modules\Reporting\Services\ReportingAuthorizationService;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Models\UserModel;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
@@ -49,6 +51,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_report_returns_readable_rows_and_summary_totals(): void
     {
         $context = $this->context('READ');
+        $this->authorize($context);
         $job = $this->createJob($context, date: '2026-06-01', supervisorCommissionType: VehicleServiceCommissionType::Fixed, supervisorCommissionValue: '15.000000');
         $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Engine tune labour');
 
@@ -88,6 +91,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_report_filters_supported_fields(): void
     {
         $context = $this->context('FILT');
+        $this->authorize($context);
         $matchingJob = $this->createJob($context, date: '2026-06-03', supervisorCommissionType: VehicleServiceCommissionType::Fixed, supervisorCommissionValue: '5.000000');
         $matchingLine = $this->line($matchingJob, $context['labour'], '1.000000', '100.000000', 'Precision alignment');
         $matching = $this->assignment($matchingJob, $matchingLine, $context['employee_id'], 'technician', '1.000000', '40.000000', VehicleServiceCommissionType::Percentage, '10.000000');
@@ -135,6 +139,7 @@ final class TechnicianWorkReportTest extends TestCase
         $this->assignmentForContext($context, 'Tenant A work');
         $this->assignmentForContext($otherTenant, 'Tenant B work');
         $this->assignmentForContext($otherOrg, 'Other org work');
+        $this->authorize($context);
 
         $this->getJson('/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
             ->assertOk()
@@ -145,6 +150,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_employee_commission_report_returns_dimensions_summaries_rankings_and_groups(): void
     {
         $context = $this->context('COM');
+        $this->authorize($context);
         $other = $this->alternateResources($context, 'COM-ALT');
         $job = $this->createJob(
             $context,
@@ -173,7 +179,7 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('summary.supervisor_commission', '25.000000')
             ->assertJsonPath('summary.total_commission', '65.000000')
             ->assertJsonPath('summary.average_commission_per_job', '65.000000')
-            ->assertJsonPath('summary.average_commission_per_hour', '21.666667')
+            ->assertJsonPath('summary.average_commission_per_hour', '21.666666')
             ->assertJsonPath('rankings.top_earning_employee.employee.code', 'EMP-COM')
             ->assertJsonPath('rankings.top_earning_employee.labour_value', '100.000000')
             ->assertJsonPath('rankings.top_commission_employee.employee.code', 'EMP-COM');
@@ -209,6 +215,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
     {
         $context = $this->context('COM-FILT');
+        $this->authorize($context);
         $otherOrg = $this->alternateResources($context, 'ORG');
         $matching = $this->assignmentForContext($context, 'Matching commission');
         $this->assignmentForContext($otherOrg, 'Other organization commission');
@@ -239,7 +246,7 @@ final class TechnicianWorkReportTest extends TestCase
             ]))
                 ->assertOk()
                 ->assertJsonPath('meta.total', 1)
-                ->assertJsonPath('data.0.id', (int) $matching->getKey());
+                ->assertJsonPath('data.0.id', 'technician-'.$matching->getKey());
         }
 
         $this->get('/api/v1/reports/vehicle-service/employee-commissions/export/csv?'.http_build_query($this->scope($context)))
@@ -252,6 +259,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_employee_commission_report_excludes_cancelled_work_by_default(): void
     {
         $context = $this->context('COM-CANCEL');
+        $this->authorize($context);
         $job = $this->createJob(
             $context,
             supervisorCommissionType: VehicleServiceCommissionType::Fixed,
@@ -296,6 +304,7 @@ final class TechnicianWorkReportTest extends TestCase
     public function test_existing_generic_and_specialized_pdf_export_endpoints_keep_working(): void
     {
         $context = $this->context('PDF');
+        $this->authorize($context);
         $this->assignmentForContext($context, 'PDF export assignment');
         Pdf::fake();
 
@@ -619,15 +628,16 @@ final class TechnicianWorkReportTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('vehicle_ownerships')->insert([
+        DB::table('customer_vehicles')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'vehicle_id' => $vehicleId,
-            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
-            'owner_id' => $customerId,
-            'ownership_type' => 'customer_owned',
+            'customer_id' => $customerId,
+            'relationship_type' => 'customer_owned',
             'started_at' => now(),
             'is_current' => true,
+            'current_guard' => 1,
+            'active_guard' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -664,5 +674,55 @@ final class TechnicianWorkReportTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /** @param array<string, mixed> $context */
+    private function authorize(array $context): void
+    {
+        $tenantId = (int) $context['tenant_id'];
+        $organizationUnitId = (int) $context['organization_unit_id'];
+        $guard = (string) config('auth.defaults.guard', 'web');
+        $now = now();
+        $userId = (int) DB::table('users')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'first_name' => 'Reporting',
+            'last_name' => 'Administrator',
+            'email' => 'reporting-admin-'.Str::lower(Str::random(8)).'@example.test',
+            'password' => bcrypt('secret-password'),
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => UserPermission::SUPER_ADMIN_ROLE,
+            'guard_name' => $guard,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach (ReportingAuthorizationService::descriptions() as $name => $description) {
+            DB::table('permissions')->insert([
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'guard_name' => $guard,
+                'module' => 'Reporting',
+                'description' => $description,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->actingAs(UserModel::query()->findOrFail($userId));
     }
 }

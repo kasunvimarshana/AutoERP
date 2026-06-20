@@ -14,6 +14,9 @@ use Modules\Payment\Models\ChequeTemplate;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Models\PaymentMethod;
+use Modules\Payment\Services\PaymentAuthorizationService;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Models\UserModel;
 use Tests\TestCase;
 
 final class ChequePrintTest extends TestCase
@@ -29,6 +32,7 @@ final class ChequePrintTest extends TestCase
     public function test_cheque_template_crud(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $payload = $this->templatePayload($tenantId);
 
         $created = $this->postJson('/api/v1/payments/cheque-templates', $payload)
@@ -53,6 +57,11 @@ final class ChequePrintTest extends TestCase
             ->assertJsonPath('data.template_name', 'Updated Bank Cheque')
             ->assertJsonPath('data.date_x_mm', '160.500');
 
+        $this->postJson('/api/v1/payments/cheque-templates', [
+            ...$payload,
+            'template_name' => 'Replacement Default Cheque',
+        ])->assertCreated();
+
         $this->deleteJson('/api/v1/payments/cheque-templates/'.$created['id'], [
             'tenant_id' => $tenantId,
         ])->assertNoContent();
@@ -63,35 +72,38 @@ final class ChequePrintTest extends TestCase
     public function test_preview_returns_payment_and_template_data_for_valid_cheque_payment(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $template = $this->createTemplate($tenantId);
         $payment = $this->createPayment($tenantId, PaymentMethodType::Cheque, PaymentStatus::Approved);
 
         $this->getJson($this->previewUrl($payment, $template, $tenantId))
             ->assertOk()
             ->assertJsonPath('data.payment.payment_number', 'PAY-0001')
-            ->assertJsonPath('data.payment.payment_method', 'cheque')
-            ->assertJsonPath('data.payment.payee_name', 'ABC Supplier')
-            ->assertJsonPath('data.payment.amount', '12500.000000')
-            ->assertJsonPath('data.payment.amount_in_words', 'Twelve Thousand Five Hundred Only')
-            ->assertJsonPath('data.payment.cheque_date', '2026-06-11')
-            ->assertJsonPath('data.payment.formatted_cheque_date', '11/06/2026')
+            ->assertJsonPath('data.line.payment_method', 'cheque')
+            ->assertJsonPath('data.line.payee_name', 'ABC Supplier')
+            ->assertJsonPath('data.line.amount', '12500.000000')
+            ->assertJsonPath('data.line.amount_in_words', 'Twelve Thousand Five Hundred Only')
+            ->assertJsonPath('data.line.cheque_date', '2026-06-11')
+            ->assertJsonPath('data.line.formatted_cheque_date', '11/06/2026')
             ->assertJsonPath('data.template.template_name', 'Default Bank Cheque');
     }
 
     public function test_preview_rejects_non_cheque_payment(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $template = $this->createTemplate($tenantId);
         $payment = $this->createPayment($tenantId, PaymentMethodType::Cash, PaymentStatus::Approved);
 
         $this->getJson($this->previewUrl($payment, $template, $tenantId))
             ->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Payment method must be cheque.');
+            ->assertJsonPath('error.message', 'Selected payment line is not cheque-capable.');
     }
 
     public function test_preview_rejects_cancelled_and_reversed_payments(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $template = $this->createTemplate($tenantId);
 
         foreach ([PaymentStatus::Cancelled, PaymentStatus::Reversed] as $status) {
@@ -111,10 +123,12 @@ final class ChequePrintTest extends TestCase
     public function test_mark_printed_creates_print_log(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $template = $this->createTemplate($tenantId);
         $payment = $this->createPayment($tenantId, PaymentMethodType::Cheque, PaymentStatus::Posted);
 
-        $this->postJson('/api/v1/payments/'.$payment->getKey().'/cheque-print/mark-printed', [
+        $lineId = $this->lineId($payment);
+        $this->postJson('/api/v1/payments/'.$payment->getKey().'/lines/'.$lineId.'/cheque-print', [
             'tenant_id' => $tenantId,
             'cheque_template_id' => $template->getKey(),
             'notes' => 'Test print confirmed',
@@ -126,6 +140,7 @@ final class ChequePrintTest extends TestCase
         $this->assertDatabaseHas('cheque_print_logs', [
             'tenant_id' => $tenantId,
             'payment_id' => $payment->getKey(),
+            'payment_line_id' => $lineId,
             'cheque_template_id' => $template->getKey(),
             'print_status' => 'printed',
             'notes' => 'Test print confirmed',
@@ -147,35 +162,43 @@ final class ChequePrintTest extends TestCase
             'PAY-SCOPE',
             $orgOne,
         );
+        $lineId = $this->lineId($payment);
 
-        $this->getJson('/api/v1/payments/'.$payment->getKey().'/cheque-print/preview?tenant_id='.$otherTenantId.'&cheque_template_id='.$template->getKey())
+        $this->authorize($otherTenantId);
+        $this->getJson('/api/v1/payments/'.$payment->getKey().'/lines/'.$lineId.'/cheque-print/preview?tenant_id='.$otherTenantId.'&cheque_template_id='.$template->getKey())
             ->assertNotFound();
 
-        $this->getJson('/api/v1/payments/'.$payment->getKey().'/cheque-print/preview?tenant_id='.$tenantId.'&organization_unit_id='.$orgTwo.'&cheque_template_id='.$template->getKey())
+        $this->authorize($tenantId, $orgOne);
+        $this->getJson('/api/v1/payments/'.$payment->getKey().'/lines/'.$lineId.'/cheque-print/preview?tenant_id='.$tenantId.'&organization_unit_id='.$orgTwo.'&cheque_template_id='.$template->getKey())
             ->assertNotFound();
 
         $otherOrgTemplate = $this->createTemplate($tenantId, $orgTwo, 'Other Org Cheque');
-        $this->getJson('/api/v1/payments/'.$payment->getKey().'/cheque-print/preview?tenant_id='.$tenantId.'&organization_unit_id='.$orgOne.'&cheque_template_id='.$otherOrgTemplate->getKey())
+        $this->getJson('/api/v1/payments/'.$payment->getKey().'/lines/'.$lineId.'/cheque-print/preview?tenant_id='.$tenantId.'&organization_unit_id='.$orgOne.'&cheque_template_id='.$otherOrgTemplate->getKey())
             ->assertNotFound();
     }
 
     public function test_inactive_template_is_rejected(): void
     {
         $tenantId = $this->createTenant();
+        $this->authorize($tenantId);
         $template = $this->createTemplate($tenantId);
         $template->forceFill(['is_active' => false])->save();
         $payment = $this->createPayment($tenantId, PaymentMethodType::Cheque, PaymentStatus::Approved);
 
         $this->getJson($this->previewUrl($payment, $template, $tenantId))
-            ->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Cheque template must be active.');
+            ->assertNotFound();
     }
 
     private function previewUrl(Payment $payment, ChequeTemplate $template, int $tenantId): string
     {
-        return '/api/v1/payments/'.$payment->getKey().'/cheque-print/preview'
+        return '/api/v1/payments/'.$payment->getKey().'/lines/'.$this->lineId($payment).'/cheque-print/preview'
             .'?tenant_id='.$tenantId
             .'&cheque_template_id='.$template->getKey();
+    }
+
+    private function lineId(Payment $payment): int
+    {
+        return (int) PaymentLine::query()->where('payment_id', $payment->getKey())->valueOrFail('id');
     }
 
     private function createPayment(
@@ -294,5 +317,52 @@ final class ChequePrintTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function authorize(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $guard = (string) config('auth.defaults.guard', 'web');
+        $now = now();
+        $userId = (int) DB::table('users')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'first_name' => 'Cheque',
+            'last_name' => 'Administrator',
+            'email' => 'cheque-admin-'.Str::lower(Str::random(8)).'@example.test',
+            'password' => bcrypt('secret-password'),
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => UserPermission::SUPER_ADMIN_ROLE,
+            'guard_name' => $guard,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach (PaymentAuthorizationService::descriptions() as $name => $description) {
+            DB::table('permissions')->insert([
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'guard_name' => $guard,
+                'module' => 'Payment',
+                'description' => $description,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->actingAs(UserModel::query()->findOrFail($userId));
     }
 }

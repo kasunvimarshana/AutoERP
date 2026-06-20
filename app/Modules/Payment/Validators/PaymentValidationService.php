@@ -10,7 +10,6 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\DTOs\BalanceResultData;
-use Modules\Invoice\Models\Invoice;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
@@ -88,11 +87,10 @@ final class PaymentValidationService
             throw new InvalidArgumentException('Payment invoice organization unit must match payment organization unit.');
         }
 
-        $invoice = Invoice::query()->findOrFail($allocation->invoiceId);
-        if ($payment->party_type !== $invoice->party_type || (int) $payment->party_id !== (int) $invoice->party_id) {
+        if ($payment->party_type !== $invoiceBalance->partyType || (int) $payment->party_id !== (int) $invoiceBalance->partyId) {
             throw new InvalidArgumentException('Payment invoice party must match payment party.');
         }
-        if ($payment->currency_id !== null && $invoice->currency_id !== null && (int) $payment->currency_id !== (int) $invoice->currency_id) {
+        if ($payment->currency_id !== null && $invoiceBalance->currencyId !== null && (int) $payment->currency_id !== $invoiceBalance->currencyId) {
             throw new InvalidArgumentException('Cross-currency payment allocation is not supported.');
         }
 

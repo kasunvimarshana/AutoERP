@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -49,6 +50,10 @@ return new class extends Migration
             $table->index('return_date', 'purchase_returns_date_idx');
             $table->index(['source_type', 'source_id'], 'purchase_returns_source_idx');
         });
+
+        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
+            DB::statement("ALTER TABLE purchase_returns ADD CONSTRAINT purchase_returns_status_chk CHECK (status IN ('draft','approved','posted','cancelled'))");
+        }
     }
 
     public function down(): void

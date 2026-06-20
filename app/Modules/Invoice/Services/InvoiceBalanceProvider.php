@@ -68,6 +68,9 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
                     ? $balance->status->value
                     : $balance->status
             ),
+            partyType: $invoice->party_type,
+            partyId: $invoice->party_id,
+            currencyId: $invoice->currency_id,
             sourceType: 'invoice',
         );
     }

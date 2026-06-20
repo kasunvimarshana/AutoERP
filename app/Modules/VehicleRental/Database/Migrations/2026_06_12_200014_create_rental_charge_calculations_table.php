@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('agreement_id')->constrained('rental_agreements')->restrictOnDelete();
             $table->foreignId('agreement_vehicle_id')->nullable()->constrained('rental_agreement_vehicles')->restrictOnDelete();
             $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->restrictOnDelete();
-            $table->unsignedBigInteger('usage_context_id')->nullable();
+            $table->foreignId('usage_context_id')->nullable()->constrained('rental_usage_contexts')->restrictOnDelete();
             $table->foreignId('rate_snapshot_id')->nullable()->constrained('rental_agreement_rate_snapshots')->restrictOnDelete();
             $table->string('agreement_direction', 20);
             $table->string('financial_side', 20);

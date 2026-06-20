@@ -7,59 +7,27 @@ namespace Modules\Payment\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Payment\Services\PaymentAuthorizationService;
-use Modules\User\Constants\UserPermission;
 
 final class PaymentSeeder extends Seeder
 {
-    use ResolvesSeedContext;
-
     public function run(): void
     {
         if (! Schema::hasTable('permissions')) {
             return;
         }
 
-        $tenant = $this->defaultTenant();
-        if ($tenant === null) {
-            return;
-        }
-
-        DB::transaction(function () use ($tenant): void {
-            $tenantId = (int) $tenant->getKey();
+        DB::transaction(function (): void {
             $guard = (string) config('auth.defaults.guard', 'web');
-            $permissionIds = [];
 
-            foreach (PaymentAuthorizationService::descriptions() as $name => $description) {
-                DB::table('permissions')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
-                    [
-                        'organization_unit_id' => null,
-                        'module' => 'Payment',
-                        'description' => $description,
-                        'row_version' => 1,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
-                $permissionIds[] = (int) DB::table('permissions')
-                    ->where('tenant_id', $tenantId)
-                    ->where('name', $name)
-                    ->where('guard_name', $guard)
-                    ->value('id');
-            }
-
-            $roleId = DB::table('roles')
-                ->where('tenant_id', $tenantId)
-                ->where('name', UserPermission::SUPER_ADMIN_ROLE)
-                ->value('id');
-            if ($roleId !== null && Schema::hasTable('role_permissions')) {
-                foreach ($permissionIds as $permissionId) {
-                    DB::table('role_permissions')->updateOrInsert(
-                        ['tenant_id' => $tenantId, 'role_id' => (int) $roleId, 'permission_id' => $permissionId],
+            foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+                foreach (PaymentAuthorizationService::descriptions() as $name => $description) {
+                    DB::table('permissions')->updateOrInsert(
+                        ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
                         [
                             'organization_unit_id' => null,
+                            'module' => 'Payment',
+                            'description' => $description,
                             'row_version' => 1,
                             'updated_at' => now(),
                             'created_at' => now(),

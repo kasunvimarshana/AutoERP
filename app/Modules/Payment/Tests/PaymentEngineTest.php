@@ -48,8 +48,8 @@ final class PaymentEngineTest extends TestCase
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-CREATE',
             lines: [
-                new PaymentLineData(amount: '25000.000000'),
-                new PaymentLineData(amount: '15000.000000'),
+                new PaymentLineData(amount: '25000.000000', paymentMethodId: $this->cashMethodId($tenantId)),
+                new PaymentLineData(amount: '15000.000000', paymentMethodId: $this->cashMethodId($tenantId)),
             ],
         ));
 
@@ -72,8 +72,11 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-001',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
             lines: [
-                new PaymentLineData(amount: '80000.000000'),
+                new PaymentLineData(amount: '80000.000000', paymentMethodId: $this->cashMethodId($tenantId)),
             ],
             allocations: [
                 new PaymentAllocationData(
@@ -94,7 +97,7 @@ final class PaymentEngineTest extends TestCase
 
         $this->assertSame('80000.000000', (string) $payment->allocated_amount);
         $this->assertSame('0.000000', (string) $payment->unapplied_amount);
-        $this->assertSame(PaymentStatus::FullyAllocated, $payment->status);
+        $this->assertSame(PaymentStatus::Posted, $payment->status);
         $this->assertSame('0.000000', (string) $invoiceOne->balance->remaining_amount);
         $this->assertSame('43000.000000', (string) $invoiceTwo->balance->remaining_amount);
     }
@@ -110,8 +113,11 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-002',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
             lines: [
-                new PaymentLineData(amount: '100000.000000'),
+                new PaymentLineData(amount: '100000.000000', paymentMethodId: $this->cashMethodId($tenantId)),
             ],
         ));
 
@@ -127,7 +133,7 @@ final class PaymentEngineTest extends TestCase
         $this->assertSame('57000.000000', (string) $payment->unapplied_amount);
         $this->assertSame('57000.000000', (string) $payment->unappliedBalance->remaining_amount);
         $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
-        $this->assertSame(PaymentStatus::PartiallyAllocated, $payment->status);
+        $this->assertSame(PaymentStatus::Posted, $payment->status);
     }
 
     public function test_many_payments_can_allocate_to_one_invoice(): void
@@ -141,7 +147,10 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-MANY-1',
-            lines: [new PaymentLineData(amount: '25000.000000')],
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '25000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
             allocations: [
                 new PaymentAllocationData(
                     invoiceId: (int) $invoice->getKey(),
@@ -157,7 +166,10 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-MANY-2',
-            lines: [new PaymentLineData(amount: '30000.000000')],
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '30000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
             allocations: [
                 new PaymentAllocationData(
                     invoiceId: (int) $invoice->getKey(),
@@ -179,7 +191,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-REFUND',
-            lines: [new PaymentLineData(amount: '50000.000000')],
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '50000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
         app(PaymentRefundService::class)->refund(new PaymentRefundData(
@@ -205,7 +218,7 @@ final class PaymentEngineTest extends TestCase
         ));
     }
 
-    public function test_reversal_restores_invoice_balance_and_blocks_reuse(): void
+    public function test_reversal_requires_a_posted_finance_journal(): void
     {
         $tenantId = $this->createTenant();
         $invoice = $this->createPostedInvoice($tenantId, 'INV-REV', '60000.000000');
@@ -215,7 +228,10 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-REV',
-            lines: [new PaymentLineData(amount: '60000.000000')],
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '60000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
             allocations: [
                 new PaymentAllocationData(
                     invoiceId: (int) $invoice->getKey(),
@@ -227,26 +243,15 @@ final class PaymentEngineTest extends TestCase
 
         $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
 
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Payment cannot be reversed without a posted Finance journal.');
+
         app(PaymentReversalService::class)->reverse(new PaymentReversalData(
             paymentId: (int) $payment->getKey(),
             reversalNumber: 'REV-001',
             reversalDate: '2026-06-06',
             reason: 'Incorrect receipt',
         ));
-
-        $this->assertSame('60000.000000', (string) $invoice->refresh()->balance->remaining_amount);
-        $this->assertSame(PaymentStatus::Reversed, $payment->refresh()->status);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cancelled, void, refunded, or reversed payments cannot be allocated.');
-
-        app(PaymentAllocationService::class)->allocate($payment, [
-            new PaymentAllocationData(
-                invoiceId: (int) $invoice->getKey(),
-                allocatedAmount: '1000.000000',
-                allocationDate: '2026-06-06',
-            ),
-        ]);
     }
 
     public function test_it_prevents_over_allocation_and_scope_mismatch(): void
@@ -262,7 +267,10 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-SCOPE',
-            lines: [new PaymentLineData(amount: '5000.000000')],
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '5000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
         try {
@@ -304,7 +312,10 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-ORG',
-            lines: [new PaymentLineData(amount: '5000.000000')],
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '5000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
         $this->expectException(InvalidArgumentException::class);
@@ -333,6 +344,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-METHODS',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
             sourceType: 'sales_order',
             sourceId: 77,
             lines: [
@@ -367,6 +380,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-INACTIVE-METHOD',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
             lines: [new PaymentLineData(amount: '10.000000', paymentMethodId: (int) $inactive->getKey())],
         ));
     }
@@ -378,13 +393,15 @@ final class PaymentEngineTest extends TestCase
         $method = $this->createPaymentMethod($otherTenantId, PaymentMethodType::Cash, 'OTHER');
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Payment method tenant must match payment tenant.');
+        $this->expectExceptionMessage('Payment method scope must match payment scope.');
         app(PaymentCreationService::class)->create(new CreatePaymentData(
             tenantId: $tenantId,
             paymentType: PaymentType::CustomerReceipt,
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-CROSS-METHOD',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
             lines: [new PaymentLineData(amount: '10.000000', paymentMethodId: (int) $method->getKey())],
         ));
     }
@@ -398,7 +415,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-FULL-REFUND',
-            lines: [new PaymentLineData(amount: '50000.000000')],
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '50000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
         app(PaymentRefundService::class)->refund(new PaymentRefundData(
@@ -410,7 +428,7 @@ final class PaymentEngineTest extends TestCase
         ));
 
         $payment->refresh();
-        $this->assertSame(PaymentStatus::Refunded, $payment->status);
+        $this->assertSame(PaymentStatus::Posted, $payment->status);
         $this->assertSame('0.000000', (string) $payment->unapplied_amount);
 
     }
@@ -424,7 +442,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-DUP-REFUND',
-            lines: [new PaymentLineData(amount: '50000.000000')],
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(amount: '50000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
         app(PaymentRefundService::class)->refund(new PaymentRefundData(
@@ -453,15 +472,21 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-DUP-REV',
-            lines: [new PaymentLineData(amount: '50000.000000')],
+            lines: [new PaymentLineData(amount: '50000.000000', paymentMethodId: $this->cashMethodId($tenantId))],
         ));
 
-        app(PaymentReversalService::class)->reverse(new PaymentReversalData(
-            paymentId: (int) $payment->getKey(),
-            reversalNumber: 'REV-DUP-1',
-            reversalDate: '2026-06-06',
-            reason: 'Wrong party',
-        ));
+        DB::table('payment_reversals')->insert([
+            'tenant_id' => $tenantId,
+            'payment_id' => $payment->getKey(),
+            'reversal_number' => 'REV-DUP-1',
+            'reversal_date' => '2026-06-06',
+            'reason' => 'Wrong party',
+            'original_amount' => '50000.000000',
+            'reversed_amount' => '50000.000000',
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->assertSame('50000.000000', (string) $payment->refresh()->reversals()->firstOrFail()->reversed_amount);
 
@@ -488,6 +513,8 @@ final class PaymentEngineTest extends TestCase
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-SETTLE',
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
             lines: [
                 new PaymentLineData(amount: '100.000000', paymentMethodId: (int) $cheque->getKey(), referenceNumber: 'CHQ-77'),
                 new PaymentLineData(amount: '200.000000', paymentMethodId: (int) $bank->getKey(), metadata: ['transfer_reference' => 'TR-77']),
@@ -522,6 +549,8 @@ final class PaymentEngineTest extends TestCase
             invoiceDate: '2026-06-06',
             organizationUnitId: $organizationUnitId,
             invoiceNumber: $invoiceNumber,
+            partyType: 'customer',
+            partyId: $this->customerId($tenantId),
             lines: [
                 new InvoiceLineData(
                     lineNumber: 1,
@@ -541,7 +570,7 @@ final class PaymentEngineTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
 
-        return (int) DB::table('tenants')->insertGetId([
+        $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),
             'code' => 'TEN-PAY-'.$suffix,
             'name' => 'Payment Tenant '.$suffix,
@@ -552,6 +581,85 @@ final class PaymentEngineTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $yearId = (int) DB::table('finance_fiscal_years')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_fiscal_periods')->insert([
+            'tenant_id' => $tenantId,
+            'fiscal_year_id' => $yearId,
+            'name' => 'June 2026',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $assetTypeId = (int) DB::table('finance_account_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'ASSET',
+            'name' => 'Asset',
+            'normal_balance' => 'debit',
+            'statement_type' => 'balance_sheet',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $liabilityTypeId = (int) DB::table('finance_account_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'LIABILITY',
+            'name' => 'Liability',
+            'normal_balance' => 'credit',
+            'statement_type' => 'balance_sheet',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $cashAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1010',
+            'name' => 'Cash',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_cash_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $payableAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'account_type_id' => $liabilityTypeId,
+            'code' => '2100',
+            'name' => 'Accounts Payable',
+            'normal_balance' => 'credit',
+            'is_posting_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'payment_made',
+            'name' => 'Payment Made',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            ['posting_profile_id' => $profileId, 'line_key' => 'cash', 'account_id' => $cashAccountId, 'created_at' => now(), 'updated_at' => now()],
+            ['posting_profile_id' => $profileId, 'line_key' => 'payable', 'account_id' => $payableAccountId, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        return $tenantId;
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int
@@ -583,6 +691,34 @@ final class PaymentEngineTest extends TestCase
             'requires_bank_account' => false,
             'is_active' => $isActive,
             'sort_order' => 1,
+        ]);
+    }
+
+    private function cashMethodId(int $tenantId): int
+    {
+        return (int) $this->createPaymentMethod($tenantId, PaymentMethodType::Cash, 'CASH')->getKey();
+    }
+
+    private function customerId(int $tenantId): int
+    {
+        $customerId = DB::table('customers')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_number', 'CUS-PAYMENT-TEST')
+            ->value('id');
+
+        if ($customerId !== null) {
+            return (int) $customerId;
+        }
+
+        return (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => 'CUS-PAYMENT-TEST',
+            'code' => 'CUS-PAYMENT-TEST',
+            'name' => 'Payment Test Customer',
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 }

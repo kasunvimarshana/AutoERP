@@ -10,7 +10,6 @@ use Illuminate\Support\Str;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Services\ItemAuthorizationService;
-use Modules\Vehicle\Models\VehicleOwnership;
 use Tests\TestCase;
 
 final class ItemBaseUomTest extends TestCase
@@ -437,14 +436,15 @@ final class ItemBaseUomTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        DB::table('vehicle_ownerships')->insert([
+        DB::table('customer_vehicles')->insert([
             ...$this->scope($context),
             'vehicle_id' => $vehicleId,
-            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
-            'owner_id' => $customerId,
-            'ownership_type' => 'customer_owned',
+            'customer_id' => $customerId,
+            'relationship_type' => 'customer_owned',
             'started_at' => $now,
             'is_current' => true,
+            'current_guard' => 1,
+            'active_guard' => 1,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

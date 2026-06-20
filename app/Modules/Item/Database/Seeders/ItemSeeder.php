@@ -27,6 +27,8 @@ final class ItemSeeder extends Seeder
             return;
         }
 
+        $this->seedPermissions();
+
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
         if ($tenant === null) {
@@ -36,7 +38,6 @@ final class ItemSeeder extends Seeder
         DB::transaction(function () use ($tenant, $organizationUnit): void {
             $tenantId = (int) $tenant->getKey();
             $organizationUnitId = $organizationUnit?->getKey();
-            $this->seedPermissions($tenantId);
             $categories = $this->seedCategories($tenantId, $organizationUnitId);
             $brand = $this->seedBrand($tenantId, $organizationUnitId);
             $items = $this->seedItems($tenantId, $organizationUnitId, $categories, $brand);
@@ -271,25 +272,27 @@ final class ItemSeeder extends Seeder
             ->first();
     }
 
-    private function seedPermissions(int $tenantId): void
+    private function seedPermissions(): void
     {
         if (! Schema::hasTable('permissions')) {
             return;
         }
 
         $guard = (string) config('auth.defaults.guard', 'web');
-        foreach (ItemAuthorizationService::descriptions() as $name => $description) {
-            DB::table('permissions')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
-                [
-                    'organization_unit_id' => null,
-                    'module' => 'Item',
-                    'description' => $description,
-                    'row_version' => 1,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
+        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+            foreach (ItemAuthorizationService::descriptions() as $name => $description) {
+                DB::table('permissions')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
+                    [
+                        'organization_unit_id' => null,
+                        'module' => 'Item',
+                        'description' => $description,
+                        'row_version' => 1,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ],
+                );
+            }
         }
     }
 }

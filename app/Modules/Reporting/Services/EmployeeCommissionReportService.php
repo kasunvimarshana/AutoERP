@@ -358,12 +358,17 @@ final class EmployeeCommissionReportService
         $direction = (string) ($params['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $groupBy = (string) ($params['group_by'] ?? 'employee');
 
-        if (isset($groupColumns[$groupBy])) {
+        $hasExplicitSort = array_key_exists('sort', $params) && trim((string) $params['sort']) !== '';
+        if (! $hasExplicitSort && isset($groupColumns[$groupBy])) {
+            $query->orderBy($groupColumns[$groupBy]);
+        }
+
+        $query->orderBy($columns[$sort] ?? $columns['job_date'], $direction);
+        if ($hasExplicitSort && isset($groupColumns[$groupBy])) {
             $query->orderBy($groupColumns[$groupBy]);
         }
 
         $query
-            ->orderBy($columns[$sort] ?? $columns['job_date'], $direction)
             ->orderBy('commission_rows.job_id', 'desc')
             ->orderBy('commission_rows.commission_source')
             ->orderBy('commission_rows.source_id');

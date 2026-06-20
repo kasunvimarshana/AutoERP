@@ -15,6 +15,9 @@ final readonly class BalanceResultData
         public string $creditAmount,
         public string $remainingAmount,
         public string $status,
+        public ?string $partyType,
+        public ?int $partyId,
+        public ?int $currencyId,
         public string $sourceType = 'invoice',
     ) {}
 }

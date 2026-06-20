@@ -18,8 +18,10 @@ use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\DTOs\PaymentPostingContext;
+use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentFinanceIntegrationService;
 use Tests\TestCase;
@@ -33,12 +35,12 @@ final class PaymentFinanceIntegrationTest extends TestCase
         [$tenantId] = $this->createChart();
         $payment = app(PaymentCreationService::class)->create(new CreatePaymentData(
             tenantId: $tenantId,
-            paymentType: PaymentType::CustomerReceipt,
+            paymentType: PaymentType::Advance,
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             paymentNumber: 'PAY-FIN-PREP',
             lines: [
-                new PaymentLineData(amount: '1000.000000'),
+                new PaymentLineData(amount: '1000.000000', paymentMethodId: (int) $this->paymentMethod($tenantId)->getKey()),
             ],
         ));
 
@@ -133,6 +135,18 @@ final class PaymentFinanceIntegrationTest extends TestCase
             'is_isolated' => true,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentMethod(int $tenantId): PaymentMethod
+    {
+        return PaymentMethod::query()->create([
+            'tenant_id' => $tenantId,
+            'code' => 'CASH',
+            'name' => 'Cash',
+            'method_type' => PaymentMethodType::Cash,
+            'direction_allowed' => 'both',
+            'is_active' => true,
         ]);
     }
 }

@@ -61,20 +61,10 @@ return new class extends Migration
                 ->on('rental_agreement_vehicle_links')
                 ->restrictOnDelete();
         });
-
-        Schema::table('rental_status_histories', function (Blueprint $table): void {
-            $table->foreign('agreement_vehicle_link_id', 'rsh_vehicle_link_fk')
-                ->references('id')
-                ->on('rental_agreement_vehicle_links')
-                ->nullOnDelete();
-        });
     }
 
     public function down(): void
     {
-        Schema::table('rental_status_histories', function (Blueprint $table): void {
-            $table->dropForeign('rsh_vehicle_link_fk');
-        });
         Schema::dropIfExists('rental_agreement_vehicle_links');
     }
 };

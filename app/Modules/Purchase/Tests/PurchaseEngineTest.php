@@ -85,7 +85,7 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('18000.000000', (string) $order->tax_total);
         $this->assertSame('10000.000000', (string) $order->charge_total);
         $this->assertSame('123000.000000', (string) $order->grand_total);
-        $this->assertCount(3, $order->adjustments);
+        $this->assertCount(2, $order->adjustments);
     }
 
     public function test_purchase_permission_descriptions_exclude_unsupported_workflows(): void
@@ -218,7 +218,7 @@ final class PurchaseEngineTest extends TestCase
 
         $this->assertSame('123000.000000', (string) $invoice->grand_total);
         $this->assertCount(2, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->get());
-        $this->assertCount(6, $invoice->adjustmentAllocations);
+        $this->assertCount(4, $invoice->adjustmentAllocations);
     }
 
     public function test_purchase_invoice_sources_must_match_the_selected_supplier(): void
@@ -297,7 +297,7 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('7200.000000', (string) $invoice->tax_total);
         $this->assertSame('4000.000000', (string) $invoice->charge_total);
         $this->assertSame('49200.000000', (string) $invoice->grand_total);
-        $this->assertSame(3, PurchaseHeaderAdjustment::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->count());
+        $this->assertSame(2, PurchaseHeaderAdjustment::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->count());
     }
 
     public function test_partial_receipt_partial_invoice_and_supplier_payment_preparation_workflow(): void
@@ -369,6 +369,8 @@ final class PurchaseEngineTest extends TestCase
                 ],
             ),
         );
+        $invoice = $this->postInvoice($invoice);
+        $paymentMethodId = $this->paymentMethod($tenantId, 'PURCHASE');
 
         $payment = app(PurchasePaymentIntegrationService::class)->createSupplierPayment(
             tenantId: $tenantId,
@@ -376,7 +378,7 @@ final class PurchaseEngineTest extends TestCase
             amount: (string) $invoice->grand_total,
             supplierType: 'supplier',
             supplierId: $supplierId,
-            lines: [new PaymentLineData((string) $invoice->grand_total, referenceNumber: 'PAY-PURCHASE')],
+            lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PURCHASE')],
             allocations: [
                 new PaymentAllocationData(
                     (int) $invoice->getKey(),
@@ -388,8 +390,9 @@ final class PurchaseEngineTest extends TestCase
 
         $this->assertSame(1, Payment::query()->count());
         $this->assertSame((string) $invoice->grand_total, (string) $payment->total_amount);
-        $this->assertSame((string) $invoice->grand_total, (string) $payment->allocated_amount);
-        $this->assertSame('0.000000', (string) $invoice->refresh()->balance_due);
+        $this->assertSame('0.000000', (string) $payment->allocated_amount);
+        $this->assertSame((string) $invoice->grand_total, (string) $invoice->refresh()->balance_due);
+        $this->assertSame('pending', (string) $payment->allocations->firstOrFail()->status->value);
     }
 
     public function test_supplier_payment_preview_is_non_persistent_and_preserves_invoice_balance(): void
@@ -405,6 +408,8 @@ final class PurchaseEngineTest extends TestCase
             supplierId: $supplierId,
             sources: [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grn->getKey(), [$lineId => '20.000000'])],
         ));
+        $invoice = $this->postInvoice($invoice);
+        $paymentMethodId = $this->paymentMethod($tenantId, 'PREVIEW');
         $balanceBefore = (string) $invoice->refresh()->balance_due;
 
         for ($i = 0; $i < 2; $i++) {
@@ -414,7 +419,7 @@ final class PurchaseEngineTest extends TestCase
                 amount: (string) $invoice->grand_total,
                 supplierType: 'supplier',
                 supplierId: $supplierId,
-                lines: [new PaymentLineData((string) $invoice->grand_total, referenceNumber: 'PAY-PREVIEW')],
+                lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PREVIEW')],
                 allocations: [new PaymentAllocationData((int) $invoice->getKey(), (string) $invoice->grand_total, '2026-06-09')],
             );
 
@@ -582,7 +587,11 @@ final class PurchaseEngineTest extends TestCase
             paymentDate: '2026-06-05',
             partyType: 'supplier',
             partyId: $supplierId,
-            lines: [new PaymentLineData(amount: '60000.000000')],
+            status: PaymentStatus::Posted,
+            lines: [new PaymentLineData(
+                amount: '60000.000000',
+                paymentMethodId: $this->paymentMethod($tenantId, 'ADVANCE'),
+            )],
         ));
 
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
@@ -601,6 +610,7 @@ final class PurchaseEngineTest extends TestCase
                 ],
             ),
         );
+        $invoice = $this->postInvoice($invoice);
 
         $advance = app(PaymentAllocationService::class)->allocate($advance, [
             new PaymentAllocationData(
@@ -610,7 +620,7 @@ final class PurchaseEngineTest extends TestCase
             ),
         ]);
 
-        $this->assertSame(PaymentStatus::PartiallyAllocated, $advance->status);
+        $this->assertSame(PaymentStatus::Posted, $advance->status);
         $this->assertSame('49200.000000', (string) $advance->allocated_amount);
         $this->assertSame('10800.000000', (string) $advance->unapplied_amount);
         $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
@@ -1177,6 +1187,8 @@ final class PurchaseEngineTest extends TestCase
 
     private function createAdjustedOrder(int $tenantId, int $warehouseId, Item $item): PurchaseOrder
     {
+        $taxGroupId = $this->taxGroup($tenantId);
+
         return app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
@@ -1184,11 +1196,18 @@ final class PurchaseEngineTest extends TestCase
             supplierId: $this->supplierId($tenantId),
             warehouseId: $warehouseId,
             lines: [
-                new PurchaseOrderLineData((int) $item->getKey(), '100.000000', '1000.000000', uomId: (int) $item->base_uom_id),
+                new PurchaseOrderLineData(
+                    (int) $item->getKey(),
+                    '100.000000',
+                    '1000.000000',
+                    uomId: (int) $item->base_uom_id,
+                    taxCalculationType: PurchaseAdjustmentCalculationType::Percentage,
+                    taxRate: '18.000000',
+                    taxGroupId: $taxGroupId,
+                ),
             ],
             adjustments: [
                 new PurchaseHeaderAdjustmentData('Discount', PurchaseAdjustmentType::Discount, PurchaseAdjustmentEffect::Decrease, '5000.000000'),
-                new PurchaseHeaderAdjustmentData('VAT', PurchaseAdjustmentType::Tax, PurchaseAdjustmentEffect::Increase, '18000.000000'),
                 new PurchaseHeaderAdjustmentData('Freight', PurchaseAdjustmentType::Freight, PurchaseAdjustmentEffect::Increase, '10000.000000'),
             ],
         ));
@@ -1253,6 +1272,77 @@ final class PurchaseEngineTest extends TestCase
         $item = $this->createItem($tenantId, 'ITEM-'.Str::upper(Str::random(4)), uomId: $uomId);
 
         return [$tenantId, $warehouseId, $item, $supplierId, $uomId];
+    }
+
+    private function postInvoice(\Modules\Invoice\Models\Invoice $invoice): \Modules\Invoice\Models\Invoice
+    {
+        $statuses = app(InvoiceStatusService::class);
+        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+
+        return $statuses->transition($invoice, InvoiceStatus::Posted);
+    }
+
+    private function paymentMethod(int $tenantId, string $suffix): int
+    {
+        return (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
+            'code' => 'CASH-'.$suffix.'-'.Str::upper(Str::random(4)),
+            'name' => 'Cash',
+            'method_type' => 'cash',
+            'direction_allowed' => 'outbound',
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function taxGroup(int $tenantId): int
+    {
+        $suffix = Str::upper(Str::random(5));
+        $taxId = (int) DB::table('taxes')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'VAT-18-'.$suffix,
+            'name' => 'VAT 18%',
+            'tax_type' => 'vat',
+            'calculation_method' => 'exclusive',
+            'is_withholding' => false,
+            'recoverable' => true,
+            'payable' => true,
+            'receivable' => false,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('tax_rates')->insert([
+            'tax_id' => $taxId,
+            'rate' => '18.000000',
+            'effective_from' => '2026-01-01',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $groupId = (int) DB::table('tax_groups')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'PURCHASE-VAT-'.$suffix,
+            'name' => 'Purchase VAT 18%',
+            'is_default' => false,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('tax_group_lines')->insert([
+            'tax_group_id' => $groupId,
+            'tax_id' => $taxId,
+            'sequence' => 1,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $groupId;
     }
 
     private function createItem(int $tenantId, string $code, ItemType $type = ItemType::Stock, bool $stockable = true, ?int $uomId = null): Item

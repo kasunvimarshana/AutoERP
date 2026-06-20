@@ -23,6 +23,8 @@ final class CustomerSeeder extends Seeder
             return;
         }
 
+        $this->seedPermissions();
+
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
         if ($tenant === null) {
@@ -30,7 +32,6 @@ final class CustomerSeeder extends Seeder
         }
 
         DB::transaction(function () use ($tenant, $organizationUnit): void {
-            $this->seedPermissions((int) $tenant->getKey());
             $category = CustomerCategory::query()->updateOrCreate(
                 ['tenant_id' => $tenant->getKey(), 'code' => 'GENERAL'],
                 [
@@ -80,14 +81,16 @@ final class CustomerSeeder extends Seeder
         }, 3);
     }
 
-    private function seedPermissions(int $tenantId): void
+    private function seedPermissions(): void
     {
         if (! Schema::hasTable('permissions')) {
             return;
         }
         $guard = (string) config('auth.defaults.guard', 'web');
-        foreach (CustomerAuthorizationService::descriptions() as $name => $description) {
-            DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['organization_unit_id' => null, 'module' => 'Customer', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+            foreach (CustomerAuthorizationService::descriptions() as $name => $description) {
+                DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['organization_unit_id' => null, 'module' => 'Customer', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+            }
         }
     }
 }

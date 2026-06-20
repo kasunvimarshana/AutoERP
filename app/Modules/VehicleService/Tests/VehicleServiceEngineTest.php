@@ -33,7 +33,6 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
-use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -460,6 +459,7 @@ final class VehicleServiceEngineTest extends TestCase
         $payments = app(VehicleServicePaymentIntegrationService::class);
 
         $method = $this->paymentMethod($context);
+        $this->paymentFinanceContext($context['tenant_id']);
 
         try {
             $payments->prepare($job->refresh(), new VehicleServicePaymentData(
@@ -646,6 +646,75 @@ final class VehicleServiceEngineTest extends TestCase
         ], $context['tenant_id'], null);
     }
 
+    private function paymentFinanceContext(int $tenantId): void
+    {
+        $yearId = (int) DB::table('finance_fiscal_years')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_fiscal_periods')->insert([
+            'tenant_id' => $tenantId,
+            'fiscal_year_id' => $yearId,
+            'name' => 'June 2026',
+            'period_number' => 6,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+            'status' => 'open',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $assetTypeId = (int) DB::table('finance_account_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'ASSET',
+            'name' => 'Asset',
+            'normal_balance' => 'debit',
+            'statement_type' => 'balance_sheet',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $cashAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1010',
+            'name' => 'Cash',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_cash_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receivableAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1100',
+            'name' => 'Accounts Receivable',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'payment_received',
+            'name' => 'Payment Received',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            ['posting_profile_id' => $profileId, 'line_key' => 'cash', 'account_id' => $cashAccountId, 'created_at' => now(), 'updated_at' => now()],
+            ['posting_profile_id' => $profileId, 'line_key' => 'receivable', 'account_id' => $receivableAccountId, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+    }
+
     private function receiveStock(array $context, string $quantity): void
     {
         app(StockMovementService::class)->record(new StockMovementData(
@@ -756,14 +825,15 @@ final class VehicleServiceEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('vehicle_ownerships')->insert([
+        DB::table('customer_vehicles')->insert([
             'tenant_id' => $tenantId,
             'vehicle_id' => $vehicleId,
-            'owner_type' => VehicleOwnership::OWNER_TYPE_CUSTOMER,
-            'owner_id' => $customerId,
-            'ownership_type' => 'customer_owned',
+            'customer_id' => $customerId,
+            'relationship_type' => 'customer_owned',
             'started_at' => now(),
             'is_current' => true,
+            'current_guard' => 1,
+            'active_guard' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

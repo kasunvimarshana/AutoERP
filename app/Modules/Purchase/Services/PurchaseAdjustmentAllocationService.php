@@ -214,6 +214,51 @@ final class PurchaseAdjustmentAllocationService
         );
     }
 
+    /**
+     * Calculate the commercial adjustment shown on an invoice independently of
+     * receipt-time accounting recognition recorded in the allocation ledger.
+     *
+     * @param  array<string, string>  $currentInvoiceQuantities
+     */
+    public function invoiceDocumentShare(
+        PurchaseHeaderAdjustment $adjustment,
+        PurchaseOrder $order,
+        array $currentInvoiceQuantities,
+    ): string {
+        $method = $this->method($adjustment);
+        if (! in_array($method, [
+            PurchaseAdjustmentAllocationMethod::Proportional,
+            PurchaseAdjustmentAllocationMethod::Manual,
+        ], true)) {
+            return $this->invoiceShare($adjustment, $order, $currentInvoiceQuantities);
+        }
+
+        $origin = $this->origin($adjustment);
+        if ($method === PurchaseAdjustmentAllocationMethod::Manual) {
+            $plan = $this->ledger->manualPlanAmounts($origin);
+            if ($plan === []) {
+                throw ValidationException::withMessages([
+                    'adjustments' => ['Manual purchase adjustment allocations require explicit line allocations.'],
+                ]);
+            }
+
+            return $this->allocator->manual(
+                $plan,
+                $this->invoiceLineQuantities($order, $currentInvoiceQuantities),
+                (string) $origin->amount,
+                false,
+            );
+        }
+
+        return $this->allocator->proportional(
+            (string) $origin->amount,
+            $this->invoiceBasis($order, $adjustment, $currentInvoiceQuantities),
+            $this->orderBasis($order, $adjustment),
+            (string) $origin->amount,
+            false,
+        );
+    }
+
     public function recognizedAtGoodsReceiptFor(PurchaseHeaderAdjustment $adjustment): string
     {
         $origin = $this->origin($adjustment);

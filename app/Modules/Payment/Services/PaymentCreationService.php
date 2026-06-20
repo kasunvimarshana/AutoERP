@@ -97,6 +97,9 @@ final class PaymentCreationService
 
             if ($data->allocations !== []) {
                 $payment = $this->allocations->createPending($payment->refresh(), $data->allocations);
+                if ($data->status === PaymentStatus::Posted) {
+                    $payment = $this->allocations->realizePending($payment->refresh(), $data->createdBy);
+                }
             } else {
                 $this->unappliedBalances->sync($payment->refresh());
             }

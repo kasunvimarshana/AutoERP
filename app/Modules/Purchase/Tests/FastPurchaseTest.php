@@ -1051,6 +1051,7 @@ final class FastPurchaseTest extends TestCase
     {
         return (int) DB::table('payment_methods')->insertGetId([
             'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
             'code' => $code,
             'name' => Str::headline($code),
             'method_type' => $type,

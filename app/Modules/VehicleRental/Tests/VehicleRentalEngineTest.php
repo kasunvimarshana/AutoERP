@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\InvoiceSourceLine;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Reporting\Services\ReportCatalog;
 use Modules\Reporting\Services\ReportQueryBuilder;
 use Modules\VehicleRental\DTOs\RentalAgreementData;
@@ -250,6 +252,10 @@ final class VehicleRentalEngineTest extends TestCase
             (int) $base->getKey() => '1.000000',
         ]);
 
+        $statuses = app(InvoiceStatusService::class);
+        $first = $statuses->transition($first, InvoiceStatus::Approved);
+        $first = $statuses->transition($first, InvoiceStatus::Posted);
+
         $this->assertSame('90.000000', $preview->grandTotal);
         $this->assertSame('90.000000', (string) $first->grand_total);
         $this->assertSame('1.000000', (string) $remaining->invoiced_quantity);
@@ -271,6 +277,7 @@ final class VehicleRentalEngineTest extends TestCase
             '2026-06-03',
             '40.000000',
             (int) $first->getKey(),
+            $context['payment_method_id'],
         );
         $this->assertSame('40.000000', (string) $payment->total_amount);
         $this->assertSame('50.000000', (string) $first->refresh()->balance_due);
@@ -826,7 +833,26 @@ final class VehicleRentalEngineTest extends TestCase
             'vehicle_id' => $this->vehicle($tenantId, 'VEH-'.$suffix, $organizationUnitId),
             'replacement_vehicle_id' => $this->vehicle($tenantId, 'VEH-REPL-'.$suffix, $organizationUnitId, '2000.000000'),
             'employee_id' => $this->employee($tenantId, 'EMP-'.$suffix, $organizationUnitId),
+            'payment_method_id' => $this->paymentMethod($tenantId, $organizationUnitId, $suffix),
         ];
+    }
+
+    private function paymentMethod(int $tenantId, int $organizationUnitId, string $suffix): int
+    {
+        return (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'scope_key' => 'org:'.$tenantId.':'.$organizationUnitId,
+            'code' => 'CASH-'.$suffix,
+            'name' => 'Cash',
+            'method_type' => 'cash',
+            'direction_allowed' => 'both',
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function tenant(string $suffix): int

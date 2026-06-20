@@ -19,7 +19,9 @@ return new class extends Migration
             $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->nullOnDelete();
             $table->foreignId('expense_id')->nullable()->constrained('rental_expenses')->nullOnDelete();
             $table->foreignId('charge_id')->nullable()->constrained('rental_charges')->nullOnDelete();
-            $table->unsignedBigInteger('agreement_vehicle_link_id')->nullable();
+            $table->foreignId('agreement_vehicle_link_id')->nullable()
+                ->constrained('rental_agreement_vehicle_links', 'id', 'rsh_vehicle_link_fk')
+                ->nullOnDelete();
             $table->string('entity_type', 20);
             $table->unsignedBigInteger('subject_id')->nullable();
             $table->string('old_status', 30)->nullable();

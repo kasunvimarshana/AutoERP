@@ -8,8 +8,6 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
-use Modules\Customer\Models\Customer;
-use Modules\Customer\Models\CustomerVehicle;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
@@ -27,6 +25,8 @@ final class VehicleSeeder extends Seeder
             return;
         }
 
+        $this->seedPermissions();
+
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
         if ($tenant === null) {
@@ -36,16 +36,11 @@ final class VehicleSeeder extends Seeder
         DB::transaction(function () use ($tenant, $organizationUnit): void {
             $tenantId = (int) $tenant->getKey();
             $organizationUnitId = $organizationUnit?->getKey();
-            $this->seedPermissions($tenantId);
             $makes = $this->seedMakesAndModels($tenantId, $organizationUnitId);
             $type = $this->seedType($tenantId, $organizationUnitId);
             $category = $this->seedCategory($tenantId, $organizationUnitId);
-            $customer = Customer::query()
-                ->where('tenant_id', $tenantId)
-                ->where('customer_number', 'CUS-000001')
-                ->first();
 
-            $vehicle = Vehicle::query()->updateOrCreate(
+            Vehicle::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'vehicle_number' => 'VEH-000001'],
                 [
                     'organization_unit_id' => $organizationUnitId,
@@ -66,56 +61,39 @@ final class VehicleSeeder extends Seeder
                     'metadata' => ['seed_source' => 'vehicle_module'],
                 ],
             );
-
-            if ($customer !== null && Schema::hasTable('customer_vehicles')) {
-                CustomerVehicle::query()->firstOrNew(
-                    [
-                        'vehicle_id' => $vehicle->getKey(),
-                        'customer_id' => $customer->getKey(),
-                        'active_guard' => 1,
-                    ],
-                )->forceFill([
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $organizationUnitId,
-                    'relationship_type' => 'customer_owned',
-                    'started_at' => '2026-01-01 00:00:00',
-                    'ended_at' => null,
-                    'is_current' => true,
-                    'current_guard' => 1,
-                    'notes' => 'Default customer ownership.',
-                ])->save();
-            }
         }, 3);
     }
 
-    private function seedPermissions(int $tenantId): void
+    private function seedPermissions(): void
     {
         if (! Schema::hasTable('permissions')) {
             return;
         }
 
         $guard = (string) config('auth.defaults.guard', 'web');
-        foreach ([
-            VehicleAuthorizationService::VIEW => 'View vehicles, master data, documents, attributes, and status history.',
-            VehicleAuthorizationService::CREATE => 'Create vehicle master records.',
-            VehicleAuthorizationService::UPDATE => 'Update vehicle master records.',
-            VehicleAuthorizationService::DELETE => 'Delete vehicle master records.',
-            VehicleAuthorizationService::MANAGE_DOCUMENTS => 'Upload, update, replace, and delete vehicle documents.',
-            VehicleAuthorizationService::DOWNLOAD_DOCUMENTS => 'Preview and download vehicle documents.',
-            VehicleAuthorizationService::MANAGE_ATTRIBUTES => 'Create, update, and delete vehicle attributes.',
-            VehicleAuthorizationService::CHANGE_STATUS => 'Change vehicle status through the status workflow.',
-        ] as $name => $description) {
-            DB::table('permissions')->updateOrInsert(
-                ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
-                [
-                    'organization_unit_id' => null,
-                    'module' => 'Vehicle',
-                    'description' => $description,
-                    'row_version' => 1,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
+        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+            foreach ([
+                VehicleAuthorizationService::VIEW => 'View vehicles, master data, documents, attributes, and status history.',
+                VehicleAuthorizationService::CREATE => 'Create vehicle master records.',
+                VehicleAuthorizationService::UPDATE => 'Update vehicle master records.',
+                VehicleAuthorizationService::DELETE => 'Delete vehicle master records.',
+                VehicleAuthorizationService::MANAGE_DOCUMENTS => 'Upload, update, replace, and delete vehicle documents.',
+                VehicleAuthorizationService::DOWNLOAD_DOCUMENTS => 'Preview and download vehicle documents.',
+                VehicleAuthorizationService::MANAGE_ATTRIBUTES => 'Create, update, and delete vehicle attributes.',
+                VehicleAuthorizationService::CHANGE_STATUS => 'Change vehicle status through the status workflow.',
+            ] as $name => $description) {
+                DB::table('permissions')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
+                    [
+                        'organization_unit_id' => null,
+                        'module' => 'Vehicle',
+                        'description' => $description,
+                        'row_version' => 1,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ],
+                );
+            }
         }
     }
 

@@ -12,6 +12,7 @@ use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
+use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
@@ -19,7 +20,10 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\Payment\Services\PaymentAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Models\UserModel;
 use Tests\TestCase;
 
 final class CoreModulesApiTest extends TestCase
@@ -179,7 +183,16 @@ final class CoreModulesApiTest extends TestCase
     public function test_payment_creation_and_invoice_allocation_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            PaymentAuthorizationService::PAYMENTS_CREATE,
+            PaymentAuthorizationService::PAYMENTS_SUBMIT,
+            PaymentAuthorizationService::PAYMENTS_APPROVE,
+            PaymentAuthorizationService::PAYMENTS_POST,
+            PaymentAuthorizationService::PAYMENTS_ALLOCATE,
+        ], 'Payment');
+        $this->paymentFinanceContext($tenantId, $organizationUnitId);
         $invoice = $this->createPostedInvoice($tenantId, $organizationUnitId);
+        $paymentMethodId = $this->paymentMethod($tenantId);
 
         $payment = $this->postJson('/api/v1/payments', [
             'tenant_id' => $tenantId,
@@ -187,10 +200,17 @@ final class CoreModulesApiTest extends TestCase
             'payment_type' => 'customer_receipt',
             'direction' => 'inbound',
             'payment_date' => '2026-06-06',
-            'lines' => [['amount' => '80.000000']],
+            'party_type' => 'customer',
+            'party_id' => $invoice->party_id,
+            'lines' => [[
+                'payment_method_id' => $paymentMethodId,
+                'amount' => '80.000000',
+            ]],
         ])->assertSuccessful()->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
+        $this->postJson('/api/v1/payments/'.$payment['id'].'/submit-approval', $scope)->assertSuccessful();
+        $this->postJson('/api/v1/payments/'.$payment['id'].'/approve', $scope)->assertSuccessful();
         $this->postJson('/api/v1/payments/'.$payment['id'].'/post', $scope)->assertSuccessful();
         $this->postJson('/api/v1/payments/'.$payment['id'].'/allocations', $scope + [
             'allocations' => [[
@@ -262,6 +282,12 @@ final class CoreModulesApiTest extends TestCase
 
     private function createItemViaApi(int $tenantId, int $organizationUnitId, string $code): array
     {
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            ItemAuthorizationService::VIEW,
+            ItemAuthorizationService::CREATE,
+            ItemAuthorizationService::UPDATE,
+        ], 'Item');
+
         return $this->postJson('/api/v1/items', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
@@ -272,6 +298,60 @@ final class CoreModulesApiTest extends TestCase
             'costing_method' => 'fifo',
             'is_stockable' => true,
         ])->assertSuccessful()->json('data');
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function actingAsSuperAdministrator(
+        int $tenantId,
+        int $organizationUnitId,
+        array $permissions,
+        string $module,
+    ): void
+    {
+        $guard = (string) config('auth.defaults.guard', 'web');
+        $now = now();
+        $userId = (int) DB::table('users')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'first_name' => 'Item',
+            'last_name' => 'Administrator',
+            'email' => 'item-admin-'.Str::lower(Str::random(8)).'@example.test',
+            'password' => bcrypt('secret-password'),
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => UserPermission::SUPER_ADMIN_ROLE,
+            'guard_name' => $guard,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach ($permissions as $permission) {
+            DB::table('permissions')->insert([
+                'tenant_id' => $tenantId,
+                'name' => $permission,
+                'guard_name' => $guard,
+                'module' => $module,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->actingAs(UserModel::query()->findOrFail($userId));
     }
 
     private function createItemDirect(int $tenantId, int $organizationUnitId, int $uomId, string $code): array
@@ -350,12 +430,16 @@ final class CoreModulesApiTest extends TestCase
 
     private function invoicePayload(int $tenantId, int $organizationUnitId): array
     {
+        $customerId = $this->customer($tenantId, $organizationUnitId);
+
         return [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'invoice_type' => 'sales',
             'direction' => 'outbound',
             'invoice_date' => '2026-06-06',
+            'party_type' => 'customer',
+            'party_id' => $customerId,
             'lines' => [[
                 'line_number' => 1,
                 'description' => 'API invoice line',
@@ -375,6 +459,96 @@ final class CoreModulesApiTest extends TestCase
         $this->postJson('/api/v1/invoices/'.$invoice['id'].'/post', $scope)->assertSuccessful();
 
         return Invoice::query()->findOrFail($invoice['id']);
+    }
+
+    private function customer(int $tenantId, int $organizationUnitId): int
+    {
+        $code = 'CUS-'.Str::upper(Str::random(6));
+
+        return (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'customer_number' => $code,
+            'code' => $code,
+            'name' => 'Customer '.$code,
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentMethod(int $tenantId): int
+    {
+        return (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
+            'code' => 'CASH-'.Str::upper(Str::random(6)),
+            'name' => 'Cash',
+            'method_type' => 'cash',
+            'direction_allowed' => 'inbound',
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentFinanceContext(int $tenantId, int $organizationUnitId): void
+    {
+        $this->fiscalPeriod($tenantId, $organizationUnitId);
+        $assetTypeId = $this->accountType($tenantId, 'PAYMENT-ASSET', 'debit');
+        $cashAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1010',
+            'name' => 'Cash',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_cash_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receivableAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1100',
+            'name' => 'Accounts Receivable',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'code' => 'payment_received',
+            'name' => 'Payment Received',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            [
+                'posting_profile_id' => $profileId,
+                'line_key' => 'cash',
+                'account_id' => $cashAccountId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'posting_profile_id' => $profileId,
+                'line_key' => 'receivable',
+                'account_id' => $receivableAccountId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
     }
 
     private function accountType(int $tenantId, string $code, string $normalBalance): int

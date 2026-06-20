@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('source_type');
             $table->unsignedBigInteger('source_id');
+            $table->unsignedBigInteger('origin_purchase_header_adjustment_id')->nullable();
             $table->string('name');
             $table->string('adjustment_type');
             $table->string('effect');
@@ -44,6 +45,11 @@ return new class extends Migration
             $table->index('adjustment_type', 'purchase_header_adjustments_type_idx');
             $table->index('finance_posting_profile_id', 'purchase_header_adjustments_profile_idx');
             $table->index('finance_account_id', 'purchase_header_adjustments_account_idx');
+            $table->foreign('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_fk')
+                ->references('id')
+                ->on('purchase_header_adjustments')
+                ->nullOnDelete();
+            $table->index('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_idx');
         });
     }
 

@@ -44,20 +44,10 @@ return new class extends Migration
             $table->foreign('rate_snapshot_id', 'ruc_rate_snapshot_fk')
                 ->references('id')->on('rental_agreement_rate_snapshots')->restrictOnDelete();
         });
-
-        Schema::table('rental_charge_calculations', function (Blueprint $table): void {
-            $table->foreign('usage_context_id', 'rental_charge_calculations_usage_context_fk')
-                ->references('id')
-                ->on('rental_usage_contexts')
-                ->restrictOnDelete();
-        });
     }
 
     public function down(): void
     {
-        Schema::table('rental_charge_calculations', function (Blueprint $table): void {
-            $table->dropForeign('rental_charge_calculations_usage_context_fk');
-        });
         Schema::dropIfExists('rental_usage_contexts');
     }
 };

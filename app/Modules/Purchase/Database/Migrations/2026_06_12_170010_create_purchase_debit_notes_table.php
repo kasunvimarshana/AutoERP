@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -37,7 +38,13 @@ return new class extends Migration
             $table->index('purchase_return_id', 'purchase_debit_notes_return_idx');
             $table->index('status', 'purchase_debit_notes_status_idx');
             $table->index(['source_type', 'source_id'], 'purchase_debit_notes_source_idx');
+            $table->index(['status', 'allocated_amount', 'remaining_amount'], 'purchase_debit_notes_allocation_idx');
         });
+
+        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
+            DB::statement("ALTER TABLE purchase_debit_notes ADD CONSTRAINT purchase_debit_notes_status_chk CHECK (status IN ('draft','approved','posted'))");
+            DB::statement('ALTER TABLE purchase_debit_notes ADD CONSTRAINT purchase_debit_notes_amounts_chk CHECK (amount >= 0 AND allocated_amount >= 0 AND remaining_amount >= 0 AND allocated_amount <= amount AND remaining_amount <= amount AND allocated_amount + remaining_amount = amount)');
+        }
     }
 
     public function down(): void

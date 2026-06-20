@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Reporting\Services\ReportCatalog;
 use Modules\Reporting\Services\ReportQueryBuilder;
 use Modules\User\Models\UserModel;
@@ -163,6 +165,9 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             $inbound->refresh(),
             '2026-06-03',
         );
+        $invoiceStatuses = app(InvoiceStatusService::class);
+        $supplierPayable = $invoiceStatuses->transition($supplierPayable, InvoiceStatus::Approved);
+        $supplierPayable = $invoiceStatuses->transition($supplierPayable, InvoiceStatus::Posted);
 
         $this->assertSame(InvoiceDirection::Outbound, $customerInvoice->direction);
         $this->assertSame('customer', $customerInvoice->party_type);
@@ -178,6 +183,7 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             '2026-06-03',
             '3000.000000',
             (int) $supplierPayable->getKey(),
+            $context['payment_method_id'],
         );
         $this->assertSame('3000.000000', (string) $supplierPayment->total_amount);
         $this->assertSame('5800.000000', (string) $supplierPayable->refresh()->balance_due);
@@ -1025,6 +1031,20 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'scope_key' => 'org:'.$tenantId.':'.$organizationUnitId,
+            'code' => 'CASH-'.$suffix,
+            'name' => 'Cash',
+            'method_type' => 'cash',
+            'direction_allowed' => 'both',
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return [
             'tenant_id' => $tenantId,
@@ -1032,6 +1052,7 @@ final class VehicleRentalLinkedRunningChartTest extends TestCase
             'customer_id' => $customerId,
             'supplier_id' => $supplierId,
             'vehicle_id' => $vehicleId,
+            'payment_method_id' => $paymentMethodId,
         ];
     }
 }
