@@ -184,6 +184,7 @@ describe('navigation access and matching', () => {
             ] },
             { section: 'Finance', items: [
                 { label: 'Invoices', children: [] },
+                { label: 'Reports', children: [] },
                 { label: 'Payments', children: ['Payments', 'Create Payment', 'Payment Methods', 'Create Payment Method', 'Cheque Templates', 'Create Cheque Template'] },
                 { label: 'Vouchers', children: [] },
             ] },

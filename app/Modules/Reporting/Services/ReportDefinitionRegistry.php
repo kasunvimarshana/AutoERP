@@ -4,23 +4,35 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use InvalidArgumentException;
 use Modules\Reporting\DTOs\ReportDefinition;
 
 final class ReportDefinitionRegistry
 {
-    public function __construct(private readonly ReportCatalog $catalog) {}
+    public function __construct(
+        private readonly ReportCatalog $catalog,
+        private readonly DetailedPurchaseReportService $detailedPurchase,
+        private readonly DetailedVehicleServiceReportService $detailedVehicleService,
+        private readonly EmployeeIncentiveReportService $employeeIncentives,
+    ) {}
 
     /**
      * @return array<string, ReportDefinition>
      */
     public function all(): array
     {
-        return $this->catalog->all();
+        $reports = $this->catalog->all();
+
+        foreach ($this->specializedDefinitions() as $definition) {
+            $reports[$definition->key] = $definition;
+        }
+
+        return $reports;
     }
 
     public function get(string $key): ReportDefinition
     {
-        return $this->catalog->get($key);
+        return $this->all()[$key] ?? throw new InvalidArgumentException("Report [{$key}] is not defined.");
     }
 
     /**
@@ -28,6 +40,21 @@ final class ReportDefinitionRegistry
      */
     public function index(): array
     {
-        return $this->catalog->index();
+        return array_values(array_map(
+            static fn (ReportDefinition $definition): array => $definition->toArray(),
+            $this->all(),
+        ));
+    }
+
+    /**
+     * @return array<int, ReportDefinition>
+     */
+    private function specializedDefinitions(): array
+    {
+        return [
+            $this->detailedPurchase->definition(),
+            $this->detailedVehicleService->definition(),
+            $this->employeeIncentives->definition(),
+        ];
     }
 }

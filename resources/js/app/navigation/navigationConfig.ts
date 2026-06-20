@@ -3,6 +3,7 @@ import { accessPermissions, protectedAccessRoles } from '@/modules/access/access
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { warehousePermissions } from '@/modules/warehouse/warehousePermissions';
 
 const tenantAccess = (modules: NonNullable<NavigationSection['items'][number]['access']>['modules']) => ({
@@ -369,6 +370,7 @@ export const navigationSections: NavigationSection[] = [
         label: 'Finance',
         items: [
             { id: 'invoices', type: 'link', label: 'Invoices', to: '/invoices', icon: 'invoice', access: tenantAccess(['invoice']) },
+            { id: 'reports', type: 'link', label: 'Reports', to: '/reports', icon: 'list', access: { ...operationalAccess([]), permissions: [reportingPermissions.view] } },
             {
                 id: 'payments',
                 type: 'module',

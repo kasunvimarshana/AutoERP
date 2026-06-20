@@ -4,6 +4,7 @@ import { AppLayout } from './layout/AppLayout';
 import { PermissionRoute } from '@/modules/auth/PermissionRoute';
 import { ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
@@ -138,6 +139,7 @@ const ReportListPage = lazy(() => import('@/modules/reporting/pages/ReportListPa
 const ReportPage = lazy(() => import('@/modules/reporting/pages/ReportPage'));
 const TechnicianWorkReportPage = lazy(() => import('@/modules/reporting/pages/TechnicianWorkReportPage'));
 const EmployeeCommissionReportPage = lazy(() => import('@/modules/reporting/pages/EmployeeCommissionReportPage'));
+const OperationalReportPage = lazy(() => import('@/modules/reporting/pages/OperationalReportPage'));
 const EmployeeListPage = lazy(() => import('@/modules/hr/EmployeeListPage'));
 const EmployeeCreatePage = lazy(() => import('@/modules/hr/EmployeeCreatePage'));
 const EmployeeEditPage = lazy(() => import('@/modules/hr/EmployeeEditPage'));
@@ -315,10 +317,13 @@ export function AppRouter() {
                     <Route path="/tax/supplier-profiles" element={<SupplierTaxProfilePage />} />
                     <Route path="/tax/posting-profiles" element={<TaxPostingProfilePage />} />
                     <Route path="/tax/reports" element={<TaxReportPages />} />
-                    <Route path="/reports" element={<ReportListPage />} />
-                    <Route path="/reports/vehicle-service/technician-work" element={<TechnicianWorkReportPage />} />
-                    <Route path="/reports/vehicle-service/employee-commissions" element={<EmployeeCommissionReportPage />} />
-                    <Route path="/reports/:key" element={<ReportPage />} />
+                    <Route path="/reports" element={requirePermission(reportingPermissions.view, <ReportListPage />)} />
+                    <Route path="/reports/purchase/detailed" element={requirePermission(reportingPermissions.view, <OperationalReportPage reportKey="purchase/detailed" kind="purchase" />)} />
+                    <Route path="/reports/vehicle-service/detailed" element={requirePermission(reportingPermissions.view, <OperationalReportPage reportKey="vehicle-service/detailed" kind="vehicle-service" />)} />
+                    <Route path="/reports/vehicle-service/employee-incentives" element={requirePermission(reportingPermissions.view, <OperationalReportPage reportKey="vehicle-service/employee-incentives" kind="employee-incentive" />)} />
+                    <Route path="/reports/vehicle-service/technician-work" element={requirePermission(reportingPermissions.view, <TechnicianWorkReportPage />)} />
+                    <Route path="/reports/vehicle-service/employee-commissions" element={requirePermission(reportingPermissions.view, <EmployeeCommissionReportPage />)} />
+                    <Route path="/reports/:key" element={requirePermission(reportingPermissions.view, <ReportPage />)} />
                     <Route path="/hr/employees" element={<EmployeeListPage />} />
                     <Route path="/hr/employees/create" element={<EmployeeCreatePage />} />
                     <Route path="/hr/employees/:id/edit" element={<EmployeeEditPage />} />

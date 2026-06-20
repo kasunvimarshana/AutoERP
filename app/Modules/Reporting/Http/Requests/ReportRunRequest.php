@@ -22,7 +22,7 @@ final class ReportRunRequest extends TenantScopedRequest
             'sort' => ['nullable', 'string', 'max:80'],
             'direction' => ['nullable', 'in:asc,desc'],
             'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'filters' => ['nullable', 'array'],
             'filters.*' => ['nullable'],
         ];
