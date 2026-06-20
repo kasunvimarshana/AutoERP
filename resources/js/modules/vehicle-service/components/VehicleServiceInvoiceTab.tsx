@@ -25,8 +25,8 @@ export default function VehicleServiceInvoiceTab({ job }: { job: VehicleServiceJ
             <ErrorAlert error={result.error} />
             <div className="flex justify-end">
                 {['completed', 'invoiced'].includes(job.status) && (result.data ?? []).some((line) => line.invoice_state !== 'invoiced')
-                    ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create invoice</LinkButton>
-                    : <Button type="button" disabled>Create invoice</Button>}
+                    ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create & post invoice</LinkButton>
+                    : <Button type="button" disabled>Create & post invoice</Button>}
             </div>
             {result.loading ? <LoadingState /> : <DataTable rows={result.data ?? []} columns={columns} rowKey={(line) => line.id} emptyMessage="No billable lines." />}
             {(job.invoice_links ?? []).length > 0 && (

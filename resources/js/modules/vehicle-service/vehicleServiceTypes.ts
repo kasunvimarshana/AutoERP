@@ -244,6 +244,8 @@ export interface VehicleServiceInvoicePayload {
 export interface VehicleServiceInvoiceCreated {
     id: number;
     invoice_number?: string | null;
+    status?: string | null;
+    posted_at?: string | null;
 }
 
 export interface VehicleServiceInventoryIssuePayload {

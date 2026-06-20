@@ -51,7 +51,7 @@ export default function VehicleServiceInvoiceCreatePage() {
 
     return (
         <>
-            <ContentHeader title={`Invoice ${job.data.job_number}`} description="Only billable service-job lines are sent to InvoiceCreationService." />
+            <ContentHeader title={`Invoice ${job.data.job_number}`} description="Creates, approves and posts the customer invoice in one transaction." />
             <ErrorAlert error={error ?? job.error ?? lines.error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <DataTable rows={lines.data ?? []} rowKey={(line) => line.id} columns={[
@@ -71,10 +71,10 @@ export default function VehicleServiceInvoiceCreatePage() {
                 ]} />
                 <Panel title="Invoice details">
                     <div className="space-y-4">
-                        <Input label="Invoice date" type="date" value={form.invoice_date} error={fieldError(error, 'invoice_date')} onChange={(event) => setForm({ ...form, invoice_date: event.target.value })} />
-                        <Input label="Due date" type="date" value={form.due_date} error={fieldError(error, 'due_date')} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
-                        <DecimalInput label="Exchange rate" value={form.exchange_rate} error={fieldError(error, 'exchange_rate')} onChange={(event) => setForm({ ...form, exchange_rate: event.target.value })} />
-                        <Textarea label="Notes" value={form.notes} error={fieldError(error, 'notes')} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+                        <Input label="Invoice date" type="date" value={form.invoice_date} error={fieldError(error, 'invoice_date')} onChange={(event) => { setPreview(null); setForm({ ...form, invoice_date: event.target.value }); }} />
+                        <Input label="Due date" type="date" value={form.due_date} error={fieldError(error, 'due_date')} onChange={(event) => { setPreview(null); setForm({ ...form, due_date: event.target.value }); }} />
+                        <DecimalInput label="Exchange rate" value={form.exchange_rate} error={fieldError(error, 'exchange_rate')} onChange={(event) => { setPreview(null); setForm({ ...form, exchange_rate: event.target.value }); }} />
+                        <Textarea label="Notes" value={form.notes} error={fieldError(error, 'notes')} onChange={(event) => { setPreview(null); setForm({ ...form, notes: event.target.value }); }} />
                         <div className="flex gap-2">
                             <Button type="button" variant="secondary" loading={busy} disabled={!hasSelection} onClick={async () => {
                                 setBusy(true); setError(null);
@@ -87,7 +87,7 @@ export default function VehicleServiceInvoiceCreatePage() {
                                     const invoiceId = Number(invoice.id);
                                     navigate(Number.isFinite(invoiceId) ? `/invoices/${invoiceId}` : `/vehicle-service/jobs/${jobId}`);
                                 } catch (requestError) { setError(toApiError(requestError)); } finally { setBusy(false); }
-                            }}>Create invoice</Button>
+                            }}>Create & post invoice</Button>
                         </div>
                         {preview && <DetailGrid items={[
                             { label: 'Subtotal', value: preview.subtotal },

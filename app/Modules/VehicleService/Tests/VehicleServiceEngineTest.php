@@ -18,7 +18,6 @@ use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -264,12 +263,11 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame($billable->getKey(), $invoice->lines->first()->source_line_id);
         $this->assertSame(0, InvoiceSourceLine::query()->where('source_line_id', $customerItem->getKey())->count());
         $this->assertSame(1, VehicleServiceInvoiceLink::query()->where('vehicle_service_job_id', $job->getKey())->count());
+        $this->assertSame(InvoiceStatus::Posted, $invoice->status);
+        $this->assertNotNull($invoice->posted_at);
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $job->refresh()->status);
 
         $method = $this->paymentMethod($context);
-        $invoiceStatuses = app(InvoiceStatusService::class);
-        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
-        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
         $payment = app(VehicleServicePaymentIntegrationService::class)->prepare(
             $job,
             new VehicleServicePaymentData(
@@ -419,6 +417,7 @@ final class VehicleServiceEngineTest extends TestCase
         $invoices = app(VehicleServiceInvoiceIntegrationService::class);
 
         $first = $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '1.500000']);
+        $this->assertSame(InvoiceStatus::Posted, $first->status);
         $this->assertSame('75.000000', (string) $first->grand_total);
         $this->assertSame(VehicleServiceJobStatus::Completed, $job->refresh()->status);
         $readiness = $invoices->billableLines($job->refresh())->firstWhere('id', $line->getKey());
@@ -426,7 +425,8 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('2.500000', (string) $readiness?->remaining_billable_quantity);
         $this->assertSame('partially_invoiced', $readiness?->invoice_state);
 
-        $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '2.500000']);
+        $second = $invoices->create($job->refresh(), '2026-06-07', [(int) $line->getKey() => '2.500000']);
+        $this->assertSame(InvoiceStatus::Posted, $second->status);
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $job->refresh()->status);
     }
 
@@ -456,12 +456,10 @@ final class VehicleServiceEngineTest extends TestCase
         $statuses->change($job, VehicleServiceJobStatus::InProgress);
         $statuses->change($job->refresh(), VehicleServiceJobStatus::Completed);
         $invoice = app(VehicleServiceInvoiceIntegrationService::class)->create($job->refresh(), '2026-06-07');
+        $this->assertSame(InvoiceStatus::Posted, $invoice->status);
         $payments = app(VehicleServicePaymentIntegrationService::class);
 
         $method = $this->paymentMethod($context);
-        $invoiceStatuses = app(InvoiceStatusService::class);
-        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
-        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
 
         try {
             $payments->prepare($job->refresh(), new VehicleServicePaymentData(

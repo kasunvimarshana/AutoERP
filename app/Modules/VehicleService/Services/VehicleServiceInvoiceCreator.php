@@ -7,8 +7,10 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -18,6 +20,7 @@ final class VehicleServiceInvoiceCreator
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
+        private readonly InvoiceStatusService $invoiceStatuses,
         private readonly VehicleServiceInvoiceSourceMapper $sources,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServicePaymentIntegrationService $payments,
@@ -71,13 +74,23 @@ final class VehicleServiceInvoiceCreator
                 'status' => 'active',
             ]);
 
+            $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
+            $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
+
             if (! $this->sources->hasRemainingBillableLines($job)
                 && $job->status === VehicleServiceJobStatus::Completed) {
                 $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy);
                 $this->payments->syncJobStatus($job->refresh(), $createdBy);
             }
 
-            return $invoice;
+            return $invoice->refresh()->loadMissing([
+                'lines',
+                'sources',
+                'sourceLines',
+                'adjustments',
+                'adjustmentAllocations',
+                'balance',
+            ]);
         });
     }
 }
