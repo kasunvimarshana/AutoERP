@@ -137,6 +137,7 @@ export interface VehicleServiceInvoiceLink {
     balance_due?: string | null;
     invoice_status?: string | null;
     status: string;
+    can_receive_payment?: boolean;
 }
 
 export interface VehicleServicePaymentLink {
@@ -147,6 +148,11 @@ export interface VehicleServicePaymentLink {
     invoice_number?: string | null;
     allocated_amount: string;
     status: string;
+    payment_status?: string | null;
+    posting_status?: string | null;
+    allocation_status?: string | null;
+    payment_method?: VehicleServicePaymentMethod | null;
+    reference_number?: string | null;
 }
 
 export interface VehicleServiceJob {
@@ -254,19 +260,52 @@ export interface VehicleServiceInventoryMovement {
     status: string;
 }
 
+export interface VehicleServicePaymentMethod {
+    id: number;
+    code?: string | null;
+    name: string;
+    method_type: string;
+    requires_reference?: boolean;
+    requires_bank_account?: boolean;
+}
+
+export interface VehicleServicePaymentBankAccount {
+    id: number;
+    code: string;
+    name: string;
+}
+
+export interface VehicleServicePaymentOptions {
+    methods: VehicleServicePaymentMethod[];
+    bank_accounts: VehicleServicePaymentBankAccount[];
+}
+
 export interface VehicleServicePaymentPayload {
     invoice_id: number;
     payment_date: string;
     amount: string;
-    payment_method_id?: number;
+    payment_method_id: number;
     currency_id?: number;
     exchange_rate?: string;
     reference_number?: string;
+    internal_bank_account_id?: number;
+    external_bank_name?: string;
+    external_bank_branch?: string;
+    instrument_number?: string;
+    instrument_date?: string;
+    deposit_date?: string;
+    realized_date?: string;
+    metadata?: Record<string, string>;
 }
 
 export interface VehicleServicePaymentCreated {
     id: number;
     payment_number?: string | null;
+    status?: string | null;
+    posting_status?: string | null;
+    allocation_status?: string | null;
+    total_amount?: string | null;
+    allocated_amount?: string | null;
 }
 
 export interface PreparedVehicleServicePayment {
@@ -274,7 +313,11 @@ export interface PreparedVehicleServicePayment {
     direction: string;
     paymentDate: string;
     referenceNumber?: string | null;
-    lines: Array<{ amount: string }>;
+    lines: Array<{
+        amount: string;
+        paymentMethodId?: number | null;
+        internalBankAccountId?: number | null;
+    }>;
     allocations: Array<{ invoiceId: number; allocatedAmount: string }>;
 }
 

@@ -327,7 +327,7 @@ export function AppRouter() {
                     <Route path="/vehicle-service/jobs/create" element={<VehicleServiceJobCreatePage />} />
                     <Route path="/vehicle-service/jobs/:id/edit" element={<VehicleServiceJobEditPage />} />
                     <Route path="/vehicle-service/jobs/:id/invoice" element={<VehicleServiceInvoiceCreatePage />} />
-                    <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
+                    <Route path="/vehicle-service/jobs/:id/payment" element={requirePermission(paymentPermissions.create, <VehicleServicePaymentPreparePage />)} />
                     <Route path="/vehicle-service/jobs/:id" element={<VehicleServiceJobDetailPage />} />
                     <Route path="/vehicle-rental/reservations" element={<RentalReservationListPage />} />
                     <Route path="/vehicle-rental/reservations/create" element={<RentalReservationCreatePage />} />

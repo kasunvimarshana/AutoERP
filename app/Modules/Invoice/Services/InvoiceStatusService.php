@@ -114,8 +114,12 @@ final class InvoiceStatusService
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
 
-        if (in_array($status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-            throw new InvalidArgumentException('Cancelled or void invoices cannot be settled.');
+        if (! in_array($status, [
+            InvoiceStatus::Posted,
+            InvoiceStatus::PartiallyPaid,
+            InvoiceStatus::Paid,
+        ], true)) {
+            throw new InvalidArgumentException('Only posted invoices can be settled.');
         }
     }
 }

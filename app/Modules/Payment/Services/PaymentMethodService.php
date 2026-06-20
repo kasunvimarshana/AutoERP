@@ -6,6 +6,7 @@ namespace Modules\Payment\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -60,6 +61,31 @@ final class PaymentMethodService
         }
 
         return $query->orderBy('sort_order')->orderBy('name')->paginate($perPage);
+    }
+
+    /** @return Collection<int, PaymentMethod> */
+    public function effectiveActiveForDirection(
+        int $tenantId,
+        ?int $organizationUnitId,
+        PaymentDirection|string $direction,
+    ): Collection {
+        $direction = $direction instanceof PaymentDirection
+            ? $direction
+            : PaymentDirection::from((string) $direction);
+
+        return $this->effectiveScope(
+            $this->scope(PaymentMethod::query(), $tenantId, $organizationUnitId),
+            $tenantId,
+            $organizationUnitId,
+        )
+            ->where('is_active', true)
+            ->whereIn('direction_allowed', [$direction->value, PaymentMethodDirection::Both->value])
+            ->orderByRaw('case when organization_unit_id is not null then 0 when tenant_id is not null then 1 else 2 end')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->unique(fn (PaymentMethod $method): string => strtoupper((string) $method->code))
+            ->values();
     }
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): PaymentMethod

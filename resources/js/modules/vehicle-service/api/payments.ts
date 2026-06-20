@@ -3,9 +3,19 @@ import type { ApiResource } from '@/shared/types/api';
 import type {
     PreparedVehicleServicePayment,
     VehicleServicePaymentCreated,
+    VehicleServicePaymentOptions,
     VehicleServicePaymentPayload,
 } from '../vehicleServiceTypes';
 import { vehicleServiceJobsEndpoint as jobs } from './endpoint';
+
+export const getVehicleServicePaymentOptions = (
+    jobId: number,
+    signal?: AbortSignal,
+) =>
+    apiClient.get<ApiResource<VehicleServicePaymentOptions>>(
+        `${jobs}/${jobId}/payments/options`,
+        { signal },
+    ).then((response) => response.data.data);
 
 export const prepareVehicleServicePayment = (
     jobId: number,

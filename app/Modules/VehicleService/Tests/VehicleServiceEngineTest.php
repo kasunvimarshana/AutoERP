@@ -18,6 +18,7 @@ use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -25,14 +26,20 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\Enums\PaymentAllocationState;
+use Modules\Payment\Enums\PaymentMethodDirection;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentMethod;
+use Modules\Payment\Services\PaymentMethodService;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
+use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
@@ -259,11 +266,18 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame(1, VehicleServiceInvoiceLink::query()->where('vehicle_service_job_id', $job->getKey())->count());
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $job->refresh()->status);
 
+        $method = $this->paymentMethod($context);
+        $invoiceStatuses = app(InvoiceStatusService::class);
+        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
+        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
         $payment = app(VehicleServicePaymentIntegrationService::class)->prepare(
             $job,
-            (int) $invoice->getKey(),
-            '2026-06-07',
-            '100.000000',
+            new VehicleServicePaymentData(
+                invoiceId: (int) $invoice->getKey(),
+                paymentDate: '2026-06-07',
+                amount: '100.000000',
+                paymentMethodId: (int) $method->getKey(),
+            ),
         );
         $this->assertSame(PaymentType::ServiceReceipt, $payment->paymentType);
         $this->assertCount(1, $payment->allocations);
@@ -444,22 +458,44 @@ final class VehicleServiceEngineTest extends TestCase
         $invoice = app(VehicleServiceInvoiceIntegrationService::class)->create($job->refresh(), '2026-06-07');
         $payments = app(VehicleServicePaymentIntegrationService::class);
 
+        $method = $this->paymentMethod($context);
+        $invoiceStatuses = app(InvoiceStatusService::class);
+        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
+        $invoice = $invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
+
         try {
-            $payments->prepare($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '251.000000');
+            $payments->prepare($job->refresh(), new VehicleServicePaymentData(
+                invoiceId: (int) $invoice->getKey(),
+                paymentDate: '2026-06-07',
+                amount: '251.000000',
+                paymentMethodId: (int) $method->getKey(),
+            ));
             $this->fail('Expected payment amount above the invoice balance to fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Payment amount cannot exceed invoice remaining balance.', $exception->getMessage());
         }
 
-        $first = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '100.000000');
-        $this->assertSame(PaymentStatus::FullyAllocated, $first->status);
+        $first = $payments->create($job->refresh(), new VehicleServicePaymentData(
+            invoiceId: (int) $invoice->getKey(),
+            paymentDate: '2026-06-07',
+            amount: '100.000000',
+            paymentMethodId: (int) $method->getKey(),
+        ));
+        $this->assertSame(PaymentStatus::Posted, $first->status);
+        $this->assertSame(PaymentAllocationState::FullyAllocated, $first->allocation_status);
         $this->assertSame('150.000000', (string) Invoice::query()->findOrFail($invoice->getKey())->balance_due);
         $this->assertSame(VehicleServiceJobStatus::PartiallyPaid, $job->refresh()->status);
         $resource = (new VehicleServiceJobResource($job->refresh()->load(app(VehicleServiceJobService::class)->relations())))->resolve();
         $this->assertSame('150.000000', $resource['invoice_links'][0]['balance_due']);
 
-        $second = $payments->create($job->refresh(), (int) $invoice->getKey(), '2026-06-07', '150.000000');
-        $this->assertSame(PaymentStatus::FullyAllocated, $second->status);
+        $second = $payments->create($job->refresh(), new VehicleServicePaymentData(
+            invoiceId: (int) $invoice->getKey(),
+            paymentDate: '2026-06-07',
+            amount: '150.000000',
+            paymentMethodId: (int) $method->getKey(),
+        ));
+        $this->assertSame(PaymentStatus::Posted, $second->status);
+        $this->assertSame(PaymentAllocationState::FullyAllocated, $second->allocation_status);
         $this->assertSame(VehicleServiceJobStatus::Paid, $job->refresh()->status);
         $this->assertSame(2, VehicleServicePaymentLink::query()->where('vehicle_service_job_id', $job->getKey())->count());
     }
@@ -597,6 +633,19 @@ final class VehicleServiceEngineTest extends TestCase
             unitCost: $source === VehicleServiceLineSourceType::InventoryItem ? '10.000000' : '0.000000',
             isCustomerSupplied: $customerSupplied,
         ));
+    }
+
+    private function paymentMethod(array $context): PaymentMethod
+    {
+        return app(PaymentMethodService::class)->create([
+            'code' => 'CASH-'.Str::upper(Str::random(5)),
+            'name' => 'Cash',
+            'method_type' => PaymentMethodType::Cash->value,
+            'direction_allowed' => PaymentMethodDirection::Inbound->value,
+            'requires_reference' => false,
+            'requires_bank_account' => false,
+            'is_active' => true,
+        ], $context['tenant_id'], null);
     }
 
     private function receiveStock(array $context, string $quantity): void

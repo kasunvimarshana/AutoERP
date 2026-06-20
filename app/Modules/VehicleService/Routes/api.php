@@ -48,6 +48,7 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     Route::post('jobs/{job}/issue-inventory', [VehicleServiceInventoryController::class, 'issue'])->whereNumber('job')->name('inventory.issue');
     Route::post('jobs/{job}/invoices/preview', [VehicleServiceInvoiceController::class, 'preview'])->whereNumber('job')->name('invoices.preview');
     Route::post('jobs/{job}/invoices', [VehicleServiceInvoiceController::class, 'store'])->whereNumber('job')->name('invoices.store');
+    Route::get('jobs/{job}/payments/options', [VehicleServicePaymentController::class, 'options'])->whereNumber('job')->name('payments.options');
     Route::post('jobs/{job}/payments/prepare', [VehicleServicePaymentController::class, 'prepare'])->whereNumber('job')->name('payments.prepare');
     Route::post('jobs/{job}/payments', [VehicleServicePaymentController::class, 'store'])->whereNumber('job')->name('payments.store');
 
