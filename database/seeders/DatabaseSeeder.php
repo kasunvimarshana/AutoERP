@@ -27,6 +27,7 @@ use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
 use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\RolePermissionModel;
+use Modules\Reporting\Database\Seeders\ReportingSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -58,6 +59,7 @@ class DatabaseSeeder extends Seeder
             VehicleSeeder::class,
             VehicleRentalSeeder::class,
             HrSeeder::class,
+            ReportingSeeder::class,
         ]);
 
         //
