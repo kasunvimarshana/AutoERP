@@ -22,6 +22,16 @@ Prioritize correctness, readability, and long-term maintainability. Fix root cau
 
 Prioritize correctness, readability, and maintainability above convenience. Do not preserve legacy design flaws through compatibility workarounds. Do not overengineer. Never make changes based on assumptions or incomplete understanding; verify requirements and assess impact first. Do not introduce hardcoded magic values—use named constants, configuration, or well-defined abstractions. Always prefer the simplest correct solution that resolves the root cause.
 
+When modifying a module, any bug, missing functionality, or incomplete implementation in a related module must be addressed within the responsible module itself. Do not introduce workarounds, patches, or misplaced logic in other modules. Keep module responsibilities clear, and ensure all changes remain clean, readable, and maintainable.
+
+Fix issues in the module where they belong. Do not compensate for bugs, missing functionality, or incomplete implementations in one module by adding workarounds to another. Maintain clear module boundaries and keep solutions clean, readable, and maintainable.
+
+Fix problems at their source. Do not work around bugs, missing functionality, or incomplete implementations in other modules. Apply changes within the module that owns the responsibility, preserving clear boundaries, readability, and long-term maintainability.
+
+Each module should contain only the logic and responsibilities it owns. If functionality belongs to another module, move it to the appropriate module instead of expanding the current module's scope. Maintain clear module boundaries and keep the codebase clean, readable, and maintainable.
+
+Do not place logic, business rules, or responsibilities in modules that do not own them. When such code is encountered, relocate it to the appropriate module and preserve clear ownership boundaries, readability, and maintainability.
+
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
 Security first: Do not introduce security risks, expose secrets, bypass validation, or weaken authentication and authorization mechanisms.
@@ -35,5 +45,7 @@ Explicit error handling: Handle errors explicitly and predictably. Do not silent
 No dead code: Do not introduce unused code, unnecessary abstractions, speculative features, or placeholders for hypothetical future requirements.
 
 Verify before completion: Before considering a task complete, verify that the solution satisfies all requirements and does not introduce regressions.
+
+Respect module ownership and separation of concerns. Fix problems at their source and keep responsibilities within the module that owns them. Do not compensate for bugs, missing functionality, or incomplete implementations in other modules. If logic is found in the wrong module, move it to the appropriate owner rather than expanding the current module's scope. Maintain clear boundaries, readability, and long-term maintainability.
 
 Understand first, verify second, change third. Never guess, never overengineer, and never preserve a flawed design when a clean maintainable solution is feasible.
