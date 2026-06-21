@@ -57,7 +57,7 @@ export function searchCustomerCategories(params: LookupLoadParams): Promise<Look
 }
 
 export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
-    return requestLookup<NamedResource>(endpoints.currencies, params, { is_active: true });
+    return requestLookup<NamedResource>(endpoints.currencies, params);
 }
 
 const relationPath = (customerId: number, relation: string) => `${endpoints.customers}/${customerId}/${relation}`;

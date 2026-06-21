@@ -15,6 +15,7 @@ use Modules\Item\Database\Seeders\ItemSeeder;
 use Modules\OrganizationUnit\Database\Seeders\OrganizationUnitSeeder;
 use Modules\Payment\Database\Seeders\PaymentSeeder;
 use Modules\Purchase\Database\Seeders\PurchaseSeeder;
+use Modules\ReferenceData\Database\Seeders\ReferenceDataSeeder;
 use Modules\Sales\Database\Seeders\SalesSeeder;
 use Modules\Sequence\Database\Seeders\SequenceSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
@@ -43,6 +44,7 @@ class DatabaseSeeder extends Seeder
             OrganizationUnitSeeder::class,
             UserSeeder::class,
             AuthSeeder::class,
+            ReferenceDataSeeder::class,
             ConfigurationSeeder::class,
             SequenceSeeder::class,
             UomSeeder::class,

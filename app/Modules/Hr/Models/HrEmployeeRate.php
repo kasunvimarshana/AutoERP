@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Hr\Enums\EmployeeRateType;
 final class HrEmployeeRate extends CoreModel

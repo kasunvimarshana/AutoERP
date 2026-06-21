@@ -71,7 +71,7 @@ export async function listItemVariantsForLookup(itemId: number, signal?: AbortSi
 }
 
 export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
-    return requestLookup<NamedResource>(endpoints.currencies, params, { is_active: true });
+    return requestLookup<NamedResource>(endpoints.currencies, params);
 }
 
 const relationPath = (supplierId: number, relation: string) => `${endpoints.suppliers}/${supplierId}/${relation}`;

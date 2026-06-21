@@ -1,42 +1,20 @@
-# Tenant Module
+# Tenant module
 
-Tenant module provides production-ready multi-tenant management based on the six-table
-tenant schema and Core-driven contracts.
+The Tenant module owns tenant identity, lifecycle, plans, documents, and domains. Runtime settings are not stored in this module; they are owned by `Modules/Configuration`.
 
-## Migration Source of Truth
+## Migration source of truth
 
-Tenant aggregate boundaries are defined by these migrations:
-
-- tenants
-- tenant_plans
-- tenant_setting_groups
-- tenant_settings
-- tenant_documents
-- tenant_domains
+- `tenant_plans`
+- `tenants`
+- `tenant_documents`
+- `tenant_domains`
 
 ## Capabilities
 
-- Tenant lifecycle management (create, update, activate, suspend, deactivate)
-- Tenant isolation key and configuration scope handling
+- Tenant lifecycle management
 - Tenant plan catalog management
-- Tenant setting group hierarchy and settings management
 - Tenant document metadata and file storage integration
 - Tenant domain management with primary-domain consistency
+- Base-currency relationship to the ReferenceData module
 
-## Architecture
-
-- Domain: entities and invariant helpers for all six tenant tables
-- Application: contract-driven services and use-cases
-- Infrastructure: Eloquent models/repositories per table and provider bindings
-- Presentation: REST controllers, validation requests, resources, and tenant CLI commands
-
-## API Surface
-
-Prefix: api/tenant
-
-- tenants (+ activate, suspend, deactivate actions)
-- plans
-- setting-groups
-- settings
-- documents
-- domains
+Tenant-scoped configuration overrides are stored in `tenant_configuration_values` and accessed only through `ConfigurationResolverInterface`.

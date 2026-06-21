@@ -1,12 +1,12 @@
-# OrganizationUnit Module
+# OrganizationUnit module
 
-This module is derived from schema-first design using:
-`app/Modules/OrganizationUnit/Infrastructure/Persistence/Eloquent/Migrations`.
+The OrganizationUnit module owns organization-unit identity, hierarchy, types, documents, and trusted ownership checks. Runtime settings are not stored in this module; they are owned by `Modules/Configuration`.
 
-It follows Core, Configuration, and Tenant architecture patterns:
-- Interface-driven dependencies
-- Domain normalization service
-- Repository contract + Eloquent implementation
-- Use-case services returning `Result`
-- HTTP controllers/requests/resources
-- Module provider and route/migration loading
+## Responsibilities
+
+- Organization-unit hierarchy and lifecycle
+- Organization-unit types
+- Organization-unit document metadata
+- Trusted tenant ownership verification through `OrganizationUnitOwnershipCheckerInterface`
+
+Organization-specific configuration overrides are stored in `organization_unit_configuration_values`. The configuration table uses a composite foreign key to ensure the organization unit belongs to the same tenant.

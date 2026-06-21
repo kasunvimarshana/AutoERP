@@ -6,7 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\Supplier\Models\Supplier;

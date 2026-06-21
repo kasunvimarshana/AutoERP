@@ -8,6 +8,8 @@ import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { vehicleRentalPermissions } from "@/modules/vehicle-rental/vehicleRentalPermissions";
 import { auditPermissions } from "@/modules/audit/auditPermissions";
+import { settingsPermissions } from "@/modules/settings/settingsPermissions";
+import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -28,6 +30,7 @@ const PermissionCataloguePage = lazy(
     () => import("@/modules/access/PermissionCataloguePage"),
 );
 const SettingsPage = lazy(() => import("@/modules/settings/SettingsPage"));
+const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceDataPage"));
 const UomListPage = lazy(() => import("@/modules/uom/UomListPage"));
 const UomCreatePage = lazy(() => import("@/modules/uom/UomCreatePage"));
 const UomEditPage = lazy(() => import("@/modules/uom/UomEditPage"));
@@ -489,7 +492,11 @@ export function AppRouter() {
                         path="/administration/audit-logs/:id"
                         element={requirePermission(auditPermissions.view, <AuditLogDetailPage />)}
                     />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/settings" element={requirePermission(settingsPermissions.view, <SettingsPage />)} />
+                    <Route
+                        path="/reference-data"
+                        element={requirePermission(referenceDataPermissions.view, <ReferenceDataPage />)}
+                    />
                     <Route path="/uoms" element={<UomListPage />} />
                     <Route path="/uoms/create" element={<UomCreatePage />} />
                     <Route path="/uoms/:id/edit" element={<UomEditPage />} />

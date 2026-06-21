@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Validators;
 
 use InvalidArgumentException;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;

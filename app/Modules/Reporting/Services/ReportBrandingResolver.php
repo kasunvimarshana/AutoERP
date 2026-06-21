@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class ReportBrandingResolver
 {
+    public function __construct(private readonly ConfigurationResolverInterface $configuration) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -22,7 +25,7 @@ final class ReportBrandingResolver
                 ->findOrFail($organizationUnitId);
 
         return [
-            'company_name' => (string) config('app.name', 'AutoERP'),
+            'company_name' => (string) $this->configuration->value('app.name', $tenantId, $organizationUnitId),
             'tenant_name' => (string) $tenant->name,
             'tenant_code' => (string) $tenant->code,
             'organization_unit_name' => $organizationUnit?->name,

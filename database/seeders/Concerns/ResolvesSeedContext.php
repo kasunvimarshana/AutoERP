@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders\Concerns;
 
 use Illuminate\Support\Facades\Schema;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Supplier\Models\Supplier;

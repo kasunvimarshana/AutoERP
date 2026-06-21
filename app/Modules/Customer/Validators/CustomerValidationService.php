@@ -6,7 +6,7 @@ namespace Modules\Customer\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\UpdateCustomerData;

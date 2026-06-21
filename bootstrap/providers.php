@@ -15,6 +15,7 @@ use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
+use Modules\ReferenceData\Providers\ReferenceDataServiceProvider;
 use Modules\Reporting\Providers\ReportingServiceProvider;
 use Modules\Sales\Providers\SalesServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
@@ -32,6 +33,7 @@ use Modules\Warehouse\Providers\WarehouseServiceProvider;
 return [
     AppServiceProvider::class,
     CoreServiceProvider::class,
+    ReferenceDataServiceProvider::class,
     ConfigurationServiceProvider::class,
     AuthServiceProvider::class,
     UserServiceProvider::class,

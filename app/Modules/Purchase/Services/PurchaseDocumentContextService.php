@@ -6,7 +6,7 @@ namespace Modules\Purchase\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUnit;

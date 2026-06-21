@@ -5,6 +5,7 @@ import {
 } from "@/modules/access/accessPermissions";
 import { itemPermissions } from "@/modules/item/itemPermissions";
 import { auditPermissions } from "@/modules/audit/auditPermissions";
+import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -1047,12 +1048,26 @@ export const navigationSections: NavigationSection[] = [
                 },
             },
             {
+                id: "reference-data",
+                type: "link",
+                label: "Reference Data",
+                to: "/reference-data",
+                icon: "list",
+                access: {
+                    requiresTenant: true,
+                    permissions: [referenceDataPermissions.view],
+                },
+            },
+            {
                 id: "settings",
                 type: "link",
                 label: "Settings",
                 to: "/settings",
                 icon: "settings",
-                access: tenantAccess(["configuration"]),
+                access: {
+                    ...tenantAccess(["configuration"]),
+                    permissions: ["configuration.entries.view"],
+                },
             },
         ],
     },

@@ -51,16 +51,6 @@ final class OrganizationUnitModel extends CoreModel
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    public function settingGroups(): HasMany
-    {
-        return $this->hasMany(OrganizationUnitSettingGroupModel::class, 'organization_unit_id');
-    }
-
-    public function settings(): HasMany
-    {
-        return $this->hasMany(OrganizationUnitSettingModel::class, 'organization_unit_id');
-    }
-
     public function documents(): HasMany
     {
         return $this->hasMany(OrganizationUnitDocumentModel::class, 'organization_unit_id');

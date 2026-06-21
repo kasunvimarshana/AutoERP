@@ -6,7 +6,7 @@ namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 
 final class CustomerBankAccount extends CoreModel

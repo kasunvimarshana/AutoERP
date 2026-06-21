@@ -7,109 +7,64 @@ namespace Modules\Configuration\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Configuration\Models\ConfigurationModel;
-use Modules\Configuration\Models\CurrencyModel;
-use Modules\Configuration\Models\LanguageModel;
-use Modules\Configuration\Models\TenantConfigurationModel;
-use Modules\Configuration\Models\TimezoneModel;
-use Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Configuration\Constants\ConfigurationPermission;
 
 final class ConfigurationSeeder extends Seeder
 {
-    use ResolvesSeedContext;
-
     public function run(): void
     {
-        DB::transaction(function (): void {
-            $this->seedReferenceData();
-            $this->seedConfigurationValues();
-        }, 3);
-    }
-
-    private function seedReferenceData(): void
-    {
-        if (Schema::hasTable('languages')) {
-            LanguageModel::query()->updateOrCreate(
-                ['code' => 'en'],
-                [
-                    'name' => 'English',
-                    'row_version' => 1,
-                    'metadata' => json_encode(['seed_source' => 'configuration_module'], JSON_THROW_ON_ERROR),
-                ],
-            );
-        }
-
-        if (Schema::hasTable('timezones')) {
-            TimezoneModel::query()->updateOrCreate(
-                ['name' => 'UTC'],
-                [
-                    'offset' => '+00:00',
-                    'row_version' => 1,
-                    'metadata' => json_encode(['seed_source' => 'configuration_module'], JSON_THROW_ON_ERROR),
-                ],
-            );
-        }
-
-        if (Schema::hasTable('currencies')) {
-            CurrencyModel::query()->updateOrCreate(
-                ['code' => $this->defaultCurrencyCode()],
-                [
-                    'name' => $this->defaultCurrencyCode() === 'USD' ? 'US Dollar' : $this->defaultCurrencyCode(),
-                    'symbol' => $this->defaultCurrencyCode() === 'USD' ? '$' : $this->defaultCurrencyCode(),
-                    'decimal_places' => 2,
-                    'is_active' => true,
-                    'row_version' => 1,
-                    'metadata' => json_encode(
-                        ['seed_source' => 'configuration_module'],
-                        JSON_THROW_ON_ERROR,
-                    ),
-                ],
-            );
-        }
-    }
-
-    private function seedConfigurationValues(): void
-    {
-        $values = [
-            'app.locale' => 'en',
-            'app.timezone' => 'UTC',
-            'app.currency' => $this->defaultCurrencyCode(),
-        ];
-
-        if (Schema::hasTable('system_configurations')) {
-            foreach ($values as $key => $value) {
-                ConfigurationModel::query()->updateOrCreate(
-                    ['key' => $key],
-                    [
-                        'value' => $value,
-                        'value_type' => 'string',
-                        'source' => 'database',
-                        'description' => 'Default AutoERP configuration.',
-                    ],
-                );
-            }
-        }
-
-        $tenant = $this->defaultTenant();
-        if ($tenant === null || ! Schema::hasTable('tenant_configurations')) {
+        if (! Schema::hasTable('permissions') || ! Schema::hasTable('tenants')) {
             return;
         }
 
-        foreach ($values as $key => $value) {
-            TenantConfigurationModel::query()->updateOrCreate(
-                ['tenant_id' => $tenant->getKey(), 'key' => $key],
-                [
-                    'value' => $value,
-                    'value_type' => 'string',
-                    'source' => 'database',
-                    'description' => 'Default AutoERP tenant configuration.',
-                ],
-            );
-        }
+        $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
 
-        $currency = $this->defaultCurrency();
-        if ($currency !== null && $tenant->currency_id !== $currency->getKey()) {
-            $tenant->forceFill(['currency_id' => $currency->getKey()])->save();
-        }
+        DB::transaction(function () use ($guard): void {
+            $tenantIds = DB::table('tenants')->whereNull('deleted_at')->pluck('id');
+
+            foreach ($tenantIds as $tenantId) {
+                foreach (ConfigurationPermission::descriptions() as $name => $description) {
+                    $identity = [
+                        'tenant_id' => (int) $tenantId,
+                        'name' => $name,
+                        'guard_name' => $guard,
+                    ];
+                    $existing = DB::table('permissions')->where($identity)->first([
+                        'id', 'organization_unit_id', 'module', 'description', 'row_version', 'deleted_at',
+                    ]);
+                    $values = [
+                        'organization_unit_id' => null,
+                        'module' => 'Configuration',
+                        'description' => $description,
+                        'deleted_at' => null,
+                    ];
+
+                    if ($existing === null) {
+                        DB::table('permissions')->insert([
+                            ...$identity,
+                            ...$values,
+                            'row_version' => 1,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        continue;
+                    }
+
+                    if (
+                        $existing->organization_unit_id !== null
+                        || $existing->module !== 'Configuration'
+                        || $existing->description !== $description
+                        || $existing->deleted_at !== null
+                    ) {
+                        DB::table('permissions')->where('id', $existing->id)->update([
+                            ...$values,
+                            'row_version' => max(1, (int) $existing->row_version) + 1,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+        }, 3);
     }
 }

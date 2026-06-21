@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Services;
 
 use Modules\Auth\Constants\AuthErrorCode;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
@@ -25,6 +26,7 @@ final class GetCurrentAuthProfileService
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
         private readonly RolePermissionRepositoryInterface $rolePermissions,
+        private readonly ConfigurationResolverInterface $configuration,
     ) {}
 
     public function getProfile(
@@ -86,7 +88,7 @@ final class GetCurrentAuthProfileService
                 'metadata' => $this->safeMetadata($user->get('metadata')),
             ],
             'tenant' => $this->tenantSummary($resolvedTenantId),
-            'organization_unit' => $this->organizationUnitSummary($resolvedOrganizationUnitId),
+            'organization_unit' => $this->organizationUnitSummary($resolvedTenantId, $resolvedOrganizationUnitId),
             'token_payload' => $this->sanitizeTokenPayload($tokenPayload),
         ]);
     }
@@ -122,11 +124,11 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $tenant->id(),
             'name' => $this->nullableString($tenant->get('name')),
-            'timezone' => $this->timezoneFromMetadata($tenant->get('metadata')),
+            'timezone' => $this->configuredTimezone($tenantId, null),
         ];
     }
 
-    private function organizationUnitSummary(?int $organizationUnitId): ?array
+    private function organizationUnitSummary(?int $tenantId, ?int $organizationUnitId): ?array
     {
         if ($organizationUnitId === null) {
             return null;
@@ -140,22 +142,17 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $organizationUnit->id(),
             'name' => $this->nullableString($organizationUnit->get('name')),
-            'timezone' => $this->timezoneFromMetadata($organizationUnit->get('metadata')),
+            'timezone' => $tenantId === null ? null : $this->configuredTimezone($tenantId, $organizationUnitId),
         ];
     }
 
-    private function timezoneFromMetadata(mixed $metadata): ?string
+    private function configuredTimezone(int $tenantId, ?int $organizationUnitId): string
     {
-        if (! is_array($metadata)) {
-            return null;
-        }
+        $value = $this->configuration->value('app.timezone', $tenantId, $organizationUnitId);
 
-        $timezone = $metadata['business_timezone'] ?? $metadata['timezone'] ?? null;
-        if (! is_string($timezone) || ! in_array($timezone, timezone_identifiers_list(), true)) {
-            return null;
-        }
-
-        return $timezone;
+        return is_string($value) && in_array($value, timezone_identifiers_list(), true)
+            ? $value
+            : (string) config('app.timezone', 'UTC');
     }
 
     /**

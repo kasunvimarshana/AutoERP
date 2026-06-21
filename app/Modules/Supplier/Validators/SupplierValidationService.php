@@ -6,7 +6,7 @@ namespace Modules\Supplier\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;

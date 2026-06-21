@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;

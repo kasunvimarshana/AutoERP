@@ -7,7 +7,7 @@ namespace Modules\Tenant\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\Concerns\HasStatusScope;
 use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -48,16 +48,6 @@ final class TenantModel extends CoreModel
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
-    }
-
-    public function settingGroups(): HasMany
-    {
-        return $this->hasMany(TenantSettingGroupModel::class, 'tenant_id');
-    }
-
-    public function settings(): HasMany
-    {
-        return $this->hasMany(TenantSettingModel::class, 'tenant_id');
     }
 
     public function documents(): HasMany

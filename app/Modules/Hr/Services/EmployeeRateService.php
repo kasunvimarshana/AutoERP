@@ -6,7 +6,7 @@ namespace Modules\Hr\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
-use Modules\Configuration\Models\CurrencyModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Hr\DTOs\EmployeeRateData;
 use Modules\Hr\Enums\EmployeeRateType;

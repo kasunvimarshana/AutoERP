@@ -56,22 +56,22 @@ No business tables or migrations. Core provides shared application infrastructur
 - `2026_06_12_000002_create_currencies_table`
 - `2026_06_12_000003_create_languages_table`
 - `2026_06_12_000004_create_timezones_table`
-- `2026_06_12_000005_create_system_configurations_table`
-- `2026_06_12_015001_create_tenant_configurations_table`
+- `2026_06_12_000005_create_global_configuration_values_table`
+- `2026_06_12_015001_create_tenant_configuration_values_table`
 
-Tables: `countries`, `currencies`, `languages`, `timezones`, `system_configurations`, `tenant_configurations`.
+Tables: `countries`, `currencies`, `languages`, `timezones`, `global_configuration_values`, `tenant_configuration_values`, `organization_unit_configuration_values`.
 
 ### Tenant
 
-Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_setting_groups_table`, `create_tenant_settings_table`, `create_tenant_documents_table`, `create_tenant_domains_table`.
+Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_documents_table`, `create_tenant_domains_table`.
 
-Tables: `tenant_plans`, `tenants`, `tenant_setting_groups`, `tenant_settings`, `tenant_documents`, `tenant_domains`.
+Tables: `tenant_plans`, `tenants`, `tenant_documents`, `tenant_domains`.
 
 ### OrganizationUnit
 
-Migrations: `create_organization_unit_types_table`, `create_organization_units_table`, `create_organization_unit_setting_groups_table`, `create_organization_unit_settings_table`, `create_organization_unit_documents_table`.
+Migrations: `create_organization_unit_types_table`, `create_organization_units_table`, `create_organization_unit_documents_table`.
 
-Tables: `organization_unit_types`, `organization_units`, `organization_unit_setting_groups`, `organization_unit_settings`, `organization_unit_documents`.
+Tables: `organization_unit_types`, `organization_units`, `organization_unit_documents`.
 
 ### User
 
@@ -231,3 +231,5 @@ The Tax item override patch was consolidated during this audit. `default_tax_gro
 - Composite unique constraints containing nullable `organization_unit_id` follow database NULL semantics. They may allow more than one global-scope row with otherwise identical values. Changing this requires an explicit business rule and was not inferred during migration cleanup.
 - Several actor/source IDs are intentionally unsigned IDs or polymorphic pairs rather than hard FKs to avoid cross-module coupling and preserve historical records.
 - Migration timestamp consolidation is appropriate for the current development/refactor stage but is not suitable for an already deployed production database without a release-specific migration strategy.
+
+- `2026_06_12_020006_create_organization_unit_configuration_values_table`

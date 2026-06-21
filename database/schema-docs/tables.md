@@ -32,8 +32,6 @@ No business tables. Core contains shared application infrastructure only.
 | `tenant_documents` | Stores document metadata associated with tenant document. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
 | `tenant_domains` | Stores tenant domain records used by the owning module. | `tenant_id` -> `tenants` | unique `domain`; unique `tenant_id,domain`; tenant scoped; soft deletes |
 | `tenant_plans` | Stores tenant plan records used by the owning module. | `currency_id` -> `currencies` | unique `slug`; soft deletes |
-| `tenant_setting_groups` | Groups related configuration keys for tenant setting group. | `tenant_id` -> `tenants`; `parent_id` -> `tenant_setting_groups` | unique `tenant_id,key`; tenant scoped; soft deletes |
-| `tenant_settings` | Stores scoped configuration values for tenant setting. | `tenant_id` -> `tenants`; `group_id` -> `tenant_setting_groups` | unique `tenant_id,key`; tenant scoped; soft deletes |
 | `tenants` | Stores tenant identity, plan, isolation, localization, and lifecycle settings. | `tenant_plan_id` -> `tenant_plans`; `currency_id` -> `currencies` | unique `code`; unique `isolation_key`; unique `slug`; unique `uuid`; soft deletes |
 
 ## OrganizationUnit
@@ -41,8 +39,6 @@ No business tables. Core contains shared application infrastructure only.
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
 | `organization_unit_documents` | Stores document metadata associated with organization unit document. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,name`; tenant scoped; organization-unit aware |
-| `organization_unit_setting_groups` | Groups related configuration keys for organization unit setting group. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `parent_id` -> `organization_unit_setting_groups` | unique `tenant_id,organization_unit_id,key`; tenant scoped; organization-unit aware |
-| `organization_unit_settings` | Stores scoped configuration values for organization unit setting. | `group_id` -> `organization_unit_setting_groups`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,organization_unit_id,group_id,key`; tenant scoped; organization-unit aware |
 | `organization_unit_types` | Stores reusable type definitions for organization unit type. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
 | `organization_units` | Stores the tenant organization hierarchy used for operational scoping. | `parent_id` -> `organization_units`; `type_id` -> `organization_unit_types`; `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
 
@@ -81,8 +77,6 @@ No business tables. Core contains shared application infrastructure only.
 | `countries` | Provides reference country codes and names used by addresses and localization. | No declared foreign keys. | unique `code`; soft deletes |
 | `currencies` | Provides currency definitions and precision used by financial documents. | No declared foreign keys. | unique `code`; soft deletes |
 | `languages` | Stores language records used by the owning module. | No declared foreign keys. | unique `code`; soft deletes |
-| `system_configurations` | Stores system configuration records used by the owning module. | No declared foreign keys. | unique `key`; soft deletes |
-| `tenant_configurations` | Stores tenant configuration records used by the owning module. | `tenant_id` -> `tenants` | unique `tenant_id,key`; tenant scoped; soft deletes |
 | `timezones` | Stores timezone records used by the owning module. | No declared foreign keys. | unique `name`; soft deletes |
 
 ## Sequence
@@ -274,6 +268,9 @@ Tax override columns remain on the Item-owned `items` table because Item service
 | `payment_status_histories` | Records status transitions and audit context for payment status history. | `tenant_id` -> `tenants`; `payment_id` -> `payments`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
 | `payment_unapplied_balances` | Stores current or period balances for payment unapplied balance. | `payment_id` -> `payments`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | unique `payment_id`; tenant scoped; organization-unit aware |
 | `payments` | Stores inbound and outbound payment headers, source traceability, and cheque details. | `currency_id` -> `currencies`; `tenant_id` -> `tenants`; `bank_account_id` -> `finance_accounts`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | unique `tenant_id,payment_number`; tenant scoped; organization-unit aware; soft deletes |
+| `global_configuration_values` | Registered global configuration overrides. | No foreign keys. | unique `key`; compare-and-swap `row_version` |
+| `tenant_configuration_values` | Registered tenant configuration overrides. | `tenant_id` -> `tenants` | unique `tenant_id,key`; tenant scoped; compare-and-swap `row_version` |
+| `organization_unit_configuration_values` | Registered organization-unit configuration overrides. | composite `organization_unit_id,tenant_id` -> `organization_units.id,tenant_id`; `tenant_id` -> `tenants` | unique scope + `key`; cross-tenant ownership prevented |
 
 ## Purchase
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\ValuationMethod;
 use Modules\Item\Enums\CostingMethod;
@@ -15,6 +15,8 @@ use Modules\Warehouse\Models\WarehouseModel;
 
 final class InventoryMethodResolver
 {
+    public function __construct(private readonly ConfigurationResolverInterface $configuration) {}
+
     public function valuation(Item $item, int $warehouseId, ?int $organizationUnitId): ValuationMethod
     {
         $itemMethod = $this->metadataValue($item->metadata, 'valuation_method');
@@ -29,13 +31,24 @@ final class InventoryMethodResolver
             return $this->valuationMethod($costing);
         }
 
+        $tenantId = (int) $item->tenant_id;
+        $inherited = $this->metadataValue($item->category?->metadata, 'valuation_method')
+            ?? $this->warehouseMetadata($warehouseId, $tenantId, 'valuation_method');
+
+        if ($inherited !== null) {
+            return $this->valuationMethod($inherited);
+        }
+
+        $configured = $this->configuration->value(
+            'inventory.valuation_method',
+            $tenantId,
+            $organizationUnitId,
+        );
+
         return $this->valuationMethod(
-            $this->metadataValue($item->category?->metadata, 'valuation_method')
-            ?? $this->warehouseMetadata($warehouseId, 'valuation_method')
-            ?? $this->organizationSetting((int) $item->tenant_id, $organizationUnitId, 'inventory.valuation_method')
-            ?? $this->tenantSetting((int) $item->tenant_id, 'inventory.valuation_method')
-            ?? $this->globalSetting('inventory.valuation_method')
-            ?? (string) config('inventory.valuation.default', 'fifo'),
+            is_string($configured)
+                ? $configured
+                : (string) config('inventory.valuation.default', 'fifo'),
         );
     }
 
@@ -56,13 +69,24 @@ final class InventoryMethodResolver
             return AllocationMethod::Batch;
         }
 
+        $tenantId = (int) $item->tenant_id;
+        $inherited = $this->metadataValue($item->category?->metadata, 'allocation_method')
+            ?? $this->warehouseMetadata($warehouseId, $tenantId, 'allocation_method');
+
+        if ($inherited !== null) {
+            return $this->allocationMethod($inherited);
+        }
+
+        $configured = $this->configuration->value(
+            'inventory.allocation_method',
+            $tenantId,
+            $organizationUnitId,
+        );
+
         return $this->allocationMethod(
-            $this->metadataValue($item->category?->metadata, 'allocation_method')
-            ?? $this->warehouseMetadata($warehouseId, 'allocation_method')
-            ?? $this->organizationSetting((int) $item->tenant_id, $organizationUnitId, 'inventory.allocation_method')
-            ?? $this->tenantSetting((int) $item->tenant_id, 'inventory.allocation_method')
-            ?? $this->globalSetting('inventory.allocation_method')
-            ?? (string) config('inventory.allocation.default', 'fifo'),
+            is_string($configured)
+                ? $configured
+                : (string) config('inventory.allocation.default', 'fifo'),
         );
     }
 
@@ -94,70 +118,14 @@ final class InventoryMethodResolver
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    private function warehouseMetadata(int $warehouseId, string $key): ?string
+    private function warehouseMetadata(int $warehouseId, int $tenantId, string $key): ?string
     {
-        $warehouse = WarehouseModel::query()->find($warehouseId);
+        $warehouse = WarehouseModel::query()
+            ->where('tenant_id', $tenantId)
+            ->find($warehouseId);
 
         return $warehouse instanceof WarehouseModel
             ? $this->metadataValue($warehouse->metadata, $key)
             : null;
-    }
-
-    private function organizationSetting(int $tenantId, ?int $organizationUnitId, string $key): ?string
-    {
-        if ($organizationUnitId === null) {
-            return null;
-        }
-
-        $value = DB::table('organization_unit_settings')
-            ->where('tenant_id', $tenantId)
-            ->where('organization_unit_id', $organizationUnitId)
-            ->where('key', $key)
-            ->orderByDesc('id')
-            ->value('value');
-
-        return $this->stringValue($value);
-    }
-
-    private function tenantSetting(int $tenantId, string $key): ?string
-    {
-        $value = DB::table('tenant_settings')
-            ->where('tenant_id', $tenantId)
-            ->where('key', $key)
-            ->whereNull('deleted_at')
-            ->value('value');
-        if ($this->stringValue($value) !== null) {
-            return $this->stringValue($value);
-        }
-
-        return $this->stringValue(DB::table('tenant_configurations')
-            ->where('tenant_id', $tenantId)
-            ->where('key', $key)
-            ->whereNull('deleted_at')
-            ->value('value'));
-    }
-
-    private function globalSetting(string $key): ?string
-    {
-        return $this->stringValue(DB::table('system_configurations')
-            ->where('key', $key)
-            ->whereNull('deleted_at')
-            ->value('value'));
-    }
-
-    private function stringValue(mixed $value): ?string
-    {
-        if (! is_string($value) || trim($value) === '') {
-            return null;
-        }
-
-        $trimmed = trim($value);
-        if (str_starts_with($trimmed, '"') && str_ends_with($trimmed, '"')) {
-            $decoded = json_decode($trimmed, true);
-
-            return is_string($decoded) && $decoded !== '' ? $decoded : null;
-        }
-
-        return $trimmed;
     }
 }
