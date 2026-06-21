@@ -62,6 +62,7 @@ final class PurchaseReturnAdjustmentService
             if ($this->math->isNegative($remaining)) {
                 throw new \InvalidArgumentException('Purchase return adjustment allocation cannot exceed source adjustment amount.');
             }
+            $this->assertAllocationAmounts($adjustment, $previouslyReturned, $returnedAmount, $remaining);
 
             $allocation = $allocations->first(
                 fn (PurchaseReturnAdjustmentAllocation $candidate): bool => (int) $candidate->purchase_return_id === (int) $return->getKey()
@@ -155,6 +156,7 @@ final class PurchaseReturnAdjustmentService
             if ($this->math->isNegative($remaining)) {
                 throw new \InvalidArgumentException('Purchase return adjustment allocation cannot exceed source adjustment amount.');
             }
+            $this->assertAllocationAmounts($adjustment, $previouslyReturned, $returnedAmount, $remaining);
 
             if ($mutate) {
                 $allocation = PurchaseReturnAdjustmentAllocation::query()
@@ -193,6 +195,24 @@ final class PurchaseReturnAdjustmentService
         }
 
         return $netReturn;
+    }
+
+    private function assertAllocationAmounts(
+        PurchaseHeaderAdjustment $adjustment,
+        string $previouslyReturned,
+        string $returnedAmount,
+        string $remaining,
+    ): void {
+        foreach ([
+            'source amount' => (string) $adjustment->amount,
+            'previously returned amount' => $previouslyReturned,
+            'returned amount' => $returnedAmount,
+            'remaining amount' => $remaining,
+        ] as $label => $amount) {
+            if ($this->math->isNegative($amount)) {
+                throw new \InvalidArgumentException("Purchase return adjustment {$label} cannot be negative.");
+            }
+        }
     }
 
     private function isFinalReceiptReturn(

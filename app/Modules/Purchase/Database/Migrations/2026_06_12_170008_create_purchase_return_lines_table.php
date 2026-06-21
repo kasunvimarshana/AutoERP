@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -41,17 +40,12 @@ return new class extends Migration
             $table->index('purchase_return_id', 'purchase_return_lines_return_idx');
             $table->index('item_id', 'purchase_return_lines_item_idx');
             $table->index(['source_line_type', 'source_line_id'], 'purchase_return_lines_source_line_idx');
-            $table->index(['purchase_return_id', 'source_line_type', 'source_line_id'], 'purchase_return_lines_return_source_idx');
             $table->index('inventory_movement_id', 'purchase_return_lines_movement_idx');
             $table->unique(['purchase_return_id', 'line_number'], 'purchase_return_lines_return_line_number_uk');
             $table->unique(['purchase_return_id', 'client_line_key'], 'purchase_return_lines_return_client_key_uk');
             $table->unique(['purchase_return_id', 'source_line_type', 'source_line_id'], 'purchase_return_lines_return_source_uk');
         });
 
-        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
-            DB::statement('ALTER TABLE purchase_return_lines ADD CONSTRAINT purchase_return_lines_quantities_chk CHECK (returned_quantity > 0 AND source_quantity >= 0 AND previously_returned_quantity >= 0 AND remaining_quantity >= 0)');
-            DB::statement('ALTER TABLE purchase_return_lines ADD CONSTRAINT purchase_return_lines_money_chk CHECK (unit_price >= 0 AND base_amount >= 0 AND discount_amount >= 0 AND tax_amount >= 0 AND charge_amount >= 0 AND line_total >= 0)');
-        }
     }
 
     public function down(): void

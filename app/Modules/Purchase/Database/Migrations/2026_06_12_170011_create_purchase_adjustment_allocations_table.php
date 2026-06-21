@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -76,13 +75,6 @@ return new class extends Migration
             $table->index(['event_type', 'entry_type'], 'purchase_adj_alloc_event_idx');
         });
 
-        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
-            DB::statement("ALTER TABLE purchase_adjustment_allocations ADD CONSTRAINT purchase_adj_alloc_entry_type_chk CHECK (entry_type IN ('allocation','reversal'))");
-            DB::statement("ALTER TABLE purchase_adjustment_allocations ADD CONSTRAINT purchase_adj_alloc_stage_chk CHECK (stage IN ('manual_plan','grn_recognition','invoice_recognition','return_recognition'))");
-            DB::statement("ALTER TABLE purchase_adjustment_allocations ADD CONSTRAINT purchase_adj_alloc_method_chk CHECK (allocation_method IN ('proportional','manual','first_invoice','last_invoice'))");
-            DB::statement('ALTER TABLE purchase_adjustment_allocations ADD CONSTRAINT purchase_adj_alloc_amounts_chk CHECK (source_amount >= 0 AND allocated_amount >= 0 AND recognized_at_grn_amount >= 0 AND recognized_at_invoice_amount >= 0 AND remaining_amount >= 0)');
-            DB::statement("ALTER TABLE purchase_adjustment_allocations ADD CONSTRAINT purchase_adj_alloc_reversal_chk CHECK ((entry_type = 'reversal' AND reversal_of_id IS NOT NULL) OR (entry_type = 'allocation' AND reversal_of_id IS NULL))");
-        }
     }
 
     public function down(): void

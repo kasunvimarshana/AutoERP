@@ -42,6 +42,7 @@ use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\FastPurchaseService;
+use Modules\Purchase\Services\PurchaseAdjustmentAllocationLedger;
 use Modules\Purchase\Services\PurchasePricingService;
 use Modules\Supplier\Models\Supplier;
 use Tests\TestCase;
@@ -336,6 +337,63 @@ final class FastPurchaseTest extends TestCase
         } catch (ValidationException $exception) {
             $this->assertSame('Manual allocation references an unknown purchase line.', $exception->errors()['adjustments.0.allocations.0.client_line_key'][0] ?? null);
         }
+    }
+
+    public function test_adjustment_ledger_rejects_invalid_metadata_and_creates_well_formed_reversals(): void
+    {
+        $context = $this->context();
+        app(FastPurchaseService::class)->create($this->payload($context, [
+            'supplier_reference' => 'FP-LEDGER-GUARDS',
+            'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => false, 'record_payment_now' => false],
+            'adjustments' => [[
+                'name' => 'Freight',
+                'adjustment_type' => 'freight',
+                'effect' => 'increase',
+                'amount' => '25.000000',
+                'allocation_method' => 'proportional',
+            ]],
+        ]));
+
+        $allocation = DB::table('purchase_adjustment_allocations')
+            ->where('stage', 'grn_recognition')
+            ->where('entry_type', 'allocation')
+            ->first();
+        $this->assertNotNull($allocation);
+
+        $ledger = app(PurchaseAdjustmentAllocationLedger::class);
+        $invalidValues = [
+            ['stage', 'invalid_stage', 'Purchase adjustment allocation stage is invalid.'],
+            ['allocation_method', 'invalid_method', 'Purchase adjustment allocation method is invalid.'],
+            ['allocated_amount', '-1.000000', 'Purchase adjustment allocation allocated_amount cannot be negative.'],
+        ];
+
+        foreach ($invalidValues as [$column, $value, $message]) {
+            $original = $allocation->{$column};
+            DB::table('purchase_adjustment_allocations')->where('id', $allocation->id)->update([$column => $value]);
+
+            try {
+                $ledger->reverseForTarget((string) $allocation->target_type, (int) $allocation->target_id, 'test_reversal');
+                $this->fail("Expected {$column} validation to fail.");
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame($message, $exception->getMessage());
+            }
+
+            DB::table('purchase_adjustment_allocations')->where('id', $allocation->id)->update([$column => $original]);
+            $this->assertDatabaseMissing('purchase_adjustment_allocations', [
+                'reversal_of_id' => $allocation->id,
+                'entry_type' => 'reversal',
+            ]);
+        }
+
+        $ledger->reverseForTarget((string) $allocation->target_type, (int) $allocation->target_id, 'test_reversal');
+
+        $this->assertDatabaseHas('purchase_adjustment_allocations', [
+            'reversal_of_id' => $allocation->id,
+            'entry_type' => 'reversal',
+            'stage' => 'grn_recognition',
+            'allocation_method' => 'proportional',
+            'event_type' => 'test_reversal',
+        ]);
     }
 
     public function test_first_and_last_invoice_adjustments_are_allocated_at_invoice_stage(): void

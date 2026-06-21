@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -46,9 +45,6 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'status'], 'goods_receipt_notes_scope_status_idx');
         });
 
-        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
-            DB::statement("ALTER TABLE goods_receipt_notes ADD CONSTRAINT goods_receipt_notes_status_chk CHECK (status IN ('draft','posted','reversed'))");
-        }
     }
 
     public function down(): void

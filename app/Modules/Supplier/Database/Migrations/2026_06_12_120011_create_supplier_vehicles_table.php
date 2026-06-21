@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -34,14 +33,6 @@ return new class extends Migration
             $table->index(['started_at', 'ended_at'], 'supplier_vehicles_dates_idx');
         });
 
-        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
-            $true = DB::getDriverName() === 'pgsql' ? 'TRUE' : '1';
-            $false = DB::getDriverName() === 'pgsql' ? 'FALSE' : '0';
-            DB::statement('ALTER TABLE supplier_vehicles ADD CONSTRAINT supplier_vehicles_dates_ck CHECK (ended_at IS NULL OR ended_at >= started_at)');
-            DB::statement("ALTER TABLE supplier_vehicles ADD CONSTRAINT supplier_vehicles_current_end_ck CHECK (is_current = {$false} OR ended_at IS NULL)");
-            DB::statement("ALTER TABLE supplier_vehicles ADD CONSTRAINT supplier_vehicles_current_guard_ck CHECK ((is_current = {$true} AND current_guard = 1) OR (is_current = {$false} AND current_guard IS NULL))");
-            DB::statement('ALTER TABLE supplier_vehicles ADD CONSTRAINT supplier_vehicles_active_guard_ck CHECK ((ended_at IS NULL AND active_guard = 1) OR (ended_at IS NOT NULL AND active_guard IS NULL))');
-        }
     }
 
     public function down(): void

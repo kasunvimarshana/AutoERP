@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -51,9 +50,6 @@ return new class extends Migration
             $table->index('purchase_order_date', 'purchase_orders_date_idx');
         });
 
-        if (in_array(DB::getDriverName(), ['mysql', 'pgsql'], true)) {
-            DB::statement("ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_status_chk CHECK (status IN ('draft','pending_approval','approved','closed','cancelled'))");
-        }
     }
 
     public function down(): void

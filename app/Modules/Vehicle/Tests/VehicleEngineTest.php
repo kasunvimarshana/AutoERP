@@ -48,6 +48,7 @@ use Modules\Vehicle\Services\VehicleMakeService;
 use Modules\Vehicle\Services\VehicleModelService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleTypeService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
 final class VehicleEngineTest extends TestCase
@@ -377,6 +378,110 @@ final class VehicleEngineTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.vehicle_number', 'VEH-COMPANY');
+    }
+
+    public function test_party_vehicle_services_enforce_dates_active_pairs_and_one_current_relationship(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scopeContext();
+        [$make, $model] = $this->masterData($tenantId, $organizationUnitId, 'REL');
+        $vehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-REL', (int) $make->getKey(), (int) $model->getKey());
+        $startedAt = now()->startOfDay()->toImmutable();
+
+        $firstCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-1');
+        $secondCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-2');
+        $invalidDateCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-3');
+        $customerService = app(CustomerVehicleService::class);
+        $firstCustomerRelationship = $customerService->create([
+            'customer_id' => $firstCustomer->getKey(),
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+        $secondCustomerRelationship = $customerService->create([
+            'customer_id' => $secondCustomer->getKey(),
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+
+        $this->assertFalse((bool) $firstCustomerRelationship->refresh()->is_current);
+        $this->assertNull($firstCustomerRelationship->current_guard);
+        $this->assertTrue((bool) $secondCustomerRelationship->refresh()->is_current);
+        $this->assertSame(1, (int) $secondCustomerRelationship->current_guard);
+        $this->assertSame(1, (int) $secondCustomerRelationship->active_guard);
+
+        try {
+            $customerService->create([
+                'customer_id' => $firstCustomer->getKey(),
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->toDateString(),
+                'is_current' => false,
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected duplicate active customer relationship validation to fail.');
+        } catch (ConflictHttpException $exception) {
+            $this->assertSame('An active Customer-Vehicle relationship already exists.', $exception->getMessage());
+        }
+
+        try {
+            $customerService->create([
+                'customer_id' => $invalidDateCustomer->getKey(),
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->addDay()->toDateString(),
+                'ended_at' => $startedAt->toDateString(),
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected invalid customer relationship dates to fail.');
+        } catch (ConflictHttpException $exception) {
+            $this->assertSame('Relationship end date cannot be before its start date.', $exception->getMessage());
+        }
+
+        $endedCustomerRelationship = $customerService->end(
+            $secondCustomerRelationship,
+            $startedAt->addDay()->toDateTimeString(),
+        );
+        $this->assertFalse((bool) $endedCustomerRelationship->is_current);
+        $this->assertNull($endedCustomerRelationship->current_guard);
+        $this->assertNull($endedCustomerRelationship->active_guard);
+
+        $firstSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-1');
+        $secondSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-2');
+        $invalidDateSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-3');
+        $supplierService = app(SupplierVehicleService::class);
+        $firstSupplierRelationship = $supplierService->create([
+            'supplier_id' => $firstSupplierId,
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+        $secondSupplierRelationship = $supplierService->create([
+            'supplier_id' => $secondSupplierId,
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+
+        $this->assertFalse((bool) $firstSupplierRelationship->refresh()->is_current);
+        $this->assertTrue((bool) $secondSupplierRelationship->refresh()->is_current);
+        $this->assertSame(1, (int) $secondSupplierRelationship->current_guard);
+
+        try {
+            $supplierService->create([
+                'supplier_id' => $invalidDateSupplierId,
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->addDay()->toDateString(),
+                'ended_at' => $startedAt->toDateString(),
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected invalid supplier relationship dates to fail.');
+        } catch (ConflictHttpException $exception) {
+            $this->assertSame('Relationship end date cannot be before its start date.', $exception->getMessage());
+        }
+
+        $endedSupplierRelationship = $supplierService->end(
+            $secondSupplierRelationship,
+            $startedAt->addDay()->toDateTimeString(),
+        );
+        $this->assertFalse((bool) $endedSupplierRelationship->is_current);
+        $this->assertNull($endedSupplierRelationship->current_guard);
+        $this->assertNull($endedSupplierRelationship->active_guard);
     }
 
     public function test_master_data_api_and_validation_errors(): void

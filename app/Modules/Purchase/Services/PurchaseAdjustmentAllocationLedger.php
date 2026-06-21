@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Models\InvoiceAdjustment;
+use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseAdjustmentAllocation;
@@ -17,6 +18,13 @@ use Modules\Purchase\Models\PurchaseOrderLine;
 
 final class PurchaseAdjustmentAllocationLedger
 {
+    private const ALLOCATION_STAGES = [
+        'manual_plan',
+        'grn_recognition',
+        'invoice_recognition',
+        'return_recognition',
+    ];
+
     public function __construct(private readonly DecimalMath $math) {}
 
     public function origin(PurchaseHeaderAdjustment $adjustment): PurchaseHeaderAdjustment
@@ -236,7 +244,7 @@ final class PurchaseAdjustmentAllocationLedger
                 continue;
             }
 
-            PurchaseAdjustmentAllocation::query()->create([
+            $entry = [
                 'tenant_id' => (int) $row->tenant_id,
                 'organization_unit_id' => $row->organization_unit_id,
                 'purchase_header_adjustment_id' => (int) $row->purchase_header_adjustment_id,
@@ -266,7 +274,9 @@ final class PurchaseAdjustmentAllocationLedger
                 'finance_account_id' => $row->finance_account_id,
                 'correlation_key' => $this->correlationKey($origin, 'reversal', $targetType, $targetId, (int) $row->getKey()),
                 'provenance' => ['reversal_of_id' => (int) $row->getKey(), 'event_type' => $eventType],
-            ]);
+            ];
+            $this->assertEntryInvariant($entry);
+            PurchaseAdjustmentAllocation::query()->create($entry);
 
             $this->syncSummary($origin);
         }
@@ -315,7 +325,7 @@ final class PurchaseAdjustmentAllocationLedger
             throw new InvalidArgumentException('Purchase adjustment allocation cannot exceed source adjustment amount.');
         }
 
-        $row = PurchaseAdjustmentAllocation::query()->create(array_merge([
+        $entry = array_merge([
             'tenant_id' => (int) $origin->tenant_id,
             'organization_unit_id' => $origin->organization_unit_id,
             'purchase_header_adjustment_id' => (int) $origin->getKey(),
@@ -332,7 +342,9 @@ final class PurchaseAdjustmentAllocationLedger
             'tax_treatment' => $target?->tax_treatment ?? $origin->tax_treatment,
             'finance_posting_profile_id' => $target?->finance_posting_profile_id ?? $origin->finance_posting_profile_id,
             'finance_account_id' => $target?->finance_account_id ?? $origin->finance_account_id,
-        ], $attributes));
+        ], $attributes);
+        $this->assertEntryInvariant($entry);
+        $row = PurchaseAdjustmentAllocation::query()->create($entry);
 
         if ($updateSummary) {
             $this->syncSummary($origin);
@@ -344,6 +356,45 @@ final class PurchaseAdjustmentAllocationLedger
         }
 
         return $row;
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function assertEntryInvariant(array $entry): void
+    {
+        if (! in_array((string) ($entry['stage'] ?? ''), self::ALLOCATION_STAGES, true)) {
+            throw new InvalidArgumentException('Purchase adjustment allocation stage is invalid.');
+        }
+
+        $methods = array_map(
+            static fn (PurchaseAdjustmentAllocationMethod $method): string => $method->value,
+            PurchaseAdjustmentAllocationMethod::cases(),
+        );
+        if (! in_array((string) ($entry['allocation_method'] ?? ''), $methods, true)) {
+            throw new InvalidArgumentException('Purchase adjustment allocation method is invalid.');
+        }
+
+        $entryType = (string) ($entry['entry_type'] ?? '');
+        $reversalOfId = $entry['reversal_of_id'] ?? null;
+        if (! in_array($entryType, ['allocation', 'reversal'], true)
+            || ($entryType === 'allocation' && $reversalOfId !== null)
+            || ($entryType === 'reversal' && $reversalOfId === null)
+        ) {
+            throw new InvalidArgumentException('Purchase adjustment allocation reversal metadata is invalid.');
+        }
+
+        foreach ([
+            'source_amount',
+            'allocated_amount',
+            'recognized_at_grn_amount',
+            'recognized_at_invoice_amount',
+            'remaining_amount',
+        ] as $column) {
+            if ($this->math->isNegative((string) ($entry[$column] ?? '0.000000'))) {
+                throw new InvalidArgumentException("Purchase adjustment allocation {$column} cannot be negative.");
+            }
+        }
     }
 
     private function syncSummary(PurchaseHeaderAdjustment $origin): void
