@@ -9,7 +9,11 @@ enum RentalExpenseType: string
     case Fuel = 'fuel';
     case Toll = 'toll';
     case Parking = 'parking';
-    case Allowance = 'allowance';
     case Repair = 'repair';
+    case Service = 'service';
+    case Allowance = 'allowance';
+    case Licence = 'licence';
+    case Insurance = 'insurance';
+    case Damage = 'damage';
     case Other = 'other';
 }

@@ -5,19 +5,21 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Supplier\Models\Supplier;
-use Modules\VehicleRental\Enums\RentalAgreementDirection;
+use Modules\Tenant\Models\TenantModel;
+use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
-use Modules\VehicleRental\Enums\RentalPartyType;
-use Modules\VehicleRental\Enums\RentalType;
+use Modules\VehicleRental\Enums\RentalMode;
+use Modules\VehicleRental\Enums\RentalProrationRule;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
 final class RentalAgreement extends CoreModel
@@ -26,142 +28,33 @@ final class RentalAgreement extends CoreModel
     use SoftDeletes;
 
     protected $table = 'rental_agreements';
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {
         return [
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'reservation_id' => 'integer',
-            'direction' => RentalAgreementDirection::class,
-            'party_type' => RentalPartyType::class,
-            'party_id' => 'integer',
-            'rental_type' => RentalType::class,
-            'billing_cycle' => RentalBillingCycle::class,
-            'billing_basis' => RentalBillingBasis::class,
-            'billing_period_days' => 'integer',
-            'agreement_date' => 'date',
-            'start_at' => 'datetime',
-            'expected_end_at' => 'datetime',
-            'actual_end_at' => 'datetime',
-            'currency_id' => 'integer',
-            'status' => RentalAgreementStatus::class,
-            'terms_snapshot' => 'array',
-            'created_by' => 'integer',
-            'updated_by' => 'integer',
+            'row_version' => 'integer', 'tenant_id' => 'integer', 'organization_unit_id' => 'integer',
+            'agreement_kind' => RentalAgreementKind::class, 'reservation_id' => 'integer', 'customer_id' => 'integer', 'supplier_id' => 'integer',
+            'agreement_date' => 'date', 'executed_at' => 'datetime', 'starts_at' => 'datetime', 'ends_at' => 'datetime', 'actual_ended_at' => 'datetime',
+            'rental_mode' => RentalMode::class, 'billing_cycle' => RentalBillingCycle::class,
+            'billing_basis' => RentalBillingBasis::class, 'proration_rule' => RentalProrationRule::class,
+            'currency_id' => 'integer', 'status' => RentalAgreementStatus::class, 'metadata' => 'array',
+            'approved_at' => 'datetime', 'terminated_at' => 'datetime',
         ];
     }
 
-    public function reservation(): BelongsTo
-    {
-        return $this->belongsTo(RentalReservation::class, 'reservation_id');
-    }
-
-    public function customer(): BelongsTo
-    {
-        return $this->belongsTo(Customer::class, 'party_id')->withTrashed();
-    }
-
-    public function supplier(): BelongsTo
-    {
-        return $this->belongsTo(Supplier::class, 'party_id')->withTrashed();
-    }
-
-    public function vehicles(): HasMany
-    {
-        return $this->hasMany(RentalAgreementVehicle::class, 'agreement_id')->orderBy('allocated_from');
-    }
-
-    public function rateSnapshot(): HasOne
-    {
-        return $this->hasOne(RentalAgreementRateSnapshot::class, 'agreement_id');
-    }
-
-    public function pickupInspections(): HasMany
-    {
-        return $this->hasMany(RentalPickupInspection::class, 'agreement_id');
-    }
-
-    public function returnInspections(): HasMany
-    {
-        return $this->hasMany(RentalReturnInspection::class, 'agreement_id');
-    }
-
-    public function usageLogs(): HasMany
-    {
-        return $this->hasMany(RentalUsageLog::class, 'agreement_id')->orderBy('usage_date');
-    }
-
-    public function operationalUsageLogs(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            RentalUsageLog::class,
-            'rental_usage_contexts',
-            'agreement_id',
-            'usage_log_id',
-        )->withPivot([
-            'agreement_vehicle_id',
-            'agreement_vehicle_link_id',
-            'rate_snapshot_id',
-            'agreement_direction',
-            'financial_side',
-            'party_type',
-            'party_id',
-        ])->withTimestamps()->orderBy('usage_date');
-    }
-
-    public function usageContexts(): HasMany
-    {
-        return $this->hasMany(RentalUsageContext::class, 'agreement_id');
-    }
-
-    public function inboundVehicleLinks(): HasMany
-    {
-        return $this->hasMany(RentalAgreementVehicleLink::class, 'inbound_agreement_id');
-    }
-
-    public function outboundVehicleLinks(): HasMany
-    {
-        return $this->hasMany(RentalAgreementVehicleLink::class, 'outbound_agreement_id');
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(RentalExpense::class, 'agreement_id');
-    }
-
-    public function billingPeriods(): HasMany
-    {
-        return $this->hasMany(RentalBillingPeriod::class, 'agreement_id');
-    }
-
-    public function chargeRuns(): HasMany
-    {
-        return $this->hasMany(RentalChargeRun::class, 'agreement_id');
-    }
-
-    public function chargeCalculations(): HasMany
-    {
-        return $this->hasMany(RentalChargeCalculation::class, 'agreement_id');
-    }
-
-    public function charges(): HasMany
-    {
-        return $this->hasMany(RentalCharge::class, 'agreement_id');
-    }
-
-    public function invoiceLinks(): HasMany
-    {
-        return $this->hasMany(RentalInvoiceLink::class, 'agreement_id');
-    }
-
-    public function paymentLinks(): HasMany
-    {
-        return $this->hasMany(RentalPaymentLink::class, 'agreement_id');
-    }
-
-    public function statusHistories(): HasMany
-    {
-        return $this->hasMany(RentalStatusHistory::class, 'agreement_id')->latest('changed_at');
-    }
+    public function tenant(): BelongsTo { return $this->belongsTo(TenantModel::class, 'tenant_id'); }
+    public function organizationUnit(): BelongsTo { return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id'); }
+    public function reservation(): BelongsTo { return $this->belongsTo(RentalReservation::class, 'reservation_id'); }
+    public function customer(): BelongsTo { return $this->belongsTo(Customer::class, 'customer_id'); }
+    public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class, 'supplier_id'); }
+    public function currency(): BelongsTo { return $this->belongsTo(CurrencyModel::class, 'currency_id'); }
+    public function terms(): HasMany { return $this->hasMany(RentalAgreementTerm::class, 'agreement_id')->orderBy('sequence'); }
+    public function rateVersions(): HasMany { return $this->hasMany(RentalAgreementRateVersion::class, 'agreement_id'); }
+    public function activeRateVersion(): HasOne { return $this->hasOne(RentalAgreementRateVersion::class, 'agreement_id')->where('status', 'active')->latestOfMany('version_number'); }
+    public function allocations(): HasMany { return $this->hasMany(RentalVehicleAllocation::class, 'agreement_id'); }
+    public function driverAssignments(): HasMany { return $this->hasMany(RentalDriverAssignment::class, 'agreement_id'); }
+    public function billingPeriods(): HasMany { return $this->hasMany(RentalBillingPeriod::class, 'agreement_id'); }
+    public function expenses(): HasMany { return $this->hasMany(RentalExpense::class, 'agreement_id'); }
+    public function depositRequirement(): HasOne { return $this->hasOne(RentalDepositRequirement::class, 'agreement_id'); }
 }

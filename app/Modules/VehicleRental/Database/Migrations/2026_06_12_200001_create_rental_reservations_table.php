@@ -12,29 +12,37 @@ return new class extends Migration
     {
         Schema::create('rental_reservations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->json('metadata')->nullable();
             $table->string('reservation_number', 100);
-            $table->string('direction', 20);
-            $table->string('party_type', 20);
-            $table->unsignedBigInteger('party_id');
-            $table->string('rental_type', 30);
-            $table->foreignId('vehicle_id')->nullable()->constrained('vehicles')->restrictOnDelete();
-            $table->dateTime('start_at');
-            $table->dateTime('expected_end_at');
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
-            $table->string('status', 20)->default('draft');
+            $table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();
+            $table->foreignId('requested_vehicle_id')->nullable()->constrained('vehicles')->nullOnDelete();
+            $table->foreignId('requested_vehicle_category_id')->nullable()->constrained('vehicle_categories')->nullOnDelete();
+            $table->string('rental_mode', 30);
+            $table->string('billing_cycle', 30);
+            $table->dateTime('requested_start_at');
+            $table->dateTime('requested_end_at');
+            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->decimal('estimated_amount', 20, 6)->default('0.000000');
+            $table->decimal('estimated_deposit_amount', 20, 6)->default('0.000000');
+            $table->string('status', 30)->default('draft');
+            $table->string('source', 30)->nullable();
             $table->text('remarks')->nullable();
+            $table->unsignedBigInteger('confirmed_by')->nullable();
+            $table->dateTime('confirmed_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->dateTime('cancelled_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'reservation_number'], 'rental_reservations_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'rental_reservations_tenant_org_idx');
-            $table->index(['vehicle_id', 'start_at', 'expected_end_at'], 'rental_reservations_vehicle_period_idx');
-            $table->index(['party_type', 'party_id'], 'rental_reservations_party_idx');
-            $table->index(['status', 'start_at'], 'rental_reservations_status_start_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'rental_reservations_scope_status_idx');
+            $table->index(['customer_id', 'requested_start_at'], 'rental_reservations_customer_start_idx');
+            $table->index(['requested_vehicle_id', 'requested_start_at', 'requested_end_at'], 'rental_reservations_vehicle_period_idx');
         });
     }
 

@@ -7,8 +7,8 @@ namespace Modules\VehicleRental\Enums;
 enum RentalBillingBasis: string
 {
     case CalendarMonth = 'calendar_month';
-    case AnniversaryMonth = 'anniversary_month';
-    case FixedThirtyDay = 'fixed_30_day';
-    case ExactDayCount = 'exact_day_count';
-    case ContractualPeriod = 'contractual_period';
+    case Anniversary = 'anniversary';
+    case FixedPeriod = 'fixed_period';
+    case PerHire = 'per_hire';
+    case PerUsageLog = 'per_usage_log';
 }

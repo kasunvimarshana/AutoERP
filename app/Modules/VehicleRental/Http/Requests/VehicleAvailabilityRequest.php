@@ -4,23 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Requests;
 
-use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\VehicleRental\Enums\RentalAgreementDirection;
 
 final class VehicleAvailabilityRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'start_at' => ['required', 'date'],
             'end_at' => ['required', 'date', 'after:start_at'],
-            'direction' => ['nullable', Rule::enum(RentalAgreementDirection::class)],
-            'exclude_agreement_id' => ['nullable', 'integer', 'min:1'],
-            'exclude_reservation_id' => ['nullable', 'integer', 'min:1'],
+            'vehicle_category_id' => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];
     }
 }

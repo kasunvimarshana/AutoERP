@@ -5,29 +5,28 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\VehicleRental\Enums\RentalPartyType;
 
 final class RentalReservationResource extends RentalResource
 {
     public function toArray(Request $request): array
     {
-        $party = $this->party_type === RentalPartyType::Customer ? $this->customer : $this->supplier;
-
         return [
             'id' => (int) $this->getKey(),
             'reservation_number' => $this->reservation_number,
-            'direction' => $this->enum($this->direction),
-            'party_type' => $this->enum($this->party_type),
-            'party_id' => (int) $this->party_id,
-            'party' => $this->partySummary($party),
-            'rental_type' => $this->enum($this->rental_type),
-            'vehicle_id' => $this->vehicle_id,
-            'vehicle' => $this->whenLoaded('vehicle', fn () => $this->vehicleSummary($this->vehicle)),
-            'start_at' => $this->start_at?->toISOString(),
-            'expected_end_at' => $this->expected_end_at?->toISOString(),
-            'currency_id' => $this->currency_id,
-            'status' => $this->enum($this->status),
+            'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
+            'requested_vehicle' => $this->whenLoaded('requestedVehicle', fn () => $this->summary($this->requestedVehicle, ['vehicle_number', 'registration_number', 'status'])),
+            'requested_vehicle_category' => $this->whenLoaded('requestedVehicleCategory', fn () => $this->summary($this->requestedVehicleCategory, ['code', 'name'])),
+            'rental_mode' => $this->enumValue($this->rental_mode),
+            'billing_cycle' => $this->enumValue($this->billing_cycle),
+            'requested_start_at' => $this->requested_start_at?->toISOString(),
+            'requested_end_at' => $this->requested_end_at?->toISOString(),
+            'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'name', 'symbol'])),
+            'estimated_amount' => $this->decimal($this->estimated_amount),
+            'estimated_deposit_amount' => $this->decimal($this->estimated_deposit_amount),
+            'status' => $this->enumValue($this->status),
+            'source' => $this->source,
             'remarks' => $this->remarks,
+            'agreement' => $this->whenLoaded('agreement', fn () => $this->summary($this->agreement, ['agreement_number', 'agreement_kind', 'status'])),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

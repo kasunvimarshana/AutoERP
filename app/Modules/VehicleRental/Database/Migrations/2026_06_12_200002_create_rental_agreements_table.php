@@ -12,27 +12,35 @@ return new class extends Migration
     {
         Schema::create('rental_agreements', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->json('metadata')->nullable();
             $table->string('agreement_number', 100);
+            $table->string('agreement_kind', 30);
             $table->foreignId('reservation_id')->nullable()->constrained('rental_reservations')->nullOnDelete();
-            $table->string('direction', 20);
-            $table->string('party_type', 20);
-            $table->unsignedBigInteger('party_id');
-            $table->string('rental_type', 30);
-            $table->string('billing_cycle', 20);
-            $table->string('billing_basis', 30)->default('contractual_period');
-            $table->string('proration_rule', 30)->default('exact_day_count');
-            $table->string('billing_timezone', 60)->default('UTC');
-            $table->unsignedSmallInteger('billing_period_days')->nullable();
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->restrictOnDelete();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->restrictOnDelete();
             $table->date('agreement_date');
-            $table->dateTime('start_at');
-            $table->dateTime('expected_end_at');
-            $table->dateTime('actual_end_at')->nullable();
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
-            $table->string('status', 20)->default('draft');
-            $table->json('terms_snapshot')->nullable();
+            $table->dateTime('executed_at')->nullable();
+            $table->dateTime('starts_at');
+            $table->dateTime('ends_at');
+            $table->dateTime('actual_ended_at')->nullable();
+            $table->string('legal_context', 20)->nullable();
+            $table->string('rental_mode', 30);
+            $table->string('billing_cycle', 30);
+            $table->string('billing_basis', 30);
+            $table->string('proration_rule', 30)->default('exact_day_count');
+            $table->string('billing_timezone', 60)->default('Asia/Colombo');
+            $table->unsignedSmallInteger('payment_term_days')->nullable();
+            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->string('status', 30)->default('draft');
+            $table->text('termination_reason')->nullable();
             $table->text('remarks')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->dateTime('approved_at')->nullable();
+            $table->unsignedBigInteger('terminated_by')->nullable();
+            $table->dateTime('terminated_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
@@ -40,10 +48,9 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'agreement_number'], 'rental_agreements_tenant_number_uk');
             $table->unique('reservation_id', 'rental_agreements_reservation_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'rental_agreements_tenant_org_idx');
-            $table->index(['party_type', 'party_id'], 'rental_agreements_party_idx');
-            $table->index(['status', 'start_at', 'expected_end_at'], 'rental_agreements_status_period_idx');
-            $table->index(['direction', 'rental_type'], 'rental_agreements_direction_type_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'agreement_kind', 'status'], 'rental_agreements_scope_kind_status_idx');
+            $table->index(['customer_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_customer_period_idx');
+            $table->index(['supplier_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_supplier_period_idx');
         });
     }
 

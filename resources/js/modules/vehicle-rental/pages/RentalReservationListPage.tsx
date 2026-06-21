@@ -1,67 +1,131 @@
-import { useState } from 'react';
-
-import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button, LinkButton } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
-import { DataTable, type DataColumn } from '@/shared/components/DataTable';
-import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { Input } from '@/shared/components/Input';
-import { LoadingState } from '@/shared/components/LoadingState';
-import { Pagination } from '@/shared/components/Pagination';
-import { Select } from '@/shared/components/Select';
-import { useApi } from '@/shared/hooks/useApi';
-import { useDebounce } from '@/shared/hooks/useDebounce';
-import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
-import { changeRentalReservationStatus, listRentalReservations } from '../vehicleRentalApi';
-import type { RentalReservation } from '../vehicleRentalTypes';
-import { RentalStatusBadge } from '../components/RentalStatusBadge';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { LinkButton } from "@/shared/components/Button";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { DataTable, type DataColumn } from "@/shared/components/DataTable";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { Input } from "@/shared/components/Input";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { Pagination } from "@/shared/components/Pagination";
+import { Select } from "@/shared/components/Select";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+import { useApi } from "@/shared/hooks/useApi";
+import { useDebounce } from "@/shared/hooks/useDebounce";
+import { formatDate } from "@/shared/utils/formatDate";
+import { readableRelation } from "@/shared/utils/object";
+import { RentalPage } from "../components/RentalPage";
+import { listRentalReservations } from "../vehicleRentalApi";
+import type { RentalReservation } from "../vehicleRentalTypes";
 
 export default function RentalReservationListPage() {
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
+    const [search, setSearch] = useState("");
+    const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
-    const [busyId, setBusyId] = useState<number | null>(null);
-    const [error, setError] = useState<ApiError | null>(null);
     const debounced = useDebounce(search);
-    const result = useApi((signal) => listRentalReservations({ search: debounced, status, page, per_page: 25 }, signal), [debounced, status, page]);
-    const action = async (row: RentalReservation, next: 'pending' | 'confirm' | 'cancel') => {
-        setBusyId(row.id);
-        setError(null);
-        try {
-            await changeRentalReservationStatus(row.id, next);
-            result.reload();
-        } catch (requestError) {
-            setError(toApiError(requestError));
-        } finally {
-            setBusyId(null);
-        }
-    };
+    const result = useApi(
+        (signal) =>
+            listRentalReservations(
+                {
+                    search: debounced || undefined,
+                    status: status || undefined,
+                    page,
+                    per_page: 25,
+                },
+                signal,
+            ),
+        [debounced, status, page],
+    );
     const columns: DataColumn<RentalReservation>[] = [
-        { key: 'number', header: 'Reservation', render: (row) => <span className="font-semibold text-slate-900">{row.reservation_number}</span> },
-        { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
-        { key: 'vehicle', header: 'Vehicle', render: (row) => row.vehicle?.registration_number ?? readableRelation(row.vehicle) },
-        { key: 'period', header: 'Period', render: (row) => `${formatDate(row.start_at)} to ${formatDate(row.expected_end_at)}` },
-        { key: 'direction', header: 'Direction', render: (row) => row.direction },
-        { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
-        { key: 'actions', header: '', render: (row) => <div className="flex flex-wrap gap-2">
-            {row.status === 'draft' && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => action(row, 'pending')}>Submit</Button>}
-            {row.status === 'pending' && <Button type="button" loading={busyId === row.id} onClick={() => action(row, 'confirm')}>Confirm</Button>}
-            {row.status === 'confirmed' && <LinkButton to={`/vehicle-rental/agreements/create?reservation_id=${row.id}`}>Create agreement</LinkButton>}
-            {!['converted', 'cancelled'].includes(row.status) && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => action(row, 'cancel')}>Cancel</Button>}
-        </div> },
+        {
+            key: "number",
+            header: "Reservation",
+            render: (row) => (
+                <Link
+                    className="font-semibold text-blue-700 hover:underline"
+                    to={`/vehicle-rental/reservations/${row.id}`}
+                >
+                    {row.reservation_number}
+                </Link>
+            ),
+        },
+        {
+            key: "customer",
+            header: "Customer",
+            render: (row) => readableRelation(row.customer),
+        },
+        {
+            key: "vehicle",
+            header: "Vehicle",
+            render: (row) => readableRelation(row.requested_vehicle),
+        },
+        {
+            key: "period",
+            header: "Period",
+            render: (row) =>
+                `${formatDate(row.requested_start_at)} – ${formatDate(row.requested_end_at)}`,
+        },
+        {
+            key: "mode",
+            header: "Mode",
+            render: (row) => row.rental_mode.replaceAll("_", " "),
+        },
+        {
+            key: "status",
+            header: "Status",
+            render: (row) => <StatusBadge status={row.status} />,
+        },
     ];
-
     return (
-        <>
-            <ContentHeader title="Rental reservations" description="Booking intent before a rental contract is confirmed." actions={<LinkButton to="/vehicle-rental/reservations/create">New reservation</LinkButton>} />
+        <RentalPage>
+            <ContentHeader
+                title="Rental reservations"
+                description="Capture customer demand before creating a binding rental agreement."
+                actions={
+                    <LinkButton to="/vehicle-rental/reservations/create">
+                        New reservation
+                    </LinkButton>
+                }
+            />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
-                <Input label="Search" type="search" value={search} placeholder="Reservation, party, or vehicle" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Select label="Status" value={status} options={['draft', 'pending', 'confirmed', 'converted', 'cancelled'].map((value) => ({ value, label: value }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                <Input
+                    label="Search"
+                    value={search}
+                    onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                    }}
+                />
+                <Select
+                    label="Status"
+                    value={status}
+                    onChange={(e) => {
+                        setStatus(e.target.value);
+                        setPage(1);
+                    }}
+                    options={[
+                        "draft",
+                        "pending",
+                        "confirmed",
+                        "converted",
+                        "cancelled",
+                        "expired",
+                    ].map((value) => ({
+                        value,
+                        label: value.replaceAll("_", " "),
+                    }))}
+                />
             </div>
-            <ErrorAlert error={error ?? result.error} />
-            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+            <ErrorAlert error={result.error} />
+            {result.loading ? (
+                <LoadingState />
+            ) : (
+                <DataTable
+                    rows={result.data?.data ?? []}
+                    columns={columns}
+                    rowKey={(row) => row.id}
+                />
+            )}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
-        </>
+        </RentalPage>
     );
 }

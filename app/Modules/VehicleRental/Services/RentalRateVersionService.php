@@ -1,0 +1,170 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\VehicleRental\Services;
+
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Modules\VehicleRental\Enums\RentalRateVersionStatus;
+use Modules\VehicleRental\Models\RentalAgreement;
+use Modules\VehicleRental\Models\RentalAgreementRateVersion;
+
+final class RentalRateVersionService
+{
+    public function __construct(private readonly RentalReferenceValidator $references) {}
+
+    public function createDraft(RentalAgreement $agreement, array $data, ?int $userId = null): RentalAgreementRateVersion
+    {
+        return DB::transaction(function () use ($agreement, $data, $userId): RentalAgreementRateVersion {
+            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $versionNumber = ((int) $agreement->rateVersions()->max('version_number')) + 1;
+            $effectiveFrom = CarbonImmutable::parse((string) ($data['effective_from'] ?? $agreement->starts_at));
+            $effectiveTo = isset($data['effective_to']) ? CarbonImmutable::parse((string) $data['effective_to']) : null;
+            if ($effectiveTo !== null && ! $effectiveTo->greaterThan($effectiveFrom)) {
+                throw new InvalidArgumentException('Rate version end must be after its start.');
+            }
+            if ($effectiveFrom->lessThan($agreement->starts_at) || $effectiveFrom->greaterThanOrEqualTo($agreement->ends_at)
+                || ($effectiveTo !== null && $effectiveTo->greaterThan($agreement->ends_at))) {
+                throw new InvalidArgumentException('Rate version period must stay inside the agreement period.');
+            }
+
+            $this->references->currency((int) ($data['currency_id'] ?? $agreement->currency_id));
+            $this->references->taxGroup(
+                isset($data['tax_group_id']) ? (int) $data['tax_group_id'] : null,
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+            );
+            $this->references->taxGroup(
+                isset($data['withholding_tax_group_id']) ? (int) $data['withholding_tax_group_id'] : null,
+                (int) $agreement->tenant_id,
+                $agreement->organization_unit_id,
+            );
+            foreach ($data['components'] ?? [] as $component) {
+                $this->references->vehicleCategory(
+                    isset($component['vehicle_category_id']) ? (int) $component['vehicle_category_id'] : null,
+                    (int) $agreement->tenant_id,
+                    $agreement->organization_unit_id,
+                );
+                $this->references->taxGroup(
+                    isset($component['tax_group_override_id']) ? (int) $component['tax_group_override_id'] : null,
+                    (int) $agreement->tenant_id,
+                    $agreement->organization_unit_id,
+                );
+            }
+
+            $fingerprint = hash('sha256', implode('|', [
+                $agreement->tenant_id, $agreement->getKey(), $versionNumber,
+                $effectiveFrom->toIso8601String(), $effectiveTo?->toIso8601String() ?? '',
+            ]));
+
+            $version = RentalAgreementRateVersion::query()->create([
+                'tenant_id' => $agreement->tenant_id,
+                'organization_unit_id' => $agreement->organization_unit_id,
+                'agreement_id' => $agreement->getKey(),
+                'version_number' => $versionNumber,
+                'effective_from' => $effectiveFrom,
+                'effective_to' => $effectiveTo,
+                'driver_mode' => $data['driver_mode'] ?? $agreement->rental_mode->value,
+                'billing_cycle' => $data['billing_cycle'] ?? $agreement->billing_cycle->value,
+                'billing_basis' => $data['billing_basis'] ?? $agreement->billing_basis->value,
+                'proration_rule' => $data['proration_rule'] ?? $agreement->proration_rule->value,
+                'excess_km_method' => $data['excess_km_method'] ?? 'period',
+                'included_km' => $data['included_km'] ?? '0.000000',
+                'included_hours' => $data['included_hours'] ?? '0.000000',
+                'weekday_included_minutes' => $data['weekday_included_minutes'] ?? 0,
+                'saturday_included_minutes' => $data['saturday_included_minutes'] ?? 0,
+                'holiday_included_minutes' => $data['holiday_included_minutes'] ?? 0,
+                'currency_id' => $data['currency_id'] ?? $agreement->currency_id,
+                'tax_group_id' => $data['tax_group_id'] ?? null,
+                'withholding_tax_group_id' => $data['withholding_tax_group_id'] ?? null,
+                'status' => RentalRateVersionStatus::Draft->value,
+                'fingerprint' => $fingerprint,
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ]);
+
+            foreach (array_values($data['components'] ?? []) as $index => $component) {
+                $version->components()->create([
+                    'tenant_id' => $agreement->tenant_id,
+                    'organization_unit_id' => $agreement->organization_unit_id,
+                    'vehicle_category_id' => $component['vehicle_category_id'] ?? null,
+                    'component_code' => $component['component_code'],
+                    'unit' => $component['unit'],
+                    'included_quantity' => $component['included_quantity'] ?? '0.000000',
+                    'rate' => $component['rate'] ?? '0.000000',
+                    'multiplier' => $component['multiplier'] ?? '1.000000',
+                    'minimum_amount' => $component['minimum_amount'] ?? null,
+                    'maximum_amount' => $component['maximum_amount'] ?? null,
+                    'tax_group_override_id' => $component['tax_group_override_id'] ?? null,
+                    'is_taxable' => $component['is_taxable'] ?? true,
+                    'calculation_order' => $component['calculation_order'] ?? ($index + 1),
+                    'status' => 'active',
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]);
+            }
+
+            return $version->load('components');
+        });
+    }
+
+    public function activate(RentalAgreementRateVersion $version, ?int $userId = null): RentalAgreementRateVersion
+    {
+        return DB::transaction(function () use ($version, $userId): RentalAgreementRateVersion {
+            $version = RentalAgreementRateVersion::query()->lockForUpdate()->findOrFail($version->getKey());
+            RentalAgreement::query()->lockForUpdate()->findOrFail($version->agreement_id);
+            if ($version->status !== RentalRateVersionStatus::Draft) {
+                throw new InvalidArgumentException('Only a draft rate version can be activated.');
+            }
+            if (! $version->components()->exists()) {
+                throw new InvalidArgumentException('At least one rate component is required.');
+            }
+
+            $overlap = RentalAgreementRateVersion::query()
+                ->where('agreement_id', $version->agreement_id)
+                ->where('id', '!=', $version->getKey())
+                ->where('status', RentalRateVersionStatus::Active->value)
+                ->where('effective_from', '<', $version->effective_to ?? '9999-12-31 23:59:59')
+                ->where(function ($query) use ($version): void {
+                    $query->whereNull('effective_to')->orWhere('effective_to', '>', $version->effective_from);
+                })
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($overlap as $active) {
+                if ($active->effective_from->lessThan($version->effective_from)) {
+                    $active->effective_to = $version->effective_from;
+                }
+                $active->status = RentalRateVersionStatus::Superseded;
+                $active->updated_by = $userId;
+                $active->save();
+            }
+
+            $version->status = RentalRateVersionStatus::Active;
+            $version->approved_by = $userId;
+            $version->approved_at = now();
+            $version->updated_by = $userId;
+            $version->save();
+
+            return $version->refresh()->load('components');
+        });
+    }
+
+    public function resolve(RentalAgreement $agreement, string $at): RentalAgreementRateVersion
+    {
+        return $agreement->rateVersions()
+            ->whereIn('status', [
+                RentalRateVersionStatus::Active->value,
+                RentalRateVersionStatus::Superseded->value,
+            ])
+            ->where('effective_from', '<=', $at)
+            ->where(function ($query) use ($at): void {
+                $query->whereNull('effective_to')->orWhere('effective_to', '>', $at);
+            })
+            ->with('components')
+            ->latest('version_number')
+            ->firstOrFail();
+    }
+}

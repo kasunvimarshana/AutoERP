@@ -1,154 +1,364 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
-import { DecimalInput } from '@/shared/components/DecimalInput';
-import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { FormActions } from '@/shared/components/FormActions';
-import { Input } from '@/shared/components/Input';
-import { Panel } from '@/shared/components/Panel';
-import { Select } from '@/shared/components/Select';
-import { Textarea } from '@/shared/components/Textarea';
-import { useApi } from '@/shared/hooks/useApi';
-import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
-import type { NamedResource } from '@/shared/types/common';
-import { businessDateInputValue, businessDateTimeInputValue } from '@/shared/utils/businessDate';
-import { useAuth } from '@/modules/auth/AuthProvider';
-import { RentalPartySelect } from '../components/RentalPartySelect';
-import { createRentalAgreement, getRentalReservation } from '../vehicleRentalApi';
-import type { RentalDirection, RentalPartyType, RentalType } from '../vehicleRentalTypes';
+import { useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
+import type { CustomerSummary } from "@/modules/customer/customerTypes";
+import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
+import type { SupplierSummary } from "@/modules/supplier/supplierTypes";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
+import { Button } from "@/shared/components/Button";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { Input } from "@/shared/components/Input";
+import { Panel } from "@/shared/components/Panel";
+import { Select } from "@/shared/components/Select";
+import { Textarea } from "@/shared/components/Textarea";
+import { RentalPage } from "../components/RentalPage";
+import { createRentalAgreement } from "../vehicleRentalApi";
 
-const localDateTime = (days = 0) => businessDateTimeInputValue(new Date(), days);
-const today = businessDateInputValue;
-const rateNames = [
-    ['allowed_hours', 'Allowed hours'], ['allowed_km', 'Allowed KM'], ['extra_hour_rate', 'Extra hour rate'],
-    ['extra_km_rate', 'Extra KM rate'], ['overtime_rate', 'Overtime rate'], ['double_overtime_rate', 'Double overtime rate'],
-    ['night_shift_rate', 'Night shift rate'], ['weekend_rate', 'Weekend rate'], ['holiday_rate', 'Holiday rate'],
-    ['driver_rate', 'Driver rate'], ['outstation_rate', 'Outstation rate'], ['day_out_rate', 'Day out rate'],
-    ['night_out_rate', 'Night out rate'], ['fuel_rate', 'Fuel rate'], ['waiting_hour_rate', 'Waiting hour rate'],
+const componentDefaults = [
+    ["base_rental", "month"],
+    ["excess_km", "km"],
+    ["driver_salary", "month"],
+    ["normal_overtime", "hour"],
+    ["double_overtime", "hour"],
+    ["triple_overtime", "hour"],
+    ["night_out", "count"],
 ] as const;
-const primaryRateNames = rateNames.slice(0, 4);
-const advancedRateNames = rateNames.slice(4);
 
 export default function RentalAgreementCreatePage() {
     const navigate = useNavigate();
-    const auth = useAuth();
-    const [searchParams] = useSearchParams();
-    const reservationId = Number(searchParams.get('reservation_id')) || 0;
-    const requestedDirection = searchParams.get('direction') === 'inbound' ? 'inbound' : 'outbound';
-    const reservation = useApi((signal) => reservationId ? getRentalReservation(reservationId, signal) : Promise.resolve(null), [reservationId]);
-    const [party, setParty] = useState<NamedResource | null>(null);
+    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
+    const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const [form, setForm] = useState({
-        direction: requestedDirection as RentalDirection,
-        party_type: (requestedDirection === 'inbound' ? 'supplier' : 'customer') as RentalPartyType,
-        rental_type: 'daily' as RentalType,
-        billing_cycle: 'final',
-        billing_basis: 'contractual_period',
-        proration_rule: 'exact_day_count',
-        billing_timezone: auth.organizationUnit?.timezone
-            ?? auth.tenant?.timezone
-            ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        billing_period_days: '',
-        agreement_date: today(),
-        start_at: localDateTime(),
-        expected_end_at: localDateTime(1),
-        remarks: '',
+        agreement_kind: "customer_rental",
+        agreement_date: "",
+        starts_at: "",
+        ends_at: "",
+        legal_context: "company",
+        rental_mode: "with_driver",
+        billing_cycle: "monthly",
+        billing_basis: "calendar_month",
+        proration_rule: "exact_day_count",
+        billing_timezone: "Asia/Colombo",
+        payment_term_days: "30",
+        currency_id: "",
+        included_km: "0",
+        excess_km_method: "period",
+        deposit_amount: "0",
+        remarks: "",
     });
-    const [rate, setRate] = useState<Record<string, string>>({
-        base_rate: '0.000000', rate_unit: 'day',
-        ...Object.fromEntries(rateNames.map(([key]) => [key, '0.000000'])),
-    });
-    const [busy, setBusy] = useState(false);
+    const [rates, setRates] = useState<Record<string, string>>(() =>
+        Object.fromEntries(componentDefaults.map(([code]) => [code, "0"])),
+    );
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const snapshot = JSON.stringify({ partyId: party?.id ?? null, form, rate });
-    const initialSnapshot = useRef(snapshot);
-    const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot.current && !busy);
-    useEffect(() => {
-        if (!reservation.data) return;
-        setParty(reservation.data.party ?? null);
-        setForm((current) => ({
-            ...current,
-            direction: reservation.data!.direction,
-            party_type: reservation.data!.party_type,
-            rental_type: reservation.data!.rental_type,
-            start_at: reservation.data!.start_at.slice(0, 16),
-            expected_end_at: reservation.data!.expected_end_at.slice(0, 16),
-            remarks: reservation.data!.remarks ?? '',
-        }));
-    }, [reservation.data]);
-
+    const partyValid = useMemo(
+        () =>
+            form.agreement_kind === "customer_rental"
+                ? Boolean(customer)
+                : Boolean(supplier),
+        [form.agreement_kind, customer, supplier],
+    );
+    const submit = async (event: FormEvent) => {
+        event.preventDefault();
+        setSaving(true);
+        setError(null);
+        try {
+            const row = await createRentalAgreement({
+                ...form,
+                customer_id:
+                    form.agreement_kind === "customer_rental"
+                        ? customer?.id
+                        : null,
+                supplier_id:
+                    form.agreement_kind === "owner_supply"
+                        ? supplier?.id
+                        : null,
+                currency_id: Number(form.currency_id),
+                payment_term_days: Number(form.payment_term_days),
+                rate_version: {
+                    effective_from: form.starts_at,
+                    driver_mode: form.rental_mode,
+                    billing_cycle: form.billing_cycle,
+                    billing_basis: form.billing_basis,
+                    proration_rule: form.proration_rule,
+                    excess_km_method: form.excess_km_method,
+                    included_km: form.included_km,
+                    currency_id: Number(form.currency_id),
+                    components: componentDefaults
+                        .filter(
+                            ([code]) =>
+                                Number(rates[code]) > 0 ||
+                                code === "base_rental",
+                        )
+                        .map(([code, unit], index) => ({
+                            component_code: code,
+                            unit,
+                            rate: rates[code],
+                            multiplier: "1",
+                            calculation_order: index + 1,
+                            is_taxable: true,
+                        })),
+                },
+                activate_rate_version: true,
+                deposit:
+                    form.agreement_kind === "customer_rental" &&
+                    Number(form.deposit_amount) > 0
+                        ? {
+                              required_amount: form.deposit_amount,
+                              currency_id: Number(form.currency_id),
+                              is_refundable: true,
+                          }
+                        : undefined,
+            });
+            navigate(`/vehicle-rental/agreements/${row.id}`);
+        } catch (e) {
+            setError(toApiError(e));
+        } finally {
+            setSaving(false);
+        }
+    };
     return (
-        <>
-            <ContentHeader title="New rental agreement" description={reservationId ? `Converting reservation ${reservation.data?.reservation_number ?? ''}` : 'Create the operational contract and freeze its rates.'} />
-            <form className="space-y-5" onSubmit={async (event) => {
-                event.preventDefault();
-                if (busy) return;
-                setBusy(true);
-                setError(null);
-                try {
-                    const saved = await createRentalAgreement({
-                        ...form,
-                        billing_period_days: form.billing_period_days || undefined,
-                        reservation_id: reservationId || undefined,
-                        party_id: party?.id,
-                        rate_snapshot: rate,
-                        remarks: form.remarks || undefined,
-                    });
-                    navigate(`/vehicle-rental/agreements/${saved.id}`);
-                } catch (requestError) {
-                    setError(toApiError(requestError));
-                } finally {
-                    setBusy(false);
-                }
-            }}>
-                <ErrorAlert error={error ?? reservation.error} />
-                <Panel title="Agreement details">
-                    <fieldset className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <legend className="sr-only">Agreement details</legend>
-                        <Select label="Direction" value={form.direction} disabled={Boolean(reservationId)} options={[{ value: 'outbound', label: 'Outbound rental' }, { value: 'inbound', label: 'Inbound hire-in' }]} onChange={(event) => {
-                            const direction = event.target.value as RentalDirection;
-                            setParty(null);
-                            setForm({ ...form, direction, party_type: direction === 'outbound' ? 'customer' : 'supplier' });
-                        }} />
-                        {form.direction === 'inbound' && <Select label="Party type" value={form.party_type} disabled={Boolean(reservationId)} options={[{ value: 'supplier', label: 'Supplier' }, { value: 'owner', label: 'Owner' }]} onChange={(event) => { setParty(null); setForm({ ...form, party_type: event.target.value as RentalPartyType }); }} />}
-                        <RentalPartySelect partyType={form.party_type} value={party} onChange={setParty} error={fieldError(error, 'party_id')} />
-                        <Select label="Rental type" value={form.rental_type} options={['hourly', 'daily', 'weekly', 'monthly', 'lease', 'subscription', 'with_driver', 'without_driver'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, rental_type: event.target.value as RentalType })} />
-                        <Select label="Billing cycle" value={form.billing_cycle} options={['hourly', 'per_trip', 'daily', 'weekly', 'monthly', 'anniversary_cycle', 'fixed_period', 'final'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, billing_cycle: event.target.value })} />
-                        <Input label="Agreement date" type="date" value={form.agreement_date} error={fieldError(error, 'agreement_date')} onChange={(event) => setForm({ ...form, agreement_date: event.target.value })} />
-                        <Input label="Start" type="datetime-local" value={form.start_at} error={fieldError(error, 'start_at')} onChange={(event) => setForm({ ...form, start_at: event.target.value })} />
-                        <Input label="Expected end" type="datetime-local" value={form.expected_end_at} error={fieldError(error, 'expected_end_at')} onChange={(event) => setForm({ ...form, expected_end_at: event.target.value })} />
-                        <div className="md:col-span-2 xl:col-span-4"><Textarea label="Terms / remarks" value={form.remarks} onChange={(event) => setForm({ ...form, remarks: event.target.value })} /></div>
-                    </fieldset>
-                    <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50">
-                        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">Advanced billing rules</summary>
-                        <fieldset className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-4">
-                            <legend className="sr-only">Advanced billing rules</legend>
-                            <Select label="Billing basis" value={form.billing_basis} options={['contractual_period', 'calendar_month', 'anniversary_month', 'fixed_30_day', 'exact_day_count'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, billing_basis: event.target.value })} />
-                            <Select label="Proration" value={form.proration_rule} options={['exact_day_count', 'calendar_day', 'contractual_period'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, proration_rule: event.target.value })} />
-                            <Input label="Billing time zone" value={form.billing_timezone} error={fieldError(error, 'billing_timezone')} onChange={(event) => setForm({ ...form, billing_timezone: event.target.value })} />
-                            {form.billing_cycle === 'fixed_period' && <Input label="Billing period days" type="number" value={form.billing_period_days} error={fieldError(error, 'billing_period_days')} onChange={(event) => setForm({ ...form, billing_period_days: event.target.value })} />}
-                        </fieldset>
-                    </details>
-                </Panel>
-                <Panel title="Rates">
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <DecimalInput label="Base rate" value={rate.base_rate} error={fieldError(error, 'rate_snapshot.base_rate')} onChange={(event) => setRate({ ...rate, base_rate: event.target.value })} />
-                        <Select label="Rate unit" value={rate.rate_unit} options={['hour', 'day', 'week', 'month', 'km', 'trip'].map((value) => ({ value, label: value }))} onChange={(event) => setRate({ ...rate, rate_unit: event.target.value })} />
-                        {primaryRateNames.map(([key, label]) => <DecimalInput key={key} label={label} value={rate[key]} error={fieldError(error, `rate_snapshot.${key}`)} onChange={(event) => setRate({ ...rate, [key]: event.target.value })} />)}
+        <RentalPage>
+            <ContentHeader
+                title="New rental agreement"
+                description="Create the customer or owner agreement and its first immutable rate version."
+            />
+            <ErrorAlert error={error} />
+            <form onSubmit={submit} className="space-y-5">
+                <Panel title="Agreement">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <Select
+                            label="Agreement kind"
+                            value={form.agreement_kind}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    agreement_kind: e.target.value,
+                                })
+                            }
+                            options={[
+                                {
+                                    value: "customer_rental",
+                                    label: "Customer rental",
+                                },
+                                {
+                                    value: "owner_supply",
+                                    label: "Vehicle owner supply",
+                                },
+                            ]}
+                        />
+                        {form.agreement_kind === "customer_rental" ? (
+                            <CustomerLookupSelect
+                                value={customer}
+                                onChange={setCustomer}
+                            />
+                        ) : (
+                            <SupplierLookupSelect
+                                value={supplier}
+                                onChange={setSupplier}
+                            />
+                        )}
+                        <Input
+                            label="Agreement date"
+                            type="date"
+                            required
+                            value={form.agreement_date}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    agreement_date: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Start"
+                            type="datetime-local"
+                            required
+                            value={form.starts_at}
+                            onChange={(e) =>
+                                setForm({ ...form, starts_at: e.target.value })
+                            }
+                        />
+                        <Input
+                            label="End"
+                            type="datetime-local"
+                            required
+                            value={form.ends_at}
+                            onChange={(e) =>
+                                setForm({ ...form, ends_at: e.target.value })
+                            }
+                        />
+                        <Select
+                            label="Rental mode"
+                            value={form.rental_mode}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    rental_mode: e.target.value,
+                                })
+                            }
+                            options={[
+                                { value: "with_driver", label: "With driver" },
+                                { value: "self_drive", label: "Self-drive" },
+                                {
+                                    value: "vehicle_only",
+                                    label: "Vehicle only",
+                                },
+                            ]}
+                        />
+                        <Select
+                            label="Billing cycle"
+                            value={form.billing_cycle}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    billing_cycle: e.target.value,
+                                })
+                            }
+                            options={[
+                                "hourly",
+                                "daily",
+                                "weekly",
+                                "monthly",
+                                "per_hire",
+                            ].map((value) => ({
+                                value,
+                                label: value.replaceAll("_", " "),
+                            }))}
+                        />
+                        <Select
+                            label="Billing basis"
+                            value={form.billing_basis}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    billing_basis: e.target.value,
+                                })
+                            }
+                            options={[
+                                "calendar_month",
+                                "anniversary",
+                                "fixed_period",
+                                "per_hire",
+                                "per_usage_log",
+                            ].map((value) => ({
+                                value,
+                                label: value.replaceAll("_", " "),
+                            }))}
+                        />
+                        <Input
+                            label="Currency ID"
+                            type="number"
+                            min="1"
+                            required
+                            value={form.currency_id}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    currency_id: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Payment term days"
+                            type="number"
+                            min="0"
+                            value={form.payment_term_days}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    payment_term_days: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Included KM"
+                            type="number"
+                            min="0"
+                            step="0.000001"
+                            value={form.included_km}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    included_km: e.target.value,
+                                })
+                            }
+                        />
+                        <Select
+                            label="Excess KM method"
+                            value={form.excess_km_method}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    excess_km_method: e.target.value,
+                                })
+                            }
+                            options={[
+                                "period",
+                                "per_hire",
+                                "per_usage_log",
+                            ].map((value) => ({
+                                value,
+                                label: value.replaceAll("_", " "),
+                            }))}
+                        />
+                        {form.agreement_kind === "customer_rental" && (
+                            <Input
+                                label="Security deposit"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={form.deposit_amount}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        deposit_amount: e.target.value,
+                                    })
+                                }
+                            />
+                        )}
                     </div>
-                    <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50">
-                        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">Additional rates and allowances</summary>
-                        <div className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-4">
-                            {advancedRateNames.map(([key, label]) => <DecimalInput key={key} label={label} value={rate[key]} error={fieldError(error, `rate_snapshot.${key}`)} onChange={(event) => setRate({ ...rate, [key]: event.target.value })} />)}
-                        </div>
-                    </details>
+                    <div className="mt-4">
+                        <Textarea
+                            label="Remarks"
+                            value={form.remarks}
+                            onChange={(e) =>
+                                setForm({ ...form, remarks: e.target.value })
+                            }
+                        />
+                    </div>
                 </Panel>
-                <FormActions>
-                    <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate(-1)}>Cancel</Button>
-                    <Button type="submit" loading={busy} disabled={reservation.loading}>Create agreement</Button>
-                </FormActions>
+                <Panel title="Rate components">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {componentDefaults.map(([code, unit]) => (
+                            <Input
+                                key={code}
+                                label={`${code.replaceAll("_", " ")} (${unit})`}
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={rates[code]}
+                                onChange={(e) =>
+                                    setRates({
+                                        ...rates,
+                                        [code]: e.target.value,
+                                    })
+                                }
+                            />
+                        ))}
+                    </div>
+                </Panel>
+                <div className="flex justify-end">
+                    <Button
+                        type="submit"
+                        loading={saving}
+                        disabled={!partyValid}
+                    >
+                        Create agreement
+                    </Button>
+                </div>
             </form>
-        </>
+        </RentalPage>
     );
 }

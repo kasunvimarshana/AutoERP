@@ -46,12 +46,16 @@ use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleDocument;
 use Modules\VehicleRental\Models\RentalAgreement;
-use Modules\VehicleRental\Models\RentalAgreementVehicle;
-use Modules\VehicleRental\Models\RentalCharge;
-use Modules\VehicleRental\Models\RentalChargeCalculation;
+use Modules\VehicleRental\Models\RentalBillingPeriod;
+use Modules\VehicleRental\Models\RentalCalculationLine;
+use Modules\VehicleRental\Models\RentalCalculationRun;
+use Modules\VehicleRental\Models\RentalCustodyEvent;
+use Modules\VehicleRental\Models\RentalDepositRequirement;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
+use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Models\RentalVehicleReplacement;
+use Modules\VehicleRental\Models\VehicleFinanceInstallment;
 use Modules\VehicleRental\Models\RentalExpense;
-use Modules\VehicleRental\Models\RentalPaymentLink;
-use Modules\VehicleRental\Models\RentalUsageContext;
 use Modules\VehicleRental\Models\RentalUsageEvent;
 use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -404,17 +408,10 @@ final class ReportCatalog
      */
     private function rentalReports(): array
     {
-        $partyName = static fn (RentalAgreement $agreement): ?string => $agreement->party_type->value === 'customer'
-            ? ($agreement->customer?->display_name ?? $agreement->customer?->name)
-            : ($agreement->supplier?->display_name ?? $agreement->supplier?->name);
-        $vehicleLabel = static fn (RentalAgreement $agreement): ?string => $agreement->vehicles
-            ->first()?->vehicle?->registration_number
-            ?? $agreement->vehicles->first()?->vehicle?->vehicle_number;
-
         return [
             new ReportDefinition(
                 key: 'vehicle-rental.fleet-availability',
-                title: 'Fleet Availability Report',
+                title: 'Fleet Availability',
                 group: 'Vehicle Rental',
                 model: Vehicle::class,
                 columns: [
@@ -422,478 +419,303 @@ final class ReportCatalog
                     $this->col('registration_number', 'Registration', sort: 'registration_number'),
                     $this->col('make', 'Make', 'make.name'),
                     $this->col('model', 'Model', 'model.name'),
-                    $this->col('status', 'Fleet Status', format: 'enum', sort: 'status'),
-                    new ReportColumn(
-                        key: 'availability',
-                        label: 'Availability',
-                        value: static fn (Vehicle $vehicle): string => $vehicle->status->value === 'active' ? 'available' : 'unavailable',
-                    ),
+                    $this->col('category', 'Category', 'category.name'),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
                 ],
                 search: ['vehicle_number', 'registration_number', 'make.name', 'model.name'],
-                relations: ['make', 'model'],
+                relations: ['make', 'model', 'category'],
                 filters: [$this->filter('status', 'Status', 'status')],
                 defaultSort: 'vehicle_number',
-                defaultDirection: 'asc',
-                includeGlobalOrganization: true,
-                description: 'Current fleet master availability; date-range availability remains in the rental availability workspace.',
             ),
             $this->rentalAgreementReport('vehicle-rental.agreement-register', 'Rental Agreement Register'),
             new ReportDefinition(
                 key: 'vehicle-rental.active-rentals',
-                title: 'Active Rentals Report',
+                title: 'Active Rental Agreements',
                 group: 'Vehicle Rental',
                 model: RentalAgreement::class,
-                columns: $this->rentalAgreementColumns($partyName, $vehicleLabel),
-                search: ['agreement_number', 'customer.name', 'supplier.name', 'vehicles.vehicle.registration_number'],
-                relations: ['customer', 'supplier', 'vehicles.vehicle'],
-                filters: [$this->filter('direction', 'Direction', 'direction')],
-                dateColumn: 'start_at',
-                defaultSort: 'start_at',
+                columns: $this->rentalAgreementColumns(),
+                search: ['agreement_number', 'customer.name', 'supplier.name'],
+                relations: ['customer', 'supplier', 'allocations.vehicle'],
+                filters: [$this->filter('agreement_kind', 'Agreement Kind', 'agreement_kind')],
+                dateColumn: 'agreement_date',
+                defaultSort: 'agreement_date',
                 constraints: ['status' => 'active'],
             ),
             new ReportDefinition(
                 key: 'vehicle-rental.overdue-rentals',
-                title: 'Overdue Rentals Report',
+                title: 'Overdue Rental Agreements',
                 group: 'Vehicle Rental',
                 model: RentalAgreement::class,
-                columns: [
-                    ...$this->rentalAgreementColumns($partyName, $vehicleLabel),
-                    new ReportColumn(
-                        key: 'days_overdue',
-                        label: 'Days Overdue',
-                        value: static fn (RentalAgreement $agreement): int => max(
-                            0,
-                            (int) $agreement->expected_end_at->startOfDay()->diffInDays(now()->startOfDay()),
-                        ),
-                    ),
-                ],
-                search: ['agreement_number', 'customer.name', 'supplier.name', 'vehicles.vehicle.registration_number'],
-                relations: ['customer', 'supplier', 'vehicles.vehicle'],
-                filters: [$this->filter('direction', 'Direction', 'direction')],
-                dateColumn: 'expected_end_at',
-                defaultSort: 'expected_end_at',
-                scope: static fn ($query) => $query
-                    ->whereIn('status', ['confirmed', 'active'])
-                    ->where('expected_end_at', '<', now()),
-            ),
-            $this->definition('vehicle-rental.running-chart', 'Running Chart Report', 'Vehicle Rental', RentalUsageLog::class, [
-                $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                $this->col('driver', 'Driver', 'driver.display_name'),
-                $this->qty('start_odometer', 'Start KM', false),
-                $this->qty('end_odometer', 'Finish KM', false),
-                $this->qty('distance_km', 'Distance'),
-                $this->qty('cumulative_km', 'Cumulative'),
-                $this->col('start_time', 'ON Time', sort: 'start_time'),
-                $this->col('end_time', 'OFF Time', sort: 'end_time'),
-                $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['agreement.agreement_number', 'vehicle.registration_number', 'driver.display_name', 'trip_from', 'trip_to'], ['agreement', 'vehicle', 'driver'], 'usage_date'),
-            $this->definition('vehicle-rental.running-chart-customer', 'Running Chart for Customer / Lessee', 'Vehicle Rental', RentalUsageContext::class, [
-                $this->col('usage_date', 'Date', 'usageLog.usage_date', 'date'),
-                $this->col('agreement', 'Customer Agreement', 'agreement.agreement_number'),
-                $this->col('customer', 'Customer / Lessee', 'agreement.customer.display_name'),
-                $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
-                new ReportColumn('start_odometer', 'Start KM', 'usageLog.start_odometer', format: 'decimal'),
-                new ReportColumn('end_odometer', 'Finish KM', 'usageLog.end_odometer', format: 'decimal'),
-                new ReportColumn('distance_km', 'Distance', 'usageLog.distance_km', format: 'decimal', summarize: true),
-                $this->col('route_from', 'From', 'usageLog.trip_from'),
-                $this->col('route_to', 'To', 'usageLog.trip_to'),
-                $this->col('status', 'Status', 'usageLog.status', 'enum'),
-            ], ['agreement.agreement_number', 'agreement.customer.name', 'usageLog.vehicle.registration_number'], ['agreement.customer', 'usageLog.vehicle'], 'usageLog.usage_date', constraints: ['financial_side' => 'revenue']),
-            $this->definition('vehicle-rental.running-chart-owner', 'Running Chart for Vehicle Owner', 'Vehicle Rental', RentalUsageContext::class, [
-                $this->col('usage_date', 'Date', 'usageLog.usage_date', 'date'),
-                $this->col('agreement', 'Owner Agreement', 'agreement.agreement_number'),
-                $this->col('owner', 'Owner / Supplier', 'agreement.supplier.display_name'),
-                $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
-                $this->col('lessee', 'Lessee Agreement', 'agreementVehicleLink.outboundAgreement.agreement_number'),
-                new ReportColumn('start_odometer', 'Start KM', 'usageLog.start_odometer', format: 'decimal'),
-                new ReportColumn('end_odometer', 'Finish KM', 'usageLog.end_odometer', format: 'decimal'),
-                new ReportColumn('distance_km', 'Distance', 'usageLog.distance_km', format: 'decimal', summarize: true),
-                $this->col('status', 'Status', 'usageLog.status', 'enum'),
-            ], ['agreement.agreement_number', 'agreement.supplier.name', 'usageLog.vehicle.registration_number', 'agreementVehicleLink.outboundAgreement.agreement_number'], ['agreement.supplier', 'usageLog.vehicle', 'agreementVehicleLink.outboundAgreement'], 'usageLog.usage_date', constraints: ['financial_side' => 'cost']),
-            $this->definition('vehicle-rental.usage-summary', 'Usage Summary Report', 'Vehicle Rental', RentalUsageLog::class, [
-                $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                $this->qty('distance_km', 'Distance'),
-                $this->qty('comparative_km', 'Comparative KM'),
-                new ReportColumn(
-                    key: 'event_total',
-                    label: 'Classified Event Quantity',
-                    format: 'decimal',
-                    summarize: true,
-                    value: fn (RentalUsageLog $log): string => $this->math->sum(
-                        $log->events->pluck('quantity')->map(fn ($value) => (string) $value)->all(),
-                    ),
-                ),
-                $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['agreement.agreement_number', 'vehicle.registration_number'], ['agreement', 'vehicle', 'events'], 'usage_date'),
-            $this->definition('vehicle-rental.running-chart-monthly', 'Running Chart Monthly Summary', 'Vehicle Rental', RentalUsageLog::class, [
-                new ReportColumn(
-                    key: 'month',
-                    label: 'Month',
-                    value: static fn (RentalUsageLog $log): string => $log->usage_date->format('Y-m'),
-                ),
-                $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                $this->col('agreement', 'Source Agreement', 'agreement.agreement_number'),
-                $this->qty('distance_km', 'Distance'),
-                new ReportColumn(
-                    key: 'working_hours',
-                    label: 'Working Hours',
-                    format: 'decimal',
-                    summarize: true,
-                    value: fn (RentalUsageLog $log): string => $this->math->div(
-                        (string) $log->working_minutes,
-                        '60.000000',
-                    ),
-                ),
-                $this->qty('cumulative_km', 'Approved Cumulative KM'),
-            ], ['agreement.agreement_number', 'vehicle.registration_number'], ['agreement', 'vehicle'], 'usage_date', constraints: ['status' => 'approved']),
-            $this->definition('vehicle-rental.allocation-history', 'Vehicle Allocation History', 'Vehicle Rental', RentalAgreementVehicle::class, [
-                $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('direction', 'Direction', 'agreement.direction', 'enum'),
-                $this->col('allocated_from', 'From', format: 'datetime', sort: 'allocated_from'),
-                $this->col('allocated_to', 'To', format: 'datetime', sort: 'allocated_to'),
-                $this->qty('start_odometer', 'Start KM', false),
-                $this->qty('end_odometer', 'End KM', false),
-                $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['vehicle.registration_number', 'agreement.agreement_number'], ['vehicle', 'agreement'], 'allocated_from'),
-            $this->definition('vehicle-rental.mileage-summary', 'Rental Mileage Summary', 'Vehicle Rental', RentalUsageLog::class, [
-                $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
-                $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                $this->col('agreement', 'Source Agreement', 'agreement.agreement_number'),
-                $this->qty('start_odometer', 'Start KM', false),
-                $this->qty('end_odometer', 'Finish KM', false),
-                $this->qty('distance_km', 'Distance'),
-                $this->qty('comparative_km', 'Comparative KM'),
-                $this->qty('cumulative_km', 'Approved Cumulative KM'),
-            ], ['vehicle.registration_number', 'agreement.agreement_number'], ['vehicle', 'agreement'], 'usage_date', constraints: ['status' => 'approved']),
-            new ReportDefinition(
-                key: 'vehicle-rental.overtime-summary',
-                title: 'Rental Overtime Summary',
-                group: 'Vehicle Rental',
-                model: RentalUsageEvent::class,
-                columns: [
-                    $this->col('usage_date', 'Date', 'usageLog.usage_date', 'date'),
-                    $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
-                    $this->col('event_type', 'Overtime Type', format: 'enum', sort: 'event_type'),
-                    $this->qty('quantity', 'Hours'),
-                    $this->col('remarks', 'Remarks'),
-                ],
-                search: ['usageLog.vehicle.registration_number', 'remarks'],
-                relations: ['usageLog.vehicle'],
-                filters: [$this->filter('event_type', 'Overtime Type', 'event_type')],
-                dateColumn: 'usageLog.usage_date',
-                defaultSort: 'id',
-                scope: static fn ($query) => $query
-                    ->whereIn('event_type', ['overtime', 'double_overtime'])
-                    ->whereHas('usageLog', fn ($usage) => $usage->where('status', 'approved')),
+                columns: $this->rentalAgreementColumns(),
+                search: ['agreement_number', 'customer.name', 'supplier.name'],
+                relations: ['customer', 'supplier', 'allocations.vehicle'],
+                dateColumn: 'ends_at',
+                defaultSort: 'ends_at',
+                scope: static fn ($query) => $query->where('status', 'active')->where('ends_at', '<', now()),
             ),
             new ReportDefinition(
-                key: 'vehicle-rental.day-night-out-summary',
-                title: 'Rental Day Out / Night Out Summary',
+                key: 'vehicle-rental.allocation-history',
+                title: 'Vehicle Allocation History',
                 group: 'Vehicle Rental',
-                model: RentalUsageEvent::class,
+                model: RentalVehicleAllocation::class,
                 columns: [
-                    $this->col('usage_date', 'Date', 'usageLog.usage_date', 'date'),
-                    $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
-                    $this->col('event_type', 'Event', format: 'enum', sort: 'event_type'),
-                    $this->qty('quantity', 'Quantity'),
-                    $this->col('remarks', 'Remarks'),
-                ],
-                search: ['usageLog.vehicle.registration_number', 'remarks'],
-                relations: ['usageLog.vehicle'],
-                filters: [$this->filter('event_type', 'Event', 'event_type')],
-                dateColumn: 'usageLog.usage_date',
-                defaultSort: 'id',
-                scope: static fn ($query) => $query
-                    ->whereIn('event_type', ['day_out', 'night_out'])
-                    ->whereHas('usageLog', fn ($usage) => $usage->where('status', 'approved')),
-            ),
-            $this->definition('vehicle-rental.charges', 'Rental Charge Report', 'Vehicle Rental', RentalCharge::class, [
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('period_start', 'Period Start', 'billing_period_start', 'datetime', 'billing_period_start'),
-                $this->col('period_end', 'Period End', 'billing_period_end', 'datetime', 'billing_period_end'),
-                $this->col('cycle_key', 'Cycle', 'billing_cycle_key', sort: 'billing_cycle_key'),
-                $this->col('charge_type', 'Charge Type', format: 'enum', sort: 'charge_type'),
-                $this->col('description', 'Description', sort: 'description'),
-                $this->qty('quantity', 'Quantity'),
-                $this->money('rate', 'Rate', false),
-                $this->money('tax_amount', 'Tax'),
-                $this->money('total_amount', 'Total'),
-                $this->col('run_status', 'Run Approval', 'chargeRun.approval_status', 'enum'),
-                $this->col('invoice_status', 'Invoice Status', format: 'enum', sort: 'invoice_status'),
-                $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['agreement.agreement_number', 'description', 'charge_type'], ['agreement', 'chargeRun'], 'billing_period_start'),
-            $this->rentalInvoiceReport('vehicle-rental.revenue', 'Rental Revenue Report', 'outbound'),
-            $this->rentalInvoiceReport('vehicle-rental.inbound-cost', 'Inbound Rental Cost Report', 'inbound'),
-            new ReportDefinition(
-                key: 'vehicle-rental.profitability',
-                title: 'Rental Profitability Report',
-                group: 'Vehicle Rental',
-                model: RentalChargeCalculation::class,
-                columns: [
-                    $this->col('calculated_at', 'Calculated', 'created_at', 'datetime', 'created_at'),
+                    $this->col('allocation_number', 'Allocation', sort: 'allocation_number'),
                     $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                    $this->col('period_start', 'Period Start', 'billing_period_start', 'datetime', 'billing_period_start'),
-                    $this->col('period_end', 'Period End', 'billing_period_end', 'datetime', 'billing_period_end'),
-                    $this->col('usage_date', 'Usage Date', 'usageLog.usage_date', 'date'),
-                    $this->col('vehicle', 'Vehicle', 'usageLog.vehicle.registration_number'),
-                    $this->col('financial_side', 'Financial Side', format: 'enum', sort: 'financial_side'),
-                    $this->col('metric', 'Metric', 'calculation_type', 'enum', 'calculation_type'),
-                    $this->col('applied_rule', 'Applied Rule', sort: 'applied_rule'),
-                    new ReportColumn(
-                        key: 'revenue',
-                        label: 'Revenue',
-                        format: 'money',
-                        summarize: true,
-                        value: static fn (RentalChargeCalculation $calculation): string => $calculation
-                            ->financial_side->value === 'revenue'
-                                ? (string) $calculation->total_amount
-                                : '0.000000',
-                    ),
-                    new ReportColumn(
-                        key: 'cost',
-                        label: 'Direct Cost',
-                        format: 'money',
-                        summarize: true,
-                        value: static fn (RentalChargeCalculation $calculation): string => $calculation
-                            ->financial_side->value === 'cost'
-                                ? (string) $calculation->total_amount
-                                : '0.000000',
-                    ),
-                    new ReportColumn(
-                        key: 'profit',
-                        label: 'Profit',
-                        format: 'money',
-                        summarize: true,
-                        value: fn (RentalChargeCalculation $calculation): string => $calculation
-                            ->financial_side->value === 'revenue'
-                                ? (string) $calculation->total_amount
-                                : $this->math->sub('0.000000', (string) $calculation->total_amount),
-                    ),
-                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
-                ],
-                search: ['agreement.agreement_number', 'usageLog.vehicle.registration_number', 'description', 'applied_rule'],
-                relations: ['agreement', 'usageLog.vehicle', 'charge', 'chargeRun'],
-                filters: [$this->filter('financial_side', 'Financial Side', 'financial_side')],
-                dateColumn: 'billing_period_start',
-                defaultSort: 'billing_period_start',
-                constraints: ['status' => 'approved'],
-                scope: static fn ($query) => $query->whereHas(
-                    'charge',
-                    fn ($charge) => $charge->where('status', 'approved'),
-                ),
-                description: 'Approved charge calculation lines. Approved revenue less approved cost is rental margin.',
-                orientation: 'landscape',
-            ),
-            new ReportDefinition(
-                key: 'vehicle-rental.deposit-liability',
-                title: 'Deposit Liability Report',
-                group: 'Vehicle Rental',
-                model: RentalPaymentLink::class,
-                columns: [
-                    $this->col('payment_date', 'Date', 'payment.payment_date', 'date'),
-                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                    $this->col('payment', 'Payment', 'payment.payment_number'),
-                    $this->money('amount', 'Deposit'),
-                    $this->col('status', 'Status', sort: 'status'),
-                ],
-                search: ['agreement.agreement_number', 'payment.payment_number'],
-                relations: ['agreement', 'payment'],
-                dateColumn: 'payment.payment_date',
-                defaultSort: 'id',
-                constraints: ['link_type' => 'deposit'],
-            ),
-            $this->rentalOutstandingReport('vehicle-rental.customer-outstanding', 'Customer Outstanding Rental Report', 'outbound'),
-            $this->rentalOutstandingReport('vehicle-rental.owner-payable', 'Owner/Supplier Payable Rental Report', 'inbound'),
-            $this->rentalOutstandingReport('vehicle-rental.customer-ageing', 'Customer Rental Outstanding Ageing', 'outbound'),
-            $this->rentalOutstandingReport('vehicle-rental.owner-payable-ageing', 'Owner/Supplier Payable Ageing', 'inbound'),
-            new ReportDefinition(
-                key: 'vehicle-rental.uninvoiced-revenue',
-                title: 'Uninvoiced Approved Rental Revenue',
-                group: 'Vehicle Rental',
-                model: RentalCharge::class,
-                columns: [
-                    $this->col('agreement', 'Customer Agreement', 'agreement.agreement_number'),
-                    $this->col('charge_type', 'Charge Type', format: 'enum', sort: 'charge_type'),
-                    $this->qty('quantity', 'Approved Quantity'),
-                    $this->money('total_amount', 'Approved Amount'),
-                    $this->col('invoice_status', 'Invoice Status', format: 'enum', sort: 'invoice_status'),
-                ],
-                search: ['agreement.agreement_number', 'description'],
-                relations: ['agreement'],
-                filters: [$this->filter('invoice_status', 'Invoice Status', 'invoice_status')],
-                dateColumn: 'created_at',
-                defaultSort: 'created_at',
-                scope: static fn ($query) => $query
-                    ->where('financial_side', 'revenue')
-                    ->where('status', 'approved')
-                    ->where('invoice_status', '!=', 'invoiced'),
-            ),
-            new ReportDefinition(
-                key: 'vehicle-rental.unprocessed-payable-cost',
-                title: 'Unprocessed Owner / Supplier Rental Cost',
-                group: 'Vehicle Rental',
-                model: RentalCharge::class,
-                columns: [
-                    $this->col('agreement', 'Owner Agreement', 'agreement.agreement_number'),
-                    $this->col('charge_type', 'Cost Type', format: 'enum', sort: 'charge_type'),
-                    $this->qty('quantity', 'Approved Quantity'),
-                    $this->money('total_amount', 'Approved Cost'),
-                    $this->col('invoice_status', 'Payable Status', format: 'enum', sort: 'invoice_status'),
-                ],
-                search: ['agreement.agreement_number', 'description'],
-                relations: ['agreement'],
-                filters: [$this->filter('invoice_status', 'Payable Status', 'invoice_status')],
-                dateColumn: 'created_at',
-                defaultSort: 'created_at',
-                scope: static fn ($query) => $query
-                    ->where('financial_side', 'cost')
-                    ->where('status', 'approved')
-                    ->where('invoice_status', '!=', 'invoiced'),
-            ),
-            $this->definition('vehicle-rental.partially-invoiced', 'Partially Invoiced Rental Charges', 'Vehicle Rental', RentalCharge::class, [
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('financial_side', 'Side', format: 'enum', sort: 'financial_side'),
-                $this->col('charge_type', 'Charge Type', format: 'enum', sort: 'charge_type'),
-                $this->qty('quantity', 'Quantity'),
-                $this->money('total_amount', 'Amount'),
-                $this->col('invoice_status', 'Status', format: 'enum', sort: 'invoice_status'),
-            ], ['agreement.agreement_number', 'description'], ['agreement'], 'created_at', constraints: ['invoice_status' => 'partially_invoiced']),
-            $this->definition('vehicle-rental.expense-recovery', 'Rental Expense and Recovery Report', 'Vehicle Rental', RentalExpense::class, [
-                $this->col('expense_date', 'Date', format: 'date', sort: 'expense_date'),
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('expense_type', 'Expense Type', format: 'enum', sort: 'expense_type'),
-                $this->col('financial_treatment', 'Financial Treatment', format: 'enum', sort: 'financial_treatment'),
-                $this->money('original_net_amount', 'Original Net'),
-                $this->money('original_tax_amount', 'Original Tax'),
-                $this->money('original_withholding_amount', 'Original WHT'),
-                $this->money('original_gross_amount', 'Original Gross'),
-                $this->money('recoverable_input_tax_amount', 'Recoverable Input Tax'),
-                $this->money('recovery_base_amount', 'Recovery Base'),
-                $this->money('recovery_tax_amount', 'Recovery Tax'),
-                $this->money('recovery_withholding_amount', 'Recovery WHT'),
-                $this->col('charge_generation_status', 'Charge Status', format: 'enum', sort: 'charge_generation_status'),
-                $this->col('status', 'Approval Status', format: 'enum', sort: 'status'),
-            ], ['agreement.agreement_number', 'receipt_no', 'reference_no', 'description'], ['agreement'], 'expense_date'),
-            $this->definition('vehicle-rental.payment-allocation', 'Rental Payment and Receipt Allocation Report', 'Vehicle Rental', RentalPaymentLink::class, [
-                $this->col('payment_date', 'Date', 'payment.payment_date', 'date'),
-                $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                $this->col('direction', 'Payment Direction', 'payment.direction', 'enum'),
-                $this->col('link_type', 'Purpose', format: 'enum', sort: 'link_type'),
-                $this->col('payment', 'Payment', 'payment.payment_number'),
-                $this->col('invoice', 'Invoice / Payable', 'invoice.invoice_number'),
-                $this->money('amount', 'Linked Amount'),
-                $this->col('status', 'Status', sort: 'status'),
-            ], ['agreement.agreement_number', 'payment.payment_number', 'invoice.invoice_number'], ['agreement', 'payment', 'invoice'], 'payment.payment_date'),
-            new ReportDefinition(
-                key: 'vehicle-rental.deposit-refund',
-                title: 'Rental Deposits, Advances, and Refunds',
-                group: 'Vehicle Rental',
-                model: RentalPaymentLink::class,
-                columns: [
-                    $this->col('payment_date', 'Date', 'payment.payment_date', 'date'),
-                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
-                    $this->col('link_type', 'Type', format: 'enum', sort: 'link_type'),
-                    $this->col('payment', 'Payment', 'payment.payment_number'),
-                    $this->money('amount', 'Amount'),
-                    $this->col('status', 'Status', sort: 'status'),
-                ],
-                search: ['agreement.agreement_number', 'payment.payment_number'],
-                relations: ['agreement', 'payment'],
-                filters: [$this->filter('link_type', 'Type', 'link_type')],
-                dateColumn: 'payment.payment_date',
-                defaultSort: 'id',
-                scope: static fn ($query) => $query->whereIn('link_type', ['deposit', 'advance', 'refund']),
-            ),
-            new ReportDefinition(
-                key: 'vehicle-rental.vehicle-utilization',
-                title: 'Vehicle Utilization Report',
-                group: 'Vehicle Rental',
-                model: RentalAgreementVehicle::class,
-                columns: [
+                    $this->col('agreement_kind', 'Agreement Kind', 'agreement.agreement_kind', 'enum'),
                     $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
+                    $this->col('vehicle_source_type', 'Source', format: 'enum', sort: 'vehicle_source_type'),
                     $this->col('allocated_from', 'From', format: 'datetime', sort: 'allocated_from'),
                     $this->col('allocated_to', 'To', format: 'datetime', sort: 'allocated_to'),
-                    new ReportColumn(
-                        key: 'utilized_hours',
-                        label: 'Utilized Hours',
-                        format: 'decimal',
-                        summarize: true,
-                        value: fn (RentalAgreementVehicle $allocation): string => $this->math->div(
-                            (string) max(
-                                0,
-                                ($allocation->allocated_to ?? now())->getTimestamp()
-                                    - $allocation->allocated_from->getTimestamp(),
-                            ),
-                            '3600.000000',
-                        ),
-                    ),
-                    $this->qty('start_odometer', 'Start KM', false),
-                    $this->qty('end_odometer', 'End KM', false),
                     $this->col('status', 'Status', format: 'enum', sort: 'status'),
                 ],
-                search: ['vehicle.registration_number', 'vehicle.vehicle_number', 'agreement.agreement_number'],
-                relations: ['vehicle', 'agreement'],
-                filters: [$this->filter('status', 'Status', 'status')],
+                search: ['allocation_number', 'agreement.agreement_number', 'vehicle.registration_number'],
+                relations: ['agreement', 'vehicle'],
+                filters: [
+                    $this->filter('status', 'Status', 'status'),
+                    $this->filter('vehicle_source_type', 'Vehicle Source', 'vehicle_source_type'),
+                ],
                 dateColumn: 'allocated_from',
                 defaultSort: 'allocated_from',
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.custody-history',
+                title: 'Vehicle Custody and Handover History',
+                group: 'Vehicle Rental',
+                model: RentalCustodyEvent::class,
+                columns: [
+                    $this->col('event_number', 'Event', sort: 'event_number'),
+                    $this->col('occurred_at', 'Date/Time', format: 'datetime', sort: 'occurred_at'),
+                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
+                    $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
+                    $this->col('event_type', 'Event Type', format: 'enum', sort: 'event_type'),
+                    $this->col('from_role', 'From', sort: 'from_role'),
+                    $this->col('to_role', 'To', sort: 'to_role'),
+                    $this->qty('odometer', 'Odometer', false),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                ],
+                search: ['event_number', 'vehicle.registration_number', 'allocation.allocation_number'],
+                relations: ['vehicle', 'allocation'],
+                filters: [
+                    $this->filter('event_type', 'Event Type', 'event_type'),
+                    $this->filter('status', 'Status', 'status'),
+                ],
+                dateColumn: 'occurred_at',
+                defaultSort: 'occurred_at',
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.replacement-history',
+                title: 'Vehicle Replacement History',
+                group: 'Vehicle Rental',
+                model: RentalVehicleReplacement::class,
+                columns: [
+                    $this->col('replacement_number', 'Replacement', sort: 'replacement_number'),
+                    $this->col('replacement_at', 'Date/Time', format: 'datetime', sort: 'replacement_at'),
+                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
+                    $this->col('old_vehicle', 'Old Vehicle', 'oldAllocation.vehicle.registration_number'),
+                    $this->col('new_vehicle', 'New Vehicle', 'newAllocation.vehicle.registration_number'),
+                    $this->col('reason_code', 'Reason Code', sort: 'reason_code'),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                ],
+                search: ['replacement_number', 'agreement.agreement_number', 'oldAllocation.vehicle.registration_number', 'newAllocation.vehicle.registration_number'],
+                relations: ['agreement', 'oldAllocation.vehicle', 'newAllocation.vehicle'],
+                filters: [$this->filter('status', 'Status', 'status')],
+                dateColumn: 'replacement_at',
+                defaultSort: 'replacement_at',
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.running-chart',
+                title: 'Daily Running Chart',
+                group: 'Vehicle Rental',
+                model: RentalUsageLog::class,
+                columns: [
+                    $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
+                    $this->col('usage_number', 'Running Chart', sort: 'usage_number'),
+                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
+                    $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
+                    $this->col('driver', 'Driver', 'driver.display_name'),
+                    $this->qty('start_odometer', 'Start KM', false),
+                    $this->qty('end_odometer', 'Finish KM', false),
+                    $this->qty('distance_km', 'Distance'),
+                    $this->qty('chargeable_distance_km', 'Chargeable KM'),
+                    $this->qty('garage_distance_km', 'Garage KM'),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                ],
+                search: ['usage_number', 'vehicle.registration_number', 'allocation.allocation_number', 'driver.display_name'],
+                relations: ['vehicle', 'allocation', 'driver'],
+                filters: [$this->filter('status', 'Status', 'status')],
+                dateColumn: 'usage_date',
+                defaultSort: 'usage_date',
                 orientation: 'landscape',
             ),
             new ReportDefinition(
-                key: 'vehicle-rental.revenue-licence-expiry',
-                title: 'Vehicle Revenue Licence Expiry Report',
+                key: 'vehicle-rental.driver-overtime',
+                title: 'Driver Overtime and Night-Out',
                 group: 'Vehicle Rental',
-                model: VehicleDocument::class,
+                model: RentalUsageLog::class,
                 columns: [
+                    $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
+                    $this->col('driver', 'Driver', 'driver.display_name'),
                     $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('document_number', 'Licence Number', sort: 'document_number'),
-                    $this->col('issued_date', 'Issued', format: 'date', sort: 'issued_date'),
-                    $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'),
-                    new ReportColumn(
-                        key: 'days_to_expiry',
-                        label: 'Days To Expiry',
-                        value: static fn (VehicleDocument $document): ?int => $document->expiry_date?->startOfDay()
-                            ->diffInDays(now()->startOfDay(), false) * -1,
-                    ),
+                    $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
+                    new ReportColumn('normal_ot_hours', 'Normal OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->normal_overtime_minutes, '60')),
+                    new ReportColumn('double_ot_hours', 'Double OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->double_overtime_minutes, '60')),
+                    new ReportColumn('triple_ot_hours', 'Triple OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->triple_overtime_minutes, '60')),
+                    $this->qty('night_out_count', 'Night-Outs'),
+                ],
+                search: ['driver.display_name', 'vehicle.registration_number', 'allocation.allocation_number'],
+                relations: ['driver', 'vehicle', 'allocation'],
+                dateColumn: 'usage_date',
+                defaultSort: 'usage_date',
+                scope: static fn ($query) => $query->whereIn('status', ['approved', 'consumed'])
+                    ->where(static fn ($hours) => $hours
+                        ->where('normal_overtime_minutes', '>', 0)
+                        ->orWhere('double_overtime_minutes', '>', 0)
+                        ->orWhere('triple_overtime_minutes', '>', 0)
+                        ->orWhere('night_out_count', '>', 0)),
+            ),
+            $this->rentalCalculationReport('vehicle-rental.customer-revenue', 'Customer Rental Revenue Calculations', 'revenue'),
+            $this->rentalCalculationReport('vehicle-rental.owner-cost', 'Vehicle Owner Cost Calculations', 'cost'),
+            $this->rentalInvoiceReport('vehicle-rental.customer-invoices', 'Customer Rental Invoices', 'outbound'),
+            $this->rentalInvoiceReport('vehicle-rental.owner-payables', 'Vehicle Owner Payables', 'inbound'),
+            $this->rentalOutstandingReport('vehicle-rental.customer-outstanding', 'Customer Rental Outstanding', 'outbound'),
+            $this->rentalOutstandingReport('vehicle-rental.owner-outstanding', 'Vehicle Owner Payable Outstanding', 'inbound'),
+            new ReportDefinition(
+                key: 'vehicle-rental.deposit-liability',
+                title: 'Rental Deposit Liability',
+                group: 'Vehicle Rental',
+                model: RentalDepositRequirement::class,
+                columns: [
+                    $this->col('agreement', 'Agreement', 'agreement.agreement_number'),
+                    $this->col('customer', 'Customer', 'agreement.customer.display_name'),
+                    $this->money('required_amount', 'Required'),
+                    $this->money('received_amount', 'Received'),
+                    $this->money('applied_amount', 'Applied'),
+                    $this->money('refunded_amount', 'Refunded'),
+                    $this->money('balance_amount', 'Liability Balance'),
                     $this->col('status', 'Status', format: 'enum', sort: 'status'),
                 ],
-                search: ['vehicle.registration_number', 'vehicle.vehicle_number', 'document_number'],
-                relations: ['vehicle'],
+                search: ['agreement.agreement_number', 'agreement.customer.name'],
+                relations: ['agreement.customer'],
                 filters: [$this->filter('status', 'Status', 'status')],
-                dateColumn: 'expiry_date',
-                defaultSort: 'expiry_date',
-                constraints: ['document_type' => 'revenue_license'],
+                defaultSort: 'id',
             ),
             new ReportDefinition(
-                key: 'vehicle-rental.document-expiry',
-                title: 'Vehicle Document Expiry Report',
+                key: 'vehicle-rental.expenses',
+                title: 'Rental Expense and Recovery',
                 group: 'Vehicle Rental',
-                model: VehicleDocument::class,
+                model: RentalExpense::class,
                 columns: [
+                    $this->col('expense_date', 'Date', format: 'date', sort: 'expense_date'),
+                    $this->col('expense_number', 'Expense', sort: 'expense_number'),
                     $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('document_type', 'Document Type', format: 'enum', sort: 'document_type'),
-                    $this->col('document_number', 'Document Number', sort: 'document_number'),
-                    $this->col('issued_date', 'Issued', format: 'date', sort: 'issued_date'),
-                    $this->col('expiry_date', 'Expiry', format: 'date', sort: 'expiry_date'),
+                    $this->col('expense_type', 'Type', format: 'enum', sort: 'expense_type'),
+                    $this->money('net_amount', 'Net'),
+                    $this->money('tax_amount', 'Tax'),
+                    $this->money('gross_amount', 'Gross'),
                     $this->col('status', 'Status', format: 'enum', sort: 'status'),
                 ],
-                search: ['vehicle.registration_number', 'vehicle.vehicle_number', 'document_number'],
+                search: ['expense_number', 'vehicle.registration_number', 'reference_number'],
                 relations: ['vehicle'],
                 filters: [
-                    $this->filter('document_type', 'Document Type', 'document_type'),
+                    $this->filter('expense_type', 'Expense Type', 'expense_type'),
                     $this->filter('status', 'Status', 'status'),
                 ],
-                dateColumn: 'expiry_date',
-                defaultSort: 'expiry_date',
-                scope: static fn ($query) => $query->whereNotNull('expiry_date'),
+                dateColumn: 'expense_date',
+                defaultSort: 'expense_date',
             ),
             new ReportDefinition(
-                key: 'vehicle-rental.tax-withholding-traceability',
+                key: 'vehicle-rental.owner-deductions',
+                title: 'Vehicle Owner Deductions',
+                group: 'Vehicle Rental',
+                model: RentalExpenseAllocation::class,
+                columns: [
+                    $this->col('expense_date', 'Date', 'expense.expense_date', 'date'),
+                    $this->col('expense', 'Expense', 'expense.expense_number'),
+                    $this->col('vehicle', 'Vehicle', 'expense.vehicle.registration_number'),
+                    $this->col('owner', 'Owner', 'supplier.display_name'),
+                    $this->money('net_amount', 'Deduction'),
+                    $this->money('withholding_amount', 'Withholding'),
+                    $this->money('total_amount', 'Total'),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                ],
+                search: ['expense.expense_number', 'expense.vehicle.registration_number', 'supplier.name'],
+                relations: ['expense.vehicle', 'supplier'],
+                dateColumn: 'expense.expense_date',
+                defaultSort: 'id',
+                constraints: ['allocation_type' => 'owner_deduction'],
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.lease-installments',
+                title: 'Vehicle Finance Installments',
+                group: 'Vehicle Rental',
+                model: VehicleFinanceInstallment::class,
+                columns: [
+                    $this->col('agreement', 'Finance Agreement', 'financeAgreement.agreement_number'),
+                    $this->col('vehicle', 'Vehicle', 'financeAgreement.vehicle.registration_number'),
+                    $this->col('leasing_company', 'Leasing Company', 'financeAgreement.supplier.display_name'),
+                    $this->col('installment_number', 'Installment', sort: 'installment_number'),
+                    $this->col('due_date', 'Due Date', format: 'date', sort: 'due_date'),
+                    $this->money('principal_due', 'Principal'),
+                    $this->money('interest_due', 'Interest'),
+                    $this->money('total_due', 'Total Due'),
+                    $this->money('paid_amount', 'Paid'),
+                    $this->money('balance_due', 'Balance'),
+                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
+                ],
+                search: ['financeAgreement.agreement_number', 'financeAgreement.vehicle.registration_number', 'financeAgreement.supplier.name'],
+                relations: ['financeAgreement.vehicle', 'financeAgreement.supplier'],
+                filters: [$this->filter('status', 'Status', 'status')],
+                dateColumn: 'due_date',
+                defaultSort: 'due_date',
+                orientation: 'landscape',
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.profitability',
+                title: 'Vehicle Rental Profitability',
+                group: 'Vehicle Rental',
+                model: RentalVehicleAllocation::class,
+                columns: [
+                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
+                    $this->col('agreement', 'Customer Agreement', 'agreement.agreement_number'),
+                    $this->money('revenue_total', 'Revenue'),
+                    $this->money('owner_cost_total', 'Owner Cost'),
+                    $this->money('company_cost_total', 'Company Direct Cost'),
+                    new ReportColumn('profit', 'Contribution', format: 'money', summarize: true, value: fn (RentalVehicleAllocation $allocation): string => $this->math->sub(
+                        (string) ($allocation->revenue_total ?? '0'),
+                        $this->math->add((string) ($allocation->owner_cost_total ?? '0'), (string) ($allocation->company_cost_total ?? '0')),
+                    )),
+                ],
+                search: ['vehicle.registration_number', 'agreement.agreement_number'],
+                relations: ['vehicle', 'agreement'],
+                defaultSort: 'id',
+                scope: static fn ($query) => $query
+                    ->whereHas('agreement', fn ($agreement) => $agreement->where('agreement_kind', 'customer_rental'))
+                    ->select('rental_vehicle_allocations.*')
+                    ->selectSub(static fn ($sub) => $sub->from('rental_calculation_lines')
+                        ->join('rental_calculation_runs', 'rental_calculation_runs.id', '=', 'rental_calculation_lines.calculation_run_id')
+                        ->join('rental_billing_periods', 'rental_billing_periods.id', '=', 'rental_calculation_runs.billing_period_id')
+                        ->whereColumn('rental_billing_periods.agreement_id', 'rental_vehicle_allocations.agreement_id')
+                        ->where('rental_billing_periods.financial_side', 'revenue')
+                        ->where('rental_calculation_runs.calculation_status', 'approved')
+                        ->where('rental_calculation_lines.status', 'approved')
+                        ->selectRaw('COALESCE(SUM(rental_calculation_lines.total_amount), 0)'), 'revenue_total')
+                    ->selectSub(static fn ($sub) => $sub->from('rental_usage_contexts')
+                        ->join('rental_calculation_lines', 'rental_calculation_lines.usage_context_id', '=', 'rental_usage_contexts.id')
+                        ->join('rental_calculation_runs', 'rental_calculation_runs.id', '=', 'rental_calculation_lines.calculation_run_id')
+                        ->whereColumn('rental_usage_contexts.vehicle_allocation_id', 'rental_vehicle_allocations.source_allocation_id')
+                        ->where('rental_usage_contexts.financial_side', 'cost')
+                        ->where('rental_calculation_runs.calculation_status', 'approved')
+                        ->where('rental_calculation_lines.status', 'approved')
+                        ->selectRaw('COALESCE(SUM(rental_calculation_lines.total_amount), 0)'), 'owner_cost_total')
+                    ->selectSub(static fn ($sub) => $sub->from('rental_expense_allocations')
+                        ->whereColumn('rental_expense_allocations.target_vehicle_allocation_id', 'rental_vehicle_allocations.id')
+                        ->where('rental_expense_allocations.allocation_type', 'company_cost')
+                        ->where('rental_expense_allocations.status', 'approved')
+                        ->selectRaw('COALESCE(SUM(rental_expense_allocations.total_amount), 0)'), 'company_cost_total'),
+                description: 'Approved rental revenue less approved owner cost and company direct rental costs.',
+            ),
+            new ReportDefinition(
+                key: 'vehicle-rental.tax-traceability',
                 title: 'Rental Tax and Withholding Traceability',
                 group: 'Vehicle Rental',
                 model: TaxTransaction::class,
@@ -908,43 +730,31 @@ final class ReportCatalog
                     $this->money('withholding_amount', 'Withholding'),
                 ],
                 search: ['source_number', 'tax_code', 'tax_name'],
-                filters: [
-                    $this->filter('tax_type', 'Tax Type', 'tax_type'),
-                    $this->filter('party_type', 'Party Type', 'party_type'),
-                ],
                 dateColumn: 'transaction_date',
                 defaultSort: 'transaction_date',
-                scope: static fn ($query) => $query
-                    ->where('source_type', 'invoice')
-                    ->whereExists(static fn ($links) => $links
-                        ->selectRaw('1')
-                        ->from('rental_invoice_links')
-                        ->whereColumn('rental_invoice_links.invoice_id', 'tax_transactions.source_id')),
+                scope: static fn ($query) => $query->where('source_type', 'invoice')
+                    ->whereExists(static fn ($sources) => $sources->selectRaw('1')
+                        ->from('invoice_sources')
+                        ->whereColumn('invoice_sources.invoice_id', 'tax_transactions.source_id')
+                        ->where('invoice_sources.source_type', 'rental_calculation_run')),
             ),
         ];
     }
 
     private function rentalAgreementReport(string $key, string $title): ReportDefinition
     {
-        $partyName = static fn (RentalAgreement $agreement): ?string => $agreement->party_type->value === 'customer'
-            ? ($agreement->customer?->display_name ?? $agreement->customer?->name)
-            : ($agreement->supplier?->display_name ?? $agreement->supplier?->name);
-        $vehicleLabel = static fn (RentalAgreement $agreement): ?string => $agreement->vehicles
-            ->first()?->vehicle?->registration_number
-            ?? $agreement->vehicles->first()?->vehicle?->vehicle_number;
-
         return new ReportDefinition(
             key: $key,
             title: $title,
             group: 'Vehicle Rental',
             model: RentalAgreement::class,
-            columns: $this->rentalAgreementColumns($partyName, $vehicleLabel),
-            search: ['agreement_number', 'customer.name', 'supplier.name', 'vehicles.vehicle.registration_number'],
-            relations: ['customer', 'supplier', 'vehicles.vehicle'],
+            columns: $this->rentalAgreementColumns(),
+            search: ['agreement_number', 'customer.name', 'supplier.name', 'allocations.vehicle.registration_number'],
+            relations: ['customer', 'supplier', 'allocations.vehicle'],
             filters: [
                 $this->filter('status', 'Status', 'status'),
-                $this->filter('direction', 'Direction', 'direction'),
-                $this->filter('rental_type', 'Rental Type', 'rental_type'),
+                $this->filter('agreement_kind', 'Agreement Kind', 'agreement_kind'),
+                $this->filter('rental_mode', 'Rental Mode', 'rental_mode'),
             ],
             dateColumn: 'agreement_date',
             defaultSort: 'agreement_date',
@@ -952,21 +762,57 @@ final class ReportCatalog
         );
     }
 
-    /**
-     * @return list<ReportColumn>
-     */
-    private function rentalAgreementColumns(\Closure $partyName, \Closure $vehicleLabel): array
+    /** @return list<ReportColumn> */
+    private function rentalAgreementColumns(): array
     {
         return [
             $this->col('agreement_date', 'Date', format: 'date', sort: 'agreement_date'),
             $this->col('agreement_number', 'Agreement', sort: 'agreement_number'),
-            $this->col('direction', 'Direction', format: 'enum', sort: 'direction'),
-            new ReportColumn('party', 'Party', value: $partyName),
-            new ReportColumn('vehicle', 'Vehicle', value: $vehicleLabel),
-            $this->col('start_at', 'Start', format: 'datetime', sort: 'start_at'),
-            $this->col('expected_end_at', 'Expected End', format: 'datetime', sort: 'expected_end_at'),
+            $this->col('agreement_kind', 'Kind', format: 'enum', sort: 'agreement_kind'),
+            new ReportColumn('party', 'Customer / Owner', value: static fn (RentalAgreement $agreement): ?string => $agreement->customer?->display_name
+                ?? $agreement->customer?->name
+                ?? $agreement->supplier?->display_name
+                ?? $agreement->supplier?->name),
+            new ReportColumn('vehicles', 'Vehicle(s)', value: static fn (RentalAgreement $agreement): string => $agreement->allocations
+                ->map(fn ($allocation) => $allocation->vehicle?->registration_number ?? $allocation->vehicle?->vehicle_number)
+                ->filter()->unique()->implode(', ')),
+            $this->col('starts_at', 'Start', format: 'datetime', sort: 'starts_at'),
+            $this->col('ends_at', 'End', format: 'datetime', sort: 'ends_at'),
+            $this->col('rental_mode', 'Mode', format: 'enum', sort: 'rental_mode'),
             $this->col('status', 'Status', format: 'enum', sort: 'status'),
         ];
+    }
+
+    private function rentalCalculationReport(string $key, string $title, string $side): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: $key,
+            title: $title,
+            group: 'Vehicle Rental',
+            model: RentalCalculationRun::class,
+            columns: [
+                $this->col('agreement', 'Agreement', 'billingPeriod.agreement.agreement_number'),
+                $this->col('period_start', 'Period Start', 'billingPeriod.period_start', 'date'),
+                $this->col('period_end', 'Period End', 'billingPeriod.period_end', 'date'),
+                $this->col('run_version', 'Version', sort: 'run_version'),
+                $this->money('net_total', 'Net'),
+                $this->money('tax_total', 'Tax'),
+                $this->money('withholding_total', 'Withholding'),
+                $this->money('grand_total', 'Total'),
+                $this->col('calculation_status', 'Calculation', format: 'enum', sort: 'calculation_status'),
+                $this->col('document_status', 'Document', format: 'enum', sort: 'document_status'),
+            ],
+            search: ['billingPeriod.agreement.agreement_number'],
+            relations: ['billingPeriod.agreement'],
+            filters: [
+                $this->filter('calculation_status', 'Calculation Status', 'calculation_status'),
+                $this->filter('document_status', 'Document Status', 'document_status'),
+            ],
+            dateColumn: 'billingPeriod.period_start',
+            defaultSort: 'id',
+            scope: static fn ($query) => $query->whereHas('billingPeriod', fn ($period) => $period->where('financial_side', $side)),
+            orientation: 'landscape',
+        );
     }
 
     private function rentalInvoiceReport(string $key, string $title, string $direction): ReportDefinition
@@ -1014,8 +860,7 @@ final class ReportCatalog
             relations: ['invoice'],
             filters: [$this->filter('status', 'Status', 'status')],
             defaultSort: 'id',
-            scope: static fn ($query) => $query
-                ->where('remaining_amount', '>', '0')
+            scope: static fn ($query) => $query->where('remaining_amount', '>', '0')
                 ->whereHas('invoice', fn ($invoice) => $invoice
                     ->where('invoice_type', 'rental')
                     ->where('direction', $direction)
@@ -1023,9 +868,6 @@ final class ReportCatalog
         );
     }
 
-    /**
-     * @param  array<string, mixed>  $constraints
-     */
     private function taxTransactions(string $key, string $title, array $constraints = []): ReportDefinition
     {
         return new ReportDefinition(

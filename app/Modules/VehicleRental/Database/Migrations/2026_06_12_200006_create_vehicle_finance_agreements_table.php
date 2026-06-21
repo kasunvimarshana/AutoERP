@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('vehicle_finance_agreements', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->json('metadata')->nullable();
+            $table->string('agreement_number', 100);
+            $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->date('agreement_date');
+            $table->dateTime('starts_at');
+            $table->dateTime('matures_at');
+            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->decimal('principal_amount', 20, 6)->default('0.000000');
+            $table->decimal('initial_deposit_amount', 20, 6)->default('0.000000');
+            $table->decimal('residual_value', 20, 6)->default('0.000000');
+            $table->string('interest_method', 30)->default('flat');
+            $table->decimal('annual_interest_rate', 12, 6)->default('0.000000');
+            $table->string('installment_frequency', 30)->default('monthly');
+            $table->unsignedInteger('installment_count');
+            $table->unsignedSmallInteger('payment_term_days')->default(0);
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
+            $table->string('status', 30)->default('draft');
+            $table->text('remarks')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->dateTime('approved_at')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['tenant_id', 'agreement_number'], 'vehicle_finance_agreements_tenant_number_uk');
+            $table->index(['vehicle_id', 'status', 'starts_at', 'matures_at'], 'vehicle_finance_agreements_vehicle_period_idx');
+            $table->index(['supplier_id', 'status'], 'vehicle_finance_agreements_supplier_status_idx');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('vehicle_finance_agreements');
+    }
+};

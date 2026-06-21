@@ -4,15 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Requests;
 
-use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\VehicleRental\Enums\RentalAgreementDirection;
-use Modules\VehicleRental\Enums\RentalAgreementStatus;
-use Modules\VehicleRental\Enums\RentalBillingCycle;
-use Modules\VehicleRental\Enums\RentalPartyType;
-use Modules\VehicleRental\Enums\RentalReservationStatus;
-use Modules\VehicleRental\Enums\RentalType;
-use Modules\VehicleRental\Services\RentalUsageContextService;
 
 final class ListRentalRequest extends TenantScopedRequest
 {
@@ -22,29 +14,27 @@ final class ListRentalRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'search' => ['nullable', 'string', 'max:150'],
-            'status' => ['nullable', Rule::in(array_unique([
-                ...array_column(RentalAgreementStatus::cases(), 'value'),
-                ...array_column(RentalReservationStatus::cases(), 'value'),
-            ]))],
-            'mode' => ['nullable', Rule::in([
-                RentalUsageContextService::MODE_LESSEE,
-                RentalUsageContextService::MODE_LESSOR,
-                RentalUsageContextService::MODE_LINKED,
-            ])],
-            'side' => ['nullable', Rule::in(['lessee', 'lessor'])],
-            'direction' => ['nullable', Rule::enum(RentalAgreementDirection::class)],
-            'party_type' => ['nullable', Rule::enum(RentalPartyType::class)],
-            'party_id' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+            'status' => ['nullable', 'string', 'max:40'],
+            'agreement_kind' => ['nullable', 'string', 'max:40'],
+            'financial_side' => ['nullable', 'string', 'max:20'],
+            'customer_id' => ['nullable', 'integer', 'min:1'],
+            'supplier_id' => ['nullable', 'integer', 'min:1'],
             'agreement_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
-            'rental_type' => ['nullable', Rule::enum(RentalType::class)],
-            'billing_cycle' => ['nullable', Rule::enum(RentalBillingCycle::class)],
-            'usage_date' => ['nullable', 'date'],
+            'requested_vehicle_id' => ['nullable', 'integer', 'min:1'],
+            'requested_vehicle_category_id' => ['nullable', 'integer', 'min:1'],
+            'vehicle_allocation_id' => ['nullable', 'integer', 'min:1'],
+            'source_allocation_id' => ['nullable', 'integer', 'min:1'],
+            'driver_id' => ['nullable', 'integer', 'min:1'],
+            'replacement_id' => ['nullable', 'integer', 'min:1'],
+            'event_type' => ['nullable', 'string', 'max:40'],
+            'expense_type' => ['nullable', 'string', 'max:40'],
+            'calculation_status' => ['nullable', 'string', 'max:40'],
+            'document_status' => ['nullable', 'string', 'max:40'],
+            'vehicle_source_type' => ['nullable', 'string', 'max:40'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'overdue' => ['nullable', 'boolean'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];
     }
 }

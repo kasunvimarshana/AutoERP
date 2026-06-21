@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('rental_deposit_requirements', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->json('metadata')->nullable();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->decimal('required_amount', 20, 6);
+            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->date('due_date')->nullable();
+            $table->boolean('is_refundable')->default(true);
+            $table->decimal('received_amount', 20, 6)->default('0.000000');
+            $table->decimal('applied_amount', 20, 6)->default('0.000000');
+            $table->decimal('refunded_amount', 20, 6)->default('0.000000');
+            $table->decimal('forfeited_amount', 20, 6)->default('0.000000');
+            $table->decimal('balance_amount', 20, 6)->default('0.000000');
+            $table->string('status', 30)->default('pending');
+            $table->text('remarks')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->timestamps();
+
+            $table->unique('agreement_id', 'rental_deposit_requirements_agreement_uk');
+            $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_idx');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('rental_deposit_requirements');
+    }
+};

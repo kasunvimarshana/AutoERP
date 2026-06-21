@@ -7,101 +7,53 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
-use Modules\VehicleRental\Http\Requests\RentalActionRequest;
+use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAgreementRequest;
+use Modules\VehicleRental\Http\Requests\UpdateRentalAgreementRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementResource;
-use Modules\VehicleRental\Http\Resources\RentalStatusHistoryResource;
+use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
-final class RentalAgreementController extends RentalController
+final class RentalAgreementController
 {
-    public function __construct(
-        private readonly VehicleRentalAuthorizationService $authorization,
-    ) {}
+    use ScopesVehicleRentalRequests;
+
+    public function __construct(private readonly VehicleRentalAuthorizationService $authorization) {}
 
     public function index(ListRentalRequest $request, RentalAgreementService $service): AnonymousResourceCollection
     {
-        return RentalAgreementResource::collection($service->paginate(
-            $request->tenantId(),
-            $request->organizationUnitId(),
-            $request->validated(),
-            $request->perPage(),
-        ));
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
+        return RentalAgreementResource::collection($service->paginate($request->tenantId(), $request->organizationUnitId(), $request->validated(), $request->perPage()));
     }
 
     public function store(StoreRentalAgreementRequest $request, RentalAgreementService $service): JsonResponse
     {
-        $this->authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::MANAGE_AGREEMENTS,
-        );
-
-        return (new RentalAgreementResource($service->create($request->toData())))
-            ->response()->setStatusCode(201);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_AGREEMENTS);
+        return (new RentalAgreementResource($service->create($request->validated(), $request->tenantId(), $request->organizationUnitId(), $request->currentUserId())))->response()->setStatusCode(201);
     }
 
-    public function show(
-        ListRentalRequest $request,
-        int $agreement,
-        RentalAgreementService $service,
-    ): RentalAgreementResource {
-        $model = $this->agreement($request, $agreement)->load($service->relations());
-
-        return new RentalAgreementResource($model);
-    }
-
-    public function confirm(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
+    public function show(ListRentalRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
     {
-        return $this->change($request, $agreement, RentalAgreementStatus::Confirmed, $service);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
+        return new RentalAgreementResource($this->scope(RentalAgreement::query(), $request)->with($service->relations())->findOrFail($agreement));
     }
 
-    public function activate(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
+    public function update(UpdateRentalAgreementRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
     {
-        return $this->change($request, $agreement, RentalAgreementStatus::Active, $service);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_AGREEMENTS);
+        return new RentalAgreementResource($service->updateDraft($this->scope(RentalAgreement::query(), $request)->findOrFail($agreement), $request->validated(), $request->currentUserId()));
     }
 
-    public function markReturned(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
+    public function transition(RentalTransitionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
     {
-        return $this->change($request, $agreement, RentalAgreementStatus::Returned, $service);
-    }
-
-    public function complete(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
-    {
-        return $this->change($request, $agreement, RentalAgreementStatus::Completed, $service);
-    }
-
-    public function cancel(RentalActionRequest $request, int $agreement, RentalAgreementService $service): RentalAgreementResource
-    {
-        return $this->change($request, $agreement, RentalAgreementStatus::Cancelled, $service);
-    }
-
-    public function history(ListRentalRequest $request, int $agreement): AnonymousResourceCollection
-    {
-        return RentalStatusHistoryResource::collection(
-            $this->agreement($request, $agreement)->statusHistories()->get(),
-        );
-    }
-
-    private function change(
-        RentalActionRequest $request,
-        int $agreement,
-        RentalAgreementStatus $status,
-        RentalAgreementService $service,
-    ): RentalAgreementResource {
-        $this->authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::MANAGE_AGREEMENTS,
-        );
-
-        return new RentalAgreementResource($service->changeStatus(
-            $this->agreement($request, $agreement),
-            $status,
-            $request->currentUserId(),
-            $request->input('reason'),
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_AGREEMENTS);
+        return new RentalAgreementResource($service->transition(
+            $this->scope(RentalAgreement::query(), $request)->findOrFail($agreement),
+            RentalAgreementStatus::from((string) $request->input('status')),
+            $request->currentUserId(), $request->input('reason'),
         ));
     }
 }

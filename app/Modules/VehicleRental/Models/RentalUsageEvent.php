@@ -12,23 +12,8 @@ use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 final class RentalUsageEvent extends CoreModel
 {
     use ScopesRentalContext;
-
     protected $table = 'rental_usage_events';
-
-    protected function casts(): array
-    {
-        return [
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'usage_log_id' => 'integer',
-            'event_type' => RentalUsageEventType::class,
-            'quantity' => 'decimal:6',
-            'created_by' => 'integer',
-        ];
-    }
-
-    public function usageLog(): BelongsTo
-    {
-        return $this->belongsTo(RentalUsageLog::class, 'usage_log_id');
-    }
+    protected $guarded = ['id'];
+    protected function casts(): array { return ['row_version'=>'integer','tenant_id'=>'integer','organization_unit_id'=>'integer','usage_log_id'=>'integer','sequence'=>'integer','event_type'=>RentalUsageEventType::class,'occurred_at'=>'datetime','quantity'=>'decimal:6','metadata'=>'array']; }
+    public function usageLog(): BelongsTo { return $this->belongsTo(RentalUsageLog::class, 'usage_log_id'); }
 }

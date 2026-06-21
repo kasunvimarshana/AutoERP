@@ -7,141 +7,49 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
+use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
-use Modules\VehicleRental\Http\Requests\RentalActionRequest;
+use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalExpenseRequest;
 use Modules\VehicleRental\Http\Resources\RentalExpenseResource;
+use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Services\RentalExpenseService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
-final class RentalExpenseController extends RentalController
+final class RentalExpenseController
 {
-    public function index(ListRentalRequest $request, int $agreement): AnonymousResourceCollection
+    use ScopesVehicleRentalRequests;
+
+    public function __construct(private readonly VehicleRentalAuthorizationService $authorization) {}
+
+    public function index(ListRentalRequest $request, RentalExpenseService $service): AnonymousResourceCollection
     {
-        return RentalExpenseResource::collection(
-            $this->agreement($request, $agreement)->expenses()->latest('id')->get(),
-        );
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW_FINANCIAL);
+        return RentalExpenseResource::collection($service->paginate($request->tenantId(), $request->organizationUnitId(), $request->validated(), $request->perPage()));
     }
 
-    public function store(
-        StoreRentalExpenseRequest $request,
-        int $agreement,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_EXPENSES,
-        );
-
-        return (new RentalExpenseResource($service->create(
-            $this->agreement($request, $agreement),
-            $request->toData(),
-        )))->response()->setStatusCode(201);
+    public function store(StoreRentalExpenseRequest $request, RentalExpenseService $service): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::RECORD_EXPENSES);
+        return (new RentalExpenseResource($service->create($request->validated(), $request->tenantId(), $request->organizationUnitId(), $request->currentUserId())))->response()->setStatusCode(201);
     }
 
-    public function update(
-        StoreRentalExpenseRequest $request,
-        int $agreement,
-        int $expense,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalExpenseResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_EXPENSES,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalExpenseResource($service->update(
-            $this->expense($model, $expense),
-            $request->toData(),
-        ));
+    public function show(ListRentalRequest $request, int $expense, RentalExpenseService $service): RentalExpenseResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW_FINANCIAL);
+        return new RentalExpenseResource($this->scope(RentalExpense::query(), $request)->with($service->relations())->findOrFail($expense));
     }
 
-    public function destroy(
-        ListRentalRequest $request,
-        int $agreement,
-        int $expense,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_EXPENSES,
-        );
-        $model = $this->agreement($request, $agreement);
-        $service->delete($this->expense($model, $expense));
-
-        return response()->json(null, 204);
-    }
-
-    public function approve(
-        RentalActionRequest $request,
-        int $agreement,
-        int $expense,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalExpenseResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::APPROVE_EXPENSES,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalExpenseResource($service->changeStatus(
-            $this->expense($model, $expense),
-            RentalExpenseStatus::Approved,
-            $request->currentUserId(),
-            $request->input('reason'),
-        ));
-    }
-
-    public function submit(
-        RentalActionRequest $request,
-        int $agreement,
-        int $expense,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalExpenseResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_EXPENSES,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalExpenseResource($service->changeStatus(
-            $this->expense($model, $expense),
-            RentalExpenseStatus::Submitted,
-            $request->currentUserId(),
-            $request->input('reason'),
-        ));
-    }
-
-    public function reject(
-        RentalActionRequest $request,
-        int $agreement,
-        int $expense,
-        RentalExpenseService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalExpenseResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::APPROVE_EXPENSES,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalExpenseResource($service->changeStatus(
-            $this->expense($model, $expense),
-            RentalExpenseStatus::Rejected,
-            $request->currentUserId(),
-            $request->input('reason'),
+    public function transition(RentalTransitionRequest $request, int $expense, RentalExpenseService $service): RentalExpenseResource
+    {
+        $status = RentalExpenseStatus::from((string) $request->input('status'));
+        $permission = in_array($status, [RentalExpenseStatus::Approved, RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed], true)
+            ? VehicleRentalAuthorizationService::APPROVE_EXPENSES
+            : VehicleRentalAuthorizationService::RECORD_EXPENSES;
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), $permission);
+        return new RentalExpenseResource($service->transition(
+            $this->scope(RentalExpense::query(), $request)->findOrFail($expense),
+            $status, $request->currentUserId(), $request->input('reason'),
         ));
     }
 }

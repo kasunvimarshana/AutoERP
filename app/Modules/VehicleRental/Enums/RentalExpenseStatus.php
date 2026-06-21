@@ -10,5 +10,6 @@ enum RentalExpenseStatus: string
     case Submitted = 'submitted';
     case Approved = 'approved';
     case Rejected = 'rejected';
-    case Charged = 'charged';
+    case Allocated = 'allocated';
+    case Reversed = 'reversed';
 }

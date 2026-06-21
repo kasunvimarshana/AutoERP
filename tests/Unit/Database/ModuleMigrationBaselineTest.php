@@ -27,7 +27,7 @@ final class ModuleMigrationBaselineTest extends TestCase
         }
 
         sort($migrations);
-        self::assertCount(216, $migrations);
+        self::assertCount(222, $migrations);
 
         $timestamps = [];
         $tables = [];
@@ -109,7 +109,7 @@ final class ModuleMigrationBaselineTest extends TestCase
         }
 
         self::assertSame([], $violations, implode(PHP_EOL, $violations));
-        self::assertCount(216, $tables);
+        self::assertCount(222, $tables);
     }
 
     /**

@@ -1,233 +1,213 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { ActionMenu } from '@/shared/components/ActionMenu';
-import { Button, LinkButton } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
-import { DataTable } from '@/shared/components/DataTable';
-import { DecimalInput } from '@/shared/components/DecimalInput';
-import { DetailGrid } from '@/shared/components/DetailGrid';
-import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { Input } from '@/shared/components/Input';
-import { LoadingState } from '@/shared/components/LoadingState';
-import { Panel } from '@/shared/components/Panel';
-import { Select } from '@/shared/components/Select';
-import { Textarea } from '@/shared/components/Textarea';
-import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
-import { useApi } from '@/shared/hooks/useApi';
-import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
-import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
-import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
-import { RentalStatusBadge } from '../components/RentalStatusBadge';
-import { allocateRentalVehicle, changeRentalAgreementStatus, createRentalPayment, getRentalAgreement, prepareRentalPayment, replaceRentalVehicle } from '../vehicleRentalApi';
-
-const today = businessDateInputValue;
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
+import { Button, LinkButton } from "@/shared/components/Button";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { DetailGrid } from "@/shared/components/DetailGrid";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { Panel } from "@/shared/components/Panel";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+import { useApi } from "@/shared/hooks/useApi";
+import { formatDate } from "@/shared/utils/formatDate";
+import { readableRelation } from "@/shared/utils/object";
+import { RentalPage } from "../components/RentalPage";
+import {
+    getRentalAgreement,
+    transitionRentalAgreement,
+} from "../vehicleRentalApi";
 
 export default function RentalAgreementDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
     const result = useApi((signal) => getRentalAgreement(id, signal), [id]);
-    const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [replaceAllocationId, setReplaceAllocationId] = useState<number | null>(null);
-    const [allocation, setAllocation] = useState({ allocated_from: '', allocated_to: '', start_odometer: '', remarks: '' });
-    const [payment, setPayment] = useState({ link_type: 'deposit', invoice_id: '', payment_date: today(), amount: '', exchange_rate: '1.000000', reference_number: '' });
-    const [paymentPreview, setPaymentPreview] = useState<Record<string, unknown> | null>(null);
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<ApiError | null>(null);
-    if (result.loading) return <LoadingState />;
-    if (!result.data) return <ErrorAlert error={result.error} />;
-    const agreement = result.data;
-    const doAction = async (status: 'confirm' | 'activate' | 'returned' | 'complete' | 'cancel') => {
-        if (busy) return;
+    const [actionError, setActionError] = useState<ApiError | null>(null);
+    const transition = async (status: string) => {
         setBusy(true);
-        setError(null);
+        setActionError(null);
         try {
-            await changeRentalAgreementStatus(agreement.id, status);
-            result.reload();
-        } catch (requestError) {
-            setError(toApiError(requestError));
+            await transitionRentalAgreement(id, status);
+            navigate(0);
+        } catch (e) {
+            setActionError(toApiError(e));
         } finally {
             setBusy(false);
         }
     };
-    const invoiceOptions = Array.from(new Map(agreement.invoice_links.filter((link) => link.status === 'active').map((link) => [link.invoice_id, link])).values());
-    const nextAction = agreement.status === 'draft'
-        ? { label: 'Confirm agreement', action: 'confirm' as const }
-        : agreement.status === 'confirmed'
-            ? { label: 'Activate agreement', action: 'activate' as const }
-            : agreement.status === 'active'
-                ? { label: 'Mark returned', action: 'returned' as const }
-                : agreement.status === 'returned'
-                    ? { label: 'Complete agreement', action: 'complete' as const }
-                    : null;
-
+    if (result.loading)
+        return (
+            <RentalPage>
+                <LoadingState />
+            </RentalPage>
+        );
+    if (!result.data)
+        return (
+            <RentalPage>
+                <ErrorAlert error={result.error} />
+            </RentalPage>
+        );
+    const row = result.data;
     return (
-        <>
-            <ContentHeader title={agreement.agreement_number} description={`${agreement.direction === 'outbound' ? 'Outbound rental' : 'Inbound hire-in'} / ${readableRelation(agreement.party)}`} />
-            <WorkflowHeader
-                status={<RentalStatusBadge status={agreement.status} />}
-                nextAction={nextAction ? <Button type="button" loading={busy} onClick={() => doAction(nextAction.action)}>{nextAction.label}</Button> : undefined}
-                secondaryActions={!['completed', 'cancelled'].includes(agreement.status) ? (
-                    <ActionMenu>
-                        <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => doAction('cancel')}>Cancel agreement</Button>
-                    </ActionMenu>
-                ) : undefined}
-                blockedReason={agreement.status === 'cancelled' ? 'No further actions are available for a cancelled agreement.' : undefined}
+        <RentalPage>
+            <ContentHeader
+                title={row.agreement_number}
+                description="Agreement, immutable rate versions, allocations and deposit obligation."
+                actions={
+                    <>
+                        <LinkButton
+                            variant="secondary"
+                            to={`/vehicle-rental/allocations?agreement_id=${id}`}
+                        >
+                            Allocations
+                        </LinkButton>
+                        {row.status === "draft" && (
+                            <Button
+                                loading={busy}
+                                onClick={() => void transition("active")}
+                            >
+                                Activate
+                            </Button>
+                        )}
+                        {row.status === "active" && (
+                            <Button
+                                variant="danger"
+                                loading={busy}
+                                onClick={() => void transition("terminated")}
+                            >
+                                Terminate
+                            </Button>
+                        )}
+                    </>
+                }
             />
-            <ErrorAlert error={error ?? result.error} />
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className="space-y-5">
-                    <Panel title="Agreement">
-                        <DetailGrid items={[
-                            { label: 'Status', value: <RentalStatusBadge status={agreement.status} /> },
-                            { label: 'Party', value: readableRelation(agreement.party) },
-                            { label: 'Rental type', value: agreement.rental_type.replaceAll('_', ' ') },
-                            { label: 'Billing cycle', value: agreement.billing_cycle.replaceAll('_', ' ') },
-                            { label: 'Billing basis', value: agreement.billing_basis.replaceAll('_', ' ') },
-                            { label: 'Agreement date', value: formatDate(agreement.agreement_date) },
-                            { label: 'Period', value: `${formatDate(agreement.start_at)} to ${formatDate(agreement.expected_end_at)}` },
-                        ]} />
-                        {agreement.remarks && <p className="mt-4 text-sm text-slate-600">{agreement.remarks}</p>}
-                    </Panel>
-                    <Panel title="Vehicle allocation">
-                        <DataTable rows={agreement.vehicles} rowKey={(row) => row.id} columns={[
-                            { key: 'vehicle', header: 'Vehicle', render: (row) => row.vehicle?.registration_number ?? readableRelation(row.vehicle) },
-                            { key: 'period', header: 'Period', render: (row) => `${formatDate(row.allocated_from)} to ${formatDate(row.allocated_to ?? agreement.expected_end_at)}` },
-                            { key: 'odometer', header: 'Odometer', render: (row) => `${row.start_odometer} / ${row.end_odometer ?? '-'}` },
-                            { key: 'status', header: 'Status', render: (row) => <RentalStatusBadge status={row.status} /> },
-                            { key: 'actions', header: '', render: (row) => <div className="flex gap-2">
-                                {!row.pickup_inspection && <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/pickup`} variant="secondary">Pickup</LinkButton>}
-                                {row.pickup_inspection && !row.return_inspection && <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/vehicles/${row.id}/return`} variant="secondary">Return</LinkButton>}
-                                {agreement.status === 'active' && row.status === 'active' && <Button type="button" variant="secondary" onClick={() => {
-                                    setReplaceAllocationId(row.id);
-                                    setVehicle(null);
-                                    setAllocation({ allocated_from: '', allocated_to: '', start_odometer: '', remarks: '' });
-                                }}>Replace</Button>}
-                            </div> },
-                        ]} />
-                        {(['draft', 'confirmed'].includes(agreement.status) || replaceAllocationId !== null) && <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={async (event) => {
-                            event.preventDefault();
-                            setBusy(true);
-                            setError(null);
-                            try {
-                                const payload = {
-                                    vehicle_id: vehicle?.id,
-                                    allocated_from: allocation.allocated_from || agreement.start_at,
-                                    allocated_to: allocation.allocated_to || agreement.expected_end_at,
-                                    start_odometer: allocation.start_odometer || vehicle?.odometer_reading,
-                                    owner_party_type: agreement.direction === 'inbound' ? agreement.party_type : undefined,
-                                    owner_party_id: agreement.direction === 'inbound' ? agreement.party_id : undefined,
-                                    remarks: allocation.remarks || undefined,
-                                };
-                                if (replaceAllocationId !== null) {
-                                    await replaceRentalVehicle(agreement.id, replaceAllocationId, payload);
-                                } else {
-                                    await allocateRentalVehicle(agreement.id, payload);
-                                }
-                                setVehicle(null);
-                                setReplaceAllocationId(null);
-                                setAllocation({ allocated_from: '', allocated_to: '', start_odometer: '', remarks: '' });
-                                result.reload();
-                            } catch (requestError) {
-                                setError(toApiError(requestError));
-                            } finally {
-                                setBusy(false);
-                            }
-                        }}>
-                            <VehicleLookupSelect value={vehicle} onChange={(value) => {
-                                setVehicle(value);
-                                setAllocation((current) => ({ ...current, start_odometer: value?.odometer_reading ?? '' }));
-                            }} error={fieldError(error, 'vehicle_id')} />
-                            <Input label="Allocated from" type="datetime-local" value={allocation.allocated_from} placeholder={agreement.start_at.slice(0, 16)} onChange={(event) => setAllocation({ ...allocation, allocated_from: event.target.value })} />
-                            <Input label="Allocated to" type="datetime-local" value={allocation.allocated_to} placeholder={agreement.expected_end_at.slice(0, 16)} onChange={(event) => setAllocation({ ...allocation, allocated_to: event.target.value })} />
-                            <DecimalInput label="Start odometer" value={allocation.start_odometer} error={fieldError(error, 'start_odometer')} onChange={(event) => setAllocation({ ...allocation, start_odometer: event.target.value })} />
-                            <Textarea label="Remarks" value={allocation.remarks} onChange={(event) => setAllocation({ ...allocation, remarks: event.target.value })} />
-                            <div className="flex items-end gap-2">
-                                {replaceAllocationId !== null && <Button type="button" variant="secondary" onClick={() => setReplaceAllocationId(null)}>Cancel</Button>}
-                                <Button type="submit" loading={busy}>{replaceAllocationId === null ? 'Allocate vehicle' : 'Replace vehicle'}</Button>
+            <ErrorAlert error={actionError ?? result.error} />
+            <div className="grid gap-5 lg:grid-cols-2">
+                <Panel title="Agreement">
+                    <DetailGrid
+                        items={[
+                            {
+                                label: "Kind",
+                                value: row.agreement_kind.replaceAll("_", " "),
+                            },
+                            {
+                                label: "Party",
+                                value: readableRelation(
+                                    row.customer ?? row.supplier,
+                                ),
+                            },
+                            {
+                                label: "Status",
+                                value: <StatusBadge status={row.status} />,
+                            },
+                            {
+                                label: "Agreement date",
+                                value: formatDate(row.agreement_date),
+                            },
+                            {
+                                label: "Start",
+                                value: formatDate(row.starts_at),
+                            },
+                            { label: "End", value: formatDate(row.ends_at) },
+                            {
+                                label: "Mode",
+                                value: row.rental_mode.replaceAll("_", " "),
+                            },
+                            {
+                                label: "Billing",
+                                value: `${row.billing_cycle} / ${row.billing_basis}`,
+                            },
+                        ]}
+                    />
+                </Panel>
+                <Panel title="Active rate version">
+                    {row.active_rate_version ? (
+                        <>
+                            <DetailGrid
+                                items={[
+                                    {
+                                        label: "Version",
+                                        value: String(
+                                            row.active_rate_version
+                                                .version_number,
+                                        ),
+                                    },
+                                    {
+                                        label: "Effective",
+                                        value: formatDate(
+                                            row.active_rate_version
+                                                .effective_from,
+                                        ),
+                                    },
+                                    {
+                                        label: "Excess KM method",
+                                        value: row.active_rate_version.excess_km_method.replaceAll(
+                                            "_",
+                                            " ",
+                                        ),
+                                    },
+                                    {
+                                        label: "Included KM",
+                                        value: row.active_rate_version
+                                            .included_km,
+                                    },
+                                ]}
+                            />
+                            <div className="mt-4 space-y-2">
+                                {row.active_rate_version.components.map(
+                                    (component) => (
+                                        <div
+                                            key={
+                                                component.id ??
+                                                component.component_code
+                                            }
+                                            className="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                                        >
+                                            <span>
+                                                {component.component_code.replaceAll(
+                                                    "_",
+                                                    " ",
+                                                )}
+                                            </span>
+                                            <strong>
+                                                {component.rate} /{" "}
+                                                {component.unit}
+                                            </strong>
+                                        </div>
+                                    ),
+                                )}
                             </div>
-                        </form>}
-                    </Panel>
-                    <Panel title="Financial links">
-                        <div className="grid gap-5 lg:grid-cols-2">
-                            <div>
-                                <h3 className="mb-2 text-sm font-semibold">Invoices</h3>
-                                <div className="space-y-2">{invoiceOptions.length === 0 ? <p className="text-sm text-slate-500">No invoice links.</p> : invoiceOptions.map((link) => <Link key={link.invoice_id} className="block text-sm font-semibold text-sky-700 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number} / balance {link.balance_due ?? '-'}</Link>)}</div>
-                            </div>
-                            <div>
-                                <h3 className="mb-2 text-sm font-semibold">Payments</h3>
-                                <div className="space-y-2">{agreement.payment_links.length === 0 ? <p className="text-sm text-slate-500">No payment links.</p> : agreement.payment_links.map((link) => <Link key={link.id} className="block text-sm font-semibold text-sky-700 hover:underline" to={`/payments/${link.payment_id}`}>{link.payment_number} / {link.link_type} / {link.amount}</Link>)}</div>
-                            </div>
-                        </div>
-                    </Panel>
-                </div>
-                <div className="space-y-5">
-                    <Panel title="Rate snapshot">
-                        <DetailGrid items={[
-                            { label: 'Base rate', value: agreement.rate_snapshot ? `${agreement.rate_snapshot.base_rate} / ${agreement.rate_snapshot.rate_unit}` : '-' },
-                            { label: 'Allowed KM', value: agreement.rate_snapshot?.allowed_km },
-                            { label: 'Allowed hours', value: agreement.rate_snapshot?.allowed_hours },
-                            { label: 'Extra KM', value: agreement.rate_snapshot?.extra_km_rate },
-                            { label: 'Extra hour', value: agreement.rate_snapshot?.extra_hour_rate },
-                            { label: 'Driver rate', value: agreement.rate_snapshot?.driver_rate },
-                        ]} />
-                    </Panel>
-                    <Panel title="Workspaces">
-                        <div className="grid gap-2">
-                            <LinkButton to={`/vehicle-rental/running-chart?mode=${agreement.direction === 'outbound' ? 'lessee' : 'lessor'}&agreement_id=${agreement.id}`} variant="secondary" className="w-full">Open running chart</LinkButton>
-                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/expenses`} variant="secondary" className="w-full">Expenses</LinkButton>
-                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/charges`} variant="secondary" className="w-full">Charge preview</LinkButton>
-                            <LinkButton to={`/vehicle-rental/agreements/${agreement.id}/invoice`} variant="secondary" className="w-full">Create invoice / payable</LinkButton>
-                        </div>
-                    </Panel>
-                    <Panel title="Prepare payment">
-                        <form className="space-y-4" onSubmit={async (event) => {
-                            event.preventDefault();
-                            setBusy(true);
-                            setError(null);
-                            try {
-                                const payload = {
-                                    ...payment,
-                                    invoice_id: payment.invoice_id ? Number(payment.invoice_id) : undefined,
-                                    reference_number: payment.reference_number || undefined,
-                                };
-                                const saved = await createRentalPayment(agreement.id, payload);
-                                navigate(`/payments/${saved.id}`);
-                            } catch (requestError) {
-                                setError(toApiError(requestError));
-                            } finally {
-                                setBusy(false);
-                            }
-                        }}>
-                            <Select label="Payment purpose" value={payment.link_type} options={['deposit', 'advance', 'settlement', 'refund'].map((value) => ({ value, label: value }))} onChange={(event) => setPayment({ ...payment, link_type: event.target.value })} />
-                            {payment.link_type === 'settlement' && <Select label="Rental invoice" value={payment.invoice_id} error={fieldError(error, 'invoice_id')} options={invoiceOptions.map((link) => ({ value: link.invoice_id, label: `${link.invoice_number} / ${link.balance_due ?? '-'}` }))} onChange={(event) => setPayment({ ...payment, invoice_id: event.target.value })} />}
-                            <Input label="Payment date" type="date" value={payment.payment_date} onChange={(event) => setPayment({ ...payment, payment_date: event.target.value })} />
-                            <DecimalInput label="Amount" value={payment.amount} error={fieldError(error, 'amount')} onChange={(event) => setPayment({ ...payment, amount: event.target.value })} />
-                            <Input label="Reference" value={payment.reference_number} onChange={(event) => setPayment({ ...payment, reference_number: event.target.value })} />
-                            <div className="flex gap-2">
-                                <Button type="button" variant="secondary" loading={busy} onClick={async () => {
-                                    setBusy(true);
-                                    setError(null);
-                                    try {
-                                        setPaymentPreview(await prepareRentalPayment(agreement.id, {
-                                            ...payment,
-                                            invoice_id: payment.invoice_id ? Number(payment.invoice_id) : undefined,
-                                        }));
-                                    } catch (requestError) {
-                                        setError(toApiError(requestError));
-                                    } finally {
-                                        setBusy(false);
-                                    }
-                                }}>Preview</Button>
-                                <Button type="submit" loading={busy}>Create</Button>
-                            </div>
-                            {paymentPreview && <p className="rounded-lg bg-sky-50 p-3 text-sm text-sky-800">Payment validated for {String(paymentPreview.paymentType ?? paymentPreview.payment_type ?? payment.link_type)}.</p>}
-                        </form>
-                    </Panel>
-                </div>
+                        </>
+                    ) : (
+                        <p className="text-sm text-slate-500">
+                            No active rate version.
+                        </p>
+                    )}
+                </Panel>
             </div>
-        </>
+            <Panel title="Vehicle allocations" className="mt-5">
+                {row.allocations?.length ? (
+                    <div className="space-y-2">
+                        {row.allocations.map((allocation) => (
+                            <Link
+                                key={allocation.id}
+                                to={`/vehicle-rental/allocations/${allocation.id}`}
+                                className="flex justify-between rounded-lg border p-3 hover:bg-slate-50"
+                            >
+                                <span>
+                                    {allocation.allocation_number} —{" "}
+                                    {readableRelation(allocation.vehicle)}
+                                </span>
+                                <StatusBadge status={allocation.status} />
+                            </Link>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-500">
+                        No vehicle allocation yet.
+                    </p>
+                )}
+            </Panel>
+        </RentalPage>
     );
 }

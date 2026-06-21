@@ -1,368 +1,295 @@
-import type { ApiCollection } from '@/shared/types/api';
-import type { NamedResource } from '@/shared/types/common';
+import type { NamedResource } from "@/shared/types/common";
 
-export type RentalDirection = 'outbound' | 'inbound';
-export type RentalPartyType = 'customer' | 'supplier' | 'owner';
-export type RentalType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'lease' | 'subscription' | 'with_driver' | 'without_driver';
-export type RentalAgreementStatus = 'draft' | 'confirmed' | 'active' | 'returned' | 'completed' | 'cancelled';
-export type RentalBillingCycle = 'hourly' | 'per_trip' | 'daily' | 'weekly' | 'monthly' | 'anniversary_cycle' | 'fixed_period' | 'final';
-export type RentalBillingBasis = 'calendar_month' | 'anniversary_month' | 'fixed_30_day' | 'exact_day_count' | 'contractual_period';
-
-export interface RentalVehicleSummary extends NamedResource {
-    registration_number?: string | null;
-    make?: string | null;
-    model?: string | null;
+export interface RentalParty extends NamedResource {
+    code?: string;
+    customer_number?: string;
+    supplier_number?: string;
+    display_name?: string;
 }
-
-export interface RentalRateSnapshot {
-    id?: number;
-    base_rate: string;
-    rate_unit: 'hour' | 'day' | 'week' | 'month' | 'km' | 'trip';
-    allowed_hours: string;
-    allowed_km: string;
-    extra_hour_rate: string;
-    extra_km_rate: string;
-    overtime_rate: string;
-    double_overtime_rate: string;
-    night_shift_rate: string;
-    weekend_rate: string;
-    holiday_rate: string;
-    driver_rate: string;
-    outstation_rate: string;
-    day_out_rate: string;
-    night_out_rate: string;
-    fuel_rate: string;
-    waiting_hour_rate: string;
-    tax_profile_id?: number | null;
-    currency_id?: number | null;
+export interface RentalVehicle extends NamedResource {
+    vehicle_number?: string;
+    registration_number?: string;
+    make?: string;
+    model?: string;
+    status?: string;
+    vehicle_category?: NamedResource | null;
 }
-
-export interface RentalInspection {
-    id: number;
-    agreement_vehicle_id: number;
-    vehicle_id: number;
-    inspected_at: string;
-    odometer: string;
-    fuel_level?: string | null;
-    condition_notes?: string | null;
-    damage_notes?: string | null;
-    damage_amount?: string | null;
-    is_damage_billable?: boolean | null;
-    attachments: unknown[];
+export interface RentalCurrency extends NamedResource {
+    code?: string;
+    symbol?: string;
 }
-
-export interface RentalAgreementVehicle {
-    id: number;
-    vehicle_id: number;
-    vehicle?: RentalVehicleSummary | null;
-    owner_party_type?: RentalPartyType | null;
-    owner_party_id?: number | null;
-    allocated_from: string;
-    allocated_to?: string | null;
-    start_odometer: string;
-    end_odometer?: string | null;
-    status: 'allocated' | 'active' | 'replaced' | 'returned';
-    remarks?: string | null;
-    pickup_inspection?: RentalInspection | null;
-    return_inspection?: RentalInspection | null;
-}
-
-export interface RentalUsageEvent {
-    id: number;
-    event_type: string;
-    quantity: string;
-    remarks?: string | null;
-}
-
-export interface RentalUsageContext {
-    id: number;
-    agreement_id: number;
-    agreement_vehicle_id: number;
-    agreement_vehicle_link_id?: number | null;
-    agreement_number?: string | null;
-    agreement_direction: RentalDirection;
-    financial_side: 'revenue' | 'cost';
-    party_type: RentalPartyType;
-    party_id: number;
-    party?: NamedResource | null;
-    rate_snapshot?: RentalRateSnapshot | null;
-}
-
-export interface RentalUsageLog {
-    id: number;
-    agreement_vehicle_id: number;
-    vehicle_id: number;
-    vehicle?: RentalVehicleSummary | null;
-    driver_id?: number | null;
-    driver?: NamedResource | null;
-    usage_date: string;
-    start_time?: string | null;
-    end_time?: string | null;
-    working_minutes: number;
-    start_odometer: string;
-    end_odometer: string;
-    distance_km: string;
-    cumulative_km?: string | null;
-    comparative_km?: string | null;
-    trip_from?: string | null;
-    trip_to?: string | null;
-    trip_purpose?: string | null;
-    status: 'draft' | 'submitted' | 'approved' | 'rejected';
-    remarks?: string | null;
-    events: RentalUsageEvent[];
-    contexts: RentalUsageContext[];
-}
-
-export interface RentalExpense {
-    id: number;
-    usage_log_id?: number | null;
-    expense_type: string;
-    expense_date: string;
-    currency_id?: number | null;
-    amount: string;
-    tax_group_id?: number | null;
-    tax_amount: string;
-    withholding_amount: string;
-    original_net_amount: string;
-    original_tax_group_id?: number | null;
-    original_tax_amount: string;
-    original_gross_amount: string;
-    original_withholding_amount: string;
-    recoverable_input_tax_amount: string;
-    recovery_base_amount: string;
-    recovery_tax_group_id?: number | null;
-    recovery_tax_amount: string;
-    recovery_withholding_amount: string;
-    markup_amount: string;
-    generated_charge_id?: number | null;
-    financial_treatment: 'company_borne' | 'customer_billable' | 'supplier_recoverable' | 'employee_reimbursable' | 'owner_payable';
-    is_billable: boolean;
-    is_recoverable: boolean;
-    is_reimbursable: boolean;
-    responsible_party_type?: string | null;
-    responsible_party_id?: number | null;
-    charge_generation_status: string;
-    receipt_no?: string | null;
-    reference_no?: string | null;
-    description?: string | null;
-    status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'charged';
-}
-
-export interface RentalCharge {
-    id: number;
-    billing_period_id?: number | null;
-    charge_run_id?: number | null;
-    billing_period_start?: string | null;
-    billing_period_end?: string | null;
-    billing_cycle_key?: string | null;
-    period_sequence?: number | null;
-    financial_side: 'revenue' | 'cost';
-    charge_type: string;
-    description: string;
-    quantity: string;
-    rate: string;
-    amount: string;
-    discount_amount: string;
-    tax_amount: string;
-    withholding_amount: string;
-    tax_group_id?: number | null;
-    total_amount: string;
-    invoice_status: 'not_invoiced' | 'partially_invoiced' | 'invoiced';
-    status: 'draft' | 'approved' | 'cancelled';
-    invoiced_quantity?: string | null;
-    remaining_invoice_quantity?: string | null;
-}
-
-export interface RentalInvoiceLink {
-    id: number;
-    charge_id: number;
-    invoice_id: number;
-    invoice_number?: string | null;
-    invoiced_quantity: string;
-    invoiced_amount: string;
-    balance_due?: string | null;
-    invoice_status?: string | null;
-    status: string;
-}
-
-export interface RentalPaymentLink {
-    id: number;
-    payment_id: number;
-    payment_number?: string | null;
-    invoice_id?: number | null;
-    invoice_number?: string | null;
-    link_type: string;
-    amount: string;
-    status: string;
-}
-
 export interface RentalReservation {
     id: number;
     reservation_number: string;
-    direction: RentalDirection;
-    party_type: RentalPartyType;
-    party_id: number;
-    party?: NamedResource | null;
-    rental_type: RentalType;
-    vehicle_id?: number | null;
-    vehicle?: RentalVehicleSummary | null;
-    start_at: string;
-    expected_end_at: string;
+    customer?: RentalParty | null;
+    requested_vehicle?: RentalVehicle | null;
+    requested_vehicle_category?: NamedResource | null;
+    rental_mode: string;
+    billing_cycle: string;
+    requested_start_at: string;
+    requested_end_at: string;
+    currency?: RentalCurrency | null;
+    estimated_amount: string;
+    estimated_deposit_amount: string;
     status: string;
+    source?: string | null;
     remarks?: string | null;
 }
-
+export interface RentalRateComponent {
+    id?: number;
+    component_code: string;
+    unit: string;
+    included_quantity: string;
+    rate: string;
+    multiplier: string;
+    is_taxable: boolean;
+    calculation_order: number;
+}
+export interface RentalRateVersion {
+    id: number;
+    version_number: number;
+    effective_from: string;
+    effective_to?: string | null;
+    driver_mode: string;
+    billing_cycle: string;
+    billing_basis: string;
+    proration_rule: string;
+    excess_km_method: string;
+    included_km: string;
+    included_hours: string;
+    weekday_included_minutes: number;
+    saturday_included_minutes: number;
+    holiday_included_minutes: number;
+    status: string;
+    components: RentalRateComponent[];
+}
 export interface RentalAgreement {
     id: number;
     agreement_number: string;
-    reservation_id?: number | null;
-    direction: RentalDirection;
-    party_type: RentalPartyType;
-    party_id: number;
-    party?: NamedResource | null;
-    rental_type: RentalType;
-    billing_cycle: RentalBillingCycle;
-    billing_basis: RentalBillingBasis;
+    agreement_kind: string;
+    customer?: RentalParty | null;
+    supplier?: RentalParty | null;
+    agreement_date: string;
+    starts_at: string;
+    ends_at: string;
+    actual_ended_at?: string | null;
+    legal_context?: string | null;
+    rental_mode: string;
+    billing_cycle: string;
+    billing_basis: string;
     proration_rule: string;
     billing_timezone: string;
-    billing_period_days?: number | null;
-    agreement_date: string;
-    start_at: string;
-    expected_end_at: string;
-    actual_end_at?: string | null;
-    status: RentalAgreementStatus;
-    status_label: string;
+    payment_term_days?: number | null;
+    currency?: RentalCurrency | null;
+    status: string;
     remarks?: string | null;
-    rate_snapshot?: RentalRateSnapshot | null;
-    vehicles: RentalAgreementVehicle[];
-    usage_logs: RentalUsageLog[];
-    expenses: RentalExpense[];
-    charges: RentalCharge[];
-    invoice_links: RentalInvoiceLink[];
-    payment_links: RentalPaymentLink[];
-    vehicle_links: RentalAgreementVehicleLink[];
+    active_rate_version?: RentalRateVersion | null;
+    rate_versions?: RentalRateVersion[];
+    allocations?: RentalAllocation[];
+    deposit_requirement?: RentalDeposit | null;
 }
-
-export interface RentalAgreementVehicleLink {
+export interface RentalDriverAssignment {
     id: number;
-    vehicle_id: number;
-    inbound_agreement_id: number;
-    inbound_agreement_vehicle_id: number;
-    outbound_agreement_id: number;
-    outbound_agreement_vehicle_id: number;
-    effective_from: string;
-    effective_to: string;
-    status: 'draft' | 'submitted' | 'approved' | 'cancelled' | 'superseded';
+    employee?: NamedResource | null;
+    assignment_role: string;
+    assigned_from: string;
+    assigned_to?: string | null;
+    is_primary: boolean;
+    status: string;
+}
+export interface RentalCustodyItem {
+    id?: number;
+    item_type: string;
+    item_code?: string | null;
+    description: string;
+    condition_status?: string | null;
+    is_chargeable: boolean;
+    estimated_amount: string;
+    responsible_side?: string | null;
+}
+export interface RentalCustodyEvent {
+    id: number;
+    event_number: string;
+    vehicle?: RentalVehicle | null;
+    allocation?: NamedResource | null;
+    event_type: string;
+    occurred_at: string;
+    odometer: string;
+    fuel_level_percent?: string | null;
+    location?: string | null;
+    from_role: string;
+    to_role: string;
+    condition_summary?: string | null;
+    damage_summary?: string | null;
+    status: string;
+    items: RentalCustodyItem[];
+}
+export interface RentalAllocation {
+    id: number;
+    allocation_number: string;
+    agreement?: NamedResource | null;
+    vehicle?: RentalVehicle | null;
+    vehicle_source_type: string;
+    source_allocation?: NamedResource | null;
+    allocated_from: string;
+    allocated_to?: string | null;
+    actual_returned_at?: string | null;
+    start_odometer?: string | null;
+    end_odometer?: string | null;
+    status: string;
+    remarks?: string | null;
+    drivers?: RentalDriverAssignment[];
+    custody_events?: RentalCustodyEvent[];
+}
+export interface RentalUsageEvent {
+    id?: number;
+    event_type: string;
+    occurred_at?: string | null;
+    quantity: string;
+    unit?: string | null;
+    reference_number?: string | null;
     remarks?: string | null;
 }
-
-export interface RunningChartAgreementOption {
-    agreement_id: number;
-    agreement_vehicle_id: number;
-    agreement_number: string;
-    direction: RentalDirection;
-    party_type: RentalPartyType;
-    party_id: number;
-    party_name?: string | null;
-    vehicle_id: number;
-    vehicle_registration?: string | null;
-    rental_type: RentalType;
-    billing_cycle: string;
-    start_at: string;
-    expected_end_at: string;
-    allocation_from: string;
-    allocation_to?: string | null;
-    status: RentalAgreementStatus;
-}
-
-export interface RunningChartResolvedContext {
-    agreement_id: number;
-    agreement_vehicle_id: number;
-    agreement_number: string;
-    direction: RentalDirection;
-    financial_side: 'revenue' | 'cost';
-    party_type: RentalPartyType;
-    party_id: number;
-    party_name?: string | null;
-    billing_cycle: string;
-    currency_id?: number | null;
-    rate_snapshot: RentalRateSnapshot;
-}
-
-export interface RunningChartContext {
-    mode?: RunningChartMode | null;
-    vehicle_id: number;
-    vehicle?: {
-        id: number;
-        vehicle_number: string;
-        registration_number?: string | null;
-        odometer_reading: string;
-    } | null;
-    selected_agreement_id: number;
-    agreement_vehicle_link_id?: number | null;
-    agreement_vehicle_link?: RentalAgreementVehicleLink | null;
-    last_valid_finish_odometer: string;
-    approved_cumulative_mileage: string;
-    contexts: RunningChartResolvedContext[];
-}
-
-export type RunningChartMode = 'lessee' | 'lessor' | 'linked';
-
-export interface RunningChartTripPayload {
-    id?: number;
-    tenant_id?: number;
-    organization_unit_id?: number | null;
-    mode: RunningChartMode;
-    lessee_agreement_id?: number;
-    lessee_agreement_vehicle_id?: number;
-    lessor_agreement_id?: number;
-    lessor_agreement_vehicle_id?: number;
+export interface RentalUsageLog {
+    id: number;
+    usage_number: string;
+    allocation?: NamedResource | null;
+    vehicle?: RentalVehicle | null;
+    driver?: NamedResource | null;
     usage_date: string;
-    driver_id?: number | null;
-    start_time: string;
-    end_time: string;
+    started_at?: string | null;
+    ended_at?: string | null;
     start_odometer: string;
     end_odometer: string;
-    comparative_km?: string;
-    trip_from?: string;
-    trip_to?: string;
-    trip_purpose?: string;
-    remarks?: string;
-    events?: Array<{ event_type: string; quantity: string; remarks?: string | null }>;
-}
-
-export interface RunningChartPreview {
-    daily_km: string;
+    distance_km: string;
+    chargeable_distance_km: string;
+    garage_distance_km: string;
+    internal_distance_km: string;
     working_minutes: number;
-    working_hours: string;
-    overtime_hours: string;
-    customer_revenue: string;
-    owner_cost: string;
-    estimated_margin: string;
-    persistent: false;
-    contexts: Array<{
-        agreement_id: number;
-        financial_side: 'revenue' | 'cost';
-        estimated_total: string;
-        lines: Array<{ type: string; quantity: string; rate: string; unit?: string | null; amount: string }>;
-    }>;
+    normal_overtime_minutes: number;
+    double_overtime_minutes: number;
+    triple_overtime_minutes: number;
+    night_out_count: string;
+    status: string;
+    events: RentalUsageEvent[];
+    remarks?: string | null;
 }
-
-export interface RentalAvailabilityRow {
-    vehicle: RentalVehicleSummary;
-    available: boolean;
-    reasons: string[];
+export interface RentalExpense {
+    id: number;
+    expense_number: string;
+    vehicle?: RentalVehicle | null;
+    expense_type: string;
+    expense_date: string;
+    net_amount: string;
+    tax_amount: string;
+    gross_amount: string;
+    reference_number?: string | null;
+    description?: string | null;
+    status: string;
 }
-
-export interface RentalInvoicePreview {
-    subtotal: string;
-    discountTotal: string;
-    taxTotal: string;
-    chargeTotal: string;
-    grandTotal: string;
-    lines?: unknown[];
+export interface RentalCalculationLine {
+    id: number;
+    line_number: number;
+    component_code: string;
+    description: string;
+    chargeable_quantity: string;
+    unit?: string | null;
+    rate: string;
+    net_amount: string;
+    tax_amount: string;
+    withholding_amount: string;
+    total_amount: string;
+    status: string;
 }
-
-export type RentalAgreementCollection = ApiCollection<RentalAgreement>;
-export type RentalReservationCollection = ApiCollection<RentalReservation>;
-export type RunningChartAgreementCollection = ApiCollection<RunningChartAgreementOption>;
+export interface RentalCalculationRun {
+    id: number;
+    billing_period?: {
+        id: number;
+        agreement?: NamedResource | null;
+        financial_side: string;
+        period_start: string;
+        period_end: string;
+        status: string;
+    } | null;
+    run_version: number;
+    calculation_status: string;
+    document_status: string;
+    net_total: string;
+    tax_total: string;
+    withholding_total: string;
+    grand_total: string;
+    lines: RentalCalculationLine[];
+}
+export interface RentalDepositLink {
+    id: number;
+    link_type: string;
+    payment_id?: number | null;
+    invoice_id?: number | null;
+    amount: string;
+    status: string;
+    linked_at: string;
+    reverses_link_id?: number | null;
+}
+export interface RentalDeposit {
+    id: number;
+    agreement?: NamedResource | null;
+    required_amount: string;
+    received_amount: string;
+    applied_amount: string;
+    refunded_amount: string;
+    balance_amount: string;
+    status: string;
+    due_date?: string | null;
+    is_refundable: boolean;
+    links?: RentalDepositLink[];
+}
+export interface VehicleFinanceInstallment {
+    id: number;
+    installment_number: number;
+    due_date: string;
+    principal_due: string;
+    interest_due: string;
+    fee_due: string;
+    tax_due: string;
+    total_due: string;
+    paid_amount: string;
+    balance_due: string;
+    status: string;
+    invoice_id?: number | null;
+}
+export interface VehicleFinanceAgreement {
+    id: number;
+    agreement_number: string;
+    supplier?: RentalParty | null;
+    vehicle?: RentalVehicle | null;
+    agreement_date: string;
+    starts_at: string;
+    matures_at: string;
+    principal_amount: string;
+    initial_deposit_amount: string;
+    residual_value: string;
+    annual_interest_rate: string;
+    installment_frequency: string;
+    installment_count: number;
+    status: string;
+    installments: VehicleFinanceInstallment[];
+}
+export interface RentalMetadata {
+    agreement_kinds: string[];
+    agreement_statuses: string[];
+    allocation_statuses: string[];
+    rental_modes: string[];
+    billing_cycles: string[];
+    billing_bases: string[];
+    proration_rules: string[];
+    excess_km_methods: string[];
+    vehicle_source_types: string[];
+    custody_event_types: string[];
+    usage_event_types: string[];
+    expense_types: string[];
+    expense_allocation_types: string[];
+    financial_sides: string[];
+    rate_component_codes: string[];
+    rate_units: string[];
+}
+export type RentalPayload = Record<string, unknown>;

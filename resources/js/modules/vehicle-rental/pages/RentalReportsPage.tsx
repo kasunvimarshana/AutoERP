@@ -1,56 +1,109 @@
-import { Link } from 'react-router-dom';
-import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Panel } from '@/shared/components/Panel';
+import { Link } from "react-router-dom";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { Panel } from "@/shared/components/Panel";
+import { useApi } from "@/shared/hooks/useApi";
+import { listReports } from "@/modules/reporting/reportingApi";
+import type { ReportDefinition } from "@/modules/reporting/reportingTypes";
+import { RentalPage } from "../components/RentalPage";
 
-const reports = [
-    ['vehicle-rental.fleet-availability', 'Fleet Availability Report'],
-    ['vehicle-rental.agreement-register', 'Rental Agreement Register'],
-    ['vehicle-rental.active-rentals', 'Active Rentals Report'],
-    ['vehicle-rental.overdue-rentals', 'Overdue Rentals Report'],
-    ['vehicle-rental.running-chart', 'Running Chart Report'],
-    ['vehicle-rental.running-chart-customer', 'Running Chart for Customer / Lessee'],
-    ['vehicle-rental.running-chart-owner', 'Running Chart for Vehicle Owner'],
-    ['vehicle-rental.running-chart-monthly', 'Running Chart Monthly Summary'],
-    ['vehicle-rental.usage-summary', 'Usage Summary Report'],
-    ['vehicle-rental.allocation-history', 'Vehicle Allocation History'],
-    ['vehicle-rental.mileage-summary', 'Rental Mileage Summary'],
-    ['vehicle-rental.overtime-summary', 'Rental Overtime Summary'],
-    ['vehicle-rental.day-night-out-summary', 'Day Out / Night Out Summary'],
-    ['vehicle-rental.charges', 'Rental Charge Report'],
-    ['vehicle-rental.revenue', 'Rental Revenue Report'],
-    ['vehicle-rental.inbound-cost', 'Inbound Rental Cost Report'],
-    ['vehicle-rental.profitability', 'Rental Profitability Report'],
-    ['vehicle-rental.deposit-liability', 'Deposit Liability Report'],
-    ['vehicle-rental.deposit-refund', 'Deposits, Advances, and Refunds'],
-    ['vehicle-rental.customer-outstanding', 'Customer Outstanding Rental Report'],
-    ['vehicle-rental.owner-payable', 'Owner / Supplier Payable Rental Report'],
-    ['vehicle-rental.customer-ageing', 'Customer Rental Outstanding Ageing'],
-    ['vehicle-rental.owner-payable-ageing', 'Owner / Supplier Payable Ageing'],
-    ['vehicle-rental.uninvoiced-revenue', 'Uninvoiced Approved Revenue'],
-    ['vehicle-rental.unprocessed-payable-cost', 'Unprocessed Payable Cost'],
-    ['vehicle-rental.partially-invoiced', 'Partially Invoiced Charges'],
-    ['vehicle-rental.expense-recovery', 'Expense and Recovery Report'],
-    ['vehicle-rental.payment-allocation', 'Payment and Receipt Allocation'],
-    ['vehicle-rental.vehicle-utilization', 'Vehicle Utilization Report'],
-    ['vehicle-rental.revenue-licence-expiry', 'Vehicle Revenue Licence Expiry Report'],
-    ['vehicle-rental.document-expiry', 'Vehicle Document Expiry Report'],
-    ['vehicle-rental.tax-withholding-traceability', 'Tax and Withholding Traceability'],
+const groups = [
+    [
+        "Operations",
+        [
+            "availability",
+            "agreement",
+            "allocation",
+            "custody",
+            "replacement",
+            "running",
+            "overtime",
+            "utilization",
+        ],
+    ],
+    [
+        "Customer billing",
+        ["revenue", "customer", "invoice", "outstanding", "deposit"],
+    ],
+    ["Owner payables", ["owner", "cost", "payable", "deduction"]],
+    [
+        "Compliance and management",
+        ["finance", "licence", "document", "profitability", "tax"],
+    ],
 ] as const;
 
 export default function RentalReportsPage() {
+    const result = useApi((signal) => listReports(signal), []);
+    const reports = (result.data ?? []).filter((report) =>
+        report.key.startsWith("vehicle-rental."),
+    );
+
     return (
-        <>
-            <ContentHeader title="Vehicle rental reports" description="Operational and financial reporting through the existing Reporting module." />
-            <Panel title="Available reports">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {reports.map(([key, title]) => (
-                        <Link key={key} to={`/reports/${key}`} className="rounded-lg border border-slate-200 p-4 transition hover:border-sky-300 hover:bg-sky-50">
-                            <strong className="block text-slate-900">{title}</strong>
-                            <span className="mt-1 block text-xs text-slate-500">{key}</span>
-                        </Link>
-                    ))}
+        <RentalPage>
+            <ContentHeader
+                title="Vehicle Rental reports"
+                description="Operational and financial reports backed by approved rental sources and central Finance documents."
+            />
+            <ErrorAlert error={result.error} />
+            {result.loading ? (
+                <LoadingState label="Loading rental reports..." />
+            ) : (
+                <div className="grid gap-5 xl:grid-cols-2">
+                    {groups.map(([title, keywords]) => {
+                        const rows = reports.filter((report) =>
+                            keywords.some((keyword) =>
+                                `${report.key} ${report.title}`
+                                    .toLowerCase()
+                                    .includes(keyword),
+                            ),
+                        );
+                        return rows.length > 0 ? (
+                            <ReportGroup
+                                key={title}
+                                title={title}
+                                reports={rows}
+                            />
+                        ) : null;
+                    })}
+                    {reports.length === 0 && (
+                        <Panel>
+                            <p className="text-sm text-slate-500">
+                                No Vehicle Rental reports are registered.
+                            </p>
+                        </Panel>
+                    )}
                 </div>
-            </Panel>
-        </>
+            )}
+        </RentalPage>
+    );
+}
+
+function ReportGroup({
+    title,
+    reports,
+}: {
+    title: string;
+    reports: ReportDefinition[];
+}) {
+    return (
+        <Panel title={title}>
+            <div className="divide-y divide-slate-100">
+                {reports.map((report) => (
+                    <Link
+                        key={report.key}
+                        to={`/reports/${report.key}`}
+                        className="block rounded-lg px-2 py-3 hover:bg-slate-50"
+                    >
+                        <div className="font-semibold text-slate-900">
+                            {report.title}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                            {report.description ?? report.key}
+                        </div>
+                    </Link>
+                ))}
+            </div>
+        </Panel>
     );
 }

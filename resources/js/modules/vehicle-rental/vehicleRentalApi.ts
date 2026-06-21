@@ -1,177 +1,204 @@
-import { apiClient } from '@/shared/api/apiClient';
-import type { ApiResource, ListParams } from '@/shared/types/api';
+import { apiClient } from "@/shared/api/apiClient";
+import { endpoints } from "@/shared/api/endpoints";
+import type {
+    ApiCollection,
+    ApiResource,
+    ListParams,
+} from "@/shared/types/api";
 import type {
     RentalAgreement,
-    RentalAgreementCollection,
-    RentalAgreementVehicle,
-    RentalAgreementVehicleLink,
-    RentalAvailabilityRow,
-    RentalCharge,
+    RentalAllocation,
+    RentalCalculationRun,
+    RentalCustodyEvent,
+    RentalDeposit,
     RentalExpense,
-    RentalInspection,
-    RentalInvoicePreview,
+    RentalMetadata,
+    RentalPayload,
     RentalReservation,
-    RentalReservationCollection,
-    RentalUsageEvent,
     RentalUsageLog,
-    RunningChartAgreementCollection,
-    RunningChartContext,
-    RunningChartPreview,
-    RunningChartTripPayload,
-} from './vehicleRentalTypes';
+    RentalVehicle,
+    VehicleFinanceAgreement,
+} from "./vehicleRentalTypes";
 
-const endpoint = '/api/v1/vehicle-rental';
-
-export const listRentalReservations = async (params: ListParams, signal?: AbortSignal): Promise<RentalReservationCollection> =>
-    (await apiClient.get<RentalReservationCollection>(`${endpoint}/reservations`, { params, signal })).data;
-export const createRentalReservation = async (payload: Record<string, unknown>): Promise<RentalReservation> =>
-    (await apiClient.post<ApiResource<RentalReservation>>(`${endpoint}/reservations`, payload)).data.data;
-export const getRentalReservation = async (id: number, signal?: AbortSignal): Promise<RentalReservation> =>
-    (await apiClient.get<ApiResource<RentalReservation>>(`${endpoint}/reservations/${id}`, { signal })).data.data;
-export const changeRentalReservationStatus = async (id: number, status: 'pending' | 'confirm' | 'cancel'): Promise<RentalReservation> =>
-    (await apiClient.patch<ApiResource<RentalReservation>>(`${endpoint}/reservations/${id}/${status}`)).data.data;
-
-export const listRentalAgreements = async (params: ListParams, signal?: AbortSignal): Promise<RentalAgreementCollection> =>
-    (await apiClient.get<RentalAgreementCollection>(`${endpoint}/agreements`, { params, signal })).data;
-export const createRentalAgreement = async (payload: Record<string, unknown>): Promise<RentalAgreement> =>
-    (await apiClient.post<ApiResource<RentalAgreement>>(`${endpoint}/agreements`, payload)).data.data;
-export const getRentalAgreement = async (id: number, signal?: AbortSignal): Promise<RentalAgreement> =>
-    (await apiClient.get<ApiResource<RentalAgreement>>(`${endpoint}/agreements/${id}`, { signal })).data.data;
-export const changeRentalAgreementStatus = async (id: number, status: 'confirm' | 'activate' | 'returned' | 'complete' | 'cancel'): Promise<RentalAgreement> =>
-    (await apiClient.patch<ApiResource<RentalAgreement>>(`${endpoint}/agreements/${id}/${status}`)).data.data;
-
-export const getVehicleAvailability = async (params: Record<string, unknown>, signal?: AbortSignal): Promise<RentalAvailabilityRow[]> =>
-    (await apiClient.get<ApiResource<RentalAvailabilityRow[]>>(`${endpoint}/availability`, { params, signal })).data.data;
-export const allocateRentalVehicle = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalAgreementVehicle> =>
-    (await apiClient.post<ApiResource<RentalAgreementVehicle>>(`${endpoint}/agreements/${agreementId}/vehicles`, payload)).data.data;
-export const replaceRentalVehicle = async (agreementId: number, allocationId: number, payload: Record<string, unknown>): Promise<RentalAgreementVehicle> =>
-    (await apiClient.post<ApiResource<RentalAgreementVehicle>>(`${endpoint}/agreements/${agreementId}/vehicles/${allocationId}/replace`, payload)).data.data;
-export const savePickupInspection = async (agreementId: number, allocationId: number, payload: Record<string, unknown>): Promise<RentalInspection> =>
-    (await apiClient.put<ApiResource<RentalInspection>>(`${endpoint}/agreements/${agreementId}/vehicles/${allocationId}/pickup`, payload)).data.data;
-export const saveReturnInspection = async (agreementId: number, allocationId: number, payload: Record<string, unknown>): Promise<RentalInspection> =>
-    (await apiClient.put<ApiResource<RentalInspection>>(`${endpoint}/agreements/${agreementId}/vehicles/${allocationId}/return`, payload)).data.data;
-
-export const listRentalUsageLogs = async (agreementId: number, signal?: AbortSignal): Promise<RentalUsageLog[]> =>
-    (await apiClient.get<ApiResource<RentalUsageLog[]>>(`${endpoint}/agreements/${agreementId}/usage-logs`, { signal })).data.data;
-export const createRentalUsageLog = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalUsageLog> =>
-    (await apiClient.post<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs`, payload)).data.data;
-export const updateRentalUsageLog = async (agreementId: number, usageLogId: number, payload: Record<string, unknown>): Promise<RentalUsageLog> =>
-    (await apiClient.put<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}`, payload)).data.data;
-export const deleteRentalUsageLog = async (agreementId: number, usageLogId: number): Promise<void> => {
-    await apiClient.delete(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}`);
-};
-export const createRentalUsageEvent = async (agreementId: number, usageLogId: number, payload: Record<string, unknown>): Promise<RentalUsageEvent> =>
-    (await apiClient.post<ApiResource<RentalUsageEvent>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events`, payload)).data.data;
-export const updateRentalUsageEvent = async (agreementId: number, usageLogId: number, eventId: number, payload: Record<string, unknown>): Promise<RentalUsageEvent> =>
-    (await apiClient.put<ApiResource<RentalUsageEvent>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events/${eventId}`, payload)).data.data;
-export const deleteRentalUsageEvent = async (agreementId: number, usageLogId: number, eventId: number): Promise<void> => {
-    await apiClient.delete(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/events/${eventId}`);
-};
-export const changeRentalUsageStatus = async (agreementId: number, usageLogId: number, status: 'submit' | 'approve' | 'reject', reason?: string): Promise<RentalUsageLog> =>
-    (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/agreements/${agreementId}/usage-logs/${usageLogId}/${status}`, { reason })).data.data;
-export const listRunningChartAgreements = async (
+const base = endpoints.vehicleRental;
+const collection = <T>(
+    path: string,
     params: ListParams = {},
     signal?: AbortSignal,
-): Promise<RunningChartAgreementCollection> =>
-    (await apiClient.get<RunningChartAgreementCollection>(
-        `${endpoint}/running-chart/agreements`,
-        { params, signal },
-    )).data;
-export const getRunningChartContext = async (params: {
-    mode?: string;
-    agreement_id?: number;
-    agreement_vehicle_id?: number;
-    lessee_agreement_id?: number;
-    lessee_agreement_vehicle_id?: number;
-    lessor_agreement_id?: number;
-    lessor_agreement_vehicle_id?: number;
-    usage_date: string;
-    start_time?: string;
-}, signal?: AbortSignal): Promise<RunningChartContext> =>
-    (await apiClient.get<ApiResource<RunningChartContext>>(`${endpoint}/running-chart/context`, { params, signal })).data.data;
-export const listRunningChartTrips = async (params: {
-    mode?: string;
-    agreement_id?: number;
-    agreement_vehicle_id?: number;
-    lessee_agreement_id?: number;
-    lessee_agreement_vehicle_id?: number;
-    lessor_agreement_id?: number;
-    lessor_agreement_vehicle_id?: number;
-    usage_date: string;
-}, signal?: AbortSignal): Promise<RentalUsageLog[]> =>
-    (await apiClient.get<ApiResource<RentalUsageLog[]>>(`${endpoint}/running-chart/trips`, { params, signal })).data.data;
-export const createRunningChartTrip = async (payload: RunningChartTripPayload): Promise<RentalUsageLog> =>
-    (await apiClient.post<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips`, payload)).data.data;
-export const updateRunningChartTrip = async (usageLogId: number, payload: RunningChartTripPayload): Promise<RentalUsageLog> =>
-    (await apiClient.put<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips/${usageLogId}`, payload)).data.data;
-export const deleteRunningChartTrip = async (usageLogId: number): Promise<void> => {
-    await apiClient.delete(`${endpoint}/running-chart/trips/${usageLogId}`);
-};
-export const changeRunningChartTripStatus = async (
-    usageLogId: number,
-    status: 'submit' | 'approve' | 'reject',
-    reason?: string,
-): Promise<RentalUsageLog> =>
-    (await apiClient.patch<ApiResource<RentalUsageLog>>(`${endpoint}/running-chart/trips/${usageLogId}/${status}`, { reason })).data.data;
-export const submitRunningChartDaily = async (payload: {
-    mode: string;
-    lessee_agreement_id?: number;
-    lessee_agreement_vehicle_id?: number;
-    lessor_agreement_id?: number;
-    lessor_agreement_vehicle_id?: number;
-    usage_date: string;
-    trips: RunningChartTripPayload[];
-}): Promise<RentalUsageLog[]> =>
-    (await apiClient.post<ApiResource<RentalUsageLog[]>>(`${endpoint}/running-chart/daily-submit`, payload)).data.data;
-export const previewRunningChart = async (payload: {
-    mode: string;
-    lessee_agreement_id?: number;
-    lessee_agreement_vehicle_id?: number;
-    lessor_agreement_id?: number;
-    lessor_agreement_vehicle_id?: number;
-    usage_date: string;
-    trips: RunningChartTripPayload[];
-}): Promise<RunningChartPreview> =>
-    (await apiClient.post<ApiResource<RunningChartPreview>>(`${endpoint}/running-chart/preview`, payload)).data.data;
-export const createRentalAgreementVehicleLink = async (payload: Record<string, unknown>): Promise<RentalAgreementVehicleLink> =>
-    (await apiClient.post<ApiResource<RentalAgreementVehicleLink>>(`${endpoint}/agreement-vehicle-links`, payload)).data.data;
-export const changeRentalAgreementVehicleLinkStatus = async (
-    linkId: number,
-    status: 'submit' | 'approve' | 'cancel',
-    reason?: string,
-): Promise<RentalAgreementVehicleLink> =>
-    (await apiClient.patch<ApiResource<RentalAgreementVehicleLink>>(
-        `${endpoint}/agreement-vehicle-links/${linkId}/${status}`,
-        { reason },
-    )).data.data;
+) =>
+    apiClient
+        .get<ApiCollection<T>>(`${base}/${path}`, { params, signal })
+        .then((response) => response.data);
+const resource = <T>(path: string, signal?: AbortSignal) =>
+    apiClient
+        .get<ApiResource<T>>(`${base}/${path}`, { signal })
+        .then((response) => response.data.data);
+const post = <T>(path: string, payload: RentalPayload = {}) =>
+    apiClient
+        .post<ApiResource<T>>(`${base}/${path}`, payload)
+        .then((response) => response.data.data);
+const put = <T>(path: string, payload: RentalPayload) =>
+    apiClient
+        .put<ApiResource<T>>(`${base}/${path}`, payload)
+        .then((response) => response.data.data);
+const patch = <T>(path: string, payload: RentalPayload = {}) =>
+    apiClient
+        .patch<ApiResource<T>>(`${base}/${path}`, payload)
+        .then((response) => response.data.data);
 
-export const listRentalExpenses = async (agreementId: number, signal?: AbortSignal): Promise<RentalExpense[]> =>
-    (await apiClient.get<ApiResource<RentalExpense[]>>(`${endpoint}/agreements/${agreementId}/expenses`, { signal })).data.data;
-export const createRentalExpense = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalExpense> =>
-    (await apiClient.post<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses`, payload)).data.data;
-export const updateRentalExpense = async (agreementId: number, expenseId: number, payload: Record<string, unknown>): Promise<RentalExpense> =>
-    (await apiClient.put<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}`, payload)).data.data;
-export const deleteRentalExpense = async (agreementId: number, expenseId: number): Promise<void> => {
-    await apiClient.delete(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}`);
-};
-export const changeRentalExpenseStatus = async (agreementId: number, expenseId: number, status: 'submit' | 'approve' | 'reject'): Promise<RentalExpense> =>
-    (await apiClient.patch<ApiResource<RentalExpense>>(`${endpoint}/agreements/${agreementId}/expenses/${expenseId}/${status}`)).data.data;
+export const getRentalMetadata = (signal?: AbortSignal) =>
+    resource<RentalMetadata>("metadata", signal);
+export const getRentalDashboard = (signal?: AbortSignal) =>
+    resource<Record<string, number>>("dashboard", signal);
+export const listAvailableRentalVehicles = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalVehicle>("vehicles/available", params, signal);
 
-export const listRentalCharges = async (agreementId: number, signal?: AbortSignal): Promise<RentalCharge[]> =>
-    (await apiClient.get<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges`, { signal })).data.data;
-export const previewRentalCharges = async (agreementId: number): Promise<RentalCharge[]> =>
-    (await apiClient.post<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges/preview`)).data.data;
-export const generateRentalCharges = async (agreementId: number, replace = false): Promise<RentalCharge[]> =>
-    (await apiClient.post<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges/generate`, { replace })).data.data;
-export const approveRentalCharges = async (agreementId: number): Promise<RentalCharge[]> =>
-    (await apiClient.patch<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/charges/approve`)).data.data;
-export const listRentalInvoiceCharges = async (agreementId: number, signal?: AbortSignal): Promise<RentalCharge[]> =>
-    (await apiClient.get<ApiResource<RentalCharge[]>>(`${endpoint}/agreements/${agreementId}/invoice-charges`, { signal })).data.data;
-export const previewRentalInvoice = async (agreementId: number, payload: Record<string, unknown>): Promise<RentalInvoicePreview> =>
-    (await apiClient.post<ApiResource<RentalInvoicePreview>>(`${endpoint}/agreements/${agreementId}/invoices/preview`, payload)).data.data;
-export const createRentalInvoice = async (agreementId: number, payload: Record<string, unknown>): Promise<{ id: number; invoice_number: string; grand_total: string }> =>
-    (await apiClient.post<ApiResource<{ id: number; invoice_number: string; grand_total: string }>>(`${endpoint}/agreements/${agreementId}/invoices`, payload)).data.data;
-export const prepareRentalPayment = async (agreementId: number, payload: Record<string, unknown>): Promise<Record<string, unknown>> =>
-    (await apiClient.post<ApiResource<Record<string, unknown>>>(`${endpoint}/agreements/${agreementId}/payments/prepare`, payload)).data.data;
-export const createRentalPayment = async (agreementId: number, payload: Record<string, unknown>): Promise<{ id: number; payment_number: string; total_amount: string }> =>
-    (await apiClient.post<ApiResource<{ id: number; payment_number: string; total_amount: string }>>(`${endpoint}/agreements/${agreementId}/payments`, payload)).data.data;
+export const listRentalReservations = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalReservation>("reservations", params, signal);
+export const getRentalReservation = (id: number, signal?: AbortSignal) =>
+    resource<RentalReservation>(`reservations/${id}`, signal);
+export const createRentalReservation = (payload: RentalPayload) =>
+    post<RentalReservation>("reservations", payload);
+export const updateRentalReservation = (id: number, payload: RentalPayload) =>
+    put<RentalReservation>(`reservations/${id}`, payload);
+export const transitionRentalReservation = (
+    id: number,
+    status: string,
+    reason?: string,
+) =>
+    patch<RentalReservation>(`reservations/${id}/transition`, {
+        status,
+        reason,
+    });
+
+export const listRentalAgreements = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalAgreement>("agreements", params, signal);
+export const getRentalAgreement = (id: number, signal?: AbortSignal) =>
+    resource<RentalAgreement>(`agreements/${id}`, signal);
+export const createRentalAgreement = (payload: RentalPayload) =>
+    post<RentalAgreement>("agreements", payload);
+export const updateRentalAgreement = (id: number, payload: RentalPayload) =>
+    put<RentalAgreement>(`agreements/${id}`, payload);
+export const transitionRentalAgreement = (
+    id: number,
+    status: string,
+    reason?: string,
+) => patch<RentalAgreement>(`agreements/${id}/transition`, { status, reason });
+export const createRentalRateVersion = (
+    agreementId: number,
+    payload: RentalPayload,
+) => post(`agreements/${agreementId}/rate-versions`, payload);
+export const activateRentalRateVersion = (versionId: number) =>
+    patch(`rate-versions/${versionId}/activate`);
+
+export const listRentalAllocations = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalAllocation>("allocations", params, signal);
+export const getRentalAllocation = (id: number, signal?: AbortSignal) =>
+    resource<RentalAllocation>(`allocations/${id}`, signal);
+export const createRentalAllocation = (
+    agreementId: number,
+    payload: RentalPayload,
+) => post<RentalAllocation>(`agreements/${agreementId}/allocations`, payload);
+export const assignRentalDriver = (id: number, payload: RentalPayload) =>
+    post<RentalAllocation>(`allocations/${id}/drivers`, payload);
+
+export const listRentalCustodyEvents = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalCustodyEvent>("custody-events", params, signal);
+export const createRentalCustodyEvent = (
+    allocationId: number,
+    payload: RentalPayload,
+) =>
+    post<RentalCustodyEvent>(
+        `allocations/${allocationId}/custody-events`,
+        payload,
+    );
+export const confirmRentalCustodyEvent = (id: number) =>
+    patch<RentalCustodyEvent>(`custody-events/${id}/confirm`);
+export const reverseRentalCustodyEvent = (id: number, reason: string) =>
+    patch<RentalCustodyEvent>(`custody-events/${id}/reverse`, {
+        status: "reversed",
+        reason,
+    });
+export const replaceRentalVehicle = (
+    allocationId: number,
+    payload: RentalPayload,
+) => post(`allocations/${allocationId}/replacement`, payload);
+
+export const listRentalUsageLogs = (params: ListParams, signal?: AbortSignal) =>
+    collection<RentalUsageLog>("usage-logs", params, signal);
+export const createRentalUsageLog = (
+    allocationId: number,
+    payload: RentalPayload,
+) => post<RentalUsageLog>(`allocations/${allocationId}/usage-logs`, payload);
+export const transitionRentalUsageLog = (
+    id: number,
+    status: string,
+    reason?: string,
+) => patch<RentalUsageLog>(`usage-logs/${id}/transition`, { status, reason });
+
+export const listRentalExpenses = (params: ListParams, signal?: AbortSignal) =>
+    collection<RentalExpense>("expenses", params, signal);
+export const createRentalExpense = (payload: RentalPayload) =>
+    post<RentalExpense>("expenses", payload);
+export const transitionRentalExpense = (
+    id: number,
+    status: string,
+    reason?: string,
+) => patch<RentalExpense>(`expenses/${id}/transition`, { status, reason });
+
+export const listRentalCalculationRuns = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<RentalCalculationRun>("calculation-runs", params, signal);
+export const calculateRentalAgreement = (
+    agreementId: number,
+    payload: RentalPayload,
+) => post<RentalCalculationRun>(`agreements/${agreementId}/calculate`, payload);
+export const transitionRentalCalculationRun = (
+    id: number,
+    status: string,
+    reason?: string,
+) =>
+    patch<RentalCalculationRun>(`calculation-runs/${id}/transition`, {
+        status,
+        reason,
+    });
+export const createRentalInvoice = (id: number, payload: RentalPayload) =>
+    post<{ id: number; invoice_number: string; status: string }>(
+        `calculation-runs/${id}/invoice`,
+        payload,
+    );
+
+export const listRentalDeposits = (params: ListParams, signal?: AbortSignal) =>
+    collection<RentalDeposit>("deposits", params, signal);
+export const receiveRentalDeposit = (id: number, payload: RentalPayload) =>
+    post<RentalDeposit>(`deposits/${id}/receive`, payload);
+export const applyRentalDeposit = (id: number, payload: RentalPayload) =>
+    post<RentalDeposit>(`deposits/${id}/apply`, payload);
+export const refundRentalDeposit = (id: number, payload: RentalPayload) =>
+    post<RentalDeposit>(`deposits/${id}/refund`, payload);
+export const forfeitRentalDeposit = (id: number, payload: RentalPayload) =>
+    post<RentalDeposit>(`deposits/${id}/forfeit`, payload);
+
+export const listVehicleFinanceAgreements = (
+    params: ListParams,
+    signal?: AbortSignal,
+) => collection<VehicleFinanceAgreement>("finance-agreements", params, signal);
+export const createVehicleFinanceAgreement = (payload: RentalPayload) =>
+    post<VehicleFinanceAgreement>("finance-agreements", payload);
+export const activateVehicleFinanceAgreement = (id: number) =>
+    patch<VehicleFinanceAgreement>(`finance-agreements/${id}/activate`);
+export const createVehicleFinancePayable = (
+    installmentId: number,
+    payload: RentalPayload,
+) => post(`finance-installments/${installmentId}/payable`, payload);

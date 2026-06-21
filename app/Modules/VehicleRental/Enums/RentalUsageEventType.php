@@ -6,18 +6,13 @@ namespace Modules\VehicleRental\Enums;
 
 enum RentalUsageEventType: string
 {
-    case ExtraHour = 'extra_hour';
-    case ExtraKm = 'extra_km';
-    case Overtime = 'overtime';
-    case DoubleOvertime = 'double_overtime';
-    case NightShift = 'night_shift';
-    case Weekend = 'weekend';
-    case Holiday = 'holiday';
-    case DayOut = 'day_out';
-    case NightOut = 'night_out';
-    case Driver = 'driver';
-    case Outstation = 'outstation';
+    case Parking = 'parking';
+    case Toll = 'toll';
     case Waiting = 'waiting';
+    case Outstation = 'outstation';
     case Pass = 'pass';
+    case Fuel = 'fuel';
+    case Repair = 'repair';
+    case Damage = 'damage';
     case Other = 'other';
 }

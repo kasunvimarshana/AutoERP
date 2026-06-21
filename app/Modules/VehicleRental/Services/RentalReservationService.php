@@ -9,18 +9,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Customer\Enums\CustomerStatus;
-use Modules\Customer\Models\Customer;
-use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
-use Modules\Supplier\Enums\SupplierStatus;
-use Modules\Supplier\Models\Supplier;
-use Modules\VehicleRental\DTOs\RentalReservationData;
-use Modules\VehicleRental\Enums\RentalAgreementDirection;
-use Modules\VehicleRental\Enums\RentalPartyType;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\RentalReservation;
-use Modules\VehicleRental\Models\RentalStatusHistory;
-use RuntimeException;
 
 final class RentalReservationService
 {
@@ -35,245 +25,168 @@ final class RentalReservationService
     ];
 
     public function __construct(
-        private readonly GenerateSequenceNumberService $sequences,
+        private readonly RentalNumberService $numbers,
         private readonly RentalAvailabilityService $availability,
+        private readonly RentalReferenceValidator $references,
+        private readonly RentalStatusHistoryService $history,
     ) {}
 
-    public function create(RentalReservationData $data): RentalReservation
+    public function create(array $data, int $tenantId, ?int $organizationUnitId, ?int $userId): RentalReservation
     {
-        return DB::transaction(function () use ($data): RentalReservation {
-            $this->validate($data);
-            if ($data->vehicleId !== null) {
-                $this->availability->assertAvailable(
-                    $data->tenantId,
-                    $data->organizationUnitId,
-                    $data->vehicleId,
-                    $data->startAt,
-                    $data->expectedEndAt,
-                    direction: $data->direction,
+        return DB::transaction(function () use ($data, $tenantId, $organizationUnitId, $userId): RentalReservation {
+            $this->validate($data, $tenantId, $organizationUnitId);
+            if (! empty($data['requested_vehicle_id'])) {
+                $this->availability->assertVehicle(
+                    $tenantId,
+                    $organizationUnitId,
+                    (int) $data['requested_vehicle_id'],
+                    (string) $data['requested_start_at'],
+                    (string) $data['requested_end_at'],
                 );
             }
 
             $reservation = RentalReservation::query()->create([
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'reservation_number' => $data->reservationNumber ?? $this->nextNumber($data),
-                'direction' => $data->direction->value,
-                'party_type' => $data->partyType->value,
-                'party_id' => $data->partyId,
-                'rental_type' => $data->rentalType->value,
-                'vehicle_id' => $data->vehicleId,
-                'start_at' => $data->startAt,
-                'expected_end_at' => $data->expectedEndAt,
-                'currency_id' => $data->currencyId,
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'reservation_number' => $data['reservation_number'] ?? $this->numbers->next($tenantId, $organizationUnitId, 'vehicle_rental_reservation', 'RR-'),
+                'customer_id' => $data['customer_id'],
+                'requested_vehicle_id' => $data['requested_vehicle_id'] ?? null,
+                'requested_vehicle_category_id' => $data['requested_vehicle_category_id'] ?? null,
+                'rental_mode' => $data['rental_mode'],
+                'billing_cycle' => $data['billing_cycle'],
+                'requested_start_at' => $data['requested_start_at'],
+                'requested_end_at' => $data['requested_end_at'],
+                'currency_id' => $data['currency_id'],
+                'estimated_amount' => $data['estimated_amount'] ?? '0.000000',
+                'estimated_deposit_amount' => $data['estimated_deposit_amount'] ?? '0.000000',
                 'status' => RentalReservationStatus::Draft->value,
-                'remarks' => $data->remarks,
-                'created_by' => $data->createdBy,
+                'source' => $data['source'] ?? null,
+                'remarks' => $data['remarks'] ?? null,
+                'created_by' => $userId,
+                'updated_by' => $userId,
             ]);
-            $this->recordStatus($reservation, null, RentalReservationStatus::Draft, $data->createdBy);
 
-            return $reservation->load(['customer', 'supplier', 'vehicle.make', 'vehicle.model']);
+            $this->history->record($reservation, null, RentalReservationStatus::Draft->value, $userId);
+
+            return $reservation->load($this->relations());
         });
     }
 
-    public function update(RentalReservation $reservation, RentalReservationData $data): RentalReservation
+    public function update(RentalReservation $reservation, array $data, ?int $userId): RentalReservation
     {
-        return DB::transaction(function () use ($reservation, $data): RentalReservation {
-            $reservation = RentalReservation::query()
-                ->forContext($data->tenantId, $data->organizationUnitId)
-                ->lockForUpdate()
-                ->findOrFail($reservation->getKey());
-            if (! in_array($reservation->status, [
-                RentalReservationStatus::Draft,
-                RentalReservationStatus::Pending,
-            ], true)) {
+        return DB::transaction(function () use ($reservation, $data, $userId): RentalReservation {
+            $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            if (! in_array($reservation->status, [RentalReservationStatus::Draft, RentalReservationStatus::Pending], true)) {
                 throw new InvalidArgumentException('Only draft or pending reservations can be edited.');
             }
-            $this->validate($data);
-            if ($data->vehicleId !== null) {
-                $this->availability->assertAvailable(
-                    $data->tenantId,
-                    $data->organizationUnitId,
-                    $data->vehicleId,
-                    $data->startAt,
-                    $data->expectedEndAt,
-                    excludeReservationId: (int) $reservation->getKey(),
-                    direction: $data->direction,
-                );
-            }
 
-            $reservation->fill([
-                'direction' => $data->direction->value,
-                'party_type' => $data->partyType->value,
-                'party_id' => $data->partyId,
-                'rental_type' => $data->rentalType->value,
-                'vehicle_id' => $data->vehicleId,
-                'start_at' => $data->startAt,
-                'expected_end_at' => $data->expectedEndAt,
-                'currency_id' => $data->currencyId,
-                'remarks' => $data->remarks,
-                'updated_by' => $data->createdBy,
-            ])->save();
-
-            return $reservation->refresh()->load(['customer', 'supplier', 'vehicle.make', 'vehicle.model']);
-        });
-    }
-
-    public function changeStatus(
-        RentalReservation $reservation,
-        RentalReservationStatus $status,
-        ?int $changedBy = null,
-        ?string $reason = null,
-    ): RentalReservation {
-        return DB::transaction(function () use ($reservation, $status, $changedBy, $reason): RentalReservation {
-            $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
-            $old = $reservation->status;
-            if ($old === $status) {
-                return $reservation;
-            }
-            if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
-                throw new InvalidArgumentException(
-                    "Invalid rental reservation status transition from {$old->value} to {$status->value}.",
-                );
-            }
-            if ($status === RentalReservationStatus::Confirmed && $reservation->vehicle_id !== null) {
-                $this->availability->assertAvailable(
+            $merged = array_merge($reservation->toArray(), $data);
+            $this->validate($merged, (int) $reservation->tenant_id, $reservation->organization_unit_id);
+            if (! empty($merged['requested_vehicle_id'])) {
+                $this->availability->assertVehicle(
                     (int) $reservation->tenant_id,
                     $reservation->organization_unit_id,
-                    (int) $reservation->vehicle_id,
-                    $reservation->start_at->toDateTimeString(),
-                    $reservation->expected_end_at->toDateTimeString(),
+                    (int) $merged['requested_vehicle_id'],
+                    (string) $merged['requested_start_at'],
+                    (string) $merged['requested_end_at'],
                     excludeReservationId: (int) $reservation->getKey(),
-                    direction: $reservation->direction,
                 );
             }
-            $reservation->forceFill(['status' => $status->value, 'updated_by' => $changedBy])->save();
-            $this->recordStatus($reservation, $old, $status, $changedBy, $reason);
 
-            return $reservation->refresh();
+            $reservation->fill(array_intersect_key($data, array_flip([
+                'customer_id', 'requested_vehicle_id', 'requested_vehicle_category_id', 'rental_mode', 'billing_cycle',
+                'requested_start_at', 'requested_end_at', 'currency_id', 'estimated_amount',
+                'estimated_deposit_amount', 'source', 'remarks',
+            ])));
+            $reservation->row_version = ((int) $reservation->row_version) + 1;
+            $reservation->updated_by = $userId;
+            $reservation->save();
+
+            return $reservation->refresh()->load($this->relations());
         });
     }
 
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    public function paginate(
-        int $tenantId,
-        ?int $organizationUnitId,
-        array $filters,
-        int $perPage,
-    ): LengthAwarePaginator {
-        $query = RentalReservation::query()
-            ->forContext($tenantId, $organizationUnitId)
-            ->with(['customer', 'supplier', 'vehicle.make', 'vehicle.model']);
+    public function transition(RentalReservation $reservation, RentalReservationStatus $to, ?int $userId = null, ?string $reason = null): RentalReservation
+    {
+        return DB::transaction(function () use ($reservation, $to, $userId, $reason): RentalReservation {
+            $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            $from = $reservation->status;
+            if ($from === $to) {
+                return $reservation->load($this->relations());
+            }
+            if (! in_array($to->value, self::TRANSITIONS[$from->value] ?? [], true)) {
+                throw new InvalidArgumentException("Invalid reservation transition from {$from->value} to {$to->value}.");
+            }
+            if ($to === RentalReservationStatus::Confirmed && $reservation->requested_vehicle_id !== null) {
+                $this->availability->assertVehicle(
+                    (int) $reservation->tenant_id,
+                    $reservation->organization_unit_id,
+                    (int) $reservation->requested_vehicle_id,
+                    $reservation->requested_start_at->toDateTimeString(),
+                    $reservation->requested_end_at->toDateTimeString(),
+                    excludeReservationId: (int) $reservation->getKey(),
+                );
+            }
+
+            $reservation->status = $to;
+            $reservation->confirmed_by = $to === RentalReservationStatus::Confirmed ? $userId : $reservation->confirmed_by;
+            $reservation->confirmed_at = $to === RentalReservationStatus::Confirmed ? now() : $reservation->confirmed_at;
+            $reservation->cancelled_by = $to === RentalReservationStatus::Cancelled ? $userId : $reservation->cancelled_by;
+            $reservation->cancelled_at = $to === RentalReservationStatus::Cancelled ? now() : $reservation->cancelled_at;
+            $reservation->updated_by = $userId;
+            $reservation->save();
+            $this->history->record($reservation, $from->value, $to->value, $userId, $reason);
+
+            return $reservation->refresh()->load($this->relations());
+        });
+    }
+
+    public function paginate(int $tenantId, ?int $organizationUnitId, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = RentalReservation::query()->forContext($tenantId, $organizationUnitId)->with($this->relations());
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
-            $query->where(function (Builder $scope) use ($search): void {
-                $scope->where('reservation_number', 'like', "%{$search}%")
-                    ->orWhereHas('vehicle', fn (Builder $vehicle) => $vehicle
-                        ->where('vehicle_number', 'like', "%{$search}%")
-                        ->orWhere('registration_number', 'like', "%{$search}%"));
-            });
+            $query->where(fn (Builder $scope) => $scope
+                ->where('reservation_number', 'like', "%{$search}%")
+                ->orWhereHas('customer', fn (Builder $customer) => $customer->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('requestedVehicle', fn (Builder $vehicle) => $vehicle
+                    ->where('vehicle_number', 'like', "%{$search}%")
+                    ->orWhere('registration_number', 'like', "%{$search}%")));
         }
-        foreach (['status', 'direction', 'party_type', 'party_id', 'vehicle_id'] as $filter) {
-            if (isset($filters[$filter]) && $filters[$filter] !== '') {
-                $query->where($filter, $filters[$filter]);
+        foreach (['status', 'customer_id', 'requested_vehicle_id', 'requested_vehicle_category_id'] as $key) {
+            if (isset($filters[$key]) && $filters[$key] !== '') {
+                $query->where($key, $filters[$key]);
             }
         }
         if (! empty($filters['date_from'])) {
-            $query->whereDate('start_at', '>=', $filters['date_from']);
+            $query->whereDate('requested_start_at', '>=', $filters['date_from']);
         }
         if (! empty($filters['date_to'])) {
-            $query->whereDate('start_at', '<=', $filters['date_to']);
+            $query->whereDate('requested_start_at', '<=', $filters['date_to']);
         }
 
-        return $query->latest('start_at')->latest('id')->paginate($perPage);
+        return $query->latest('requested_start_at')->latest('id')->paginate($perPage);
     }
 
-    private function validate(RentalReservationData $data): void
+    public function relations(): array
     {
-        $start = CarbonImmutable::parse($data->startAt);
-        $end = CarbonImmutable::parse($data->expectedEndAt);
-        if ($end->lessThanOrEqualTo($start)) {
-            throw new InvalidArgumentException('Reservation end date and time must be after the start date and time.');
-        }
-        $this->party($data->tenantId, $data->organizationUnitId, $data->direction, $data->partyType, $data->partyId);
+        return ['customer', 'requestedVehicle.make', 'requestedVehicle.model', 'requestedVehicle.category', 'requestedVehicleCategory', 'currency', 'agreement'];
     }
 
-    private function party(
-        int $tenantId,
-        ?int $organizationUnitId,
-        RentalAgreementDirection $direction,
-        RentalPartyType $partyType,
-        int $partyId,
-    ): void {
-        if ($direction === RentalAgreementDirection::Outbound && $partyType !== RentalPartyType::Customer) {
-            throw new InvalidArgumentException('Outbound rentals require a customer party.');
-        }
-        if ($direction === RentalAgreementDirection::Inbound && ! in_array($partyType, [
-            RentalPartyType::Supplier,
-            RentalPartyType::Owner,
-        ], true)) {
-            throw new InvalidArgumentException('Inbound hire-in agreements require a supplier or owner party.');
-        }
-
-        if ($partyType === RentalPartyType::Customer) {
-            $party = Customer::query()->where('tenant_id', $tenantId)
-                ->where(fn (Builder $query) => $query->whereNull('organization_unit_id')
-                    ->when($organizationUnitId !== null, fn (Builder $inner) => $inner->orWhere('organization_unit_id', $organizationUnitId)))
-                ->findOrFail($partyId);
-            if ($party->status !== CustomerStatus::Active) {
-                throw new InvalidArgumentException('Only active customers can be used for rental reservations.');
-            }
-
-            return;
-        }
-
-        $party = Supplier::query()->where('tenant_id', $tenantId)
-            ->where(fn (Builder $query) => $query->whereNull('organization_unit_id')
-                ->when($organizationUnitId !== null, fn (Builder $inner) => $inner->orWhere('organization_unit_id', $organizationUnitId)))
-            ->findOrFail($partyId);
-        if ($party->status !== SupplierStatus::Active) {
-            throw new InvalidArgumentException('Only active suppliers or owners can be used for hire-in reservations.');
-        }
-    }
-
-    private function nextNumber(RentalReservationData $data): string
+    private function validate(array $data, int $tenantId, ?int $organizationUnitId): void
     {
-        $result = $this->sequences->execute([
-            'tenant_id' => $data->tenantId,
-            'organization_unit_id' => $data->organizationUnitId,
-            'document_type' => 'rental_reservation',
-            'period_type' => 'yearly',
-            'at_date' => CarbonImmutable::parse($data->startAt)->toDateString(),
-            'prefix' => 'RRES-{PERIOD}-',
-            'padding' => 6,
-        ]);
-        if ($result->isFailure()) {
-            throw new RuntimeException($result->errorOrFail()->message);
+        $start = CarbonImmutable::parse((string) $data['requested_start_at']);
+        $end = CarbonImmutable::parse((string) $data['requested_end_at']);
+        if (! $end->greaterThan($start)) {
+            throw new InvalidArgumentException('Reservation end must be after its start.');
         }
 
-        return (string) $result->valueOrFail()['generated_number'];
-    }
-
-    private function recordStatus(
-        RentalReservation $reservation,
-        ?RentalReservationStatus $old,
-        RentalReservationStatus $new,
-        ?int $changedBy,
-        ?string $reason = null,
-    ): void {
-        RentalStatusHistory::query()->create([
-            'tenant_id' => $reservation->tenant_id,
-            'organization_unit_id' => $reservation->organization_unit_id,
-            'reservation_id' => $reservation->getKey(),
-            'entity_type' => 'reservation',
-            'subject_id' => $reservation->getKey(),
-            'old_status' => $old?->value,
-            'new_status' => $new->value,
-            'reason' => $reason,
-            'changed_by' => $changedBy,
-            'changed_at' => now(),
-        ]);
+        $this->references->customer((int) $data['customer_id'], $tenantId, $organizationUnitId);
+        $this->references->currency((int) $data['currency_id']);
+        $this->references->vehicleCategory(
+            isset($data['requested_vehicle_category_id']) ? (int) $data['requested_vehicle_category_id'] : null,
+            $tenantId,
+            $organizationUnitId,
+        );
     }
 }

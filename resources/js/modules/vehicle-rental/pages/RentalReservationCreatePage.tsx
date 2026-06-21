@@ -1,91 +1,195 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
-import { ContentHeader } from '@/shared/components/ContentHeader';
-import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { Input } from '@/shared/components/Input';
-import { Panel } from '@/shared/components/Panel';
-import { Select } from '@/shared/components/Select';
-import { Textarea } from '@/shared/components/Textarea';
-import type { NamedResource } from '@/shared/types/common';
-import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
-import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
-import { RentalPartySelect } from '../components/RentalPartySelect';
-import { createRentalReservation } from '../vehicleRentalApi';
-import type { RentalDirection, RentalPartyType, RentalType } from '../vehicleRentalTypes';
-
-const localDateTime = (days = 0) => {
-    const date = new Date(Date.now() + days * 86_400_000);
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return date.toISOString().slice(0, 16);
-};
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
+import type { CustomerSummary } from "@/modules/customer/customerTypes";
+import { VehicleLookupSelect } from "@/modules/vehicle/components/VehicleLookupSelect";
+import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
+import { Button } from "@/shared/components/Button";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { Input } from "@/shared/components/Input";
+import { Panel } from "@/shared/components/Panel";
+import { Select } from "@/shared/components/Select";
+import { Textarea } from "@/shared/components/Textarea";
+import { RentalPage } from "../components/RentalPage";
+import { createRentalReservation } from "../vehicleRentalApi";
 
 export default function RentalReservationCreatePage() {
     const navigate = useNavigate();
-    const [party, setParty] = useState<NamedResource | null>(null);
+    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [form, setForm] = useState({
-        direction: 'outbound' as RentalDirection,
-        party_type: 'customer' as RentalPartyType,
-        rental_type: 'daily' as RentalType,
-        start_at: localDateTime(),
-        expected_end_at: localDateTime(1),
-        remarks: '',
+        rental_mode: "with_driver",
+        billing_cycle: "monthly",
+        requested_start_at: "",
+        requested_end_at: "",
+        currency_id: "",
+        estimated_amount: "0",
+        estimated_deposit_amount: "0",
+        source: "walk_in",
+        remarks: "",
     });
-    const [busy, setBusy] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-
+    const submit = async (event: FormEvent) => {
+        event.preventDefault();
+        setSaving(true);
+        setError(null);
+        try {
+            const row = await createRentalReservation({
+                ...form,
+                customer_id: customer?.id,
+                requested_vehicle_id: vehicle?.id || null,
+                currency_id: Number(form.currency_id),
+                estimated_amount: form.estimated_amount,
+                estimated_deposit_amount: form.estimated_deposit_amount,
+            });
+            navigate(`/vehicle-rental/reservations/${row.id}`);
+        } catch (e) {
+            setError(toApiError(e));
+        } finally {
+            setSaving(false);
+        }
+    };
     return (
-        <>
-            <ContentHeader title="New rental reservation" description="Reserve a period and optional vehicle before creating the agreement." />
-            <form className="space-y-5" onSubmit={async (event) => {
-                event.preventDefault();
-                if (busy) return;
-                setBusy(true);
-                setError(null);
-                try {
-                    await createRentalReservation({
-                        ...form,
-                        party_id: party?.id,
-                        vehicle_id: vehicle?.id,
-                        remarks: form.remarks || undefined,
-                    });
-                    navigate('/vehicle-rental/reservations');
-                } catch (requestError) {
-                    setError(toApiError(requestError));
-                } finally {
-                    setBusy(false);
-                }
-            }}>
-                <ErrorAlert error={error} />
-                <Panel title="Reservation">
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <Select label="Direction" value={form.direction} options={[
-                            { value: 'outbound', label: 'Outbound rental' },
-                            { value: 'inbound', label: 'Inbound hire-in' },
-                        ]} onChange={(event) => {
-                            const direction = event.target.value as RentalDirection;
-                            setParty(null);
-                            setForm({ ...form, direction, party_type: direction === 'outbound' ? 'customer' : 'supplier' });
-                        }} />
-                        {form.direction === 'inbound' && <Select label="Party type" value={form.party_type} options={[
-                            { value: 'supplier', label: 'Supplier' },
-                            { value: 'owner', label: 'Owner' },
-                        ]} onChange={(event) => { setParty(null); setForm({ ...form, party_type: event.target.value as RentalPartyType }); }} />}
-                        <RentalPartySelect partyType={form.party_type} value={party} onChange={setParty} error={fieldError(error, 'party_id')} />
-                        <Select label="Rental type" value={form.rental_type} options={['hourly', 'daily', 'weekly', 'monthly', 'lease', 'subscription', 'with_driver', 'without_driver'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => setForm({ ...form, rental_type: event.target.value as RentalType })} />
-                        <VehicleLookupSelect value={vehicle} onChange={setVehicle} error={fieldError(error, 'vehicle_id')} />
-                        <Input label="Start" type="datetime-local" value={form.start_at} error={fieldError(error, 'start_at')} onChange={(event) => setForm({ ...form, start_at: event.target.value })} />
-                        <Input label="Expected end" type="datetime-local" value={form.expected_end_at} error={fieldError(error, 'expected_end_at')} onChange={(event) => setForm({ ...form, expected_end_at: event.target.value })} />
-                        <div className="md:col-span-2 xl:col-span-3"><Textarea label="Remarks" value={form.remarks} onChange={(event) => setForm({ ...form, remarks: event.target.value })} /></div>
+        <RentalPage>
+            <ContentHeader
+                title="New rental reservation"
+                description="Record the requested period, rental mode, vehicle preference and estimated deposit."
+            />
+            <ErrorAlert error={error} />
+            <form onSubmit={submit}>
+                <Panel>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <CustomerLookupSelect
+                            value={customer}
+                            onChange={setCustomer}
+                        />
+                        <VehicleLookupSelect
+                            value={vehicle}
+                            onChange={setVehicle}
+                        />
+                        <Select
+                            label="Rental mode"
+                            value={form.rental_mode}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    rental_mode: e.target.value,
+                                })
+                            }
+                            options={[
+                                { value: "with_driver", label: "With driver" },
+                                { value: "self_drive", label: "Self-drive" },
+                                {
+                                    value: "vehicle_only",
+                                    label: "Vehicle only",
+                                },
+                            ]}
+                        />
+                        <Select
+                            label="Billing cycle"
+                            value={form.billing_cycle}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    billing_cycle: e.target.value,
+                                })
+                            }
+                            options={[
+                                "hourly",
+                                "daily",
+                                "weekly",
+                                "monthly",
+                                "per_hire",
+                            ].map((value) => ({
+                                value,
+                                label: value.replaceAll("_", " "),
+                            }))}
+                        />
+                        <Input
+                            label="Start"
+                            type="datetime-local"
+                            required
+                            value={form.requested_start_at}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    requested_start_at: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Expected end"
+                            type="datetime-local"
+                            required
+                            value={form.requested_end_at}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    requested_end_at: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Currency ID"
+                            type="number"
+                            min="1"
+                            required
+                            value={form.currency_id}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    currency_id: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Estimated amount"
+                            type="number"
+                            step="0.000001"
+                            min="0"
+                            value={form.estimated_amount}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    estimated_amount: e.target.value,
+                                })
+                            }
+                        />
+                        <Input
+                            label="Estimated deposit"
+                            type="number"
+                            step="0.000001"
+                            min="0"
+                            value={form.estimated_deposit_amount}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    estimated_deposit_amount: e.target.value,
+                                })
+                            }
+                        />
+                        <Textarea
+                            label="Remarks"
+                            value={form.remarks}
+                            onChange={(e) =>
+                                setForm({ ...form, remarks: e.target.value })
+                            }
+                        />
+                    </div>
+                    <div className="mt-5 flex justify-end">
+                        <Button
+                            type="submit"
+                            loading={saving}
+                            disabled={!customer}
+                        >
+                            Create reservation
+                        </Button>
                     </div>
                 </Panel>
-                <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                    <Button type="submit" loading={busy}>Save reservation</Button>
-                </div>
             </form>
-        </>
+        </RentalPage>
     );
 }

@@ -6,241 +6,52 @@ namespace Modules\VehicleRental\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\VehicleRental\Enums\RentalUsageEventType;
-use Modules\VehicleRental\Enums\RentalUsageLogStatus;
+use Modules\VehicleRental\Enums\RentalUsageStatus;
+use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
-use Modules\VehicleRental\Http\Requests\RentalActionRequest;
-use Modules\VehicleRental\Http\Requests\StoreRentalUsageEventRequest;
-use Modules\VehicleRental\Http\Requests\StoreRentalUsageLogRequest;
-use Modules\VehicleRental\Http\Resources\RentalUsageEventResource;
+use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
+use Modules\VehicleRental\Http\Requests\StoreRentalUsageRequest;
 use Modules\VehicleRental\Http\Resources\RentalUsageLogResource;
-use Modules\VehicleRental\Services\RentalUsageEventService;
-use Modules\VehicleRental\Services\RentalUsageLogService;
+use Modules\VehicleRental\Models\RentalUsageLog;
+use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Services\RentalUsageService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
-final class RentalUsageController extends RentalController
+final class RentalUsageController
 {
-    public function index(ListRentalRequest $request, int $agreement): AnonymousResourceCollection
+    use ScopesVehicleRentalRequests;
+
+    public function __construct(private readonly VehicleRentalAuthorizationService $authorization) {}
+
+    public function index(ListRentalRequest $request, RentalUsageService $service): AnonymousResourceCollection
     {
-        return RentalUsageLogResource::collection(
-            $this->agreement($request, $agreement)->operationalUsageLogs()
-                ->with([
-                    'vehicle.make',
-                    'vehicle.model',
-                    'driver',
-                    'events',
-                    'contexts.agreement.customer',
-                    'contexts.agreement.supplier',
-                    'contexts.rateSnapshot',
-                ])
-                ->get(),
-        );
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
+        return RentalUsageLogResource::collection($service->paginate($request->tenantId(), $request->organizationUnitId(), $request->validated(), $request->perPage()));
     }
 
-    public function store(
-        StoreRentalUsageLogRequest $request,
-        int $agreement,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-
-        return (new RentalUsageLogResource($service->create(
-            $this->agreement($request, $agreement),
-            $request->toData(),
-        )))->response()->setStatusCode(201);
+    public function store(StoreRentalUsageRequest $request, int $allocation, RentalUsageService $service): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::RECORD_USAGE);
+        $allocationModel = $this->scope(RentalVehicleAllocation::query(), $request)->findOrFail($allocation);
+        return (new RentalUsageLogResource($service->create($allocationModel, $request->validated(), $request->currentUserId())))->response()->setStatusCode(201);
     }
 
-    public function update(
-        StoreRentalUsageLogRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalUsageLogResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalUsageLogResource($service->update(
-            $this->usageLog($model, $usageLog),
-            $request->toData(),
-        ));
+    public function show(ListRentalRequest $request, int $usage, RentalUsageService $service): RentalUsageLogResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
+        return new RentalUsageLogResource($this->scope(RentalUsageLog::query(), $request)->with($service->relations())->findOrFail($usage));
     }
 
-    public function destroy(
-        ListRentalRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-        $service->delete($this->usageLog($model, $usageLog));
-
-        return response()->json(null, 204);
-    }
-
-    public function storeEvent(
-        StoreRentalUsageEventRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageEventService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-        $data = $request->toData();
-        if ($data->eventType === RentalUsageEventType::Holiday) {
-            $authorization->assert(
-                $request->currentUserId(),
-                $request->tenantId(),
-                VehicleRentalAuthorizationService::CLASSIFY_HOLIDAY,
-            );
-            if (trim((string) $data->remarks) === '') {
-                abort(422, 'Holiday usage classification requires a documented reason or calendar reference.');
-            }
-        }
-
-        return (new RentalUsageEventResource($service->create(
-            $this->usageLog($model, $usageLog),
-            $data,
-        )))->response()->setStatusCode(201);
-    }
-
-    public function updateEvent(
-        StoreRentalUsageEventRequest $request,
-        int $agreement,
-        int $usageLog,
-        int $event,
-        RentalUsageEventService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalUsageEventResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-        $log = $this->usageLog($model, $usageLog);
-
-        return new RentalUsageEventResource($service->update(
-            $log->events()->findOrFail($event),
-            $request->toData(),
-        ));
-    }
-
-    public function destroyEvent(
-        ListRentalRequest $request,
-        int $agreement,
-        int $usageLog,
-        int $event,
-        RentalUsageEventService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): JsonResponse {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-        $log = $this->usageLog($model, $usageLog);
-        $service->delete($log->events()->findOrFail($event));
-
-        return response()->json(null, 204);
-    }
-
-    public function submit(
-        RentalActionRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalUsageLogResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::RECORD_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalUsageLogResource($service->changeStatus(
-            $this->usageLog($model, $usageLog),
-            RentalUsageLogStatus::Submitted,
-            $request->currentUserId(),
-            $request->input('reason'),
-        ));
-    }
-
-    public function approve(
-        RentalActionRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalUsageLogResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::APPROVE_USAGE,
-        );
-        $mileageOverride = $request->boolean('mileage_override');
-        if ($mileageOverride) {
-            $authorization->assert(
-                $request->currentUserId(),
-                $request->tenantId(),
-                VehicleRentalAuthorizationService::OVERRIDE_MILEAGE,
-            );
-            if (trim((string) $request->input('reason')) === '') {
-                abort(422, 'A reason is required for a mileage-chain override.');
-            }
-        }
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalUsageLogResource($service->changeStatus(
-            $this->usageLog($model, $usageLog),
-            RentalUsageLogStatus::Approved,
-            $request->currentUserId(),
-            $request->input('reason'),
-            $mileageOverride,
-        ));
-    }
-
-    public function reject(
-        RentalActionRequest $request,
-        int $agreement,
-        int $usageLog,
-        RentalUsageLogService $service,
-        VehicleRentalAuthorizationService $authorization,
-    ): RentalUsageLogResource {
-        $authorization->assert(
-            $request->currentUserId(),
-            $request->tenantId(),
-            VehicleRentalAuthorizationService::APPROVE_USAGE,
-        );
-        $model = $this->agreement($request, $agreement);
-
-        return new RentalUsageLogResource($service->changeStatus(
-            $this->usageLog($model, $usageLog),
-            RentalUsageLogStatus::Rejected,
-            $request->currentUserId(),
-            $request->input('reason'),
+    public function transition(RentalTransitionRequest $request, int $usage, RentalUsageService $service): RentalUsageLogResource
+    {
+        $status = RentalUsageStatus::from((string) $request->input('status'));
+        $permission = in_array($status, [RentalUsageStatus::Approved, RentalUsageStatus::Rejected, RentalUsageStatus::Reversed], true)
+            ? VehicleRentalAuthorizationService::APPROVE_USAGE
+            : VehicleRentalAuthorizationService::RECORD_USAGE;
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), $permission);
+        return new RentalUsageLogResource($service->transition(
+            $this->scope(RentalUsageLog::query(), $request)->findOrFail($usage),
+            $status, $request->currentUserId(), $request->input('reason'),
         ));
     }
 }

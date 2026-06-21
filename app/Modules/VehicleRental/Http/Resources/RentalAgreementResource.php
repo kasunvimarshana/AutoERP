@@ -5,50 +5,44 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\VehicleRental\Enums\RentalPartyType;
 
 final class RentalAgreementResource extends RentalResource
 {
     public function toArray(Request $request): array
     {
-        $party = $this->party_type === RentalPartyType::Customer ? $this->customer : $this->supplier;
-
         return [
             'id' => (int) $this->getKey(),
             'agreement_number' => $this->agreement_number,
+            'agreement_kind' => $this->enumValue($this->agreement_kind),
             'reservation_id' => $this->reservation_id,
-            'direction' => $this->enum($this->direction),
-            'party_type' => $this->enum($this->party_type),
-            'party_id' => (int) $this->party_id,
-            'party' => $this->partySummary($party),
-            'rental_type' => $this->enum($this->rental_type),
-            'billing_cycle' => $this->enum($this->billing_cycle),
-            'billing_basis' => $this->enum($this->billing_basis),
-            'proration_rule' => $this->proration_rule,
-            'billing_timezone' => $this->billing_timezone,
-            'billing_period_days' => $this->billing_period_days,
+            'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
+            'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'agreement_date' => $this->agreement_date?->toDateString(),
-            'start_at' => $this->start_at?->toISOString(),
-            'expected_end_at' => $this->expected_end_at?->toISOString(),
-            'actual_end_at' => $this->actual_end_at?->toISOString(),
-            'currency_id' => $this->currency_id,
-            'status' => $this->enum($this->status),
-            'status_label' => str((string) $this->enum($this->status))->replace('_', ' ')->title()->toString(),
-            'terms_snapshot' => $this->terms_snapshot,
+            'executed_at' => $this->executed_at?->toISOString(),
+            'starts_at' => $this->starts_at?->toISOString(),
+            'ends_at' => $this->ends_at?->toISOString(),
+            'actual_ended_at' => $this->actual_ended_at?->toISOString(),
+            'legal_context' => $this->legal_context,
+            'rental_mode' => $this->enumValue($this->rental_mode),
+            'billing_cycle' => $this->enumValue($this->billing_cycle),
+            'billing_basis' => $this->enumValue($this->billing_basis),
+            'proration_rule' => $this->enumValue($this->proration_rule),
+            'billing_timezone' => $this->billing_timezone,
+            'payment_term_days' => $this->payment_term_days,
+            'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'name', 'symbol'])),
+            'status' => $this->enumValue($this->status),
+            'termination_reason' => $this->termination_reason,
             'remarks' => $this->remarks,
-            'rate_snapshot' => $this->whenLoaded('rateSnapshot', fn () => $this->rateSnapshot === null
-                ? null
-                : (new RentalRateSnapshotResource($this->rateSnapshot))->resolve($request)),
-            'vehicles' => $this->whenLoaded('vehicles', fn () => RentalAgreementVehicleResource::collection($this->vehicles)->resolve($request), []),
-            'usage_logs' => $this->whenLoaded('operationalUsageLogs', fn () => RentalUsageLogResource::collection($this->operationalUsageLogs)->resolve($request), []),
-            'expenses' => $this->whenLoaded('expenses', fn () => RentalExpenseResource::collection($this->expenses)->resolve($request), []),
-            'charges' => $this->whenLoaded('charges', fn () => RentalChargeResource::collection($this->charges)->resolve($request), []),
-            'vehicle_links' => [
-                ...$this->whenLoaded('inboundVehicleLinks', fn () => RentalAgreementVehicleLinkResource::collection($this->inboundVehicleLinks)->resolve($request), []),
-                ...$this->whenLoaded('outboundVehicleLinks', fn () => RentalAgreementVehicleLinkResource::collection($this->outboundVehicleLinks)->resolve($request), []),
-            ],
-            'invoice_links' => $this->whenLoaded('invoiceLinks', fn () => RentalInvoiceLinkResource::collection($this->invoiceLinks)->resolve($request), []),
-            'payment_links' => $this->whenLoaded('paymentLinks', fn () => RentalPaymentLinkResource::collection($this->paymentLinks)->resolve($request), []),
+            'terms' => $this->loadedCollection('terms', fn ($term): array => [
+                'id' => (int) $term->getKey(), 'sequence' => (int) $term->sequence,
+                'term_code' => $term->term_code, 'title' => $term->title,
+                'content' => $term->content, 'is_printable' => (bool) $term->is_printable,
+            ]),
+            'active_rate_version' => $this->whenLoaded('activeRateVersion', fn () => $this->activeRateVersion === null ? null : (new RentalRateVersionResource($this->activeRateVersion))->resolve($request)),
+            'rate_versions' => $this->whenLoaded('rateVersions', fn () => RentalRateVersionResource::collection($this->rateVersions)->resolve($request), []),
+            'allocations' => $this->whenLoaded('allocations', fn () => RentalAllocationResource::collection($this->allocations)->resolve($request), []),
+            'deposit_requirement' => $this->whenLoaded('depositRequirement', fn () => $this->depositRequirement === null ? null : (new RentalDepositRequirementResource($this->depositRequirement))->resolve($request)),
+            'approved_at' => $this->approved_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

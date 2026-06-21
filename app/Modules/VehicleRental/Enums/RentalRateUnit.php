@@ -6,10 +6,14 @@ namespace Modules\VehicleRental\Enums;
 
 enum RentalRateUnit: string
 {
+    case Fixed = 'fixed';
+    case Minute = 'minute';
     case Hour = 'hour';
     case Day = 'day';
     case Week = 'week';
     case Month = 'month';
-    case Km = 'km';
+    case Kilometre = 'km';
     case Trip = 'trip';
+    case Count = 'count';
+    case Litre = 'litre';
 }

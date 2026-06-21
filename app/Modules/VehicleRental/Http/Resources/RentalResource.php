@@ -4,48 +4,41 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Resources;
 
-use Modules\Core\Http\Resources\ModuleResource;
+use BackedEnum;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 
-abstract class RentalResource extends ModuleResource
+abstract class RentalResource extends JsonResource
 {
-    protected function enum(mixed $value): mixed
+    protected function enumValue(mixed $value): mixed
     {
-        return $value instanceof \BackedEnum ? $value->value : $value;
+        return $value instanceof BackedEnum ? $value->value : $value;
     }
 
-    protected function partySummary(mixed $party): ?array
+    protected function summary(mixed $model, array $fields): ?array
     {
-        if ($party === null) {
+        if ($model === null) {
             return null;
         }
-
-        return [
-            'id' => (int) $party->getKey(),
-            'code' => $party->code ?? $party->customer_number ?? $party->supplier_number,
-            'name' => $party->display_name ?? $party->name,
-        ];
+        $data = ['id' => (int) $model->getKey()];
+        foreach ($fields as $field) {
+            $value = $model->{$field} ?? null;
+            $data[$field] = $value instanceof BackedEnum ? $value->value : $value;
+        }
+        return $data;
     }
 
-    protected function vehicleSummary(mixed $vehicle): ?array
+    protected function decimal(mixed $value): string
     {
-        if ($vehicle === null) {
-            return null;
-        }
+        return number_format((float) ($value ?? 0), 6, '.', '');
+    }
 
-        return [
-            'id' => (int) $vehicle->getKey(),
-            'code' => $vehicle->vehicle_number,
-            'name' => $vehicle->registration_number ?? $vehicle->vehicle_number,
-            'vehicle_number' => $vehicle->vehicle_number,
-            'registration_number' => $vehicle->registration_number,
-            'odometer_reading' => (string) $vehicle->odometer_reading,
-            'status' => $this->enum($vehicle->status),
-            'make' => $vehicle->relationLoaded('make') && $vehicle->make !== null
-                ? ['id' => (int) $vehicle->make->getKey(), 'code' => $vehicle->make->code, 'name' => $vehicle->make->name]
-                : null,
-            'model' => $vehicle->relationLoaded('model') && $vehicle->model !== null
-                ? ['id' => (int) $vehicle->model->getKey(), 'code' => $vehicle->model->code, 'name' => $vehicle->model->name]
-                : null,
-        ];
+    protected function loadedCollection(string $relation, callable $mapper): array
+    {
+        if (! $this->resource->relationLoaded($relation)) {
+            return [];
+        }
+        $value = $this->resource->getRelation($relation);
+        return $value instanceof Collection ? $value->map($mapper)->values()->all() : [];
     }
 }

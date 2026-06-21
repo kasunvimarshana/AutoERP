@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
-use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
@@ -22,355 +20,237 @@ use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Invoice\Services\InvoiceCreationService;
-use Modules\VehicleRental\Enums\RentalAgreementDirection;
-use Modules\VehicleRental\Enums\RentalAgreementStatus;
-use Modules\VehicleRental\Enums\RentalChargeInvoiceStatus;
-use Modules\VehicleRental\Enums\RentalChargeStatus;
-use Modules\VehicleRental\Enums\RentalPartyType;
-use Modules\VehicleRental\Models\RentalAgreement;
-use Modules\VehicleRental\Models\RentalCharge;
-use Modules\VehicleRental\Models\RentalInvoiceLink;
+use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalCalculationStatus;
+use Modules\VehicleRental\Enums\RentalDocumentStatus;
+use Modules\VehicleRental\Models\RentalCalculationLine;
+use Modules\VehicleRental\Models\RentalCalculationRun;
 
 final class RentalInvoiceIntegrationService
 {
-    private const AGREEMENT_SOURCE = 'VehicleRentalAgreement';
-
-    private const CHARGE_SOURCE = 'RentalCharge';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
     ) {}
 
-    /**
-     * @return Collection<int, RentalCharge>
-     */
-    public function billableCharges(RentalAgreement $agreement): Collection
-    {
-        return $agreement->charges()
-            ->where('status', RentalChargeStatus::Approved->value)
-            ->whereHas('chargeRun', fn ($query) => $query
-                ->where('approval_status', 'approved')
-                ->where('calculation_status', 'calculated'))
-            ->get()
-            ->each(function (RentalCharge $charge) use ($agreement): void {
-                $invoiced = $this->invoicedQuantity(
-                    (int) $agreement->tenant_id,
-                    $agreement->organization_unit_id,
-                    (int) $charge->getKey(),
-                );
-                $remaining = $this->math->sub((string) $charge->quantity, $invoiced);
-                if ($this->math->isNegative($remaining)) {
-                    $remaining = '0.000000';
-                }
-                $charge->setAttribute('computed_invoice_status', $this->invoiceStatus($charge, $invoiced, $remaining)->value);
-                $charge->setAttribute('invoiced_quantity', $invoiced);
-                $charge->setAttribute('remaining_invoice_quantity', $remaining);
-            });
-    }
-
-    /**
-     * @param  array<int, string>  $chargeQuantities
-     */
-    public function preview(
-        RentalAgreement $agreement,
-        string $invoiceDate,
-        array $chargeQuantities = [],
-        ?string $dueDate = null,
-    ): InvoiceCalculationResult {
-        return $this->invoices->preview(
-            $this->toInvoiceData($agreement, $invoiceDate, $chargeQuantities, $dueDate),
-        );
-    }
-
-    /**
-     * @param  array<int, string>  $chargeQuantities
-     */
+    /** @param list<int>|null $lineIds */
     public function create(
-        RentalAgreement $agreement,
+        RentalCalculationRun $run,
         string $invoiceDate,
-        array $chargeQuantities = [],
-        ?string $dueDate = null,
-        ?int $currencyId = null,
-        string $exchangeRate = '1.000000',
+        ?string $dueDate,
+        InvoiceStatus $status,
+        ?array $lineIds,
+        ?int $userId,
         ?string $notes = null,
-        ?int $createdBy = null,
     ): Invoice {
-        return DB::transaction(function () use (
-            $agreement,
-            $invoiceDate,
-            $chargeQuantities,
-            $dueDate,
-            $currencyId,
-            $exchangeRate,
-            $notes,
-            $createdBy,
-        ): Invoice {
-            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
-            $chargeIds = $agreement->charges()
-                ->where('status', RentalChargeStatus::Approved->value)
+        return DB::transaction(function () use ($run, $invoiceDate, $dueDate, $status, $lineIds, $userId, $notes): Invoice {
+            $run = RentalCalculationRun::query()
+                ->with(['billingPeriod.agreement', 'lines'])
                 ->lockForUpdate()
-                ->pluck('id');
-            if ($chargeIds->isNotEmpty()) {
-                InvoiceSourceLine::query()
-                    ->where('tenant_id', $agreement->tenant_id)
-                    ->where('source_line_type', self::CHARGE_SOURCE)
-                    ->whereIn('source_line_id', $chargeIds)
-                    ->lockForUpdate()
-                    ->get();
+                ->findOrFail($run->getKey());
+            if ($run->calculation_status !== RentalCalculationStatus::Approved) {
+                throw new InvalidArgumentException('Only an approved rental calculation can create an invoice or owner payable.');
             }
-            $data = $this->toInvoiceData(
-                $agreement,
-                $invoiceDate,
-                $chargeQuantities,
-                $dueDate,
-                $currencyId,
-                $exchangeRate,
-                $notes,
-                $createdBy,
-            );
-            $invoice = $this->invoices->create($data);
 
-            foreach ($invoice->lines as $invoiceLine) {
-                if ($invoiceLine->source_line_type !== self::CHARGE_SOURCE || $invoiceLine->source_line_id === null) {
+            $agreement = $run->billingPeriod->agreement;
+            $selected = $run->lines
+                ->when($lineIds !== null && $lineIds !== [], fn ($lines) => $lines->whereIn('id', $lineIds))
+                ->values();
+            if ($selected->isEmpty()) {
+                throw new InvalidArgumentException('Select at least one remaining calculation line.');
+            }
+
+            $invoiceLines = [];
+            $sourceLines = [];
+            $adjustments = [];
+            $lineNumber = 1;
+            foreach ($selected as $line) {
+                $previouslyInvoiced = (string) InvoiceSourceLine::query()
+                    ->where('tenant_id', $run->tenant_id)
+                    ->where('source_type', 'rental_calculation_run')
+                    ->where('source_id', $run->getKey())
+                    ->where('source_line_type', 'rental_calculation_line')
+                    ->where('source_line_id', $line->getKey())
+                    ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value]))
+                    ->sum('invoiced_quantity');
+                $net = (string) $line->net_amount;
+                $isPositive = $this->math->compare($net, '0') > 0;
+                $isNegative = $this->math->compare($net, '0') < 0;
+                $negativeAdjustmentType = $agreement->agreement_kind === RentalAgreementKind::OwnerSupply
+                    ? AdjustmentType::DebitNote
+                    : AdjustmentType::CreditNote;
+                $negativeConsumed = $isNegative && $this->hasActiveAdjustment($line, $negativeAdjustmentType);
+                if (($isPositive && $this->math->compare($previouslyInvoiced, '1.000000') >= 0) || $negativeConsumed) {
                     continue;
                 }
-                $sourceLine = $invoice->sourceLines
-                    ->firstWhere('source_line_id', $invoiceLine->source_line_id);
-                $charge = RentalCharge::query()
-                    ->where('tenant_id', $agreement->tenant_id)
-                    ->where('organization_unit_id', $agreement->organization_unit_id)
-                    ->where('agreement_id', $agreement->getKey())
-                    ->findOrFail($invoiceLine->source_line_id);
-                RentalInvoiceLink::query()->create([
-                    'tenant_id' => $agreement->tenant_id,
-                    'organization_unit_id' => $agreement->organization_unit_id,
-                    'billing_period_id' => $charge->billing_period_id,
-                    'charge_run_id' => $charge->charge_run_id,
-                    'agreement_id' => $agreement->getKey(),
-                    'charge_id' => $invoiceLine->source_line_id,
-                    'invoice_id' => $invoice->getKey(),
-                    'invoice_line_id' => $invoiceLine->getKey(),
-                    'invoiced_quantity' => (string) $sourceLine?->invoiced_quantity,
-                    'invoiced_amount' => (string) $invoiceLine->line_total,
-                    'status' => 'active',
-                ]);
+
+                if ($isPositive) {
+                    $lineTotal = $this->math->add($net, (string) $line->tax_amount);
+                    $invoiceLines[] = new InvoiceLineData(
+                        lineNumber: $lineNumber++,
+                        description: (string) $line->description,
+                        quantity: '1.000000',
+                        unitPrice: $net,
+                        lineType: InvoiceLineType::Charge,
+                        taxAmount: (string) $line->tax_amount,
+                        lineTotal: $lineTotal,
+                        sourceLineType: 'rental_calculation_line',
+                        sourceLineId: (int) $line->getKey(),
+                        metadata: [
+                            'component_code' => $line->component_code->value,
+                            'measured_quantity' => (string) $line->measured_quantity,
+                            'chargeable_quantity' => (string) $line->chargeable_quantity,
+                            'unit' => $line->unit,
+                        ],
+                    );
+                    $sourceLines[] = new InvoiceSourceLineData(
+                        tenantId: (int) $run->tenant_id,
+                        sourceType: 'rental_calculation_run',
+                        sourceId: (int) $run->getKey(),
+                        sourceLineType: 'rental_calculation_line',
+                        sourceLineId: (int) $line->getKey(),
+                        sourceQuantity: '1.000000',
+                        invoicedQuantity: '1.000000',
+                        sourceUnitPrice: $net,
+                        sourceLineTotal: $lineTotal,
+                        organizationUnitId: $run->organization_unit_id,
+                        previouslyInvoicedQuantity: $previouslyInvoiced,
+                        invoicedLineTotal: $lineTotal,
+                    );
+                } elseif ($isNegative) {
+                    $adjustments[] = new InvoiceAdjustmentData(
+                        name: (string) $line->description,
+                        adjustmentType: $negativeAdjustmentType,
+                        effect: AdjustmentEffect::Decrease,
+                        amount: $this->math->sub('0', (string) $line->total_amount),
+                        sourceType: 'rental_calculation_line',
+                        sourceId: (int) $line->getKey(),
+                        calculationType: 'fixed',
+                        allocationMethod: AllocationMethod::Manual,
+                        isSystemGenerated: true,
+                        description: 'Rental source adjustment',
+                    );
+                }
+
+                if ($isPositive
+                    && $this->math->compare((string) $line->withholding_amount, '0') > 0
+                    && ! $this->hasActiveAdjustment($line, AdjustmentType::Withholding)) {
+                    $adjustments[] = new InvoiceAdjustmentData(
+                        name: 'Withholding tax — '.$line->description,
+                        adjustmentType: AdjustmentType::Withholding,
+                        effect: AdjustmentEffect::Decrease,
+                        amount: (string) $line->withholding_amount,
+                        sourceType: 'rental_calculation_line',
+                        sourceId: (int) $line->getKey(),
+                        calculationType: 'fixed',
+                        allocationMethod: AllocationMethod::Manual,
+                        isSystemGenerated: true,
+                    );
+                }
             }
-            $this->syncInvoiceStatuses($agreement);
+
+            if ($invoiceLines === []) {
+                throw new InvalidArgumentException('Selected rental calculation has no positive uninvoiced lines.');
+            }
+
+            $sourceSubtotal = $this->math->sum(array_map(fn (InvoiceLineData $line) => $this->math->mul($line->quantity, $line->unitPrice), $invoiceLines));
+            $sourceTax = $this->math->sum(array_map(fn (InvoiceLineData $line) => $line->taxAmount, $invoiceLines));
+            $adjustmentTotal = $this->math->sum(array_map(fn (InvoiceAdjustmentData $adjustment) => $adjustment->amount, $adjustments));
+            $sourceGrand = $this->math->sub($this->math->add($sourceSubtotal, $sourceTax), $adjustmentTotal);
+            if ($this->math->compare($sourceGrand, '0') < 0) {
+                throw new InvalidArgumentException('Rental deductions cannot exceed the positive payable or invoice amount.');
+            }
+
+            $direction = $agreement->agreement_kind === RentalAgreementKind::CustomerRental
+                ? InvoiceDirection::Outbound
+                : InvoiceDirection::Inbound;
+            $partyType = $agreement->agreement_kind === RentalAgreementKind::CustomerRental ? 'customer' : 'supplier';
+            $partyId = $agreement->agreement_kind === RentalAgreementKind::CustomerRental ? $agreement->customer_id : $agreement->supplier_id;
+            $invoice = $this->invoices->create(new CreateInvoiceData(
+                tenantId: (int) $run->tenant_id,
+                invoiceType: InvoiceType::Rental,
+                direction: $direction,
+                invoiceDate: $invoiceDate,
+                organizationUnitId: $run->organization_unit_id,
+                partyType: $partyType,
+                partyId: (int) $partyId,
+                dueDate: $dueDate,
+                currencyId: $run->currency_id,
+                status: $status,
+                notes: $notes ?? 'Rental calculation '.$run->billingPeriod->billing_cycle_key,
+                createdBy: $userId,
+                lines: $invoiceLines,
+                sources: [new InvoiceSourceData(
+                    tenantId: (int) $run->tenant_id,
+                    sourceType: 'rental_calculation_run',
+                    sourceId: (int) $run->getKey(),
+                    organizationUnitId: $run->organization_unit_id,
+                    sourceDocumentNumber: 'RC-'.$run->getKey().'-'.$run->run_version,
+                    sourceDocumentDate: $run->billingPeriod->period_end->toDateString(),
+                    sourceSubtotal: $sourceSubtotal,
+                    sourceAdjustmentTotal: $adjustmentTotal,
+                    sourceGrandTotal: $sourceGrand,
+                )],
+                sourceLines: $sourceLines,
+                adjustments: $adjustments,
+            ));
+
+            $uninvoiced = $run->lines->filter(fn (RentalCalculationLine $line): bool => ! $this->isConsumed($run, $line, $agreement->agreement_kind))->count();
+            $run->document_status = $uninvoiced === 0
+                ? RentalDocumentStatus::Generated
+                : RentalDocumentStatus::PartiallyGenerated;
+            $run->updated_by = $userId;
+            $run->save();
 
             return $invoice;
         });
     }
 
-    /**
-     * @param  array<int, string>  $chargeQuantities
-     */
-    private function toInvoiceData(
-        RentalAgreement $agreement,
-        string $invoiceDate,
-        array $chargeQuantities,
-        ?string $dueDate = null,
-        ?int $currencyId = null,
-        string $exchangeRate = '1.000000',
-        ?string $notes = null,
-        ?int $createdBy = null,
-    ): CreateInvoiceData {
-        if (! in_array($agreement->status, [
-            RentalAgreementStatus::Active,
-            RentalAgreementStatus::Returned,
-            RentalAgreementStatus::Completed,
-        ], true)) {
-            throw new InvalidArgumentException('Only active, returned, or completed rental agreements can be invoiced.');
-        }
-        $agreement->loadMissing('rateSnapshot');
-        $charges = $this->billableCharges($agreement);
-        $validIds = $charges->pluck('id')->map(fn ($id): int => (int) $id)->all();
-        if (array_diff(array_keys($chargeQuantities), $validIds) !== []) {
-            throw new InvalidArgumentException('Invoice selection contains a charge that is not billable for this agreement.');
-        }
-
-        $invoiceLines = [];
-        $sourceLines = [];
-        $selectedTotal = '0.000000';
-        $selectedWithholding = '0.000000';
-        $lineNumber = 1;
-        $selectionProvided = $chargeQuantities !== [];
-        foreach ($charges as $charge) {
-            if ($selectionProvided && ! array_key_exists((int) $charge->getKey(), $chargeQuantities)) {
-                continue;
-            }
-            $remaining = (string) $charge->getAttribute('remaining_invoice_quantity');
-            if ($this->math->compare($remaining, '0.000000') <= 0) {
-                continue;
-            }
-            $quantity = $this->math->normalize($chargeQuantities[(int) $charge->getKey()] ?? $remaining);
-            if ($this->math->isZero($quantity)) {
-                continue;
-            }
-            if ($this->math->compare($quantity, $remaining) > 0) {
-                throw new InvalidArgumentException('Invoice quantity cannot exceed rental charge remaining quantity.');
-            }
-            $ratio = $this->math->div($quantity, (string) $charge->quantity, 12);
-            $discount = $this->math->mul((string) $charge->discount_amount, $ratio);
-            $tax = $this->math->mul((string) $charge->tax_amount, $ratio);
-            $withholding = $this->math->mul((string) $charge->withholding_amount, $ratio);
-            $lineTotal = $this->math->add(
-                $this->math->sub($this->math->mul($quantity, (string) $charge->rate), $discount),
-                $tax,
-            );
-            $selectedTotal = $this->math->add(
-                $selectedTotal,
-                $this->math->sub($lineTotal, $withholding),
-            );
-            $selectedWithholding = $this->math->add($selectedWithholding, $withholding);
-            $invoiced = $this->invoicedQuantity(
-                (int) $agreement->tenant_id,
-                $agreement->organization_unit_id,
-                (int) $charge->getKey(),
-            );
-
-            $invoiceLines[] = new InvoiceLineData(
-                lineNumber: $lineNumber++,
-                description: (string) $charge->description,
-                quantity: $quantity,
-                unitPrice: (string) $charge->rate,
-                lineType: InvoiceLineType::Charge,
-                discountAmount: $discount,
-                taxAmount: $tax,
-                lineTotal: $lineTotal,
-                sourceLineType: self::CHARGE_SOURCE,
-                sourceLineId: (int) $charge->getKey(),
-                metadata: ['tax_group_id' => $charge->tax_group_id],
-            );
-            $sourceLines[] = new InvoiceSourceLineData(
-                tenantId: (int) $agreement->tenant_id,
-                sourceType: self::AGREEMENT_SOURCE,
-                sourceId: (int) $agreement->getKey(),
-                sourceLineType: self::CHARGE_SOURCE,
-                sourceLineId: (int) $charge->getKey(),
-                sourceQuantity: (string) $charge->quantity,
-                invoicedQuantity: $quantity,
-                sourceUnitPrice: (string) $charge->rate,
-                sourceLineTotal: (string) $charge->total_amount,
-                organizationUnitId: $agreement->organization_unit_id,
-                previouslyInvoicedQuantity: $invoiced,
-                invoicedLineTotal: $lineTotal,
-            );
-        }
-        if ($invoiceLines === []) {
-            throw new InvalidArgumentException('No approved rental charges remain to invoice.');
-        }
-
-        $allCharges = $agreement->charges()
-            ->where('status', RentalChargeStatus::Approved->value)
-            ->get();
-
-        return new CreateInvoiceData(
-            tenantId: (int) $agreement->tenant_id,
-            invoiceType: InvoiceType::Rental,
-            direction: $agreement->direction === RentalAgreementDirection::Outbound
-                ? InvoiceDirection::Outbound
-                : InvoiceDirection::Inbound,
-            invoiceDate: $invoiceDate,
-            organizationUnitId: $agreement->organization_unit_id,
-            partyType: $agreement->party_type === RentalPartyType::Owner ? 'supplier' : $agreement->party_type->value,
-            partyId: (int) $agreement->party_id,
-            dueDate: $dueDate,
-            currencyId: $currencyId ?? $agreement->currency_id ?? $agreement->rateSnapshot?->currency_id,
-            exchangeRate: $exchangeRate,
-            notes: $notes ?? 'Rental agreement '.$agreement->agreement_number,
-            createdBy: $createdBy,
-            lines: $invoiceLines,
-            sources: [new InvoiceSourceData(
-                tenantId: (int) $agreement->tenant_id,
-                sourceType: self::AGREEMENT_SOURCE,
-                sourceId: (int) $agreement->getKey(),
-                organizationUnitId: $agreement->organization_unit_id,
-                sourceDocumentNumber: (string) $agreement->agreement_number,
-                sourceDocumentDate: $agreement->agreement_date->toDateString(),
-                sourceSubtotal: $this->math->sum($allCharges->pluck('amount')->map(fn ($value) => (string) $value)->all()),
-                sourceGrandTotal: $this->math->sum($allCharges->pluck('total_amount')->map(fn ($value) => (string) $value)->all()),
-                invoicedAmount: $selectedTotal,
-            )],
-            sourceLines: $sourceLines,
-            adjustments: $this->math->isZero($selectedWithholding) ? [] : [
-                new InvoiceAdjustmentData(
-                    name: 'Rental withholding',
-                    adjustmentType: AdjustmentType::Withholding,
-                    effect: AdjustmentEffect::Decrease,
-                    amount: $selectedWithholding,
-                    sourceType: self::AGREEMENT_SOURCE,
-                    sourceId: (int) $agreement->getKey(),
-                    allocationMethod: AllocationMethod::Manual,
-                    isSystemGenerated: true,
-                    description: 'Withholding retained from approved rental calculations.',
-                ),
-            ],
-        );
+    private function hasActiveAdjustment(RentalCalculationLine $line, AdjustmentType $type): bool
+    {
+        return InvoiceAdjustment::query()
+            ->where('tenant_id', $line->tenant_id)
+            ->where('source_type', 'rental_calculation_line')
+            ->where('source_id', $line->getKey())
+            ->where('adjustment_type', $type->value)
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]))
+            ->exists();
     }
 
-    private function invoicedQuantity(int $tenantId, ?int $organizationUnitId, int $chargeId): string
-    {
-        return $this->math->normalize((string) InvoiceSourceLine::query()
-            ->where('tenant_id', $tenantId)
-            ->where('source_line_type', self::CHARGE_SOURCE)
-            ->where('source_line_id', $chargeId)
-            ->whereHas('invoice', fn ($query) => $query
-                ->where('tenant_id', $tenantId)
-                ->where('organization_unit_id', $organizationUnitId)
-                ->whereNotIn('status', [
+    private function isConsumed(
+        RentalCalculationRun $run,
+        RentalCalculationLine $line,
+        RentalAgreementKind $agreementKind,
+    ): bool {
+        $net = (string) $line->net_amount;
+        if ($this->math->compare($net, '0') > 0) {
+            return $this->math->compare((string) InvoiceSourceLine::query()
+                ->where('tenant_id', $run->tenant_id)
+                ->where('source_type', 'rental_calculation_run')
+                ->where('source_id', $run->getKey())
+                ->where('source_line_type', 'rental_calculation_line')
+                ->where('source_line_id', $line->getKey())
+                ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                     InvoiceStatus::Cancelled->value,
                     InvoiceStatus::Void->value,
                 ]))
-            ->sum('invoiced_quantity'));
-    }
-
-    private function invoiceStatus(RentalCharge $charge, string $invoiced, string $remaining): RentalChargeInvoiceStatus
-    {
-        return $this->math->isZero($remaining)
-            ? RentalChargeInvoiceStatus::Invoiced
-            : ($this->math->isZero($invoiced)
-                ? RentalChargeInvoiceStatus::NotInvoiced
-                : RentalChargeInvoiceStatus::PartiallyInvoiced);
-    }
-
-    private function syncInvoiceStatuses(RentalAgreement $agreement): void
-    {
-        $charges = $agreement->charges()
-            ->where('status', RentalChargeStatus::Approved->value)
-            ->lockForUpdate()
-            ->get();
-        foreach ($charges as $charge) {
-            $invoiced = $this->invoicedQuantity(
-                (int) $agreement->tenant_id,
-                $agreement->organization_unit_id,
-                (int) $charge->getKey(),
-            );
-            $remaining = $this->math->sub((string) $charge->quantity, $invoiced);
-            if ($this->math->isNegative($remaining)) {
-                $remaining = '0.000000';
-            }
-            $status = $this->invoiceStatus($charge, $invoiced, $remaining);
-            $charge->forceFill(['invoice_status' => $status->value])->save();
+                ->sum('invoiced_quantity'), '1.000000') >= 0;
         }
-        foreach ($agreement->chargeRuns()->lockForUpdate()->get() as $run) {
-            $runCharges = $charges->where('charge_run_id', $run->getKey());
-            if ($runCharges->isEmpty()) {
-                continue;
-            }
-            $statuses = $runCharges->pluck('invoice_status')->map(
-                fn ($status): string => $status instanceof RentalChargeInvoiceStatus ? $status->value : (string) $status,
+        if ($this->math->compare($net, '0') < 0) {
+            return $this->hasActiveAdjustment(
+                $line,
+                $agreementKind === RentalAgreementKind::OwnerSupply
+                    ? AdjustmentType::DebitNote
+                    : AdjustmentType::CreditNote,
             );
-            $run->forceFill([
-                'invoice_status' => $statuses->every(fn (string $status): bool => $status === RentalChargeInvoiceStatus::Invoiced->value)
-                    ? RentalChargeInvoiceStatus::Invoiced->value
-                    : ($statuses->contains(RentalChargeInvoiceStatus::PartiallyInvoiced->value)
-                        || $statuses->contains(RentalChargeInvoiceStatus::Invoiced->value)
-                            ? RentalChargeInvoiceStatus::PartiallyInvoiced->value
-                            : RentalChargeInvoiceStatus::NotInvoiced->value),
-            ])->save();
         }
+
+        return true;
     }
 }

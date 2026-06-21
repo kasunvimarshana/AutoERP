@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
-use Modules\VehicleRental\Http\Controllers\RentalAgreementVehicleController;
-use Modules\VehicleRental\Http\Controllers\RentalAgreementVehicleLinkController;
+use Modules\VehicleRental\Http\Controllers\RentalAllocationController;
 use Modules\VehicleRental\Http\Controllers\RentalAvailabilityController;
-use Modules\VehicleRental\Http\Controllers\RentalChargeController;
+use Modules\VehicleRental\Http\Controllers\RentalCalculationController;
+use Modules\VehicleRental\Http\Controllers\RentalContextController;
+use Modules\VehicleRental\Http\Controllers\RentalCustodyController;
+use Modules\VehicleRental\Http\Controllers\RentalDepositController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
-use Modules\VehicleRental\Http\Controllers\RentalInspectionController;
-use Modules\VehicleRental\Http\Controllers\RentalInvoiceController;
-use Modules\VehicleRental\Http\Controllers\RentalPaymentController;
+use Modules\VehicleRental\Http\Controllers\RentalRateVersionController;
+use Modules\VehicleRental\Http\Controllers\RentalReplacementController;
 use Modules\VehicleRental\Http\Controllers\RentalReservationController;
-use Modules\VehicleRental\Http\Controllers\RentalRunningChartController;
 use Modules\VehicleRental\Http\Controllers\RentalUsageController;
+use Modules\VehicleRental\Http\Controllers\VehicleFinanceController;
 
 $middleware = [
     'api',
@@ -25,83 +26,66 @@ $middleware = [
 ];
 
 Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.vehicle-rental.')->group(function (): void {
-    Route::get('availability', [RentalAvailabilityController::class, 'index'])->name('availability.index');
-    Route::get('running-chart/agreements', [RentalRunningChartController::class, 'agreements'])->name('running-chart.agreements');
-    Route::get('running-chart/context', [RentalRunningChartController::class, 'context'])->name('running-chart.context');
-    Route::get('running-chart/trips', [RentalRunningChartController::class, 'trips'])->name('running-chart.trips');
-    Route::post('running-chart/trips', [RentalRunningChartController::class, 'storeTrip'])->name('running-chart.trips.store');
-    Route::put('running-chart/trips/{usageLog}', [RentalRunningChartController::class, 'updateTrip'])
-        ->whereNumber('usageLog')->name('running-chart.trips.update');
-    Route::delete('running-chart/trips/{usageLog}', [RentalRunningChartController::class, 'destroyTrip'])
-        ->whereNumber('usageLog')->name('running-chart.trips.destroy');
-    Route::patch('running-chart/trips/{usageLog}/submit', [RentalRunningChartController::class, 'submitTrip'])
-        ->whereNumber('usageLog')->name('running-chart.trips.submit');
-    Route::post('running-chart/daily-submit', [RentalRunningChartController::class, 'submitDaily'])->name('running-chart.daily-submit');
-    Route::patch('running-chart/trips/{usageLog}/approve', [RentalRunningChartController::class, 'approveTrip'])
-        ->whereNumber('usageLog')->name('running-chart.trips.approve');
-    Route::patch('running-chart/trips/{usageLog}/reject', [RentalRunningChartController::class, 'rejectTrip'])
-        ->whereNumber('usageLog')->name('running-chart.trips.reject');
-    Route::post('running-chart/preview', [RentalRunningChartController::class, 'preview'])->name('running-chart.preview');
-    Route::post('agreement-vehicle-links', [RentalAgreementVehicleLinkController::class, 'store'])->name('agreement-vehicle-links.store');
-    Route::patch('agreement-vehicle-links/{link}/submit', [RentalAgreementVehicleLinkController::class, 'submit'])
-        ->whereNumber('link')->name('agreement-vehicle-links.submit');
-    Route::patch('agreement-vehicle-links/{link}/approve', [RentalAgreementVehicleLinkController::class, 'approve'])
-        ->whereNumber('link')->name('agreement-vehicle-links.approve');
-    Route::patch('agreement-vehicle-links/{link}/cancel', [RentalAgreementVehicleLinkController::class, 'cancel'])
-        ->whereNumber('link')->name('agreement-vehicle-links.cancel');
+    Route::get('metadata', [RentalContextController::class, 'metadata'])->name('metadata');
+    Route::get('dashboard', [RentalContextController::class, 'dashboard'])->name('dashboard');
+    Route::get('vehicles/available', [RentalAvailabilityController::class, 'index'])->name('vehicles.available');
 
     Route::get('reservations', [RentalReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations', [RentalReservationController::class, 'store'])->name('reservations.store');
     Route::get('reservations/{reservation}', [RentalReservationController::class, 'show'])->whereNumber('reservation')->name('reservations.show');
     Route::put('reservations/{reservation}', [RentalReservationController::class, 'update'])->whereNumber('reservation')->name('reservations.update');
-    Route::patch('reservations/{reservation}/pending', [RentalReservationController::class, 'pending'])->whereNumber('reservation')->name('reservations.pending');
-    Route::patch('reservations/{reservation}/confirm', [RentalReservationController::class, 'confirm'])->whereNumber('reservation')->name('reservations.confirm');
-    Route::patch('reservations/{reservation}/cancel', [RentalReservationController::class, 'cancel'])->whereNumber('reservation')->name('reservations.cancel');
-    Route::get('reservations/{reservation}/status-history', [RentalReservationController::class, 'history'])->whereNumber('reservation')->name('reservations.history');
+    Route::patch('reservations/{reservation}/transition', [RentalReservationController::class, 'transition'])->whereNumber('reservation')->name('reservations.transition');
 
     Route::get('agreements', [RentalAgreementController::class, 'index'])->name('agreements.index');
     Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
     Route::get('agreements/{agreement}', [RentalAgreementController::class, 'show'])->whereNumber('agreement')->name('agreements.show');
-    Route::patch('agreements/{agreement}/confirm', [RentalAgreementController::class, 'confirm'])->whereNumber('agreement')->name('agreements.confirm');
-    Route::patch('agreements/{agreement}/activate', [RentalAgreementController::class, 'activate'])->whereNumber('agreement')->name('agreements.activate');
-    Route::patch('agreements/{agreement}/returned', [RentalAgreementController::class, 'markReturned'])->whereNumber('agreement')->name('agreements.returned');
-    Route::patch('agreements/{agreement}/complete', [RentalAgreementController::class, 'complete'])->whereNumber('agreement')->name('agreements.complete');
-    Route::patch('agreements/{agreement}/cancel', [RentalAgreementController::class, 'cancel'])->whereNumber('agreement')->name('agreements.cancel');
-    Route::get('agreements/{agreement}/status-history', [RentalAgreementController::class, 'history'])->whereNumber('agreement')->name('agreements.history');
+    Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])->whereNumber('agreement')->name('agreements.update');
+    Route::patch('agreements/{agreement}/transition', [RentalAgreementController::class, 'transition'])->whereNumber('agreement')->name('agreements.transition');
+    Route::post('agreements/{agreement}/rate-versions', [RentalRateVersionController::class, 'store'])->whereNumber('agreement')->name('rate-versions.store');
+    Route::patch('rate-versions/{version}/activate', [RentalRateVersionController::class, 'activate'])->whereNumber('version')->name('rate-versions.activate');
 
-    Route::get('agreements/{agreement}/vehicles', [RentalAgreementVehicleController::class, 'index'])->whereNumber('agreement')->name('vehicles.index');
-    Route::post('agreements/{agreement}/vehicles', [RentalAgreementVehicleController::class, 'store'])->whereNumber('agreement')->name('vehicles.store');
-    Route::post('agreements/{agreement}/vehicles/{allocation}/replace', [RentalAgreementVehicleController::class, 'replace'])->whereNumber(['agreement', 'allocation'])->name('vehicles.replace');
-    Route::put('agreements/{agreement}/vehicles/{allocation}/pickup', [RentalInspectionController::class, 'pickup'])->whereNumber(['agreement', 'allocation'])->name('inspections.pickup');
-    Route::put('agreements/{agreement}/vehicles/{allocation}/return', [RentalInspectionController::class, 'return'])->whereNumber(['agreement', 'allocation'])->name('inspections.return');
+    Route::get('allocations', [RentalAllocationController::class, 'index'])->name('allocations.index');
+    Route::post('agreements/{agreement}/allocations', [RentalAllocationController::class, 'store'])->whereNumber('agreement')->name('allocations.store');
+    Route::get('allocations/{allocation}', [RentalAllocationController::class, 'show'])->whereNumber('allocation')->name('allocations.show');
+    Route::post('allocations/{allocation}/drivers', [RentalAllocationController::class, 'assignDriver'])->whereNumber('allocation')->name('allocations.drivers.store');
 
-    Route::get('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'index'])->whereNumber('agreement')->name('usage.index');
-    Route::post('agreements/{agreement}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('agreement')->name('usage.store');
-    Route::put('agreements/{agreement}/usage-logs/{usageLog}', [RentalUsageController::class, 'update'])->whereNumber(['agreement', 'usageLog'])->name('usage.update');
-    Route::delete('agreements/{agreement}/usage-logs/{usageLog}', [RentalUsageController::class, 'destroy'])->whereNumber(['agreement', 'usageLog'])->name('usage.destroy');
-    Route::post('agreements/{agreement}/usage-logs/{usageLog}/events', [RentalUsageController::class, 'storeEvent'])->whereNumber(['agreement', 'usageLog'])->name('usage.events.store');
-    Route::put('agreements/{agreement}/usage-logs/{usageLog}/events/{event}', [RentalUsageController::class, 'updateEvent'])->whereNumber(['agreement', 'usageLog', 'event'])->name('usage.events.update');
-    Route::delete('agreements/{agreement}/usage-logs/{usageLog}/events/{event}', [RentalUsageController::class, 'destroyEvent'])->whereNumber(['agreement', 'usageLog', 'event'])->name('usage.events.destroy');
-    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/submit', [RentalUsageController::class, 'submit'])->whereNumber(['agreement', 'usageLog'])->name('usage.submit');
-    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/approve', [RentalUsageController::class, 'approve'])->whereNumber(['agreement', 'usageLog'])->name('usage.approve');
-    Route::patch('agreements/{agreement}/usage-logs/{usageLog}/reject', [RentalUsageController::class, 'reject'])->whereNumber(['agreement', 'usageLog'])->name('usage.reject');
+    Route::get('custody-events', [RentalCustodyController::class, 'index'])->name('custody.index');
+    Route::post('allocations/{allocation}/custody-events', [RentalCustodyController::class, 'store'])->whereNumber('allocation')->name('custody.store');
+    Route::get('custody-events/{event}', [RentalCustodyController::class, 'show'])->whereNumber('event')->name('custody.show');
+    Route::patch('custody-events/{event}/confirm', [RentalCustodyController::class, 'confirm'])->whereNumber('event')->name('custody.confirm');
+    Route::patch('custody-events/{event}/reverse', [RentalCustodyController::class, 'reverse'])->whereNumber('event')->name('custody.reverse');
 
-    Route::get('agreements/{agreement}/expenses', [RentalExpenseController::class, 'index'])->whereNumber('agreement')->name('expenses.index');
-    Route::post('agreements/{agreement}/expenses', [RentalExpenseController::class, 'store'])->whereNumber('agreement')->name('expenses.store');
-    Route::put('agreements/{agreement}/expenses/{expense}', [RentalExpenseController::class, 'update'])->whereNumber(['agreement', 'expense'])->name('expenses.update');
-    Route::delete('agreements/{agreement}/expenses/{expense}', [RentalExpenseController::class, 'destroy'])->whereNumber(['agreement', 'expense'])->name('expenses.destroy');
-    Route::patch('agreements/{agreement}/expenses/{expense}/submit', [RentalExpenseController::class, 'submit'])->whereNumber(['agreement', 'expense'])->name('expenses.submit');
-    Route::patch('agreements/{agreement}/expenses/{expense}/approve', [RentalExpenseController::class, 'approve'])->whereNumber(['agreement', 'expense'])->name('expenses.approve');
-    Route::patch('agreements/{agreement}/expenses/{expense}/reject', [RentalExpenseController::class, 'reject'])->whereNumber(['agreement', 'expense'])->name('expenses.reject');
+    Route::post('allocations/{allocation}/replacement', [RentalReplacementController::class, 'store'])->whereNumber('allocation')->name('replacements.store');
+    Route::get('replacements/{replacement}', [RentalReplacementController::class, 'show'])->whereNumber('replacement')->name('replacements.show');
 
-    Route::get('agreements/{agreement}/charges', [RentalChargeController::class, 'index'])->whereNumber('agreement')->name('charges.index');
-    Route::post('agreements/{agreement}/charges/preview', [RentalChargeController::class, 'preview'])->whereNumber('agreement')->name('charges.preview');
-    Route::post('agreements/{agreement}/charges/generate', [RentalChargeController::class, 'generate'])->whereNumber('agreement')->name('charges.generate');
-    Route::patch('agreements/{agreement}/charges/approve', [RentalChargeController::class, 'approveAll'])->whereNumber('agreement')->name('charges.approve');
+    Route::get('usage-logs', [RentalUsageController::class, 'index'])->name('usage.index');
+    Route::post('allocations/{allocation}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('allocation')->name('usage.store');
+    Route::get('usage-logs/{usage}', [RentalUsageController::class, 'show'])->whereNumber('usage')->name('usage.show');
+    Route::patch('usage-logs/{usage}/transition', [RentalUsageController::class, 'transition'])->whereNumber('usage')->name('usage.transition');
 
-    Route::get('agreements/{agreement}/invoice-charges', [RentalInvoiceController::class, 'charges'])->whereNumber('agreement')->name('invoices.charges');
-    Route::post('agreements/{agreement}/invoices/preview', [RentalInvoiceController::class, 'preview'])->whereNumber('agreement')->name('invoices.preview');
-    Route::post('agreements/{agreement}/invoices', [RentalInvoiceController::class, 'store'])->whereNumber('agreement')->name('invoices.store');
-    Route::post('agreements/{agreement}/payments/prepare', [RentalPaymentController::class, 'prepare'])->whereNumber('agreement')->name('payments.prepare');
-    Route::post('agreements/{agreement}/payments', [RentalPaymentController::class, 'store'])->whereNumber('agreement')->name('payments.store');
+    Route::get('expenses', [RentalExpenseController::class, 'index'])->name('expenses.index');
+    Route::post('expenses', [RentalExpenseController::class, 'store'])->name('expenses.store');
+    Route::get('expenses/{expense}', [RentalExpenseController::class, 'show'])->whereNumber('expense')->name('expenses.show');
+    Route::patch('expenses/{expense}/transition', [RentalExpenseController::class, 'transition'])->whereNumber('expense')->name('expenses.transition');
+
+    Route::get('calculation-runs', [RentalCalculationController::class, 'index'])->name('calculations.index');
+    Route::post('agreements/{agreement}/calculate', [RentalCalculationController::class, 'calculate'])->whereNumber('agreement')->name('calculations.calculate');
+    Route::get('calculation-runs/{run}', [RentalCalculationController::class, 'show'])->whereNumber('run')->name('calculations.show');
+    Route::patch('calculation-runs/{run}/transition', [RentalCalculationController::class, 'transition'])->whereNumber('run')->name('calculations.transition');
+    Route::post('calculation-runs/{run}/invoice', [RentalCalculationController::class, 'createInvoice'])->whereNumber('run')->name('calculations.invoice');
+
+    Route::get('deposits', [RentalDepositController::class, 'index'])->name('deposits.index');
+    Route::get('deposits/{deposit}', [RentalDepositController::class, 'show'])->whereNumber('deposit')->name('deposits.show');
+    Route::post('deposits/{deposit}/receive', [RentalDepositController::class, 'receive'])->whereNumber('deposit')->name('deposits.receive');
+    Route::post('deposits/{deposit}/apply', [RentalDepositController::class, 'apply'])->whereNumber('deposit')->name('deposits.apply');
+    Route::post('deposits/{deposit}/refund', [RentalDepositController::class, 'refund'])->whereNumber('deposit')->name('deposits.refund');
+    Route::post('deposits/{deposit}/forfeit', [RentalDepositController::class, 'forfeit'])->whereNumber('deposit')->name('deposits.forfeit');
+    Route::patch('deposit-links/{link}/reverse', [RentalDepositController::class, 'reverse'])->whereNumber('link')->name('deposits.links.reverse');
+
+    Route::get('finance-agreements', [VehicleFinanceController::class, 'index'])->name('finance-agreements.index');
+    Route::post('finance-agreements', [VehicleFinanceController::class, 'store'])->name('finance-agreements.store');
+    Route::get('finance-agreements/{agreement}', [VehicleFinanceController::class, 'show'])->whereNumber('agreement')->name('finance-agreements.show');
+    Route::patch('finance-agreements/{agreement}/activate', [VehicleFinanceController::class, 'activate'])->whereNumber('agreement')->name('finance-agreements.activate');
+    Route::post('finance-installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])->whereNumber('installment')->name('finance-installments.payable');
+    Route::patch('finance-installments/refresh-due-statuses', [VehicleFinanceController::class, 'refreshDueStatuses'])->name('finance-installments.refresh-due-statuses');
 });

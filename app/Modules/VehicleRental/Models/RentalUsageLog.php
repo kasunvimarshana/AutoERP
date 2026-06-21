@@ -9,82 +9,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\VehicleRental\Enums\RentalUsageLogStatus;
+use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
 final class RentalUsageLog extends CoreModel
 {
     use ScopesRentalContext;
-
     protected $table = 'rental_usage_logs';
-
-    protected function casts(): array
-    {
-        return [
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'agreement_id' => 'integer',
-            'agreement_vehicle_id' => 'integer',
-            'vehicle_id' => 'integer',
-            'driver_id' => 'integer',
-            'usage_date' => 'date',
-            'effective_at' => 'datetime',
-            'operational_sequence' => 'integer',
-            'working_minutes' => 'integer',
-            'start_odometer' => 'decimal:6',
-            'end_odometer' => 'decimal:6',
-            'distance_km' => 'decimal:6',
-            'cumulative_km' => 'decimal:6',
-            'comparative_km' => 'decimal:6',
-            'status' => RentalUsageLogStatus::class,
-            'approved_by' => 'integer',
-            'approved_at' => 'datetime',
-            'submitted_by' => 'integer',
-            'submitted_at' => 'datetime',
-            'rejected_by' => 'integer',
-            'rejected_at' => 'datetime',
-            'created_by' => 'integer',
-            'updated_by' => 'integer',
-        ];
-    }
-
-    public function agreement(): BelongsTo
-    {
-        return $this->belongsTo(RentalAgreement::class, 'agreement_id');
-    }
-
-    public function agreementVehicle(): BelongsTo
-    {
-        return $this->belongsTo(RentalAgreementVehicle::class, 'agreement_vehicle_id');
-    }
-
-    public function vehicle(): BelongsTo
-    {
-        return $this->belongsTo(Vehicle::class, 'vehicle_id');
-    }
-
-    public function driver(): BelongsTo
-    {
-        return $this->belongsTo(HrEmployee::class, 'driver_id');
-    }
-
-    public function events(): HasMany
-    {
-        return $this->hasMany(RentalUsageEvent::class, 'usage_log_id');
-    }
-
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(RentalExpense::class, 'usage_log_id');
-    }
-
-    public function contexts(): HasMany
-    {
-        return $this->hasMany(RentalUsageContext::class, 'usage_log_id');
-    }
-
-    public function statusHistories(): HasMany
-    {
-        return $this->hasMany(RentalStatusHistory::class, 'usage_log_id')->latest('changed_at');
-    }
+    protected $guarded = ['id'];
+    protected function casts(): array { return ['row_version'=>'integer','tenant_id'=>'integer','organization_unit_id'=>'integer','vehicle_allocation_id'=>'integer','vehicle_id'=>'integer','driver_assignment_id'=>'integer','driver_id'=>'integer','usage_date'=>'date','started_at'=>'datetime','ended_at'=>'datetime','start_odometer'=>'decimal:6','end_odometer'=>'decimal:6','distance_km'=>'decimal:6','chargeable_distance_km'=>'decimal:6','garage_distance_km'=>'decimal:6','internal_distance_km'=>'decimal:6','working_minutes'=>'integer','normal_overtime_minutes'=>'integer','double_overtime_minutes'=>'integer','triple_overtime_minutes'=>'integer','night_out_count'=>'decimal:6','operational_sequence'=>'integer','status'=>RentalUsageStatus::class,'metadata'=>'array','submitted_at'=>'datetime','approved_at'=>'datetime','rejected_at'=>'datetime','reversed_at'=>'datetime']; }
+    public function allocation(): BelongsTo { return $this->belongsTo(RentalVehicleAllocation::class, 'vehicle_allocation_id'); }
+    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function driverAssignment(): BelongsTo { return $this->belongsTo(RentalDriverAssignment::class, 'driver_assignment_id'); }
+    public function driver(): BelongsTo { return $this->belongsTo(HrEmployee::class, 'driver_id'); }
+    public function events(): HasMany { return $this->hasMany(RentalUsageEvent::class, 'usage_log_id')->orderBy('sequence'); }
+    public function contexts(): HasMany { return $this->hasMany(RentalUsageContext::class, 'usage_log_id'); }
 }
