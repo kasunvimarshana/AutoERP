@@ -41,7 +41,9 @@ use Modules\User\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Services\AuthenticatedUserProvider;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Modules\User\Services\Rules\UserDomainService;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\User\Services\UserAccessResolver;
+use Modules\User\Services\UserPermissionChecker;
 
 final class UserServiceProvider extends ServiceProvider
 {
@@ -51,6 +53,7 @@ final class UserServiceProvider extends ServiceProvider
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
         $this->app->scoped(UserAccessResolver::class);
+        $this->app->scoped(PermissionCheckerInterface::class, UserPermissionChecker::class);
 
         $this->app->singleton(UserDomainServiceInterface::class, UserDomainService::class);
         $this->app->singleton(

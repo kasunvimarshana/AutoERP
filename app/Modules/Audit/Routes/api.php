@@ -13,7 +13,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'current.organization-unit',
 );
 
-Route::prefix('api/audit')
+Route::prefix('api/v1/audit-logs')
     ->middleware([
         'api',
         'auth:'.$protectedGuard,
@@ -21,10 +21,8 @@ Route::prefix('api/audit')
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
     ])
-    ->name('audit.')
+    ->name('audit.logs.')
     ->group(function (): void {
-        Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
-        Route::get('audit-logs/{id}', [AuditLogController::class, 'show'])
-            ->whereNumber('id')
-            ->name('audit-logs.show');
+        Route::get('/', [AuditLogController::class, 'index'])->name('index');
+        Route::get('{id}', [AuditLogController::class, 'show'])->whereNumber('id')->name('show');
     });

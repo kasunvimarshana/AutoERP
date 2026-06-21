@@ -4,6 +4,7 @@ import {
     protectedAccessRoles,
 } from "@/modules/access/accessPermissions";
 import { itemPermissions } from "@/modules/item/itemPermissions";
+import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -1032,6 +1033,17 @@ export const navigationSections: NavigationSection[] = [
                     ...tenantAccess(["user"]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
+                },
+            },
+            {
+                id: "audit-logs",
+                type: "link",
+                label: "Audit Logs",
+                to: "/administration/audit-logs",
+                icon: "list",
+                access: {
+                    requiresTenant: true,
+                    permissions: [auditPermissions.view],
                 },
             },
             {

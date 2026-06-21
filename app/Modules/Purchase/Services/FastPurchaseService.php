@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
-use Modules\Audit\DTOs\AuditLogActivityData;
-use Modules\Audit\Services\AuditLogs\LogActivityService;
+use Modules\Audit\Constants\AuditEventCategory;
+use Modules\Audit\Contracts\AuditRecorderInterface;
+use Modules\Audit\Data\AuditEventData;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\IdempotencyService;
@@ -20,6 +21,7 @@ use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Models\PaymentMethod;
+use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
@@ -46,7 +48,7 @@ final class FastPurchaseService
         private readonly PurchaseValidationService $validator,
         private readonly PurchaseUomService $uoms,
         private readonly TaxCalculationService $taxes,
-        private readonly LogActivityService $audit,
+        private readonly AuditRecorderInterface $audit,
         private readonly WarehouseDefaultResolver $warehouses,
         private readonly PurchaseDocumentContextService $documentContexts,
         private readonly PurchaseAdjustmentCatalogueService $adjustmentCatalogue,
@@ -1035,31 +1037,51 @@ final class FastPurchaseService
      */
     private function writeAuditLog(array $resolved, string $referenceHash, string $requestHash, array $response): void
     {
-        $result = $this->audit->execute(new AuditLogActivityData(
-            event: 'fast_purchase.completed',
-            auditableType: 'fast_purchase_reference',
-            auditableId: $referenceHash,
-            tenantId: (int) $resolved['tenant_id'],
-            organizationUnitId: $resolved['organization_unit_id'],
-            userId: $resolved['current_user_id'],
-            newValues: [
-                'response' => $response,
-                'documents' => $response['documents'],
-                'summary' => $response['summary'],
-            ],
+        $documents = is_array($response['documents'] ?? null) ? $response['documents'] : [];
+
+        $this->audit->record(new AuditEventData(
+            eventName: PurchaseAuditEvent::FAST_PURCHASE_COMPLETED,
+            eventCategory: AuditEventCategory::FINANCIAL,
+            sourceModule: 'purchase',
+            subjectType: 'fast_purchase',
+            subjectId: $referenceHash,
+            subjectReference: (string) $resolved['supplier_reference'],
+            sourceType: 'fast_purchase',
+            sourceId: $referenceHash,
+            sourceReference: (string) $resolved['supplier_reference'],
             metadata: [
                 'request_hash' => $requestHash,
                 'supplier_id' => (int) $resolved['supplier']->getKey(),
-                'supplier_reference' => $resolved['supplier_reference'],
-                'purchase_date' => $resolved['purchase_date'],
+                'purchase_date' => (string) $resolved['purchase_date'],
+                'summary' => $response['summary'] ?? [],
+                'documents' => $this->auditDocumentReferences($documents),
             ],
             tags: ['purchase', 'fast_purchase'],
-            occurredAt: now()->toDateTimeString(),
+            producerKey: 'fast_purchase.completed:'.$referenceHash.':'.$requestHash,
         ));
+    }
 
-        if ($result->isFailure()) {
-            throw new InvalidArgumentException('Fast purchase audit log could not be written.');
+    /**
+     * @param  array<string, mixed>  $documents
+     * @return array<string, mixed>
+     */
+    private function auditDocumentReferences(array $documents): array
+    {
+        $result = [];
+        foreach (['purchase_order', 'goods_receipt', 'supplier_invoice', 'supplier_payment', 'inventory_transaction', 'finance_posting'] as $key) {
+            if (is_array($documents[$key] ?? null)) {
+                $result[$key] = $documents[$key];
+            }
         }
+
+        $result['inventory_transaction_count'] = is_array($documents['inventory_transactions'] ?? null)
+            ? count($documents['inventory_transactions'])
+            : 0;
+        $result['finance_posting_count'] = is_array($documents['finance_postings'] ?? null)
+            ? count($documents['finance_postings'])
+            : 0;
+
+        return $result;
     }
 
     /**

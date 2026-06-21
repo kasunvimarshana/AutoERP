@@ -329,7 +329,7 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `audit_logs` | Records auditable entity and user activity without owning business data. | polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware; soft deletes |
+| `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | canonical subject/source references; no lifecycle foreign keys | tenant and organization scoped; permission-controlled reads; no updates or deletes |
 
 ## Extension
 

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
-use Modules\Audit\Models\AuditLogModel;
+use Modules\Audit\Models\AuditLog;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
@@ -75,7 +75,7 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(1, InventoryMovement::query()->count());
         $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
         $this->assertSame(1, FinanceJournalEntry::query()->count());
-        $this->assertSame(1, AuditLogModel::query()->where('event', 'fast_purchase.completed')->count());
+        $this->assertSame(1, AuditLog::query()->where('event_name', 'purchase.fast_purchase.completed')->count());
     }
 
     public function test_credit_purchase_creates_grn_invoice_relationship_and_balance(): void
@@ -605,7 +605,7 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(0, GoodsReceiptNote::query()->count());
         $this->assertSame(0, Invoice::query()->count());
         $this->assertSame(0, Payment::query()->count());
-        $this->assertSame(0, AuditLogModel::query()->where('event', 'fast_purchase.completed')->count());
+        $this->assertSame(0, AuditLog::query()->where('event_name', 'purchase.fast_purchase.completed')->count());
     }
 
     public function test_discount_and_charge_contract_matches_created_grn_and_invoice(): void
@@ -769,7 +769,7 @@ final class FastPurchaseTest extends TestCase
         $this->assertSame(0, InventoryMovement::query()->count());
         $this->assertSame(0, Invoice::query()->count());
         $this->assertSame(0, Payment::query()->count());
-        $this->assertSame(0, AuditLogModel::query()->where('event', 'fast_purchase.completed')->count());
+        $this->assertSame(0, AuditLog::query()->where('event_name', 'purchase.fast_purchase.completed')->count());
     }
 
     public function test_scope_and_client_authority_validation(): void

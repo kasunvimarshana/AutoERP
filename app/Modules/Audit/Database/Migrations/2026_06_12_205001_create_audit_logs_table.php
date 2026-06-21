@@ -10,47 +10,73 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('audit_logs', function (Blueprint $table) {
+        Schema::create('audit_logs', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx')->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->index('audit_logs_organization_unit_idx')->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->uuid('event_uuid')->unique('audit_logs_event_uuid_uk');
+            $table->string('producer_key', 190)->nullable();
+            $table->char('producer_fingerprint', 64)->nullable()->unique('audit_logs_producer_fingerprint_uk');
 
-            $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
+            // Deliberately no foreign keys: audit history must survive owner/user lifecycle changes.
+            // Scope combinations are validated before append and human-readable snapshots are retained.
+            $table->unsignedBigInteger('tenant_id');
+            $table->string('tenant_name');
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->string('organization_unit_name')->nullable();
 
-            $table->string('event')->index('audit_logs_event_idx')->comment('The action that triggered this entry (created, updated, deleted, etc.)');
+            $table->string('event_category', 40);
+            $table->string('event_name', 150);
 
-            // Polymorphic morph columns
-            // $table->morphs('auditable');
-            $table->string('auditable_type')->index('audit_logs_auditable_type_idx');
-            $table->string('auditable_id')->index('audit_logs_auditable_id_idx');
-            $table->string('source_module')->nullable()->comment('Generic source module key');
-            $table->string('source_type')->nullable()->comment('Generic source record/event type');
-            $table->string('source_id')->nullable()->comment('Generic source identifier');
-            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
-            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 100);
+            $table->string('actor_name');
+            $table->string('actor_guard', 64)->nullable();
+            $table->string('actor_provider', 100)->nullable();
+            $table->string('application_id', 100)->nullable();
+            $table->unsignedBigInteger('impersonator_user_id')->nullable();
 
-            // Captured attribute snapshots
-            $table->json('old_values')->nullable();
-            $table->json('new_values')->nullable();
+            $table->string('subject_type', 100);
+            $table->string('subject_id', 150);
+            $table->string('subject_reference')->nullable();
 
-            // Request context
-            $table->string('url')->nullable();
-            $table->string('ip_address')->nullable();
-            $table->text('user_agent')->nullable();
+            $table->string('source_module', 100);
+            $table->string('source_type', 100)->nullable();
+            $table->string('source_id', 150)->nullable();
+            $table->string('source_reference')->nullable();
 
-            // Extensibility
+            $table->json('changes')->nullable();
+            $table->json('metadata')->nullable();
             $table->json('tags')->nullable();
 
-            // Audit logs are only ever created, never updated.
-            $table->timestamp('occurred_at')->useCurrent();
-            $table->timestamps();
-            $table->softDeletes();
+            $table->string('request_id', 100)->nullable();
+            $table->string('request_method', 12)->nullable();
+            $table->string('route_name')->nullable();
+            $table->string('route_path')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->string('user_agent', 500)->nullable();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'auditable_type', 'auditable_id'], 'audit_logs_auditable_idx');
-            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'audit_logs_source_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'occurred_at'], 'audit_logs_occurred_at_idx');
+            $table->timestamp('occurred_at');
+            $table->timestamp('recorded_at')->useCurrent();
+
+            $table->index(
+                ['tenant_id', 'organization_unit_id', 'occurred_at', 'id'],
+                'audit_logs_scope_time_idx',
+            );
+            $table->index(
+                ['tenant_id', 'event_name', 'occurred_at', 'id'],
+                'audit_logs_event_time_idx',
+            );
+            $table->index(
+                ['tenant_id', 'actor_type', 'actor_id', 'occurred_at', 'id'],
+                'audit_logs_actor_time_idx',
+            );
+            $table->index(
+                ['tenant_id', 'subject_type', 'subject_id', 'occurred_at', 'id'],
+                'audit_logs_subject_time_idx',
+            );
+            $table->index(
+                ['tenant_id', 'source_module', 'source_type', 'source_id', 'occurred_at'],
+                'audit_logs_source_time_idx',
+            );
         });
     }
 

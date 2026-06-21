@@ -4,50 +4,49 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Http\Controllers;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Audit\DTOs\AuditLogQueryData;
 use Modules\Audit\Http\Requests\ListAuditLogRequest;
-use Modules\Audit\Http\Resources\AuditLogResource;
-use Modules\Audit\Services\AuditLogs\GetAuditLogService;
-use Modules\Audit\Services\AuditLogs\ListAuditLogsService;
-use Modules\Core\DTOs\PagedResult;
+use Modules\Audit\Http\Requests\ViewAuditLogRequest;
+use Modules\Audit\Http\Resources\AuditLogDetailResource;
+use Modules\Audit\Http\Resources\AuditLogSummaryResource;
+use Modules\Audit\Models\AuditLog;
+use Modules\Audit\Services\AuditAuthorizationService;
+use Modules\Audit\Services\AuditQueryFactory;
+use Modules\Audit\Services\GetAuditLog;
+use Modules\Audit\Services\ListAuditLogs;
 
 final class AuditLogController extends Controller
 {
     public function __construct(
-        private readonly ListAuditLogsService $listService,
-        private readonly GetAuditLogService $getService,
+        private readonly ListAuditLogs $list,
+        private readonly GetAuditLog $get,
+        private readonly AuditQueryFactory $queryFactory,
+        private readonly AuditAuthorizationService $authorization,
     ) {}
 
     public function index(ListAuditLogRequest $request): JsonResponse
     {
-        $validated = $request->validated();
-        $result = $this->listService->execute(AuditLogQueryData::fromArray($validated));
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
-        }
-
-        $pageResult = $result->valueOrFail();
-        if (! $pageResult instanceof PagedResult) {
-            return response()->json(['message' => 'Unexpected list response.'], 500);
-        }
+        $page = $this->list->execute($this->queryFactory->fromValidated($request->validated()));
 
         return response()->json([
-            'data' => AuditLogResource::collection($pageResult->items)->resolve(),
-            'meta' => $pageResult->paginationMeta(),
+            'data' => AuditLogSummaryResource::collection($page->items)->resolve($request),
+            'meta' => [
+                'next_cursor' => $page->nextCursor,
+                'has_more' => $page->nextCursor !== null,
+                'per_page' => $page->perPage,
+            ],
         ]);
     }
 
-    public function show(int|string $id): JsonResponse|AuditLogResource
+    public function show(ViewAuditLogRequest $request, int $id): AuditLogDetailResource
     {
-        $result = $this->getService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        $record = $this->get->execute($id);
+        if ($record === null) {
+            throw (new ModelNotFoundException())->setModel(AuditLog::class, [$id]);
         }
 
-        return new AuditLogResource($result->valueOrFail());
+        return new AuditLogDetailResource($record, $this->authorization->canViewSensitiveCurrent());
     }
 }

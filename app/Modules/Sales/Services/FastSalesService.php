@@ -7,8 +7,9 @@ namespace Modules\Sales\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Audit\DTOs\AuditLogActivityData;
-use Modules\Audit\Services\AuditLogs\LogActivityService;
+use Modules\Audit\Constants\AuditEventCategory;
+use Modules\Audit\Contracts\AuditRecorderInterface;
+use Modules\Audit\Data\AuditEventData;
 use Modules\Configuration\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\IdempotencyService;
@@ -49,6 +50,7 @@ use Modules\Payment\Services\PaymentCreationService;
 use Modules\Sales\DTOs\CreateSalesDeliveryData;
 use Modules\Sales\DTOs\CreateSalesInvoiceData;
 use Modules\Sales\DTOs\CreateSalesOrderData;
+use Modules\Sales\Constants\SalesAuditEvent;
 use Modules\Sales\DTOs\SalesDeliveryLineData;
 use Modules\Sales\DTOs\SalesHeaderAdjustmentData;
 use Modules\Sales\DTOs\SalesInvoiceSourceData;
@@ -90,7 +92,7 @@ final class FastSalesService
         private readonly ItemPriceResolutionService $priceResolver,
         private readonly PaymentCreationService $payments,
         private readonly FinancePostingInterface $financePostings,
-        private readonly LogActivityService $audit,
+        private readonly AuditRecorderInterface $audit,
         private readonly WarehouseDefaultResolver $warehouses,
         private readonly IdempotencyService $idempotency,
         private readonly FastSalesIdempotencyNormalizer $idempotencyNormalizer,
@@ -1420,31 +1422,51 @@ final class FastSalesService
      */
     private function writeAuditLog(array $resolved, string $referenceHash, string $requestHash, array $response): void
     {
-        $result = $this->audit->execute(new AuditLogActivityData(
-            event: 'fast_sales.completed',
-            auditableType: 'fast_sales_reference',
-            auditableId: $referenceHash,
-            tenantId: (int) $resolved['tenant_id'],
-            organizationUnitId: $resolved['organization_unit_id'],
-            userId: $resolved['current_user_id'],
-            newValues: [
-                'response' => $response,
-                'documents' => $response['documents'],
-                'summary' => $response['summary'],
-            ],
+        $documents = is_array($response['documents'] ?? null) ? $response['documents'] : [];
+
+        $this->audit->record(new AuditEventData(
+            eventName: SalesAuditEvent::FAST_SALES_COMPLETED,
+            eventCategory: AuditEventCategory::FINANCIAL,
+            sourceModule: 'sales',
+            subjectType: 'fast_sales',
+            subjectId: $referenceHash,
+            subjectReference: (string) $resolved['customer_reference'],
+            sourceType: 'fast_sales',
+            sourceId: $referenceHash,
+            sourceReference: (string) $resolved['customer_reference'],
             metadata: [
                 'request_hash' => $requestHash,
                 'customer_id' => (int) $resolved['customer']->getKey(),
-                'customer_reference' => $resolved['customer_reference'],
-                'transaction_date' => $resolved['transaction_date'],
+                'transaction_date' => (string) $resolved['transaction_date'],
+                'summary' => $response['summary'] ?? [],
+                'documents' => $this->auditDocumentReferences($documents),
             ],
             tags: ['sales', 'fast_sales'],
-            occurredAt: now()->toDateTimeString(),
+            producerKey: 'fast_sales.completed:'.$referenceHash.':'.$requestHash,
         ));
+    }
 
-        if ($result->isFailure()) {
-            throw new InvalidArgumentException('Fast sales audit log could not be written.');
+    /**
+     * @param  array<string, mixed>  $documents
+     * @return array<string, mixed>
+     */
+    private function auditDocumentReferences(array $documents): array
+    {
+        $result = [];
+        foreach (['sales_order', 'goods_delivery', 'customer_invoice', 'customer_receipt', 'inventory_transaction', 'finance_posting'] as $key) {
+            if (is_array($documents[$key] ?? null)) {
+                $result[$key] = $documents[$key];
+            }
         }
+
+        $result['inventory_transaction_count'] = is_array($documents['inventory_transactions'] ?? null)
+            ? count($documents['inventory_transactions'])
+            : 0;
+        $result['finance_posting_count'] = is_array($documents['finance_postings'] ?? null)
+            ? count($documents['finance_postings'])
+            : 0;
+
+        return $result;
     }
 
     /**

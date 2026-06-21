@@ -1,5 +1,6 @@
 export const endpoints = {
     auth: '/api/v1/auth',
+    auditLogs: '/api/v1/audit-logs',
     users: '/api/user/users',
     roles: '/api/user/roles',
     permissions: '/api/user/permissions',

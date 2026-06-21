@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Modules\Audit\Database\Seeders\AuditSeeder;
 use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Configuration\Database\Seeders\ConfigurationSeeder;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
@@ -58,6 +59,7 @@ class DatabaseSeeder extends Seeder
             VehicleRentalSeeder::class,
             HrSeeder::class,
             ReportingSeeder::class,
+            AuditSeeder::class,
             SuperAdminPermissionSeeder::class,
         ]);
     }

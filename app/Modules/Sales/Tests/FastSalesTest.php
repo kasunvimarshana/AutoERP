@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Audit\Models\AuditLogModel;
+use Modules\Audit\Models\AuditLog;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\PostingContext;
@@ -68,7 +68,7 @@ final class FastSalesTest extends TestCase
         $this->assertSame(0, Invoice::query()->count());
         $this->assertSame(0, Payment::query()->count());
         $this->assertSame(0, FinanceJournalEntry::query()->count());
-        $this->assertSame(1, AuditLogModel::query()->where('event', 'fast_sales.completed')->count());
+        $this->assertSame(1, AuditLog::query()->where('event_name', 'sales.fast_sales.completed')->count());
     }
 
     public function test_delivery_only_sale_creates_delivery_inventory_issue_and_finance_without_invoice_or_receipt(): void
@@ -368,7 +368,7 @@ final class FastSalesTest extends TestCase
         $this->assertSame(0, InventoryMovement::query()->where('source_type', 'sales_delivery')->count());
         $this->assertSame(0, Invoice::query()->count());
         $this->assertSame(0, Payment::query()->count());
-        $this->assertSame(0, AuditLogModel::query()->where('event', 'fast_sales.completed')->count());
+        $this->assertSame(0, AuditLog::query()->where('event_name', 'sales.fast_sales.completed')->count());
     }
 
     public function test_scope_and_client_authority_fields_are_rejected(): void

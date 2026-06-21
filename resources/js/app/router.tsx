@@ -7,8 +7,11 @@ import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { vehicleRentalPermissions } from "@/modules/vehicle-rental/vehicleRentalPermissions";
+import { auditPermissions } from "@/modules/audit/auditPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
+const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
+const AuditLogDetailPage = lazy(() => import("@/modules/audit/AuditLogDetailPage"));
 const DashboardPage = lazy(() => import("@/modules/dashboard/DashboardPage"));
 const AccessOverviewPage = lazy(
     () => import("@/modules/access/AccessOverviewPage"),
@@ -477,6 +480,14 @@ export function AppRouter() {
                     <Route
                         path="/administration/access"
                         element={<AccessOverviewPage />}
+                    />
+                    <Route
+                        path="/administration/audit-logs"
+                        element={requirePermission(auditPermissions.view, <AuditLogListPage />)}
+                    />
+                    <Route
+                        path="/administration/audit-logs/:id"
+                        element={requirePermission(auditPermissions.view, <AuditLogDetailPage />)}
                     />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/uoms" element={<UomListPage />} />
