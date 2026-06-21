@@ -34,6 +34,16 @@ Do not place logic, business rules, or responsibilities in modules that do not o
 
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
+Support both vertical (feature-based) and horizontal (cross-cutting) development where appropriate. Design changes should enable feature enhancement without breaking existing functionality. Maintain data integrity at all times. Ensure loose coupling and high cohesion between modules. Follow clean architecture principles with clear separation of concerns, and respect module ownership boundaries. Prefer scalable and maintainable designs over tightly coupled or rigid implementations.
+
+Support vertical feature development and necessary horizontal cross-cutting improvements without violating module boundaries. Ensure all changes preserve data integrity, maintain loose coupling, and follow clean architecture principles. Enhance features in a way that does not introduce unnecessary dependencies or architectural complexity. Prioritize scalability, maintainability, and clarity over structural overengineering.
+
+Prefer modular code organization and split large files when they reduce readability, maintainability, or increase cognitive complexity. However, do not split blindly—each split must have a clear architectural reason such as separation of concerns, feature boundary, or reuse. Avoid over-fragmentation that makes the system harder to navigate or understand.
+
+Split large files only when they become difficult to read, maintain, or reason about. Ensure each split reflects a clear responsibility, feature boundary, or abstraction. Do not split code arbitrarily or excessively, as over-fragmentation reduces clarity and maintainability.
+
+Organize code into modular units to improve readability and maintainability. Split large files only when they violate clarity, separation of concerns, or become difficult to reason about. Ensure every split has a clear purpose and preserves architectural coherence. Avoid both oversized files and unnecessary fragmentation.
+
 Security first: Do not introduce security risks, expose secrets, bypass validation, or weaken authentication and authorization mechanisms.
 
 Performance awareness: Consider performance implications, but do not sacrifice readability and maintainability for premature optimization.
