@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Middleware;
 
 use Closure;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 final class CurrentTenantMiddleware
 {
-    public function __construct(private readonly CurrentTenantContextResolverInterface $resolver) {}
+    public function __construct(
+        private readonly CurrentTenantContextResolverInterface $resolver,
+        private readonly ApiErrorResponseFactory $responses,
+    ) {}
 
     /**
      * @param  Closure(Request): Response  $next
@@ -24,14 +26,14 @@ final class CurrentTenantMiddleware
         try {
             $context = $this->resolver->resolve($request);
         } catch (CurrentTenantContextResolutionException $exception) {
-            return $this->errorResponse($exception->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->responses->forStatus(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->getMessage());
         }
 
         if ($context === null) {
             if ($this->currentTenantRequired()) {
-                return $this->errorResponse(
-                    'Unable to resolve tenant context for the active request.',
+                return $this->responses->forStatus(
                     Response::HTTP_BAD_REQUEST,
+                    'Unable to resolve tenant context for the active request.',
                 );
             }
 
@@ -39,13 +41,13 @@ final class CurrentTenantMiddleware
         }
 
         if (! $this->resolver->hasAccess($request, $context)) {
-            return $this->errorResponse(
-                'Authenticated user cannot access the resolved tenant.',
+            return $this->responses->forStatus(
                 Response::HTTP_FORBIDDEN,
+                'Authenticated user cannot access the resolved tenant.',
             );
         }
 
-        $request->attributes->set($this->configString('request_attribute', 'current_tenant'), $context->toArray());
+        $request->attributes->set($this->configString('request_attribute', 'current_tenant'), $context);
         $request->attributes->set($this->configString('id_attribute', 'current_tenant_id'), $context->tenantId());
         $request->attributes->set($this->configString('code_attribute', 'current_tenant_code'), $context->tenantCode());
         $request->attributes->set($this->configString('uuid_attribute', 'current_tenant_uuid'), $context->tenantUuid());
@@ -67,34 +69,11 @@ final class CurrentTenantMiddleware
 
     private function currentTenantRequired(): bool
     {
-        if (! function_exists('config')) {
-            return true;
-        }
-
-        try {
-            return (bool) config('core.current_tenant.required', true);
-        } catch (Throwable) {
-            return true;
-        }
+        return (bool) config('core.current_tenant.required', true);
     }
 
     private function configString(string $key, string $fallback): string
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            return (string) config('core.current_tenant.'.$key, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
-    }
-
-    private function errorResponse(string $message, int $status): JsonResponse
-    {
-        return response()->json([
-            'message' => $message,
-        ], $status);
+        return (string) config('core.current_tenant.'.$key, $fallback);
     }
 }

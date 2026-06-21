@@ -54,6 +54,20 @@ final class EloquentUserTenantRepository extends EloquentRepository implements U
             ->exists();
     }
 
+    /** @return list<DataRecord> */
+    public function listDefaultsForTenantAndUser(int $tenantId, int $userId): array
+    {
+        return $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->where('is_default', true)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Model $model): DataRecord => $this->toRecord($model))
+            ->values()
+            ->all();
+    }
+
     public function clearDefaultForUser(int $tenantId, int $userId, ?int $excludeId = null): void
     {
         $query = $this->query()

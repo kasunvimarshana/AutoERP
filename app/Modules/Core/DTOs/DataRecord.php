@@ -21,9 +21,14 @@ final readonly class DataRecord
         }
     }
 
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->values);
+    }
+
     public function get(string $key, mixed $default = null): mixed
     {
-        return $this->values[$key] ?? $default;
+        return $this->has($key) ? $this->values[$key] : $default;
     }
 
     public function require(string $key): mixed

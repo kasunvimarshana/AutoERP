@@ -7,7 +7,7 @@ namespace Modules\Vehicle\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;

@@ -86,24 +86,26 @@ final class VehicleDocumentService
             ->get();
     }
 
-    public function content(Vehicle $vehicle, VehicleDocument $document): ?string
+    /** @return resource|false */
+    public function stream(Vehicle $vehicle, VehicleDocument $document): mixed
     {
         $this->assertOwned($vehicle, $document);
 
         if (! is_string($document->file_path) || $document->file_path === '') {
-            return null;
+            return false;
         }
 
-        $content = $this->files->read($document->file_path);
-        if ($content === null) {
+        if (! $this->files->exists($document->file_path)) {
             Log::warning('Vehicle document file was not found for preview or download.', [
                 'vehicle_id' => $vehicle->getKey(),
                 'document_id' => $document->getKey(),
                 'path' => $document->file_path,
             ]);
+
+            return false;
         }
 
-        return $content;
+        return $this->files->readStream($document->file_path);
     }
 
     public function mimeType(Vehicle $vehicle, VehicleDocument $document): string

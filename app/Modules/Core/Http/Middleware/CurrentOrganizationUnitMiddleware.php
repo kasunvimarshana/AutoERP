@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Middleware;
 
 use Closure;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextResolverInterface;
 use Modules\Core\Exceptions\CurrentOrganizationUnitContextResolutionException;
+use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 final class CurrentOrganizationUnitMiddleware
 {
-    public function __construct(private readonly CurrentOrganizationUnitContextResolverInterface $resolver) {}
+    public function __construct(
+        private readonly CurrentOrganizationUnitContextResolverInterface $resolver,
+        private readonly ApiErrorResponseFactory $responses,
+    ) {}
 
     /**
      * @param  Closure(Request): Response  $next
@@ -24,14 +26,14 @@ final class CurrentOrganizationUnitMiddleware
         try {
             $context = $this->resolver->resolve($request);
         } catch (CurrentOrganizationUnitContextResolutionException $exception) {
-            return $this->errorResponse($exception->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->responses->forStatus(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->getMessage());
         }
 
         if ($context === null) {
             if ($this->required()) {
-                return $this->errorResponse(
-                    'Unable to resolve organization unit context for the active request.',
+                return $this->responses->forStatus(
                     Response::HTTP_BAD_REQUEST,
+                    'Unable to resolve organization unit context for the active request.',
                 );
             }
 
@@ -39,13 +41,13 @@ final class CurrentOrganizationUnitMiddleware
         }
 
         if (! $this->resolver->hasAccess($request, $context)) {
-            return $this->errorResponse(
-                'Authenticated user cannot access the resolved organization unit.',
+            return $this->responses->forStatus(
                 Response::HTTP_FORBIDDEN,
+                'Authenticated user cannot access the resolved organization unit.',
             );
         }
 
-        $request->attributes->set($this->configString('request_attribute', 'current_organization_unit'), $context->toArray());
+        $request->attributes->set($this->configString('request_attribute', 'current_organization_unit'), $context);
         $request->attributes->set($this->configString('id_attribute', 'current_organization_unit_id'), $context->organizationUnitId());
         $request->attributes->set($this->configString('tenant_id_attribute', 'current_organization_unit_tenant_id'), $context->tenantId());
         $request->attributes->set($this->configString('code_attribute', 'current_organization_unit_code'), $context->code());
@@ -60,34 +62,11 @@ final class CurrentOrganizationUnitMiddleware
 
     private function required(): bool
     {
-        if (! function_exists('config')) {
-            return true;
-        }
-
-        try {
-            return (bool) config('core.current_organization_unit.required', true);
-        } catch (Throwable) {
-            return true;
-        }
+        return (bool) config('core.current_organization_unit.required', true);
     }
 
     private function configString(string $key, string $fallback): string
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            return (string) config('core.current_organization_unit.'.$key, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
-    }
-
-    private function errorResponse(string $message, int $status): JsonResponse
-    {
-        return response()->json([
-            'message' => $message,
-        ], $status);
+        return (string) config('core.current_organization_unit.'.$key, $fallback);
     }
 }

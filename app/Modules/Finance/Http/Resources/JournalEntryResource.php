@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Finance\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Finance\Enums\JournalStatus;
 
-final class JournalEntryResource extends ModuleResource
+final class JournalEntryResource extends JsonResource
 {
     public function toArray(Request $request): array
     {

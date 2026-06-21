@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('idempotency_records', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
             $table->string('operation', 120);
             $table->string('reference_hash', 64);
             $table->string('scope_hash', 64);

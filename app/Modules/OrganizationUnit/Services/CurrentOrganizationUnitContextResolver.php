@@ -6,7 +6,6 @@ namespace Modules\OrganizationUnit\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
-use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextResolverInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
@@ -15,21 +14,19 @@ use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentOrganizationUnitContextResolutionException;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\User\Repositories\UserTenantRepositoryInterface;
-use Throwable;
 
 final class CurrentOrganizationUnitContextResolver implements CurrentOrganizationUnitContextResolverInterface
 {
     public function __construct(
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
-        private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserTenantRepositoryInterface $userTenants,
     ) {}
 
     public function resolve(Request $request): ?CurrentOrganizationUnitContext
     {
-        $tenantId = $this->resolveTenantId($request);
+        $tenantId = $this->resolveTenantId();
         if ($tenantId === null) {
             return null;
         }
@@ -41,38 +38,52 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             return $explicit;
         }
 
-        $authenticatedOrganizationUnitId = $this->resolveAuthenticatedOrganizationUnitId($request);
-        if ($authenticatedOrganizationUnitId === null) {
+        $userId = $this->resolveAuthenticatedUserId($request);
+        if ($userId === null) {
             return null;
         }
 
-        $organizationUnit = $this->organizationUnits->findById($authenticatedOrganizationUnitId);
+        $defaultMemberships = $this->userTenants->listDefaultsForTenantAndUser($tenantId, $userId);
+        if (count($defaultMemberships) > 1) {
+            throw new CurrentOrganizationUnitContextResolutionException(
+                'Multiple default organization memberships exist for the active tenant and user.',
+            );
+        }
+
+        $defaultMembership = $defaultMemberships[0] ?? null;
+        if (! $defaultMembership instanceof DataRecord) {
+            return null;
+        }
+
+        $organizationUnitId = $this->toNullableInt($defaultMembership->get('organization_unit_id'));
+        if ($organizationUnitId === null) {
+            return null;
+        }
+
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
         if ($organizationUnit === null) {
-            return null;
+            throw new CurrentOrganizationUnitContextResolutionException(
+                'Default organization unit membership could not be resolved.',
+            );
         }
 
-        return $this->toContext($organizationUnit, $tenantId, $applicationId, 'authenticated_user');
+        return $this->toContext($organizationUnit, $tenantId, $applicationId, 'default_membership');
     }
 
     public function hasAccess(Request $request, CurrentOrganizationUnitContext $context): bool
     {
-        if ($context->organizationUnitId() <= 0 || $context->tenantId() <= 0) {
+        if (! $context->isActive() || $context->organizationUnitId() <= 0 || $context->tenantId() <= 0) {
             return false;
         }
 
-        $tenantId = $this->resolveTenantId($request);
+        $tenantId = $this->resolveTenantId();
         if ($tenantId === null || $tenantId !== $context->tenantId()) {
             return false;
         }
 
-        $authenticatedOrganizationUnitId = $this->resolveAuthenticatedOrganizationUnitId($request);
-        if ($authenticatedOrganizationUnitId !== null && $authenticatedOrganizationUnitId === $context->organizationUnitId()) {
-            return true;
-        }
-
         $userId = $this->resolveAuthenticatedUserId($request);
         if ($userId === null) {
-            return true;
+            return false;
         }
 
         return $this->userTenants->existsForTenantUserAndOrganizationUnit(
@@ -213,34 +224,11 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
         return $this->toContext($organizationUnit, $tenantId, $applicationId, 'request_metadata');
     }
 
-    private function resolveTenantId(Request $request): ?int
+    private function resolveTenantId(): ?int
     {
         $tenantId = $this->currentTenant->currentTenantId();
-        if ($tenantId !== null && $tenantId > 0) {
-            return $tenantId;
-        }
 
-        $tenantId = $this->currentUser->currentTenantId();
-        if ($tenantId !== null && $tenantId > 0) {
-            return $tenantId;
-        }
-
-        return $this->toNullableInt(data_get($request->user(), 'tenant_id'));
-    }
-
-    private function resolveAuthenticatedOrganizationUnitId(Request $request): ?int
-    {
-        $organizationUnitId = $this->currentUser->currentOrganizationUnitId();
-        if ($organizationUnitId !== null && $organizationUnitId > 0) {
-            return $organizationUnitId;
-        }
-
-        $organizationUnitId = $this->currentOrganizationUnit->currentOrganizationUnitId();
-        if ($organizationUnitId !== null && $organizationUnitId > 0) {
-            return $organizationUnitId;
-        }
-
-        return $this->toNullableInt(data_get($request->user(), 'organization_unit_id'));
+        return $tenantId !== null && $tenantId > 0 ? $tenantId : null;
     }
 
     private function resolveAuthenticatedUserId(Request $request): ?int
@@ -275,8 +263,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
         }
 
         return $this->currentTenant->currentApplicationId()
-            ?? $this->currentUser->currentApplicationId()
-            ?? $this->currentOrganizationUnit->currentApplicationId();
+            ?? $this->currentUser->currentApplicationId();
     }
 
     private function toContext(
@@ -299,6 +286,12 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             );
         }
 
+        if (! $this->toBool($organizationUnit->get('is_active'))) {
+            throw new CurrentOrganizationUnitContextResolutionException(
+                'Resolved organization unit is not active.',
+            );
+        }
+
         return new CurrentOrganizationUnitContext(
             $organizationUnit,
             $organizationUnitId,
@@ -318,16 +311,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
      */
     private function configArray(string $key, array $fallback): array
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            $resolved = config('core.current_organization_unit.'.$key, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
-
+        $resolved = config('organization-unit.resolution.signals.'.$key, $fallback);
         if (! is_array($resolved)) {
             return $fallback;
         }

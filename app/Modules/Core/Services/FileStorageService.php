@@ -5,248 +5,143 @@ declare(strict_types=1);
 namespace Modules\Core\Services;
 
 use Illuminate\Filesystem\FilesystemAdapter;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Modules\Core\Contracts\FileStorageServiceInterface;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FileStorageService implements FileStorageServiceInterface
 {
-    protected FilesystemAdapter $disk;
+    private readonly string $defaultDisk;
 
-    protected string $defaultDisk;
+    private readonly FilesystemAdapter $defaultAdapter;
 
     public function __construct(string $defaultDisk)
     {
-        if (trim($defaultDisk) === '') {
-            throw new InvalidArgumentException('Default storage disk cannot be empty.');
-        }
-
-        $this->defaultDisk = $defaultDisk;
-        $disk = Storage::disk($defaultDisk);
-        if (! $disk instanceof FilesystemAdapter) {
-            throw new RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
-        }
-
-        $this->disk = $disk;
+        $this->defaultDisk = $this->normalizeDisk($defaultDisk);
+        $this->defaultAdapter = $this->resolveDisk($this->defaultDisk);
     }
 
-    public function store(string $tmpPath, string $directory, string $filename, ?string $disk = null): string
+    public function store(string $sourcePath, string $directory, string $filename, ?string $disk = null): string
     {
-        if (! is_file($tmpPath)) {
-            throw new InvalidArgumentException(sprintf('Temporary file not found: %s', $tmpPath));
+        if (! is_file($sourcePath) || ! is_readable($sourcePath)) {
+            throw new InvalidArgumentException('Source file is not readable.');
         }
 
-        $contents = file_get_contents($tmpPath);
-        if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to read temporary file: %s', $tmpPath));
+        $stream = fopen($sourcePath, 'rb');
+        if ($stream === false) {
+            throw new RuntimeException('Unable to open source file for reading.');
         }
 
-        return $this->storeContent($contents, $directory, $filename, $disk);
-    }
-
-    public function storeContent(
-        string $contents,
-        string $directory,
-        string $filename,
-        ?string $disk = null,
-    ): string {
-        if ($contents === '') {
-            throw new InvalidArgumentException('File contents cannot be empty.');
-        }
-
-        $adapter = $this->getDisk($disk);
         $targetPath = $this->buildTargetPath($directory, $filename);
-        $stored = $adapter->put($targetPath, $contents);
-        if (! $stored) {
-            throw new RuntimeException(sprintf('Unable to store file at path: %s', $targetPath));
+
+        try {
+            if (! $this->getDisk($disk)->writeStream($targetPath, $stream)) {
+                throw new RuntimeException(sprintf('Unable to store file at path: %s', $targetPath));
+            }
+        } finally {
+            fclose($stream);
         }
 
         return $targetPath;
     }
 
-    /**
-     * Compatibility bridge for duplicated sample interfaces in workspace.
-     */
-    public function storeFile(
-        UploadedFile $file,
-        string $directory,
-        ?string $filename = null,
-        ?string $disk = null,
-    ): string {
-        $realPath = $file->getRealPath();
-        if ($realPath === false || ! is_file($realPath)) {
-            return '';
-        }
-
-        $contents = file_get_contents($realPath);
-        if ($contents === false) {
-            throw new RuntimeException(sprintf('Unable to read uploaded file: %s', $realPath));
-        }
-
-        return $this->storeContent(
-            $contents,
-            $directory,
-            $filename ?? $file->getClientOriginalName(),
-            $disk,
-        );
-    }
-
     public function delete(string $path, ?string $disk = null): bool
     {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->delete($path);
+        return $this->getDisk($disk)->delete($this->normalizeRelativePath($path));
     }
 
     public function exists(string $path, ?string $disk = null): bool
     {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->exists($path);
-    }
-
-    public function url(string $path, ?string $disk = null): string
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->url($path);
-    }
-
-    public function size(string $path, ?string $disk = null): int
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->size($path);
+        return $this->getDisk($disk)->exists($this->normalizeRelativePath($path));
     }
 
     public function mimeType(string $path, ?string $disk = null): string|false
     {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->mimeType($path);
-    }
-
-    public function lastModified(string $path, ?string $disk = null): int
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->lastModified($path);
-    }
-
-    public function read(string $path, ?string $disk = null): ?string
-    {
-        $adapter = $this->getDisk($disk);
-
-        if (! $adapter->exists($path)) {
-            return null;
-        }
-
-        return $adapter->get($path);
-    }
-
-    public function write(string $path, string $contents, ?string $disk = null): bool
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->put($path, $contents);
-    }
-
-    public function copy(string $from, string $to, ?string $disk = null): bool
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->copy($from, $to);
-    }
-
-    public function move(string $from, string $to, ?string $disk = null): bool
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->move($from, $to);
-    }
-
-    public function temporaryUrl(
-        string $path,
-        int $minutes,
-        ?string $disk = null,
-    ): ?string {
-        if ($minutes < 1) {
-            throw new InvalidArgumentException('Temporary URL minutes must be greater than zero.');
-        }
-
-        $adapter = $this->getDisk($disk);
-        if (method_exists($adapter, 'temporaryUrl')) {
-            return $adapter->temporaryUrl($path, now()->addMinutes($minutes));
-        }
-
-        return null;
+        return $this->getDisk($disk)->mimeType($this->normalizeRelativePath($path));
     }
 
     public function readStream(string $path, ?string $disk = null): mixed
     {
-        $adapter = $this->getDisk($disk);
+        $normalizedPath = $this->normalizeRelativePath($path);
+        $stream = $this->getDisk($disk)->readStream($normalizedPath);
 
-        return $adapter->readStream($path);
-    }
-
-    /**
-     * Compatibility bridge for duplicated sample interfaces in workspace.
-     */
-    public function stream(string $path, ?string $disk = null): StreamedResponse
-    {
-        $adapter = $this->getDisk($disk);
-
-        return $adapter->response($path);
-    }
-
-    public function getDefaultDisk(): string
-    {
-        return $this->defaultDisk;
-    }
-
-    public function setDefaultDisk(string $disk): void
-    {
-        if (trim($disk) === '') {
-            throw new InvalidArgumentException('Storage disk cannot be empty.');
+        if (! is_resource($stream)) {
+            throw new RuntimeException(sprintf('Unable to open stored file for reading: %s', $normalizedPath));
         }
 
-        $this->defaultDisk = $disk;
+        return $stream;
+    }
+
+    private function getDisk(?string $disk): FilesystemAdapter
+    {
+        if ($disk === null) {
+            return $this->defaultAdapter;
+        }
+
+        $disk = $this->normalizeDisk($disk);
+
+        return $disk === $this->defaultDisk ? $this->defaultAdapter : $this->resolveDisk($disk);
+    }
+
+    private function resolveDisk(string $disk): FilesystemAdapter
+    {
         $adapter = Storage::disk($disk);
         if (! $adapter instanceof FilesystemAdapter) {
-            throw new RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
+            throw new RuntimeException(sprintf('Storage disk "%s" is not a filesystem adapter.', $disk));
         }
-
-        $this->disk = $adapter;
-    }
-
-    protected function getDisk(?string $disk = null): FilesystemAdapter
-    {
-        if ($disk !== null && trim($disk) === '') {
-            throw new InvalidArgumentException('Storage disk cannot be empty.');
-        }
-
-        if ($disk === null || $disk === $this->defaultDisk) {
-            return $this->disk;
-        }
-
-        /** @var FilesystemAdapter $adapter */
-        $adapter = Storage::disk($disk);
 
         return $adapter;
     }
 
-    private function buildTargetPath(string $directory, string $filename): string
+    private function normalizeDisk(string $disk): string
     {
-        $normalizedFilename = trim($filename);
-        if ($normalizedFilename === '') {
-            throw new InvalidArgumentException('Filename cannot be empty.');
+        $disk = trim($disk);
+        if ($disk === '') {
+            throw new InvalidArgumentException('Storage disk cannot be empty.');
         }
 
-        $targetPath = trim($directory, '/');
+        return $disk;
+    }
 
-        return $targetPath === '' ? $normalizedFilename : $targetPath.'/'.$normalizedFilename;
+    private function buildTargetPath(string $directory, string $filename): string
+    {
+        $filename = trim($filename);
+        if (
+            $filename === ''
+            || $filename === '.'
+            || $filename === '..'
+            || str_contains($filename, '/')
+            || str_contains($filename, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $filename) === 1
+        ) {
+            throw new InvalidArgumentException('Filename must be a safe basename.');
+        }
+
+        $directory = trim($directory);
+        if ($directory === '') {
+            return $filename;
+        }
+
+        return $this->normalizeRelativePath($directory).'/'.$filename;
+    }
+
+    private function normalizeRelativePath(string $path): string
+    {
+        $path = str_replace('\\', '/', trim($path));
+        $path = trim($path, '/');
+
+        if ($path === '' || preg_match('/[\x00-\x1F\x7F]/', $path) === 1) {
+            throw new InvalidArgumentException('Storage path must be a non-empty relative path.');
+        }
+
+        $segments = explode('/', $path);
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                throw new InvalidArgumentException('Storage path contains an invalid segment.');
+            }
+        }
+
+        return implode('/', $segments);
     }
 }

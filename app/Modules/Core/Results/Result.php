@@ -43,11 +43,6 @@ final class Result
         return ! $this->successful;
     }
 
-    public function value(): mixed
-    {
-        return $this->value;
-    }
-
     public function valueOrFail(): mixed
     {
         if ($this->isFailure()) {
@@ -55,11 +50,6 @@ final class Result
         }
 
         return $this->value;
-    }
-
-    public function error(): ?Error
-    {
-        return $this->error;
     }
 
     public function errorOrFail(): Error

@@ -14,6 +14,27 @@ final class AuthRefreshTokenModel extends CoreModel
 
     protected $table = 'auth_refresh_tokens';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'access_token_id',
+        'client_id',
+        'identity_id',
+        'session_id',
+        'user_id',
+        'refresh_key',
+        'refresh_hash',
+        'rotated',
+        'rotated_at',
+        'replaced_by_expires_at',
+        'status',
+        'issued_at',
+        'expires_at',
+        'revoked_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

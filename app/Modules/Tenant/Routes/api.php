@@ -9,7 +9,6 @@ use Modules\Tenant\Http\Controllers\TenantDomainController;
 use Modules\Tenant\Http\Controllers\TenantPlanController;
 use Modules\Tenant\Http\Controllers\TenantSettingController;
 use Modules\Tenant\Http\Controllers\TenantSettingGroupController;
-use Modules\Tenant\Http\Middleware\TenantResolutionMiddleware;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -25,7 +24,6 @@ Route::prefix('api/tenant')
         'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
-        TenantResolutionMiddleware::class,
         $currentOrganizationUnitMiddleware,
     ])
     ->name('tenant.')

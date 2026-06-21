@@ -4,26 +4,34 @@ declare(strict_types=1);
 
 namespace Modules\Core\Support;
 
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use InvalidArgumentException;
 use Modules\Core\Contracts\ExceptionParserInterface;
+use Modules\Core\Exceptions\DomainException;
 use Throwable;
 
 final class ExceptionParser implements ExceptionParserInterface
 {
+    public function __construct(private readonly ConfigRepository $config) {}
+
     public function parse(Throwable $exception): array
     {
-        $message = trim($exception->getMessage());
+        $safeToExpose = $exception instanceof DomainException || $exception instanceof InvalidArgumentException;
+        $debug = (bool) $this->config->get('app.debug', false);
+        $message = $safeToExpose || $debug
+            ? trim($exception->getMessage())
+            : 'Unexpected error.';
         $message = $message !== '' ? $message : 'Unexpected error.';
 
-        $code = is_int($exception->getCode()) && $exception->getCode() > 0
-            ? 'EXCEPTION_'.(string) $exception->getCode()
+        $numericCode = $exception->getCode();
+        $code = is_int($numericCode) && $numericCode > 0
+            ? 'EXCEPTION_'.(string) $numericCode
             : 'EXCEPTION';
 
         return [
             'code' => $code,
             'message' => $message,
-            'context' => [
-                'exception' => $exception::class,
-            ],
+            'context' => $debug ? ['exception' => $exception::class] : [],
         ];
     }
 }

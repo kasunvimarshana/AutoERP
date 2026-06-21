@@ -13,6 +13,28 @@ final class AuthVerificationChallengeModel extends CoreModel
 
     protected $table = 'auth_verification_challenges';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_id',
+        'identity_id',
+        'user_id',
+        'challenge_key',
+        'challenge_type',
+        'channel',
+        'target',
+        'challenge_hash',
+        'attempts',
+        'max_attempts',
+        'status',
+        'issued_at',
+        'expires_at',
+        'verified_at',
+        'revoked_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

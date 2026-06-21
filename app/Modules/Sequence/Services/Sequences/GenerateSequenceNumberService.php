@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Services\Sequences;
 
+use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -17,6 +18,7 @@ final class GenerateSequenceNumberService
     public function __construct(
         private readonly SequenceRepositoryInterface $sequences,
         private readonly SequenceDomainServiceInterface $domain,
+        private readonly TransactionManagerInterface $transactions,
     ) {}
 
     public function execute(array $payload): Result
@@ -41,7 +43,7 @@ final class GenerateSequenceNumberService
                 isset($payload['at_date']) ? (string) $payload['at_date'] : null,
             );
 
-            $result = $this->sequences->transaction(function () use (
+            $result = $this->transactions->runInTransaction(function () use (
                 $tenantId,
                 $organizationUnitId,
                 $documentType,

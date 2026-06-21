@@ -15,5 +15,8 @@ interface UserTenantRepositoryInterface extends RepositoryPortInterface
 
     public function existsForTenantUserAndOrganizationUnit(int $tenantId, int $userId, int $organizationUnitId): bool;
 
+    /** @return list<DataRecord> */
+    public function listDefaultsForTenantAndUser(int $tenantId, int $userId): array;
+
     public function clearDefaultForUser(int $tenantId, int $userId, ?int $excludeId = null): void;
 }

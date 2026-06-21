@@ -8,6 +8,19 @@ return [
         'max_per_page' => 100,
     ],
     'resolution' => [
-        'required' => (bool) env('ORGANIZATION_UNIT_RESOLUTION_REQUIRED', true),
+        'signals' => [
+            'id_input_keys' => ['organization_unit_id'],
+            'id_route_keys' => ['organization_unit_id', 'organization_unit'],
+            'id_header_keys' => ['X-Organization-Unit-Id', 'X-Organization-Unit'],
+            'code_input_keys' => ['organization_unit_code'],
+            'code_route_keys' => ['organization_unit_code'],
+            'code_header_keys' => ['X-Organization-Unit-Code'],
+            'path_input_keys' => ['organization_unit_path'],
+            'path_header_keys' => ['X-Organization-Unit-Path'],
+            'name_input_keys' => ['organization_unit_name'],
+            'name_header_keys' => ['X-Organization-Unit-Name'],
+            'application_input_keys' => ['application_id', 'app_id', 'client_id'],
+            'application_header_keys' => ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
+        ],
     ],
 ];

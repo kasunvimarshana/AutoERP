@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Vehicle\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Response;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleDocument;
@@ -29,6 +28,7 @@ use Modules\Vehicle\Services\VehicleQueryService;
 use Modules\Vehicle\Services\VehicleRelationQueryService;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class VehicleRelationController
 {
@@ -72,7 +72,7 @@ final class VehicleRelationController
         return response()->json(null, 204);
     }
 
-    public function previewDocument(ListVehicleRequest $request, int $vehicle, int $document): Response
+    public function previewDocument(ListVehicleRequest $request, int $vehicle, int $document): StreamedResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::DOWNLOAD_DOCUMENTS);
 
@@ -81,7 +81,7 @@ final class VehicleRelationController
         return $this->documentResponse($model, $this->relations->document($model, $document), true);
     }
 
-    public function downloadDocument(ListVehicleRequest $request, int $vehicle, int $document): Response
+    public function downloadDocument(ListVehicleRequest $request, int $vehicle, int $document): StreamedResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::DOWNLOAD_DOCUMENTS);
 
@@ -159,14 +159,20 @@ final class VehicleRelationController
         return VehicleStatusHistoryResource::collection($this->relations->statusHistory($this->vehicle($request, $vehicle), $request->perPage()));
     }
 
-    private function documentResponse(Vehicle $vehicle, VehicleDocument $document, bool $inline): Response
+    private function documentResponse(Vehicle $vehicle, VehicleDocument $document, bool $inline): StreamedResponse
     {
-        $content = $this->documents->content($vehicle, $document);
-        if ($content === null) {
+        $stream = $this->documents->stream($vehicle, $document);
+        if (! is_resource($stream)) {
             abort(404, 'Vehicle document file not found.');
         }
 
-        return response($content, 200, [
+        return response()->stream(static function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
             'Content-Type' => $this->documents->mimeType($vehicle, $document),
             'Content-Disposition' => HeaderUtils::makeDisposition(
                 $inline ? ResponseHeaderBag::DISPOSITION_INLINE : ResponseHeaderBag::DISPOSITION_ATTACHMENT,

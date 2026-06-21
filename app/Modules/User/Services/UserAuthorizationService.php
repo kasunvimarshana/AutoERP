@@ -18,7 +18,7 @@ final class UserAuthorizationService
     public function canCurrent(string $permission): bool
     {
         $userId = $this->currentUser->currentUserId();
-        $tenantId = $this->currentTenant->currentTenantId() ?? $this->currentUser->currentTenantId();
+        $tenantId = $this->currentTenant->currentTenantId();
 
         if ($userId === null || $tenantId === null) {
             return false;

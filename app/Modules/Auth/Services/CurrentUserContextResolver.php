@@ -9,15 +9,10 @@ use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
 use Modules\Core\DTOs\CurrentUserContext;
-use Modules\User\Repositories\UserTenantRepositoryInterface;
-use Throwable;
 
 final class CurrentUserContextResolver implements CurrentUserContextResolverInterface
 {
-    public function __construct(
-        private readonly AuthFactory $authFactory,
-        private readonly UserTenantRepositoryInterface $userTenants,
-    ) {}
+    public function __construct(private readonly AuthFactory $authFactory) {}
 
     public function resolve(Request $request): ?CurrentUserContext
     {
@@ -31,20 +26,16 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
                 continue;
             }
 
-            $userId = (string) $user->getAuthIdentifier();
-            if ($userId === '') {
+            $userId = $this->toNullableInt($user->getAuthIdentifier());
+            if ($userId === null) {
                 continue;
             }
-
-            $provider = $this->guardProvider($guardName);
 
             return new CurrentUserContext(
                 $user,
                 $userId,
                 $guardName,
-                $provider,
-                $this->toNullableInt(data_get($user, 'tenant_id')),
-                $this->toNullableInt(data_get($user, 'organization_unit_id')),
+                $this->guardProvider($guardName),
                 $this->resolveApplicationId($request, $tokenPayload),
                 $tokenPayload,
             );
@@ -53,55 +44,12 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
         return null;
     }
 
-    public function resolveRequestedTenantId(Request $request): ?int
-    {
-        foreach ($this->configArray('tenant_input_keys', ['tenant_id']) as $key) {
-            $value = $request->input($key);
-            $tenantId = $this->toNullableInt($value);
-            if ($tenantId !== null) {
-                return $tenantId;
-            }
-        }
-
-        foreach ($this->configArray('tenant_route_keys', ['tenant_id', 'tenant']) as $key) {
-            $value = $request->route($key);
-            $tenantId = $this->toNullableInt($value);
-            if ($tenantId !== null) {
-                return $tenantId;
-            }
-        }
-
-        foreach ($this->configArray('tenant_header_keys', ['X-Tenant-Id', 'X-Tenant']) as $key) {
-            $tenantId = $this->toNullableInt($request->headers->get($key));
-            if ($tenantId !== null) {
-                return $tenantId;
-            }
-        }
-
-        return null;
-    }
-
-    public function hasTenantAccess(CurrentUserContext $context, int $tenantId): bool
-    {
-        if ($tenantId <= 0) {
-            return false;
-        }
-
-        if ($context->tenantId() === $tenantId) {
-            return true;
-        }
-
-        return $this->userTenants->existsForTenantAndUser($tenantId, $context->userIdAsInt());
-    }
-
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function candidateGuards(Request $request): array
     {
         $guards = [];
-
         $route = $request->route();
+
         if ($route !== null) {
             foreach ($route->gatherMiddleware() as $middleware) {
                 if (! is_string($middleware) || ! str_starts_with($middleware, 'auth')) {
@@ -122,7 +70,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
             }
         }
 
-        $contextGuardAttribute = $this->configString('guard_attribute', 'current_user_guard');
+        $contextGuardAttribute = (string) config('core.current_user.guard_attribute', 'current_user_guard');
         $contextGuard = $request->attributes->get($contextGuardAttribute);
         if (is_string($contextGuard) && trim($contextGuard) !== '') {
             $guards[] = trim($contextGuard);
@@ -145,9 +93,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
         return $uniqueGuards;
     }
 
-    /**
-     * @param  array<string, mixed>  $tokenPayload
-     */
+    /** @param array<string, mixed> $tokenPayload */
     private function resolveApplicationId(Request $request, array $tokenPayload): ?string
     {
         foreach ($this->configArray('application_input_keys', ['application_id', 'app_id', 'client_id']) as $key) {
@@ -157,12 +103,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
             }
         }
 
-        $applicationHeaderKeys = $this->configArray(
-            'application_header_keys',
-            ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
-        );
-
-        foreach ($applicationHeaderKeys as $key) {
+        foreach ($this->configArray('application_header_keys', ['X-Application-Id', 'X-App-Id', 'X-Client-Id']) as $key) {
             $value = $request->headers->get($key);
             if (is_string($value) && trim($value) !== '') {
                 return trim($value);
@@ -188,11 +129,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
 
     private function toNullableInt(mixed $value): ?int
     {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (! is_numeric($value)) {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
             return null;
         }
 
@@ -203,24 +140,25 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
 
     private function configString(string $key, string $fallback): string
     {
-        return $this->configStringFromPath('core.current_user.'.$key, $fallback);
+        return (string) config('module-auth.current_user_context.'.$key, $fallback);
     }
 
     /**
-     * @param  list<string>  $fallback
+     * @param list<string> $fallback
      * @return list<string>
      */
     private function configArray(string $key, array $fallback): array
     {
-        $resolved = $this->configArrayFromPath('core.current_user.'.$key, $fallback);
+        $resolved = config('module-auth.current_user_context.'.$key, $fallback);
+        if (! is_array($resolved)) {
+            return $fallback;
+        }
+
         $values = [];
-
         foreach ($resolved as $value) {
-            if (! is_string($value) || trim($value) === '') {
-                continue;
+            if (is_string($value) && trim($value) !== '') {
+                $values[] = trim($value);
             }
-
-            $values[] = trim($value);
         }
 
         /** @var list<string> $values */
@@ -229,32 +167,13 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
 
     private function configStringFromPath(string $path, string $fallback): string
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            return (string) config($path, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
+        return (string) config($path, $fallback);
     }
 
-    /**
-     * @param  array<string, mixed>  $fallback
-     * @return array<string, mixed>
-     */
+    /** @param array<string, mixed> $fallback @return array<string, mixed> */
     private function configArrayFromPath(string $path, array $fallback): array
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            $resolved = config($path, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
+        $resolved = config($path, $fallback);
 
         return is_array($resolved) ? $resolved : $fallback;
     }

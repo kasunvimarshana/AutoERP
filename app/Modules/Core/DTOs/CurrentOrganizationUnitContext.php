@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\DTOs;
 
+use InvalidArgumentException;
+
 final readonly class CurrentOrganizationUnitContext
 {
     public function __construct(
@@ -16,7 +18,29 @@ final readonly class CurrentOrganizationUnitContext
         private bool $isActive,
         private ?string $applicationId,
         private string $source,
-    ) {}
+    ) {
+        if ($this->organizationUnitId < 1 || $this->tenantId < 1) {
+            throw new InvalidArgumentException(
+                'Current organization unit and tenant identifiers must be positive.',
+            );
+        }
+
+        if ((int) $this->organizationUnit->id() !== $this->organizationUnitId) {
+            throw new InvalidArgumentException(
+                'Current organization unit record does not match the organization unit identifier.',
+            );
+        }
+
+        if ((int) $this->organizationUnit->require('tenant_id') !== $this->tenantId) {
+            throw new InvalidArgumentException(
+                'Current organization unit record does not belong to the tenant context.',
+            );
+        }
+
+        if (trim($this->name) === '' || trim($this->source) === '') {
+            throw new InvalidArgumentException('Current organization unit name and source are required.');
+        }
+    }
 
     public function organizationUnit(): DataRecord
     {

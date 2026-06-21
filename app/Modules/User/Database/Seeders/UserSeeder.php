@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\PasswordHasherInterface;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;

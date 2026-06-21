@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
 
-final class SalesQuotationResource extends ModuleResource
+final class SalesQuotationResource extends JsonResource
 {
     use FormatsSalesResources;
 

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Invoice\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Invoice\Http\Resources\Concerns\FormatsInvoiceResources;
 
-final class InvoiceBalanceResource extends ModuleResource
+final class InvoiceBalanceResource extends JsonResource
 {
     use FormatsInvoiceResources;
 

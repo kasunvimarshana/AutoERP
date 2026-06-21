@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Resources;
 
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-final class InventoryStockStateChangeResource extends ModuleResource {}
+final class InventoryStockStateChangeResource extends JsonResource {}

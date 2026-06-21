@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Modules\Core\Services\DecimalMath;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-abstract class PurchaseResource extends ModuleResource
+abstract class PurchaseResource extends JsonResource
 {
     private ?DecimalMath $decimalMath = null;
 

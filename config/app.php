@@ -118,6 +118,12 @@ return [
     |
     */
 
+    'bootstrap' => [
+        'tenant_code' => env('AUTOERP_TENANT_CODE', 'AUTOERP'),
+        'organization_unit_code' => env('AUTOERP_ORGANIZATION_UNIT_CODE', 'HQ'),
+        'currency_code' => env('AUTOERP_CURRENCY_CODE', 'USD'),
+    ],
+
     'maintenance' => [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),

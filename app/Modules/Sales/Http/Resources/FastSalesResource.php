@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-final class FastSalesResource extends ModuleResource
+final class FastSalesResource extends JsonResource
 {
     public function toArray(Request $request): array
     {

@@ -11,6 +11,11 @@ return [
     'provider_drivers' => [
         'internal' => InternalAuthenticationProvider::class,
     ],
+    'current_user_context' => [
+        'token_payload_attribute' => env('AUTH_TOKEN_PAYLOAD_ATTRIBUTE', 'auth_access_token'),
+        'application_input_keys' => ['application_id', 'app_id', 'client_id'],
+        'application_header_keys' => ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
+    ],
     'access_token_ttl_seconds' => (int) env('AUTH_ACCESS_TOKEN_TTL', 3600),
     'refresh_token_ttl_seconds' => (int) env('AUTH_REFRESH_TOKEN_TTL', 2592000),
     'authorization_code_ttl_seconds' => (int) env('AUTH_AUTHORIZATION_CODE_TTL', 300),

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Payment\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Payment\Services\PaymentCapabilityService;
 
-final class PaymentResource extends ModuleResource
+final class PaymentResource extends JsonResource
 {
     /**
      * @return array<string, mixed>

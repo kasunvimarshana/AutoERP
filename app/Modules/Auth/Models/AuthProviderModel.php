@@ -14,6 +14,22 @@ final class AuthProviderModel extends CoreModel
 
     protected $table = 'auth_providers';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_key',
+        'name',
+        'guard_name',
+        'provider_name',
+        'driver',
+        'status',
+        'is_sso',
+        'config',
+        'last_synced_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

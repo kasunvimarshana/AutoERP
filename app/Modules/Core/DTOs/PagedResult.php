@@ -40,7 +40,9 @@ final readonly class PagedResult
             return 0;
         }
 
-        return (int) ceil($this->total / $this->perPage);
+        $wholePages = intdiv($this->total, $this->perPage);
+
+        return $wholePages + ($this->total % $this->perPage === 0 ? 0 : 1);
     }
 
     public function hasMore(): bool
@@ -60,7 +62,8 @@ final readonly class PagedResult
      */
     public function paginationMeta(): array
     {
-        $from = $this->total === 0 ? null : (($this->page - 1) * $this->perPage) + 1;
+        $offset = ($this->page - 1) * $this->perPage;
+        $from = $this->total === 0 || $offset >= $this->total ? null : $offset + 1;
 
         return [
             'current_page' => $this->page,

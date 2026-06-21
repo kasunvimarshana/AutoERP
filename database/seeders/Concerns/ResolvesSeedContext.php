@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Core\Database\Seeders\Concerns;
+namespace Database\Seeders\Concerns;
 
 use Illuminate\Support\Facades\Schema;
 use Modules\Configuration\Models\CurrencyModel;
@@ -52,16 +52,16 @@ trait ResolvesSeedContext
 
     private function defaultTenantCode(): string
     {
-        return strtoupper(trim((string) env('AUTOERP_TENANT_CODE', 'AUTOERP')));
+        return strtoupper(trim((string) config('app.bootstrap.tenant_code', 'AUTOERP')));
     }
 
     private function defaultOrganizationUnitCode(): string
     {
-        return strtoupper(trim((string) env('AUTOERP_ORGANIZATION_UNIT_CODE', 'HQ')));
+        return strtoupper(trim((string) config('app.bootstrap.organization_unit_code', 'HQ')));
     }
 
     private function defaultCurrencyCode(): string
     {
-        return strtoupper(trim((string) env('AUTOERP_CURRENCY_CODE', 'USD')));
+        return strtoupper(trim((string) config('app.bootstrap.currency_code', 'USD')));
     }
 }

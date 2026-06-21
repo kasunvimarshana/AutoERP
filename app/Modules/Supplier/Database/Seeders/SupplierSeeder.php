@@ -7,7 +7,7 @@ namespace Modules\Supplier\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierCategory;
 use Modules\Supplier\Models\SupplierCategoryAssignment;

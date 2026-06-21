@@ -27,7 +27,5 @@ Route::prefix('api/sequence')
             ->name('sequences.preview-number');
         Route::post('sequences/generate-number', [SequenceController::class, 'generateNumber'])
             ->name('sequences.generate-number');
-        Route::post('sequences/rollback-number', [SequenceController::class, 'rollbackNumber'])
-            ->name('sequences.rollback-number');
         Route::apiResource('sequences', SequenceController::class);
     });

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\DTOs;
 
+use InvalidArgumentException;
+
 final readonly class CurrentTenantContext
 {
     public function __construct(
@@ -17,7 +19,23 @@ final readonly class CurrentTenantContext
         private bool $isActive,
         private ?string $applicationId,
         private string $source,
-    ) {}
+    ) {
+        if ($this->tenantId < 1) {
+            throw new InvalidArgumentException('Current tenant identifier must be positive.');
+        }
+
+        if ((int) $this->tenant->id() !== $this->tenantId) {
+            throw new InvalidArgumentException('Current tenant record does not match the tenant identifier.');
+        }
+
+        if (trim($this->tenantCode) === '' || trim($this->tenantUuid) === '') {
+            throw new InvalidArgumentException('Current tenant code and UUID are required.');
+        }
+
+        if (trim($this->source) === '') {
+            throw new InvalidArgumentException('Current tenant source is required.');
+        }
+    }
 
     public function tenant(): DataRecord
     {

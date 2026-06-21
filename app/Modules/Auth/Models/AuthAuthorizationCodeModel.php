@@ -13,6 +13,29 @@ final class AuthAuthorizationCodeModel extends CoreModel
 
     protected $table = 'auth_authorization_codes';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_id',
+        'client_id',
+        'identity_id',
+        'session_id',
+        'user_id',
+        'code_key',
+        'code_hash',
+        'scopes',
+        'code_challenge',
+        'code_challenge_method',
+        'redirect_uri',
+        'status',
+        'issued_at',
+        'expires_at',
+        'consumed_at',
+        'revoked_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

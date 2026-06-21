@@ -50,13 +50,8 @@ final class GetCurrentAuthProfileService
             return $this->failure(AuthErrorCode::UNAUTHORIZED_ACCESS, 'Authenticated user is not active.');
         }
 
-        $userTenantId = $this->toNullableInt($user->get('tenant_id'));
-        if ($tenantId !== null && $userTenantId !== null && $tenantId !== $userTenantId) {
-            return $this->failure(AuthErrorCode::TENANT_MISMATCH, 'Authenticated user does not belong to the requested tenant.');
-        }
-
-        $resolvedTenantId = $tenantId ?? $userTenantId;
-        $resolvedOrganizationUnitId = $organizationUnitId ?? $this->toNullableInt($user->get('organization_unit_id'));
+        $resolvedTenantId = $tenantId;
+        $resolvedOrganizationUnitId = $organizationUnitId;
         $roleSummaries = $this->userRoles->listRoleSummariesForTenantUser($resolvedTenantId, $userId);
         $roleIds = array_map(static fn (array $role): int => (int) $role['id'], $roleSummaries);
         $roles = array_values(array_unique(array_map(
@@ -101,16 +96,6 @@ final class GetCurrentAuthProfileService
         return Result::failure(new Error($code, $message));
     }
 
-    private function toNullableInt(mixed $value): ?int
-    {
-        if ($value === null || $value === '' || ! is_numeric($value)) {
-            return null;
-        }
-
-        $normalized = (int) $value;
-
-        return $normalized > 0 ? $normalized : null;
-    }
 
     private function nullableString(mixed $value): ?string
     {

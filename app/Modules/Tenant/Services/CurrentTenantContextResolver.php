@@ -6,7 +6,6 @@ namespace Modules\Tenant\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
-use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
@@ -15,13 +14,11 @@ use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\UserTenantRepositoryInterface;
-use Throwable;
 
 final class CurrentTenantContextResolver implements CurrentTenantContextResolverInterface
 {
     public function __construct(
         private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantDomainRepositoryInterface $tenantDomains,
         private readonly UserTenantRepositoryInterface $userTenants,
@@ -41,22 +38,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return $hostTenant;
         }
 
-        $configuredFallback = $this->resolveConfiguredFallbackTenant($applicationId);
-        if ($configuredFallback !== null) {
-            return $configuredFallback;
-        }
-
-        $authenticatedTenantId = $this->resolveAuthenticatedTenantId($request);
-        if ($authenticatedTenantId === null) {
-            return null;
-        }
-
-        $tenant = $this->tenants->findById($authenticatedTenantId);
-        if ($tenant === null) {
-            return null;
-        }
-
-        return $this->toContext($tenant, $applicationId, 'authenticated_user');
+        return $this->resolveConfiguredFallbackTenant($applicationId);
     }
 
     public function hasAccess(Request $request, CurrentTenantContext $context): bool
@@ -66,22 +48,9 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return false;
         }
 
-        $authenticatedTenantId = $this->resolveAuthenticatedTenantId($request);
-        if (
-            $this->enforceAuthenticatedTenantMatch()
-            && $authenticatedTenantId !== null
-            && $authenticatedTenantId !== $resolvedTenantId
-        ) {
-            return false;
-        }
-
-        if ($authenticatedTenantId !== null && $authenticatedTenantId === $resolvedTenantId) {
-            return true;
-        }
-
         $userId = $this->resolveAuthenticatedUserId($request);
         if ($userId === null) {
-            return true;
+            return false;
         }
 
         return $this->userTenants->existsForTenantAndUser($resolvedTenantId, $userId);
@@ -365,18 +334,6 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return $this->toContext($tenant, $applicationId, 'request_metadata', $normalizedDomain);
     }
 
-    private function resolveAuthenticatedTenantId(Request $request): ?int
-    {
-        $tenantId = $this->currentUser->currentTenantId();
-        if ($tenantId !== null && $tenantId > 0) {
-            return $tenantId;
-        }
-
-        $user = $request->user();
-
-        return $this->toNullableInt(data_get($user, 'tenant_id'));
-    }
-
     private function resolveAuthenticatedUserId(Request $request): ?int
     {
         $userId = $this->currentUser->currentUserId();
@@ -413,7 +370,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             }
         }
 
-        return $this->currentUser->currentApplicationId() ?? $this->currentTenant->currentApplicationId();
+        return $this->currentUser->currentApplicationId();
     }
 
     private function hasExplicitContextSignals(Request $request): bool
@@ -577,16 +534,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
      */
     private function configArray(string $key, array $fallback): array
     {
-        if (! function_exists('config')) {
-            return $fallback;
-        }
-
-        try {
-            $resolved = config('core.current_tenant.'.$key, $fallback);
-        } catch (Throwable) {
-            return $fallback;
-        }
-
+        $resolved = config('tenant.resolution.signals.'.$key, $fallback);
         if (! is_array($resolved)) {
             return $fallback;
         }
@@ -604,29 +552,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return array_values(array_unique($values));
     }
 
-    private function enforceAuthenticatedTenantMatch(): bool
-    {
-        try {
-            return (bool) config('tenant.resolution.enforce_authenticated_tenant_match', true);
-        } catch (Throwable) {
-            return true;
-        }
-    }
 
     private function configuredFallbackEnabled(): bool
     {
-        try {
-            if (! (bool) config('tenant.resolution.local_fallback_enabled', false)) {
-                return false;
-            }
-
-            if (! function_exists('app')) {
-                return false;
-            }
-
-            return app()->environment(['local', 'testing']);
-        } catch (Throwable) {
-            return false;
-        }
+        return (bool) config('tenant.resolution.local_fallback_enabled', false)
+            && app()->environment(['local', 'testing']);
     }
 }

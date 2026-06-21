@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Auth\Models\AuthProviderModel;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 
 final class AuthSeeder extends Seeder
 {

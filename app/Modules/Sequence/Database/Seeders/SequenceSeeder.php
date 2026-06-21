@@ -7,7 +7,7 @@ namespace Modules\Sequence\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Sequence\Models\SequenceModel;
 use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 

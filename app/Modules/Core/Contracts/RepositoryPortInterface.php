@@ -34,6 +34,4 @@ interface RepositoryPortInterface
     public function restore(int|string $id): bool;
 
     public function exists(array $criteria): bool;
-
-    public function transaction(callable $callback): mixed;
 }

@@ -54,6 +54,7 @@ use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
@@ -76,6 +77,7 @@ final class AuthController extends Controller
         private readonly AuthorizeClientService $authorizeClientService,
         private readonly ExchangeAuthorizationCodeService $exchangeAuthorizationCodeService,
         private readonly GetCurrentAuthProfileService $currentAuthProfileService,
+        private readonly ApiErrorResponseFactory $errorResponses,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
@@ -226,22 +228,18 @@ final class AuthController extends Controller
     {
         $context = $this->currentUser->current();
         if ($context === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authenticated user context is not available.',
-                'error' => [
-                    'code' => AuthErrorCode::UNAUTHORIZED_ACCESS,
-                    'type' => 'authentication',
-                    'message' => 'Authenticated user context is not available.',
-                    'details' => (object) [],
-                ],
-            ], 401);
+            return $this->errorResponses->make(
+                AuthErrorCode::UNAUTHORIZED_ACCESS,
+                'Authenticated user context is not available.',
+                401,
+                'authentication',
+            );
         }
 
         $result = $this->currentAuthProfileService->getProfile(
-            $context->userIdAsInt(),
-            $this->currentTenant->currentTenantId() ?? $context->tenantId(),
-            $this->currentOrganizationUnit->currentOrganizationUnitId() ?? $context->organizationUnitId(),
+            $context->userId(),
+            $this->currentTenant->currentTenantId(),
+            $this->currentOrganizationUnit->currentOrganizationUnitId(),
             $context->guard(),
             $context->provider(),
             $context->applicationId(),
@@ -265,15 +263,14 @@ final class AuthController extends Controller
     {
         $context = $this->currentUser->requireCurrent();
 
-        $payload['user_id'] = $context->userIdAsInt();
+        $payload['user_id'] = $context->userId();
 
-        $tenantId = $this->currentTenant->currentTenantId() ?? $context->tenantId();
+        $tenantId = $this->currentTenant->currentTenantId();
         if ($tenantId !== null) {
             $payload['tenant_id'] = $tenantId;
         }
 
-        $organizationUnitId = $this->currentOrganizationUnit->currentOrganizationUnitId()
-            ?? $context->organizationUnitId();
+        $organizationUnitId = $this->currentOrganizationUnit->currentOrganizationUnitId();
         if ($organizationUnitId !== null) {
             $payload['organization_unit_id'] = $organizationUnitId;
         }
@@ -288,16 +285,12 @@ final class AuthController extends Controller
             $status = $this->statusForErrorCode($error->code);
             $type = $this->typeForStatus($status);
 
-            return response()->json([
-                'success' => false,
-                'message' => $error->message,
-                'error' => [
-                    'code' => $error->code,
-                    'type' => $type,
-                    'message' => $error->message,
-                    'details' => (object) [],
-                ],
-            ], $status);
+            return $this->errorResponses->make(
+                $error->code,
+                $error->message,
+                $status,
+                $type,
+            );
         }
 
         return response()->json(

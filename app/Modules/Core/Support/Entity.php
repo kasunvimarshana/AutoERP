@@ -9,20 +9,25 @@ use Stringable;
 
 abstract class Entity
 {
-    public function __construct(private readonly Stringable|string $id)
+    private readonly string $id;
+
+    public function __construct(Stringable|string $id)
     {
-        if (! $id instanceof Stringable && trim($id) === '') {
+        $normalizedId = trim((string) $id);
+        if ($normalizedId === '') {
             throw new InvalidArgumentException('Entity identifier cannot be empty.');
         }
+
+        $this->id = $normalizedId;
     }
 
-    public function id(): Stringable|string
+    public function id(): string
     {
         return $this->id;
     }
 
     public function sameIdentityAs(self $other): bool
     {
-        return (string) $this->id === (string) $other->id;
+        return $other::class === static::class && $this->id === $other->id;
     }
 }

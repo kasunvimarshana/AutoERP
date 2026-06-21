@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Core\Http\Resources\ModuleResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Sales\Http\Resources\Concerns\FormatsSalesResources;
 use Modules\Sales\Services\SalesDocumentCapabilityService;
 use Modules\Sales\Services\SalesProgressService;
 use Modules\Sales\Services\SalesRelatedDocumentService;
 
-final class SalesOrderResource extends ModuleResource
+final class SalesOrderResource extends JsonResource
 {
     use FormatsSalesResources;
 

@@ -14,6 +14,26 @@ final class AuthClientModel extends CoreModel
 
     protected $table = 'auth_clients';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_id',
+        'client_key',
+        'client_name',
+        'client_secret_hash',
+        'status',
+        'allowed_grant_types',
+        'allowed_scopes',
+        'redirect_uris',
+        'trusted_origins',
+        'is_confidential',
+        'is_first_party',
+        'secret_rotated_at',
+        'expires_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

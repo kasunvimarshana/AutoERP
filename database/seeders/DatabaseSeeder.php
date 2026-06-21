@@ -6,7 +6,6 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Configuration\Database\Seeders\ConfigurationSeeder;
-use Modules\Core\Database\Seeders\CoreSeeder;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Customer\Database\Seeders\CustomerVehicleSeeder;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
@@ -38,7 +37,6 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            CoreSeeder::class,
             TenantSeeder::class,
             TenantDomainSeeder::class,
             OrganizationUnitSeeder::class,

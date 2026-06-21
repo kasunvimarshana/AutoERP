@@ -14,9 +14,5 @@ interface CurrentUserContextAccessorInterface
 
     public function currentUserId(): ?int;
 
-    public function currentTenantId(): ?int;
-
-    public function currentOrganizationUnitId(): ?int;
-
     public function currentApplicationId(): ?string;
 }

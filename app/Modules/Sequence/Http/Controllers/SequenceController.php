@@ -10,7 +10,6 @@ use Modules\Core\DTOs\PagedResult;
 use Modules\Sequence\Http\Requests\GenerateSequenceNumberRequest;
 use Modules\Sequence\Http\Requests\ListSequenceRequest;
 use Modules\Sequence\Http\Requests\PreviewSequenceNumberRequest;
-use Modules\Sequence\Http\Requests\RollbackSequenceNumberRequest;
 use Modules\Sequence\Http\Requests\UpsertSequenceRequest;
 use Modules\Sequence\Http\Resources\SequenceResource;
 use Modules\Sequence\Services\Sequences\CreateSequenceService;
@@ -19,7 +18,6 @@ use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
 use Modules\Sequence\Services\Sequences\GetSequenceService;
 use Modules\Sequence\Services\Sequences\ListSequencesService;
 use Modules\Sequence\Services\Sequences\PreviewSequenceNumberService;
-use Modules\Sequence\Services\Sequences\RollbackSequenceNumberService;
 use Modules\Sequence\Services\Sequences\UpdateSequenceService;
 
 final class SequenceController extends Controller
@@ -32,7 +30,6 @@ final class SequenceController extends Controller
         private readonly DeleteSequenceService $deleteSequence,
         private readonly PreviewSequenceNumberService $previewSequenceNumber,
         private readonly GenerateSequenceNumberService $generateSequenceNumber,
-        private readonly RollbackSequenceNumberService $rollbackSequenceNumber,
     ) {}
 
     public function index(ListSequenceRequest $request): JsonResponse
@@ -133,21 +130,4 @@ final class SequenceController extends Controller
         return response()->json($result->valueOrFail());
     }
 
-    public function rollbackNumber(RollbackSequenceNumberRequest $request): JsonResponse
-    {
-        $result = $this->rollbackSequenceNumber->execute($request->validated());
-
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = match ($error->code) {
-                'SEQUENCE_NOT_FOUND' => 404,
-                'SEQUENCE_CONCURRENCY_CONFLICT' => 409,
-                default => 422,
-            };
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return response()->json($result->valueOrFail());
-    }
 }

@@ -7,8 +7,8 @@ namespace Modules\Core\Repositories;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use LogicException;
 use Modules\Core\Constants\SchemaColumns;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
@@ -118,7 +118,10 @@ abstract class EloquentRepository
     public function restore(int|string $id): bool
     {
         if (! in_array(SoftDeletes::class, class_uses_recursive($this->model), true)) {
-            return false;
+            throw new LogicException(sprintf(
+                'Model %s does not support restoration because it does not use SoftDeletes.',
+                $this->model::class,
+            ));
         }
 
         $targetModel = $this->findByIdentifier($id, [], true, true);
@@ -129,11 +132,6 @@ abstract class EloquentRepository
     public function exists(array $criteria): bool
     {
         return $this->applyCriteria($this->query(), $criteria)->exists();
-    }
-
-    public function transaction(callable $callback): mixed
-    {
-        return DB::transaction($callback);
     }
 
     protected function applyCriteria(Builder $query, array $criteria): Builder

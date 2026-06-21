@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\User\Services;
 
 use LogicException;
-use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\User\Contracts\AuthenticatedUserProviderInterface;
@@ -15,7 +14,6 @@ final class AuthenticatedUserProvider implements AuthenticatedUserProviderInterf
 {
     public function __construct(
         private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly UserRepositoryInterface $users,
     ) {}
 
@@ -26,13 +24,8 @@ final class AuthenticatedUserProvider implements AuthenticatedUserProviderInterf
             return null;
         }
 
-        $record = $this->users->findById($current->userIdAsInt());
+        $record = $this->users->findById($current->userId());
         if ($record === null) {
-            return null;
-        }
-
-        $tenantId = $this->currentTenant->currentTenantId();
-        if ($tenantId !== null && (int) $record->get('tenant_id') !== $tenantId) {
             return null;
         }
 

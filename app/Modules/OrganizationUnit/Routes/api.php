@@ -8,7 +8,6 @@ use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitDocumentController
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitSettingController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitSettingGroupController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitTypeController;
-use Modules\OrganizationUnit\Http\Middleware\OrganizationUnitResolutionMiddleware;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -25,7 +24,6 @@ Route::prefix('api/organization-unit')
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
-        OrganizationUnitResolutionMiddleware::class,
     ])
     ->name('organization-unit.')
     ->group(function (): void {

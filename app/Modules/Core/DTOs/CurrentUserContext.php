@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\DTOs;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use InvalidArgumentException;
 
+/** Authenticated identity only. Tenant and organization contexts are resolved independently. */
 final readonly class CurrentUserContext
 {
     /**
@@ -13,28 +15,34 @@ final readonly class CurrentUserContext
      */
     public function __construct(
         private Authenticatable $user,
-        private string $userId,
+        private int $userId,
         private string $guard,
         private ?string $provider,
-        private ?int $tenantId,
-        private ?int $organizationUnitId,
         private ?string $applicationId,
         private array $tokenPayload = [],
-    ) {}
+    ) {
+        if ($this->userId < 1) {
+            throw new InvalidArgumentException('Current user identifier must be a positive integer.');
+        }
+
+        if (trim($this->guard) === '') {
+            throw new InvalidArgumentException('Current user guard cannot be empty.');
+        }
+
+        $authIdentifier = $this->user->getAuthIdentifier();
+        if (! is_numeric($authIdentifier) || (int) $authIdentifier !== $this->userId) {
+            throw new InvalidArgumentException('Current user identifier does not match the authenticated user.');
+        }
+    }
 
     public function user(): Authenticatable
     {
         return $this->user;
     }
 
-    public function userId(): string
+    public function userId(): int
     {
         return $this->userId;
-    }
-
-    public function userIdAsInt(): int
-    {
-        return (int) $this->userId;
     }
 
     public function guard(): string
@@ -47,41 +55,14 @@ final readonly class CurrentUserContext
         return $this->provider;
     }
 
-    public function tenantId(): ?int
-    {
-        return $this->tenantId;
-    }
-
-    public function organizationUnitId(): ?int
-    {
-        return $this->organizationUnitId;
-    }
-
     public function applicationId(): ?string
     {
         return $this->applicationId;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function tokenPayload(): array
     {
         return $this->tokenPayload;
-    }
-
-    /**
-     * @return array<string, int|string|null>
-     */
-    public function toArray(): array
-    {
-        return [
-            'user_id' => $this->userId,
-            'guard' => $this->guard,
-            'provider' => $this->provider,
-            'tenant_id' => $this->tenantId,
-            'organization_unit_id' => $this->organizationUnitId,
-            'application_id' => $this->applicationId,
-        ];
     }
 }

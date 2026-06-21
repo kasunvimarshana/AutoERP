@@ -9,38 +9,13 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Exceptions\DomainException;
 use Modules\Core\Http\Middleware\CurrentOrganizationUnitMiddleware;
 use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\CurrentUserMiddleware;
-use Modules\Core\Http\Middleware\NormalizeApiErrorResponseMiddleware;
+use Modules\Core\Http\Middleware\EnsureApiErrorResponseMiddleware;
+use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-
-if (! function_exists('api_error_response')) {
-    function api_error_response(
-        string $code,
-        string $message,
-        int $status,
-        string $type,
-        array $details = [],
-    ) {
-        $payload = [
-            'success' => false,
-            'message' => $message,
-            'error' => [
-                'code' => $code,
-                'type' => $type,
-                'message' => $message,
-                'details' => (object) $details,
-            ],
-        ];
-
-        if (isset($details['fields']) && is_array($details['fields'])) {
-            $payload['errors'] = $details['fields'];
-        }
-
-        return response()->json($payload, $status);
-    }
-}
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -55,91 +30,65 @@ return Application::configure(basePath: dirname(__DIR__))
             (string) env('CORE_CURRENT_ORGANIZATION_UNIT_MIDDLEWARE_ALIAS', 'current.organization-unit') => CurrentOrganizationUnitMiddleware::class,
         ]);
 
-        $middleware->append(NormalizeApiErrorResponseMiddleware::class);
+        $middleware->append(EnsureApiErrorResponseMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (AuthenticationException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return api_error_response('AUTHENTICATION_FAILED', 'Unauthenticated.', 401, 'authentication');
-            }
+        $errorResponse = static function (int $status, string $message, array $details = []) {
+            return app(ApiErrorResponseFactory::class)->forStatus($status, $message, $details);
+        };
 
-            return null;
+        $exceptions->render(function (AuthenticationException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(401, 'Unauthenticated.')
+                : null;
         });
 
-        $exceptions->render(function (AuthorizationException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return api_error_response('AUTHORIZATION_DENIED', 'This action is not authorized.', 403, 'authorization');
-            }
-
-            return null;
+        $exceptions->render(function (AuthorizationException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(403, 'This action is not authorized.')
+                : null;
         });
 
-        $exceptions->render(function (ValidationException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return api_error_response(
-                    'VALIDATION_FAILED',
-                    'Validation failed.',
-                    422,
-                    'validation',
-                    ['fields' => $exception->errors()],
-                );
-            }
-
-            return null;
+        $exceptions->render(function (ValidationException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(422, 'Validation failed.', ['fields' => $exception->errors()])
+                : null;
         });
 
-        $exceptions->render(function (ModelNotFoundException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return api_error_response('RESOURCE_NOT_FOUND', 'Resource not found.', 404, 'not_found');
-            }
-
-            return null;
+        $exceptions->render(function (ModelNotFoundException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(404, 'Resource not found.')
+                : null;
         });
 
-        $exceptions->render(function (InvalidArgumentException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return api_error_response(
-                    'BUSINESS_RULE_VIOLATION',
-                    $exception->getMessage(),
-                    422,
-                    'domain',
-                );
-            }
-
-            return null;
+        $exceptions->render(function (DomainException|InvalidArgumentException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(422, $exception->getMessage())
+                : null;
         });
 
         $exceptions->render(function (HttpResponseException $exception, Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return $exception->getResponse();
-            }
-
-            return null;
+            return $request->is('api/*') || $request->expectsJson()
+                ? $exception->getResponse()
+                : null;
         });
 
-        $exceptions->render(function (Throwable $exception, Request $request) {
+        $exceptions->render(function (Throwable $exception, Request $request) use ($errorResponse) {
             if (! ($request->is('api/*') || $request->expectsJson())) {
                 return null;
             }
 
             if ($exception instanceof HttpExceptionInterface) {
                 $status = $exception->getStatusCode();
+                $message = $status >= 500
+                    ? 'Unexpected server error.'
+                    : ($exception->getMessage() !== '' ? $exception->getMessage() : 'HTTP error.');
 
-                return api_error_response(
-                    'HTTP_'.(string) $status,
-                    $exception->getMessage() !== '' ? $exception->getMessage() : 'HTTP error.',
-                    $status,
-                    $status === 404 ? 'not_found' : 'http',
-                );
+                return $errorResponse($status, $message);
             }
 
             report($exception);
 
-            return api_error_response(
-                'UNEXPECTED_ERROR',
-                'Unexpected server error.',
-                500,
-                'infrastructure',
-            );
+            return $errorResponse(500, 'Unexpected server error.');
         });
     })->create();

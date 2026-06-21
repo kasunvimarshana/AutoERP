@@ -15,6 +15,21 @@ final class AuthIdentityModel extends CoreModel
 
     protected $table = 'auth_identities';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_id',
+        'user_id',
+        'provider_user_key',
+        'status',
+        'is_primary',
+        'last_authenticated_at',
+        'verified_at',
+        'claims',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

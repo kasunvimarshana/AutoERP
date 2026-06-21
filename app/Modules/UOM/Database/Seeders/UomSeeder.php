@@ -7,7 +7,7 @@ namespace Modules\UOM\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\UOM\Models\UomConversionModel;
 

@@ -15,6 +15,24 @@ final class AuthSessionModel extends CoreModel
 
     protected $table = 'auth_sessions';
 
+    protected $fillable = [
+        'row_version',
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'provider_id',
+        'identity_id',
+        'user_id',
+        'session_key',
+        'status',
+        'ip_address',
+        'user_agent',
+        'device_name',
+        'last_activity_at',
+        'revoked_at',
+        'expires_at',
+    ];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

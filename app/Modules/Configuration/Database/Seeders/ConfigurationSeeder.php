@@ -12,7 +12,7 @@ use Modules\Configuration\Models\CurrencyModel;
 use Modules\Configuration\Models\LanguageModel;
 use Modules\Configuration\Models\TenantConfigurationModel;
 use Modules\Configuration\Models\TimezoneModel;
-use Modules\Core\Database\Seeders\Concerns\ResolvesSeedContext;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 
 final class ConfigurationSeeder extends Seeder
 {
