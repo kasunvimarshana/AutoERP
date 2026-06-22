@@ -7,7 +7,9 @@ Runtime settings are not stored here. `Modules/Configuration` owns validated glo
 ## Trust boundaries
 
 - A tenant context is selected only by a verified tenant host or explicit tenant-selection header on a configured central SaaS host.
-- Request body, query parameters, and normal resource route identifiers never select tenant context.
+- The login endpoint may accept a human-readable `tenant_code`; Auth translates it into the same validated tenant-selection header before credentials are checked. Raw tenant IDs are not accepted from the public login payload.
+- Request body, query parameters, and normal resource route identifiers never select tenant context outside that explicit pre-authentication login contract.
+- Local/testing environments may resolve the configured bootstrap tenant automatically on `localhost`; production never uses this fallback.
 - Every authenticated request must have a matching active `user_tenants` membership.
 - `status` is the only tenant lifecycle source of truth.
 - Cross-tenant platform endpoints additionally require an explicitly flagged platform operator; a tenant Super Admin role alone is insufficient.

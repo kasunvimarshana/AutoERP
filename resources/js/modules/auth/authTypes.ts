@@ -43,7 +43,7 @@ export interface CurrentUserResponse {
 export interface LoginPayload {
     login_identifier: string;
     password: string;
-    tenant_id?: number | null;
+    tenant_code?: string | null;
     organization_unit_id?: number | null;
     device_name?: string | null;
 }

@@ -13,7 +13,10 @@ return [
             'id' => 'X-Tenant-Id',
             'code' => 'X-Tenant-Code',
         ],
-        'local_fallback_enabled' => (bool) env('TENANT_LOCAL_FALLBACK_ENABLED', false),
+        // Local development must remain usable before a browser has a tenant session.
+        // The resolver still restricts this fallback to local/testing environments.
+        'local_fallback_enabled' => app()->environment(['local', 'testing'])
+            || filter_var(env('TENANT_LOCAL_FALLBACK_ENABLED', false), FILTER_VALIDATE_BOOL),
         'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN'),
         'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
     ],

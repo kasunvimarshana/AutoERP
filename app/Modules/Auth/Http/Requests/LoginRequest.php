@@ -29,7 +29,7 @@ final class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'tenant_code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'provider_key' => ['nullable', 'string', 'max:120'],
             'login_identifier' => ['required', 'string', 'max:320'],

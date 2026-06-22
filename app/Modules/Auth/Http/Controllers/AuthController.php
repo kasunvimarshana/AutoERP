@@ -336,11 +336,25 @@ final class AuthController extends Controller
     private function resolveLoginContext(LoginRequest $request): array|Result
     {
         $payload = $request->validated();
+        $tenantCode = strtoupper(trim((string) ($payload['tenant_code'] ?? '')));
+        unset($payload['tenant_code']);
+
+        if ($tenantCode !== '') {
+            $tenantCodeHeader = (string) config('tenant.resolution.selection_headers.code', 'X-Tenant-Code');
+            $existingTenantCode = strtoupper(trim((string) $request->headers->get($tenantCodeHeader, '')));
+            if ($existingTenantCode !== '' && $existingTenantCode !== $tenantCode) {
+                return $this->tenantResolutionFailure();
+            }
+
+            $request->headers->set($tenantCodeHeader, $tenantCode);
+        }
 
         try {
             $tenantContext = $this->tenantResolver->resolve($request);
-        } catch (CurrentTenantContextResolutionException) {
-            return $this->tenantResolutionFailure();
+        } catch (CurrentTenantContextResolutionException $exception) {
+            return $this->tenantResolutionFailure(
+                app()->environment(['local', 'testing']) ? $exception->getMessage() : null,
+            );
         }
 
         if ($tenantContext === null) {
@@ -398,11 +412,13 @@ final class AuthController extends Controller
         return null;
     }
 
-    private function tenantResolutionFailure(): Result
+    private function tenantResolutionFailure(?string $diagnostic = null): Result
     {
         return Result::failure(new Error(
             AuthErrorCode::TENANT_RESOLUTION_FAILED,
-            'Tenant could not be resolved for this domain.',
+            $diagnostic !== null && trim($diagnostic) !== ''
+                ? $diagnostic
+                : 'Tenant could not be resolved for this domain.',
         ));
     }
 

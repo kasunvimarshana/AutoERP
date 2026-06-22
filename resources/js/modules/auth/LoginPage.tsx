@@ -13,6 +13,7 @@ export default function LoginPage() {
     const location = useLocation();
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [tenantCode, setTenantCode] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -54,6 +55,7 @@ export default function LoginPage() {
                             await auth.login({
                                 login_identifier: loginIdentifier,
                                 password,
+                                tenant_code: tenantCode.trim() || null,
                             });
                             navigate(from, { replace: true });
                         } catch (nextError) {
@@ -66,6 +68,15 @@ export default function LoginPage() {
                     }}
                 >
                     <ErrorAlert error={error} title="Unable to sign in" />
+                    <Input
+                        label="Workspace code"
+                        name="tenant_code"
+                        autoComplete="organization"
+                        value={tenantCode}
+                        onChange={(event) => setTenantCode(event.target.value.toUpperCase())}
+                        error={fieldError(error, 'tenant_code')}
+                        hint="Optional on a tenant-specific domain. Required when signing in through the central SaaS address."
+                    />
                     <Input
                         label="Email or username"
                         name="login_identifier"

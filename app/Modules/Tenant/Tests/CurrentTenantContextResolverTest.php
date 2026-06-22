@@ -78,6 +78,68 @@ final class CurrentTenantContextResolverTest extends TestCase
         );
     }
 
+    public function test_localhost_uses_the_configured_local_tenant_fallback(): void
+    {
+        config()->set('tenant.resolution.central_hosts', []);
+        config()->set('tenant.resolution.local_fallback_enabled', true);
+        config()->set('tenant.resolution.local_fallback_domain', null);
+        config()->set('tenant.resolution.local_fallback_tenant_code', 'AUTOERP');
+
+        $tenant = new DataRecord([
+            'id' => 10,
+            'uuid' => '00000000-0000-4000-8000-000000000010',
+            'code' => 'AUTOERP',
+            'name' => 'AutoERP',
+            'slug' => 'autoerp',
+            'status' => 'active',
+            'trial_ends_at' => null,
+            'subscription_ends_at' => null,
+        ]);
+        $tenants = $this->createMock(TenantRepositoryInterface::class);
+        $tenants->expects(self::once())->method('findByCode')->with('AUTOERP')->willReturn($tenant);
+
+        $domains = $this->createMock(TenantDomainRepositoryInterface::class);
+        $domains->expects(self::once())->method('findPrimaryByTenant')->with(10)->willReturn(new DataRecord([
+            'id' => 1,
+            'tenant_id' => 10,
+            'domain' => 'localhost',
+        ]));
+
+        $context = $this->resolver($tenants, $domains)->resolve(
+            Request::create('http://localhost/api/v1/auth/login', 'POST'),
+        );
+
+        self::assertNotNull($context);
+        self::assertSame(10, $context->tenantId());
+        self::assertSame('local_fallback', $context->source());
+    }
+
+    public function test_central_host_accepts_a_human_readable_tenant_code_header(): void
+    {
+        config()->set('tenant.resolution.central_hosts', ['platform.example.test']);
+        config()->set('tenant.resolution.local_fallback_enabled', false);
+
+        $tenant = $this->activeTenant(10);
+        $tenants = $this->createMock(TenantRepositoryInterface::class);
+        $tenants->expects(self::once())->method('findByCode')->with('TENANT-10')->willReturn($tenant);
+
+        $domains = $this->createMock(TenantDomainRepositoryInterface::class);
+        $domains->method('findPrimaryByTenant')->with(10)->willReturn(new DataRecord([
+            'id' => 1,
+            'tenant_id' => 10,
+            'domain' => 'tenant.example.test',
+        ]));
+
+        $request = Request::create('https://platform.example.test/api/v1/auth/login', 'POST');
+        $request->headers->set('X-Tenant-Code', 'TENANT-10');
+
+        $context = $this->resolver($tenants, $domains)->resolve($request);
+
+        self::assertNotNull($context);
+        self::assertSame(10, $context->tenantId());
+        self::assertSame('selection_header', $context->source());
+    }
+
     private function resolver(
         ?TenantRepositoryInterface $tenants = null,
         ?TenantDomainRepositoryInterface $domains = null,
