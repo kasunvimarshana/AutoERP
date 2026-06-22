@@ -3,34 +3,28 @@
 declare(strict_types=1);
 
 return [
-    'pagination' => [
-        'default_per_page' => 20,
-        'max_per_page' => 100,
-    ],
+    'pagination' => ['default_per_page' => 20, 'max_per_page' => 100],
     'resolution' => [
-        'local_fallback_enabled' => (bool) env('TENANT_LOCAL_FALLBACK_ENABLED', false),
-        'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN', null),
-        'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
-        'signals' => [
-            'id_input_keys' => ['tenant_id'],
-            'id_route_keys' => ['tenant_id'],
-            'id_header_keys' => ['X-Tenant-Id'],
-            'code_input_keys' => ['tenant_code'],
-            'code_route_keys' => ['tenant', 'tenant_code'],
-            'code_header_keys' => ['X-Tenant-Code'],
-            'uuid_input_keys' => ['tenant_uuid'],
-            'uuid_route_keys' => ['tenant_uuid'],
-            'uuid_header_keys' => ['X-Tenant-Uuid'],
-            'isolation_key_input_keys' => ['tenant_isolation_key'],
-            'isolation_key_route_keys' => ['tenant_isolation_key'],
-            'isolation_key_header_keys' => ['X-Tenant-Isolation-Key'],
-            'domain_input_keys' => ['tenant_domain'],
-            'domain_header_keys' => ['X-Tenant-Domain'],
-            'application_input_keys' => ['application_id', 'app_id', 'client_id'],
-            'application_header_keys' => ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
+        'central_hosts' => array_values(array_filter(array_map(
+            static fn (string $host): string => strtolower(trim($host)),
+            explode(',', (string) env('TENANT_CENTRAL_HOSTS', '')),
+        ))),
+        'selection_headers' => [
+            'id' => 'X-Tenant-Id',
+            'code' => 'X-Tenant-Code',
         ],
+        'local_fallback_enabled' => (bool) env('TENANT_LOCAL_FALLBACK_ENABLED', false),
+        'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN'),
+        'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
     ],
-    'defaults' => [
-        'is_isolated' => true,
+    'documents' => [
+        'disk' => env('TENANT_DOCUMENT_DISK', env('FILESYSTEM_DISK', 'local')),
+        'max_size_kb' => (int) env('TENANT_DOCUMENT_MAX_SIZE_KB', 10240),
+        'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
+    ],
+    'domains' => [
+        'verification_ttl_minutes' => (int) env('TENANT_DOMAIN_VERIFICATION_TTL_MINUTES', 1440),
+        'verification_txt_prefix' => '_autoerp-verification',
+        'verification_value_prefix' => 'autoerp-verification=',
     ],
 ];

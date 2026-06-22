@@ -131,11 +131,8 @@ final class PaymentFinanceIntegrationTest extends TestCase
             'name' => 'Payment Finance Integration '.$suffix,
             'slug' => 'payment-finance-integration-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function paymentMethod(int $tenantId): PaymentMethod

@@ -132,10 +132,7 @@ final class InvoiceFinanceIntegrationTest extends TestCase
             'name' => 'Invoice Finance Integration '.$suffix,
             'slug' => 'invoice-finance-integration-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 }

@@ -4,64 +4,70 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
-use Modules\Core\Repositories\EloquentRepository;
 use Modules\Tenant\Models\TenantPlanModel;
 
-final class EloquentTenantPlanRepository extends EloquentRepository implements TenantPlanRepositoryInterface
+final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterface
 {
-    public function __construct(TenantPlanModel $model)
+    public function __construct(private readonly TenantPlanModel $model) {}
+
+    public function findById(int|string $id): ?DataRecord
     {
-        parent::__construct($model);
+        $model = $this->query()->find($id);
+        return $model instanceof TenantPlanModel ? $this->record($model) : null;
     }
 
     public function findBySlug(string $slug): ?DataRecord
     {
-        $model = $this->query()->where('slug', trim($slug))->first();
-
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
+        $model = $this->query()->where('slug', strtolower(trim($slug)))->first();
+        return $model instanceof TenantPlanModel ? $this->record($model) : null;
     }
 
-    public function pageByFilters(
-        ?bool $isActive,
-        ?string $billingInterval,
-        ?string $search,
-        int $perPage,
-        int $page,
-    ): PagedResult {
-        $query = $this->query();
+    public function create(array $attributes): DataRecord
+    {
+        return $this->record($this->model->newQuery()->create($attributes));
+    }
 
-        if ($isActive !== null) {
-            $query->where('is_active', $isActive);
-        }
+    public function updateWithVersion(int|string $id, int $expectedVersion, array $attributes): ?DataRecord
+    {
+        $attributes['row_version'] = $expectedVersion + 1;
+        $attributes['updated_at'] = now();
+        $updated = $this->model->newQuery()->whereKey($id)->where('row_version', $expectedVersion)->update($attributes);
+        return $updated === 1 ? $this->findById($id) : null;
+    }
 
-        if ($billingInterval !== null && trim($billingInterval) !== '') {
-            $query->where('billing_interval', trim($billingInterval));
-        }
-
-        if ($search !== null && trim($search) !== '') {
-            $searchTerm = trim($search);
-            $query->where(function ($nestedQuery) use ($searchTerm): void {
-                $nestedQuery->where('name', 'like', '%'.$searchTerm.'%')
-                    ->orWhere('slug', 'like', '%'.$searchTerm.'%');
-            });
-        }
-
+    public function pageByFilters(?bool $isActive, ?string $billingInterval, ?string $search, int $perPage, int $page): PagedResult
+    {
+        $query = $this->query()
+            ->when($isActive !== null, fn (Builder $q) => $q->where('is_active', $isActive))
+            ->when($billingInterval !== null && trim($billingInterval) !== '', fn (Builder $q) => $q->where('billing_interval', trim($billingInterval)))
+            ->when($search !== null && trim($search) !== '', function (Builder $q) use ($search): void {
+                $term = trim((string) $search);
+                $q->where(fn (Builder $nested) => $nested->where('name', 'like', "%{$term}%")->orWhere('slug', 'like', "%{$term}%"));
+            })->orderBy('price')->orderBy('name');
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
-
-        $items = [];
-        foreach ($paginator->items() as $model) {
-            if ($model instanceof Model) {
-                $items[] = $this->toRecord($model);
-            }
-        }
-
+        $items = array_values(array_map(fn (Model $model): DataRecord => $this->record($model), $paginator->items()));
         return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+    }
+
+    public function isAssigned(int|string $id): bool
+    {
+        return $this->model->newQuery()->whereKey($id)->whereHas('tenants')->exists();
+    }
+
+    private function query(): Builder
+    {
+        return $this->model->newQuery()->with('currency:id,code,name,symbol,is_active');
+    }
+
+    private function record(TenantPlanModel $model): DataRecord
+    {
+        $payload = $model->attributesToArray();
+        $payload['currency'] = $model->relationLoaded('currency') && $model->currency !== null
+            ? $model->currency->only(['id', 'code', 'name', 'symbol', 'is_active']) : null;
+        return new DataRecord($payload);
     }
 }

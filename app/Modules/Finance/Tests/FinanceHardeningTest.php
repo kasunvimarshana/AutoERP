@@ -331,11 +331,8 @@ final class FinanceHardeningTest extends TestCase
             'name' => 'Finance Hardening '.$suffix,
             'slug' => 'finance-hardening-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function organizationUnit(int $tenantId, string $code): int

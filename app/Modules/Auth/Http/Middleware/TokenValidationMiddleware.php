@@ -46,7 +46,6 @@ final class TokenValidationMiddleware
     {
         $candidates = [
             $request->attributes->get('current_tenant_id'),
-            $request->input('tenant_id'),
             $request->headers->get('X-Tenant-ID'),
             $request->headers->get('X-Tenant-Id'),
             $request->headers->get('X-Tenant'),

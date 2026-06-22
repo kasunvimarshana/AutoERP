@@ -137,11 +137,8 @@ final class FinancePostingContractTest extends TestCase
             'name' => 'Finance Posting Contract '.$suffix,
             'slug' => 'finance-posting-contract-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     /**

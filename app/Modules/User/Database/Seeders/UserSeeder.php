@@ -75,6 +75,10 @@ final class UserSeeder extends Seeder
                 ],
             );
 
+            $user->forceFill([
+                'is_platform_operator' => $this->adminIsPlatformOperator(),
+            ])->save();
+
             if (Schema::hasTable('user_tenants')) {
                 UserTenantModel::query()->updateOrCreate(
                     [
@@ -146,6 +150,17 @@ final class UserSeeder extends Seeder
         }
 
         throw new RuntimeException('AUTOERP_ADMIN_EMAIL is required outside local/testing/development.');
+    }
+
+
+    private function adminIsPlatformOperator(): bool
+    {
+        $default = app()->environment(['local', 'testing', 'development']);
+
+        return filter_var(
+            env('AUTOERP_ADMIN_IS_PLATFORM_OPERATOR', $default),
+            FILTER_VALIDATE_BOOLEAN,
+        );
     }
 
     private function adminPassword(): string

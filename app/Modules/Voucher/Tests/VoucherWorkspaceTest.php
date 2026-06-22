@@ -334,11 +334,8 @@ final class VoucherWorkspaceTest extends TestCase
             'name' => 'Voucher Tenant '.$suffix,
             'slug' => 'voucher-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function accountType(int $tenantId, string $code, string $normalBalance): int

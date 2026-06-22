@@ -6,6 +6,7 @@ import {
 import { itemPermissions } from "@/modules/item/itemPermissions";
 import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
+import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -1034,6 +1035,39 @@ export const navigationSections: NavigationSection[] = [
                     ...tenantAccess(["user"]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
+                },
+            },
+            {
+                id: "tenant-administration",
+                type: "link",
+                label: "Tenant Administration",
+                to: "/administration/tenant",
+                icon: "settings",
+                access: {
+                    requiresTenant: true,
+                    permissions: [tenantPermissions.profileView],
+                },
+            },
+            {
+                id: "saas-tenants",
+                type: "link",
+                label: "SaaS Tenants",
+                to: "/administration/saas-tenants",
+                icon: "users",
+                access: {
+                    requiresTenant: true,
+                    permissions: [tenantPermissions.platformView],
+                },
+            },
+            {
+                id: "tenant-plans",
+                type: "link",
+                label: "Tenant Plans",
+                to: "/administration/tenant-plans",
+                icon: "list",
+                access: {
+                    requiresTenant: true,
+                    permissions: [tenantPermissions.platformManagePlans],
                 },
             },
             {

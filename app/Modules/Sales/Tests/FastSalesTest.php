@@ -547,11 +547,8 @@ final class FastSalesTest extends TestCase
             'name' => 'Fast Sales '.$suffix,
             'slug' => 'fast-sales-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function organizationUnit(int $tenantId, string $code): int

@@ -398,11 +398,8 @@ final class InventoryIntegrityTest extends TestCase
             'name' => 'Inventory Tenant '.$suffix,
             'slug' => 'inventory-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createWarehouse(int $tenantId): int

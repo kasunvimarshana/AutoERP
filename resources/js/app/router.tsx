@@ -10,6 +10,7 @@ import { vehicleRentalPermissions } from "@/modules/vehicle-rental/vehicleRental
 import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { settingsPermissions } from "@/modules/settings/settingsPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
+import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -31,6 +32,9 @@ const PermissionCataloguePage = lazy(
 );
 const SettingsPage = lazy(() => import("@/modules/settings/SettingsPage"));
 const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceDataPage"));
+const TenantWorkspacePage = lazy(() => import("@/modules/tenant/TenantWorkspacePage"));
+const PlatformTenantsPage = lazy(() => import("@/modules/tenant/PlatformTenantsPage"));
+const TenantPlansPage = lazy(() => import("@/modules/tenant/TenantPlansPage"));
 const UomListPage = lazy(() => import("@/modules/uom/UomListPage"));
 const UomCreatePage = lazy(() => import("@/modules/uom/UomCreatePage"));
 const UomEditPage = lazy(() => import("@/modules/uom/UomEditPage"));
@@ -496,6 +500,18 @@ export function AppRouter() {
                     <Route
                         path="/reference-data"
                         element={requirePermission(referenceDataPermissions.view, <ReferenceDataPage />)}
+                    />
+                    <Route
+                        path="/administration/tenant"
+                        element={requirePermission(tenantPermissions.profileView, <TenantWorkspacePage />)}
+                    />
+                    <Route
+                        path="/administration/saas-tenants"
+                        element={requirePermission(tenantPermissions.platformView, <PlatformTenantsPage />)}
+                    />
+                    <Route
+                        path="/administration/tenant-plans"
+                        element={requirePermission(tenantPermissions.platformManagePlans, <TenantPlansPage />)}
                     />
                     <Route path="/uoms" element={<UomListPage />} />
                     <Route path="/uoms/create" element={<UomCreatePage />} />

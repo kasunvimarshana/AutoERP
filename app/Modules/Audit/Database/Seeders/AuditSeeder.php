@@ -15,7 +15,7 @@ final class AuditSeeder extends Seeder
         $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
 
         DB::transaction(function () use ($guard): void {
-            $tenantIds = DB::table('tenants')->whereNull('deleted_at')->pluck('id');
+            $tenantIds = DB::table('tenants')->where('status', '!=', 'archived')->pluck('id');
 
             foreach ($tenantIds as $tenantId) {
                 foreach (AuditPermission::descriptions() as $name => $description) {

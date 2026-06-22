@@ -11,16 +11,22 @@ final class TenantDomainModel extends CoreModel
 {
     protected $table = 'tenant_domains';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id', 'domain', 'is_primary', 'primary_marker', 'status',
+        'verification_method', 'verification_token_hash', 'verification_expires_at',
+        'verified_at', 'verified_by', 'metadata', 'row_version', 'created_by', 'updated_by',
+    ];
+
+    protected $hidden = ['verification_token_hash'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'metadata' => 'array',
             'tenant_id' => 'integer',
             'is_primary' => 'boolean',
-            'is_verified' => 'boolean',
+            'verification_expires_at' => 'datetime',
             'verified_at' => 'datetime',
+            'metadata' => 'array',
         ]);
     }
 

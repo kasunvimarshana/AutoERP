@@ -69,7 +69,7 @@ final class ItemApiTest extends TestCase
     {
         $context = $this->createAuthContext(['code' => 'ITEM-PRICE', 'email' => 'item-price@example.test']);
         $currencyId = $this->createCurrency('LKR');
-        DB::table('tenants')->where('id', $context['tenant_id'])->update(['currency_id' => $currencyId]);
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
         $otherCurrencyId = $this->createCurrency('USD');
         $pcsUomId = $this->createUom($context, 'PCS');
         $boxUomId = $this->createUom($context, 'BOX');
@@ -616,12 +616,9 @@ final class ItemApiTest extends TestCase
             'name' => $code.' Tenant',
             'slug' => strtolower($code).'-tenant',
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            'updated_at' => $now]);
         $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Main',

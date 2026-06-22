@@ -25,10 +25,6 @@ return [
         'id_attribute' => env('CORE_CURRENT_TENANT_ID_ATTRIBUTE', 'current_tenant_id'),
         'code_attribute' => env('CORE_CURRENT_TENANT_CODE_ATTRIBUTE', 'current_tenant_code'),
         'uuid_attribute' => env('CORE_CURRENT_TENANT_UUID_ATTRIBUTE', 'current_tenant_uuid'),
-        'isolation_key_attribute' => env(
-            'CORE_CURRENT_TENANT_ISOLATION_KEY_ATTRIBUTE',
-            'current_tenant_isolation_key',
-        ),
         'domain_attribute' => env('CORE_CURRENT_TENANT_DOMAIN_ATTRIBUTE', 'current_tenant_domain'),
         'status_attribute' => env('CORE_CURRENT_TENANT_STATUS_ATTRIBUTE', 'current_tenant_status'),
         'active_attribute' => env('CORE_CURRENT_TENANT_ACTIVE_ATTRIBUTE', 'current_tenant_is_active'),

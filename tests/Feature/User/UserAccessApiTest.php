@@ -308,12 +308,9 @@ final class UserAccessApiTest extends TestCase
             'name' => $code.' Tenant',
             'slug' => strtolower($code).'-tenant',
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            'updated_at' => $now]);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Head Office', 'HO');
         $userId = $this->createUser(
             $tenantId,

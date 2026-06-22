@@ -298,12 +298,9 @@ final class WarehouseApiTest extends TestCase
             'name' => $code.' Tenant',
             'slug' => Str::lower($code).'-tenant',
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            'updated_at' => $now]);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Main', 'MAIN');
         $email = (string) ($overrides['email'] ?? Str::lower($code).'@example.test');
         $userId = (int) DB::table('users')->insertGetId([

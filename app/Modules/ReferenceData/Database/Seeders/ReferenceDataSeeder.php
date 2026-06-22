@@ -83,7 +83,7 @@ final class ReferenceDataSeeder extends Seeder
         $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
 
         DB::transaction(function () use ($guard): void {
-            foreach (DB::table('tenants')->whereNull('deleted_at')->pluck('id') as $tenantId) {
+            foreach (DB::table('tenants')->where('status', '!=', 'archived')->pluck('id') as $tenantId) {
                 foreach (ReferenceDataPermission::descriptions() as $name => $description) {
                     $identity = ['tenant_id' => (int) $tenantId, 'name' => $name, 'guard_name' => $guard];
                     $existing = DB::table('permissions')->where($identity)->first([
@@ -123,7 +123,7 @@ final class ReferenceDataSeeder extends Seeder
 
     private function assignDefaultCurrency(): void
     {
-        if (! Schema::hasTable('tenants') || ! Schema::hasColumn('tenants', 'currency_id')) {
+        if (! Schema::hasTable('tenants') || ! Schema::hasColumn('tenants', 'base_currency_id')) {
             return;
         }
 
@@ -133,9 +133,9 @@ final class ReferenceDataSeeder extends Seeder
         }
 
         TenantModel::query()
-            ->whereNull('currency_id')
+            ->whereNull('base_currency_id')
             ->update([
-                'currency_id' => $currency->getKey(),
+                'base_currency_id' => $currency->getKey(),
                 'row_version' => DB::raw('row_version + 1'),
                 'updated_at' => now(),
             ]);

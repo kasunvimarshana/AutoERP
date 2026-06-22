@@ -20,6 +20,7 @@ use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\User\Constants\UserErrorCode;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
+use Modules\User\Constants\UserTenantStatus;
 use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
@@ -890,9 +891,15 @@ final class UserService extends AbstractUserCrudService
         return DB::table('users')
             ->join('user_roles', 'user_roles.user_id', '=', 'users.id')
             ->join('roles', 'roles.id', '=', 'user_roles.role_id')
-            ->where('users.tenant_id', $tenantId)
             ->where('users.status', UserStatus::ACTIVE)
             ->where('user_roles.tenant_id', $tenantId)
+            ->whereExists(function ($membership) use ($tenantId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')

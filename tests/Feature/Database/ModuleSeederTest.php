@@ -63,12 +63,9 @@ final class ModuleSeederTest extends TestCase
             'name' => "Seeder {$code}",
             'slug' => strtolower($code),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function role(int $tenantId): int

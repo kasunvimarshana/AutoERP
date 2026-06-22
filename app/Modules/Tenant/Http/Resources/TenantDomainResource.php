@@ -10,12 +10,24 @@ use Modules\Core\DTOs\DataRecord;
 
 final class TenantDomainResource extends JsonResource
 {
+    /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
-        }
+        $values = $this->resource instanceof DataRecord
+            ? $this->resource->toArray()
+            : (is_array($this->resource) ? $this->resource : []);
 
-        return is_array($this->resource) ? $this->resource : [];
+        return array_intersect_key($values, array_flip([
+            'id',
+            'domain',
+            'is_primary',
+            'status',
+            'verification_method',
+            'verification_expires_at',
+            'verified_at',
+            'row_version',
+            'created_at',
+            'updated_at',
+        ]));
     }
 }

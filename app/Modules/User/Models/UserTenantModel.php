@@ -13,7 +13,16 @@ final class UserTenantModel extends CoreModel
 {
     protected $table = 'user_tenants';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'organization_unit_id',
+        'metadata',
+        'user_id',
+        'role_id',
+        'status',
+        'is_default',
+        'row_version',
+    ];
 
     protected function casts(): array
     {

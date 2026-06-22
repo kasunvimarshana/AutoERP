@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->string('status')->default('active')->comment('active, inactive, suspended');
+            $table->boolean('is_platform_operator')->default(false)->index()->comment('Explicit SaaS control-plane access; never inferred from a tenant role');
             $table->string('avatar_path')->nullable();
             $table->string('phone')->nullable();
             $table->json('preferences')->nullable();

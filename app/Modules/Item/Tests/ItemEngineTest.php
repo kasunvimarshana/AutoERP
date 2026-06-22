@@ -270,11 +270,8 @@ final class ItemEngineTest extends TestCase
             'name' => 'Item Tenant '.$suffix,
             'slug' => 'item-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int

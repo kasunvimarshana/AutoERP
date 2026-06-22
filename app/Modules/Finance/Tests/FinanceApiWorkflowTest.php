@@ -105,11 +105,8 @@ final class FinanceApiWorkflowTest extends TestCase
             'name' => 'Finance API '.$suffix,
             'slug' => 'finance-api-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
         $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Finance API Org',

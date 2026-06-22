@@ -6,17 +6,18 @@ namespace Modules\Tenant\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class ListTenantDocumentRequest extends FormRequest
+final class CreateTenantDomainRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return auth()->check();
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
+            'domain' => ['required', 'string', 'max:253'],
         ];
     }
 }

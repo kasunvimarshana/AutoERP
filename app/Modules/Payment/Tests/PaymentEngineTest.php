@@ -576,11 +576,8 @@ final class PaymentEngineTest extends TestCase
             'name' => 'Payment Tenant '.$suffix,
             'slug' => 'payment-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
 
         $yearId = (int) DB::table('finance_fiscal_years')->insertGetId([
             'tenant_id' => $tenantId,

@@ -85,11 +85,8 @@ abstract class InventoryTestCase extends TestCase
             'name' => 'Inventory Tenant '.$suffix,
             'slug' => 'inventory-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     protected function createWarehouse(int $tenantId, string $code): int

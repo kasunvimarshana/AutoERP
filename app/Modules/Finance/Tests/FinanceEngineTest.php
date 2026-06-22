@@ -298,11 +298,8 @@ final class FinanceEngineTest extends TestCase
             'name' => 'Finance Tenant '.$suffix,
             'slug' => 'finance-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int

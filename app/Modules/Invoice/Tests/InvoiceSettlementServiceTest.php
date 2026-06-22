@@ -65,10 +65,7 @@ final class InvoiceSettlementServiceTest extends TestCase
             'name' => 'Invoice Settlement '.$suffix,
             'slug' => 'invoice-settlement-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 }

@@ -354,7 +354,7 @@ final class PurchaseOrderApiTest extends TestCase
             'DEFAULT-'.Str::upper(Str::random(4)),
             isDefault: true,
         );
-        DB::table('tenants')->where('id', $context['tenant_id'])->update(['currency_id' => $currencyId]);
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
         DB::table('warehouses')->where('id', $context['warehouse_id'])->update(['is_default' => true]);
 
         $this->withAuth($context)->getJson('/api/v1/purchase/orders/create-context')
@@ -676,7 +676,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $context = $this->context();
         $currencyId = $this->createCurrency('RTE-'.Str::upper(Str::random(4)));
-        DB::table('tenants')->where('id', $context['tenant_id'])->update(['currency_id' => $currencyId]);
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
 
         $response = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
             'currency_id' => $currencyId,
@@ -1046,12 +1046,9 @@ final class PurchaseOrderApiTest extends TestCase
             'name' => 'PO Tenant '.$suffix,
             'slug' => 'po-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $suffix): int

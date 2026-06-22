@@ -300,11 +300,8 @@ final class ChequePrintTest extends TestCase
             'name' => 'Cheque Tenant '.$suffix,
             'slug' => 'cheque-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int

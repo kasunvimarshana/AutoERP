@@ -5,123 +5,70 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Rules;
 
 use InvalidArgumentException;
-use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Services\Contracts\TenantDomainServiceInterface;
-use Modules\Tenant\ValueObjects\TenantIsolationKey;
 
 final class TenantDomainService implements TenantDomainServiceInterface
 {
     public function normalizeCode(string $value): string
     {
-        $normalized = strtoupper(trim($value));
-        if ($normalized === '') {
-            throw new InvalidArgumentException('Tenant code is required.');
+        $value = strtoupper(trim($value));
+        if ($value === '' || preg_match('/^[A-Z0-9][A-Z0-9_-]{1,49}$/', $value) !== 1) {
+            throw new InvalidArgumentException('Tenant code must contain 2-50 uppercase letters, numbers, dashes, or underscores.');
         }
-
-        return $normalized;
+        return $value;
     }
 
     public function normalizeName(string $value): string
     {
-        $normalized = trim($value);
-        if ($normalized === '') {
+        $value = trim($value);
+        if ($value === '') {
             throw new InvalidArgumentException('Tenant name is required.');
         }
-
-        return $normalized;
+        return $value;
     }
 
     public function normalizeSlug(string $value): string
     {
-        $normalized = strtolower(trim($value));
-        if ($normalized === '') {
-            throw new InvalidArgumentException('Slug is required.');
+        $value = strtolower(trim($value));
+        if ($value === '' || preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $value) !== 1) {
+            throw new InvalidArgumentException('Tenant slug must be a lowercase URL-safe value.');
         }
-
-        return $normalized;
-    }
-
-    public function normalizeKey(string $value): string
-    {
-        $normalized = trim($value);
-        if ($normalized === '') {
-            throw new InvalidArgumentException('Key is required.');
-        }
-
-        return $normalized;
+        return $value;
     }
 
     public function normalizeDomain(string $value): string
     {
-        $normalized = strtolower(trim($value));
-        if ($normalized === '') {
-            throw new InvalidArgumentException('Domain is required.');
+        $value = strtolower(rtrim(trim($value), '.'));
+        if (
+            $value === ''
+            || strlen($value) > 253
+            || str_contains($value, '://')
+            || str_contains($value, '/')
+            || str_contains($value, ':')
+            || filter_var($value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false
+        ) {
+            throw new InvalidArgumentException('A hostname without a protocol, port, or path is required.');
         }
 
-        return $normalized;
+        return $value;
     }
 
     public function normalizeBillingInterval(?string $value): string
     {
-        $candidate = strtolower(trim((string) $value));
-        if ($candidate === '') {
-            return 'month';
+        $value = strtolower(trim((string) $value));
+        $value = $value === '' ? 'month' : $value;
+        if (! in_array($value, ['month', 'quarter', 'year'], true)) {
+            throw new InvalidArgumentException('Billing interval must be month, quarter, or year.');
         }
-
-        if (! in_array($candidate, ['month', 'year'], true)) {
-            throw new InvalidArgumentException('Billing interval must be month or year.');
-        }
-
-        return $candidate;
+        return $value;
     }
 
     public function normalizeOptionalText(?string $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
-        $normalized = trim($value);
-
-        return $normalized === '' ? null : $normalized;
+        $value = $value === null ? null : trim($value);
+        return $value === '' ? null : $value;
     }
 
-    public function normalizeStatus(?string $status): string
-    {
-        $candidate = strtolower(trim((string) $status));
-        if ($candidate === '') {
-            return TenantStatus::ACTIVE;
-        }
-
-        if (! TenantStatus::isValid($candidate)) {
-            throw new InvalidArgumentException(sprintf('Unsupported tenant status "%s".', $candidate));
-        }
-
-        return $candidate;
-    }
-
-    public function deriveActiveFlag(string $status): bool
-    {
-        return $status === TenantStatus::ACTIVE;
-    }
-
-    public function ensureIsolationKey(bool $isIsolated, ?string $isolationKey, string $fallback): ?string
-    {
-        if (! $isIsolated) {
-            return null;
-        }
-
-        $candidate = trim((string) ($isolationKey ?? ''));
-        if ($candidate === '') {
-            $candidate = trim($fallback);
-        }
-
-        return (string) new TenantIsolationKey($candidate);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     public function normalizeMetadata(mixed $value): array
     {
         return is_array($value) ? $value : [];

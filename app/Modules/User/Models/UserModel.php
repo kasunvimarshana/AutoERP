@@ -21,9 +21,9 @@ final class UserModel extends Authenticatable
 
     protected $table = 'users';
 
-    protected $guarded = ['id'];
+    protected $guarded = ['id', 'is_platform_operator'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'is_platform_operator'];
 
     protected function casts(): array
     {
@@ -34,6 +34,7 @@ final class UserModel extends Authenticatable
             'preferences' => 'array',
             'date_of_birth' => 'date',
             'email_verified_at' => 'datetime',
+            'is_platform_operator' => 'boolean',
             'row_version' => 'integer',
         ]);
     }

@@ -7,66 +7,149 @@ namespace Modules\Tenant\Repositories;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\DTOs\DataRecord;
-use Modules\Core\Repositories\EloquentRepository;
 use Modules\Tenant\Models\TenantDomainModel;
+use RuntimeException;
 
-final class EloquentTenantDomainRepository extends EloquentRepository implements TenantDomainRepositoryInterface
+final class EloquentTenantDomainRepository implements TenantDomainRepositoryInterface
 {
-    public function __construct(TenantDomainModel $model)
+    private const VERSION_CONFLICT = 'tenant-domain-version-conflict';
+
+    public function __construct(private readonly TenantDomainModel $model) {}
+
+    public function listByTenant(int $tenantId): array
     {
-        parent::__construct($model);
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->orderByDesc('is_primary')
+            ->orderBy('domain')
+            ->get()
+            ->map(fn (Model $model): DataRecord => $this->record($model))
+            ->values()
+            ->all();
     }
 
-    public function listByTenant(int|string $tenantId): array
+    public function findByIdForTenant(int|string $id, int $tenantId): ?DataRecord
     {
-        $records = [];
+        $model = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->find($id);
 
-        foreach (
-            $this->query()
-                ->where('tenant_id', $tenantId)
-                ->orderByDesc('is_primary')
-                ->orderBy('domain')
-                ->get() as $model
-        ) {
-            if ($model instanceof Model) {
-                $records[] = $this->toRecord($model);
-            }
-        }
-
-        return $records;
+        return $model instanceof TenantDomainModel ? $this->record($model) : null;
     }
 
     public function findByDomain(string $domain): ?DataRecord
     {
-        $model = $this->query()->where('domain', strtolower(trim($domain)))->first();
+        $model = $this->model->newQuery()
+            ->where('domain', strtolower(trim($domain)))
+            ->first();
 
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
+        return $model instanceof TenantDomainModel ? $this->record($model) : null;
     }
 
-    public function findPrimaryByTenant(int|string $tenantId): ?DataRecord
+    public function findPrimaryByTenant(int $tenantId): ?DataRecord
     {
-        $model = $this->query()->where('tenant_id', $tenantId)->where('is_primary', true)->first();
-
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
-    }
-
-    public function clearPrimaryForTenant(int|string $tenantId): int
-    {
-        return $this->query()
+        $model = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('is_primary', true)
-            ->update([
-                'is_primary' => false,
-                'row_version' => DB::raw('row_version + 1'),
-                'updated_at' => now(),
-            ]);
+            ->where('status', 'active')
+            ->whereNotNull('verified_at')
+            ->first();
+
+        return $model instanceof TenantDomainModel ? $this->record($model) : null;
+    }
+
+    public function create(array $attributes): DataRecord
+    {
+        return $this->record($this->model->newQuery()->create($attributes));
+    }
+
+    public function updateWithVersion(
+        int|string $id,
+        int $tenantId,
+        int $expectedVersion,
+        array $attributes,
+    ): ?DataRecord {
+        $attributes['row_version'] = $expectedVersion + 1;
+        $attributes['updated_at'] = now();
+
+        $updated = $this->model->newQuery()
+            ->whereKey($id)
+            ->where('tenant_id', $tenantId)
+            ->where('row_version', $expectedVersion)
+            ->update($attributes);
+
+        return $updated === 1 ? $this->findByIdForTenant($id, $tenantId) : null;
+    }
+
+    public function setPrimaryWithVersion(
+        int|string $id,
+        int $tenantId,
+        int $expectedVersion,
+        ?int $updatedBy,
+    ): ?DataRecord {
+        try {
+            DB::transaction(function () use ($id, $tenantId, $expectedVersion, $updatedBy): void {
+                $target = $this->model->newQuery()
+                    ->whereKey($id)
+                    ->where('tenant_id', $tenantId)
+                    ->where('row_version', $expectedVersion)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $target instanceof TenantDomainModel) {
+                    throw new RuntimeException(self::VERSION_CONFLICT);
+                }
+
+                $this->model->newQuery()
+                    ->where('tenant_id', $tenantId)
+                    ->where('is_primary', true)
+                    ->where('id', '!=', $target->getKey())
+                    ->update([
+                        'is_primary' => false,
+                        'primary_marker' => null,
+                        'row_version' => DB::raw('row_version + 1'),
+                        'updated_by' => $updatedBy,
+                        'updated_at' => now(),
+                    ]);
+
+                $updated = $this->model->newQuery()
+                    ->whereKey($id)
+                    ->where('tenant_id', $tenantId)
+                    ->where('row_version', $expectedVersion)
+                    ->update([
+                        'is_primary' => true,
+                        'primary_marker' => 'primary',
+                        'row_version' => $expectedVersion + 1,
+                        'updated_by' => $updatedBy,
+                        'updated_at' => now(),
+                    ]);
+
+                if ($updated !== 1) {
+                    throw new RuntimeException(self::VERSION_CONFLICT);
+                }
+            }, 3);
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === self::VERSION_CONFLICT) {
+                return null;
+            }
+
+            throw $exception;
+        }
+
+        return $this->findByIdForTenant($id, $tenantId);
+    }
+
+    public function deleteWithVersion(int|string $id, int $tenantId, int $expectedVersion): bool
+    {
+        return $this->model->newQuery()
+            ->whereKey($id)
+            ->where('tenant_id', $tenantId)
+            ->where('row_version', $expectedVersion)
+            ->delete() === 1;
+    }
+
+    private function record(Model $model): DataRecord
+    {
+        return new DataRecord($model->attributesToArray());
     }
 }

@@ -34,8 +34,8 @@ final class PurchaseDocumentContextService
      */
     public function purchaseOrderCreateContext(int $tenantId, ?int $organizationUnitId): array
     {
-        $tenant = TenantModel::query()->with('currency')->findOrFail($tenantId);
-        $currency = $tenant->currency instanceof CurrencyModel ? $tenant->currency : null;
+        $tenant = TenantModel::query()->with('baseCurrency')->findOrFail($tenantId);
+        $currency = $tenant->baseCurrency instanceof CurrencyModel ? $tenant->baseCurrency : null;
         $warehouse = $this->warehouseDefaults->resolveDefaultWarehouse($tenantId, $organizationUnitId);
         $location = $warehouse instanceof WarehouseModel
             ? $this->warehouseDefaults->resolveDefaultLocation($warehouse)

@@ -7,6 +7,7 @@ namespace Modules\User\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\DTOs\DataRecord;
 use Modules\User\Constants\UserPermission;
+use Modules\User\Constants\UserTenantStatus;
 
 final class UserAccessResolver
 {
@@ -14,6 +15,11 @@ final class UserAccessResolver
      * @var array<string, bool>
      */
     private array $superAdminCache = [];
+
+    /**
+     * @var array<int, bool>
+     */
+    private array $platformOperatorCache = [];
 
     /**
      * @var array<string, list<string>>
@@ -59,14 +65,41 @@ final class UserAccessResolver
             ->join('users', 'users.id', '=', 'user_roles.user_id')
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
-            ->where('users.tenant_id', $tenantId)
             ->where('users.status', 'active')
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')
             ->exists();
 
         return $this->superAdminCache[$key];
+    }
+
+    public function isPlatformOperator(int $userId): bool
+    {
+        if ($userId < 1) {
+            return false;
+        }
+
+        if (array_key_exists($userId, $this->platformOperatorCache)) {
+            return $this->platformOperatorCache[$userId];
+        }
+
+        $this->platformOperatorCache[$userId] = DB::table('users')
+            ->where('id', $userId)
+            ->where('status', 'active')
+            ->where('is_platform_operator', true)
+            ->whereNull('deleted_at')
+            ->exists();
+
+        return $this->platformOperatorCache[$userId];
     }
 
     /**
@@ -90,6 +123,13 @@ final class UserAccessResolver
             )
             : $this->assignedPermissionNames($userId, $tenantId);
 
+        if (! $this->isPlatformOperator($userId)) {
+            $names = array_values(array_filter(
+                $names,
+                static fn (string $name): bool => ! str_starts_with($name, 'tenant.platform.'),
+            ));
+        }
+
         sort($names);
         $this->effectiveNameCache[$key] = array_values(array_unique($names));
 
@@ -105,11 +145,21 @@ final class UserAccessResolver
             return [];
         }
 
-        if ($this->isSuperAdmin($userId, $tenantId)) {
-            return $this->activePermissionCatalogue($tenantId);
+        $permissions = $this->isSuperAdmin($userId, $tenantId)
+            ? $this->activePermissionCatalogue($tenantId)
+            : $this->assignedPermissions($userId, $tenantId);
+
+        if ($this->isPlatformOperator($userId)) {
+            return $permissions;
         }
 
-        return $this->assignedPermissions($userId, $tenantId);
+        return array_values(array_filter(
+            $permissions,
+            static fn (array $permission): bool => ! str_starts_with(
+                $permission['name'],
+                'tenant.platform.',
+            ),
+        ));
     }
 
     /**
@@ -217,6 +267,7 @@ final class UserAccessResolver
             $this->superAdminCache[$key],
             $this->effectiveNameCache[$key],
             $this->assignedNameCache[$key],
+            $this->platformOperatorCache[$userId],
         );
     }
 
@@ -268,8 +319,15 @@ final class UserAccessResolver
             ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
             ->where('user_permissions.tenant_id', $tenantId)
             ->where('user_permissions.user_id', $userId)
-            ->where('users.tenant_id', $tenantId)
             ->where('users.status', 'active')
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('permissions.tenant_id', $tenantId)
             ->whereNull('users.deleted_at')
             ->whereNull('permissions.deleted_at')
@@ -304,8 +362,15 @@ final class UserAccessResolver
             ->join('users', 'users.id', '=', 'user_roles.user_id')
             ->where('role_permissions.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
-            ->where('users.tenant_id', $tenantId)
             ->where('users.status', 'active')
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('permissions.tenant_id', $tenantId)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')

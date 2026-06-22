@@ -110,11 +110,8 @@ final class BooleanQueryFilterTest extends TestCase
             'name' => 'Tenant '.$suffix,
             'slug' => 'tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
 
         $organizationUnitId = $this->organization($tenantId, $suffix);
         $userId = $this->userWithWarehousePermissions($tenantId, $organizationUnitId, $suffix);

@@ -907,11 +907,8 @@ final class FastPurchaseTest extends TestCase
             'name' => 'Fast Purchase '.$suffix,
             'slug' => 'fast-purchase-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function uom(int $tenantId, string $code): int

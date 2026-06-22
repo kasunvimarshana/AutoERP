@@ -4,217 +4,358 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Documents;
 
+use InvalidArgumentException;
+use Modules\Audit\Contracts\AuditRecorderInterface;
+use Modules\Audit\Data\AuditEventData;
+use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\FileStorageServiceInterface;
-use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainServiceInterface;
-use Modules\Tenant\Support\TenantContext;
+use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Throwable;
 
 final class TenantDocumentService
 {
     public function __construct(
         private readonly TenantDocumentRepositoryInterface $documents,
-        private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantDomainServiceInterface $domain,
+        private readonly TenantDomainServiceInterface $rules,
         private readonly FileStorageServiceInterface $files,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly TenantContext $tenantContext,
-        private readonly TransactionManagerInterface $transactions,
-        private readonly ErrorNormalizerInterface $errorNormalizer,
+        private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly AuditRecorderInterface $auditRecorder,
+        private readonly ErrorNormalizerInterface $errors,
+        private readonly LoggerInterface $logger,
     ) {}
 
-    public function listByTenant(int|string $tenantId): Result
+    public function list(int $tenantId): Result
     {
-        try {
-            $resolvedTenantId = $this->tenantContext->resolveTenantId($this->toNullableInt($tenantId));
-
-            return Result::success($this->documents->listByTenant($resolvedTenantId));
-        } catch (Throwable $exception) {
-            return Result::failure($this->errorNormalizer->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.documents.list'],
-            ));
-        }
+        return Result::success($this->documents->listByTenant($tenantId));
     }
 
-    public function get(int|string $id): Result
+    public function get(int $tenantId, int|string $id): Result
     {
+        $record = $this->documents->findByIdForTenant($id, $tenantId);
+
+        return $record === null
+            ? Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant document not found.'))
+            : Result::success($record);
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function create(int $tenantId, array $payload): Result
+    {
+        $storedFile = null;
+
         try {
-            $record = $this->documents->findById($id);
-            if ($record === null || ! $this->isRecordInTenantScope($record)) {
-                return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant document not found.'));
+            $name = $this->rules->normalizeName((string) ($payload['name'] ?? ''));
+            if ($this->documents->findByTenantAndName($tenantId, $name) !== null) {
+                return Result::failure(new Error(
+                    TenantErrorCode::CONFLICT,
+                    'Tenant document name already exists.',
+                ));
             }
+
+            $storedFile = $this->storeUploadedFile($tenantId, $payload);
+            $record = $this->documents->create([
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'document_type' => $this->rules->normalizeOptionalText(
+                    isset($payload['document_type'])
+                        ? (string) $payload['document_type']
+                        : null,
+                ),
+                ...$storedFile,
+                'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
+                'row_version' => 1,
+                'created_by' => $this->currentUser->currentUserId(),
+                'updated_by' => $this->currentUser->currentUserId(),
+            ]);
+
+            $this->recordAudit('tenant.document.created', $record);
 
             return Result::success($record);
         } catch (Throwable $exception) {
-            return Result::failure($this->errorNormalizer->normalize(
+            $this->removeStoredFile($storedFile);
+
+            return Result::failure($this->errors->normalize(
                 $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.documents.get', 'document_id' => (string) $id],
+                TenantErrorCode::FILE_OPERATION_FAILED,
+                ['operation' => 'tenant.document.create'],
             ));
         }
     }
 
-    public function create(array $payload): Result
-    {
+    /** @param array<string, mixed> $payload */
+    public function update(
+        int $tenantId,
+        int|string $id,
+        array $payload,
+    ): Result {
+        $replacementFile = null;
+
         try {
-            return $this->transactions->runInTransaction(function () use ($payload): Result {
-                $tenantId = $this->tenantContext->resolveTenantId($this->toNullableInt($payload['tenant_id'] ?? null));
-                if ($this->tenants->findById($tenantId) === null) {
-                    return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
-                }
+            $existing = $this->documents->findByIdForTenant($id, $tenantId);
+            if ($existing === null) {
+                return Result::failure(new Error(
+                    TenantErrorCode::NOT_FOUND,
+                    'Tenant document not found.',
+                ));
+            }
 
-                $name = $this->domain->normalizeName((string) ($payload['name'] ?? ''));
-                if ($this->documents->findByTenantAndName($tenantId, $name) !== null) {
-                    return Result::failure(
-                        new Error(TenantErrorCode::CONFLICT, 'Tenant document name already exists.'),
-                    );
-                }
+            $expectedVersion = (int) ($payload['expected_version'] ?? 0);
+            $name = array_key_exists('name', $payload)
+                ? $this->rules->normalizeName((string) $payload['name'])
+                : (string) $existing->require('name');
 
-                $filePath = $this->resolveFilePath($payload, $tenantId);
+            $duplicate = $this->documents->findByTenantAndName($tenantId, $name);
+            if ($duplicate !== null && (int) $duplicate->id() !== (int) $existing->id()) {
+                return Result::failure(new Error(
+                    TenantErrorCode::CONFLICT,
+                    'Tenant document name already exists.',
+                ));
+            }
 
-                $record = $this->documents->create([
-                    'tenant_id' => $tenantId,
-                    'name' => $name,
-                    'file_path' => $filePath,
-                    'mime_type' => isset($payload['mime_type']) ? (string) $payload['mime_type'] : null,
-                    'size' => isset($payload['size']) ? (int) $payload['size'] : null,
-                    'type' => isset($payload['type']) ? (string) $payload['type'] : null,
-                    'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
-                    'row_version' => 1,
-                ]);
+            $attributes = [
+                'name' => $name,
+                'document_type' => array_key_exists('document_type', $payload)
+                    ? $this->rules->normalizeOptionalText(
+                        $payload['document_type'] === null
+                            ? null
+                            : (string) $payload['document_type'],
+                    )
+                    : $existing->get('document_type'),
+                'metadata' => array_key_exists('metadata', $payload)
+                    ? $this->rules->normalizeMetadata($payload['metadata'])
+                    : $this->rules->normalizeMetadata($existing->get('metadata')),
+                'updated_by' => $this->currentUser->currentUserId(),
+            ];
 
-                return Result::success($record);
-            });
+            if (isset($payload['file_tmp_path'])) {
+                $replacementFile = $this->storeUploadedFile($tenantId, $payload);
+                $attributes = [...$attributes, ...$replacementFile];
+            }
+
+            $updated = $this->documents->updateWithVersion(
+                $id,
+                $tenantId,
+                $expectedVersion,
+                $attributes,
+            );
+            if ($updated === null) {
+                $this->removeStoredFile($replacementFile);
+
+                return Result::failure(new Error(
+                    TenantErrorCode::VERSION_CONFLICT,
+                    'Document changed since it was loaded. Refresh and try again.',
+                ));
+            }
+
+            if ($replacementFile !== null) {
+                $this->deleteFileIfPresent(
+                    (string) $existing->require('storage_path'),
+                    (string) $existing->require('storage_disk'),
+                    'replacement cleanup',
+                );
+            }
+
+            $this->recordAudit('tenant.document.updated', $updated);
+
+            return Result::success($updated);
         } catch (Throwable $exception) {
-            return Result::failure($this->errorNormalizer->normalize(
+            $this->removeStoredFile($replacementFile);
+
+            return Result::failure($this->errors->normalize(
                 $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.documents.create'],
+                TenantErrorCode::FILE_OPERATION_FAILED,
+                ['operation' => 'tenant.document.update'],
             ));
         }
     }
 
-    public function update(int|string $id, array $payload): Result
-    {
-        try {
-            return $this->transactions->runInTransaction(function () use ($id, $payload): Result {
-                $existing = $this->documents->findById($id);
-                if ($existing === null || ! $this->isRecordInTenantScope($existing)) {
-                    return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant document not found.'));
-                }
-
-                $tenantId = (int) $existing->require('tenant_id');
-                $name = $this->domain->normalizeName((string) ($payload['name'] ?? $existing->require('name')));
-                $byName = $this->documents->findByTenantAndName($tenantId, $name);
-                if ($byName !== null && (string) $byName->id() !== (string) $existing->id()) {
-                    return Result::failure(
-                        new Error(TenantErrorCode::CONFLICT, 'Tenant document name already exists.'),
-                    );
-                }
-
-                $filePath = array_key_exists('file_path', $payload) || isset($payload['file_tmp_path'])
-                    ? $this->resolveFilePath($payload, $tenantId)
-                    : (string) $existing->require('file_path');
-
-                $record = $this->documents->update($id, [
-                    'name' => $name,
-                    'file_path' => $filePath,
-                    'mime_type' => array_key_exists('mime_type', $payload)
-                        ? (isset($payload['mime_type']) ? (string) $payload['mime_type'] : null)
-                        : $existing->get('mime_type'),
-                    'size' => array_key_exists('size', $payload)
-                        ? (isset($payload['size']) ? (int) $payload['size'] : null)
-                        : $existing->get('size'),
-                    'type' => array_key_exists('type', $payload)
-                        ? (isset($payload['type']) ? (string) $payload['type'] : null)
-                        : $existing->get('type'),
-                    'metadata' => array_key_exists('metadata', $payload)
-                        ? $this->domain->normalizeMetadata($payload['metadata'])
-                        : $this->domain->normalizeMetadata($existing->get('metadata')),
-                    'row_version' => ((int) $existing->get('row_version', 1)) + 1,
-                ]);
-
-                return Result::success($record);
-            });
-        } catch (Throwable $exception) {
-            return Result::failure($this->errorNormalizer->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.documents.update', 'document_id' => (string) $id],
+    public function delete(
+        int $tenantId,
+        int|string $id,
+        int $expectedVersion,
+    ): Result {
+        $record = $this->documents->findByIdForTenant($id, $tenantId);
+        if ($record === null) {
+            return Result::failure(new Error(
+                TenantErrorCode::NOT_FOUND,
+                'Tenant document not found.',
             ));
         }
+
+        if (! $this->documents->deleteWithVersion($id, $tenantId, $expectedVersion)) {
+            return Result::failure(new Error(
+                TenantErrorCode::VERSION_CONFLICT,
+                'Document changed since it was loaded. Refresh and try again.',
+            ));
+        }
+
+        $cleanupSucceeded = $this->deleteFileIfPresent(
+            (string) $record->require('storage_path'),
+            (string) $record->require('storage_disk'),
+            'deletion cleanup',
+        );
+
+        $this->recordAudit(
+            'tenant.document.deleted',
+            $record,
+            ['storage_cleanup_succeeded' => $cleanupSucceeded],
+        );
+
+        return Result::success(true);
     }
 
-    public function delete(int|string $id): Result
+    public function download(int $tenantId, int|string $id): Result
     {
         try {
-            return $this->transactions->runInTransaction(function () use ($id): Result {
-                $existing = $this->documents->findById($id);
-                if ($existing === null || ! $this->isRecordInTenantScope($existing)) {
-                    return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant document not found.'));
-                }
+            $record = $this->documents->findByIdForTenant($id, $tenantId);
+            if ($record === null) {
+                return Result::failure(new Error(
+                    TenantErrorCode::NOT_FOUND,
+                    'Tenant document not found.',
+                ));
+            }
 
-                return Result::success($this->documents->delete($id));
-            });
+            $stream = $this->files->readStream(
+                (string) $record->require('storage_path'),
+                (string) $record->require('storage_disk'),
+            );
+            if (! is_resource($stream)) {
+                throw new RuntimeException('Stored document could not be opened.');
+            }
+
+            return Result::success([
+                'record' => $record,
+                'stream' => $stream,
+            ]);
         } catch (Throwable $exception) {
-            return Result::failure($this->errorNormalizer->normalize(
+            return Result::failure($this->errors->normalize(
                 $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.documents.delete', 'document_id' => (string) $id],
+                TenantErrorCode::FILE_OPERATION_FAILED,
+                ['operation' => 'tenant.document.download'],
             ));
         }
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
      */
-    private function resolveFilePath(array $payload, int $tenantId): string
+    private function storeUploadedFile(int $tenantId, array $payload): array
     {
-        if (isset($payload['file_tmp_path'])) {
-            $tmpPath = (string) $payload['file_tmp_path'];
-            $originalName = isset($payload['file_original_name'])
-                ? (string) $payload['file_original_name']
-                : 'document.bin';
-            $extension = strtolower(trim((string) pathinfo($originalName, PATHINFO_EXTENSION)));
-            $filename = sprintf(
-                '%s-%s.%s',
-                $tenantId,
-                $this->uuid->generate(),
-                $extension === '' ? 'bin' : $extension,
-            );
-
-            return $this->files->store($tmpPath, 'tenants/documents', $filename);
+        $temporaryPath = isset($payload['file_tmp_path'])
+            ? (string) $payload['file_tmp_path']
+            : '';
+        if ($temporaryPath === '' || ! is_file($temporaryPath)) {
+            throw new InvalidArgumentException('A valid uploaded file is required.');
         }
 
-        return $this->domain->normalizeOptionalText(
-            isset($payload['file_path']) ? (string) $payload['file_path'] : null,
-        )
-            ?? throw new \InvalidArgumentException('File path is required.');
-    }
-
-    private function isRecordInTenantScope(DataRecord $record): bool
-    {
-        return (int) $record->require('tenant_id') === $this->tenantContext->requireTenantId();
-    }
-
-    private function toNullableInt(mixed $value): ?int
-    {
-        if ($value === null || $value === '' || ! is_numeric($value)) {
-            return null;
+        $originalFilename = basename(
+            (string) ($payload['file_original_name'] ?? 'document.bin'),
+        );
+        $mimeType = mime_content_type($temporaryPath) ?: 'application/octet-stream';
+        $allowedMimeTypes = config('tenant.documents.allowed_mime_types', []);
+        if (! is_array($allowedMimeTypes) || ! in_array($mimeType, $allowedMimeTypes, true)) {
+            throw new InvalidArgumentException('Unsupported document file type.');
         }
 
-        $normalized = (int) $value;
+        $size = filesize($temporaryPath);
+        $maxBytes = max(
+            (int) config('tenant.documents.max_size_kb', 10240),
+            1,
+        ) * 1024;
+        if ($size === false || $size < 1 || $size > $maxBytes) {
+            throw new InvalidArgumentException('Document file size is invalid.');
+        }
 
-        return $normalized > 0 ? $normalized : null;
+        $disk = $this->disk();
+        $storedPath = $this->files->store(
+            $temporaryPath,
+            'tenants/'.$tenantId.'/documents',
+            $this->uuid->generate(),
+            $disk,
+        );
+
+        return [
+            'storage_disk' => $disk,
+            'storage_path' => $storedPath,
+            'original_filename' => $originalFilename,
+            'mime_type' => $mimeType,
+            'size_bytes' => $size,
+            'checksum_sha256' => hash_file('sha256', $temporaryPath),
+        ];
+    }
+
+    /** @param array<string, mixed>|null $file */
+    private function removeStoredFile(?array $file): void
+    {
+        if ($file === null) {
+            return;
+        }
+
+        $path = (string) ($file['storage_path'] ?? '');
+        $disk = (string) ($file['storage_disk'] ?? $this->disk());
+        if ($path !== '') {
+            $this->deleteFileIfPresent($path, $disk, 'failed operation cleanup');
+        }
+    }
+
+    private function deleteFileIfPresent(
+        string $path,
+        string $disk,
+        string $operation,
+    ): bool {
+        if (! $this->files->exists($path, $disk)) {
+            return true;
+        }
+
+        if ($this->files->delete($path, $disk)) {
+            return true;
+        }
+
+        $this->logger->warning('Tenant document storage cleanup failed.', [
+            'operation' => $operation,
+            'disk' => $disk,
+            'path' => $path,
+        ]);
+
+        return false;
+    }
+
+    private function disk(): string
+    {
+        return (string) config('tenant.documents.disk', 'local');
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function recordAudit(
+        string $eventName,
+        DataRecord $record,
+        array $metadata = [],
+    ): void {
+        $this->auditRecorder->record(new AuditEventData(
+            eventName: $eventName,
+            eventCategory: 'administration',
+            sourceModule: 'tenant',
+            subjectType: 'tenant_document',
+            subjectId: (string) $record->id(),
+            subjectReference: (string) $record->get('name'),
+            metadata: [
+                'document_type' => $record->get('document_type'),
+                'mime_type' => $record->get('mime_type'),
+                'size_bytes' => $record->get('size_bytes'),
+                ...$metadata,
+            ],
+            tags: ['tenant', 'document'],
+        ));
     }
 }

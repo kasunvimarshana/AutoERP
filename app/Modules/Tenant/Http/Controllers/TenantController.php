@@ -8,20 +8,27 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Core\Results\Result;
+use Modules\Tenant\Constants\TenantPermission;
 use Modules\Tenant\Http\Requests\ListTenantRequest;
+use Modules\Tenant\Http\Requests\TenantLifecycleRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantRequest;
 use Modules\Tenant\Http\Resources\TenantResource;
+use Modules\Tenant\Http\Support\TenantApiResponder;
 use Modules\Tenant\Services\ActivateTenantService;
+use Modules\Tenant\Services\ArchiveTenantService;
 use Modules\Tenant\Services\CreateTenantService;
 use Modules\Tenant\Services\DeactivateTenantService;
 use Modules\Tenant\Services\GetTenantService;
 use Modules\Tenant\Services\ListTenantsService;
 use Modules\Tenant\Services\SuspendTenantService;
+use Modules\Tenant\Services\TenantAuthorizationService;
 use Modules\Tenant\Services\UpdateTenantService;
 
 final class TenantController extends Controller
 {
     public function __construct(
+        private readonly TenantAuthorizationService $authorization,
         private readonly ListTenantsService $listTenants,
         private readonly GetTenantService $getTenant,
         private readonly CreateTenantService $createTenant,
@@ -29,20 +36,20 @@ final class TenantController extends Controller
         private readonly ActivateTenantService $activateTenant,
         private readonly SuspendTenantService $suspendTenant,
         private readonly DeactivateTenantService $deactivateTenant,
+        private readonly ArchiveTenantService $archiveTenant,
     ) {}
 
     public function index(ListTenantRequest $request): JsonResponse
     {
-        $result = $this->listTenants->execute($request->validated());
+        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
 
+        $result = $this->listTenants->execute($request->validated());
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return TenantApiResponder::error($result->errorOrFail());
         }
 
         $page = $result->valueOrFail();
-        if (! $page instanceof PagedResult) {
-            return response()->json(['message' => 'Unexpected list response.'], 500);
-        }
+        abort_unless($page instanceof PagedResult, 500, 'Unexpected tenant list response.');
 
         return response()->json([
             'data' => TenantResource::collection($page->items)->resolve(),
@@ -52,97 +59,120 @@ final class TenantController extends Controller
 
     public function show(int|string $tenant): JsonResponse|TenantResource
     {
-        $result = $this->getTenant->execute($tenant);
+        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
 
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return new TenantResource($result->valueOrFail());
+        return $this->tenantResponse($this->getTenant->execute($tenant));
     }
 
     public function store(UpsertTenantRequest $request): JsonResponse|TenantResource
     {
-        $result = $this->createTenant->execute($this->prepareMutationPayload($request));
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE);
 
+        $result = $this->createTenant->execute($this->payload($request));
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return TenantApiResponder::error($result->errorOrFail());
         }
 
-        return (new TenantResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new TenantResource($result->valueOrFail()))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    public function update(UpsertTenantRequest $request, int|string $tenant): JsonResponse|TenantResource
-    {
-        $result = $this->updateTenant->execute($tenant, $this->prepareMutationPayload($request));
+    public function update(
+        UpsertTenantRequest $request,
+        int|string $tenant,
+    ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE);
 
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'TENANT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return new TenantResource($result->valueOrFail());
+        return $this->tenantResponse(
+            $this->updateTenant->execute($tenant, $this->payload($request)),
+        );
     }
 
-    public function activate(int|string $tenant): JsonResponse|TenantResource
-    {
-        $result = $this->activateTenant->execute($tenant);
+    public function activate(
+        TenantLifecycleRequest $request,
+        int|string $tenant,
+    ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
+        $data = $request->validated();
 
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'TENANT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return new TenantResource($result->valueOrFail());
+        return $this->tenantResponse($this->activateTenant->execute(
+            $tenant,
+            (int) $data['expected_version'],
+            (string) $data['reason'],
+        ));
     }
 
-    public function deactivate(int|string $tenant): JsonResponse|TenantResource
-    {
-        $result = $this->deactivateTenant->execute($tenant);
+    public function suspend(
+        TenantLifecycleRequest $request,
+        int|string $tenant,
+    ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
+        $data = $request->validated();
 
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'TENANT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return new TenantResource($result->valueOrFail());
+        return $this->tenantResponse($this->suspendTenant->execute(
+            $tenant,
+            (int) $data['expected_version'],
+            (string) $data['reason'],
+        ));
     }
 
-    public function suspend(int|string $tenant): JsonResponse|TenantResource
-    {
-        $result = $this->suspendTenant->execute($tenant);
+    public function deactivate(
+        TenantLifecycleRequest $request,
+        int|string $tenant,
+    ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
+        $data = $request->validated();
 
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'TENANT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return new TenantResource($result->valueOrFail());
+        return $this->tenantResponse($this->deactivateTenant->execute(
+            $tenant,
+            (int) $data['expected_version'],
+            (string) $data['reason'],
+        ));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function prepareMutationPayload(UpsertTenantRequest $request): array
+    public function archive(
+        TenantLifecycleRequest $request,
+        int|string $tenant,
+    ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
+        $data = $request->validated();
+
+        return $this->tenantResponse($this->archiveTenant->execute(
+            $tenant,
+            (int) $data['expected_version'],
+            (string) $data['reason'],
+        ));
+    }
+
+    /** @return array<string, mixed> */
+    private function payload(UpsertTenantRequest $request): array
     {
         $payload = $request->validated();
-        $logoUpload = $request->file('logo_path');
+        $file = $request->file('logo');
+        unset($payload['logo']);
 
-        if ($logoUpload instanceof UploadedFile) {
-            unset($payload['logo_path']);
-
-            $payload['logo_tmp_path'] = $logoUpload->getRealPath();
-            $payload['logo_original_name'] = $logoUpload->getClientOriginalName();
+        if ($file instanceof UploadedFile) {
+            $payload['logo_tmp_path'] = $file->getRealPath();
+            $payload['logo_original_name'] = $file->getClientOriginalName();
         }
 
         return $payload;
+    }
+
+    private function tenantResponse(Result $result): JsonResponse|TenantResource
+    {
+        return $result->isFailure()
+            ? TenantApiResponder::error($result->errorOrFail())
+            : new TenantResource($result->valueOrFail());
+    }
+
+    private function requirePermission(string $permission): void
+    {
+        abort_unless(
+            $this->authorization->allows($permission),
+            403,
+            'You are not authorized to perform this action.',
+        );
     }
 }

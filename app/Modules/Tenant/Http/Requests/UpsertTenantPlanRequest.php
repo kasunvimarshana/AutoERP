@@ -13,20 +13,28 @@ final class UpsertTenantPlanRequest extends FormRequest
         return auth()->check();
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
-        $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
+        $creating = $this->isMethod('post');
+        $required = $creating ? ['required'] : ['sometimes'];
 
         return [
-            'name' => array_merge($required, ['string', 'max:255']),
-            'slug' => array_merge($required, ['string', 'max:255']),
+            'expected_version' => $creating
+                ? ['prohibited']
+                : ['required', 'integer', 'min:1'],
+            'name' => [...$required, 'string', 'max:255'],
+            'slug' => [...$required, 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'features' => ['nullable', 'array'],
             'limits' => ['nullable', 'array'],
             'price' => ['nullable', 'decimal:0,6', 'gte:0'],
             'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],
-            'billing_interval' => ['nullable', 'string', 'in:month,year'],
-            'is_active' => ['nullable', 'boolean'],
-            'metadata' => ['nullable', 'array'],
+            'billing_interval' => [
+                $creating ? 'required' : 'sometimes',
+                'string',
+                'in:month,quarter,year',
+            ],
+            'is_active' => ['sometimes', 'boolean'],
         ];
     }
 }

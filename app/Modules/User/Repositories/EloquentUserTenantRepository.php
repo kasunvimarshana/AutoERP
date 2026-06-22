@@ -7,6 +7,7 @@ namespace Modules\User\Repositories;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Repositories\EloquentRepository;
+use Modules\User\Constants\UserTenantStatus;
 use Modules\User\Models\UserTenantModel;
 
 final class EloquentUserTenantRepository extends EloquentRepository implements UserTenantRepositoryInterface
@@ -42,6 +43,7 @@ final class EloquentUserTenantRepository extends EloquentRepository implements U
         return $this->query()
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
+            ->where('status', UserTenantStatus::ACTIVE)
             ->exists();
     }
 
@@ -51,6 +53,7 @@ final class EloquentUserTenantRepository extends EloquentRepository implements U
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->where('organization_unit_id', $organizationUnitId)
+            ->where('status', UserTenantStatus::ACTIVE)
             ->exists();
     }
 
@@ -61,6 +64,7 @@ final class EloquentUserTenantRepository extends EloquentRepository implements U
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->where('is_default', true)
+            ->where('status', UserTenantStatus::ACTIVE)
             ->orderBy('id')
             ->get()
             ->map(fn (Model $model): DataRecord => $this->toRecord($model))

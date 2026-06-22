@@ -7,27 +7,11 @@ namespace Modules\Tenant\Services\Contracts;
 interface TenantDomainServiceInterface
 {
     public function normalizeCode(string $value): string;
-
     public function normalizeName(string $value): string;
-
     public function normalizeSlug(string $value): string;
-
-    public function normalizeKey(string $value): string;
-
     public function normalizeDomain(string $value): string;
-
     public function normalizeBillingInterval(?string $value): string;
-
     public function normalizeOptionalText(?string $value): ?string;
-
-    public function normalizeStatus(?string $status): string;
-
-    public function deriveActiveFlag(string $status): bool;
-
-    public function ensureIsolationKey(bool $isIsolated, ?string $isolationKey, string $fallback): ?string;
-
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function normalizeMetadata(mixed $value): array;
 }

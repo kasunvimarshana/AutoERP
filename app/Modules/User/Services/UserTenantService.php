@@ -6,6 +6,7 @@ namespace Modules\User\Services;
 
 use Modules\Core\Results\Result;
 use Modules\User\Constants\UserErrorCode;
+use Modules\User\Constants\UserTenantStatus;
 use Modules\User\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Throwable;
@@ -48,7 +49,9 @@ final class UserTenantService extends AbstractUserCrudService
                 return $this->failure(UserErrorCode::DUPLICATE_USER_TENANT, 'User tenant mapping already exists.');
             }
 
-            $isDefault = $this->toBool($payload['is_default'] ?? false);
+            $status = (string) ($payload['status'] ?? UserTenantStatus::ACTIVE);
+            $isDefault = $status === UserTenantStatus::ACTIVE
+                && $this->toBool($payload['is_default'] ?? false);
             if ($isDefault) {
                 $this->userTenants->clearDefaultForUser($tenantId, $userId);
             }
@@ -59,6 +62,7 @@ final class UserTenantService extends AbstractUserCrudService
                 'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                 'user_id' => $userId,
                 'role_id' => $this->toNullableInt($payload['role_id'] ?? null),
+                'status' => $status,
                 'is_default' => $isDefault,
                 'row_version' => 1,
             ]));
@@ -83,9 +87,13 @@ final class UserTenantService extends AbstractUserCrudService
                 return $this->failure(UserErrorCode::DUPLICATE_USER_TENANT, 'User tenant mapping already exists.');
             }
 
-            $isDefault = array_key_exists('is_default', $payload)
-                ? $this->toBool($payload['is_default'])
-                : (bool) $existing->get('is_default', false);
+            $status = array_key_exists('status', $payload)
+                ? (string) $payload['status']
+                : (string) $existing->get('status', UserTenantStatus::ACTIVE);
+            $isDefault = $status === UserTenantStatus::ACTIVE
+                && (array_key_exists('is_default', $payload)
+                    ? $this->toBool($payload['is_default'])
+                    : (bool) $existing->get('is_default', false));
 
             if ($isDefault) {
                 $this->userTenants->clearDefaultForUser($tenantId, $userId, (int) $existing->id());
@@ -101,6 +109,7 @@ final class UserTenantService extends AbstractUserCrudService
                 'role_id' => array_key_exists('role_id', $payload)
                     ? $this->toNullableInt($payload['role_id'])
                     : $this->toNullableInt($existing->get('role_id')),
+                'status' => $status,
                 'is_default' => $isDefault,
                 'row_version' => (int) $existing->get('row_version', 1) + 1,
             ]));
@@ -129,6 +138,10 @@ final class UserTenantService extends AbstractUserCrudService
     private function criteria(array $filters): array
     {
         $criteria = [];
+
+        if (isset($filters['status']) && is_scalar($filters['status'])) {
+            $criteria['status'] = trim((string) $filters['status']);
+        }
 
         foreach (['tenant_id', 'organization_unit_id', 'user_id', 'role_id'] as $key) {
             if (! array_key_exists($key, $filters)) {

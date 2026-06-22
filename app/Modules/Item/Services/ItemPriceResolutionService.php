@@ -183,7 +183,7 @@ final class ItemPriceResolutionService
         }
 
         $tenant = TenantModel::query()->find((int) $item->tenant_id);
-        $tenantCurrencyId = $tenant?->currency_id === null ? null : (int) $tenant->currency_id;
+        $tenantCurrencyId = $tenant?->base_currency_id === null ? null : (int) $tenant->base_currency_id;
         if ($currencyId !== null && $tenantCurrencyId !== $currencyId) {
             throw new InvalidArgumentException('Standard Price is only valid in the tenant base currency; configure a contextual or manual price for the selected currency.');
         }

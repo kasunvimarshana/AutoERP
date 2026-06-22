@@ -11,14 +11,18 @@ final class TenantDocumentModel extends CoreModel
 {
     protected $table = 'tenant_documents';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id', 'name', 'document_type', 'storage_disk', 'storage_path',
+        'original_filename', 'mime_type', 'size_bytes', 'checksum_sha256',
+'metadata', 'row_version', 'created_by', 'updated_by',
+    ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'metadata' => 'array',
             'tenant_id' => 'integer',
-            'size' => 'integer',
+            'size_bytes' => 'integer',
+            'metadata' => 'array',
         ]);
     }
 

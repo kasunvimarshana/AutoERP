@@ -13,28 +13,19 @@ final class UpsertTenantDocumentRequest extends FormRequest
         return auth()->check();
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
-        $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
-        $filePathRules = ['nullable', 'string', 'max:2048'];
-        $fileUploadRules = ['nullable', 'file', 'max:10240'];
-
-        if ($this->isMethod('post')) {
-            $filePathRules[] = 'required_without:file_upload';
-            $fileUploadRules[] = 'required_without:file_path';
-        }
+        $creating = $this->isMethod('post');
+        $maxSize = max((int) config('tenant.documents.max_size_kb', 10240), 1);
 
         return [
-            'tenant_id' => $this->isMethod('post')
-                ? ['required', 'integer', 'min:1']
-                : ['sometimes', 'integer', 'min:1'],
-            'name' => array_merge($required, ['string', 'max:255']),
-            'file_path' => $filePathRules,
-            'file_upload' => $fileUploadRules,
-            'mime_type' => ['nullable', 'string', 'max:255'],
-            'size' => ['nullable', 'integer', 'min:0'],
-            'type' => ['nullable', 'string', 'max:255'],
-            'metadata' => ['nullable', 'array'],
+            'expected_version' => $creating
+                ? ['prohibited']
+                : ['required', 'integer', 'min:1'],
+            'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
+            'document_type' => ['nullable', 'string', 'max:100'],
+            'file' => [$creating ? 'required' : 'nullable', 'file', 'max:'.$maxSize],
         ];
     }
 }

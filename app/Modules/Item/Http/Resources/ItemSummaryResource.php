@@ -25,7 +25,7 @@ final class ItemSummaryResource extends JsonResource
             'costing_method' => $this->enumValue($this->costing_method),
             'category' => $this->whenLoaded('category', fn () => $this->namedResource($this->category)),
             'brand' => $this->whenLoaded('brand', fn () => $this->namedResource($this->brand)),
-            'tenant_base_currency' => $this->whenLoaded('tenant', fn () => $this->namedResource($this->tenant?->currency, true)),
+            'tenant_base_currency' => $this->whenLoaded('tenant', fn () => $this->namedResource($this->tenant?->baseCurrency, true)),
             'base_uom' => $this->whenLoaded('baseUom', fn () => $this->namedResource($this->baseUom, true)),
             'standard_price' => $this->standard_price === null ? null : (string) $this->standard_price,
             'standard_price_basis' => 'per_base_uom_tax_exclusive_tenant_base_currency',

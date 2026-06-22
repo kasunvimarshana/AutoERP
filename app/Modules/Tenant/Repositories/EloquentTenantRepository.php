@@ -4,99 +4,88 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
-use Modules\Core\Repositories\EloquentRepository;
 use Modules\Tenant\Models\TenantModel;
 
-final class EloquentTenantRepository extends EloquentRepository implements TenantRepositoryInterface
+final class EloquentTenantRepository implements TenantRepositoryInterface
 {
-    public function __construct(TenantModel $model)
+    public function __construct(private readonly TenantModel $model) {}
+
+    public function findById(int|string $id): ?DataRecord
     {
-        parent::__construct($model);
+        $model = $this->query()->find($id);
+        return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
     public function findByCode(string $code): ?DataRecord
     {
         $model = $this->query()->where('code', strtoupper(trim($code)))->first();
-
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
+        return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
     public function findByUuid(string $uuid): ?DataRecord
     {
         $model = $this->query()->where('uuid', trim($uuid))->first();
-
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
+        return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
-    public function findByIsolationKey(string $isolationKey): ?DataRecord
+    public function create(array $attributes): DataRecord
     {
-        $model = $this->query()->where('isolation_key', trim($isolationKey))->first();
-
-        if (! $model instanceof Model) {
-            return null;
-        }
-
-        return $this->toRecord($model);
+        return $this->record($this->model->newQuery()->create($attributes));
     }
 
-    public function pageByFilters(
-        ?string $status,
-        ?bool $isActive,
-        ?string $search,
-        int $perPage,
-        int $page,
-    ): PagedResult {
-        $criteria = [];
+    public function updateWithVersion(int|string $id, int $expectedVersion, array $attributes): ?DataRecord
+    {
+        $attributes['row_version'] = $expectedVersion + 1;
+        $attributes['updated_at'] = now();
+        $updated = $this->model->newQuery()
+            ->whereKey($id)
+            ->where('row_version', $expectedVersion)
+            ->update($attributes);
 
-        if ($status !== null && trim($status) !== '') {
-            $criteria['status'] = strtolower(trim($status));
-        }
+        return $updated === 1 ? $this->findById($id) : null;
+    }
 
-        if ($isActive !== null) {
-            $criteria['is_active'] = $isActive;
-        }
+    public function pageByFilters(?string $status, ?string $search, int $perPage, int $page): PagedResult
+    {
+        $query = $this->query()
+            ->when($status !== null && trim($status) !== '', fn (Builder $q) => $q->where('status', strtolower(trim($status))))
+            ->when($search !== null && trim($search) !== '', function (Builder $q) use ($search): void {
+                $term = trim((string) $search);
+                $q->where(function (Builder $nested) use ($term): void {
+                    $nested->where('code', 'like', "%{$term}%")
+                        ->orWhere('name', 'like', "%{$term}%")
+                        ->orWhere('slug', 'like', "%{$term}%");
+                });
+            })
+            ->orderBy('name');
 
-        if ($search !== null && trim($search) !== '') {
-            $searchTerm = trim($search);
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $items = array_values(array_map(
+            fn (Model $model): DataRecord => $this->record($model),
+            $paginator->items(),
+        ));
 
-            $paginator = $this->query()
-                ->where(function ($query) use ($searchTerm): void {
-                    $query->where('code', 'like', '%'.$searchTerm.'%')
-                        ->orWhere('name', 'like', '%'.$searchTerm.'%')
-                        ->orWhere('slug', 'like', '%'.$searchTerm.'%')
-                        ->orWhere('configuration_scope', 'like', '%'.$searchTerm.'%');
-                })
-                ->when(
-                    array_key_exists('status', $criteria),
-                    fn ($query) => $query->where('status', $criteria['status']),
-                )
-                ->when(
-                    array_key_exists('is_active', $criteria),
-                    fn ($query) => $query->where('is_active', $criteria['is_active']),
-                )
-                ->paginate($perPage, ['*'], 'page', $page);
+        return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+    }
 
-            $items = [];
-            foreach ($paginator->items() as $model) {
-                if ($model instanceof Model) {
-                    $items[] = $this->toRecord($model);
-                }
-            }
+    private function query(): Builder
+    {
+        return $this->model->newQuery()->with(['plan:id,name,slug,is_active', 'baseCurrency:id,code,name,symbol,is_active']);
+    }
 
-            return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
-        }
-
-        return $this->page($criteria, $perPage, $page);
+    private function record(TenantModel $model): DataRecord
+    {
+        $payload = $model->attributesToArray();
+        $payload['plan'] = $model->relationLoaded('plan') && $model->plan !== null
+            ? $model->plan->only(['id', 'name', 'slug', 'is_active'])
+            : null;
+        $payload['base_currency'] = $model->relationLoaded('baseCurrency') && $model->baseCurrency !== null
+            ? $model->baseCurrency->only(['id', 'code', 'name', 'symbol', 'is_active'])
+            : null;
+        return new DataRecord($payload);
     }
 }

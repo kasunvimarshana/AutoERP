@@ -12,7 +12,7 @@ final class AuditOwnershipValidator
     /** @return array{tenant_name:string|null,organization_unit_name:string|null} */
     public function validateSystemScope(int $tenantId, ?int $organizationUnitId): array
     {
-        $tenant = DB::table('tenants')->where('id', $tenantId)->whereNull('deleted_at')->first(['name']);
+        $tenant = DB::table('tenants')->where('id', $tenantId)->where('status', '!=', 'archived')->first(['name']);
         if ($tenant === null) {
             throw new InvalidArgumentException('Audit tenant scope does not exist.');
         }

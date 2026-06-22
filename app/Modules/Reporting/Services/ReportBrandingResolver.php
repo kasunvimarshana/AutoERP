@@ -17,7 +17,7 @@ final class ReportBrandingResolver
      */
     public function resolve(int $tenantId, ?int $organizationUnitId): array
     {
-        $tenant = TenantModel::query()->with('currency')->findOrFail($tenantId);
+        $tenant = TenantModel::query()->with('baseCurrency')->findOrFail($tenantId);
         $organizationUnit = $organizationUnitId === null
             ? null
             : OrganizationUnitModel::query()
@@ -30,7 +30,7 @@ final class ReportBrandingResolver
             'tenant_code' => (string) $tenant->code,
             'organization_unit_name' => $organizationUnit?->name,
             'organization_unit_code' => $organizationUnit?->code,
-            'currency_code' => $tenant->currency?->code,
+            'currency_code' => $tenant->baseCurrency?->code,
             'logo_data_uri' => $this->imageDataUri(
                 (string) ($organizationUnit?->image_path ?: $tenant->logo_path ?: ''),
             ),

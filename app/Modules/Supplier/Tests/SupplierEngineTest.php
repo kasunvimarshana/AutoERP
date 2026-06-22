@@ -387,12 +387,9 @@ final class SupplierEngineTest extends TestCase
             'name' => 'Supplier Tenant '.$suffix,
             'slug' => 'supplier-tenant-'.Str::lower($suffix).'-'.Str::lower(Str::random(3)),
             'status' => 'active',
-            'currency_id' => $currencyId,
-            'is_active' => true,
-            'is_isolated' => true,
+            'base_currency_id' => $currencyId,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
         $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,

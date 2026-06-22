@@ -635,11 +635,8 @@ final class TaxEngineTest extends TestCase
             'name' => 'Tax Tenant '.$suffix,
             'slug' => 'tax-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int

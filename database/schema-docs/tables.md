@@ -29,10 +29,10 @@ No business tables. Core contains shared application infrastructure only.
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `tenant_documents` | Stores document metadata associated with tenant document. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
-| `tenant_domains` | Stores tenant domain records used by the owning module. | `tenant_id` -> `tenants` | unique `domain`; unique `tenant_id,domain`; tenant scoped; soft deletes |
-| `tenant_plans` | Stores tenant plan records used by the owning module. | `currency_id` -> `currencies` | unique `slug`; soft deletes |
-| `tenants` | Stores tenant identity, plan, isolation, localization, and lifecycle settings. | `tenant_plan_id` -> `tenant_plans`; `currency_id` -> `currencies` | unique `code`; unique `isolation_key`; unique `slug`; unique `uuid`; soft deletes |
+| `tenant_documents` | Stores private tenant-owned file metadata and checksums. | `tenant_id` -> `tenants` | unique `tenant_id,name`; unique `storage_disk,storage_path`; tenant scoped; immutable storage ownership |
+| `tenant_domains` | Stores tenant hostnames and DNS ownership-verification state. | `tenant_id` -> `tenants` | unique `domain`; one primary marker per tenant; verified active primary required for activation |
+| `tenant_plans` | Stores SaaS subscription-plan definitions. | `currency_id` -> `currencies` | unique `slug`; status lifecycle; optimistic concurrency |
+| `tenants` | Stores tenant identity, authoritative lifecycle, plan assignment, and base-accounting-currency invariant. | `tenant_plan_id` -> `tenant_plans`; `base_currency_id` -> `currencies` | unique `code`; unique `slug`; unique `uuid`; status is the lifecycle source of truth; optimistic concurrency |
 
 ## OrganizationUnit
 
@@ -54,7 +54,7 @@ No business tables. Core contains shared application infrastructure only.
 | `user_permissions` | Stores user permission records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `permission_id` -> `permissions`; `user_id` -> `users` | unique `tenant_id,user_id,permission_id`; tenant scoped; organization-unit aware |
 | `user_roles` | Stores user role records used by the owning module. | `role_id` -> `roles`; `user_id` -> `users`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,role_id`; tenant scoped; organization-unit aware |
 | `user_tenants` | Stores user tenant records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `role_id` -> `roles`; `user_id` -> `users` | unique `tenant_id,organization_unit_id,user_id`; tenant scoped; organization-unit aware |
-| `users` | Stores tenant user identities, credentials, status, and profile data. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,email`; unique `tenant_id,username`; tenant scoped; organization-unit aware; soft deletes |
+| `users` | Stores tenant user identities, credentials, status, profile data, and explicit SaaS platform-operator trust. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,email`; unique `tenant_id,username`; platform access is never inferred from tenant roles; soft deletes |
 
 ## Auth
 

@@ -7,6 +7,7 @@ namespace Modules\Auth\Providers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Auth\Console\Commands\AuthClientCreateCommand;
@@ -20,6 +21,7 @@ use Modules\Auth\Http\Middleware\AuthContextMiddleware;
 use Modules\Auth\Http\Middleware\AuthenticateMiddleware;
 use Modules\Auth\Http\Middleware\SSOContextMiddleware;
 use Modules\Auth\Http\Middleware\TokenValidationMiddleware;
+use Modules\Auth\Listeners\RevokeTenantAccessOnStatusChange;
 use Modules\Auth\Models\AuthAccessTokenModel;
 use Modules\Auth\Models\AuthAuthorizationCodeModel;
 use Modules\Auth\Models\AuthClientModel;
@@ -60,6 +62,7 @@ use Modules\Auth\Services\InternalAuthenticationProvider;
 use Modules\Auth\Services\Rules\AuthDomainService;
 use Modules\Auth\Services\ValidateTokenService;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
+use Modules\Tenant\Events\TenantStatusChanged;
 use Modules\User\Models\UserModel;
 
 final class AuthServiceProvider extends ServiceProvider
@@ -160,11 +163,7 @@ final class AuthServiceProvider extends ServiceProvider
                     return null;
                 }
 
-                $tenantInputKey = (string) config('module-auth.token_guard_tenant_input_key', 'tenant_id');
-                $tenantId = $request->input($tenantInputKey)
-                    ?? $request->headers->get('X-Tenant-ID')
-                    ?? $request->headers->get('X-Tenant-Id')
-                    ?? $request->headers->get('X-Tenant');
+                $tenantId = $request->headers->get((string) config('tenant.resolution.selection_headers.id', 'X-Tenant-Id'));
                 $validation = $this->app->make(ValidateTokenService::class)->validateToken(
                     $plainAccessToken,
                     is_numeric($tenantId) ? (int) $tenantId : null,
@@ -185,6 +184,8 @@ final class AuthServiceProvider extends ServiceProvider
                 return UserModel::query()->find((int) $userId);
             },
         );
+
+        Event::listen(TenantStatusChanged::class, RevokeTenantAccessOnStatusChange::class);
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');

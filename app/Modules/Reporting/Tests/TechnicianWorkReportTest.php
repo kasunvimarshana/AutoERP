@@ -559,11 +559,8 @@ final class TechnicianWorkReportTest extends TestCase
             'name' => 'Report Tenant '.$suffix,
             'slug' => 'report-tenant-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 
     private function organizationUnit(int $tenantId, string $code): int

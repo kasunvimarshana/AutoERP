@@ -395,12 +395,9 @@ final class SupplierApiTest extends TestCase
             'name' => $code.' Tenant',
             'slug' => strtolower($code).'-tenant',
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'row_version' => 1,
             'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            'updated_at' => $now]);
         $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Main',

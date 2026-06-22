@@ -322,10 +322,7 @@ final class FinanceEnterpriseCoreTest extends TestCase
             'name' => 'Finance Enterprise Core '.$suffix,
             'slug' => 'finance-enterprise-core-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 }

@@ -59,10 +59,7 @@ final class InvoiceBalanceProviderTest extends TestCase
             'name' => 'Invoice Balance Provider '.$suffix,
             'slug' => 'invoice-balance-provider-'.Str::lower($suffix),
             'status' => 'active',
-            'is_active' => true,
-            'is_isolated' => true,
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
     }
 }

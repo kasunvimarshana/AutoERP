@@ -11,6 +11,7 @@ use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\UserTenantRepositoryInterface;
@@ -20,542 +21,174 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
     public function __construct(
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantDomainRepositoryInterface $tenantDomains,
-        private readonly UserTenantRepositoryInterface $userTenants,
+        private readonly TenantDomainRepositoryInterface $domains,
+        private readonly UserTenantRepositoryInterface $memberships,
     ) {}
 
     public function resolve(Request $request): ?CurrentTenantContext
     {
-        $applicationId = $this->resolveApplicationId($request);
+        $applicationId = $this->currentUser->currentApplicationId();
+        $host = $this->normalizeHost($request->getHost());
+        $hostContext = $this->fromHost($host, $applicationId);
 
-        $explicit = $this->resolveExplicitTenant($request, $applicationId);
-        if ($explicit !== null) {
-            return $explicit;
+        if ($host !== null && ! $this->isNeutralHost($host) && $hostContext === null) {
+            throw new CurrentTenantContextResolutionException(
+                'The request host is not assigned to an active verified tenant.',
+            );
         }
 
-        $hostTenant = $this->resolveHostTenant($request, $applicationId);
-        if ($hostTenant !== null) {
-            return $hostTenant;
+        $selectedContext = $this->fromSelectionHeaders($request, $applicationId);
+        if ($hostContext !== null && $selectedContext !== null && $hostContext->tenantId() !== $selectedContext->tenantId()) {
+            throw new CurrentTenantContextResolutionException('The requested host and selected tenant do not match.');
+        }
+        if ($selectedContext !== null) {
+            return $selectedContext;
+        }
+        if ($hostContext !== null) {
+            return $hostContext;
         }
 
-        return $this->resolveConfiguredFallbackTenant($applicationId);
+        return $this->localFallback($applicationId);
     }
 
     public function hasAccess(Request $request, CurrentTenantContext $context): bool
     {
-        $resolvedTenantId = $context->tenantId();
-        if ($resolvedTenantId <= 0) {
-            return false;
-        }
-
-        $userId = $this->resolveAuthenticatedUserId($request);
-        if ($userId === null) {
-            return false;
-        }
-
-        return $this->userTenants->existsForTenantAndUser($resolvedTenantId, $userId);
+        $userId = $this->authenticatedUserId($request);
+        return $userId !== null && $this->memberships->existsForTenantAndUser($context->tenantId(), $userId);
     }
 
-    private function resolveExplicitTenant(Request $request, ?string $applicationId): ?CurrentTenantContext
+    private function fromHost(?string $host, ?string $applicationId): ?CurrentTenantContext
     {
-        $contexts = [];
-
-        foreach ($this->configArray('id_input_keys', ['tenant_id']) as $key) {
-            $contexts[] = $this->contextFromTenantIdSignal($request->input($key), $applicationId, 'request_metadata');
-        }
-
-        foreach ($this->configArray('id_route_keys', ['tenant_id']) as $key) {
-            $contexts[] = $this->contextFromTenantIdSignal($request->route($key), $applicationId, 'request_metadata');
-        }
-
-        foreach ($this->configArray('id_header_keys', ['X-Tenant-Id']) as $key) {
-            $contexts[] = $this->contextFromTenantIdSignal(
-                $request->headers->get($key),
-                $applicationId,
-                'request_metadata',
-            );
-        }
-
-        foreach ($this->configArray('code_input_keys', ['tenant_code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->input($key)),
-                'code',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('code_route_keys', ['tenant', 'tenant_code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->route($key)),
-                'code',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('code_header_keys', ['X-Tenant-Code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->headers->get($key)),
-                'code',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('uuid_input_keys', ['tenant_uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->input($key)),
-                'uuid',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('uuid_route_keys', ['tenant_uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->route($key)),
-                'uuid',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('uuid_header_keys', ['X-Tenant-Uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->headers->get($key)),
-                'uuid',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('isolation_key_input_keys', ['tenant_isolation_key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->input($key)),
-                'isolation',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('isolation_key_route_keys', ['tenant_isolation_key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->route($key)),
-                'isolation',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('isolation_key_header_keys', ['X-Tenant-Isolation-Key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal(
-                $this->stringSignal($request->headers->get($key)),
-                'isolation',
-                $applicationId,
-            );
-        }
-
-        foreach ($this->configArray('domain_input_keys', ['tenant_domain']) as $key) {
-            $contexts[] = $this->contextFromDomainSignal($this->stringSignal($request->input($key)), $applicationId);
-        }
-
-        foreach ($this->configArray('domain_header_keys', ['X-Tenant-Domain']) as $key) {
-            $contexts[] = $this->contextFromDomainSignal(
-                $this->stringSignal($request->headers->get($key)),
-                $applicationId,
-            );
-        }
-
-        $contexts = array_values(array_filter(
-            $contexts,
-            static fn ($context): bool => $context instanceof CurrentTenantContext,
-        ));
-
-        if ($contexts === []) {
+        if ($host === null || $this->isNeutralHost($host)) {
             return null;
         }
-
-        $uniqueTenantIds = array_values(array_unique(array_map(
-            static fn (CurrentTenantContext $context): int => $context->tenantId(),
-            $contexts,
-        )));
-
-        if (count($uniqueTenantIds) > 1) {
-            throw new CurrentTenantContextResolutionException(
-                'Requested tenant metadata resolved to multiple tenants.',
-            );
+        $domain = $this->domains->findByDomain($host);
+        if ($domain === null || $domain->get('status') !== 'active' || $domain->get('verified_at') === null) {
+            return null;
         }
-
-        return $contexts[0];
+        $tenantId = $this->positiveInt($domain->get('tenant_id'));
+        $tenant = $tenantId === null ? null : $this->tenants->findById($tenantId);
+        return $tenant === null ? null : $this->context($tenant, $applicationId, 'verified_host', $host);
     }
 
-    private function resolveHostTenant(Request $request, ?string $applicationId): ?CurrentTenantContext
+    private function fromSelectionHeaders(Request $request, ?string $applicationId): ?CurrentTenantContext
     {
-        if ($this->hasExplicitContextSignals($request)) {
+        $idHeader = (string) config('tenant.resolution.selection_headers.id', 'X-Tenant-Id');
+        $codeHeader = (string) config('tenant.resolution.selection_headers.code', 'X-Tenant-Code');
+        $idValue = $request->headers->get($idHeader);
+        $codeValue = $request->headers->get($codeHeader);
+        if (($idValue === null || $idValue === '') && ($codeValue === null || trim((string) $codeValue) === '')) {
             return null;
         }
 
-        $host = $this->normalizeDomain($request->getHost());
-        if ($host === null) {
-            return null;
+        $byId = null;
+        if ($idValue !== null && $idValue !== '') {
+            $tenantId = $this->positiveInt($idValue);
+            if ($tenantId === null) {
+                throw new CurrentTenantContextResolutionException('The selected tenant identifier is invalid.');
+            }
+            $byId = $this->tenants->findById($tenantId);
         }
+        $byCode = $codeValue === null || trim((string) $codeValue) === ''
+            ? null : $this->tenants->findByCode((string) $codeValue);
 
-        $domain = $this->tenantDomains->findByDomain($host);
-        if ($domain === null) {
-            return null;
+        if (($byId === null && $idValue !== null && $idValue !== '') || ($byCode === null && $codeValue !== null && trim((string) $codeValue) !== '')) {
+            throw new CurrentTenantContextResolutionException('The selected tenant could not be resolved.');
         }
-
-        if (! $this->isActiveDomain($domain)) {
-            return null;
+        if ($byId !== null && $byCode !== null && (int) $byId->id() !== (int) $byCode->id()) {
+            throw new CurrentTenantContextResolutionException('Tenant selection headers resolve to different tenants.');
         }
-
-        $tenantId = $this->toNullableInt($domain->get('tenant_id'));
-        if ($tenantId === null) {
-            return null;
-        }
-
-        $tenant = $this->tenants->findById($tenantId);
-        if ($tenant === null) {
-            return null;
-        }
-
-        return $this->toContext($tenant, $applicationId, 'request_host', $host);
+        return $this->context($byId ?? $byCode, $applicationId, 'selection_header');
     }
 
-    private function resolveConfiguredFallbackTenant(?string $applicationId): ?CurrentTenantContext
+    private function localFallback(?string $applicationId): ?CurrentTenantContext
     {
-        if (! $this->configuredFallbackEnabled()) {
+        if (! (bool) config('tenant.resolution.local_fallback_enabled', false) || ! app()->environment(['local', 'testing'])) {
             return null;
         }
-
-        $fallbackDomain = $this->stringSignal(config('tenant.resolution.local_fallback_domain'));
-        if ($fallbackDomain !== null) {
-            $normalizedDomain = $this->normalizeDomain($fallbackDomain);
-            if ($normalizedDomain !== null) {
-                $domain = $this->tenantDomains->findByDomain($normalizedDomain);
-                if ($domain !== null && $this->isActiveDomain($domain)) {
-                    $tenantId = $this->toNullableInt($domain->get('tenant_id'));
-                    $tenant = $tenantId !== null ? $this->tenants->findById($tenantId) : null;
-                    if ($tenant !== null) {
-                        return $this->toContext($tenant, $applicationId, 'configured_fallback', $normalizedDomain);
-                    }
-                }
+        $domainValue = trim((string) config('tenant.resolution.local_fallback_domain', ''));
+        if ($domainValue !== '') {
+            $domain = $this->domains->findByDomain($domainValue);
+            $tenantId = $domain === null ? null : $this->positiveInt($domain->get('tenant_id'));
+            $tenant = $tenantId === null ? null : $this->tenants->findById($tenantId);
+            if ($tenant !== null) {
+                return $this->context($tenant, $applicationId, 'local_fallback', $domainValue);
             }
         }
-
-        $fallbackCode = $this->stringSignal(config('tenant.resolution.local_fallback_tenant_code'));
-        if ($fallbackCode === null) {
-            return null;
-        }
-
-        $tenant = $this->tenants->findByCode($fallbackCode);
-        if ($tenant === null) {
-            return null;
-        }
-
-        return $this->toContext($tenant, $applicationId, 'configured_fallback');
+        $code = trim((string) config('tenant.resolution.local_fallback_tenant_code', ''));
+        $tenant = $code === '' ? null : $this->tenants->findByCode($code);
+        return $tenant === null ? null : $this->context($tenant, $applicationId, 'local_fallback');
     }
 
-    private function contextFromTenantIdSignal(
-        mixed $value,
-        ?string $applicationId,
-        string $source,
-    ): ?CurrentTenantContext {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $tenantId = $this->toNullableInt($value);
-        if ($tenantId === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant identifier is invalid.');
-        }
-
-        $tenant = $this->tenants->findById($tenantId);
-        if ($tenant === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
-        }
-
-        return $this->toContext($tenant, $applicationId, $source);
-    }
-
-    private function contextFromRecordSignal(
-        ?string $value,
-        string $type,
-        ?string $applicationId,
-    ): ?CurrentTenantContext {
-        if ($value === null) {
-            return null;
-        }
-
-        $tenant = match ($type) {
-            'code' => $this->tenants->findByCode($value),
-            'uuid' => $this->tenants->findByUuid($value),
-            'isolation' => $this->tenants->findByIsolationKey($value),
-            default => null,
-        };
-
-        if ($tenant === null && $type === 'code') {
-            $tenantId = $this->toNullableInt($value);
-            if ($tenantId !== null) {
-                $tenant = $this->tenants->findById($tenantId);
-            }
-        }
-
-        if ($tenant === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
-        }
-
-        return $this->toContext($tenant, $applicationId, 'request_metadata');
-    }
-
-    private function contextFromDomainSignal(?string $value, ?string $applicationId): ?CurrentTenantContext
+    private function context(DataRecord $tenant, ?string $applicationId, string $source, ?string $domain = null): CurrentTenantContext
     {
-        if ($value === null) {
-            return null;
-        }
-
-        $normalizedDomain = $this->normalizeDomain($value);
-        if ($normalizedDomain === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant domain is invalid.');
-        }
-
-        $domain = $this->tenantDomains->findByDomain($normalizedDomain);
-        if ($domain === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
-        }
-
-        if (! $this->isActiveDomain($domain)) {
-            throw new CurrentTenantContextResolutionException('Requested tenant domain is not active.');
-        }
-
-        $tenantId = $this->toNullableInt($domain->get('tenant_id'));
-        if ($tenantId === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
-        }
-
-        $tenant = $this->tenants->findById($tenantId);
-        if ($tenant === null) {
-            throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
-        }
-
-        return $this->toContext($tenant, $applicationId, 'request_metadata', $normalizedDomain);
-    }
-
-    private function resolveAuthenticatedUserId(Request $request): ?int
-    {
-        $userId = $this->currentUser->currentUserId();
-        if ($userId !== null && $userId > 0) {
-            return $userId;
-        }
-
-        $user = $request->user();
-        if (! $user instanceof Authenticatable) {
-            return null;
-        }
-
-        return $this->toNullableInt($user->getAuthIdentifier());
-    }
-
-    private function resolveApplicationId(Request $request): ?string
-    {
-        foreach ($this->configArray('application_input_keys', ['application_id', 'app_id', 'client_id']) as $key) {
-            $value = $request->input($key);
-            if (is_scalar($value) && trim((string) $value) !== '') {
-                return trim((string) $value);
-            }
-        }
-
-        $applicationHeaderKeys = $this->configArray(
-            'application_header_keys',
-            ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
-        );
-
-        foreach ($applicationHeaderKeys as $key) {
-            $value = $request->headers->get($key);
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
-            }
-        }
-
-        return $this->currentUser->currentApplicationId();
-    }
-
-    private function hasExplicitContextSignals(Request $request): bool
-    {
-        foreach (
-            [
-                ...$this->configArray('id_input_keys', ['tenant_id']),
-                ...$this->configArray('code_input_keys', ['tenant_code']),
-                ...$this->configArray('uuid_input_keys', ['tenant_uuid']),
-                ...$this->configArray('isolation_key_input_keys', ['tenant_isolation_key']),
-                ...$this->configArray('domain_input_keys', ['tenant_domain']),
-            ] as $key
-        ) {
-            if ($request->input($key) !== null && $request->input($key) !== '') {
-                return true;
-            }
-        }
-
-        foreach (
-            [
-                ...$this->configArray('id_route_keys', ['tenant_id']),
-                ...$this->configArray('code_route_keys', ['tenant', 'tenant_code']),
-                ...$this->configArray('uuid_route_keys', ['tenant_uuid']),
-                ...$this->configArray('isolation_key_route_keys', ['tenant_isolation_key']),
-            ] as $key
-        ) {
-            if ($request->route($key) !== null && $request->route($key) !== '') {
-                return true;
-            }
-        }
-
-        foreach (
-            [
-                ...$this->configArray('id_header_keys', ['X-Tenant-Id']),
-                ...$this->configArray('code_header_keys', ['X-Tenant-Code']),
-                ...$this->configArray('uuid_header_keys', ['X-Tenant-Uuid']),
-                ...$this->configArray('isolation_key_header_keys', ['X-Tenant-Isolation-Key']),
-                ...$this->configArray('domain_header_keys', ['X-Tenant-Domain']),
-            ] as $key
-        ) {
-            $value = $request->headers->get($key);
-            if (is_string($value) && trim($value) !== '') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function toContext(
-        DataRecord $tenant,
-        ?string $applicationId,
-        string $source,
-        ?string $domain = null,
-    ): CurrentTenantContext {
-        $tenantId = $this->toNullableInt($tenant->get('id'));
-        $tenantCode = $this->stringSignal($tenant->get('code'));
-        $tenantUuid = $this->stringSignal($tenant->get('uuid'));
-
-        if ($tenantId === null || $tenantCode === null || $tenantUuid === null) {
+        $tenantId = $this->positiveInt($tenant->get('id'));
+        $code = trim((string) $tenant->get('code', ''));
+        $uuid = trim((string) $tenant->get('uuid', ''));
+        $status = strtolower(trim((string) $tenant->get('status', '')));
+        if ($tenantId === null || $code === '' || $uuid === '') {
             throw new CurrentTenantContextResolutionException('Resolved tenant record is incomplete.');
         }
-
-        if (! $this->isActiveTenant($tenant)) {
-            throw new CurrentTenantContextResolutionException('Resolved tenant is not active.');
+        if (! TenantStatus::allowsRuntimeAccess($status)) {
+            throw new CurrentTenantContextResolutionException('The selected tenant is not active.');
         }
-
-        $resolvedDomain = $domain;
-        if ($resolvedDomain === null) {
-            $primaryDomain = $this->tenantDomains->findPrimaryByTenant($tenantId);
-            $resolvedDomain = $primaryDomain instanceof DataRecord
-                ? $this->normalizeDomain($primaryDomain->get('domain'))
-                : null;
+        $subscriptionEndsAt = $tenant->get('subscription_ends_at');
+        $trialEndsAt = $tenant->get('trial_ends_at');
+        if ($subscriptionEndsAt !== null && strtotime((string) $subscriptionEndsAt) < time()) {
+            throw new CurrentTenantContextResolutionException('The selected tenant subscription has expired.');
         }
-
-        return new CurrentTenantContext(
-            $tenant,
-            $tenantId,
-            $tenantCode,
-            $tenantUuid,
-            $this->stringSignal($tenant->get('isolation_key')),
-            $resolvedDomain,
-            $this->stringSignal($tenant->get('status')),
-            $this->toBool($tenant->get('is_active')),
-            $applicationId,
-            $source,
-        );
-    }
-
-    private function stringSignal(mixed $value): ?string
-    {
-        if ($value === null || ! is_scalar($value)) {
-            return null;
+        if ($subscriptionEndsAt === null && $trialEndsAt !== null && strtotime((string) $trialEndsAt) < time()) {
+            throw new CurrentTenantContextResolutionException('The selected tenant trial has expired.');
         }
-
-        $normalized = trim((string) $value);
-
-        return $normalized !== '' ? $normalized : null;
-    }
-
-    private function normalizeDomain(mixed $value): ?string
-    {
-        $domain = $this->stringSignal($value);
         if ($domain === null) {
+            $primary = $this->domains->findPrimaryByTenant($tenantId);
+            $domain = $primary === null ? null : (string) $primary->get('domain');
+        }
+        return new CurrentTenantContext($tenant, $tenantId, $code, $uuid, $domain, $status, $applicationId, $source);
+    }
+
+    private function authenticatedUserId(Request $request): ?int
+    {
+        $id = $this->currentUser->currentUserId();
+        if ($id !== null && $id > 0) {
+            return $id;
+        }
+        $user = $request->user();
+        return $user instanceof Authenticatable ? $this->positiveInt($user->getAuthIdentifier()) : null;
+    }
+
+    private function isNeutralHost(string $host): bool
+    {
+        if (in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+            return true;
+        }
+
+        $configured = config('tenant.resolution.central_hosts', []);
+        if (! is_array($configured)) {
+            return false;
+        }
+
+        return in_array($host, array_values(array_filter(array_map(
+            fn (mixed $value): ?string => $this->normalizeHost($value),
+            $configured,
+        ))), true);
+    }
+
+    private function normalizeHost(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
             return null;
         }
-
-        if (str_contains($domain, '://')) {
-            $parsed = parse_url($domain, PHP_URL_HOST);
-            $domain = is_string($parsed) ? $parsed : $domain;
-        }
-
-        $domain = strtolower(trim($domain));
-        $domain = preg_replace('/:\d+$/', '', $domain);
-
-        return is_string($domain) && $domain !== '' ? $domain : null;
+        $host = strtolower(rtrim(trim((string) $value), '.'));
+        return $host === '' ? null : $host;
     }
 
-    private function toNullableInt(mixed $value): ?int
+    private function positiveInt(mixed $value): ?int
     {
-        if ($value === null || $value === '' || ! is_numeric($value)) {
+        if (! is_numeric($value)) {
             return null;
         }
-
-        $normalized = (int) $value;
-
-        return $normalized > 0 ? $normalized : null;
-    }
-
-    private function toBool(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_string($value)) {
-            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value === 1;
-        }
-
-        return false;
-    }
-
-    private function isActiveDomain(DataRecord $domain): bool
-    {
-        return strtolower(trim((string) $domain->get('status', ''))) === 'active';
-    }
-
-    private function isActiveTenant(DataRecord $tenant): bool
-    {
-        return $this->toBool($tenant->get('is_active'))
-            && strtolower(trim((string) $tenant->get('status', ''))) === 'active';
-    }
-
-    /**
-     * @param  list<string>  $fallback
-     * @return list<string>
-     */
-    private function configArray(string $key, array $fallback): array
-    {
-        $resolved = config('tenant.resolution.signals.'.$key, $fallback);
-        if (! is_array($resolved)) {
-            return $fallback;
-        }
-
-        $values = [];
-        foreach ($resolved as $value) {
-            if (! is_string($value) || trim($value) === '') {
-                continue;
-            }
-
-            $values[] = trim($value);
-        }
-
-        /** @var list<string> $values */
-        return array_values(array_unique($values));
-    }
-
-
-    private function configuredFallbackEnabled(): bool
-    {
-        return (bool) config('tenant.resolution.local_fallback_enabled', false)
-            && app()->environment(['local', 'testing']);
+        $value = (int) $value;
+        return $value > 0 ? $value : null;
     }
 }
