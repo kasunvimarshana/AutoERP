@@ -1,4 +1,5 @@
 import type { NavigationSection } from "./navigationTypes";
+import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "../routePaths";
 import {
     accessPermissions,
     protectedAccessRoles,
@@ -78,9 +79,9 @@ export const navigationSections: NavigationSection[] = [
                 id: "dashboard",
                 type: "link",
                 label: "Dashboard",
-                to: "/dashboard",
+                to: DASHBOARD_PATH,
                 icon: "dashboard",
-                match: ["/dashboard"],
+                match: [DASHBOARD_PATH],
             },
         ],
     },
@@ -1052,7 +1053,7 @@ export const navigationSections: NavigationSection[] = [
                 id: "saas-tenants",
                 type: "link",
                 label: "SaaS Tenants",
-                to: "/administration/saas-tenants",
+                to: PLATFORM_HOME_PATH,
                 icon: "users",
                 access: {
                     requiresPlatformOperator: true,

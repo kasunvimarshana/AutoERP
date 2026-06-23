@@ -1,6 +1,7 @@
 import { lazy, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
+import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "./routePaths";
 import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { ProtectedRoute } from "@/modules/auth/ProtectedRoute";
 import { PlatformOperatorRoute } from "@/modules/auth/PlatformOperatorRoute";
@@ -456,9 +457,9 @@ export function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route
                         index
-                        element={<Navigate to="/dashboard" replace />}
+                        element={<Navigate to={DASHBOARD_PATH} replace />}
                     />
-                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path={DASHBOARD_PATH} element={<DashboardPage />} />
                     <Route path="/access/users" element={<UserListPage />} />
                     <Route
                         path="/access/users/create"
@@ -511,7 +512,7 @@ export function AppRouter() {
                         element={requirePermission(tenantPermissions.profileView, <TenantWorkspacePage />)}
                     />
                     <Route
-                        path="/administration/saas-tenants"
+                        path={PLATFORM_HOME_PATH}
                         element={requirePlatformOperator(<PlatformTenantsPage />)}
                     />
                     <Route

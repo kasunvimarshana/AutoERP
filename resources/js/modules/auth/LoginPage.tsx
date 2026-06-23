@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from '@/app/routePaths';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -28,15 +29,15 @@ export default function LoginPage() {
     }
 
     if (auth.isAuthenticated) {
-        return <Navigate to={auth.isPlatformOperator ? '/administration/tenants' : '/dashboard'} replace />;
+        return <Navigate to={auth.isPlatformOperator ? PLATFORM_HOME_PATH : DASHBOARD_PATH} replace />;
     }
 
     const requestedPath = location.state && typeof location.state === 'object' && 'from' in location.state
         ? String(location.state.from)
         : null;
     const destination = authMode === 'platform'
-        ? '/administration/tenants'
-        : requestedPath ?? '/dashboard';
+        ? PLATFORM_HOME_PATH
+        : requestedPath ?? DASHBOARD_PATH;
 
     return (
         <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
