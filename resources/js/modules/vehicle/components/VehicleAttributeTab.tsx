@@ -17,7 +17,7 @@ const emptyPayload: VehicleAttributePayload = { attribute_key: '', attribute_val
 
 export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
     const auth = useAuth();
-    const canManage = hasVehiclePermission(auth.permissions, vehiclePermissions.manageAttributes);
+    const canManage = hasVehiclePermission(auth, vehiclePermissions.manageAttributes);
     const [rows, setRows] = useState<VehicleAttribute[]>([]);
     const [form, setForm] = useState<VehicleAttributePayload>(emptyPayload);
     const [editing, setEditing] = useState<number | null>(null);

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { listSupplierStatusHistory } from '../supplierApi';
 import type { SupplierStatusHistory } from '../supplierTypes';
 import { SupplierRelationHeader } from './SupplierRelationHeader';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 
 export default function SupplierStatusHistoryTab({ supplierId }: { supplierId: number }) {
     const [page, setPage] = useState(1);
@@ -16,7 +17,7 @@ export default function SupplierStatusHistoryTab({ supplierId }: { supplierId: n
         { key: 'from', header: 'From', render: (row) => row.old_status ? <StatusBadge status={row.old_status} /> : '-' },
         { key: 'to', header: 'To', render: (row) => <StatusBadge status={row.new_status} /> },
         { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '-' },
-        { key: 'changed', header: 'Changed at', render: (row) => new Date(row.changed_at).toLocaleString() },
+        { key: 'changed', header: 'Changed at', render: (row) => formatBusinessDateTime(row.changed_at) },
     ];
     return <><SupplierRelationHeader title="Status history" description="Immutable supplier status transition history." /><ErrorAlert error={result.error} />{result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={result.data?.meta} onPageChange={setPage} /></>;
 }

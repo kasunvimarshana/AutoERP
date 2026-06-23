@@ -3,6 +3,7 @@ import {
     businessDateInputValue,
     businessDateTimeInputValue,
     configureBusinessTimeZone,
+    formatBusinessDateTime,
 } from './businessDate';
 
 afterEach(() => configureBusinessTimeZone(null));
@@ -14,6 +15,14 @@ describe('business date utilities', () => {
 
         expect(businessDateInputValue(instant)).toBe('2026-06-16');
         expect(businessDateTimeInputValue(instant)).toBe('2026-06-16T01:30');
+    });
+
+    it('formats timestamps in the configured business timezone and handles invalid input', () => {
+        configureBusinessTimeZone('Asia/Colombo');
+
+        expect(formatBusinessDateTime('2026-06-15T20:00:00.000Z')).toContain('Jun');
+        expect(formatBusinessDateTime('not-a-date')).toBe('-');
+        expect(formatBusinessDateTime(null, 'Not available')).toBe('Not available');
     });
 
     it('applies calendar-day changes to business-local input values', () => {

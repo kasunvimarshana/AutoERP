@@ -1,3 +1,5 @@
+import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
+
 export const vehiclePermissions = {
     view: 'vehicle.view',
     create: 'vehicle.create',
@@ -9,6 +11,6 @@ export const vehiclePermissions = {
     changeStatus: 'vehicle.status.change',
 } as const;
 
-export function hasVehiclePermission(permissions: string[], permission: string): boolean {
-    return permissions.length === 0 || permissions.includes(permission);
+export function hasVehiclePermission(subject: AccessSubject, permission: string): boolean {
+    return hasPermission(subject, permission);
 }

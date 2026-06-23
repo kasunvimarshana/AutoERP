@@ -14,7 +14,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: null,
             roles: [],
             permissions: [],
+            permissionsLoaded: true,
             enabledModules: null,
+            enabledModulesLoaded: true,
         });
 
         expect(sections.flatMap((section) => section.items).map((item) => item.id)).toEqual(['dashboard']);
@@ -26,7 +28,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: 20,
             roles: [],
             permissions: ['vehicle-rental.reservations.manage'],
+            permissionsLoaded: true,
             enabledModules: ['VehicleRental', 'Invoice', 'Payment'],
+            enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
@@ -42,7 +46,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: 20,
             roles: [],
             permissions: [],
+            permissionsLoaded: true,
             enabledModules: null,
+            enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
@@ -63,6 +69,7 @@ describe('navigation access and matching', () => {
             permissions: [purchasePermissions.ordersView, itemPermissions.view],
             permissionsLoaded: false,
             enabledModules: null,
+            enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
@@ -77,7 +84,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: null,
             roles: [],
             permissions: [purchasePermissions.ordersView, 'suppliers.view'],
+            permissionsLoaded: true,
             enabledModules: null,
+            enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
@@ -100,7 +109,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: 20,
             roles: [],
             permissions: [],
+            permissionsLoaded: true,
             enabledModules: ['supplier', 'customer'],
+            enabledModulesLoaded: true,
         });
 
         expect(sections.flatMap((section) => section.items).map((item) => item.id)).not.toContain('vehicle');
@@ -112,7 +123,9 @@ describe('navigation access and matching', () => {
             organizationUnitId: 20,
             roles: [],
             permissions: ['item.view'],
+            permissionsLoaded: true,
             enabledModules: ['item'],
+            enabledModulesLoaded: true,
         });
         const itemModule = sections
             .flatMap((section) => section.items)

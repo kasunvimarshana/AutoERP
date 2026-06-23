@@ -27,7 +27,7 @@ const tabs = [
 export default function VehicleCreatePage() {
     const navigate = useNavigate();
     const auth = useAuth();
-    const canCreate = hasVehiclePermission(auth.permissions, vehiclePermissions.create);
+    const canCreate = hasVehiclePermission(auth, vehiclePermissions.create);
     const [activeTab, setActiveTab] = useState<CreateTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);

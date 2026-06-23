@@ -17,10 +17,11 @@ import { changeCustomerStatus, listCustomers, setCustomerActive } from './custom
 import { customerStatuses, customerTypes, type CustomerCategory, type CustomerSummary } from './customerTypes';
 import { CustomerCategorySelect } from './components/CustomerCategorySelect';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 
 const options = (values: readonly string[]) => values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 export default function CustomerListPage() {
-    const auth = useAuth(); const canUpdate = auth.permissions.includes('customers.update'); const canCreate = auth.permissions.includes('customers.create');
+    const auth = useAuth(); const canUpdate = hasPermission(auth, 'customers.update'); const canCreate = hasPermission(auth, 'customers.create');
     const [search, setSearch] = useState('');
     const [type, setType] = useState('');
     const [status, setStatus] = useState('');

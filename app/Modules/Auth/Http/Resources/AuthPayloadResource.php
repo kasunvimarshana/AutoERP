@@ -16,6 +16,7 @@ final class AuthPayloadResource extends JsonResource
     private const SENSITIVE_KEYS = [
         'token_hash',
         'refresh_hash',
+        'refresh_token',
         'challenge_hash',
         'code_hash',
         'client_secret_hash',
@@ -55,7 +56,6 @@ final class AuthPayloadResource extends JsonResource
 
             return [
                 'token' => $payload['tokens']['access_token'] ?? null,
-                'refresh_token' => $payload['tokens']['refresh_token'] ?? null,
                 'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
                 'user' => $this->userSummary($userPayload),
                 'tenant' => $this->relationSummary($payload['tenant'] ?? null),

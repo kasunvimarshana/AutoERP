@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -11,14 +12,27 @@ export function ExportActions({ reportKey, params }: { reportKey: string; params
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
-    if (!auth.permissions.includes(reportingPermissions.export)) return null;
+    if (!hasPermission(auth, reportingPermissions.export)) return null;
 
     const run = async (format: ReportFormat) => {
         setBusy(format);
         setError(null);
+        const opensPreview = format === 'html' || format === 'print';
+        const previewWindow = opensPreview ? window.open('', '_blank') : null;
+        if (opensPreview && !previewWindow) {
+            setBusy(null);
+            setError(new ApiError('The report preview was blocked. Allow popups for AutoERP and try again.', null));
+            return;
+        }
+
         try {
-            await exportReport(reportKey, format, params);
+            if (previewWindow) {
+                previewWindow.document.title = 'Preparing report…';
+                previewWindow.document.body.textContent = 'Preparing report…';
+            }
+            await exportReport(reportKey, format, params, previewWindow);
         } catch (requestError) {
+            previewWindow?.close();
             setError(toApiError(requestError));
         } finally {
             setBusy(null);

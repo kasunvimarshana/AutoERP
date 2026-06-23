@@ -8,6 +8,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import {
     changeTenantDomain,
     createTenantDomain,
@@ -92,7 +93,7 @@ export function TenantDomainsPanel({ canManage }: { canManage: boolean }) {
                         <div><dt className="font-medium text-slate-600">Host</dt><dd className="mt-1 break-all rounded bg-slate-100 p-3 font-mono">{challenge.value.host}</dd></div>
                         <div><dt className="font-medium text-slate-600">Value</dt><dd className="mt-1 break-all rounded bg-slate-100 p-3 font-mono">{challenge.value.value}</dd></div>
                     </dl>
-                    <p className="mt-3 text-xs text-slate-500">Challenge expires at {new Date(challenge.value.expires_at).toLocaleString()} and is shown only when generated.</p>
+                    <p className="mt-3 text-xs text-slate-500">Challenge expires at {formatBusinessDateTime(challenge.value.expires_at)} and is shown only when generated.</p>
                 </Panel>
             )}
             <div className="space-y-3">
@@ -101,7 +102,7 @@ export function TenantDomainsPanel({ canManage }: { canManage: boolean }) {
                         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                             <div>
                                 <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{domain.domain}</p><StatusBadge status={domain.status} />{domain.is_primary && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">Primary</span>}</div>
-                                <p className="mt-1 text-xs text-slate-500">{domain.verified_at ? `Verified ${new Date(domain.verified_at).toLocaleString()}` : 'Ownership verification required before activation or primary use.'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{domain.verified_at ? `Verified ${formatBusinessDateTime(domain.verified_at)}` : 'Ownership verification required before activation or primary use.'}</p>
                             </div>
                             {canManage && <div className="flex flex-wrap gap-2">
                                 <Button variant="secondary" loading={busyId === domain.id} onClick={() => void act(domain, 'challenge')}>DNS challenge</Button>

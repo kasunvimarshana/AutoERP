@@ -10,6 +10,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 
 const methodTypes = [
     'cash', 'cheque', 'bank_transfer', 'card', 'mobile_wallet', 'direct_debit', 'other',
@@ -37,6 +38,7 @@ export default function PaymentMethodFormPage() {
     });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const formGuard = useMutationFormGuard(busy);
 
     useEffect(() => {
         if (existing.data) {
@@ -45,6 +47,7 @@ export default function PaymentMethodFormPage() {
     }, [existing.data]);
 
     function update(patch: Partial<PaymentMethod>) {
+        formGuard.markDirty();
         setForm((current) => ({ ...current, ...patch }));
     }
 
@@ -65,6 +68,7 @@ export default function PaymentMethodFormPage() {
             };
             if (id) await updatePaymentMethod(id, payload);
             else await createPaymentMethod(payload);
+            formGuard.markSaved();
             navigate('/payments/methods');
         } catch (caught) {
             setError(toApiError(caught));

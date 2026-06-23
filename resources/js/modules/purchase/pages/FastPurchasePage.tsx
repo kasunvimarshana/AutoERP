@@ -36,6 +36,8 @@ export default function FastPurchasePage() {
         context,
         defaults,
         currentError,
+        contextRecoveryError,
+        retryContext,
         errorFor,
         supplier,
         setSupplier,
@@ -123,6 +125,9 @@ export default function FastPurchasePage() {
                 />}
             >
                 <ErrorAlert error={currentError} />
+                {contextRecoveryError && (
+                    <Button type="button" variant="secondary" onClick={retryContext}>Retry purchase defaults</Button>
+                )}
                 {result ? <FastPurchaseCompletedSummary result={result} /> : <>
                     {activeTab === 'details' && (
                         <FastPurchaseDetailsSection

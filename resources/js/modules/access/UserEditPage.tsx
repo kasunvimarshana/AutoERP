@@ -24,9 +24,9 @@ export default function UserEditPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const initializedUserId = useRef<number | null>(null);
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersUpdate);
-    const canAssignRoles = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersAssignRoles);
-    const canManageOrganizationAccess = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersManageOrganizationAccess);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.usersUpdate);
+    const canAssignRoles = hasAccessPermission(auth, accessPermissions.usersAssignRoles);
+    const canManageOrganizationAccess = hasAccessPermission(auth, accessPermissions.usersManageOrganizationAccess);
     const user = useApi((signal) => accessApi.getUser(String(id), signal), [id], Boolean(id));
     const roles = useApi((signal) => accessApi.listRoles({ per_page: 100 }, signal), []);
     const organizationUnits = useApi((signal) => accessApi.listOrganizationUnits({ tenant_id: tenantId }, signal), [tenantId], Number.isFinite(tenantId) && tenantId > 0);

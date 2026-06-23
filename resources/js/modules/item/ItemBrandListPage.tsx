@@ -19,7 +19,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 
 export default function ItemBrandListPage() {
     const auth = useAuth();
-    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageBrands);
+    const canManage = hasItemPermission(auth, itemPermissions.manageBrands);
     const [search, setSearch] = useState('');
     const [active, setActive] = useState('');
     const [page, setPage] = useState(1);

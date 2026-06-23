@@ -13,6 +13,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { listChequeTemplates, markChequePrinted, previewCheque, updateChequeTemplate } from './chequePrintApi';
 import { ChequePreviewCanvas } from './ChequePreviewCanvas';
 import { coordinateFields, type ChequeCoordinateKey, type ChequeTemplate } from './chequePrintTypes';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 
 export default function ChequePrintPreviewPage() {
     const params = useParams();
@@ -73,7 +74,7 @@ export default function ChequePrintPreviewPage() {
         setMessage('');
         try {
             const log = await markChequePrinted(paymentId, lineId, adjustedTemplate.id, notes);
-            setMessage(`Marked as printed at ${new Date(log.printed_at).toLocaleString()}.`);
+            setMessage(`Marked as printed at ${formatBusinessDateTime(log.printed_at)}.`);
         } catch (error) {
             setActionError(toApiError(error));
         } finally {

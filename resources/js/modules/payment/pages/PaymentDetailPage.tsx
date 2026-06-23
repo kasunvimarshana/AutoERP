@@ -152,11 +152,11 @@ export default function PaymentDetailPage() {
                     { label: 'Finance journal', value: value.finance_journal?.number ?? value.finance_journal?.id ?? '-' },
                     { label: 'Source', value: humanize(value.source_type) },
                 ]} />}
-                {tabState.activeTab === 'lines' && <RecordTable rows={(value.lines ?? []) as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'status', 'instrument_number', 'instrument_date', 'metadata']} />}
-                {tabState.activeTab === 'allocations' && (allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'invoice_balance_after', 'allocation_method', 'status']} />)}
-                {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['balance_type', 'original_amount', 'allocated_amount', 'refunded_amount', 'remaining_amount', 'allocation_status', 'status']} />)}
+                {tabState.activeTab === 'lines' && <RecordTable rows={(value.lines ?? []) as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'status', 'instrument_number', 'instrument_date', 'metadata']} rowKey={(row, index) => String(row.id ?? row.reference_number ?? row.instrument_number ?? `payment-line-${index}`)} />}
+                {tabState.activeTab === 'allocations' && (allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'invoice_balance_after', 'allocation_method', 'status']} rowKey={(row, index) => String(row.id ?? `${String(row.invoice ?? 'invoice')}-${String(row.allocation_date ?? index)}`)} />)}
+                {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['balance_type', 'original_amount', 'allocated_amount', 'refunded_amount', 'remaining_amount', 'allocation_status', 'status']} rowKey={() => 'unapplied-balance'} />)}
                 {tabState.activeTab === 'refunds' && <div className="space-y-5">
-                    <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment', 'reason', 'status']} />
+                    <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.refund_number ?? `refund-${index}`)} />
                     {canRefund && <div className="grid gap-4 md:grid-cols-[180px_180px_180px_minmax(0,1fr)_auto] md:items-end">
                         <Input label="Refund number" value={refundNumber} onChange={(event) => setRefundNumber(event.target.value)} />
                         <Input label="Refund date" type="date" value={refundDate} onChange={(event) => setRefundDate(event.target.value)} />
@@ -166,7 +166,7 @@ export default function PaymentDetailPage() {
                     </div>}
                 </div>}
                 {tabState.activeTab === 'reversals' && <div className="space-y-5">
-                    <RecordTable rows={(value.reversals ?? []) as Record<string, unknown>[]} fields={['reversal_number', 'reversal_date', 'original_amount', 'reversed_amount', 'reason', 'status']} />
+                    <RecordTable rows={(value.reversals ?? []) as Record<string, unknown>[]} fields={['reversal_number', 'reversal_date', 'original_amount', 'reversed_amount', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.reversal_number ?? `reversal-${index}`)} />
                     {canReverse && <div className="grid gap-4 md:grid-cols-[180px_180px_minmax(0,1fr)_auto] md:items-end">
                         <Input label="Reversal number" value={reversalNumber} onChange={(event) => setReversalNumber(event.target.value)} />
                         <Input label="Reversal date" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} />
@@ -174,7 +174,7 @@ export default function PaymentDetailPage() {
                         <Button variant="danger" loading={busy} onClick={() => void submitReversal()}>Reverse</Button>
                     </div>}
                 </div>}
-                {tabState.activeTab === 'history' && <RecordTable rows={(value.status_history ?? []) as Record<string, unknown>[]} fields={['changed_at', 'from_status', 'to_status', 'reason']} />}
+                {tabState.activeTab === 'history' && <RecordTable rows={(value.status_history ?? []) as Record<string, unknown>[]} fields={['changed_at', 'from_status', 'to_status', 'reason']} rowKey={(row, index) => String(row.id ?? row.changed_at ?? `status-${index}`)} />}
             </div>
         </Panel>
     </>;

@@ -21,9 +21,9 @@ export default function RoleListPage() {
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
-    const canCreate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesCreate);
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesUpdate);
-    const canDelete = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesDelete);
+    const canCreate = hasAccessPermission(auth, accessPermissions.rolesCreate);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canDelete = hasAccessPermission(auth, accessPermissions.rolesDelete);
     const roles = useApi((signal) => accessApi.listRoles({
         search: debouncedSearch || undefined,
         page,

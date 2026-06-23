@@ -13,6 +13,8 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { PlatformTenantForm } from './components/PlatformTenantForm';
 import {
     changeTenantStatus,
@@ -30,6 +32,7 @@ export default function PlatformTenantsPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
+    const debouncedSearch = useDebounce(search);
     const [editing, setEditing] = useState<TenantRecord | null>(null);
     const [selected, setSelected] = useState<TenantRecord | null>(null);
     const [reason, setReason] = useState('');
@@ -38,8 +41,8 @@ export default function PlatformTenantsPage() {
     const [error, setError] = useState<ApiError | null>(null);
 
     const tenants = useApi(
-        (signal) => listPlatformTenants({ page, per_page: 20, search: search || undefined, status: status || undefined }, signal),
-        [page, search, status],
+        (signal) => listPlatformTenants({ page, per_page: 20, search: debouncedSearch || undefined, status: status || undefined }, signal),
+        [page, debouncedSearch, status],
     );
     const plans = useApi((signal) => listTenantPlans({ page: 1, per_page: 100, is_active: true }, signal), []);
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), []);
@@ -115,4 +118,4 @@ export default function PlatformTenantsPage() {
 function Detail({ label, value }: { label: string; value: string }) {
     return <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-1 font-medium text-slate-900">{value}</dd></div>;
 }
-function formatDate(value: string | null): string { return value ? new Date(value).toLocaleString() : 'Not set'; }
+function formatDate(value: string | null): string { return formatBusinessDateTime(value, 'Not set'); }

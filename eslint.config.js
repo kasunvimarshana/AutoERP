@@ -17,12 +17,14 @@ export default tseslint.config(
         },
         rules: {
             ...reactHooks.configs.recommended.rules,
+            // Keep hook correctness visible while the remaining legacy violations are remediated.
+            // Rules of Hooks remains an error; migration-sensitive rules are warnings instead of being disabled.
+            'react-hooks/exhaustive-deps': 'warn',
+            'react-hooks/immutability': 'warn',
+            'react-hooks/refs': 'warn',
+            'react-hooks/set-state-in-effect': 'warn',
             '@typescript-eslint/no-explicit-any': 'error',
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-            'react-hooks/exhaustive-deps': 'off',
-            'react-hooks/immutability': 'off',
-            'react-hooks/refs': 'off',
-            'react-hooks/set-state-in-effect': 'off',
         },
     },
 );

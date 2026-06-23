@@ -7,17 +7,20 @@ import { Input } from "@/shared/components/Input";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { Panel } from "@/shared/components/Panel";
 import { useApi } from "@/shared/hooks/useApi";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { RentalPage } from "../components/RentalPage";
 import type { RentalVehicle } from "../vehicleRentalTypes";
 import { listAvailableRentalVehicles } from "../vehicleRentalApi";
 
-const today = new Date().toISOString().slice(0, 10);
 
 export default function VehicleAvailabilityPage() {
-    const [draft, setDraft] = useState({
-        start_at: `${today}T00:00`,
-        end_at: `${today}T23:59`,
-        search: "",
+    const [draft, setDraft] = useState(() => {
+        const businessDate = businessDateInputValue();
+        return {
+            start_at: `${businessDate}T00:00`,
+            end_at: `${businessDate}T23:59`,
+            search: "",
+        };
     });
     const [filters, setFilters] = useState(draft);
     const result = useApi(
@@ -91,6 +94,7 @@ export default function VehicleAvailabilityPage() {
                         label="End"
                         type="datetime-local"
                         required
+                        min={draft.start_at || undefined}
                         value={draft.end_at}
                         onChange={(event) =>
                             setDraft({ ...draft, end_at: event.target.value })

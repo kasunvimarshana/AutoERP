@@ -22,6 +22,7 @@ final class VehicleServiceDocument extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'vehicle_service_job_id' => 'integer',
+            'size_bytes' => 'integer',
             'uploaded_by' => 'integer',
         ]);
     }

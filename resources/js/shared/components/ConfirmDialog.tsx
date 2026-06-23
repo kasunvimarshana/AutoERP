@@ -14,7 +14,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
     onConfirm: () => void;
 }) {
     return (
-        <Modal open={open} title={title} onClose={onCancel}>
+        <Modal open={open} title={title} onClose={onCancel} closeDisabled={loading}>
             <div className="space-y-5">
                 <div className="text-sm text-slate-700">{message}</div>
                 <div className="flex justify-end gap-2">

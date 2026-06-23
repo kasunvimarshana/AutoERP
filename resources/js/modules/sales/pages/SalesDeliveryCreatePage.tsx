@@ -12,6 +12,7 @@ import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { readableRelation } from '@/shared/utils/object';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { createSalesDelivery, getDeliverableSalesOrderLines, getSalesOrder, type SalesLineSummary } from '../salesApi';
 import type { SalesOrder } from '../salesTypes';
 import {
@@ -65,8 +66,8 @@ export default function SalesDeliveryCreatePage() {
     };
 
     useEffect(() => {
-        const id = Number(params.get('order_id') ?? 0);
-        if (id > 0) void loadOrder({ id, name: 'Loading sales order...' });
+        const id = parsePositiveInteger(params.get('order_id'));
+        if (id !== null) void loadOrder({ id, name: 'Loading sales order...' });
         // The query-string source is only applied when the create page opens.
     }, []);
 

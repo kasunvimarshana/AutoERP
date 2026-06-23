@@ -9,6 +9,7 @@ import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import {
     createReferenceRecord,
     listReferenceRecords,
@@ -28,10 +29,11 @@ export function ReferenceDataPanel({ canManage }: { canManage: boolean }) {
     const [catalog, setCatalog] = useState<ReferenceCatalog>('currencies');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const debouncedSearch = useDebounce(search);
     const [editing, setEditing] = useState<ReferenceRecord | 'create' | null>(null);
     const [working, setWorking] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
-    const records = useApi((signal) => listReferenceRecords(catalog, search, page, signal), [catalog, search, page]);
+    const records = useApi((signal) => listReferenceRecords(catalog, debouncedSearch, page, signal), [catalog, debouncedSearch, page]);
 
     const columns: DataColumn<ReferenceRecord>[] = [
         {

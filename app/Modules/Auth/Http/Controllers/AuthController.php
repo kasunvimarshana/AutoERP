@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Constants\AuthTokenScope;
+use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\AuthorizeClientData;
 use Modules\Auth\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\DTOs\LinkExternalIdentityData;
@@ -43,6 +44,7 @@ use Modules\Auth\Services\LinkExternalIdentityService;
 use Modules\Auth\Services\ListSessionsService;
 use Modules\Auth\Services\LoginService;
 use Modules\Auth\Services\LogoutService;
+use Modules\Auth\Services\RefreshTokenCookie;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Auth\Services\RegisterService;
 use Modules\Auth\Services\RequestVerificationChallengeService;
@@ -72,6 +74,8 @@ final class AuthController extends Controller
         private readonly LinkExternalIdentityService $linkExternalIdentityService,
         private readonly UnlinkExternalIdentityService $unlinkExternalIdentityService,
         private readonly RefreshTokenService $refreshTokenService,
+        private readonly RefreshTokenCookie $refreshTokenCookie,
+        private readonly TokenProviderInterface $tokens,
         private readonly RevokeSessionService $revokeSessionService,
         private readonly ListSessionsService $listSessionsService,
         private readonly ValidateTokenService $validateTokenService,
@@ -101,7 +105,7 @@ final class AuthController extends Controller
             fn (): Result => $this->loginService->login(LoginData::fromArray($payload)),
         );
 
-        return $this->respond($result);
+        return $this->respondWithRefreshCookie($result);
     }
 
     public function register(RegisterRequest $request): JsonResponse|AuthPayloadResource
@@ -148,18 +152,36 @@ final class AuthController extends Controller
 
     public function refreshToken(RefreshTokenRequest $request): JsonResponse|AuthPayloadResource
     {
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken === null) {
+            return $this->errorResponses->make(
+                AuthErrorCode::TOKEN_INVALID,
+                'Refresh session is not available.',
+                401,
+                'authentication',
+            );
+        }
+
         $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
         if ($payload instanceof Result) {
             return $this->respond($payload);
         }
+        $payload['refresh_token'] = $refreshToken;
         $payload['token_scope'] = AuthTokenScope::TENANT;
+        $payload['scopes'] = [];
+        $payload['access_token_ttl_seconds'] = (int) config('module-auth.access_token_ttl_seconds');
+        $payload['refresh_token_ttl_seconds'] = (int) config('module-auth.refresh_token_ttl_seconds');
 
         $result = $this->tenantExecution->runForTenant(
             (int) $payload['tenant_id'],
             fn (): Result => $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($payload)),
         );
 
-        return $this->respond($result);
+        $response = $this->respondWithRefreshCookie($result);
+
+        return $result->isFailure() && $response instanceof JsonResponse
+            ? $this->refreshTokenCookie->forget($response)
+            : $response;
     }
 
     public function logout(LogoutRequest $request): JsonResponse|AuthPayloadResource
@@ -176,7 +198,16 @@ final class AuthController extends Controller
             LogoutData::fromArray($payload),
         );
 
-        return $this->respond($result);
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken !== null) {
+            $this->tokens->revokeRefreshToken($refreshToken, $this->currentTenant->currentTenantId());
+        }
+
+        $response = $this->respond($result);
+
+        return $response instanceof JsonResponse
+            ? $this->refreshTokenCookie->forget($response)
+            : $response;
     }
 
     public function revokeSession(RevokeSessionRequest $request, int|string $session): JsonResponse|AuthPayloadResource
@@ -331,6 +362,24 @@ final class AuthController extends Controller
         }
 
         return $payload;
+    }
+
+    private function respondWithRefreshCookie(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource
+    {
+        if ($result->isFailure()) {
+            return $this->respond($result, $successStatus);
+        }
+
+        $payload = $result->valueOrFail();
+        $response = response()->json(
+            (new AuthPayloadResource($payload))->resolve(request()),
+            $successStatus,
+        );
+        $refreshToken = $this->refreshTokenCookie->extract($payload);
+
+        return $refreshToken === null
+            ? $response
+            : $this->refreshTokenCookie->attach($response, $refreshToken);
     }
 
     private function respond(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource

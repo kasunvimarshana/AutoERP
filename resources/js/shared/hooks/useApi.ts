@@ -11,7 +11,7 @@ export function useApi<T>(
     request: (signal: AbortSignal) => Promise<T>,
     dependencies: DependencyList,
     enabled = true,
-    clearOnLoad = false,
+    clearOnLoad = true,
 ) {
     const requestRef = useRef(request);
     requestRef.current = request;

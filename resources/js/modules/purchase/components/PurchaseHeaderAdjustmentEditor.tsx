@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { FormDrawer } from '@/shared/components/Drawer';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PurchaseHeaderAdjustmentForm, type HeaderAdjustmentAllocationLine } from './PurchaseHeaderAdjustmentForm';
 import { getPurchaseAdjustmentCatalogue } from '../purchaseApi';
@@ -28,16 +30,31 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, allocationLines = 
 }) {
     const [dialog, setDialog] = useState<AdjustmentDialog | null>(null);
     const [catalogue, setCatalogue] = useState<PurchaseAdjustmentCatalogueEntry[]>([]);
+    const [catalogueError, setCatalogueError] = useState<ApiError | null>(null);
+    const [catalogueLoading, setCatalogueLoading] = useState(true);
+    const [catalogueReload, setCatalogueReload] = useState(0);
     const { confirm, confirmDialog } = useConfirmDialog();
 
     useEffect(() => {
         const controller = new AbortController();
+        setCatalogueLoading(true);
+        setCatalogueError(null);
         void getPurchaseAdjustmentCatalogue(controller.signal)
-            .then(setCatalogue)
-            .catch(() => undefined);
+            .then((entries) => {
+                if (!controller.signal.aborted) setCatalogue(entries);
+            })
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) {
+                    setCatalogue([]);
+                    setCatalogueError(toApiError(requestError));
+                }
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setCatalogueLoading(false);
+            });
 
         return () => controller.abort();
-    }, []);
+    }, [catalogueReload]);
 
     const saveAdjustment = (adjustment: EditableHeaderAdjustment) => {
         if (dialog?.mode === 'edit') {
@@ -59,12 +76,19 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, allocationLines = 
 
     return (
         <div className="space-y-4">
+            {catalogueError && (
+                <div className="space-y-3">
+                    <ErrorAlert error={catalogueError} title="Adjustment catalogue unavailable" />
+                    <Button type="button" variant="secondary" onClick={() => setCatalogueReload((current) => current + 1)}>Retry catalogue</Button>
+                </div>
+            )}
             <HeaderAdjustmentTable
                 adjustments={adjustments}
                 onAdd={() => setDialog({ mode: 'create', adjustment: emptyHeaderAdjustment() })}
                 onEdit={(adjustment, index) => setDialog({ mode: 'edit', index, adjustment })}
                 onRemove={(index) => void removeAdjustment(index)}
                 hasError={(index) => adjustmentHasError(index, errorFor)}
+                disabled={catalogueLoading || Boolean(catalogueError) || catalogue.length === 0}
             />
             <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit adjustment' : 'Add adjustment'} onClose={() => setDialog(null)}>
                 {dialog && (
@@ -85,12 +109,13 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, allocationLines = 
     );
 }
 
-function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError }: {
+function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError, disabled }: {
     adjustments: EditableHeaderAdjustment[];
     onAdd: () => void;
     onEdit: (adjustment: EditableHeaderAdjustment, index: number) => void;
     onRemove: (index: number) => void;
     hasError: (index: number) => boolean;
+    disabled: boolean;
 }) {
     const rows = adjustments.map((adjustment, index) => ({ ...adjustment, rowIndex: index }));
     const columns: DataColumn<EditableHeaderAdjustment & { rowIndex: number }>[] = [
@@ -101,7 +126,7 @@ function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError 
         { key: 'mapping', header: 'Finance Mapping', render: (row) => row.finance_mapping_label ?? row.cost_treatment ?? '-' },
         { key: 'amount', header: 'Amount', render: formatAdjustmentAmount, className: 'tabular-nums' },
         { key: 'allocation', header: 'Allocation', render: (row) => row.allocation_method.replaceAll('_', ' ') },
-        { key: 'actions', header: 'Actions', className: 'text-right', render: (row) => <AdjustmentActions onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} /> },
+        { key: 'actions', header: 'Actions', className: 'text-right', render: (row) => <AdjustmentActions disabled={disabled} onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} /> },
     ];
 
     return (
@@ -113,10 +138,10 @@ function HeaderAdjustmentTable({ adjustments, onAdd, onEdit, onRemove, hasError 
                 emptyMessage="No adjustments added yet."
                 mobileSummary={(row) => row.name || row.adjustment_type.replaceAll('_', ' ')}
                 mobileDetails={(row) => <AdjustmentMobileDetails adjustment={row} />}
-                mobileActions={(row) => <AdjustmentActions onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} />}
+                mobileActions={(row) => <AdjustmentActions disabled={disabled} onEdit={() => onEdit(row, row.rowIndex)} onRemove={() => onRemove(row.rowIndex)} />}
                 rowBadge={(row) => hasError(row.rowIndex) ? <ErrorBadge /> : null}
             />
-            <Button type="button" variant="secondary" onClick={onAdd}>Add adjustment</Button>
+            <Button type="button" variant="secondary" disabled={disabled} onClick={onAdd}>Add adjustment</Button>
         </div>
     );
 }
@@ -126,8 +151,8 @@ function adjustmentHasError(index: number, errorFor: (field: string) => string |
         .some((field) => Boolean(errorFor(`adjustments.${index}.${field}`)));
 }
 
-function AdjustmentActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={onEdit}>Edit adjustment</button><button type="button" className="font-semibold text-rose-600" onClick={onRemove}>Remove adjustment</button></div>;
+function AdjustmentActions({ disabled, onEdit, onRemove }: { disabled: boolean; onEdit: () => void; onRemove: () => void }) {
+    return <div className="flex justify-end gap-3"><button type="button" disabled={disabled} className="font-semibold text-sky-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={onEdit}>Edit adjustment</button><button type="button" disabled={disabled} className="font-semibold text-rose-600 disabled:cursor-not-allowed disabled:opacity-50" onClick={onRemove}>Remove adjustment</button></div>;
 }
 
 function AdjustmentMobileDetails({ adjustment }: { adjustment: EditableHeaderAdjustment }) {

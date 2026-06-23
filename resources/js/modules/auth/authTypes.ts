@@ -23,7 +23,6 @@ export interface AuthOrganizationUnit {
 
 export interface AuthSession {
     token: string;
-    refresh_token?: string | null;
     token_type: 'Bearer' | string;
     session_id?: number | null;
     user: AuthUser;

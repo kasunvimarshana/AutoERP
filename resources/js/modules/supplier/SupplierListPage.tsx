@@ -17,10 +17,11 @@ import { changeSupplierStatus, listSuppliers, setSupplierActive } from './suppli
 import { supplierStatuses, supplierTypes, type SupplierCategory, type SupplierSummary } from './supplierTypes';
 import { SupplierCategorySelect } from './components/SupplierCategorySelect';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 
 const options = (values: readonly string[]) => values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 export default function SupplierListPage() {
-    const auth = useAuth(); const canUpdate = auth.permissions.includes('suppliers.update'); const canCreate = auth.permissions.includes('suppliers.create');
+    const auth = useAuth(); const canUpdate = hasPermission(auth, 'suppliers.update'); const canCreate = hasPermission(auth, 'suppliers.create');
     const [search, setSearch] = useState('');
     const [type, setType] = useState('');
     const [status, setStatus] = useState('');

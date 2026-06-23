@@ -11,6 +11,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { readableRelation } from '@/shared/utils/object';
 import { createSalesAllocation, getAllocatableSalesOrderLines, getSalesOrder, type SalesLineSummary } from '../salesApi';
 import {
@@ -65,8 +66,8 @@ export default function SalesAllocationCreatePage() {
     };
 
     useEffect(() => {
-        const id = Number(params.get('order_id') ?? 0);
-        if (id > 0) void loadOrder({ id, name: 'Loading sales order...' });
+        const id = parsePositiveInteger(params.get('order_id'));
+        if (id !== null) void loadOrder({ id, name: 'Loading sales order...' });
     }, []);
 
     const columns: DataColumn<AllocationDraftLine>[] = [

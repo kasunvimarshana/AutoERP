@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -11,6 +12,8 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { useDebounce } from '@/shared/hooks/useDebounce';
+import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { createTenantPlan, deactivateTenantPlan, listTenantPlans, updateTenantPlan } from './tenantApi';
 import type { TenantModuleCode, TenantPlan, TenantPlanLimits } from './tenantTypes';
 
@@ -50,7 +53,8 @@ const emptyLimits = (): LimitFormState => ({
 export default function TenantPlansPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
-    const plans = useApi((signal) => listTenantPlans({ page, per_page: 20, search: search || undefined }, signal), [page, search]);
+    const debouncedSearch = useDebounce(search);
+    const plans = useApi((signal) => listTenantPlans({ page, per_page: 20, search: debouncedSearch || undefined }, signal), [page, debouncedSearch]);
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), []);
     const [editing, setEditing] = useState<TenantPlan | null>(null);
     const [name, setName] = useState('');
@@ -82,17 +86,22 @@ export default function TenantPlansPage() {
 
     async function save(event: FormEvent) {
         event.preventDefault();
+        const validation = validatePlanForm({ name, slug, price, currencyId, limits });
+        if (validation.error) {
+            setError(validation.error);
+            return;
+        }
+
         setSaving(true);
         setError(null);
-
         const payload = {
             name: name.trim(),
             slug: slug.trim(),
             price,
-            currency_id: currencyId ? Number(currencyId) : null,
+            currency_id: validation.currencyId,
             billing_interval: interval,
             features: { enabled_modules: enabledModules },
-            limits: normalizeLimits(limits),
+            limits: validation.limits,
             is_active: active,
         };
 
@@ -151,15 +160,16 @@ export default function TenantPlansPage() {
                 <Panel title={editing ? `Edit ${editing.name}` : 'Create a subscription plan'}>
                     <form className="space-y-6" onSubmit={(event) => void save(event)}>
                         <div className="grid gap-4 md:grid-cols-2">
-                            <Input label="Plan name" value={name} onChange={(event) => setName(event.target.value)} required />
-                            <Input label="Plan slug" value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase())} placeholder="professional" required />
-                            <Input label="Price" type="number" min="0" step="0.000001" value={price} onChange={(event) => setPrice(event.target.value)} required />
+                            <Input label="Plan name" value={name} error={fieldError(error, 'name')} onChange={(event) => setName(event.target.value)} required />
+                            <Input label="Plan slug" value={slug} error={fieldError(error, 'slug')} onChange={(event) => setSlug(event.target.value.toLowerCase())} placeholder="professional" required />
+                            <DecimalInput label="Price" value={price} error={fieldError(error, 'price')} onChange={(event) => setPrice(event.target.value)} required />
                             <Select
                                 label="Billing currency"
                                 value={currencyId}
                                 onChange={(event) => setCurrencyId(event.target.value)}
                                 options={(currencies.data ?? []).map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}` }))}
                                 placeholder="Select currency for paid plans"
+                                error={fieldError(error, 'currency_id')}
                             />
                             <Select
                                 label="Billing interval"
@@ -207,6 +217,7 @@ export default function TenantPlansPage() {
                                         step="1"
                                         value={limits[limit.key]}
                                         onChange={(event) => setLimits((current) => ({ ...current, [limit.key]: event.target.value }))}
+                                        error={fieldError(error, `limits.${limit.key}`)}
                                         hint={limit.hint}
                                     />
                                 ))}
@@ -251,12 +262,54 @@ export default function TenantPlansPage() {
     );
 }
 
-function normalizeLimits(values: LimitFormState): TenantPlanLimits {
-    return Object.fromEntries(
-        Object.entries(values)
-            .filter(([, value]) => value.trim() !== '')
-            .map(([key, value]) => [key, Number(value)]),
-    ) as TenantPlanLimits;
+function validatePlanForm(values: {
+    name: string;
+    slug: string;
+    price: string;
+    currencyId: string;
+    limits: LimitFormState;
+}): { error: ApiError | null; currencyId: number | null; limits: TenantPlanLimits } {
+    const fields: Record<string, string[]> = {};
+    const name = values.name.trim();
+    const slug = values.slug.trim();
+
+    if (name === '') fields.name = ['Plan name is required.'];
+    if (slug === '') fields.slug = ['Plan slug is required.'];
+    if (!isNonNegativeDecimal(values.price) || values.price.trim() === '') {
+        fields.price = ['Price must be a non-negative decimal amount.'];
+    }
+
+    const paidPlan = isNonNegativeDecimal(values.price)
+        && values.price.trim() !== ''
+        && compareDecimalStrings(values.price, '0') > 0;
+    const parsedCurrencyId = values.currencyId === '' ? null : Number(values.currencyId);
+    if (paidPlan && parsedCurrencyId === null) {
+        fields.currency_id = ['A billing currency is required for a paid plan.'];
+    } else if (parsedCurrencyId !== null && (!Number.isSafeInteger(parsedCurrencyId) || parsedCurrencyId < 1)) {
+        fields.currency_id = ['Select a valid billing currency.'];
+    }
+
+    const parsedLimits: Partial<TenantPlanLimits> = {};
+    for (const [key, rawValue] of Object.entries(values.limits) as Array<[keyof TenantPlanLimits, string]>) {
+        const value = rawValue.trim();
+        if (value === '') continue;
+        const parsed = Number(value);
+        if (!Number.isSafeInteger(parsed) || parsed < 1) {
+            fields[`limits.${key}`] = ['Limit must be a positive whole number.'];
+            continue;
+        }
+        parsedLimits[key] = parsed;
+    }
+
+    const error = Object.keys(fields).length > 0
+        ? new ApiError('Please correct the highlighted plan fields.', 422, 'CLIENT_VALIDATION_FAILED', 'validation', fields)
+        : null;
+
+    return {
+        error,
+        currencyId: parsedCurrencyId,
+        limits: parsedLimits as TenantPlanLimits,
+    };
 }
 
 function toLimitValue(value: number | undefined): string {

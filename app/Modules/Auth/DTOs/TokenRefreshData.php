@@ -30,8 +30,8 @@ final readonly class TokenRefreshData
             AuthTokenScope::normalize((string) ($payload['token_scope'] ?? AuthTokenScope::TENANT)),
             (string) ($payload['refresh_token'] ?? ''),
             isset($payload['scopes']) && is_array($payload['scopes']) ? array_values($payload['scopes']) : [],
-            max(1, (int) ($payload['access_token_ttl_seconds'] ?? 3600)),
-            max(1, (int) ($payload['refresh_token_ttl_seconds'] ?? 2592000)),
+            max(1, (int) ($payload['access_token_ttl_seconds'] ?? config('module-auth.access_token_ttl_seconds'))),
+            max(1, (int) ($payload['refresh_token_ttl_seconds'] ?? config('module-auth.refresh_token_ttl_seconds'))),
         );
     }
 }

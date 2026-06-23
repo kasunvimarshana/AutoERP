@@ -47,6 +47,10 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
     const [error, setError] = useState<ApiError | null>(null);
     const [previewing, setPreviewing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [supplierContextError, setSupplierContextError] = useState<ApiError | null>(null);
+    const [supplierContextReload, setSupplierContextReload] = useState(0);
+    const [warehouseLocationsError, setWarehouseLocationsError] = useState<ApiError | null>(null);
+    const [warehouseLocationsReload, setWarehouseLocationsReload] = useState(0);
 
     const purchaseDateTouched = useRef(false);
     const currencyTouched = useRef(false);
@@ -62,7 +66,8 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
     const createInvoice = preset !== 'purchase_receive';
     const recordPayment = preset === 'purchase_receive_invoice_pay';
     const paymentTotal = paymentRowsTotal(paymentRows);
-    const currentError = error ?? context.error;
+    const contextRecoveryError = context.error ?? supplierContextError ?? warehouseLocationsError;
+    const currentError = error ?? contextRecoveryError;
     const errorFor = useCallback((field: string) => fieldError(currentError, field), [currentError]);
 
     useEffect(() => {
@@ -79,6 +84,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         if (!supplier?.id) return;
 
         const controller = new AbortController();
+        setSupplierContextError(null);
         void getPurchaseSupplierContext(supplier.id, controller.signal)
             .then((supplierContext) => {
                 if (controller.signal.aborted) return;
@@ -86,25 +92,30 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
                     setCurrencyState(supplierContext.currency);
                 }
             })
-            .catch(() => undefined);
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setSupplierContextError(toApiError(requestError));
+            });
 
         return () => controller.abort();
-    }, [supplier?.id]);
+    }, [supplier?.id, supplierContextReload]);
 
     useEffect(() => {
         if (!warehouse?.id) return;
 
         const controller = new AbortController();
+        setWarehouseLocationsError(null);
         void getPurchaseWarehouseLocations(warehouse.id, controller.signal)
             .then((locations) => {
                 if (controller.signal.aborted || locationTouched.current) return;
                 const defaultLocation = (locations as Array<NamedResource & { is_default?: boolean }>).find((location) => location.is_default) ?? null;
                 setWarehouseLocationState(defaultLocation);
             })
-            .catch(() => undefined);
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setWarehouseLocationsError(toApiError(requestError));
+            });
 
         return () => controller.abort();
-    }, [warehouse?.id]);
+    }, [warehouse?.id, warehouseLocationsReload]);
 
     const setSupplier = (next: NamedResource | null) => {
         if (supplier?.id && next?.id && supplier.id !== next.id && lines.length > 0) {
@@ -234,8 +245,10 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             && paymentReady
             && !previewing
             && !submitting
+            && !context.loading
+            && !contextRecoveryError
         );
-    }, [lines, paymentRows, paymentTotal, previewing, purchaseDate, recordPayment, submitting, supplier?.id, supplierReference, warehouse?.id]);
+    }, [context.loading, contextRecoveryError, lines, paymentRows, paymentTotal, previewing, purchaseDate, recordPayment, submitting, supplier?.id, supplierReference, warehouse?.id]);
 
     const canPreview = canSubmit && canPreviewPermission;
     const canExecute = canSubmit && canExecutePermission && !previewStale && !previewing;
@@ -320,10 +333,18 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         return submittedIndex >= 0 ? submittedIndex : index;
     }, []);
 
+    const retryContext = () => {
+        if (context.error) context.retry();
+        if (supplierContextError) setSupplierContextReload((current) => current + 1);
+        if (warehouseLocationsError) setWarehouseLocationsReload((current) => current + 1);
+    };
+
     return {
         context,
         defaults,
         currentError,
+        contextRecoveryError,
+        retryContext,
         errorFor,
         supplier,
         setSupplier,

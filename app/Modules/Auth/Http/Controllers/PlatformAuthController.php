@@ -14,6 +14,7 @@ use Modules\Auth\Http\Requests\PlatformLoginRequest;
 use Modules\Auth\Http\Requests\PlatformRefreshTokenRequest;
 use Modules\Auth\Http\Resources\AuthPayloadResource;
 use Modules\Auth\Services\PlatformLoginService;
+use Modules\Auth\Services\RefreshTokenCookie;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -25,6 +26,7 @@ final class PlatformAuthController extends Controller
     public function __construct(
         private readonly PlatformLoginService $login,
         private readonly RefreshTokenService $refreshTokens,
+        private readonly RefreshTokenCookie $refreshTokenCookie,
         private readonly TokenProviderInterface $tokens,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly ApiErrorResponseFactory $errors,
@@ -39,21 +41,37 @@ final class PlatformAuthController extends Controller
             (string) $request->ip(),
         );
 
-        return $this->respond($result);
+        return $this->respondWithRefreshCookie($result);
     }
 
     public function refresh(PlatformRefreshTokenRequest $request): JsonResponse
     {
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken === null) {
+            return $this->errors->make(
+                AuthErrorCode::TOKEN_INVALID,
+                'Refresh session is not available.',
+                401,
+                'authentication',
+            );
+        }
+
         $payload = $request->validated();
+        $payload['refresh_token'] = $refreshToken;
         $payload['tenant_id'] = null;
         $payload['token_scope'] = AuthTokenScope::PLATFORM;
         $payload['scopes'] = ['platform'];
+        $payload['access_token_ttl_seconds'] = (int) config('module-auth.access_token_ttl_seconds');
+        $payload['refresh_token_ttl_seconds'] = (int) config('module-auth.refresh_token_ttl_seconds');
 
-        return $this->executionContext->runAsControlPlane(
-            fn (): JsonResponse => $this->respond(
-                $this->refreshTokens->refreshToken(TokenRefreshData::fromArray($payload)),
-            ),
-        );
+        return $this->executionContext->runAsControlPlane(function () use ($payload): JsonResponse {
+            $result = $this->refreshTokens->refreshToken(TokenRefreshData::fromArray($payload));
+            $response = $this->respondWithRefreshCookie($result);
+
+            return $result->isFailure()
+                ? $this->refreshTokenCookie->forget($response)
+                : $response;
+        });
     }
 
     public function me(): JsonResponse
@@ -89,12 +107,35 @@ final class PlatformAuthController extends Controller
 
     public function logout(): JsonResponse
     {
-        $token = request()->bearerToken();
+        $request = request();
+        $token = $request->bearerToken();
         if (is_string($token) && $token !== '') {
             $this->tokens->revokeAccessToken($token);
         }
 
-        return response()->json(['success' => true]);
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken !== null) {
+            $this->tokens->revokeRefreshToken($refreshToken);
+        }
+
+        return $this->refreshTokenCookie->forget(response()->json(['success' => true]));
+    }
+
+    private function respondWithRefreshCookie(Result $result): JsonResponse
+    {
+        if ($result->isFailure()) {
+            return $this->respond($result);
+        }
+
+        $payload = $result->valueOrFail();
+        $response = response()->json(
+            (new AuthPayloadResource($payload))->resolve(request()),
+        );
+        $refreshToken = $this->refreshTokenCookie->extract($payload);
+
+        return $refreshToken === null
+            ? $response
+            : $this->refreshTokenCookie->attach($response, $refreshToken);
     }
 
     private function respond(Result $result): JsonResponse

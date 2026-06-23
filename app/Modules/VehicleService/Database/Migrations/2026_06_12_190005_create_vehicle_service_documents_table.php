@@ -16,7 +16,12 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_service_job_id');
             $table->string('document_type', 30);
-            $table->string('file_path')->nullable();
+            $table->string('storage_disk', 50);
+            $table->string('storage_path');
+            $table->string('original_filename');
+            $table->string('mime_type', 255);
+            $table->unsignedBigInteger('size_bytes');
+            $table->char('checksum_sha256', 64);
             $table->text('description')->nullable();
             $table->unsignedBigInteger('uploaded_by')->nullable();
             $table->timestamps();

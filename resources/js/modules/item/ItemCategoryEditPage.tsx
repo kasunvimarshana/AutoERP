@@ -15,7 +15,7 @@ import { ItemCategoryForm } from './components/ItemCategoryForm';
 export default function ItemCategoryEditPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
-    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageCategories);
+    const canManage = hasItemPermission(auth, itemPermissions.manageCategories);
     const navigate = useNavigate();
     const category = useApi((signal) => getItemCategory(id, signal), [id], Number.isFinite(id));
     const [submitting, setSubmitting] = useState(false);

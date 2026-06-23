@@ -12,10 +12,10 @@ const focusableSelector = [
 export function useDialogAccessibility(
     open: boolean,
     containerRef: RefObject<HTMLElement | null>,
-    onClose: () => void,
+    onRequestClose: () => void,
 ) {
-    const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
+    const onRequestCloseRef = useRef(onRequestClose);
+    onRequestCloseRef.current = onRequestClose;
 
     useEffect(() => {
         if (!open) return;
@@ -38,7 +38,7 @@ export function useDialogAccessibility(
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                onCloseRef.current();
+                onRequestCloseRef.current();
                 return;
             }
             if (event.key !== 'Tab') return;

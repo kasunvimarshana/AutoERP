@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { TabPanel, Tabs, type TabItem } from '@/shared/components/Tabs';
 import { TenantDocumentsPanel } from './components/TenantDocumentsPanel';
@@ -13,9 +14,9 @@ export default function TenantWorkspacePage() {
     const auth = useAuth();
     const availableTabs = useMemo<TabItem<TenantTab>[]>(() => {
         const tabs: TabItem<TenantTab>[] = [];
-        if (auth.permissions.includes(tenantPermissions.profileView)) tabs.push({ id: 'profile', label: 'Profile' });
-        if (auth.permissions.includes(tenantPermissions.domainsView)) tabs.push({ id: 'domains', label: 'Verified domains' });
-        if (auth.permissions.includes(tenantPermissions.documentsView)) tabs.push({ id: 'documents', label: 'Private documents' });
+        if (hasPermission(auth, tenantPermissions.profileView)) tabs.push({ id: 'profile', label: 'Profile' });
+        if (hasPermission(auth, tenantPermissions.domainsView)) tabs.push({ id: 'domains', label: 'Verified domains' });
+        if (hasPermission(auth, tenantPermissions.documentsView)) tabs.push({ id: 'documents', label: 'Private documents' });
         return tabs;
     }, [auth.permissions]);
     const [selectedTab, setSelectedTab] = useState<TenantTab>('profile');
@@ -31,15 +32,15 @@ export default function TenantWorkspacePage() {
                 <Tabs id="tenant-workspace" tabs={availableTabs} active={activeTab} onChange={setSelectedTab} />
                 <TabPanel tabsId="tenant-workspace" tabId="profile" active={activeTab}>
                     <TenantProfilePanel
-                        canManage={auth.permissions.includes(tenantPermissions.profileManage)}
-                        canManageCrossOrg={auth.permissions.includes(tenantPermissions.crossOrgPolicyManage)}
+                        canManage={hasPermission(auth, tenantPermissions.profileManage)}
+                        canManageCrossOrg={hasPermission(auth, tenantPermissions.crossOrgPolicyManage)}
                     />
                 </TabPanel>
                 <TabPanel tabsId="tenant-workspace" tabId="domains" active={activeTab}>
-                    <TenantDomainsPanel canManage={auth.permissions.includes(tenantPermissions.domainsManage)} />
+                    <TenantDomainsPanel canManage={hasPermission(auth, tenantPermissions.domainsManage)} />
                 </TabPanel>
                 <TabPanel tabsId="tenant-workspace" tabId="documents" active={activeTab}>
-                    <TenantDocumentsPanel canManage={auth.permissions.includes(tenantPermissions.documentsManage)} />
+                    <TenantDocumentsPanel canManage={hasPermission(auth, tenantPermissions.documentsManage)} />
                 </TabPanel>
             </div>
         </>

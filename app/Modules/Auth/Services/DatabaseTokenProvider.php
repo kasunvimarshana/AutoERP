@@ -234,6 +234,31 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         return true;
     }
 
+    public function revokeRefreshToken(string $plainRefreshToken, ?int $tenantId = null): bool
+    {
+        [$refreshKey, $refreshSecret] = $this->splitToken($plainRefreshToken);
+        if ($refreshKey === null || $refreshSecret === null) {
+            return false;
+        }
+
+        $record = $this->refreshTokens->findActiveByRefreshKey($refreshKey);
+        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
+            return false;
+        }
+
+        if (! $this->passwordHasher->verify($refreshSecret, (string) $record->get('refresh_hash', ''))) {
+            return false;
+        }
+
+        $this->refreshTokens->update($record->id(), [
+            'status' => 'revoked',
+            'revoked_at' => now(),
+            'row_version' => ((int) $record->get('row_version', 1)) + 1,
+        ]);
+
+        return true;
+    }
+
     public function revokeSessionTokens(int $sessionId, ?int $tenantId = null): void
     {
         $this->accessTokens->revokeBySessionId($sessionId, $tenantId);

@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { useApi } from '@/shared/hooks/useApi';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { JournalForm } from '../components/JournalForm';
@@ -26,6 +27,7 @@ export default function FinanceJournalCreatePage() {
     const [form, setForm] = useState(initial);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const formGuard = useMutationFormGuard(submitting);
 
     if (lookups.loading) return <LoadingState />;
     if (!lookups.data) return <ErrorAlert error={lookups.error} />;
@@ -35,6 +37,7 @@ export default function FinanceJournalCreatePage() {
         setError(null);
         try {
             const journal = await createJournal(form);
+            formGuard.markSaved();
             navigate(`/finance/journals/${journal.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -47,7 +50,7 @@ export default function FinanceJournalCreatePage() {
         <ContentHeader title="New journal entry" description="Create a balanced draft for review and posting." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <JournalForm value={form} onChange={setForm} lookups={lookups.data} error={error} />
+            <JournalForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} lookups={lookups.data} error={error} />
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button type="submit" loading={submitting}>Create draft</Button>

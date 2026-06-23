@@ -24,7 +24,7 @@ export default function LoginPage() {
         document.title = 'Login - AutoERP';
     }, []);
 
-    if (auth.isLoading && auth.token && !auth.user) {
+    if (auth.isLoading && !auth.user) {
         return <LoadingState label="Checking your session..." fullPage />;
     }
 

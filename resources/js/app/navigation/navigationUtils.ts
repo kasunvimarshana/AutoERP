@@ -6,11 +6,9 @@ import type {
     NavigationModuleItem,
     NavigationSection,
 } from './navigationTypes';
-import { protectedAccessRoles } from '@/modules/access/accessPermissions';
+import { meetsAccessRequirement, normalizeAccessValue } from '@/modules/auth/accessControl';
 
-export function normalizeAccessValue(value: string): string {
-    return value.trim().toLowerCase();
-}
+export { normalizeAccessValue } from '@/modules/auth/accessControl';
 
 export function canAccessNavigation(rule: NavigationAccessRule | undefined, context: NavigationAccessContext): boolean {
     if (!rule) return true;
@@ -18,26 +16,20 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     if (rule.requiresPlatformOperator && !context.isPlatformOperator) return false;
     if (rule.requiresOrganizationUnit && !context.organizationUnitId) return false;
 
-    if (rule.modules && context.enabledModules) {
+    if (rule.modules) {
+        if (!context.enabledModulesLoaded || context.enabledModules === null) return false;
         const enabled = new Set(context.enabledModules.map(normalizeModule));
-        if (!rule.modules.every((module) => enabled.has(normalizeModule(module)))) {
-            return false;
-        }
+        if (!rule.modules.every((module) => enabled.has(normalizeModule(module)))) return false;
     }
 
-    const roles = context.roles.map(normalizeAccessValue);
-    if (roles.includes(protectedAccessRoles.superAdmin)) return true;
-
-    const permissions = context.permissions.map(normalizeAccessValue);
-    const exactMatch = rule.permissions?.some((permission) => permissions.includes(normalizeAccessValue(permission)));
-    const roleMatch = rule.roles?.some((role) => roles.includes(normalizeAccessValue(role)));
-    const hasPermissionRule = Boolean(rule.permissions?.length);
-    const hasRoleRule = Boolean(rule.roles?.length);
-
-    if (!hasPermissionRule && !hasRoleRule) return true;
-    if (hasPermissionRule && context.permissionsLoaded === false) return false;
-
-    return Boolean(exactMatch || roleMatch);
+    return meetsAccessRequirement({
+        roles: context.roles,
+        permissions: context.permissions,
+        permissionsLoaded: context.permissionsLoaded,
+    }, {
+        permissions: rule.permissions,
+        roles: rule.roles,
+    });
 }
 
 function normalizeModule(value: string): string {

@@ -27,10 +27,10 @@ export default function UserListPage() {
     const [rowLoading, setRowLoading] = useState<number | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
-    const canCreate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersCreate);
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersUpdate);
-    const canActivate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersActivate);
-    const canDeactivate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersDeactivate);
+    const canCreate = hasAccessPermission(auth, accessPermissions.usersCreate);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.usersUpdate);
+    const canActivate = hasAccessPermission(auth, accessPermissions.usersActivate);
+    const canDeactivate = hasAccessPermission(auth, accessPermissions.usersDeactivate);
 
     const users = useApi((signal) => accessApi.listUsers({
         search: debouncedSearch || undefined,

@@ -5,6 +5,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { listVehicleStatusHistory } from '../vehicleApi';
 import type { VehicleStatusHistory } from '../vehicleTypes';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 
 export function VehicleStatusHistoryTab({ vehicleId }: { vehicleId: number }) {
     const [rows, setRows] = useState<VehicleStatusHistory[]>([]);
@@ -39,7 +40,7 @@ export function VehicleStatusHistoryTab({ vehicleId }: { vehicleId: number }) {
                     { key: 'from', header: 'From', render: (row) => row.old_status ?? '-' },
                     { key: 'to', header: 'To', render: (row) => row.new_status },
                     { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '-' },
-                    { key: 'changed', header: 'Changed', render: (row) => row.changed_at ? new Date(row.changed_at).toLocaleString() : '-' },
+                    { key: 'changed', header: 'Changed', render: (row) => row.changed_at ? formatBusinessDateTime(row.changed_at) : '-' },
                 ]}
             />
         </div>

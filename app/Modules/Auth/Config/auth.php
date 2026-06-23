@@ -17,6 +17,13 @@ return [
     ],
     'access_token_ttl_seconds' => (int) env('AUTH_ACCESS_TOKEN_TTL', 3600),
     'refresh_token_ttl_seconds' => (int) env('AUTH_REFRESH_TOKEN_TTL', 2592000),
+    'web_refresh_cookie' => [
+        'name' => env('AUTH_REFRESH_COOKIE_NAME', 'autoerp_refresh_token'),
+        'path' => env('AUTH_REFRESH_COOKIE_PATH', '/api'),
+        'domain' => env('AUTH_REFRESH_COOKIE_DOMAIN'),
+        'secure' => (bool) env('AUTH_REFRESH_COOKIE_SECURE', env('APP_ENV') === 'production'),
+        'same_site' => env('AUTH_REFRESH_COOKIE_SAME_SITE', 'strict'),
+    ],
     'authorization_code_ttl_seconds' => (int) env('AUTH_AUTHORIZATION_CODE_TTL', 300),
     'verification_ttl_seconds' => (int) env('AUTH_VERIFICATION_TTL', 600),
     'max_login_attempts' => (int) env('AUTH_MAX_LOGIN_ATTEMPTS', 5),

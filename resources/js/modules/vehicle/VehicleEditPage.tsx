@@ -29,7 +29,7 @@ export default function VehicleEditPage() {
     const vehicleId = Number(useParams().id);
     const navigate = useNavigate();
     const auth = useAuth();
-    const canUpdate = hasVehiclePermission(auth.permissions, vehiclePermissions.update);
+    const canUpdate = hasVehiclePermission(auth, vehiclePermissions.update);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [activeTab, setActiveTab] = useState<EditTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);

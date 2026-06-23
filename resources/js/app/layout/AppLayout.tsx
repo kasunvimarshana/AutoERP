@@ -22,9 +22,10 @@ export function AppLayout() {
         organizationUnitId: auth.organizationUnit?.id ?? null,
         roles: auth.roles,
         permissions: auth.permissions,
-        permissionsLoaded: !auth.isLoading && auth.isAuthenticated,
+        permissionsLoaded: auth.permissionsLoaded,
         enabledModules: auth.enabledModules,
-    }), [auth.enabledModules, auth.isAuthenticated, auth.isLoading, auth.isPlatformOperator, auth.organizationUnit?.id, auth.permissions, auth.roles, auth.tenant?.id]);
+        enabledModulesLoaded: auth.enabledModulesLoaded,
+    }), [auth.enabledModules, auth.enabledModulesLoaded, auth.isPlatformOperator, auth.organizationUnit?.id, auth.permissions, auth.permissionsLoaded, auth.roles, auth.tenant?.id]);
     const match = useMemo(
         () => findNavigationMatch(location.pathname, location.search, visibleSections),
         [location.pathname, location.search, visibleSections],

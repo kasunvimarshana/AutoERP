@@ -47,6 +47,8 @@ export function GenericLookupSelect<T extends NamedResource>({
     const inputId = id ?? `${generatedId}-input`;
     const listboxId = `${generatedId}-listbox`;
     const rootRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const listboxRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<AbortController | null>(null);
     const requestSeqRef = useRef(0);
     const inFlightKeyRef = useRef<string | null>(null);
@@ -67,6 +69,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     const [searchError, setSearchError] = useState('');
     const [loadMoreError, setLoadMoreError] = useState('');
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [selectionError, setSelectionError] = useState('');
 
     const searchText = hasUserInput ? inputValue.trim() : '';
     const debouncedSearchText = useDebounce(searchText, debounceMs);
@@ -210,6 +213,18 @@ export function GenericLookupSelect<T extends NamedResource>({
     useEffect(() => () => abortRequest(false), [abortRequest]);
 
     useEffect(() => {
+        const message = required && value === null ? `Select a valid ${label.toLowerCase()} from the list.` : '';
+        inputRef.current?.setCustomValidity(message);
+        if (value !== null) setSelectionError('');
+    }, [label, required, value]);
+
+    useEffect(() => {
+        if (!open || activeIndex < 0) return;
+        const activeOption = listboxRef.current?.querySelector<HTMLElement>(`#${CSS.escape(`${listboxId}-option-${options[activeIndex]?.id ?? ''}`)}`);
+        activeOption?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex, listboxId, open, options]);
+
+    useEffect(() => {
         if (!open || disabled) return;
 
         if (!canLoadCurrentSearch) {
@@ -235,11 +250,12 @@ export function GenericLookupSelect<T extends NamedResource>({
     return (
         <div ref={rootRef} className="relative">
             <Input
+                ref={inputRef}
                 id={inputId}
                 label={label}
                 value={inputValue}
                 placeholder={placeholder}
-                error={error}
+                error={error ?? selectionError}
                 disabled={disabled}
                 required={required}
                 role="combobox"
@@ -252,10 +268,24 @@ export function GenericLookupSelect<T extends NamedResource>({
                 className={disabled ? 'cursor-not-allowed bg-slate-50 text-slate-500' : ''}
                 onFocus={openDropdown}
                 onClick={openDropdown}
+                onBlur={(event) => {
+                    const nextTarget = event.relatedTarget;
+                    if (nextTarget instanceof Node && rootRef.current?.contains(nextTarget)) return;
+                    reconcileUnselectedText();
+                    closeDropdown();
+                }}
+                onInvalid={(event) => {
+                    if (required && value === null) {
+                        event.preventDefault();
+                        setSelectionError(`Select a valid ${label.toLowerCase()} from the list.`);
+                        openDropdown();
+                    }
+                }}
                 onKeyDown={handleKeyDown}
                 onChange={(event) => {
                     setInputValue(event.target.value);
                     setHasUserInput(true);
+                    setSelectionError('');
                     openDropdown();
                     abortRequest();
                     clearResults();
@@ -274,6 +304,7 @@ export function GenericLookupSelect<T extends NamedResource>({
 
             {open && (
                 <div
+                    ref={listboxRef}
                     id={listboxId}
                     role="listbox"
                     aria-label={`${label} options`}
@@ -283,7 +314,19 @@ export function GenericLookupSelect<T extends NamedResource>({
                     {(loading || waitingForDebounce) && options.length === 0 && (
                         <LookupMessage role="status">Searching...</LookupMessage>
                     )}
-                    {searchError && <LookupMessage tone="error">{searchError}</LookupMessage>}
+                    {searchError && (
+                        <div className="px-3 py-2 text-sm text-rose-600">
+                            <p>{searchError}</p>
+                            <button
+                                type="button"
+                                className="mt-1 font-medium text-sky-700 hover:underline"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => loadPage(searchText, 1, 'replace')}
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
                     {!loading && !waitingForDebounce && hasLoaded && options.length === 0 && !searchError && (
                         <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
                     )}
@@ -325,11 +368,15 @@ export function GenericLookupSelect<T extends NamedResource>({
 
     function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
         if (event.key === 'Escape') {
+            setInputValue(selectedLabel);
+            setHasUserInput(false);
+            setSelectionError('');
             closeDropdown();
             return;
         }
 
         if (event.key === 'Tab') {
+            reconcileUnselectedText();
             closeDropdown();
             return;
         }
@@ -368,7 +415,20 @@ export function GenericLookupSelect<T extends NamedResource>({
         if (onChange(option) === false) return;
         setInputValue(formatLabel(option));
         setHasUserInput(false);
+        setSelectionError('');
         closeDropdown();
+    }
+
+    function reconcileUnselectedText() {
+        if (value !== null) {
+            setInputValue(selectedLabel);
+            setHasUserInput(false);
+            return;
+        }
+
+        setInputValue('');
+        setHasUserInput(false);
+        if (required) setSelectionError(`Select a valid ${label.toLowerCase()} from the list.`);
     }
 }
 

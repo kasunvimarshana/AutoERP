@@ -29,13 +29,13 @@ export async function getPlatformTenant(id: number, signal?: AbortSignal): Promi
 }
 
 export async function createPlatformTenant(payload: FormData): Promise<TenantRecord> {
-    const response = await apiClient.post<ApiResource<TenantRecord>>('/api/v1/platform/tenants', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await apiClient.post<ApiResource<TenantRecord>>('/api/v1/platform/tenants', payload);
     return response.data.data;
 }
 
 export async function updatePlatformTenant(id: number, payload: FormData): Promise<TenantRecord> {
-    payload.append('_method', 'PATCH');
-    const response = await apiClient.post<ApiResource<TenantRecord>>(`/api/v1/platform/tenants/${id}`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const requestPayload = withMethodOverride(payload, 'PATCH');
+    const response = await apiClient.post<ApiResource<TenantRecord>>(`/api/v1/platform/tenants/${id}`, requestPayload);
     return response.data.data;
 }
 
@@ -50,8 +50,8 @@ export async function getTenantProfile(signal?: AbortSignal): Promise<TenantReco
 }
 
 export async function updateTenantProfile(payload: FormData): Promise<TenantRecord> {
-    payload.append('_method', 'PATCH');
-    const response = await apiClient.post<ApiResource<TenantRecord>>('/api/v1/tenant/profile', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const requestPayload = withMethodOverride(payload, 'PATCH');
+    const response = await apiClient.post<ApiResource<TenantRecord>>('/api/v1/tenant/profile', requestPayload);
     return response.data.data;
 }
 
@@ -90,13 +90,13 @@ export async function listTenantDocuments(signal?: AbortSignal): Promise<TenantD
 }
 
 export async function createTenantDocument(payload: FormData): Promise<TenantDocument> {
-    const response = await apiClient.post<ApiResource<TenantDocument>>('/api/v1/tenant/documents', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await apiClient.post<ApiResource<TenantDocument>>('/api/v1/tenant/documents', payload);
     return response.data.data;
 }
 
 export async function updateTenantDocument(id: number, payload: FormData): Promise<TenantDocument> {
-    payload.append('_method', 'PATCH');
-    const response = await apiClient.post<ApiResource<TenantDocument>>(`/api/v1/tenant/documents/${id}`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const requestPayload = withMethodOverride(payload, 'PATCH');
+    const response = await apiClient.post<ApiResource<TenantDocument>>(`/api/v1/tenant/documents/${id}`, requestPayload);
     return response.data.data;
 }
 
@@ -110,8 +110,10 @@ export async function downloadTenantDocument(document: TenantDocument): Promise<
     const link = window.document.createElement('a');
     link.href = url;
     link.download = document.original_filename;
+    window.document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 export async function listTenantPlans(params: { page?: number; per_page?: number; search?: string; is_active?: boolean }, signal?: AbortSignal): Promise<TenantPlanPage> {
@@ -133,4 +135,11 @@ export async function updateTenantPlan(plan: TenantPlan, payload: Record<string,
 export async function deactivateTenantPlan(plan: TenantPlan): Promise<TenantPlan> {
     const response = await apiClient.patch<ApiResource<TenantPlan>>(`/api/v1/platform/tenant-plans/${plan.id}/deactivate`, { expected_version: plan.row_version });
     return response.data.data;
+}
+
+function withMethodOverride(source: FormData, method: 'PATCH'): FormData {
+    const payload = new FormData();
+    source.forEach((value, key) => payload.append(key, value));
+    payload.set('_method', method);
+    return payload;
 }

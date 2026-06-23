@@ -17,9 +17,10 @@ final class PlatformRefreshTokenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'refresh_token' => ['required', 'string', 'min:10'],
-            'access_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
-            'refresh_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
+            'refresh_token' => ['prohibited'],
+            'scopes' => ['prohibited'],
+            'access_token_ttl_seconds' => ['prohibited'],
+            'refresh_token_ttl_seconds' => ['prohibited'],
         ];
     }
 }

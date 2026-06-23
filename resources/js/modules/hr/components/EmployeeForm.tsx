@@ -23,8 +23,9 @@ import { HrSkillSelect } from './HrSkillSelect';
 type Tab = 'basic' | 'contacts' | 'addresses' | 'documents' | 'skills' | 'certifications' | 'licenses' | 'rates' | 'availability' | 'review';
 const emptyRelations: EmployeeRelationsPayload = { contacts: [], addresses: [], documents: [], skills: [], certifications: [], licenses: [], rates: [] };
 
-export function EmployeeForm({ initial, oneShot = false, submitting, error, onSubmit }: {
+export function EmployeeForm({ initial, oneShot = false, submitting, error, onDirty, onSubmit }: {
     initial?: Employee | null; oneShot?: boolean; submitting?: boolean; error: ApiError | null;
+    onDirty?: () => void;
     onSubmit: (employee: EmployeePayload, relations: EmployeeRelationsPayload) => Promise<void>;
 }) {
     const [tab, setTab] = useState<Tab>('basic');
@@ -43,7 +44,19 @@ export function EmployeeForm({ initial, oneShot = false, submitting, error, onSu
     });
     const [relations, setRelations] = useState<EmployeeRelationsPayload>(emptyRelations);
     const finalPayload = useMemo(() => ({ ...payload, department_id: department?.id ?? null, designation_id: designation?.id ?? null, employment_type_id: employmentType?.id ?? null, reporting_manager_id: manager?.id ?? null }), [department, designation, employmentType, manager, payload]);
-    const input = (key: keyof EmployeePayload) => ({ value: String(payload[key] ?? ''), onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayload({ ...payload, [key]: e.target.value }), error: fieldError(error, key) });
+    const updatePayload = (patch: Partial<EmployeePayload>) => {
+        onDirty?.();
+        setPayload((current) => ({ ...current, ...patch }));
+    };
+    const updateRelations = (patch: Partial<EmployeeRelationsPayload>) => {
+        onDirty?.();
+        setRelations((current) => ({ ...current, ...patch }));
+    };
+    const input = (key: keyof EmployeePayload) => ({
+        value: String(payload[key] ?? ''),
+        onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updatePayload({ [key]: e.target.value } as Partial<EmployeePayload>),
+        error: fieldError(error, key),
+    });
     const disabledRelations = !oneShot;
 
     return <Panel><ErrorAlert error={error} /><Tabs<Tab> active={tab} onChange={setTab} tabs={[
@@ -55,8 +68,8 @@ export function EmployeeForm({ initial, oneShot = false, submitting, error, onSu
             <Input label="Employee Number" {...input('employee_number')} disabled={Boolean(initial)} /><Input label="Code" {...input('code')} /><Input label="Display Name" {...input('display_name')} />
             <Input label="First Name" {...input('first_name')} /><Input label="Middle Name" {...input('middle_name')} /><Input label="Last Name" {...input('last_name')} />
             <Input label="Email" {...input('email')} /><Input label="Phone" {...input('phone')} /><Input label="Mobile" {...input('mobile')} />
-            <HrDepartmentSelect value={department} onChange={setDepartment} error={fieldError(error, 'department_id')} /><HrDesignationSelect value={designation} onChange={setDesignation} error={fieldError(error, 'designation_id')} /><HrEmploymentTypeSelect value={employmentType} onChange={setEmploymentType} error={fieldError(error, 'employment_type_id')} />
-            <EmployeeLookupSelect value={manager} onChange={setManager} excludeId={initial?.id} error={fieldError(error, 'reporting_manager_id')} />
+            <HrDepartmentSelect value={department} onChange={(value) => { onDirty?.(); setDepartment(value); }} error={fieldError(error, 'department_id')} /><HrDesignationSelect value={designation} onChange={(value) => { onDirty?.(); setDesignation(value); }} error={fieldError(error, 'designation_id')} /><HrEmploymentTypeSelect value={employmentType} onChange={(value) => { onDirty?.(); setEmploymentType(value); }} error={fieldError(error, 'employment_type_id')} />
+            <EmployeeLookupSelect value={manager} onChange={(value) => { onDirty?.(); setManager(value); }} excludeId={initial?.id} error={fieldError(error, 'reporting_manager_id')} />
             <Input label="Joined Date" type="date" {...input('joined_date')} /><Input label="Resigned Date" type="date" {...input('resigned_date')} /><Input label="Date of Birth" type="date" {...input('date_of_birth')} />
             <Select label="Gender" options={['male', 'female', 'other', 'not_specified'].map(option)} {...input('gender')} />
             {!initial && <Select label="Status" options={['pending_approval', 'active', 'inactive', 'on_leave', 'suspended'].map(option)} {...input('status')} />}
@@ -64,14 +77,14 @@ export function EmployeeForm({ initial, oneShot = false, submitting, error, onSu
             <Input label="Hourly Rate" {...input('default_hourly_rate')} /><Input label="Daily Rate" {...input('default_daily_rate')} /><Input label="Service Rate" {...input('default_service_rate')} />
             <div className="md:col-span-3"><Textarea label="Notes" {...input('notes')} /></div>
         </div>}
-        {tab === 'contacts' && <ContactBuilder disabled={disabledRelations} rows={relations.contacts} setRows={(contacts) => setRelations({ ...relations, contacts })} />}
-        {tab === 'addresses' && <AddressBuilder disabled={disabledRelations} rows={relations.addresses} setRows={(addresses) => setRelations({ ...relations, addresses })} />}
-        {tab === 'documents' && <DocumentBuilder disabled={disabledRelations} rows={relations.documents} setRows={(documents) => setRelations({ ...relations, documents })} />}
-        {tab === 'skills' && <SkillBuilder disabled={disabledRelations} rows={relations.skills} setRows={(skills) => setRelations({ ...relations, skills })} />}
-        {tab === 'certifications' && <CertificationBuilder disabled={disabledRelations} rows={relations.certifications} setRows={(certifications) => setRelations({ ...relations, certifications })} />}
-        {tab === 'licenses' && <LicenseBuilder disabled={disabledRelations} rows={relations.licenses} setRows={(licenses) => setRelations({ ...relations, licenses })} />}
-        {tab === 'rates' && <RateBuilder disabled={disabledRelations} rows={relations.rates} setRows={(rates) => setRelations({ ...relations, rates })} />}
-        {tab === 'availability' && <AvailabilityBuilder disabled={disabledRelations} value={relations.availability} setValue={(availability) => setRelations({ ...relations, availability })} />}
+        {tab === 'contacts' && <ContactBuilder disabled={disabledRelations} rows={relations.contacts} setRows={(contacts) => updateRelations({ contacts })} />}
+        {tab === 'addresses' && <AddressBuilder disabled={disabledRelations} rows={relations.addresses} setRows={(addresses) => updateRelations({ addresses })} />}
+        {tab === 'documents' && <DocumentBuilder disabled={disabledRelations} rows={relations.documents} setRows={(documents) => updateRelations({ documents })} />}
+        {tab === 'skills' && <SkillBuilder disabled={disabledRelations} rows={relations.skills} setRows={(skills) => updateRelations({ skills })} />}
+        {tab === 'certifications' && <CertificationBuilder disabled={disabledRelations} rows={relations.certifications} setRows={(certifications) => updateRelations({ certifications })} />}
+        {tab === 'licenses' && <LicenseBuilder disabled={disabledRelations} rows={relations.licenses} setRows={(licenses) => updateRelations({ licenses })} />}
+        {tab === 'rates' && <RateBuilder disabled={disabledRelations} rows={relations.rates} setRows={(rates) => updateRelations({ rates })} />}
+        {tab === 'availability' && <AvailabilityBuilder disabled={disabledRelations} value={relations.availability} setValue={(availability) => updateRelations({ availability })} />}
         {tab === 'review' && <div className="border border-slate-200 bg-slate-50 p-4 text-sm"><p className="font-semibold">{finalPayload.display_name || finalPayload.first_name || 'New employee'}</p><p>{department?.name ?? 'No department'} / {designation?.name ?? 'No designation'}</p><p className="mt-2">Relations: {relations.contacts.length} contacts, {relations.addresses.length} addresses, {relations.documents.length} documents, {relations.skills.length} skills, {relations.certifications.length} certifications, {relations.licenses.length} licenses, {relations.rates.length} rates.</p></div>}
         <div className="flex justify-end"><Button loading={submitting} onClick={() => void onSubmit(finalPayload, relations)}>{initial ? 'Save Employee' : 'Create Employee'}</Button></div>
     </div></Panel>;

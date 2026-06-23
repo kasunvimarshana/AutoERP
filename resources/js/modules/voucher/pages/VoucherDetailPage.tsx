@@ -9,6 +9,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
+import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { getVoucher, type VoucherAllocation, type VoucherJournalLine, type VoucherLine } from '../voucherApi';
 import { VoucherStatusStrip } from '../components/VoucherStatusStrip';
 
@@ -52,7 +53,7 @@ export default function VoucherDetailPage() {
                 title={voucher.data.voucher_number ?? humanize(voucher.data.voucher_type)}
                 actions={<>
                     {voucher.data.source_document_url && <Link className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" to={voucher.data.source_document_url}>Source</Link>}
-                    {voucher.data.print_url && <Button variant="secondary" onClick={() => window.open(voucher.data?.print_url ?? '', '_blank', 'noopener')}>Print</Button>}
+                    {voucher.data.print_url && <Button variant="secondary" onClick={() => openSameOriginUrl(voucher.data?.print_url ?? '')}>Print</Button>}
                 </>}
             />
 

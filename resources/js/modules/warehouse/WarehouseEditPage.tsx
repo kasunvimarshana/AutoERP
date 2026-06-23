@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { getWarehouse, updateWarehouse } from './warehouseApi';
@@ -15,14 +16,15 @@ import type { Warehouse, WarehousePayload } from './warehouseTypes';
 export default function WarehouseEditPage() {
     const warehouseId = Number(useParams().id);
     const auth = useAuth();
-    const canUpdate = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesUpdate);
-    const canManageDefault = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesManageDefaults);
+    const canUpdate = hasWarehousePermission(auth, warehousePermissions.warehousesUpdate);
+    const canManageDefault = hasWarehousePermission(auth, warehousePermissions.warehousesManageDefaults);
     const navigate = useNavigate();
     const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
     const [form, setForm] = useState<WarehousePayload | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const formGuard = useMutationFormGuard(saving);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -46,6 +48,7 @@ export default function WarehouseEditPage() {
         try {
             const payload = canManageDefault ? form : omitDefault(form);
             const updated = await updateWarehouse(warehouseId, payload);
+            formGuard.markSaved();
             navigate(`/warehouses/${updated.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -64,7 +67,7 @@ export default function WarehouseEditPage() {
             <ErrorAlert error={error} />
             {canUpdate && (
                 <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-                    <WarehouseForm value={form} onChange={setForm} error={error} canManageDefault={canManageDefault} />
+                    <WarehouseForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} error={error} canManageDefault={canManageDefault} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => navigate(`/warehouses/${warehouseId}`)}>Cancel</Button>
                         <Button type="submit" loading={saving}>Save Warehouse</Button>

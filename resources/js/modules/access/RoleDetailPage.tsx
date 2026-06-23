@@ -22,8 +22,8 @@ export default function RoleDetailPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [deleting, setDeleting] = useState(false);
     const role = useApi((signal) => accessApi.getRole(String(id), signal), [id], Boolean(id));
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesUpdate);
-    const canDelete = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesDelete);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canDelete = hasAccessPermission(auth, accessPermissions.rolesDelete);
 
     const deleteRole = async (record: AccessRole) => {
         if (!window.confirm(`Delete role "${record.name}"?`)) return;

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/modules/auth/AuthProvider";
+import { hasPermission } from "@/modules/auth/accessControl";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DataTable, type DataColumn } from "@/shared/components/DataTable";
@@ -13,7 +14,13 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
 import { formatDate } from "@/shared/utils/formatDate";
+import type { NamedResource } from "@/shared/types/common";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { readableRelation } from "@/shared/utils/object";
+import {
+    RentalInvoiceLookupSelect,
+    RentalPaymentMethodLookupSelect,
+} from "../components/RentalLookups";
 import { RentalPage } from "../components/RentalPage";
 import {
     applyRentalDeposit,
@@ -25,7 +32,6 @@ import {
 import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
 import type { RentalDeposit } from "../vehicleRentalTypes";
 
-const today = new Date().toISOString().slice(0, 10);
 
 export default function RentalDepositPage() {
     const auth = useAuth();
@@ -33,8 +39,8 @@ export default function RentalDepositPage() {
     const [selected, setSelected] = useState<RentalDeposit | null>(null);
     const [action, setAction] = useState("receive");
     const [amount, setAmount] = useState("");
-    const [invoiceId, setInvoiceId] = useState("");
-    const [paymentMethodId, setPaymentMethodId] = useState("");
+    const [invoice, setInvoice] = useState<NamedResource | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<NamedResource | null>(null);
     const [reference, setReference] = useState("");
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -47,7 +53,8 @@ export default function RentalDepositPage() {
             ),
         [status],
     );
-    const canManage = auth.permissions.includes(
+    const canManage = hasPermission(
+        auth,
         vehicleRentalPermissions.depositsManage,
     );
 
@@ -60,30 +67,31 @@ export default function RentalDepositPage() {
             if (action === "receive") {
                 await receiveRentalDeposit(selected.id, {
                     amount,
-                    payment_date: today,
-                    payment_method_id: Number(paymentMethodId),
+                    payment_date: businessDateInputValue(),
+                    payment_method_id: paymentMethod?.id,
                     reference_number: reference || null,
                 });
             } else if (action === "refund") {
                 await refundRentalDeposit(selected.id, {
                     amount,
-                    payment_date: today,
-                    payment_method_id: Number(paymentMethodId),
+                    payment_date: businessDateInputValue(),
+                    payment_method_id: paymentMethod?.id,
                     reference_number: reference || null,
                 });
             } else if (action === "apply") {
                 await applyRentalDeposit(selected.id, {
-                    invoice_id: Number(invoiceId),
+                    invoice_id: invoice?.id,
                     amount,
                 });
             } else {
                 await forfeitRentalDeposit(selected.id, {
-                    invoice_id: Number(invoiceId),
+                    invoice_id: invoice?.id,
                     amount,
                 });
             }
             setAmount("");
-            setInvoiceId("");
+            setInvoice(null);
+            setPaymentMethod(null);
             setReference("");
             setSelected(null);
             result.reload();
@@ -199,7 +207,11 @@ export default function RentalDepositPage() {
                         <Select
                             label="Action"
                             value={action}
-                            onChange={(event) => setAction(event.target.value)}
+                            onChange={(event) => {
+                                setAction(event.target.value);
+                                setInvoice(null);
+                                setPaymentMethod(null);
+                            }}
                             options={[
                                 { value: "receive", label: "Receive deposit" },
                                 { value: "apply", label: "Apply to invoice" },
@@ -220,27 +232,18 @@ export default function RentalDepositPage() {
                             onChange={(event) => setAmount(event.target.value)}
                         />
                         {(action === "apply" || action === "forfeit") && (
-                            <Input
-                                label="Invoice ID"
-                                type="number"
-                                min="1"
+                            <RentalInvoiceLookupSelect
+                                value={invoice}
+                                onChange={setInvoice}
                                 required
-                                value={invoiceId}
-                                onChange={(event) =>
-                                    setInvoiceId(event.target.value)
-                                }
                             />
                         )}
                         {(action === "receive" || action === "refund") && (
-                            <Input
-                                label="Payment method ID"
-                                type="number"
-                                min="1"
+                            <RentalPaymentMethodLookupSelect
+                                value={paymentMethod}
+                                onChange={setPaymentMethod}
+                                direction={action === "refund" ? "outbound" : "inbound"}
                                 required
-                                value={paymentMethodId}
-                                onChange={(event) =>
-                                    setPaymentMethodId(event.target.value)
-                                }
                             />
                         )}
                         {(action === "receive" || action === "refund") && (
@@ -253,7 +256,15 @@ export default function RentalDepositPage() {
                             />
                         )}
                         <div className="flex items-end gap-2">
-                            <Button type="submit" loading={saving}>
+                            <Button
+                                type="submit"
+                                loading={saving}
+                                disabled={
+                                    !amount ||
+                                    ((action === "apply" || action === "forfeit") && !invoice) ||
+                                    ((action === "receive" || action === "refund") && !paymentMethod)
+                                }
+                            >
                                 Save
                             </Button>
                             <Button

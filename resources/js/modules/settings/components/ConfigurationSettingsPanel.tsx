@@ -12,6 +12,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import {
     createConfigurationEntry,
     deleteConfigurationEntry,
@@ -63,7 +64,7 @@ export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit, m
         },
         { key: 'owner', header: 'Owner', render: (row) => row.owner },
         { key: 'value', header: 'Current override', render: (row) => formatValue(row) },
-        { key: 'updated', header: 'Updated', render: (row) => new Date(row.updated_at).toLocaleString() },
+        { key: 'updated', header: 'Updated', render: (row) => formatBusinessDateTime(row.updated_at) },
         {
             key: 'actions',
             header: '',

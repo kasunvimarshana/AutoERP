@@ -20,8 +20,8 @@ const emptyPayload: VehicleDocumentPayload = { document_type: 'registration', do
 
 export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
     const auth = useAuth();
-    const canManage = hasVehiclePermission(auth.permissions, vehiclePermissions.manageDocuments);
-    const canDownload = hasVehiclePermission(auth.permissions, vehiclePermissions.downloadDocuments);
+    const canManage = hasVehiclePermission(auth, vehiclePermissions.manageDocuments);
+    const canDownload = hasVehiclePermission(auth, vehiclePermissions.downloadDocuments);
     const [rows, setRows] = useState<VehicleDocument[]>([]);
     const [form, setForm] = useState<VehicleDocumentPayload>(emptyPayload);
     const [editing, setEditing] = useState<number | null>(null);

@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { JournalForm } from '../components/JournalForm';
 import { getFinanceLookups, getJournal, updateJournal, type FinanceLookups, type JournalPayload } from '../financeApi';
 
@@ -16,6 +17,7 @@ export default function FinanceJournalEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const formGuard = useMutationFormGuard(submitting);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -59,6 +61,7 @@ export default function FinanceJournalEditPage() {
         setError(null);
         try {
             const journal = await updateJournal(journalId, form);
+            formGuard.markSaved();
             navigate(`/finance/journals/${journal.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -71,7 +74,7 @@ export default function FinanceJournalEditPage() {
         <ContentHeader title="Edit journal draft" description="Posted journals are read-only and corrected through reversal." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <JournalForm value={form} onChange={setForm} lookups={lookups} error={error} />
+            <JournalForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} lookups={lookups} error={error} />
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button type="submit" loading={submitting}>Save draft</Button>

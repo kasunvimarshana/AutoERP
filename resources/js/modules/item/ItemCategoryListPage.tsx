@@ -19,7 +19,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 
 export default function ItemCategoryListPage() {
     const auth = useAuth();
-    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageCategories);
+    const canManage = hasItemPermission(auth, itemPermissions.manageCategories);
     const [search, setSearch] = useState('');
     const [active, setActive] = useState('');
     const [page, setPage] = useState(1);

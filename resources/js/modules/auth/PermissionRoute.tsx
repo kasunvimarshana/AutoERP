@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { hasPermission } from './accessControl';
 import { useAuth } from './AuthProvider';
 
 interface PermissionRouteProps {
@@ -12,12 +13,13 @@ export function PermissionRoute({ permission, children }: PermissionRouteProps) 
     const auth = useAuth();
     const location = useLocation();
 
-    if (auth.isLoading) {
+    if (auth.isLoading || !auth.permissionsLoaded) {
         return <LoadingState label="Checking access..." fullPage />;
     }
 
-    if (!auth.permissions.includes(permission)) {
-        return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+    if (!hasPermission(auth, permission)) {
+        const deniedFrom = `${location.pathname}${location.search}${location.hash}`;
+        return <Navigate to="/dashboard" replace state={{ deniedFrom }} />;
     }
 
     return children ?? <Outlet />;

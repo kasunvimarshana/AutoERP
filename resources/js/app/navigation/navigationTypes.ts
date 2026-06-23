@@ -77,8 +77,9 @@ export interface NavigationAccessContext {
     organizationUnitId?: number | string | null;
     roles: string[];
     permissions: string[];
-    permissionsLoaded?: boolean;
+    permissionsLoaded: boolean;
     enabledModules: string[] | null;
+    enabledModulesLoaded: boolean;
 }
 
 export interface NavigationMatch {
