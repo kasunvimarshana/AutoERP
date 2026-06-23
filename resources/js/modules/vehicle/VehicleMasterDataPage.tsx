@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MutableRefObject } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -127,8 +127,9 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
     const [busyId, setBusyId] = useState<number | null>(null);
     const [editing, setEditing] = useState<VehicleMasterRow | null>(null);
     const [formOpen, setFormOpen] = useState(false);
-    const [formDirty, setFormDirty] = useState(false);
     const [formVersion, setFormVersion] = useState(0);
+    const formDirtyRef = useRef(false);
+    const formSubmittingRef = useRef(false);
     const debouncedSearch = useDebounce(search);
 
     useEffect(() => {
@@ -139,7 +140,6 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
         setActionError(null);
         setEditing(null);
         setFormOpen(false);
-        setFormDirty(false);
     }, [kind]);
 
     const result = useApi((signal) => api.list({
@@ -151,27 +151,35 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
     }, signal), [active, debouncedSearch, kind, makeFilter?.id, page, refreshKey], true, true);
 
     const openCreate = () => {
+        formDirtyRef.current = false;
+        formSubmittingRef.current = false;
         setActionError(null);
         setEditing(null);
-        setFormDirty(false);
         setFormVersion((value) => value + 1);
         setFormOpen(true);
     };
 
     const openEdit = (row: VehicleMasterRow) => {
+        formDirtyRef.current = false;
+        formSubmittingRef.current = false;
         setActionError(null);
         setEditing(row);
-        setFormDirty(false);
         setFormVersion((value) => value + 1);
         setFormOpen(true);
     };
 
     const closeForm = useCallback(() => {
-        if (formDirty && !window.confirm('You have unsaved changes. Leave this form and discard them?')) return;
+        formDirtyRef.current = false;
+        formSubmittingRef.current = false;
         setFormOpen(false);
         setEditing(null);
-        setFormDirty(false);
-    }, [formDirty]);
+    }, []);
+
+    const requestFormClose = useCallback(() => {
+        if (formSubmittingRef.current) return;
+        if (formDirtyRef.current && !window.confirm('You have unsaved changes. Leave this form and discard them?')) return;
+        closeForm();
+    }, [closeForm]);
 
     const saveForm = useCallback(async (payload: VehicleMasterPayload) => {
         if (editing) {
@@ -179,7 +187,6 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
         } else {
             await api.create(payload);
         }
-        setFormDirty(false);
         setFormOpen(false);
         setEditing(null);
         setRefreshKey((value) => value + 1);
@@ -255,13 +262,14 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
                 </>
             )}
 
-            <Modal open={formOpen} title={editing ? `Edit ${singularLabel(kind)}` : config.addLabel} onClose={closeForm}>
+            <Modal open={formOpen} title={editing ? `Edit ${singularLabel(kind)}` : config.addLabel} onClose={requestFormClose}>
                 <VehicleMasterForm
                     key={`${kind}-${editing?.id ?? 'new'}-${formVersion}`}
                     kind={kind}
                     initial={editing}
-                    onCancel={closeForm}
-                    onDirtyChange={setFormDirty}
+                    onCancel={requestFormClose}
+                    dirtyRef={formDirtyRef}
+                    submittingRef={formSubmittingRef}
                     onSubmit={saveForm}
                 />
             </Modal>
@@ -315,40 +323,45 @@ function masterColumns(
     return columns;
 }
 
+interface VehicleMasterFormProps {
+    kind: VehicleMasterKind;
+    initial: VehicleMasterRow | null;
+    onCancel: () => void;
+    dirtyRef: MutableRefObject<boolean>;
+    submittingRef: MutableRefObject<boolean>;
+    onSubmit: (payload: VehicleMasterPayload) => Promise<void>;
+}
+
 function VehicleMasterForm({
     kind,
     initial,
     onCancel,
-    onDirtyChange,
+    dirtyRef,
+    submittingRef,
     onSubmit,
-}: {
-    kind: VehicleMasterKind;
-    initial: VehicleMasterRow | null;
-    onCancel: () => void;
-    onDirtyChange: (dirty: boolean) => void;
-    onSubmit: (payload: VehicleMasterPayload) => Promise<void>;
-}) {
+}: VehicleMasterFormProps) {
     const [form, setForm] = useState(() => formFromRow(initial));
     const [make, setMake] = useState<VehicleMake | null>(() => namedToMake(initial?.make));
     const [parent, setParent] = useState<VehicleCategory | null>(() => namedToCategory(initial?.parent));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const snapshot = JSON.stringify({ form, makeId: make?.id ?? null, parentId: parent?.id ?? null });
-    const initialSnapshot = useRef(snapshot);
-    const dirty = snapshot !== initialSnapshot.current;
-    const confirmDiscard = useUnsavedChanges(dirty && !submitting);
+    const [dirty, setDirty] = useState(false);
+    useUnsavedChanges(dirty && !submitting);
 
-    useEffect(() => {
-        onDirtyChange(dirty);
-    }, [dirty, onDirtyChange]);
+    const markDirty = useCallback(() => {
+        dirtyRef.current = true;
+        setDirty(true);
+    }, [dirtyRef]);
 
     const update = (key: keyof MasterFormState, value: string | boolean) => {
+        markDirty();
         setForm((current) => ({ ...current, [key]: value }));
     };
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (submitting) return;
+        submittingRef.current = true;
         setSubmitting(true);
         setError(null);
         try {
@@ -356,22 +369,24 @@ function VehicleMasterForm({
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
+            submittingRef.current = false;
             setSubmitting(false);
         }
     };
 
     return (
-        <form className="space-y-5" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit} onChangeCapture={markDirty}>
             <ErrorAlert error={error} />
             <div className="grid gap-4 md:grid-cols-2">
                 {kind === 'models' && (
                     <GenericLookupSelect<VehicleMake>
                         label="Make *"
                         value={make}
-                        onChange={setMake}
+                        onChange={(value) => { markDirty(); setMake(value); }}
                         search={searchVehicleMakes}
                         formatLabel={formatNamedResource}
                         error={fieldError(error, 'vehicle_make_id')}
+                        required
                         loadOnOpen
                         minSearchLength={0}
                     />
@@ -380,7 +395,7 @@ function VehicleMasterForm({
                     <GenericLookupSelect<VehicleCategory>
                         label="Parent Category"
                         value={parent}
-                        onChange={setParent}
+                        onChange={(value) => { markDirty(); setParent(value); }}
                         search={searchVehicleCategories}
                         formatLabel={formatNamedResource}
                         error={fieldError(error, 'parent_id')}
@@ -452,7 +467,7 @@ function VehicleMasterForm({
                 </div>
             </div>
             <FormActions>
-                <Button type="button" variant="secondary" onClick={() => confirmDiscard() && onCancel()}>Cancel</Button>
+                <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
                 <Button type="submit" loading={submitting}>{initial ? `Save ${singularLabel(kind)}` : `Create ${singularLabel(kind)}`}</Button>
             </FormActions>
         </form>

@@ -71,7 +71,7 @@ const warehouseNavigationPermissions = [
     warehousePermissions.locationsCreate,
 ];
 
-export const navigationSections: NavigationSection[] = [
+export const tenantNavigationSections: NavigationSection[] = [
     {
         id: "primary",
         items: [
@@ -345,7 +345,7 @@ export const navigationSections: NavigationSection[] = [
                 label: "Users",
                 icon: "users",
                 access: {
-                    ...tenantAccess(["user"]),
+                    ...tenantAccess([]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
                 },
@@ -356,7 +356,7 @@ export const navigationSections: NavigationSection[] = [
                         label: "User List",
                         to: "/access/users",
                         access: {
-                            ...tenantAccess(["user"]),
+                            ...tenantAccess([]),
                             permissions: [accessPermissions.usersView],
                         },
                     },
@@ -367,7 +367,7 @@ export const navigationSections: NavigationSection[] = [
                         to: "/access/roles",
                         icon: "role",
                         access: {
-                            ...tenantAccess(["user"]),
+                            ...tenantAccess([]),
                             permissions: [accessPermissions.rolesView],
                         },
                     },
@@ -378,7 +378,7 @@ export const navigationSections: NavigationSection[] = [
                         to: "/access/permissions",
                         icon: "permission",
                         access: {
-                            ...tenantAccess(["user"]),
+                            ...tenantAccess([]),
                             permissions: [accessPermissions.permissionsView],
                         },
                     },
@@ -1018,7 +1018,7 @@ export const navigationSections: NavigationSection[] = [
                 label: "Vouchers",
                 to: "/vouchers",
                 icon: "voucher",
-                access: tenantAccess(["voucher"]),
+                access: tenantAccess([]),
             },
         ],
     },
@@ -1033,7 +1033,7 @@ export const navigationSections: NavigationSection[] = [
                 to: "/administration/access",
                 icon: "users",
                 access: {
-                    ...tenantAccess(["user"]),
+                    ...tenantAccess([]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
                 },
@@ -1046,37 +1046,11 @@ export const navigationSections: NavigationSection[] = [
                 icon: "settings",
                 access: {
                     requiresTenant: true,
-                    permissions: [tenantPermissions.profileView],
-                },
-            },
-            {
-                id: "saas-tenants",
-                type: "link",
-                label: "SaaS Tenants",
-                to: PLATFORM_HOME_PATH,
-                icon: "users",
-                access: {
-                    requiresPlatformOperator: true,
-                },
-            },
-            {
-                id: "tenant-plans",
-                type: "link",
-                label: "Tenant Plans",
-                to: "/administration/tenant-plans",
-                icon: "list",
-                access: {
-                    requiresPlatformOperator: true,
-                },
-            },
-            {
-                id: "platform-configuration",
-                type: "link",
-                label: "Platform Defaults",
-                to: "/administration/platform-configuration",
-                icon: "settings",
-                access: {
-                    requiresPlatformOperator: true,
+                    permissions: [
+                        tenantPermissions.profileView,
+                        tenantPermissions.domainsView,
+                        tenantPermissions.documentsView,
+                    ],
                 },
             },
             {
@@ -1108,9 +1082,43 @@ export const navigationSections: NavigationSection[] = [
                 to: "/settings",
                 icon: "settings",
                 access: {
-                    ...tenantAccess(["configuration"]),
+                    ...tenantAccess([]),
                     permissions: ["configuration.entries.view"],
                 },
+            },
+        ],
+    },
+];
+
+
+export const platformNavigationSections: NavigationSection[] = [
+    {
+        id: "platform",
+        label: "Platform Administration",
+        items: [
+            {
+                id: "saas-tenants",
+                type: "link",
+                label: "SaaS Tenants",
+                to: PLATFORM_HOME_PATH,
+                icon: "users",
+                access: { requiresPlatformOperator: true },
+            },
+            {
+                id: "tenant-plans",
+                type: "link",
+                label: "Tenant Plans",
+                to: "/administration/tenant-plans",
+                icon: "list",
+                access: { requiresPlatformOperator: true },
+            },
+            {
+                id: "platform-configuration",
+                type: "link",
+                label: "Platform Defaults",
+                to: "/administration/platform-configuration",
+                icon: "settings",
+                access: { requiresPlatformOperator: true },
             },
         ],
     },

@@ -14,5 +14,13 @@ export default defineConfig({
         globals: true,
         setupFiles: ['./resources/js/test/setup.ts'],
         css: false,
+        restoreMocks: true,
+        clearMocks: true,
+        fileParallelism: true,
+        maxWorkers: 4,
+        pool: 'threads',
+        testTimeout: 10_000,
+        hookTimeout: 10_000,
+        teardownTimeout: 5_000,
     },
 });

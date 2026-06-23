@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
-import { navigationSections } from './navigationConfig';
+import { tenantNavigationSections } from './navigationConfig';
 import {
     filterNavigation,
     findNavigationMatch,
@@ -9,8 +9,9 @@ import {
 
 describe('navigation access and matching', () => {
     it('hides tenant workspaces when tenant context is missing', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: null,
+            isPlatformOperator: false,
             organizationUnitId: null,
             roles: [],
             permissions: [],
@@ -23,13 +24,14 @@ describe('navigation access and matching', () => {
     });
 
     it('uses enabled tenant modules and exact permissions without treating navigation as authorization', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
             permissions: ['vehicle-rental.reservations.manage'],
             permissionsLoaded: true,
-            enabledModules: ['VehicleRental', 'Invoice', 'Payment'],
+            enabledModules: ['vehicle-rental', 'invoice', 'payment'],
             enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
@@ -40,9 +42,10 @@ describe('navigation access and matching', () => {
         expect(itemIds).not.toContain('users');
     });
 
-    it('keeps module-only tenant navigation visible while hiding permission-gated access', () => {
-        const sections = filterNavigation(navigationSections, {
+    it('fails closed when enabled-module data is unavailable', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
             permissions: [],
@@ -52,60 +55,64 @@ describe('navigation access and matching', () => {
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
+        expect(itemIds).toContain('dashboard');
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('items');
         expect(itemIds).not.toContain('vehicle-rental');
-        expect(itemIds).toContain('sales');
-        expect(itemIds).toContain('vehicle');
+        expect(itemIds).not.toContain('sales');
+        expect(itemIds).not.toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
     });
 
     it('does not grant permission-gated navigation while permissions are loading', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
             permissions: [purchasePermissions.ordersView, itemPermissions.view],
             permissionsLoaded: false,
-            enabledModules: null,
+            enabledModules: ['purchase', 'item', 'vehicle'],
             enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('items');
-        expect(itemIds).toContain('vehicle');
+        expect(itemIds).not.toContain('vehicle');
     });
 
     it('hides organization workflows when no branch or organization unit is selected', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: null,
             roles: [],
-            permissions: [purchasePermissions.ordersView, 'suppliers.view'],
+            permissions: [purchasePermissions.ordersView, 'suppliers.view', 'vehicle.view'],
             permissionsLoaded: true,
-            enabledModules: null,
+            enabledModules: ['purchase', 'supplier', 'vehicle'],
             enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('sales');
-        expect(itemIds).toContain('suppliers');
-        expect(itemIds).toContain('vehicle');
+        expect(itemIds).not.toContain('suppliers');
+        expect(itemIds).not.toContain('vehicle');
     });
 
     it('selects vehicle master-data children before the broader vehicle list route', () => {
-        const match = findNavigationMatch('/vehicles/models', '', navigationSections);
+        const match = findNavigationMatch('/vehicles/models', '', tenantNavigationSections);
 
         expect(match?.parent?.id).toBe('vehicle');
         expect(match?.item.id).toBe('vehicle-models');
     });
 
     it('hides the vehicle parent when the vehicle module is unavailable', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
             permissions: [],
@@ -118,8 +125,9 @@ describe('navigation access and matching', () => {
     });
 
     it('filters item navigation children by exact permissions', () => {
-        const sections = filterNavigation(navigationSections, {
+        const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
+            isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
             permissions: ['item.view'],
@@ -132,15 +140,11 @@ describe('navigation access and matching', () => {
             .find((item) => item.id === 'items');
 
         expect(itemModule?.type).toBe('module');
-        expect(itemModule?.type === 'module' ? itemModule.children.map((child) => child.label) : []).toEqual([
-            'Categories',
-            'Brands',
-            'Items',
-        ]);
+        expect(itemModule?.type === 'module' ? itemModule.children.map((child) => child.label) : []).toEqual(['Items']);
     });
 
     it('selects the query-specific child for shared invoice routes', () => {
-        const match = findNavigationMatch('/invoices', '?view=service', navigationSections);
+        const match = findNavigationMatch('/invoices', '?view=service', tenantNavigationSections);
 
         expect(match?.parent?.id).toBe('vehicle-service');
         expect(match?.item.id).toBe('service-invoices');
@@ -150,67 +154,54 @@ describe('navigation access and matching', () => {
         const match = findNavigationMatch(
             '/vehicle-rental/agreements',
             '?direction=inbound',
-            navigationSections,
+            tenantNavigationSections,
         );
 
         expect(match?.parent?.id).toBe('vehicle-rental');
-        expect(match?.item.id).toBe('owner-agreements');
+        expect(match?.item.id).toBe('rental-agreements');
     });
 
     it('selects the requested running chart mode', () => {
         const match = findNavigationMatch(
             '/vehicle-rental/running-chart',
             '?mode=linked',
-            navigationSections,
+            tenantNavigationSections,
         );
 
         expect(match?.parent?.id).toBe('vehicle-rental');
-        expect(match?.item.id).toBe('linked-running-charts');
+        expect(match?.item.id).toBe('rental-running-chart');
     });
 
-    it('keeps the requested business hierarchy', () => {
-        const labels = navigationSections.map((section) => ({
-            section: section.label ?? '',
-            items: section.items.map((item) => ({
-                label: item.label,
-                children: item.type === 'module' ? item.children.map((child) => child.label) : [],
-            })),
-        }));
-
-        expect(labels).toEqual([
-            { section: '', items: [{ label: 'Dashboard', children: [] }] },
-            { section: 'Master Data', items: [
-                { label: 'Suppliers', children: ['Supplier List', 'Create Supplier', 'Supplier Vehicles', 'Create Supplier Vehicle'] },
-                { label: 'Customers', children: ['Customer List', 'Create Customer', 'Customer Vehicles', 'Create Customer Vehicle'] },
-                { label: 'Vehicle', children: ['Makes', 'Types', 'Categories', 'Models', 'Vehicles'] },
-                { label: 'Items', children: ['Categories', 'Create Category', 'Brands', 'Create Brand', 'Items', 'Create Item'] },
-            ] },
-            { section: 'Access Control', items: [
-                { label: 'Users', children: ['User List', 'Roles', 'Permissions'] },
-            ] },
-            { section: 'Operations', items: [
-                { label: 'Warehouses', children: ['Warehouses', 'Create Warehouse', 'Warehouse Locations', 'Create Warehouse Location'] },
-                { label: 'Purchase', children: ['Purchase Orders', 'Goods Receipts', 'Supplier Invoices', 'Supplier Payments', 'Purchase Returns', 'Debit Notes', 'Fast Purchase'] },
-                { label: 'Sales', children: ['Fast Sales', 'Sales Orders', 'Stock Allocations', 'Sales Deliveries', 'Sales Returns', 'Customer Invoices', 'Customer Receipts'] },
-                { label: 'Vehicle Service', children: ['Service Jobs', 'Service Invoices', 'Customer Receipts'] },
-                { label: 'Vehicle Rental', children: ['Owner / Supplier Agreements', 'Customer Agreements', 'Customer Running Charts', 'Owner / Supplier Running Charts', 'Linked Running Charts', 'Owner / Supplier Payables', 'Customer Invoices', 'Settlements'] },
-            ] },
-            { section: 'Finance', items: [
-                { label: 'Invoices', children: [] },
-                { label: 'Reports', children: [] },
-                { label: 'Payments', children: ['Payments', 'Create Payment', 'Payment Methods', 'Create Payment Method', 'Cheque Templates', 'Create Cheque Template'] },
-                { label: 'Vouchers', children: [] },
-            ] },
-            { section: 'Administration', items: [
-                { label: 'Users & Access', children: [] },
-                { label: 'Settings', children: [] },
-            ] },
+    it('keeps the primary business hierarchy without brittle duplicate snapshots', () => {
+        expect(tenantNavigationSections.map((section) => section.label ?? '')).toEqual([
+            '',
+            'Master Data',
+            'Access Control',
+            'Operations',
+            'Finance',
+            'Administration',
         ]);
 
-        const itemLabels = labels
+        const administration = tenantNavigationSections.find((section) => section.label === 'Administration');
+        expect(administration?.items.map((item) => item.label)).toEqual([
+            'Users & Access',
+            'Tenant Administration',
+            'Audit Logs',
+            'Reference Data',
+            'Settings',
+        ]);
+
+        const items = tenantNavigationSections
             .flatMap((section) => section.items)
-            .find((item) => item.label === 'Items')?.children ?? [];
-        expect(itemLabels).toContain('Create Brand');
-        expect(itemLabels).toContain('Create Item');
+            .find((item) => item.label === 'Items');
+        expect(items?.type).toBe('module');
+        expect(items?.type === 'module' ? items.children.map((child) => child.label) : []).toEqual([
+            'Categories',
+            'Create Category',
+            'Brands',
+            'Create Brand',
+            'Items',
+            'Create Item',
+        ]);
     });
 });

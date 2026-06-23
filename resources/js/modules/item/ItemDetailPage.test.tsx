@@ -1,27 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ItemDetailPage from './ItemDetailPage';
 import { itemPermissions } from './itemPermissions';
 import type { Item } from './itemTypes';
-
 const apiMocks = vi.hoisted(() => ({
     getItem: vi.fn(),
 }));
-
 const authState = vi.hoisted(() => ({
     permissions: [] as string[],
 }));
-
 vi.mock('./itemApi', () => ({
     getItem: apiMocks.getItem,
 }));
-
 vi.mock('@/modules/auth/AuthProvider', () => ({
-    useAuth: () => ({ permissions: authState.permissions }),
+    useAuth: () => ({ roles: [], permissions: authState.permissions, permissionsLoaded: true }),
 }));
-
 vi.mock('./components/ItemUnitTab', () => ({
     default: ({ readOnly }: { readOnly?: boolean }) => (
         <div>
@@ -36,35 +32,28 @@ vi.mock('./components/ItemPriceTab', () => ({ default: ({ readOnly }: { readOnly
 vi.mock('./components/ItemCodeTab', () => ({ default: ({ readOnly }: { readOnly?: boolean }) => <div>{readOnly ? 'Codes read-only' : 'Codes editable'}</div> }));
 vi.mock('./components/ItemUsageRuleTab', () => ({ default: ({ readOnly }: { readOnly?: boolean }) => <div>{readOnly ? 'Usage read-only' : 'Usage editable'}</div> }));
 vi.mock('./components/BaseUomRevisionHistoryTab', () => ({ default: () => <div>Base UOM revisions</div> }));
-
 describe('Item detail page', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         authState.permissions = [itemPermissions.view];
         apiMocks.getItem.mockResolvedValue(item());
     });
-
     it('renders relation tabs read-only and hides edit without update permission', async () => {
         renderPage(<RoutePage />, ['/items/10?tab=units']);
-
         expect(await screen.findByRole('heading', { name: 'ITM-10 - Brake Pad' })).toBeInTheDocument();
         expect(await screen.findByText('Units read-only')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Add Unit' })).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
     });
-
     it('falls back to Summary for invalid tab links and shows permission-aware Edit navigation', async () => {
         authState.permissions = [itemPermissions.view, itemPermissions.update];
-
         renderPage(<RoutePage />, ['/items/10?tab=not-real']);
-
         expect(await screen.findByRole('heading', { name: 'ITM-10 - Brake Pad' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Summary' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByText('Brake pad set')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/items/10/edit');
     });
 });
-
 function RoutePage() {
     return (
         <Routes>
@@ -72,15 +61,13 @@ function RoutePage() {
         </Routes>
     );
 }
-
 function renderPage(page: ReactElement, initialEntries: string[]) {
     return render(
-        <MemoryRouter initialEntries={initialEntries}>
+        <TestRouter initialEntries={initialEntries}>
             {page}
-        </MemoryRouter>,
+        </TestRouter>,
     );
 }
-
 function item(): Item {
     return {
         id: 10,

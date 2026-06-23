@@ -1,3 +1,4 @@
+import type { TenantModuleCode } from '@/app/access/tenantModules';
 import type { PaginationMeta } from '@/shared/types/pagination';
 
 export type TenantStatus = 'draft' | 'active' | 'inactive' | 'suspended' | 'archived';
@@ -28,27 +29,13 @@ export interface TenantRecord {
     trial_ends_at: string | null;
     subscription_ends_at: string | null;
     row_version: number;
-    plan: Pick<TenantPlan, 'id' | 'name' | 'slug' | 'is_active'> | null;
+    plan: TenantPlan | null;
     base_currency: NamedReference | null;
     created_at: string;
     updated_at: string;
 }
 
-export type TenantModuleCode =
-    | 'customer'
-    | 'supplier'
-    | 'item'
-    | 'warehouse'
-    | 'inventory'
-    | 'purchase'
-    | 'sales'
-    | 'vehicle'
-    | 'vehicle-service'
-    | 'vehicle-rental'
-    | 'invoice'
-    | 'payment'
-    | 'finance'
-    | 'reporting';
+export type { TenantModuleCode };
 
 export interface TenantPlanFeatures {
     enabled_modules: TenantModuleCode[];

@@ -3,6 +3,7 @@ import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDa
 import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -15,24 +16,10 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { createTenantPlan, deactivateTenantPlan, listTenantPlans, updateTenantPlan } from './tenantApi';
-import type { TenantModuleCode, TenantPlan, TenantPlanLimits } from './tenantTypes';
+import { TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
+import type { TenantPlan, TenantPlanLimits } from './tenantTypes';
 
-const MODULE_OPTIONS: Array<{ value: TenantModuleCode; label: string }> = [
-    { value: 'customer', label: 'Customers' },
-    { value: 'supplier', label: 'Suppliers' },
-    { value: 'item', label: 'Items' },
-    { value: 'warehouse', label: 'Warehouses' },
-    { value: 'inventory', label: 'Inventory' },
-    { value: 'purchase', label: 'Purchasing' },
-    { value: 'sales', label: 'Sales' },
-    { value: 'vehicle', label: 'Vehicles' },
-    { value: 'vehicle-service', label: 'Vehicle service' },
-    { value: 'vehicle-rental', label: 'Vehicle rental' },
-    { value: 'invoice', label: 'Invoicing' },
-    { value: 'payment', label: 'Payments' },
-    { value: 'finance', label: 'Finance' },
-    { value: 'reporting', label: 'Reporting' },
-];
+const MODULE_OPTIONS = TENANT_MODULES;
 
 const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: string }> = [
     { key: 'max_users', label: 'Maximum users', hint: 'Leave empty for no plan limit.' },
@@ -67,6 +54,7 @@ export default function TenantPlansPage() {
     const [active, setActive] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [deactivateTarget, setDeactivateTarget] = useState<TenantPlan | null>(null);
 
     useEffect(() => {
         setName(editing?.name ?? '');
@@ -117,7 +105,10 @@ export default function TenantPlansPage() {
         }
     }
 
-    async function deactivate(plan: TenantPlan) {
+    async function deactivate() {
+        const plan = deactivateTarget;
+        if (!plan) return;
+        setDeactivateTarget(null);
         setSaving(true);
         setError(null);
         try {
@@ -192,11 +183,11 @@ export default function TenantPlansPage() {
                             <p className="mt-1 text-sm text-slate-500">Only selected business modules are accessible to tenants assigned to this plan.</p>
                             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                 {MODULE_OPTIONS.map((module) => (
-                                    <label key={module.value} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                                    <label key={module.code} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
                                         <input
                                             type="checkbox"
-                                            checked={enabledModules.includes(module.value)}
-                                            onChange={() => toggleModule(module.value)}
+                                            checked={enabledModules.includes(module.code)}
+                                            onChange={() => toggleModule(module.code)}
                                         />
                                         {module.label}
                                     </label>
@@ -248,8 +239,8 @@ export default function TenantPlansPage() {
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button variant="secondary" onClick={() => setEditing(plan)}>Edit</Button>
-                                        {plan.is_active && <Button variant="danger" loading={saving} onClick={() => void deactivate(plan)}>Deactivate</Button>}
+                                        <Button variant="secondary" disabled={saving} onClick={() => setEditing(plan)}>Edit</Button>
+                                        {plan.is_active && <Button variant="danger" disabled={saving} onClick={() => setDeactivateTarget(plan)}>Deactivate</Button>}
                                     </div>
                                 </div>
                             ))}
@@ -258,6 +249,19 @@ export default function TenantPlansPage() {
                     <Pagination meta={plans.data?.meta} onPageChange={setPage} />
                 </Panel>
             </div>
+            <ConfirmDialog
+                open={deactivateTarget !== null}
+                title="Deactivate tenant plan"
+                message={deactivateTarget ? (
+                    <p>
+                        Deactivate <strong>{deactivateTarget.name}</strong>? It will no longer be available for new tenant assignments. Existing tenant impact must be reviewed before continuing.
+                    </p>
+                ) : null}
+                confirmLabel="Deactivate plan"
+                loading={saving}
+                onCancel={() => setDeactivateTarget(null)}
+                onConfirm={() => void deactivate()}
+            />
         </>
     );
 }

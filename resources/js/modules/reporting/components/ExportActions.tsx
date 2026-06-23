@@ -3,7 +3,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError } from '@/shared/api/apiError';
 import { exportReport } from '../reportingApi';
 import { reportingPermissions } from '../reportingPermissions';
 import type { EmployeeCommissionReportParams, OperationalReportParams, ReportFormat, ReportParams, TechnicianWorkReportParams } from '../reportingTypes';

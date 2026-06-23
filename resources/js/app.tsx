@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 import { App } from '@/app/App';
 import { AppProviders } from '@/app/providers/AppProviders';
 import { AppErrorBoundary } from '@/app/errors/AppErrorBoundary';
@@ -15,11 +14,9 @@ if (!root) {
 ReactDOM.createRoot(root).render(
     <React.StrictMode>
         <AppErrorBoundary>
-            <BrowserRouter>
-                <AppProviders>
-                    <App />
-                </AppProviders>
-            </BrowserRouter>
+            <AppProviders>
+                <App />
+            </AppProviders>
         </AppErrorBoundary>
     </React.StrictMode>,
 );

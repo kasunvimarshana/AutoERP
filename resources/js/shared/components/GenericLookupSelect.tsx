@@ -213,15 +213,22 @@ export function GenericLookupSelect<T extends NamedResource>({
     useEffect(() => () => abortRequest(false), [abortRequest]);
 
     useEffect(() => {
-        const message = required && value === null ? `Select a valid ${label.toLowerCase()} from the list.` : '';
+        const message = required && value === null ? requiredSelectionMessage(label) : '';
         inputRef.current?.setCustomValidity(message);
         if (value !== null) setSelectionError('');
     }, [label, required, value]);
 
     useEffect(() => {
         if (!open || activeIndex < 0) return;
-        const activeOption = listboxRef.current?.querySelector<HTMLElement>(`#${CSS.escape(`${listboxId}-option-${options[activeIndex]?.id ?? ''}`)}`);
-        activeOption?.scrollIntoView({ block: 'nearest' });
+        const optionId = `${listboxId}-option-${options[activeIndex]?.id ?? ''}`;
+        const activeOption = document.getElementById(optionId);
+        if (
+            activeOption
+            && listboxRef.current?.contains(activeOption)
+            && typeof activeOption.scrollIntoView === 'function'
+        ) {
+            activeOption.scrollIntoView({ block: 'nearest' });
+        }
     }, [activeIndex, listboxId, open, options]);
 
     useEffect(() => {
@@ -277,7 +284,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 onInvalid={(event) => {
                     if (required && value === null) {
                         event.preventDefault();
-                        setSelectionError(`Select a valid ${label.toLowerCase()} from the list.`);
+                        setSelectionError(requiredSelectionMessage(label));
                         openDropdown();
                     }
                 }}
@@ -428,7 +435,7 @@ export function GenericLookupSelect<T extends NamedResource>({
 
         setInputValue('');
         setHasUserInput(false);
-        if (required) setSelectionError(`Select a valid ${label.toLowerCase()} from the list.`);
+        if (required) setSelectionError(requiredSelectionMessage(label));
     }
 }
 
@@ -488,4 +495,9 @@ function LookupMessage({
             {children}
         </div>
     );
+}
+
+function requiredSelectionMessage(label: string): string {
+    const normalizedLabel = label.replace(/\s*\*+\s*$/, '').trim().toLowerCase();
+    return `Select a valid ${normalizedLabel} from the list.`;
 }

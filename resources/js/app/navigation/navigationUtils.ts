@@ -6,7 +6,9 @@ import type {
     NavigationModuleItem,
     NavigationSection,
 } from './navigationTypes';
-import { meetsAccessRequirement, normalizeAccessValue } from '@/modules/auth/accessControl';
+import { meetsAccessRequirement } from '@/modules/auth/accessControl';
+import { parseEnabledTenantModules } from '@/app/access/tenantModules';
+import { resolveTenantRouteEntitlement } from '@/app/access/routeEntitlements';
 
 export { normalizeAccessValue } from '@/modules/auth/accessControl';
 
@@ -16,10 +18,10 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     if (rule.requiresPlatformOperator && !context.isPlatformOperator) return false;
     if (rule.requiresOrganizationUnit && !context.organizationUnitId) return false;
 
-    if (rule.modules) {
-        if (!context.enabledModulesLoaded || context.enabledModules === null) return false;
-        const enabled = new Set(context.enabledModules.map(normalizeModule));
-        if (!rule.modules.every((module) => enabled.has(normalizeModule(module)))) return false;
+    if (rule.modules && rule.modules.length > 0) {
+        if (!context.enabledModulesLoaded) return false;
+        const enabled = parseEnabledTenantModules(context.enabledModules);
+        if (enabled === null || !rule.modules.every((module) => enabled.has(module))) return false;
     }
 
     return meetsAccessRequirement({
@@ -32,9 +34,6 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     });
 }
 
-function normalizeModule(value: string): string {
-    return normalizeAccessValue(value).replace(/[^a-z0-9]/g, '');
-}
 
 export function filterNavigation(
     sections: NavigationSection[],
@@ -45,19 +44,58 @@ export function filterNavigation(
     for (const section of sections) {
         const items: NavigationSection['items'] = [];
         for (const item of section.items) {
-            if (!canAccessNavigation(item.access, context)) continue;
             if (item.type === 'link') {
-                items.push(item);
+                const access = resolveLinkAccess(item);
+                if (access !== null && canAccessNavigation(access, context)) items.push(item);
                 continue;
             }
 
-            const children = item.children.filter((child) => canAccessNavigation(child.access, context));
+            if (!canAccessNavigation(modeAccessOnly(item.access), context)) continue;
+            const children = item.children.filter((child) => {
+                const access = resolveLinkAccess(child);
+                return access !== null && canAccessNavigation(access, context);
+            });
             if (children.length > 0) items.push({ ...item, children });
         }
         if (items.length > 0) visibleSections.push({ ...section, items });
     }
 
     return visibleSections;
+}
+
+function resolveLinkAccess(item: NavigationLinkItem): NavigationAccessRule | null | undefined {
+    const configured = item.access;
+    if (configured?.requiresPlatformOperator) return configured;
+
+    const pathname = stripQuery(item.to);
+    const entitlement = resolveTenantRouteEntitlement(pathname);
+    if (entitlement === null) return null;
+
+    const hasEntitlement = Boolean(
+        entitlement.requiresOrganizationUnit
+        || entitlement.modules?.length
+        || entitlement.permissions?.length
+        || entitlement.roles?.length
+    );
+
+    if (!hasEntitlement) return configured;
+
+    return {
+        requiresTenant: configured?.requiresTenant ?? true,
+        requiresPlatformOperator: configured?.requiresPlatformOperator,
+        requiresOrganizationUnit: entitlement.requiresOrganizationUnit,
+        modules: entitlement.modules,
+        permissions: entitlement.permissions,
+        roles: entitlement.roles,
+    };
+}
+
+function modeAccessOnly(rule: NavigationAccessRule | undefined): NavigationAccessRule | undefined {
+    if (!rule) return undefined;
+    return {
+        requiresTenant: rule.requiresTenant,
+        requiresPlatformOperator: rule.requiresPlatformOperator,
+    };
 }
 
 export function isPathMatch(pathname: string, item: NavigationLinkItem): boolean {

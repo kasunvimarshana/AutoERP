@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VehicleCreatePage from './VehicleCreatePage';
 import VehicleDetailPage from './VehicleDetailPage';
 import VehicleEditPage from './VehicleEditPage';
 import type { Vehicle } from './vehicleTypes';
-
 const apiMocks = vi.hoisted(() => ({
     createVehicle: vi.fn(),
     createVehicleWithRelations: vi.fn(),
@@ -21,7 +21,6 @@ const apiMocks = vi.hoisted(() => ({
     searchVehicleModels: vi.fn(),
     searchVehicleTypes: vi.fn(),
 }));
-
 vi.mock('./vehicleApi', () => ({
     ...apiMocks,
     createVehicleDocument: vi.fn(),
@@ -35,9 +34,10 @@ vi.mock('./vehicleApi', () => ({
     updateVehicleOwnership: vi.fn(),
     deleteVehicleOwnership: vi.fn(),
 }));
-
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
+        roles: [],
+        permissionsLoaded: true,
         permissions: [
             'vehicle.create',
             'vehicle.update',
@@ -45,7 +45,6 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
         ],
     }),
 }));
-
 const vehicle: Vehicle = {
     id: 10,
     vehicle_number: 'VEH-10',
@@ -60,7 +59,6 @@ const vehicle: Vehicle = {
     odometer_reading: '0.000000',
     odometer_unit: 'km',
 };
-
 describe('Vehicle route pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -77,10 +75,8 @@ describe('Vehicle route pages', () => {
         apiMocks.searchVehicleCategories.mockResolvedValue(collection([]));
         apiMocks.updateVehicle.mockResolvedValue(vehicle);
     });
-
     it('renders create as a separate page with only Basic, Documents, and Attributes tabs', async () => {
         renderPage(<VehicleCreatePage />, ['/vehicles/create']);
-
         expect(screen.getByRole('heading', { name: 'Create Vehicle' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Basic' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Documents' })).toBeInTheDocument();
@@ -88,7 +84,6 @@ describe('Vehicle route pages', () => {
         expect(screen.queryByRole('tab', { name: 'Ownership' })).not.toBeInTheDocument();
         expect(screen.queryByRole('tab', { name: 'Review' })).not.toBeInTheDocument();
     });
-
     it('prevents duplicate create submissions', async () => {
         const user = userEvent.setup();
         let resolveCreate: ((value: Vehicle) => void) | undefined;
@@ -96,17 +91,13 @@ describe('Vehicle route pages', () => {
             resolveCreate = resolve;
         }));
         renderPage(<VehicleCreatePage />, ['/vehicles/create']);
-
         await user.click(screen.getByRole('button', { name: 'Create Vehicle' }));
         await user.click(screen.getByRole('button', { name: /Create Vehicle/ }));
-
         expect(apiMocks.createVehicle).toHaveBeenCalledOnce();
         resolveCreate?.(vehicle);
     });
-
     it('renders edit as a separate editable page without ownership or review tabs', async () => {
         renderPage(<RoutePage page={<VehicleEditPage />} path="/vehicles/:id/edit" />, ['/vehicles/10/edit']);
-
         expect(await screen.findByRole('heading', { name: 'Edit Vehicle' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Basic' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Documents' })).toBeInTheDocument();
@@ -115,11 +106,9 @@ describe('Vehicle route pages', () => {
         expect(screen.queryByRole('tab', { name: 'Review' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
     });
-
     it('renders detail read-only and removes quick actions', async () => {
         const user = userEvent.setup();
         renderPage(<RoutePage page={<VehicleDetailPage />} path="/vehicles/:id" />, ['/vehicles/10']);
-
         expect(await screen.findByRole('heading', { name: 'VEH-10' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Summary' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Documents' })).toBeInTheDocument();
@@ -129,7 +118,6 @@ describe('Vehicle route pages', () => {
         expect(screen.queryByText('Create service job')).not.toBeInTheDocument();
         expect(screen.queryByText('Review documents')).not.toBeInTheDocument();
         expect(screen.queryByText('View status history')).not.toBeInTheDocument();
-
         await user.click(screen.getByRole('tab', { name: 'Documents' }));
         expect(await screen.findAllByText('REG-1')).not.toHaveLength(0);
         expect(screen.getAllByRole('button', { name: 'Preview' })).not.toHaveLength(0);
@@ -138,7 +126,6 @@ describe('Vehicle route pages', () => {
         expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     });
 });
-
 function RoutePage({ page, path }: { page: ReactElement; path: string }) {
     return (
         <Routes>
@@ -146,15 +133,13 @@ function RoutePage({ page, path }: { page: ReactElement; path: string }) {
         </Routes>
     );
 }
-
 function renderPage(page: ReactElement, initialEntries: string[]) {
     return render(
-        <MemoryRouter initialEntries={initialEntries}>
+        <TestRouter initialEntries={initialEntries}>
             {page}
-        </MemoryRouter>,
+        </TestRouter>,
     );
 }
-
 function collection<T>(data: T[]) {
     return {
         data,

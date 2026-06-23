@@ -62,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initial = getStoredApiContext();
     const [token, setToken] = useState<string | null>(initial.accessToken);
     const [authMode, setAuthMode] = useState<AuthMode>(initial.authMode);
-    const [sessionId, setSessionId] = useState<number | null>(initial.sessionId);
     const [user, setUser] = useState<AuthUser | null>(null);
     const [tenant, setTenant] = useState<AuthTenant | null>(null);
     const [organizationUnit, setOrganizationUnit] = useState<AuthOrganizationUnit | null>(null);
@@ -80,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authLoadId.current += 1;
         setToken(null);
         setAuthMode('tenant');
-        setSessionId(null);
         setUser(null);
         setTenant(null);
         setOrganizationUnit(null);
@@ -115,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         setToken(session.token);
         setAuthMode(session.authMode);
-        setSessionId(session.sessionId);
         setUser(session.user);
         setTenant(session.tenant);
         setOrganizationUnit(session.organizationUnit);

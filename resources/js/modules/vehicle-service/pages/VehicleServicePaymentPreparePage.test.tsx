@@ -1,18 +1,16 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VehicleServicePaymentPreparePage from './VehicleServicePaymentPreparePage';
-
 const apiMocks = vi.hoisted(() => ({
     createVehicleServicePayment: vi.fn(),
     getVehicleServiceJob: vi.fn(),
     getVehicleServicePaymentOptions: vi.fn(),
     prepareVehicleServicePayment: vi.fn(),
 }));
-
 vi.mock('../vehicleServiceApi', () => apiMocks);
-
 describe('VehicleServicePaymentPreparePage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -43,17 +41,14 @@ describe('VehicleServicePaymentPreparePage', () => {
             allocation_status: 'fully_allocated',
         });
     });
-
     it('requires and submits a configured payment method', async () => {
         const user = userEvent.setup();
         renderPage();
-
         expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
         const selects = screen.getAllByRole('combobox');
         await user.selectOptions(selects[0], '11');
         await user.selectOptions(selects[1], '3');
         await user.click(screen.getByRole('button', { name: 'Receive, post and allocate' }));
-
         await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             invoice_id: 11,
             payment_method_id: 3,
@@ -61,7 +56,6 @@ describe('VehicleServicePaymentPreparePage', () => {
         })));
         expect(await screen.findByText('Payment created')).toBeInTheDocument();
     });
-
     it('supports payment methods that require a reference and bank account', async () => {
         apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
             methods: [{
@@ -76,7 +70,6 @@ describe('VehicleServicePaymentPreparePage', () => {
         });
         const user = userEvent.setup();
         renderPage();
-
         expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
         const selects = screen.getAllByRole('combobox');
         await user.selectOptions(selects[0], '11');
@@ -84,7 +77,6 @@ describe('VehicleServicePaymentPreparePage', () => {
         await user.selectOptions(screen.getByLabelText('Internal bank account'), '7');
         await user.type(screen.getByLabelText('Reference *'), 'TRX-100');
         await user.click(screen.getByRole('button', { name: 'Review payment' }));
-
         await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             payment_method_id: 4,
             internal_bank_account_id: 7,
@@ -93,18 +85,16 @@ describe('VehicleServicePaymentPreparePage', () => {
         expect(await screen.findByText('Payment validation completed successfully')).toBeInTheDocument();
     });
 });
-
 function renderPage() {
     return render(
-        <MemoryRouter initialEntries={['/vehicle-service/jobs/9/payment']}>
+        <TestRouter initialEntries={['/vehicle-service/jobs/9/payment']}>
             <Routes>
                 <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
                 <Route path="/payments/:id" element={<div>Payment created</div>} />
             </Routes>
-        </MemoryRouter>,
+        </TestRouter>,
     );
 }
-
 function job() {
     return {
         id: 9,

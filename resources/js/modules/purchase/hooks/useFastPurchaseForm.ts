@@ -334,7 +334,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
     }, []);
 
     const retryContext = () => {
-        if (context.error) context.retry();
+        if (context.error) context.reload();
         if (supplierContextError) setSupplierContextReload((current) => current + 1);
         if (warehouseLocationsError) setWarehouseLocationsReload((current) => current + 1);
     };

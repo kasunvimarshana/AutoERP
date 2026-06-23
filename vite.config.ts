@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -23,10 +23,5 @@ export default defineConfig({
             ignored: ['**/storage/framework/views/**'],
         },
     },
-    test: {
-        environment: 'jsdom',
-        setupFiles: ['./resources/js/test/setup.ts'],
-        restoreMocks: true,
-        clearMocks: true,
-    },
+
 });

@@ -14,7 +14,13 @@ export const authApi = {
             return data;
         }
 
-        const { auth_mode: _authMode, ...tenantPayload } = payload;
+        const tenantPayload = {
+            login_identifier: payload.login_identifier,
+            password: payload.password,
+            tenant_code: payload.tenant_code,
+            organization_unit_id: payload.organization_unit_id,
+            device_name: payload.device_name,
+        };
         const { data } = await apiClient.post<AuthSession>(`${endpoints.auth}/login`, tenantPayload);
         return data;
     },

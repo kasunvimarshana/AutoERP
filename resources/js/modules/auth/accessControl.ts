@@ -7,8 +7,8 @@ export interface AccessSubject {
 }
 
 export interface AccessRequirement {
-    permissions?: string[];
-    roles?: string[];
+    permissions?: readonly string[];
+    roles?: readonly string[];
 }
 
 export function normalizeAccessValue(value: string): string {
