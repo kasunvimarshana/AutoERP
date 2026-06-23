@@ -62,6 +62,8 @@ MUST design all user interfaces for speed, clarity, and task completion efficien
 
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
+Always fix issues in the layer where the root cause exists. Backend issues must be resolved in the backend, not hidden or worked around in the frontend. Core business logic, validations, rules, calculations, permissions, and data integrity enforcement must be implemented and enforced in the backend as the single source of truth. The frontend should focus on presentation, user interaction, and user experience, and may only duplicate validations for immediate feedback—not as the authoritative enforcement point.
+
 Security first: Do not introduce security risks, expose secrets, bypass validation, or weaken authentication and authorization mechanisms.
 
 Performance awareness: Consider performance implications, but do not sacrifice readability and maintainability for premature optimization.
