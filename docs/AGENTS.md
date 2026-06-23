@@ -60,6 +60,8 @@ Prioritize speed and clarity over information overload. Keep user flows minimal,
 
 MUST design all user interfaces for speed, clarity, and task completion efficiency. Users should be able to finish actions with minimal steps and without cognitive overload. Avoid presenting unnecessary information during primary workflows (such as forms and actions). Only show essential fields and immediate context. Move extra information (history, reports, logs, analytics, advanced options) to separate views, tabs, or expandable sections. Ensure every screen has a clear purpose, a focused flow, and a simple path to completion.
 
+Avoid hardcoded magic values. Use enums for predefined choices, constants for shared fixed values, and configuration or environment variables for configurable settings. Always use descriptive identifiers instead of raw literals to improve readability, maintainability, and consistency.
+
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
 Always fix issues in the layer where the root cause exists. Backend issues must be resolved in the backend, not hidden or worked around in the frontend. Core business logic, validations, rules, calculations, permissions, and data integrity enforcement must be implemented and enforced in the backend as the single source of truth. The frontend should focus on presentation, user interaction, and user experience, and may only duplicate validations for immediate feedback—not as the authoritative enforcement point.
@@ -75,6 +77,8 @@ Explicit error handling: Handle errors explicitly and predictably. Do not silent
 No dead code: Do not introduce unused code, unnecessary abstractions, speculative features, or placeholders for hypothetical future requirements.
 
 Verify before completion: Before considering a task complete, verify that the solution satisfies all requirements and does not introduce regressions.
+
+Do not use hardcoded magic values. Store fixed values in appropriate abstractions such as enums, constants, configuration files, or environment variables based on their purpose. Use enums for predefined option sets, constants for shared immutable values, and configuration sources for environment-specific or frequently changing values. Always reference values through descriptive names rather than embedding raw literals in code.
 
 Respect module ownership and separation of concerns. Fix problems at their source and keep responsibilities within the module that owns them. Do not compensate for bugs, missing functionality, or incomplete implementations in other modules. If logic is found in the wrong module, move it to the appropriate owner rather than expanding the current module's scope. Maintain clear boundaries, readability, and long-term maintainability.
 
