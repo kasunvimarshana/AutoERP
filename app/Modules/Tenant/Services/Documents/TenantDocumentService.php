@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Documents;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use InvalidArgumentException;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -416,7 +417,7 @@ final class TenantDocumentService
     {
         $this->auditRecorder->record(new AuditEventData(
             eventName: $eventName,
-            eventCategory: 'administration',
+            eventCategory: AuditEventCategory::ADMINISTRATION,
             sourceModule: 'tenant',
             subjectType: 'tenant_document',
             subjectId: (string) $record->id(),

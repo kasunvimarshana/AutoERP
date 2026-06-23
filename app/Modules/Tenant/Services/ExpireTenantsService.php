@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -51,7 +52,7 @@ final class ExpireTenantsService
                 $this->audit->recordSystem(new SystemAuditEventData(
                     event: new AuditEventData(
                         eventName: 'tenant.subscription_expired',
-                        eventCategory: 'security',
+                        eventCategory: AuditEventCategory::SECURITY,
                         sourceModule: 'tenant',
                         subjectType: 'tenant',
                         subjectId: (string) $tenantId,

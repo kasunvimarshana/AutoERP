@@ -8,7 +8,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { auditApi } from './auditApi';
-import type { AuditListFilters, AuditLogSummary } from './auditTypes';
+import { AUDIT_EVENT_CATEGORIES, type AuditListFilters, type AuditLogSummary } from './auditTypes';
 
 const emptyFilters: AuditListFilters = { per_page: 25 };
 
@@ -114,6 +114,6 @@ function formatDateTime(value: string): string {
     return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
 }
 
-const categoryOptions = ['authentication', 'authorization', 'configuration', 'data', 'financial', 'inventory', 'workflow', 'system'].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+const categoryOptions = AUDIT_EVENT_CATEGORIES.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 const actorOptions = ['user', 'system', 'integration', 'job'].map((value) => ({ value, label: value }));
 const pageSizeOptions = [25, 50, 100].map((value) => ({ value: String(value), label: String(value) }));

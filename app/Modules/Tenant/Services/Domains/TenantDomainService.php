@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Domains;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use DateTimeImmutable;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -466,7 +467,7 @@ final class TenantDomainService
     ): void {
         $this->audit->record(new AuditEventData(
             eventName: $eventName,
-            eventCategory: 'security',
+            eventCategory: AuditEventCategory::SECURITY,
             sourceModule: 'tenant',
             subjectType: 'tenant_domain',
             subjectId: (string) $record->id(),

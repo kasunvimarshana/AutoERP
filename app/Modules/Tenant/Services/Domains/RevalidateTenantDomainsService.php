@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Domains;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use DateTimeImmutable;
 use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Contracts\AuditRecorderInterface;
@@ -101,7 +102,7 @@ final class RevalidateTenantDomainsService
         $this->audit->recordSystem(new SystemAuditEventData(
             event: new AuditEventData(
                 eventName: 'tenant.domain.revalidation_failed',
-                eventCategory: 'security',
+                eventCategory: AuditEventCategory::SECURITY,
                 sourceModule: 'tenant',
                 subjectType: 'tenant_domain',
                 subjectId: (string) $disabled->id(),

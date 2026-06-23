@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
@@ -56,7 +57,7 @@ final class DeleteTenantPlanService
 
                 $this->audit->recordPlatform(new AuditEventData(
                     eventName: 'tenant.plan.deactivated',
-                    eventCategory: 'administration',
+                    eventCategory: AuditEventCategory::ADMINISTRATION,
                     sourceModule: 'tenant',
                     subjectType: 'tenant_plan',
                     subjectId: (string) $updated->id(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
+use Modules\Audit\Constants\AuditEventCategory;
 use DateTimeImmutable;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -94,7 +95,7 @@ final class TenantLifecycleService
             $tenantId = (int) $updated->id();
             $this->audit->recordPlatform(new AuditEventData(
                 eventName: 'tenant.status_changed',
-                eventCategory: 'security',
+                eventCategory: AuditEventCategory::SECURITY,
                 sourceModule: 'tenant',
                 subjectType: 'tenant',
                 subjectId: (string) $tenantId,
