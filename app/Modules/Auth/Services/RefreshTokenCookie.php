@@ -25,17 +25,17 @@ final class RefreshTokenCookie
 
     public function attach(JsonResponse $response, string $refreshToken): JsonResponse
     {
-        $response->headers->setCookie(Cookie::create(
-            name: $this->name(),
-            value: $refreshToken,
-            expires: now()->addSeconds($this->ttlSeconds()),
-            path: $this->path(),
-            domain: $this->domain(),
-            secure: $this->secure(),
-            httpOnly: true,
-            raw: false,
-            sameSite: $this->sameSite(),
-        ));
+        $cookie = Cookie::create($this->name())
+            ->withValue($refreshToken)
+            ->withExpires(now()->addSeconds($this->ttlSeconds()))
+            ->withPath($this->path())
+            ->withDomain($this->domain())
+            ->withSecure($this->secure())
+            ->withHttpOnly(true)
+            ->withRaw(false)
+            ->withSameSite($this->sameSite());
+
+        $response->headers->setCookie($cookie);
 
         return $response;
     }

@@ -35,9 +35,10 @@ final class AuthFoundationTest extends TestCase
             ->assertJsonPath('user.email', 'admin@example.test')
             ->assertJsonPath('tenant.name', 'Acme ERP')
             ->assertJsonPath('organization_unit.name', 'Head Office')
+            ->assertJsonMissingPath('refresh_token')
+            ->assertPlainCookie($this->refreshCookieName())
             ->assertJsonStructure([
                 'token',
-                'refresh_token',
                 'user' => ['id', 'name', 'email'],
                 'tenant' => ['id', 'name'],
                 'organization_unit' => ['id', 'name'],
@@ -281,16 +282,32 @@ final class AuthFoundationTest extends TestCase
         $login = $this->postJson('/api/v1/platform/auth/login', [
             'email' => 'platform@example.test',
             'password' => 'platform-password',
-        ])->assertOk();
-        $refreshToken = (string) $login->json('refresh_token');
+        ])->assertOk()
+            ->assertJsonMissingPath('refresh_token')
+            ->assertPlainCookie($this->refreshCookieName());
 
-        $this->postJson('/api/v1/platform/auth/refresh', [
-            'refresh_token' => $refreshToken,
-        ])->assertOk();
+        $refreshCookie = $login->getCookie($this->refreshCookieName(), false);
+        $this->assertNotNull($refreshCookie);
+        $refreshToken = (string) $refreshCookie->getValue();
 
-        $this->postJson('/api/v1/platform/auth/refresh', [
-            'refresh_token' => $refreshToken,
-        ])->assertUnauthorized();
+        $refresh = $this->withUnencryptedCookie($this->refreshCookieName(), $refreshToken)
+            ->postJson('/api/v1/platform/auth/refresh')
+            ->assertOk()
+            ->assertJsonMissingPath('refresh_token')
+            ->assertPlainCookie($this->refreshCookieName());
+
+        $rotatedCookie = $refresh->getCookie($this->refreshCookieName(), false);
+        $this->assertNotNull($rotatedCookie);
+        $this->assertNotSame($refreshToken, (string) $rotatedCookie->getValue());
+
+        $this->withUnencryptedCookie($this->refreshCookieName(), $refreshToken)
+            ->postJson('/api/v1/platform/auth/refresh')
+            ->assertUnauthorized();
+    }
+
+    private function refreshCookieName(): string
+    {
+        return (string) config('module-auth.web_refresh_cookie.name', 'autoerp_refresh_token');
     }
 
     private function createPlatformOperator(): int
