@@ -13,11 +13,11 @@ return new class extends Migration
         Schema::create('auth_clients', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->json('metadata')->nullable();
 
-            $table->foreignId('provider_id')->nullable()->constrained('auth_providers', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('provider_id')->nullable();
             $table->string('client_key', 120);
             $table->string('client_name', 180);
             $table->string('client_secret_hash')->nullable();
@@ -34,6 +34,15 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['id', 'tenant_id'], 'auth_clients_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_clients_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['provider_id', 'tenant_id'], 'auth_clients_provider_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_providers')
+                ->restrictOnDelete();
             $table->unique(['tenant_id', 'client_key'], 'auth_clients_key_uk');
             $table->index(['tenant_id', 'provider_id'], 'auth_clients_provider_idx');
         });

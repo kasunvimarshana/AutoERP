@@ -322,7 +322,6 @@ final class ChequePrintTest extends TestCase
         $now = now();
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Cheque',
             'last_name' => 'Administrator',
             'email' => 'cheque-admin-'.Str::lower(Str::random(8)).'@example.test',

@@ -27,6 +27,7 @@ use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Services\UserService;
 use Throwable;
 
@@ -43,6 +44,7 @@ final class AuthWorkflowService
         private readonly ErrorNormalizerInterface $errorNormalizer,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
+        private readonly UserOrganizationUnitRepositoryInterface $userOrganizationUnits,
     ) {}
 
     public function login(LoginData $data): Result
@@ -81,9 +83,18 @@ final class AuthWorkflowService
                     return $this->failure(AuthErrorCode::USER_INACTIVE, 'User account is inactive.');
                 }
 
+                $organizationUnitId = $this->resolveUserOrganizationUnitId(
+                    $data->tenantId,
+                    (int) $user['id'],
+                    $data->organizationUnitId,
+                );
+                if ($organizationUnitId instanceof Result) {
+                    return $organizationUnitId;
+                }
+
                 $session = $this->registry->sessionProvider()->create([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'provider_id' => $providerRecord['id'] ?? null,
                     'identity_id' => $identity['id'] ?? null,
                     'user_id' => $user['id'],
@@ -95,7 +106,7 @@ final class AuthWorkflowService
 
                 $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'provider_id' => $providerRecord['id'] ?? null,
                     'identity_id' => $identity['id'] ?? null,
                     'session_id' => $session['id'] ?? null,
@@ -111,6 +122,7 @@ final class AuthWorkflowService
                     isset($providerRecord['id']) ? (int) $providerRecord['id'] : null,
                     isset($identity['id']) ? (int) $identity['id'] : null,
                     (int) $user['id'],
+                    $organizationUnitId,
                 );
 
                 $this->clearRecentFailures($data);
@@ -120,9 +132,7 @@ final class AuthWorkflowService
                     'identity' => $identity,
                     'user' => $user,
                     'tenant' => $this->tenantSummary($data->tenantId),
-                    'organization_unit' => $this->organizationUnitSummary(
-                        $data->organizationUnitId ?? $this->toNullableInt($user['organization_unit_id'] ?? null),
-                    ),
+                    'organization_unit' => $this->organizationUnitSummary($organizationUnitId),
                     'session' => $session,
                     'tokens' => $tokenPair,
                 ]);
@@ -169,7 +179,8 @@ final class AuthWorkflowService
 
                 $createdUser = $this->userService->create([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_ids' => $data->organizationUnitId === null ? [] : [$data->organizationUnitId],
+                    'default_organization_unit_id' => $data->organizationUnitId,
                     'first_name' => $data->firstName,
                     'last_name' => $data->lastName,
                     'email' => $data->email,
@@ -455,6 +466,53 @@ final class AuthWorkflowService
         return strtolower(trim((string) ($user['status'] ?? ''))) === 'active';
     }
 
+    private function resolveUserOrganizationUnitId(
+        int $tenantId,
+        int $userId,
+        ?int $requestedOrganizationUnitId,
+    ): int|Result|null {
+        if ($requestedOrganizationUnitId !== null) {
+            if (! $this->userOrganizationUnits->existsForTenantUserAndOrganizationUnit(
+                $tenantId,
+                $userId,
+                $requestedOrganizationUnitId,
+            ) || ! $this->isActiveOrganizationUnit($tenantId, $requestedOrganizationUnitId)) {
+                return $this->failure(
+                    AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                    'Organization unit is not available for this user.',
+                );
+            }
+
+            return $requestedOrganizationUnitId;
+        }
+
+        $assignment = $this->userOrganizationUnits->findDefaultForTenantAndUser($tenantId, $userId)
+            ?? $this->userOrganizationUnits->firstActiveForTenantAndUser($tenantId, $userId);
+        if ($assignment === null) {
+            return null;
+        }
+
+        $organizationUnitId = $this->toNullableInt($assignment->get('organization_unit_id'));
+        if ($organizationUnitId === null || ! $this->isActiveOrganizationUnit($tenantId, $organizationUnitId)) {
+            return $this->failure(
+                AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                'The user default organization unit is not active.',
+            );
+        }
+
+        return $organizationUnitId;
+    }
+
+    private function isActiveOrganizationUnit(int $tenantId, int $organizationUnitId): bool
+    {
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+        if ($organizationUnit === null || (int) $organizationUnit->get('tenant_id', 0) !== $tenantId) {
+            return false;
+        }
+
+        return filter_var($organizationUnit->get('is_active', false), FILTER_VALIDATE_BOOL);
+    }
+
     private function tenantSummary(?int $tenantId): ?array
     {
         if ($tenantId === null) {
@@ -529,10 +587,11 @@ final class AuthWorkflowService
         ?int $providerId,
         ?int $identityId,
         ?int $userId,
+        ?int $effectiveOrganizationUnitId = null,
     ): void {
         $this->loginAttempts->create([
             'tenant_id' => $data->tenantId,
-            'organization_unit_id' => $data->organizationUnitId,
+            'organization_unit_id' => $effectiveOrganizationUnitId ?? $data->organizationUnitId,
             'provider_id' => $providerId,
             'identity_id' => $identityId,
             'user_id' => $userId,

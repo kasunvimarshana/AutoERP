@@ -14,7 +14,7 @@ use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserRoleModel;
-use Modules\User\Models\UserTenantModel;
+use Modules\User\Models\UserOrganizationUnitModel;
 use RuntimeException;
 
 final class UserSeeder extends Seeder
@@ -63,7 +63,6 @@ final class UserSeeder extends Seeder
             $user = UserModel::query()->updateOrCreate(
                 ['tenant_id' => $tenant->getKey(), 'email' => $email],
                 [
-                    'organization_unit_id' => $organizationUnit->getKey(),
                     'username' => strtolower(trim((string) env('AUTOERP_ADMIN_USERNAME', 'admin'))),
                     'first_name' => 'System',
                     'last_name' => 'Administrator',
@@ -76,19 +75,25 @@ final class UserSeeder extends Seeder
             );
 
             $user->forceFill([
-                'is_platform_operator' => $this->adminIsPlatformOperator(),
+                'is_platform_operator' => false,
+                'platform_login_email' => null,
             ])->save();
 
-            if (Schema::hasTable('user_tenants')) {
-                UserTenantModel::query()->updateOrCreate(
+            if ($this->shouldSeedPlatformOperator()) {
+                $this->seedPlatformOperator();
+            }
+
+            if (Schema::hasTable('user_organization_units')) {
+                UserOrganizationUnitModel::query()->updateOrCreate(
                     [
                         'tenant_id' => $tenant->getKey(),
                         'organization_unit_id' => $organizationUnit->getKey(),
                         'user_id' => $user->getKey(),
                     ],
                     [
-                        'role_id' => $role->getKey(),
+                        'status' => 'active',
                         'is_default' => true,
+                        'default_marker' => 'default',
                         'row_version' => 1,
                         'metadata' => json_encode(['seed_source' => 'user_module'], JSON_THROW_ON_ERROR),
                     ],
@@ -138,6 +143,55 @@ final class UserSeeder extends Seeder
         }
     }
 
+    private function seedPlatformOperator(): void
+    {
+        $email = $this->platformAdminEmail();
+        $operator = UserModel::query()
+            ->where('platform_login_email', $email)
+            ->firstOrNew();
+
+        $operator->forceFill([
+            'tenant_id' => null,
+            'platform_login_email' => $email,
+            'email' => $email,
+            'username' => null,
+            'first_name' => 'Platform',
+            'last_name' => 'Administrator',
+            'email_verified_at' => now(),
+            'password' => app(PasswordHasherInterface::class)->hash($this->platformAdminPassword()),
+            'status' => 'active',
+            'is_platform_operator' => true,
+            'row_version' => max(1, (int) ($operator->row_version ?? 0)),
+            'metadata' => ['seed_source' => 'user_module', 'account_scope' => 'platform'],
+        ])->save();
+    }
+
+    private function platformAdminEmail(): string
+    {
+        $email = strtolower(trim((string) env('AUTOERP_PLATFORM_ADMIN_EMAIL', '')));
+        if ($email === '' && app()->environment(['local', 'testing', 'development'])) {
+            $email = $this->adminEmail();
+        }
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_EMAIL must be a valid email address.');
+        }
+
+        return $email;
+    }
+
+    private function platformAdminPassword(): string
+    {
+        $password = trim((string) env('AUTOERP_PLATFORM_ADMIN_PASSWORD', ''));
+        if ($password !== '') {
+            return $password;
+        }
+        if (app()->environment(['local', 'testing', 'development'])) {
+            return $this->adminPassword();
+        }
+
+        throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_PASSWORD is required when platform seeding is enabled.');
+    }
+
     private function adminEmail(): string
     {
         $email = strtolower(trim((string) env('AUTOERP_ADMIN_EMAIL', '')));
@@ -153,12 +207,10 @@ final class UserSeeder extends Seeder
     }
 
 
-    private function adminIsPlatformOperator(): bool
+    private function shouldSeedPlatformOperator(): bool
     {
-        $default = app()->environment(['local', 'testing', 'development']);
-
         return filter_var(
-            env('AUTOERP_ADMIN_IS_PLATFORM_OPERATOR', $default),
+            env('AUTOERP_SEED_PLATFORM_OPERATOR', false),
             FILTER_VALIDATE_BOOLEAN,
         );
     }

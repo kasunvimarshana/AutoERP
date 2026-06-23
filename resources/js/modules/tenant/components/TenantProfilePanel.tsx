@@ -11,7 +11,12 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { getTenantProfile, updateTenantProfile } from '../tenantApi';
 
-export function TenantProfilePanel({ canManage }: { canManage: boolean }) {
+type TenantProfilePanelProps = {
+    canManage: boolean;
+    canManageCrossOrg: boolean;
+};
+
+export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfilePanelProps) {
     const profile = useApi((signal) => getTenantProfile(signal), []);
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), []);
     const [name, setName] = useState('');
@@ -39,7 +44,9 @@ export function TenantProfilePanel({ canManage }: { canManage: boolean }) {
             payload.append('expected_version', String(profile.data.row_version));
             payload.append('name', name.trim());
             payload.append('base_currency_id', currencyId);
-            payload.append('cross_org_transactions', crossOrg ? '1' : '0');
+            if (canManageCrossOrg) {
+                payload.append('cross_org_transactions', crossOrg ? '1' : '0');
+            }
             if (logo) payload.append('logo', logo);
             profile.setData(await updateTenantProfile(payload));
         } catch (error: unknown) {
@@ -83,12 +90,12 @@ export function TenantProfilePanel({ canManage }: { canManage: boolean }) {
                         hint="PNG, JPEG, or WebP. Maximum 5 MB."
                     />
                     <label className="flex min-h-10 items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700">
-                        <input type="checkbox" checked={crossOrg} onChange={(event) => setCrossOrg(event.target.checked)} disabled={!canManage} />
+                        <input type="checkbox" checked={crossOrg} onChange={(event) => setCrossOrg(event.target.checked)} disabled={!canManageCrossOrg} />
                         Allow approved transactions across organization units
                     </label>
                 </div>
                 <p className="mt-4 text-xs leading-5 text-slate-500">
-                    Base accounting currency becomes immutable after the tenant is first activated. Document currencies and exchange rates remain controlled by their owning business modules.
+                    Cross-organization transactions require a dedicated policy permission. Base accounting currency becomes immutable after the tenant is first activated. Document currencies and exchange rates remain controlled by their owning business modules.
                 </p>
             </Panel>
             {canManage && <div className="flex justify-end"><Button type="submit" loading={saving}>Save tenant profile</Button></div>}

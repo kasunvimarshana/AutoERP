@@ -7,7 +7,6 @@ namespace Modules\Tenant\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 
 final class TenantModel extends CoreModel
@@ -34,11 +33,6 @@ final class TenantModel extends CoreModel
             'subscription_ends_at' => 'datetime',
             'metadata' => 'array',
         ]);
-    }
-
-    public function organizationUnits(): HasMany
-    {
-        return $this->hasMany(OrganizationUnitModel::class, 'tenant_id');
     }
 
     public function plan(): BelongsTo

@@ -36,7 +36,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
                 $userId,
                 $guardName,
                 $this->guardProvider($guardName),
-                $this->resolveApplicationId($request, $tokenPayload),
+                $this->resolveApplicationId($tokenPayload),
                 $tokenPayload,
             );
         }
@@ -94,22 +94,8 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
     }
 
     /** @param array<string, mixed> $tokenPayload */
-    private function resolveApplicationId(Request $request, array $tokenPayload): ?string
+    private function resolveApplicationId(array $tokenPayload): ?string
     {
-        foreach ($this->configArray('application_input_keys', ['application_id', 'app_id', 'client_id']) as $key) {
-            $value = $request->input($key);
-            if (is_scalar($value) && trim((string) $value) !== '') {
-                return trim((string) $value);
-            }
-        }
-
-        foreach ($this->configArray('application_header_keys', ['X-Application-Id', 'X-App-Id', 'X-Client-Id']) as $key) {
-            $value = $request->headers->get($key);
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
-            }
-        }
-
         foreach (['application_id', 'app_id', 'client_id'] as $key) {
             $value = $tokenPayload[$key] ?? null;
             if (is_scalar($value) && trim((string) $value) !== '') {

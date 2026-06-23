@@ -10,14 +10,17 @@ use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantDomainServiceInterface;
-use Psr\Log\LoggerInterface;
+use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
+use Modules\Tenant\Services\TenantEntitlementService;
+use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
 use RuntimeException;
 use Throwable;
 
@@ -25,13 +28,16 @@ final class TenantDocumentService
 {
     public function __construct(
         private readonly TenantDocumentRepositoryInterface $documents,
-        private readonly TenantDomainServiceInterface $rules,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly TenantValueNormalizerInterface $rules,
+        private readonly TenantEntitlementService $entitlements,
+        private readonly TenantStorageCleanupService $storageCleanup,
         private readonly FileStorageServiceInterface $files,
         private readonly UuidGeneratorInterface $uuid,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $auditRecorder,
+        private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
-        private readonly LoggerInterface $logger,
     ) {}
 
     public function list(int $tenantId): Result
@@ -63,26 +69,36 @@ final class TenantDocumentService
             }
 
             $storedFile = $this->storeUploadedFile($tenantId, $payload);
-            $record = $this->documents->create([
-                'tenant_id' => $tenantId,
-                'name' => $name,
-                'document_type' => $this->rules->normalizeOptionalText(
-                    isset($payload['document_type'])
-                        ? (string) $payload['document_type']
-                        : null,
-                ),
-                ...$storedFile,
-                'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
-                'row_version' => 1,
-                'created_by' => $this->currentUser->currentUserId(),
-                'updated_by' => $this->currentUser->currentUserId(),
-            ]);
 
-            $this->recordAudit('tenant.document.created', $record);
+            /** @var DataRecord $record */
+            $record = $this->transactions->runInTransaction(function () use (
+                $tenantId,
+                $payload,
+                $name,
+                $storedFile,
+            ): DataRecord {
+                $this->lockTenant($tenantId);
+                $this->assertStorageCapacity($tenantId, (int) $storedFile['size_bytes']);
+
+                $record = $this->documents->create([
+                    'tenant_id' => $tenantId,
+                    'name' => $name,
+                    'document_type' => $this->normalizeDocumentType($payload['document_type'] ?? null),
+                    ...$storedFile,
+                    'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
+                    'row_version' => 1,
+                    'created_by' => $this->currentUser->currentUserId(),
+                    'updated_by' => $this->currentUser->currentUserId(),
+                ]);
+
+                $this->recordAudit('tenant.document.created', $record);
+
+                return $record;
+            });
 
             return Result::success($record);
         } catch (Throwable $exception) {
-            $this->removeStoredFile($storedFile);
+            $this->removeStoredFile($tenantId, $storedFile, 'failed create cleanup');
 
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -93,11 +109,8 @@ final class TenantDocumentService
     }
 
     /** @param array<string, mixed> $payload */
-    public function update(
-        int $tenantId,
-        int|string $id,
-        array $payload,
-    ): Result {
+    public function update(int $tenantId, int|string $id, array $payload): Result
+    {
         $replacementFile = null;
 
         try {
@@ -110,10 +123,16 @@ final class TenantDocumentService
             }
 
             $expectedVersion = (int) ($payload['expected_version'] ?? 0);
+            if ($expectedVersion < 1) {
+                return Result::failure(new Error(
+                    TenantErrorCode::VERSION_CONFLICT,
+                    'The current document version is required.',
+                ));
+            }
+
             $name = array_key_exists('name', $payload)
                 ? $this->rules->normalizeName((string) $payload['name'])
                 : (string) $existing->require('name');
-
             $duplicate = $this->documents->findByTenantAndName($tenantId, $name);
             if ($duplicate !== null && (int) $duplicate->id() !== (int) $existing->id()) {
                 return Result::failure(new Error(
@@ -125,11 +144,7 @@ final class TenantDocumentService
             $attributes = [
                 'name' => $name,
                 'document_type' => array_key_exists('document_type', $payload)
-                    ? $this->rules->normalizeOptionalText(
-                        $payload['document_type'] === null
-                            ? null
-                            : (string) $payload['document_type'],
-                    )
+                    ? $this->normalizeDocumentType($payload['document_type'])
                     : $existing->get('document_type'),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->rules->normalizeMetadata($payload['metadata'])
@@ -142,14 +157,41 @@ final class TenantDocumentService
                 $attributes = [...$attributes, ...$replacementFile];
             }
 
-            $updated = $this->documents->updateWithVersion(
-                $id,
+            /** @var DataRecord|null $updated */
+            $updated = $this->transactions->runInTransaction(function () use (
                 $tenantId,
+                $id,
                 $expectedVersion,
+                $existing,
                 $attributes,
-            );
+                $replacementFile,
+            ): ?DataRecord {
+                $this->lockTenant($tenantId);
+                if ($replacementFile !== null) {
+                    $this->assertStorageCapacity(
+                        $tenantId,
+                        (int) $replacementFile['size_bytes'],
+                        (int) $existing->get('size_bytes', 0),
+                    );
+                }
+
+                $updated = $this->documents->updateWithVersion(
+                    $id,
+                    $tenantId,
+                    $expectedVersion,
+                    $attributes,
+                );
+                if ($updated === null) {
+                    return null;
+                }
+
+                $this->recordAudit('tenant.document.updated', $updated);
+
+                return $updated;
+            });
+
             if ($updated === null) {
-                $this->removeStoredFile($replacementFile);
+                $this->removeStoredFile($tenantId, $replacementFile, 'version conflict cleanup');
 
                 return Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
@@ -158,18 +200,17 @@ final class TenantDocumentService
             }
 
             if ($replacementFile !== null) {
-                $this->deleteFileIfPresent(
+                $this->deleteOrQueue(
+                    $tenantId,
                     (string) $existing->require('storage_path'),
                     (string) $existing->require('storage_disk'),
-                    'replacement cleanup',
+                    'document replacement cleanup',
                 );
             }
 
-            $this->recordAudit('tenant.document.updated', $updated);
-
             return Result::success($updated);
         } catch (Throwable $exception) {
-            $this->removeStoredFile($replacementFile);
+            $this->removeStoredFile($tenantId, $replacementFile, 'failed update cleanup');
 
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -179,39 +220,54 @@ final class TenantDocumentService
         }
     }
 
-    public function delete(
-        int $tenantId,
-        int|string $id,
-        int $expectedVersion,
-    ): Result {
-        $record = $this->documents->findByIdForTenant($id, $tenantId);
-        if ($record === null) {
-            return Result::failure(new Error(
-                TenantErrorCode::NOT_FOUND,
-                'Tenant document not found.',
+    public function delete(int $tenantId, int|string $id, int $expectedVersion): Result
+    {
+        try {
+            $record = $this->documents->findByIdForTenant($id, $tenantId);
+            if ($record === null) {
+                return Result::failure(new Error(
+                    TenantErrorCode::NOT_FOUND,
+                    'Tenant document not found.',
+                ));
+            }
+
+            $deleted = $this->transactions->runInTransaction(function () use (
+                $tenantId,
+                $id,
+                $expectedVersion,
+                $record,
+            ): bool {
+                if (! $this->documents->deleteWithVersion($id, $tenantId, $expectedVersion)) {
+                    return false;
+                }
+
+                $this->recordAudit('tenant.document.deleted', $record);
+
+                return true;
+            });
+
+            if (! $deleted) {
+                return Result::failure(new Error(
+                    TenantErrorCode::VERSION_CONFLICT,
+                    'Document changed since it was loaded. Refresh and try again.',
+                ));
+            }
+
+            $this->deleteOrQueue(
+                $tenantId,
+                (string) $record->require('storage_path'),
+                (string) $record->require('storage_disk'),
+                'document deletion cleanup',
+            );
+
+            return Result::success(true);
+        } catch (Throwable $exception) {
+            return Result::failure($this->errors->normalize(
+                $exception,
+                TenantErrorCode::FILE_OPERATION_FAILED,
+                ['operation' => 'tenant.document.delete'],
             ));
         }
-
-        if (! $this->documents->deleteWithVersion($id, $tenantId, $expectedVersion)) {
-            return Result::failure(new Error(
-                TenantErrorCode::VERSION_CONFLICT,
-                'Document changed since it was loaded. Refresh and try again.',
-            ));
-        }
-
-        $cleanupSucceeded = $this->deleteFileIfPresent(
-            (string) $record->require('storage_path'),
-            (string) $record->require('storage_disk'),
-            'deletion cleanup',
-        );
-
-        $this->recordAudit(
-            'tenant.document.deleted',
-            $record,
-            ['storage_cleanup_succeeded' => $cleanupSucceeded],
-        );
-
-        return Result::success(true);
     }
 
     public function download(int $tenantId, int|string $id): Result
@@ -233,10 +289,7 @@ final class TenantDocumentService
                 throw new RuntimeException('Stored document could not be opened.');
             }
 
-            return Result::success([
-                'record' => $record,
-                'stream' => $stream,
-            ]);
+            return Result::success(['record' => $record, 'stream' => $stream]);
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -248,7 +301,7 @@ final class TenantDocumentService
 
     /**
      * @param array<string, mixed> $payload
-     * @return array<string, mixed>
+     * @return array{storage_disk:string,storage_path:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string}
      */
     private function storeUploadedFile(int $tenantId, array $payload): array
     {
@@ -259,9 +312,9 @@ final class TenantDocumentService
             throw new InvalidArgumentException('A valid uploaded file is required.');
         }
 
-        $originalFilename = basename(
+        $originalFilename = mb_substr(basename(
             (string) ($payload['file_original_name'] ?? 'document.bin'),
-        );
+        ), 0, 255);
         $mimeType = mime_content_type($temporaryPath) ?: 'application/octet-stream';
         $allowedMimeTypes = config('tenant.documents.allowed_mime_types', []);
         if (! is_array($allowedMimeTypes) || ! in_array($mimeType, $allowedMimeTypes, true)) {
@@ -269,12 +322,14 @@ final class TenantDocumentService
         }
 
         $size = filesize($temporaryPath);
-        $maxBytes = max(
-            (int) config('tenant.documents.max_size_kb', 10240),
-            1,
-        ) * 1024;
+        $maxBytes = max((int) config('tenant.documents.max_size_kb', 10240), 1) * 1024;
         if ($size === false || $size < 1 || $size > $maxBytes) {
             throw new InvalidArgumentException('Document file size is invalid.');
+        }
+
+        $checksum = hash_file('sha256', $temporaryPath);
+        if (! is_string($checksum) || strlen($checksum) !== 64) {
+            throw new RuntimeException('Document checksum could not be calculated.');
         }
 
         $disk = $this->disk();
@@ -290,13 +345,47 @@ final class TenantDocumentService
             'storage_path' => $storedPath,
             'original_filename' => $originalFilename,
             'mime_type' => $mimeType,
-            'size_bytes' => $size,
-            'checksum_sha256' => hash_file('sha256', $temporaryPath),
+            'size_bytes' => (int) $size,
+            'checksum_sha256' => $checksum,
         ];
     }
 
+    private function lockTenant(int $tenantId): void
+    {
+        if ($this->tenants->lockById($tenantId) === null) {
+            throw new InvalidArgumentException('Tenant not found.');
+        }
+    }
+
+    private function assertStorageCapacity(int $tenantId, int $newSize, int $replacedSize = 0): void
+    {
+        $limitMb = $this->entitlements->limit($tenantId, 'max_storage_mb');
+        if ($limitMb === null) {
+            return;
+        }
+
+        $currentBytes = $this->documents->totalSizeByTenant($tenantId);
+        $projectedBytes = max(0, $currentBytes - max(0, $replacedSize)) + max(0, $newSize);
+        $limitBytes = $limitMb * 1024 * 1024;
+        if ($projectedBytes > $limitBytes) {
+            throw new InvalidArgumentException(sprintf(
+                'Tenant document storage limit of %d MB would be exceeded.',
+                $limitMb,
+            ));
+        }
+    }
+
+    private function normalizeDocumentType(mixed $value): ?string
+    {
+        $normalized = $this->rules->normalizeOptionalText(
+            $value === null ? null : (string) $value,
+        );
+
+        return $normalized === null ? null : mb_substr($normalized, 0, 100);
+    }
+
     /** @param array<string, mixed>|null $file */
-    private function removeStoredFile(?array $file): void
+    private function removeStoredFile(int $tenantId, ?array $file, string $reason): void
     {
         if ($file === null) {
             return;
@@ -305,43 +394,26 @@ final class TenantDocumentService
         $path = (string) ($file['storage_path'] ?? '');
         $disk = (string) ($file['storage_disk'] ?? $this->disk());
         if ($path !== '') {
-            $this->deleteFileIfPresent($path, $disk, 'failed operation cleanup');
+            $this->deleteOrQueue($tenantId, $path, $disk, $reason);
         }
     }
 
-    private function deleteFileIfPresent(
-        string $path,
-        string $disk,
-        string $operation,
-    ): bool {
-        if (! $this->files->exists($path, $disk)) {
-            return true;
+    private function deleteOrQueue(int $tenantId, string $path, string $disk, string $reason): void
+    {
+        if (! $this->files->exists($path, $disk) || $this->files->delete($path, $disk)) {
+            return;
         }
 
-        if ($this->files->delete($path, $disk)) {
-            return true;
-        }
-
-        $this->logger->warning('Tenant document storage cleanup failed.', [
-            'operation' => $operation,
-            'disk' => $disk,
-            'path' => $path,
-        ]);
-
-        return false;
+        $this->storageCleanup->enqueue($tenantId, $disk, $path, $reason);
     }
 
     private function disk(): string
     {
-        return (string) config('tenant.documents.disk', 'local');
+        return (string) config('tenant.documents.disk', 'tenant_private');
     }
 
-    /** @param array<string, mixed> $metadata */
-    private function recordAudit(
-        string $eventName,
-        DataRecord $record,
-        array $metadata = [],
-    ): void {
+    private function recordAudit(string $eventName, DataRecord $record): void
+    {
         $this->auditRecorder->record(new AuditEventData(
             eventName: $eventName,
             eventCategory: 'administration',
@@ -353,7 +425,6 @@ final class TenantDocumentService
                 'document_type' => $record->get('document_type'),
                 'mime_type' => $record->get('mime_type'),
                 'size_bytes' => $record->get('size_bytes'),
-                ...$metadata,
             ],
             tags: ['tenant', 'document'],
         ));

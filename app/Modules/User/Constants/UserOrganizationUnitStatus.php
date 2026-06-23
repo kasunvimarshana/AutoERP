@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Constants;
 
-final class UserTenantStatus
+final class UserOrganizationUnitStatus
 {
     public const ACTIVE = 'active';
     public const INACTIVE = 'inactive';

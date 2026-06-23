@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Contracts;
 
-interface TenantDomainServiceInterface
+interface TenantValueNormalizerInterface
 {
     public function normalizeCode(string $value): string;
     public function normalizeName(string $value): string;

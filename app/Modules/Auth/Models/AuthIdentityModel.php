@@ -6,11 +6,13 @@ namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\CoreModel;
 use Modules\User\Models\UserModel;
 
 final class AuthIdentityModel extends CoreModel
 {
+    use HasImmutableTenantOwnership;
     use SoftDeletes;
 
     protected $table = 'auth_identities';

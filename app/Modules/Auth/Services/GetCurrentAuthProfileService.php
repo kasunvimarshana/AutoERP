@@ -6,11 +6,12 @@ namespace Modules\Auth\Services;
 
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -21,12 +22,13 @@ final class GetCurrentAuthProfileService
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantPlanRepositoryInterface $tenantPlans,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
         private readonly RolePermissionRepositoryInterface $rolePermissions,
         private readonly ConfigurationResolverInterface $configuration,
+        private readonly TenantEntitlementService $entitlements,
+        private readonly PlatformOperatorCheckerInterface $platformOperators,
     ) {}
 
     public function getProfile(
@@ -52,6 +54,21 @@ final class GetCurrentAuthProfileService
             return $this->failure(AuthErrorCode::UNAUTHORIZED_ACCESS, 'Authenticated user is not active.');
         }
 
+        if ($tenantId === null || $tenantId < 1) {
+            return $this->failure(AuthErrorCode::TENANT_RESOLUTION_FAILED, 'Authenticated tenant context is unavailable.');
+        }
+
+        if ((int) $user->get('tenant_id', 0) !== $tenantId || (bool) $user->get('is_platform_operator', false)) {
+            return $this->failure(AuthErrorCode::TENANT_MISMATCH, 'Authenticated user does not belong to this tenant.');
+        }
+
+        if ($organizationUnitId !== null && ! $this->organizationUnitBelongsToTenant($tenantId, $organizationUnitId)) {
+            return $this->failure(
+                AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                'Authenticated organization unit does not belong to this tenant.',
+            );
+        }
+
         $resolvedTenantId = $tenantId;
         $resolvedOrganizationUnitId = $organizationUnitId;
         $roleSummaries = $this->userRoles->listRoleSummariesForTenantUser($resolvedTenantId, $userId);
@@ -72,6 +89,7 @@ final class GetCurrentAuthProfileService
             'guard' => $guard,
             'provider' => $provider,
             'application_id' => $applicationId,
+            'is_platform_operator' => $this->platformOperators->isPlatformOperator($userId),
             'roles' => $roles,
             'permissions' => $permissions,
             'enabled_modules' => $this->enabledModules($resolvedTenantId),
@@ -83,6 +101,7 @@ final class GetCurrentAuthProfileService
                 'last_name' => $this->nullableString($user->get('last_name')),
                 'email' => (string) $user->get('email', ''),
                 'status' => $status,
+                'is_platform_operator' => $this->platformOperators->isPlatformOperator($userId),
                 'roles' => $roles,
                 'permissions' => $permissions,
                 'metadata' => $this->safeMetadata($user->get('metadata')),
@@ -135,7 +154,11 @@ final class GetCurrentAuthProfileService
         }
 
         $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
-        if ($organizationUnit === null) {
+        if (
+            $organizationUnit === null
+            || $tenantId === null
+            || (int) $organizationUnit->get('tenant_id', 0) !== $tenantId
+        ) {
             return ['id' => $organizationUnitId, 'name' => null];
         }
 
@@ -144,6 +167,14 @@ final class GetCurrentAuthProfileService
             'name' => $this->nullableString($organizationUnit->get('name')),
             'timezone' => $tenantId === null ? null : $this->configuredTimezone($tenantId, $organizationUnitId),
         ];
+    }
+
+    private function organizationUnitBelongsToTenant(int $tenantId, int $organizationUnitId): bool
+    {
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+
+        return $organizationUnit !== null
+            && (int) $organizationUnit->get('tenant_id', 0) === $tenantId;
     }
 
     private function configuredTimezone(int $tenantId, ?int $organizationUnitId): string
@@ -155,46 +186,10 @@ final class GetCurrentAuthProfileService
             : (string) config('app.timezone', 'UTC');
     }
 
-    /**
-     * @return list<string>|null
-     */
+    /** @return list<string>|null */
     private function enabledModules(?int $tenantId): ?array
     {
-        if ($tenantId === null) {
-            return null;
-        }
-
-        $tenant = $this->tenants->findById($tenantId);
-        $planId = $tenant?->get('tenant_plan_id');
-        if (! is_numeric($planId) || (int) $planId < 1) {
-            return null;
-        }
-
-        $plan = $this->tenantPlans->findById((int) $planId);
-        $features = $plan?->get('features');
-        if (! is_array($features)) {
-            return null;
-        }
-
-        $configured = $features['enabled_modules'] ?? $features['modules'] ?? null;
-        if (! is_array($configured)) {
-            return null;
-        }
-
-        $modules = [];
-        foreach ($configured as $key => $value) {
-            if (is_int($key) && is_scalar($value)) {
-                $modules[] = strtolower(trim((string) $value));
-
-                continue;
-            }
-
-            if (is_string($key) && filter_var($value, FILTER_VALIDATE_BOOL)) {
-                $modules[] = strtolower(trim($key));
-            }
-        }
-
-        return array_values(array_unique(array_filter($modules)));
+        return $tenantId === null ? null : $this->entitlements->enabledModules($tenantId);
     }
 
     /**

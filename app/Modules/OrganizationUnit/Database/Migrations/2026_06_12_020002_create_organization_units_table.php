@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('type_id')->nullable()->constrained('organization_unit_types', 'id', 'organization_units_type_id_fk')->nullOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('organization_units', 'id', 'organization_units_parent_id_fk')->nullOnDelete();
+            $table->unsignedBigInteger('type_id')->nullable();
+            $table->unsignedBigInteger('parent_id')->nullable();
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('image_path')->nullable();
@@ -32,6 +32,14 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'organization_units_id_tenant_uk');
+            $table->foreign(['type_id', 'tenant_id'], 'organization_units_type_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_unit_types')
+                ->restrictOnDelete();
+            $table->foreign(['parent_id', 'tenant_id'], 'organization_units_parent_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
             $table->unique(['tenant_id', 'name'], 'organization_units_name_uk');
             $table->index(['tenant_id', 'parent_id'], 'organization_units_parent_id_idx');
             $table->index(['tenant_id', 'path'], 'organization_units_path_idx');

@@ -9,6 +9,8 @@ use Modules\Core\DTOs\DataRecord;
 
 interface OrganizationUnitRepositoryInterface extends RepositoryPortInterface
 {
+    public function countByTenant(int $tenantId): int;
+
     /**
      * @return list<DataRecord>
      */

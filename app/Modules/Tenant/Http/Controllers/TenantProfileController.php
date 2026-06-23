@@ -41,6 +41,9 @@ final class TenantProfileController extends Controller
         $this->requirePermission(TenantPermission::PROFILE_MANAGE);
 
         $payload = $request->validated();
+        if (array_key_exists('cross_org_transactions', $payload)) {
+            $this->requirePermission(TenantPermission::CROSS_ORG_POLICY_MANAGE);
+        }
         $file = $request->file('logo');
         unset($payload['logo']);
 

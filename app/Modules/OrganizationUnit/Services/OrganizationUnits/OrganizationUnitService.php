@@ -15,6 +15,7 @@ use Modules\OrganizationUnit\Repositories\OrganizationUnitTypeRepositoryInterfac
 use Modules\OrganizationUnit\Services\Contracts\OrganizationUnitDomainServiceInterface;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Services\TenantEntitlementService;
 use Throwable;
 
 final class OrganizationUnitService
@@ -23,6 +24,7 @@ final class OrganizationUnitService
         private readonly OrganizationUnitRepositoryInterface $units,
         private readonly OrganizationUnitTypeRepositoryInterface $types,
         private readonly TenantRepositoryInterface $tenants,
+        private readonly TenantEntitlementService $entitlements,
         private readonly OrganizationUnitDomainServiceInterface $domain,
         private readonly OrganizationUnitContext $organizationUnitContext,
         private readonly TransactionManagerInterface $transactions,
@@ -70,8 +72,15 @@ final class OrganizationUnitService
                 $tenantId = $this->organizationUnitContext->resolveTenantId(
                     $this->toNullableInt($payload['tenant_id'] ?? null),
                 );
-                if ($this->tenants->findById($tenantId) === null) {
+                if ($this->tenants->lockById($tenantId) === null) {
                     return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_NOT_FOUND, 'Tenant not found.'));
+                }
+                $unitLimit = $this->entitlements->limit($tenantId, 'max_organization_units');
+                if ($unitLimit !== null && $this->units->countByTenant($tenantId) >= $unitLimit) {
+                    return Result::failure(new Error(
+                        OrganizationUnitErrorCode::PLAN_LIMIT_REACHED,
+                        'The tenant plan organization unit limit has been reached.',
+                    ));
                 }
 
                 $name = $this->domain->normalizeName((string) ($payload['name'] ?? ''));

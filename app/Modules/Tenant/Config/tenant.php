@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'platform' => ['middleware_alias' => 'platform.operator'],
+    'entitlements' => ['middleware_alias' => 'tenant.feature'],
     'pagination' => ['default_per_page' => 20, 'max_per_page' => 100],
     'resolution' => [
         'central_hosts' => array_values(array_filter(array_map(
@@ -13,15 +15,16 @@ return [
             'id' => 'X-Tenant-Id',
             'code' => 'X-Tenant-Code',
         ],
-        // Local development must remain usable before a browser has a tenant session.
-        // The resolver still restricts this fallback to local/testing environments.
-        'local_fallback_enabled' => app()->environment(['local', 'testing'])
-            || filter_var(env('TENANT_LOCAL_FALLBACK_ENABLED', false), FILTER_VALIDATE_BOOL),
+        // Disabled by default. Explicit opt-in is still restricted to local/testing by the resolver.
+        'local_fallback_enabled' => filter_var(
+            env('TENANT_LOCAL_FALLBACK_ENABLED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
         'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN'),
         'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
     ],
     'documents' => [
-        'disk' => env('TENANT_DOCUMENT_DISK', env('FILESYSTEM_DISK', 'local')),
+        'disk' => env('TENANT_DOCUMENT_DISK', 'tenant_private'),
         'max_size_kb' => (int) env('TENANT_DOCUMENT_MAX_SIZE_KB', 10240),
         'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
     ],
@@ -29,5 +32,8 @@ return [
         'verification_ttl_minutes' => (int) env('TENANT_DOMAIN_VERIFICATION_TTL_MINUTES', 1440),
         'verification_txt_prefix' => '_autoerp-verification',
         'verification_value_prefix' => 'autoerp-verification=',
+        'revalidation_interval_hours' => (int) env('TENANT_DOMAIN_REVALIDATION_INTERVAL_HOURS', 24),
+        'verification_grace_days' => (int) env('TENANT_DOMAIN_VERIFICATION_GRACE_DAYS', 7),
+        'revalidation_batch_size' => (int) env('TENANT_DOMAIN_REVALIDATION_BATCH_SIZE', 100),
     ],
 ];

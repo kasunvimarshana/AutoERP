@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
 import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { ProtectedRoute } from "@/modules/auth/ProtectedRoute";
+import { PlatformOperatorRoute } from "@/modules/auth/PlatformOperatorRoute";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
@@ -443,6 +444,10 @@ function requirePermission(permission: string, element: ReactNode) {
     return <PermissionRoute permission={permission}>{element}</PermissionRoute>;
 }
 
+function requirePlatformOperator(element: ReactNode) {
+    return <PlatformOperatorRoute>{element}</PlatformOperatorRoute>;
+}
+
 export function AppRouter() {
     return (
         <Routes>
@@ -507,11 +512,15 @@ export function AppRouter() {
                     />
                     <Route
                         path="/administration/saas-tenants"
-                        element={requirePermission(tenantPermissions.platformView, <PlatformTenantsPage />)}
+                        element={requirePlatformOperator(<PlatformTenantsPage />)}
                     />
                     <Route
                         path="/administration/tenant-plans"
-                        element={requirePermission(tenantPermissions.platformManagePlans, <TenantPlansPage />)}
+                        element={requirePlatformOperator(<TenantPlansPage />)}
+                    />
+                    <Route
+                        path="/administration/platform-configuration"
+                        element={requirePlatformOperator(<SettingsPage mode="platform" />)}
                     />
                     <Route path="/uoms" element={<UomListPage />} />
                     <Route path="/uoms/create" element={<UomCreatePage />} />

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Auth\DTOs;
 
+use Modules\Auth\Constants\AuthTokenScope;
+
 final readonly class TokenRefreshData
 {
     /**
@@ -11,6 +13,7 @@ final readonly class TokenRefreshData
      */
     public function __construct(
         public ?int $tenantId,
+        public string $tokenScope,
         public string $refreshToken,
         public array $scopes,
         public int $accessTokenTtlSeconds,
@@ -24,6 +27,7 @@ final readonly class TokenRefreshData
     {
         return new self(
             isset($payload['tenant_id']) ? (int) $payload['tenant_id'] : null,
+            AuthTokenScope::normalize((string) ($payload['token_scope'] ?? AuthTokenScope::TENANT)),
             (string) ($payload['refresh_token'] ?? ''),
             isset($payload['scopes']) && is_array($payload['scopes']) ? array_values($payload['scopes']) : [],
             max(1, (int) ($payload['access_token_ttl_seconds'] ?? 3600)),

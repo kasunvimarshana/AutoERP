@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use DateTimeImmutable;
 use Illuminate\Http\Request;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\User\Repositories\UserTenantRepositoryInterface;
 
 final class CurrentTenantContextResolver implements CurrentTenantContextResolverInterface
 {
@@ -22,7 +24,8 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantDomainRepositoryInterface $domains,
-        private readonly UserTenantRepositoryInterface $memberships,
+        private readonly TenantUserAccessCheckerInterface $userAccess,
+        private readonly ClockInterface $clock,
     ) {}
 
     public function resolve(Request $request): ?CurrentTenantContext
@@ -54,7 +57,23 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
     public function hasAccess(Request $request, CurrentTenantContext $context): bool
     {
         $userId = $this->authenticatedUserId($request);
-        return $userId !== null && $this->memberships->existsForTenantAndUser($context->tenantId(), $userId);
+        $tokenTenantId = $this->authenticatedTokenTenantId();
+
+        if ($userId === null || $tokenTenantId !== $context->tenantId()) {
+            return false;
+        }
+
+        return $this->userAccess->isActiveTenantUser($userId, $context->tenantId());
+    }
+
+    private function authenticatedTokenTenantId(): ?int
+    {
+        $context = $this->currentUser->current();
+        if ($context === null) {
+            return null;
+        }
+
+        return $this->positiveInt($context->tokenPayload()['tenant_id'] ?? null);
     }
 
     private function fromHost(?string $host, ?string $applicationId): ?CurrentTenantContext
@@ -134,10 +153,11 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
         $subscriptionEndsAt = $tenant->get('subscription_ends_at');
         $trialEndsAt = $tenant->get('trial_ends_at');
-        if ($subscriptionEndsAt !== null && strtotime((string) $subscriptionEndsAt) < time()) {
+        $now = $this->clock->now();
+        if ($this->isExpired($subscriptionEndsAt, $now)) {
             throw new CurrentTenantContextResolutionException('The selected tenant subscription has expired.');
         }
-        if ($subscriptionEndsAt === null && $trialEndsAt !== null && strtotime((string) $trialEndsAt) < time()) {
+        if ($subscriptionEndsAt === null && $this->isExpired($trialEndsAt, $now)) {
             throw new CurrentTenantContextResolutionException('The selected tenant trial has expired.');
         }
         if ($domain === null) {
@@ -145,6 +165,15 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             $domain = $primary === null ? null : (string) $primary->get('domain');
         }
         return new CurrentTenantContext($tenant, $tenantId, $code, $uuid, $domain, $status, $applicationId, $source);
+    }
+
+    private function isExpired(mixed $value, DateTimeImmutable $now): bool
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return false;
+        }
+
+        return new DateTimeImmutable((string) $value) <= $now;
     }
 
     private function authenticatedUserId(Request $request): ?int

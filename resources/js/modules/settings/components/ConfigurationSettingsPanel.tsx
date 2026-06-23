@@ -28,23 +28,24 @@ import type {
 interface Props {
     permissions: string[];
     hasOrganizationUnit: boolean;
+    mode: 'tenant' | 'platform';
 }
 
-export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit }: Props) {
-    const scopes = useMemo(() => availableScopes(hasOrganizationUnit), [hasOrganizationUnit]);
+export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit, mode }: Props) {
+    const scopes = useMemo(() => availableScopes(hasOrganizationUnit, mode), [hasOrganizationUnit, mode]);
     const [scope, setScope] = useState<ConfigurationScope>(scopes[0]?.value ?? 'tenant');
     const [prefix, setPrefix] = useState('');
     const [page, setPage] = useState(1);
     const [editing, setEditing] = useState<ConfigurationEntry | 'create' | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [working, setWorking] = useState(false);
-    const definitions = useApi((signal) => listConfigurationDefinitions(signal), []);
+    const definitions = useApi((signal) => listConfigurationDefinitions(scope, signal), [scope]);
     const entries = useApi(
         (signal) => listConfigurationEntries(scope, prefix, page, signal),
         [scope, prefix, page],
     );
     const canManage = scope === 'global'
-        ? permissions.includes('configuration.entries.manage_global')
+        ? mode === 'platform'
         : scope === 'organization_unit'
             ? permissions.includes('configuration.entries.manage_organization')
             : permissions.includes('configuration.entries.manage_tenant');
@@ -270,7 +271,12 @@ function ValueEditor({ definition, value, error, lookup, onChange }: {
 
 function availableScopes(
     hasOrganizationUnit: boolean,
+    mode: 'tenant' | 'platform',
 ): Array<{ value: ConfigurationScope; label: string }> {
+    if (mode === 'platform') {
+        return [{ value: 'global', label: 'Global defaults' }];
+    }
+
     const scopes: Array<{ value: ConfigurationScope; label: string }> = [
         { value: 'tenant', label: 'Active tenant' },
     ];
@@ -278,8 +284,6 @@ function availableScopes(
     if (hasOrganizationUnit) {
         scopes.push({ value: 'organization_unit', label: 'Active organization unit' });
     }
-
-    scopes.push({ value: 'global', label: 'Global defaults' });
 
     return scopes;
 }

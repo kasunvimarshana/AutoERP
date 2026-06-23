@@ -1,9 +1,12 @@
+import type { AuthMode } from '@/shared/api/authSessionStorage';
+
 export interface AuthUser {
     id: number | string;
     name: string | null;
     email: string | null;
     roles?: string[];
     permissions?: string[];
+    is_platform_operator?: boolean;
 }
 
 export interface AuthTenant {
@@ -29,6 +32,7 @@ export interface AuthSession {
     roles?: string[];
     permissions?: string[];
     enabled_modules?: string[] | null;
+    is_platform_operator?: boolean;
 }
 
 export interface CurrentUserResponse {
@@ -38,9 +42,11 @@ export interface CurrentUserResponse {
     roles?: string[];
     permissions?: string[];
     enabled_modules?: string[] | null;
+    is_platform_operator?: boolean;
 }
 
 export interface LoginPayload {
+    auth_mode: AuthMode;
     login_identifier: string;
     password: string;
     tenant_code?: string | null;

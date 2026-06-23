@@ -14,6 +14,7 @@ import {
     getStoredApiContext,
     storeAuthSession,
 } from '@/shared/api/authSessionStorage';
+import type { AuthMode } from '@/shared/api/authSessionStorage';
 import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import { authApi } from './authApi';
 import type { AuthOrganizationUnit, AuthTenant, AuthUser, LoginPayload } from './authTypes';
@@ -26,6 +27,8 @@ interface AuthContextValue {
     roles: string[];
     permissions: string[];
     enabledModules: string[] | null;
+    isPlatformOperator: boolean;
+    authMode: AuthMode;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (payload: LoginPayload) => Promise<void>;
@@ -38,6 +41,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const stored = getStoredApiContext();
     const [token, setToken] = useState<string | null>(stored.accessToken);
+    const [authMode, setAuthMode] = useState<AuthMode>(stored.authMode);
     const [sessionId, setSessionId] = useState<number | null>(stored.sessionId);
     const [user, setUser] = useState<AuthUser | null>(null);
     const [tenant, setTenant] = useState<AuthTenant | null>(
@@ -49,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [roles, setRoles] = useState<string[]>([]);
     const [permissions, setPermissions] = useState<string[]>([]);
     const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
+    const [isPlatformOperator, setIsPlatformOperator] = useState(false);
     const [isLoading, setIsLoading] = useState<boolean>(Boolean(stored.accessToken));
     const authLoadId = useRef(0);
 
@@ -56,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authLoadId.current += 1;
         clearStoredAuthSession();
         setToken(null);
+        setAuthMode('tenant');
         setSessionId(null);
         setUser(null);
         setTenant(null);
@@ -63,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoles([]);
         setPermissions([]);
         setEnabledModules(null);
+        setIsPlatformOperator(false);
         configureBusinessTimeZone(null);
         setIsLoading(false);
     }, []);
@@ -77,10 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles?: string[];
         permissions?: string[];
         enabled_modules?: string[] | null;
+        is_platform_operator?: boolean;
+        auth_mode?: AuthMode;
     }) => {
+        const nextAuthMode = next.auth_mode ?? authMode;
         if (next.token) {
             setToken(next.token);
         }
+        setAuthMode(nextAuthMode);
         setSessionId(next.session_id ?? null);
         setUser(next.user);
         setTenant(next.tenant);
@@ -88,15 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoles(next.roles ?? next.user.roles ?? []);
         setPermissions(next.permissions ?? next.user.permissions ?? []);
         setEnabledModules(next.enabled_modules ?? null);
+        setIsPlatformOperator(next.is_platform_operator ?? next.user.is_platform_operator ?? false);
         configureBusinessTimeZone(next.organization_unit?.timezone ?? next.tenant?.timezone);
         storeAuthSession({
             accessToken: next.token ?? token,
             refreshToken: next.refresh_token ?? getStoredApiContext().refreshToken,
             sessionId: next.session_id ?? sessionId,
-            tenantId: toNumber(next.tenant?.id),
-            organizationUnitId: toNumber(next.organization_unit?.id),
+            tenantId: nextAuthMode === 'tenant' ? toNumber(next.tenant?.id) : null,
+            organizationUnitId: nextAuthMode === 'tenant' ? toNumber(next.organization_unit?.id) : null,
+            authMode: nextAuthMode,
         });
-    }, [sessionId, token]);
+    }, [authMode, sessionId, token]);
 
     const loadCurrentUser = useCallback(async (signal?: AbortSignal) => {
         const loadId = authLoadId.current + 1;
@@ -109,7 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            const current = await authApi.me(signal);
+            const storedContext = getStoredApiContext();
+            const current = await authApi.me(storedContext.authMode, signal);
             if (signal?.aborted) return;
             applySession({
                 user: current.user,
@@ -118,6 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 roles: current.roles,
                 permissions: current.permissions,
                 enabled_modules: current.enabled_modules,
+                is_platform_operator: current.is_platform_operator,
+                auth_mode: storedContext.authMode,
             });
         } catch (error) {
             if (signal?.aborted) return;
@@ -141,8 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...payload,
                 device_name: payload.device_name ?? window.navigator.userAgent.slice(0, 160),
             });
-            applySession(session);
-            const current = await authApi.me();
+            applySession({ ...session, auth_mode: payload.auth_mode });
+            const current = await authApi.me(payload.auth_mode);
             applySession({
                 token: session.token,
                 refresh_token: session.refresh_token,
@@ -153,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 roles: current.roles,
                 permissions: current.permissions,
                 enabled_modules: current.enabled_modules,
+                is_platform_operator: current.is_platform_operator,
+                auth_mode: payload.auth_mode,
             });
         } finally {
             setIsLoading(false);
@@ -163,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const current = getStoredApiContext();
         try {
             if (current.accessToken) {
-                await authApi.logout({
+                await authApi.logout(current.authMode, {
                     access_token: current.accessToken,
                     session_id: current.sessionId,
                 });
@@ -202,13 +220,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         permissions,
         enabledModules,
+        isPlatformOperator,
+        authMode,
         isAuthenticated: Boolean(token && user),
         isLoading,
         login,
         logout,
         loadCurrentUser,
     }), [
+        authMode,
         enabledModules,
+        isPlatformOperator,
         isLoading,
         loadCurrentUser,
         login,

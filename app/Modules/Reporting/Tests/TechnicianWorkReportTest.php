@@ -682,7 +682,6 @@ final class TechnicianWorkReportTest extends TestCase
         $now = now();
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Reporting',
             'last_name' => 'Administrator',
             'email' => 'reporting-admin-'.Str::lower(Str::random(8)).'@example.test',

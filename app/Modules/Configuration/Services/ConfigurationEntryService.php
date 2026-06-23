@@ -42,7 +42,7 @@ final class ConfigurationEntryService
     /** @return LengthAwarePaginator<int, ConfigurationEntryView> */
     public function list(string $scope, ?string $prefix, int $page, int $perPage): LengthAwarePaginator
     {
-        $this->assertCanView();
+        $this->assertCanView($scope);
         $context = $this->scopes->current($scope);
         $paginator = $this->repository->paginate($context, $prefix, $page, $perPage);
         $paginator->setCollection($paginator->getCollection()->map(
@@ -54,7 +54,7 @@ final class ConfigurationEntryService
 
     public function exact(string $scope, string $key): ConfigurationEntryView
     {
-        $this->assertCanView();
+        $this->assertCanView($scope);
         $context = $this->scopes->current($scope);
         $stored = $this->resolver->exact($context, strtolower(trim($key)));
 
@@ -65,7 +65,7 @@ final class ConfigurationEntryService
 
     public function resolvedCurrent(string $key): ResolvedConfigurationValue
     {
-        $this->assertCanView();
+        $this->assertCanView(ConfigurationScope::TENANT);
 
         return $this->resolver->resolve(
             strtolower(trim($key)),
@@ -189,16 +189,16 @@ final class ConfigurationEntryService
                 'scope' => ['The selected scope is not allowed for this setting.'],
             ]);
         }
-        if ($definition->sensitive && ! $this->authorization->canManageSensitiveCurrent()) {
+        if ($definition->sensitive && ! $this->authorization->canManageSensitiveCurrent($context->scope)) {
             throw new AuthorizationException('Managing sensitive configuration values is not authorized.');
         }
 
         return $definition;
     }
 
-    private function assertCanView(): void
+    private function assertCanView(string $scope): void
     {
-        if (! $this->authorization->canViewCurrent()) {
+        if (! $this->authorization->canViewScopeCurrent($scope)) {
             throw new AuthorizationException('Viewing configuration is not authorized.');
         }
     }
@@ -243,7 +243,7 @@ final class ConfigurationEntryService
             static fn (mixed $part): bool => $part !== null && $part !== '',
         );
 
-        $this->audit->record(new AuditEventData(
+        $event = new AuditEventData(
             eventName: 'configuration.entry.'.$action,
             eventCategory: AuditEventCategory::CONFIGURATION,
             sourceModule: 'configuration',
@@ -261,7 +261,15 @@ final class ConfigurationEntryService
                 'row_version' => $stored->rowVersion,
             ],
             tags: ['configuration', $this->ownerTag($definition->owner)],
-        ));
+        );
+
+        if ($stored->scope === ConfigurationScope::GLOBAL) {
+            $this->audit->recordPlatform($event);
+
+            return;
+        }
+
+        $this->audit->record($event);
     }
 
     private function ownerTag(string $owner): string

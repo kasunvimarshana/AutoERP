@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Auth\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Auth\Constants\AuthErrorCode;
+use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Auth\DTOs\AuthorizeClientData;
 use Modules\Auth\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\DTOs\LinkExternalIdentityData;
@@ -99,7 +101,12 @@ final class AuthController extends Controller
 
     public function register(RegisterRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->registerService->register(RegistrationData::fromArray($request->validated()));
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated(), true);
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->registerService->register(RegistrationData::fromArray($payload));
 
         return $this->respond($result, 201);
     }
@@ -133,7 +140,13 @@ final class AuthController extends Controller
 
     public function refreshToken(RefreshTokenRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($request->validated()));
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+        $payload['token_scope'] = AuthTokenScope::TENANT;
+
+        $result = $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($payload));
 
         return $this->respond($result);
     }
@@ -179,10 +192,14 @@ final class AuthController extends Controller
 
     public function validateToken(ValidateTokenRequest $request): JsonResponse|AuthPayloadResource
     {
-        $validated = $request->validated();
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
         $result = $this->validateTokenService->validateToken(
-            (string) $validated['access_token'],
-            isset($validated['tenant_id']) ? (int) $validated['tenant_id'] : null,
+            (string) $payload['access_token'],
+            (int) $payload['tenant_id'],
         );
 
         return $this->respond($result);
@@ -191,16 +208,26 @@ final class AuthController extends Controller
     public function requestVerificationChallenge(
         RequestVerificationChallengeRequest $request,
     ): JsonResponse|AuthPayloadResource {
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
         $result = $this->requestVerificationService
-            ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($request->validated()));
+            ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($payload));
 
         return $this->respond($result, 201);
     }
 
     public function verifyChallenge(VerifyChallengeRequest $request): JsonResponse|AuthPayloadResource
     {
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
         $result = $this->verifyChallengeService
-            ->verifyChallenge(VerificationChallengeVerifyData::fromArray($request->validated()));
+            ->verifyChallenge(VerificationChallengeVerifyData::fromArray($payload));
 
         return $this->respond($result);
     }
@@ -217,8 +244,13 @@ final class AuthController extends Controller
     public function exchangeAuthorizationCode(
         ExchangeAuthorizationCodeRequest $request,
     ): JsonResponse|AuthPayloadResource {
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
         $result = $this->exchangeAuthorizationCodeService->exchangeAuthorizationCode(
-            ExchangeAuthorizationCodeData::fromArray($request->validated()),
+            ExchangeAuthorizationCodeData::fromArray($payload),
         );
 
         return $this->respond($result, 201);
@@ -397,19 +429,56 @@ final class AuthController extends Controller
             return $organizationUnitId;
         }
 
-        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
-            if ($this->truthy($organizationUnit->get('is_default'))) {
-                return (int) $organizationUnit->id();
-            }
-        }
-
-        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
-            if ($this->truthy($organizationUnit->get('is_active'))) {
-                return (int) $organizationUnit->id();
-            }
-        }
-
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|Result
+     */
+    private function resolveTenantScopedPublicPayload(
+        Request $request,
+        array $payload,
+        bool $resolveOrganizationUnit = false,
+    ): array|Result {
+        unset($payload['tenant_id']);
+
+        try {
+            $tenantContext = $this->tenantResolver->resolve($request);
+        } catch (CurrentTenantContextResolutionException $exception) {
+            return $this->tenantResolutionFailure(
+                app()->environment(['local', 'testing']) ? $exception->getMessage() : null,
+            );
+        }
+
+        if ($tenantContext === null) {
+            return $this->tenantResolutionFailure();
+        }
+
+        $tenantId = $tenantContext->tenantId();
+        $payload['tenant_id'] = $tenantId;
+
+        if (! $resolveOrganizationUnit) {
+            unset($payload['organization_unit_id']);
+
+            return $payload;
+        }
+
+        $organizationUnitId = $this->resolveLoginOrganizationUnitId(
+            $payload['organization_unit_id'] ?? null,
+            $tenantId,
+        );
+        if ($organizationUnitId instanceof Result) {
+            return $organizationUnitId;
+        }
+
+        if ($organizationUnitId === null) {
+            unset($payload['organization_unit_id']);
+        } else {
+            $payload['organization_unit_id'] = $organizationUnitId;
+        }
+
+        return $payload;
     }
 
     private function tenantResolutionFailure(?string $diagnostic = null): Result
@@ -433,20 +502,4 @@ final class AuthController extends Controller
         return $normalized > 0 ? $normalized : null;
     }
 
-    private function truthy(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value === 1;
-        }
-
-        if (is_string($value)) {
-            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
-        }
-
-        return false;
-    }
 }

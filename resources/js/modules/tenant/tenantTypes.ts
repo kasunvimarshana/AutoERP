@@ -34,12 +34,39 @@ export interface TenantRecord {
     updated_at: string;
 }
 
+export type TenantModuleCode =
+    | 'customer'
+    | 'supplier'
+    | 'item'
+    | 'warehouse'
+    | 'inventory'
+    | 'purchase'
+    | 'sales'
+    | 'vehicle'
+    | 'vehicle-service'
+    | 'vehicle-rental'
+    | 'invoice'
+    | 'payment'
+    | 'finance'
+    | 'reporting';
+
+export interface TenantPlanFeatures {
+    enabled_modules: TenantModuleCode[];
+}
+
+export interface TenantPlanLimits {
+    max_users?: number;
+    max_organization_units?: number;
+    max_warehouses?: number;
+    max_storage_mb?: number;
+}
+
 export interface TenantPlan {
     id: number;
     name: string;
     slug: string;
-    features: Record<string, unknown> | null;
-    limits: Record<string, unknown> | null;
+    features: TenantPlanFeatures | null;
+    limits: TenantPlanLimits | null;
     price: string;
     currency_id: number | null;
     currency?: NamedReference | null;

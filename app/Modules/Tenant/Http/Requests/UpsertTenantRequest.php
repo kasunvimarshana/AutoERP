@@ -43,6 +43,7 @@ final class UpsertTenantRequest extends FormRequest
             ],
             'trial_ends_at' => ['nullable', 'date'],
             'subscription_ends_at' => ['nullable', 'date'],
+            'metadata' => ['nullable', 'array'],
         ];
     }
 }

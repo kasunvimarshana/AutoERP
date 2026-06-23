@@ -13,17 +13,29 @@ return new class extends Migration
         Schema::create('user_permissions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('permission_id');
             $table->unsignedBigInteger('created_by')->nullable()->index('user_permissions_created_by_idx');
             $table->unsignedBigInteger('updated_by')->nullable()->index('user_permissions_updated_by_idx');
 
             $table->timestamps();
 
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'up_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'up_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->cascadeOnDelete();
+            $table->foreign(['permission_id', 'tenant_id'], 'up_permission_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('permissions')
+                ->cascadeOnDelete();
             $table->unique(['tenant_id', 'user_id', 'permission_id'], 'user_permissions_uk');
         });
     }

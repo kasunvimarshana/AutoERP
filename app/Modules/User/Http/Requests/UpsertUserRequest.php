@@ -31,7 +31,6 @@ final class UpsertUserRequest extends FormRequest
 
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => array_merge($createOnly, ['array']),
             'identity_references' => array_merge($createOnly, ['array']),
             'identity_references.*' => [$this->isMethod('post') ? 'required_with:identity_references' : 'prohibited', 'string', 'max:255'],

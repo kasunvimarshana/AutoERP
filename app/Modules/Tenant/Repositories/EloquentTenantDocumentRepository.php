@@ -30,6 +30,13 @@ final class EloquentTenantDocumentRepository implements TenantDocumentRepository
         return $model instanceof TenantDocumentModel ? $this->record($model) : null;
     }
 
+    public function totalSizeByTenant(int $tenantId): int
+    {
+        return (int) $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->sum('size_bytes');
+    }
+
     public function create(array $attributes): DataRecord
     {
         return $this->record($this->model->newQuery()->create($attributes));

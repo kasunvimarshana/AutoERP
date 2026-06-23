@@ -6,10 +6,12 @@ namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Auth\Models\Concerns\HasValidTokenScope;
 use Modules\Core\Models\CoreModel;
 
 final class AuthAccessTokenModel extends CoreModel
 {
+    use HasValidTokenScope;
     use SoftDeletes;
 
     protected $table = 'auth_access_tokens';
@@ -28,6 +30,7 @@ final class AuthAccessTokenModel extends CoreModel
         'token_hash',
         'scopes',
         'grant_type',
+        'token_scope',
         'status',
         'issued_at',
         'expires_at',

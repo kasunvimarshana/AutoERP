@@ -19,9 +19,16 @@ return new class extends Migration
             $table->string('primary_marker', 16)->nullable();
             $table->enum('status', ['pending', 'active', 'disabled'])->default('pending');
             $table->enum('verification_method', ['dns_txt'])->default('dns_txt');
-            $table->char('verification_token_hash', 64)->nullable();
+            $table->char('verification_token_hash', 64)->nullable()->comment('Pending DNS verification challenge hash');
+            $table->char('verified_token_hash', 64)->nullable()->comment('Last successfully verified DNS ownership proof hash');
             $table->timestamp('verification_expires_at')->nullable();
             $table->timestamp('verified_at')->nullable();
+            $table->timestamp('last_verification_attempt_at')->nullable();
+            $table->timestamp('last_verified_at')->nullable();
+            $table->unsignedInteger('verification_failure_count')->default(0);
+            $table->string('verification_last_error', 500)->nullable();
+            $table->timestamp('revalidation_due_at')->nullable();
+            $table->timestamp('verification_grace_expires_at')->nullable();
             $table->unsignedBigInteger('verified_by')->nullable()->index('tenant_domains_verified_by_idx');
             $table->json('metadata')->nullable();
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_domains_created_by_idx');
@@ -29,6 +36,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['tenant_id', 'primary_marker'], 'tenant_domains_one_primary_uk');
             $table->index(['tenant_id', 'status'], 'tenant_domains_tenant_status_idx');
+            $table->index(['status', 'revalidation_due_at'], 'tenant_domains_revalidation_idx');
         });
     }
 

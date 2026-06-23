@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Auth\DTOs;
 
+use Modules\Auth\Constants\AuthTokenScope;
+
 final readonly class TokenIssueData
 {
     /**
@@ -17,6 +19,7 @@ final readonly class TokenIssueData
         public ?int $identityId,
         public ?int $sessionId,
         public ?int $userId,
+        public string $tokenScope,
         public array $scopes,
         public string $grantType,
         public int $accessTokenTtlSeconds,
@@ -37,6 +40,7 @@ final readonly class TokenIssueData
             isset($payload['identity_id']) ? (int) $payload['identity_id'] : null,
             isset($payload['session_id']) ? (int) $payload['session_id'] : null,
             isset($payload['user_id']) ? (int) $payload['user_id'] : null,
+            AuthTokenScope::normalize((string) ($payload['token_scope'] ?? AuthTokenScope::TENANT)),
             isset($payload['scopes']) && is_array($payload['scopes']) ? array_values($payload['scopes']) : [],
             (string) ($payload['grant_type'] ?? 'password'),
             max(1, (int) ($payload['access_token_ttl_seconds'] ?? 3600)),

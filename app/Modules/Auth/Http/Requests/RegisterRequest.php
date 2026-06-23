@@ -19,7 +19,6 @@ final class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'provider_key' => ['nullable', 'string', 'max:120'],
             'first_name' => ['required', 'string', 'max:255'],

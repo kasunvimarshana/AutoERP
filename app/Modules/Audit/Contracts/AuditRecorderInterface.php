@@ -12,6 +12,9 @@ interface AuditRecorderInterface
     /** Records a user action using trusted current request contexts. */
     public function record(AuditEventData $event): void;
 
+    /** Records a platform-operator action without borrowing an active tenant context. */
+    public function recordPlatform(AuditEventData $event, ?int $targetTenantId = null): void;
+
     /** Records an explicit background/system actor after validating its scope. */
     public function recordSystem(SystemAuditEventData $event): void;
 }

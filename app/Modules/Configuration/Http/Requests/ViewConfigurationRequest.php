@@ -11,8 +11,10 @@ class ViewConfigurationRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
-        return parent::authorize()
-            && app(ConfigurationAuthorizationService::class)->canViewCurrent();
+        $scope = $this->route('scope');
+
+        return is_string($scope)
+            && app(ConfigurationAuthorizationService::class)->canViewScopeCurrent($scope);
     }
 
     public function rules(): array

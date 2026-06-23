@@ -18,7 +18,7 @@ use Modules\User\Models\UserDocumentModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserPermissionModel;
 use Modules\User\Models\UserRoleModel;
-use Modules\User\Models\UserTenantModel;
+use Modules\User\Models\UserOrganizationUnitModel;
 use Modules\User\Policies\UserPolicy;
 use Modules\User\Repositories\EloquentPermissionRepository;
 use Modules\User\Repositories\EloquentRolePermissionRepository;
@@ -28,7 +28,7 @@ use Modules\User\Repositories\EloquentUserDocumentRepository;
 use Modules\User\Repositories\EloquentUserPermissionRepository;
 use Modules\User\Repositories\EloquentUserRepository;
 use Modules\User\Repositories\EloquentUserRoleRepository;
-use Modules\User\Repositories\EloquentUserTenantRepository;
+use Modules\User\Repositories\EloquentUserOrganizationUnitRepository;
 use Modules\User\Repositories\PermissionRepositoryInterface;
 use Modules\User\Repositories\RolePermissionRepositoryInterface;
 use Modules\User\Repositories\RoleRepositoryInterface;
@@ -37,11 +37,14 @@ use Modules\User\Repositories\UserDocumentRepositoryInterface;
 use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserRoleRepositoryInterface;
-use Modules\User\Repositories\UserTenantRepositoryInterface;
+use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Services\AuthenticatedUserProvider;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Modules\User\Services\Rules\UserDomainService;
+use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
+use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\User\Services\UserAccessResolver;
 use Modules\User\Services\UserPermissionChecker;
 
@@ -53,6 +56,9 @@ final class UserServiceProvider extends ServiceProvider
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
         $this->app->scoped(UserAccessResolver::class);
+        $this->app->scoped(PlatformOperatorCheckerInterface::class, UserAccessResolver::class);
+        $this->app->scoped(TenantUserAccessCheckerInterface::class, UserAccessResolver::class);
+        $this->app->scoped(OrganizationUnitUserAccessCheckerInterface::class, UserAccessResolver::class);
         $this->app->scoped(PermissionCheckerInterface::class, UserPermissionChecker::class);
 
         $this->app->singleton(UserDomainServiceInterface::class, UserDomainService::class);
@@ -81,8 +87,8 @@ final class UserServiceProvider extends ServiceProvider
             fn (): UserPermissionRepositoryInterface => new EloquentUserPermissionRepository(new UserPermissionModel),
         );
         $this->app->singleton(
-            UserTenantRepositoryInterface::class,
-            fn (): UserTenantRepositoryInterface => new EloquentUserTenantRepository(new UserTenantModel),
+            UserOrganizationUnitRepositoryInterface::class,
+            fn (): UserOrganizationUnitRepositoryInterface => new EloquentUserOrganizationUnitRepository(new UserOrganizationUnitModel),
         );
         $this->app->singleton(
             UserDocumentRepositoryInterface::class,

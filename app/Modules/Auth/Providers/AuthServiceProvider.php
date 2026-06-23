@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Auth\Console\Commands\AuthClientCreateCommand;
+use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Auth\Contracts\Providers\AuthProviderRegistryInterface;
 use Modules\Auth\Contracts\Providers\IdentityProviderInterface;
 use Modules\Auth\Contracts\Providers\SessionProviderInterface;
@@ -158,30 +159,60 @@ final class AuthServiceProvider extends ServiceProvider
         Auth::viaRequest(
             (string) config('module-auth.token_guard_driver', 'module-auth-token'),
             function (Request $request): ?UserModel {
-                $plainAccessToken = $request->bearerToken();
-                if (! is_string($plainAccessToken) || trim($plainAccessToken) === '') {
-                    return null;
-                }
-
-                $tenantId = $request->headers->get((string) config('tenant.resolution.selection_headers.id', 'X-Tenant-Id'));
-                $validation = $this->app->make(ValidateTokenService::class)->validateToken(
-                    $plainAccessToken,
-                    is_numeric($tenantId) ? (int) $tenantId : null,
-                );
-
-                if ($validation->isFailure()) {
-                    return null;
-                }
-
-                $payload = $validation->valueOrFail();
+                $payload = $this->validatedBearerPayload($request);
                 $userId = $payload['user_id'] ?? null;
-                if (! is_numeric($userId)) {
+                $tenantId = $payload['tenant_id'] ?? null;
+                if (
+                    ($payload['token_scope'] ?? null) !== AuthTokenScope::TENANT
+                    || ! is_numeric($userId)
+                    || ! is_numeric($tenantId)
+                ) {
+                    return null;
+                }
+
+                $user = UserModel::query()
+                    ->whereKey((int) $userId)
+                    ->where('tenant_id', (int) $tenantId)
+                    ->where('status', 'active')
+                    ->where('is_platform_operator', false)
+                    ->first();
+                if (! $user instanceof UserModel) {
                     return null;
                 }
 
                 $request->attributes->set('auth_access_token', $payload);
 
-                return UserModel::query()->find((int) $userId);
+                return $user;
+            },
+        );
+
+        Auth::viaRequest(
+            (string) config('module-auth.platform_token_guard_driver', 'module-platform-token'),
+            function (Request $request): ?UserModel {
+                $payload = $this->validatedBearerPayload($request);
+                $userId = $payload['user_id'] ?? null;
+                if (
+                    ($payload['token_scope'] ?? null) !== AuthTokenScope::PLATFORM
+                    || ! is_numeric($userId)
+                    || ($payload['tenant_id'] ?? null) !== null
+                ) {
+                    return null;
+                }
+
+                $user = UserModel::query()
+                    ->whereKey((int) $userId)
+                    ->whereNull('tenant_id')
+                    ->where('status', 'active')
+                    ->where('is_platform_operator', true)
+                    ->whereNotNull('platform_login_email')
+                    ->first();
+                if (! $user instanceof UserModel) {
+                    return null;
+                }
+
+                $request->attributes->set('auth_access_token', $payload);
+
+                return $user;
             },
         );
 
@@ -201,4 +232,18 @@ final class AuthServiceProvider extends ServiceProvider
             ], 'auth-config');
         }
     }
+    /** @return array<string, mixed> */
+    private function validatedBearerPayload(Request $request): array
+    {
+        $plainAccessToken = $request->bearerToken();
+        if (! is_string($plainAccessToken) || trim($plainAccessToken) === '') {
+            return [];
+        }
+
+        $validation = $this->app->make(ValidateTokenService::class)
+            ->validateToken($plainAccessToken);
+
+        return $validation->isSuccess() ? $validation->valueOrFail() : [];
+    }
+
 }

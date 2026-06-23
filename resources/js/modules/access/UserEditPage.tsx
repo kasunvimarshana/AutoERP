@@ -117,7 +117,7 @@ function mapUserToForm(user: AccessUser): UserFormState {
         password: '',
         role_ids: (user.roles ?? []).map((role) => role.id),
         organization_unit_ids: organizationUnits.map((unit) => unit.id),
-        default_organization_unit_id: organizationUnits.find((unit) => unit.is_default)?.id ?? user.organization_unit_id ?? null,
+        default_organization_unit_id: organizationUnits.find((unit) => unit.is_default)?.id ?? null,
         row_version: user.row_version,
     };
 }

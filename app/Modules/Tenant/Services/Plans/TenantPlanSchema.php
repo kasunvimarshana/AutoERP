@@ -1,0 +1,129 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Tenant\Services\Plans;
+
+use Illuminate\Validation\ValidationException;
+
+final class TenantPlanSchema
+{
+    /** @var list<string> */
+    public const SUPPORTED_MODULES = [
+        'customer',
+        'supplier',
+        'item',
+        'warehouse',
+        'inventory',
+        'purchase',
+        'sales',
+        'vehicle',
+        'vehicle-service',
+        'vehicle-rental',
+        'invoice',
+        'payment',
+        'finance',
+        'reporting',
+    ];
+
+    /** @var list<string> */
+    public const SUPPORTED_LIMITS = [
+        'max_users',
+        'max_organization_units',
+        'max_warehouses',
+        'max_storage_mb',
+    ];
+
+    /** @return array{enabled_modules:list<string>} */
+    public function normalizeFeatures(mixed $features): array
+    {
+        $features = $features ?? [];
+        if (! is_array($features)) {
+            throw ValidationException::withMessages([
+                'features' => ['Plan features must be an object.'],
+            ]);
+        }
+
+        $unknown = array_diff(array_keys($features), ['enabled_modules']);
+        if ($unknown !== []) {
+            throw ValidationException::withMessages([
+                'features' => ['Unsupported plan feature keys: '.implode(', ', $unknown).'.'],
+            ]);
+        }
+
+        $configured = $features['enabled_modules'] ?? [];
+        if (! is_array($configured)) {
+            throw ValidationException::withMessages([
+                'features.enabled_modules' => ['Enabled modules must be a list.'],
+            ]);
+        }
+
+        $modules = [];
+        foreach ($configured as $module) {
+            if (! is_string($module)) {
+                throw ValidationException::withMessages([
+                    'features.enabled_modules' => ['Every enabled module must be a module code.'],
+                ]);
+            }
+
+            $module = strtolower(trim($module));
+            if (! in_array($module, self::SUPPORTED_MODULES, true)) {
+                throw ValidationException::withMessages([
+                    'features.enabled_modules' => ["Unsupported module [{$module}]."],
+                ]);
+            }
+
+            $modules[] = $module;
+        }
+
+        return ['enabled_modules' => array_values(array_unique($modules))];
+    }
+
+    public function normalizePrice(mixed $price): string
+    {
+        $price = is_scalar($price) ? trim((string) $price) : '';
+        $price = $price === '' ? '0' : $price;
+        if (preg_match('/^(?:0|[1-9]\d{0,13})(?:\.(\d{1,6}))?$/', $price, $matches) !== 1) {
+            throw ValidationException::withMessages([
+                'price' => ['Price must be a non-negative decimal with at most 14 whole digits and 6 decimal places.'],
+            ]);
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $price, 2), 2, '');
+
+        return $whole.'.'.str_pad($fraction, 6, '0');
+    }
+
+    /** @return array<string, int> */
+    public function normalizeLimits(mixed $limits): array
+    {
+        $limits = $limits ?? [];
+        if (! is_array($limits)) {
+            throw ValidationException::withMessages([
+                'limits' => ['Plan limits must be an object.'],
+            ]);
+        }
+
+        $unknown = array_diff(array_keys($limits), self::SUPPORTED_LIMITS);
+        if ($unknown !== []) {
+            throw ValidationException::withMessages([
+                'limits' => ['Unsupported plan limit keys: '.implode(', ', $unknown).'.'],
+            ]);
+        }
+
+        $normalized = [];
+        foreach ($limits as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if (! is_numeric($value) || (int) $value < 1 || (string) (int) $value !== trim((string) $value)) {
+                throw ValidationException::withMessages([
+                    "limits.{$key}" => ['Plan limits must be positive whole numbers.'],
+                ]);
+            }
+            $normalized[(string) $key] = (int) $value;
+        }
+
+        return $normalized;
+    }
+}

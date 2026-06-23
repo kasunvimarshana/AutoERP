@@ -26,7 +26,12 @@ final class CurrentOrganizationUnitMiddleware
         try {
             $context = $this->resolver->resolve($request);
         } catch (CurrentOrganizationUnitContextResolutionException $exception) {
-            return $this->responses->forStatus(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->getMessage());
+            report($exception);
+
+            return $this->responses->forStatus(
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                'Organization unit context could not be resolved.',
+            );
         }
 
         if ($context === null) {

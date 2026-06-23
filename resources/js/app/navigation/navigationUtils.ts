@@ -15,6 +15,7 @@ export function normalizeAccessValue(value: string): string {
 export function canAccessNavigation(rule: NavigationAccessRule | undefined, context: NavigationAccessContext): boolean {
     if (!rule) return true;
     if (rule.requiresTenant && !context.tenantId) return false;
+    if (rule.requiresPlatformOperator && !context.isPlatformOperator) return false;
     if (rule.requiresOrganizationUnit && !context.organizationUnitId) return false;
 
     if (rule.modules && context.enabledModules) {

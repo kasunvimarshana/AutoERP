@@ -24,7 +24,12 @@ final class CurrentTenantMiddleware
         try {
             $context = $this->resolver->resolve($request);
         } catch (CurrentTenantContextResolutionException $exception) {
-            return $this->responses->forStatus(Response::HTTP_UNPROCESSABLE_ENTITY, $exception->getMessage());
+            report($exception);
+
+            return $this->responses->forStatus(
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                'Tenant context could not be resolved.',
+            );
         }
 
         if ($context === null) {

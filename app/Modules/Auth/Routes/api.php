@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Auth\Http\Controllers\AuthController;
+use Modules\Auth\Http\Controllers\PlatformAuthController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -79,3 +80,34 @@ $registerAuthRoutes = static function (string $prefix, string $namePrefix) use (
 
 $registerAuthRoutes('api/auth', 'auth.');
 $registerAuthRoutes('api/v1/auth', 'api.v1.auth.');
+
+$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
+$platformOperatorMiddleware = (string) config('tenant.platform.middleware_alias', 'platform.operator');
+
+Route::prefix('api/v1/platform/auth')
+    ->middleware('api')
+    ->name('api.v1.platform.auth.')
+    ->group(function () use (
+        $platformGuard,
+        $currentUserMiddleware,
+        $tokenValidationMiddleware,
+        $platformOperatorMiddleware,
+    ): void {
+        Route::post('login', [PlatformAuthController::class, 'login'])
+            ->middleware('throttle:5,1')
+            ->name('login');
+        Route::post('refresh', [PlatformAuthController::class, 'refresh'])
+            ->middleware('throttle:20,1')
+            ->name('refresh');
+
+        Route::middleware([
+            'throttle:60,1',
+            $tokenValidationMiddleware,
+            'auth:'.$platformGuard,
+            $currentUserMiddleware,
+            $platformOperatorMiddleware,
+        ])->group(function (): void {
+            Route::get('me', [PlatformAuthController::class, 'me'])->name('me');
+            Route::post('logout', [PlatformAuthController::class, 'logout'])->name('logout');
+        });
+    });

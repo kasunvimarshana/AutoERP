@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('auth_verification_challenges', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->json('metadata')->nullable();
 
-            $table->foreignId('provider_id')->nullable()->constrained('auth_providers', 'id')->nullOnDelete();
-            $table->foreignId('identity_id')->nullable()->constrained('auth_identities', 'id')->nullOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained('users', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('provider_id')->nullable();
+            $table->unsignedBigInteger('identity_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->string('challenge_key', 120);
             $table->string('challenge_type', 60)->default('otp');
             $table->string('channel', 60)->default('email');
@@ -36,6 +36,22 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_verification_challenges_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['provider_id', 'tenant_id'], 'auth_verification_challenges_provider_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_providers')
+                ->cascadeOnDelete();
+            $table->foreign(['identity_id', 'tenant_id'], 'auth_verification_challenges_identity_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_identities')
+                ->cascadeOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'auth_verification_challenges_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->cascadeOnDelete();
             $table->unique(['tenant_id', 'challenge_key'], 'auth_verification_challenges_key_uk');
             $table->index(['tenant_id', 'user_id', 'status'], 'auth_verification_challenges_user_idx');
         });

@@ -7,7 +7,6 @@ namespace Modules\Configuration\Constants;
 final class ConfigurationPermission
 {
     public const ENTRIES_VIEW = 'configuration.entries.view';
-    public const ENTRIES_MANAGE_GLOBAL = 'configuration.entries.manage_global';
     public const ENTRIES_MANAGE_TENANT = 'configuration.entries.manage_tenant';
     public const ENTRIES_MANAGE_ORGANIZATION = 'configuration.entries.manage_organization';
     public const ENTRIES_MANAGE_SENSITIVE = 'configuration.entries.manage_sensitive';
@@ -17,7 +16,6 @@ final class ConfigurationPermission
     {
         return [
             self::ENTRIES_VIEW => 'View registered configuration definitions and scoped overrides.',
-            self::ENTRIES_MANAGE_GLOBAL => 'Manage global configuration overrides.',
             self::ENTRIES_MANAGE_TENANT => 'Manage configuration overrides for the active tenant.',
             self::ENTRIES_MANAGE_ORGANIZATION => 'Manage configuration overrides for the active organization unit.',
             self::ENTRIES_MANAGE_SENSITIVE => 'Create or rotate protected configuration values.',

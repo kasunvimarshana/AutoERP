@@ -16,6 +16,11 @@ final class EloquentOrganizationUnitRepository extends EloquentRepository implem
         parent::__construct($model);
     }
 
+    public function countByTenant(int $tenantId): int
+    {
+        return $this->query()->where('tenant_id', $tenantId)->count();
+    }
+
     public function listByTenant(int|string $tenantId): array
     {
         $records = [];

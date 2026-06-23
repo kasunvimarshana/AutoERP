@@ -1055,8 +1055,7 @@ export const navigationSections: NavigationSection[] = [
                 to: "/administration/saas-tenants",
                 icon: "users",
                 access: {
-                    requiresTenant: true,
-                    permissions: [tenantPermissions.platformView],
+                    requiresPlatformOperator: true,
                 },
             },
             {
@@ -1066,8 +1065,17 @@ export const navigationSections: NavigationSection[] = [
                 to: "/administration/tenant-plans",
                 icon: "list",
                 access: {
-                    requiresTenant: true,
-                    permissions: [tenantPermissions.platformManagePlans],
+                    requiresPlatformOperator: true,
+                },
+            },
+            {
+                id: "platform-configuration",
+                type: "link",
+                label: "Platform Defaults",
+                to: "/administration/platform-configuration",
+                icon: "settings",
+                access: {
+                    requiresPlatformOperator: true,
                 },
             },
             {

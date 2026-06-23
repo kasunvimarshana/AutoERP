@@ -6,14 +6,14 @@ use Modules\Auth\Services\InternalAuthenticationProvider;
 return [
     'default_provider_key' => env('AUTH_DEFAULT_PROVIDER_KEY', 'internal'),
     'protected_route_guard' => env('MODULE_AUTH_PROTECTED_GUARD', 'auth-api'),
+    'platform_protected_route_guard' => env('MODULE_PLATFORM_AUTH_PROTECTED_GUARD', 'platform-api'),
     'token_guard_driver' => env('MODULE_AUTH_TOKEN_GUARD_DRIVER', 'module-auth-token'),
+    'platform_token_guard_driver' => env('MODULE_PLATFORM_AUTH_TOKEN_GUARD_DRIVER', 'module-platform-token'),
     'provider_drivers' => [
         'internal' => InternalAuthenticationProvider::class,
     ],
     'current_user_context' => [
         'token_payload_attribute' => env('AUTH_TOKEN_PAYLOAD_ATTRIBUTE', 'auth_access_token'),
-        'application_input_keys' => ['application_id', 'app_id', 'client_id'],
-        'application_header_keys' => ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
     ],
     'access_token_ttl_seconds' => (int) env('AUTH_ACCESS_TOKEN_TTL', 3600),
     'refresh_token_ttl_seconds' => (int) env('AUTH_REFRESH_TOKEN_TTL', 2592000),

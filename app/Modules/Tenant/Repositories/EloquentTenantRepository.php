@@ -32,6 +32,19 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
+    public function findBySlug(string $slug): ?DataRecord
+    {
+        $model = $this->query()->where('slug', strtolower(trim($slug)))->first();
+        return $model instanceof TenantModel ? $this->record($model) : null;
+    }
+
+    public function lockById(int|string $id): ?DataRecord
+    {
+        $model = $this->query()->whereKey($id)->lockForUpdate()->first();
+
+        return $model instanceof TenantModel ? $this->record($model) : null;
+    }
+
     public function create(array $attributes): DataRecord
     {
         return $this->record($this->model->newQuery()->create($attributes));
@@ -70,6 +83,28 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         ));
 
         return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+    }
+
+    public function listExpiredActive(\DateTimeInterface $now, int $limit): array
+    {
+        return $this->query()
+            ->where('status', 'active')
+            ->where(function (Builder $query) use ($now): void {
+                $query->where(function (Builder $subscription) use ($now): void {
+                    $subscription->whereNotNull('subscription_ends_at')
+                        ->where('subscription_ends_at', '<=', $now);
+                })->orWhere(function (Builder $trial) use ($now): void {
+                    $trial->whereNull('subscription_ends_at')
+                        ->whereNotNull('trial_ends_at')
+                        ->where('trial_ends_at', '<=', $now);
+                });
+            })
+            ->orderByRaw('COALESCE(subscription_ends_at, trial_ends_at)')
+            ->limit(max(1, min($limit, 500)))
+            ->get()
+            ->map(fn (Model $model): DataRecord => $this->record($model))
+            ->values()
+            ->all();
     }
 
     private function query(): Builder

@@ -18,6 +18,8 @@ final class WarehouseErrorCode
 
     public const SCOPE_MISMATCH = 'WAREHOUSE_SCOPE_MISMATCH';
 
+    public const PLAN_LIMIT_REACHED = 'WAREHOUSE_PLAN_LIMIT_REACHED';
+
     public const INVALID_HIERARCHY = 'WAREHOUSE_INVALID_HIERARCHY';
 
     public const UNSAFE_DELETE = 'WAREHOUSE_UNSAFE_DELETE';

@@ -48,6 +48,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'token_hash' => $this->passwordHasher->hash($accessSecret),
             'scopes' => $data->scopes,
             'grant_type' => $data->grantType,
+            'token_scope' => $data->tokenScope,
             'status' => 'active',
             'issued_at' => $issuedAt,
             'expires_at' => $accessExpiresAt,
@@ -59,12 +60,14 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'access_token_id' => (int) $access->id(),
+            'provider_id' => $data->providerId,
             'client_id' => $data->clientId,
             'identity_id' => $data->identityId,
             'session_id' => $data->sessionId,
             'user_id' => $data->userId,
             'refresh_key' => $refreshKey,
             'refresh_hash' => $this->passwordHasher->hash($refreshSecret),
+            'token_scope' => $data->tokenScope,
             'status' => 'active',
             'issued_at' => $issuedAt,
             'expires_at' => $refreshExpiresAt,
@@ -93,8 +96,12 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $existing = $this->refreshTokens->findActiveByRefreshKey($data->tenantId, $refreshKey);
-        if ($existing === null) {
+        $existing = $this->refreshTokens->findActiveByRefreshKey($refreshKey);
+        if (
+            $existing === null
+            || (string) $existing->get('token_scope', '') !== $data->tokenScope
+            || ! $this->tenantMatches($existing->get('tenant_id'), $data->tenantId, $data->tokenScope)
+        ) {
             return null;
         }
 
@@ -134,22 +141,36 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $this->refreshTokens->update($existing->id(), [
-            'status' => 'revoked',
-            'rotated' => true,
-            'rotated_at' => now(),
-            'row_version' => ((int) $existing->get('row_version', 1)) + 1,
-        ]);
+        $rowVersion = (int) $existing->get('row_version', 1);
+        if (! $this->refreshTokens->rotateIfActive((int) $existing->id(), $rowVersion)) {
+            return null;
+        }
+
+        $accessToken = $this->accessTokens->findById((int) $existing->get('access_token_id'));
+        if ($accessToken === null
+            || (string) $accessToken->get('token_scope', '') !== $data->tokenScope
+            || (int) $accessToken->get('user_id', 0) !== (int) $existing->get('user_id', 0)
+        ) {
+            return null;
+        }
+
+        $existingScopes = $this->normalizeScopes($accessToken->get('scopes'));
+        $requestedScopes = $this->normalizeScopes($data->scopes);
+        $scopes = $requestedScopes === []
+            ? $existingScopes
+            : array_values(array_intersect($existingScopes, $requestedScopes));
 
         return $this->issue(TokenIssueData::fromArray([
             'tenant_id' => $existing->get('tenant_id'),
             'organization_unit_id' => $existing->get('organization_unit_id'),
+            'provider_id' => $existing->get('provider_id'),
             'client_id' => $existing->get('client_id'),
             'identity_id' => $existing->get('identity_id'),
             'session_id' => $existing->get('session_id'),
             'user_id' => $existing->get('user_id'),
+            'token_scope' => $existing->get('token_scope', 'tenant'),
             'grant_type' => 'refresh_token',
-            'scopes' => $data->scopes,
+            'scopes' => $scopes,
             'access_token_ttl_seconds' => $data->accessTokenTtlSeconds,
             'refresh_token_ttl_seconds' => $data->refreshTokenTtlSeconds,
             'metadata' => $existing->get('metadata'),
@@ -166,8 +187,8 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $record = $this->accessTokens->findActiveByTokenKey($tenantId, $tokenKey);
-        if ($record === null) {
+        $record = $this->accessTokens->findActiveByTokenKey($tokenKey);
+        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
             return null;
         }
 
@@ -195,8 +216,8 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return false;
         }
 
-        $record = $this->accessTokens->findActiveByTokenKey($tenantId, $tokenKey);
-        if ($record === null) {
+        $record = $this->accessTokens->findActiveByTokenKey($tokenKey);
+        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
             return false;
         }
 
@@ -217,6 +238,48 @@ final class DatabaseTokenProvider implements TokenProviderInterface
     {
         $this->accessTokens->revokeBySessionId($sessionId, $tenantId);
         $this->refreshTokens->revokeBySessionId($sessionId, $tenantId);
+    }
+
+    private function tenantMatches(mixed $recordTenantId, ?int $expectedTenantId, string $tokenScope): bool
+    {
+        if ($tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM) {
+            return $recordTenantId === null && $expectedTenantId === null;
+        }
+
+        return $expectedTenantId !== null
+            && is_numeric($recordTenantId)
+            && (int) $recordTenantId === $expectedTenantId;
+    }
+
+    private function tenantMatchesForOptionalValidation(mixed $recordTenantId, ?int $expectedTenantId): bool
+    {
+        if ($expectedTenantId === null) {
+            return true;
+        }
+
+        return is_numeric($recordTenantId) && (int) $recordTenantId === $expectedTenantId;
+    }
+
+    /** @return list<string> */
+    private function normalizeScopes(mixed $scopes): array
+    {
+        if (! is_array($scopes)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($scopes as $scope) {
+            if (! is_string($scope)) {
+                continue;
+            }
+
+            $scope = trim($scope);
+            if ($scope !== '') {
+                $normalized[$scope] = $scope;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**

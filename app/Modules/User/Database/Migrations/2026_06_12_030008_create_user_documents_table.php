@@ -13,12 +13,12 @@ return new class extends Migration
         Schema::create('user_documents', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             // $table->string('uuid')->unique('user_documents_uuid_uk');
-            $table->foreignId('user_id')->constrained('users', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('user_id');
             $table->string('name');
             $table->string('file_path');
             $table->string('mime_type')->nullable();
@@ -27,6 +27,14 @@ return new class extends Migration
 
             $table->timestamps();
 
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'ud_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'ud_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->cascadeOnDelete();
             $table->unique(['tenant_id', 'user_id', 'name'], 'user_documents_user_name_uk');
         });
     }

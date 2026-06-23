@@ -24,6 +24,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $trustedProxies = array_values(array_filter(array_map(
+            static fn (string $proxy): string => trim($proxy),
+            explode(',', (string) env('TRUSTED_PROXIES', '')),
+        )));
+        if ($trustedProxies !== []) {
+            $middleware->trustProxies(at: $trustedProxies);
+        }
+
         $middleware->alias([
             (string) env('CORE_CURRENT_USER_MIDDLEWARE_ALIAS', 'current.user') => CurrentUserMiddleware::class,
             (string) env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant') => CurrentTenantMiddleware::class,
@@ -61,10 +69,20 @@ return Application::configure(basePath: dirname(__DIR__))
                 : null;
         });
 
-        $exceptions->render(function (DomainException|InvalidArgumentException $exception, Request $request) use ($errorResponse) {
+        $exceptions->render(function (DomainException $exception, Request $request) use ($errorResponse) {
             return $request->is('api/*') || $request->expectsJson()
                 ? $errorResponse(422, $exception->getMessage())
                 : null;
+        });
+
+        $exceptions->render(function (InvalidArgumentException $exception, Request $request) use ($errorResponse) {
+            if (! ($request->is('api/*') || $request->expectsJson())) {
+                return null;
+            }
+
+            report($exception);
+
+            return $errorResponse(422, 'The request contains an invalid value.');
         });
 
         $exceptions->render(function (HttpResponseException $exception, Request $request) {

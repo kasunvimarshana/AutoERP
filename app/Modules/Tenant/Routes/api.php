@@ -10,18 +10,31 @@ use Modules\Tenant\Http\Controllers\TenantPlanController;
 use Modules\Tenant\Http\Controllers\TenantProfileController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
+$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
 $currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+$platformOperatorMiddleware = (string) config('tenant.platform.middleware_alias', 'platform.operator');
 
-$authenticatedTenantMiddleware = [
+$authenticatedMiddleware = [
     'api',
     'auth:'.$protectedGuard,
     $currentUserMiddleware,
+];
+
+$authenticatedTenantMiddleware = [
+    ...$authenticatedMiddleware,
     $currentTenantMiddleware,
 ];
 
+$platformMiddleware = [
+    'api',
+    'auth:'.$platformGuard,
+    $currentUserMiddleware,
+    $platformOperatorMiddleware,
+];
+
 Route::prefix('api/v1/platform')
-    ->middleware($authenticatedTenantMiddleware)
+    ->middleware($platformMiddleware)
     ->name('platform.')
     ->group(function (): void {
         Route::apiResource('tenants', TenantController::class)

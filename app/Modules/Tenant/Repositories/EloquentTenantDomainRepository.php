@@ -148,6 +148,53 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             ->delete() === 1;
     }
 
+    public function recordVerificationAttempt(
+        int|string $id,
+        int $tenantId,
+        bool $verified,
+        ?string $error,
+        \DateTimeInterface $attemptedAt,
+        ?\DateTimeInterface $revalidationDueAt = null,
+        ?\DateTimeInterface $graceExpiresAt = null,
+    ): void {
+        $attributes = [
+            'last_verification_attempt_at' => $attemptedAt,
+            'verification_last_error' => $verified ? null : mb_substr(trim((string) $error), 0, 500),
+            'updated_at' => $attemptedAt,
+        ];
+
+        if ($verified) {
+            $attributes['last_verified_at'] = $attemptedAt;
+            $attributes['verification_failure_count'] = 0;
+            $attributes['revalidation_due_at'] = $revalidationDueAt;
+            $attributes['verification_grace_expires_at'] = $graceExpiresAt;
+        } else {
+            $attributes['verification_failure_count'] = \Illuminate\Support\Facades\DB::raw(
+                'verification_failure_count + 1',
+            );
+        }
+
+        $this->model->newQuery()
+            ->whereKey($id)
+            ->where('tenant_id', $tenantId)
+            ->update($attributes);
+    }
+
+    public function listDueForRevalidation(\DateTimeInterface $dueAt, int $limit): array
+    {
+        return $this->model->newQuery()
+            ->where('status', 'active')
+            ->whereNotNull('verified_token_hash')
+            ->whereNotNull('revalidation_due_at')
+            ->where('revalidation_due_at', '<=', $dueAt)
+            ->orderBy('revalidation_due_at')
+            ->limit(max(1, min($limit, 500)))
+            ->get()
+            ->map(fn (Model $model): DataRecord => $this->record($model))
+            ->values()
+            ->all();
+    }
+
     private function record(Model $model): DataRecord
     {
         return new DataRecord($model->attributesToArray());

@@ -21,13 +21,12 @@ import {
     listTenantPlans,
     updatePlatformTenant,
 } from './tenantApi';
-import { tenantPermissions } from './tenantPermissions';
 import type { TenantRecord } from './tenantTypes';
 
 export default function PlatformTenantsPage() {
     const auth = useAuth();
-    const canManage = auth.permissions.includes(tenantPermissions.platformManage);
-    const canLifecycle = auth.permissions.includes(tenantPermissions.platformManageLifecycle);
+    const canManage = auth.isPlatformOperator;
+    const canLifecycle = auth.isPlatformOperator;
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
