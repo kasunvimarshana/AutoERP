@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -32,10 +32,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
 
-    useEffect(() => {
-        const firstType = options.data?.document_types[0];
-        if (type === '' && firstType) setType(firstType);
-    }, [options.data, type]);
+    const selectedType = type || options.data?.document_types[0] || '';
 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -44,7 +41,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
         setSaving(true);
         setError(null);
         const payload = new FormData();
-        payload.set('document_type', type);
+        payload.set('document_type', selectedType);
         if (description.trim() !== '') payload.set('description', description.trim());
         payload.set('file', file);
 
@@ -101,7 +98,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
             <form className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-3" onSubmit={submit}>
                 <Select
                     label="Document type"
-                    value={type}
+                    value={selectedType}
                     error={fieldError(error, 'document_type')}
                     options={(options.data?.document_types ?? []).map((value) => ({
                         value,
@@ -127,7 +124,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
                     required
                     onChange={(event) => { formGuard.markDirty(); setFile(event.target.files?.[0] ?? null); }}
                 />
-                <Button type="submit" loading={saving || options.loading} disabled={!file || !type || !options.data}>Upload document</Button>
+                <Button type="submit" loading={saving || options.loading} disabled={!file || !selectedType || !options.data}>Upload document</Button>
             </form>
             {result.loading ? <LoadingState /> : (
                 <DataTable

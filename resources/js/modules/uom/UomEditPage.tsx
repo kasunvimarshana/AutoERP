@@ -23,7 +23,9 @@ export default function UomEditPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         getUom(uomId, controller.signal)
             .then((uom) => {
                 if (controller.signal.aborted) return;

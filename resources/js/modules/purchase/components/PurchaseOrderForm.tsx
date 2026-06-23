@@ -188,8 +188,10 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         if (order) return;
 
         const controller = new AbortController();
-        setCreateContextLoading(true);
-        setCreateContextError(null);
+        queueMicrotask(() => {
+            setCreateContextLoading(true);
+            setCreateContextError(null);
+        });
         void getPurchaseOrderCreateContext(controller.signal)
             .then((context) => {
                 if (controller.signal.aborted) return;

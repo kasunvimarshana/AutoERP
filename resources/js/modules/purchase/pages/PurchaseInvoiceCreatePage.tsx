@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -44,6 +45,7 @@ const initialSourceParams: Array<InitialSourceParamDefinition<PurchaseInvoiceSou
 ];
 
 export default function PurchaseInvoiceCreatePage() {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [sourceType, setSourceType] = useState<PurchaseInvoiceSourceType>('goods_receipt_note');
@@ -103,7 +105,7 @@ export default function PurchaseInvoiceCreatePage() {
                             getPurchaseOrder(sourceId, signal),
                             getInvoiceablePurchaseOrderLines(sourceId, signal),
                         ]);
-                        const label = order.purchase_order_number ?? `Purchase Order #${order.id}`;
+                        const label = order.purchase_order_number ?? 'Purchase order number unavailable';
 
                         return {
                             source: { type, id: order.id, label },
@@ -121,7 +123,7 @@ export default function PurchaseInvoiceCreatePage() {
                         getGoodsReceipt(sourceId, signal),
                         getInvoiceableGoodsReceiptLines(sourceId, signal),
                     ]);
-                    const label = grn.grn_number ?? `Goods Receipt #${grn.id}`;
+                    const label = grn.grn_number ?? 'Goods receipt number unavailable';
 
                     return {
                         source: { type, id: grn.id, label },
@@ -214,6 +216,28 @@ export default function PurchaseInvoiceCreatePage() {
         }
     };
 
+    const changeSupplier = async (value: NamedResource | null) => {
+        if (sources.length > 0 && value?.id !== supplier?.id && !await confirm({
+            title: 'Change supplier?',
+            message: 'Changing the supplier clears all selected invoice sources.',
+            confirmLabel: 'Change supplier',
+        })) return;
+        setSupplier(value);
+        if (value?.id !== supplier?.id) clearInvoiceSources();
+        setPreview(null);
+    };
+
+    const changeCurrency = async (value: NamedResource | null) => {
+        if (sources.length > 0 && value?.id !== currency?.id && !await confirm({
+            title: 'Change currency?',
+            message: 'Changing the currency clears all selected invoice sources.',
+            confirmLabel: 'Change currency',
+        })) return;
+        setCurrency(value);
+        if (value?.id !== currency?.id) clearInvoiceSources();
+        setPreview(null);
+    };
+
     const createInvoice = async () => {
         if (hasLoadingSources) return;
 
@@ -230,7 +254,8 @@ export default function PurchaseInvoiceCreatePage() {
     };
 
     return (
-        <PurchaseDocumentShell
+        <>
+            <PurchaseDocumentShell
             header={<PurchasePageHeader
                 title="Create Supplier Invoice"
                 description="Create a canonical supplier invoice from eligible Purchase sources."
@@ -239,18 +264,8 @@ export default function PurchaseInvoiceCreatePage() {
             <ErrorAlert error={error} />
             <Panel title="Invoice header">
                 <div className="grid gap-4 md:grid-cols-4">
-                    <SupplierLookupSelect value={supplier} onChange={(value) => {
-                        if (sources.length > 0 && value?.id !== supplier?.id && !window.confirm('Changing supplier clears selected invoice sources.')) return;
-                        setSupplier(value);
-                        if (value?.id !== supplier?.id) clearInvoiceSources();
-                        setPreview(null);
-                    }} error={errorFor('supplier_id')} />
-                    <CurrencyLookupSelect value={currency} onChange={(value) => {
-                        if (sources.length > 0 && value?.id !== currency?.id && !window.confirm('Changing currency clears selected invoice sources.')) return;
-                        setCurrency(value);
-                        if (value?.id !== currency?.id) clearInvoiceSources();
-                        setPreview(null);
-                    }} error={errorFor('currency_id')} />
+                    <SupplierLookupSelect value={supplier} onChange={(value) => void changeSupplier(value)} error={errorFor('supplier_id')} />
+                    <CurrencyLookupSelect value={currency} onChange={(value) => void changeCurrency(value)} error={errorFor('currency_id')} />
                     <Input label="Invoice date" type="date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => { setInvoiceDate(event.target.value); setPreview(null); }} />
                     <Input label="Due date" type="date" value={dueDate} error={errorFor('due_date')} onChange={(event) => { setDueDate(event.target.value); setPreview(null); }} />
                     <Input label="Invoice number" value={invoiceNumber} error={errorFor('invoice_number')} onChange={(event) => { setInvoiceNumber(event.target.value); setPreview(null); }} />
@@ -305,7 +320,9 @@ export default function PurchaseInvoiceCreatePage() {
                 <Button type="button" variant="secondary" loading={busy} disabled={hasLoadingSources} onClick={runPreview}>Preview</Button>
                 <Button type="button" loading={busy} disabled={hasLoadingSources} onClick={() => void createInvoice()}>Create invoice</Button>
             </div>
-        </PurchaseDocumentShell>
+            </PurchaseDocumentShell>
+            {confirmDialog}
+        </>
     );
 }
 
@@ -357,6 +374,6 @@ function isInvoiceLine(line: EditablePurchaseInvoiceLine | null): line is Editab
     return line !== null;
 }
 
-function fallbackSourceLabel(type: PurchaseInvoiceSourceType, sourceId: number): string {
-    return type === 'purchase_order' ? `Purchase Order #${sourceId}` : `Goods Receipt #${sourceId}`;
+function fallbackSourceLabel(type: PurchaseInvoiceSourceType, _sourceId: number): string {
+    return type === 'purchase_order' ? 'Selected purchase order' : 'Selected goods receipt';
 }

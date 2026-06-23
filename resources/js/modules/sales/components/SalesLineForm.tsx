@@ -54,15 +54,19 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 
     useEffect(() => {
         if (!draft.item?.id) {
-            setContext(null);
-            setContextError(null);
-            setContextLoading(false);
+            queueMicrotask(() => {
+                setContext(null);
+                setContextError(null);
+                setContextLoading(false);
+            });
             return;
         }
 
         const controller = new AbortController();
-        setContextLoading(true);
-        setContextError(null);
+        queueMicrotask(() => {
+            setContextLoading(true);
+            setContextError(null);
+        });
         void getSalesItemContext(draft.item.id, {
             item_variant_id: draft.item_variant_id ?? undefined,
             currency_id: currencyId,
@@ -113,15 +117,15 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 
     const variantOptions = context?.variants.map((variant) => ({
         value: variant.id,
-        label: [variant.code, variant.name].filter(Boolean).join(' - ') || `Variant #${variant.id}`,
+        label: [variant.code, variant.name].filter(Boolean).join(' - ') || 'Unnamed variant',
     })) ?? [];
     const uomOptions = context?.allowed_sales_uoms.map((row) => ({
         value: row.id,
-        label: [row.uom?.code, row.uom?.name].filter(Boolean).join(' - ') || `UOM #${row.id}`,
+        label: [row.uom?.code, row.uom?.name].filter(Boolean).join(' - ') || 'Unnamed unit of measure',
     })) ?? [];
     const taxGroupOptions = config.taxGroupOptions?.map((group) => ({
         value: group.id,
-        label: [group.code, group.name].filter(Boolean).join(' - ') || `Tax group #${group.id}`,
+        label: [group.code, group.name].filter(Boolean).join(' - ') || 'Unnamed tax group',
     })) ?? [];
 
     return (

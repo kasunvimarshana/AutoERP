@@ -105,8 +105,11 @@ export default function TechnicianWorkReportPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError(null);
+        });
         runTechnicianWorkReport(cleanParams(filters), controller.signal)
             .then((data) => {
                 if (!controller.signal.aborted) setResult(data);

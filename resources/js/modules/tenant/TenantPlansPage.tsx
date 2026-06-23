@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -56,21 +56,24 @@ export default function TenantPlansPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [deactivateTarget, setDeactivateTarget] = useState<TenantPlan | null>(null);
 
-    useEffect(() => {
-        setName(editing?.name ?? '');
-        setSlug(editing?.slug ?? '');
-        setPrice(editing?.price ?? '0.000000');
-        setCurrencyId(editing?.currency_id ? String(editing.currency_id) : '');
-        setInterval(editing?.billing_interval ?? 'month');
-        setEnabledModules(editing?.features?.enabled_modules ?? []);
+    function startEditing(plan: TenantPlan) {
+        setEditing(plan);
+        setName(plan.name);
+        setSlug(plan.slug);
+        setPrice(plan.price);
+        setCurrencyId(plan.currency_id ? String(plan.currency_id) : '');
+        setInterval(plan.billing_interval);
+        setEnabledModules(plan.features?.enabled_modules ?? []);
         setLimits({
-            max_users: toLimitValue(editing?.limits?.max_users),
-            max_organization_units: toLimitValue(editing?.limits?.max_organization_units),
-            max_warehouses: toLimitValue(editing?.limits?.max_warehouses),
-            max_storage_mb: toLimitValue(editing?.limits?.max_storage_mb),
+            max_users: toLimitValue(plan.limits?.max_users),
+            max_organization_units: toLimitValue(plan.limits?.max_organization_units),
+            max_warehouses: toLimitValue(plan.limits?.max_warehouses),
+            max_storage_mb: toLimitValue(plan.limits?.max_storage_mb),
         });
-        setActive(editing?.is_active ?? true);
-    }, [editing]);
+        setActive(plan.is_active);
+        setError(null);
+    }
+
 
     async function save(event: FormEvent) {
         event.preventDefault();
@@ -239,7 +242,7 @@ export default function TenantPlansPage() {
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button variant="secondary" disabled={saving} onClick={() => setEditing(plan)}>Edit</Button>
+                                        <Button variant="secondary" disabled={saving} onClick={() => startEditing(plan)}>Edit</Button>
                                         {plan.is_active && <Button variant="danger" disabled={saving} onClick={() => setDeactivateTarget(plan)}>Deactivate</Button>}
                                     </div>
                                 </div>

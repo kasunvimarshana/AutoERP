@@ -63,8 +63,7 @@ export default function AuditLogDetailPage() {
                     <Panel title="Source">
                         <DetailGrid items={[
                             { label: 'Type', value: record.source.type ?? '-' },
-                            { label: 'ID', value: record.source.id ?? '-' },
-                            { label: 'Reference', value: record.source.reference ?? '-' },
+                                            { label: 'Reference', value: record.source.reference ?? '-' },
                             { label: 'Tags', value: record.tags.length > 0 ? record.tags.join(', ') : '-' },
                             { label: 'Sensitive details', value: record.sensitive_details_visible ? 'Visible' : 'Restricted' },
                             { label: 'Producer key', value: record.producer_key ?? '-' },

@@ -35,7 +35,7 @@ export default function VehicleAvailabilityPage() {
             key: "number",
             header: "Vehicle",
             render: (row) =>
-                row.vehicle_number ?? row.registration_number ?? `#${row.id}`,
+                row.vehicle_number ?? row.registration_number ?? 'Vehicle details unavailable',
         },
         {
             key: "registration",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -40,11 +40,13 @@ export default function VehicleEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const initialSnapshot = useRef<string | null>(null);
+    const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         getVehicle(vehicleId, controller.signal)
             .then((value) => {
                 if (controller.signal.aborted) return;
@@ -55,13 +57,13 @@ export default function VehicleEditPage() {
                 setCategory(value.category as VehicleCategory ?? null);
                 const mapped = vehicleToPayload(value);
                 setPayload(mapped);
-                initialSnapshot.current = JSON.stringify({
+                setInitialSnapshot(JSON.stringify({
                     payload: mapped,
                     makeId: value.make?.id ?? null,
                     modelId: value.model?.id ?? null,
                     typeId: value.type?.id ?? null,
                     categoryId: value.category?.id ?? null,
-                });
+                }));
                 setError(null);
             })
             .catch((requestError) => {
@@ -88,7 +90,7 @@ export default function VehicleEditPage() {
         typeId: type?.id ?? null,
         categoryId: category?.id ?? null,
     });
-    const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot.current && snapshot !== initialSnapshot.current && !submitting));
+    const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot && snapshot !== initialSnapshot && !submitting));
 
     if (!canUpdate) {
         return (

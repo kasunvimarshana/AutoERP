@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -16,6 +17,7 @@ import { accessPermissions, hasAccessPermission } from './accessPermissions';
 
 export default function RoleListPage() {
     const auth = useAuth();
+    const { confirm, confirmDialog } = useConfirmDialog();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -31,7 +33,7 @@ export default function RoleListPage() {
     }, signal), [debouncedSearch, page]);
 
     const deleteRole = async (role: AccessRole) => {
-        if (!window.confirm(`Delete role "${role.name}"?`)) return;
+        if (!await confirm({ title: 'Delete role', message: `Delete the role “${role.name}”? This cannot be undone.`, confirmLabel: 'Delete role' })) return;
         setDeletingId(role.id);
         setActionError(null);
         try {
@@ -44,7 +46,7 @@ export default function RoleListPage() {
         }
     };
 
-    const columns = useMemo<DataColumn<AccessRole>[]>(() => [
+    const columns: DataColumn<AccessRole>[] = [
         { key: 'name', header: 'Name', render: (row) => <span className="font-semibold text-slate-900">{row.name}</span> },
         { key: 'code', header: 'Code', render: (row) => row.code ?? row.guard_name ?? '-' },
         { key: 'description', header: 'Description', render: (row) => row.description ?? '-' },
@@ -65,7 +67,7 @@ export default function RoleListPage() {
                 </div>
             ),
         },
-    ], [canDelete, canUpdate, deletingId]);
+    ];
 
     return (
         <>
@@ -88,6 +90,7 @@ export default function RoleListPage() {
                 />
             )}
             <Pagination meta={roles.data?.meta} onPageChange={setPage} />
+            {confirmDialog}
         </>
     );
 }

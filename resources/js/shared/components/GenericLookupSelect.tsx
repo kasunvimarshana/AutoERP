@@ -50,14 +50,14 @@ export function GenericLookupSelect<T extends NamedResource>({
     const inputRef = useRef<HTMLInputElement>(null);
     const listboxRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<AbortController | null>(null);
+    const searchRef = useRef(search);
     const requestSeqRef = useRef(0);
     const inFlightKeyRef = useRef<string | null>(null);
-    const skipNextValueSyncRef = useRef(false);
     const excludedKey = normalizeExcludedIds(excludeId, excludeIds).join('|');
     const excludedIds = useMemo(() => new Set(excludedKey ? excludedKey.split('|') : []), [excludedKey]);
 
     const selectedLabel = useMemo(() => value ? formatLabel(value) : '', [formatLabel, value]);
-    const [inputValue, setInputValue] = useState(selectedLabel);
+    const [inputValue, setInputValue] = useState('');
     const [hasUserInput, setHasUserInput] = useState(false);
     const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<T[]>([]);
@@ -73,8 +73,10 @@ export function GenericLookupSelect<T extends NamedResource>({
 
     const searchText = hasUserInput ? inputValue.trim() : '';
     const debouncedSearchText = useDebounce(searchText, debounceMs);
-    const activeOptionId = activeIndex >= 0 && options[activeIndex]
-        ? `${listboxId}-option-${options[activeIndex].id}`
+    const visibleOptions = useMemo(() => filterExcluded(options, excludedIds), [excludedIds, options]);
+    const normalizedActiveIndex = activeIndex >= 0 && activeIndex < visibleOptions.length ? activeIndex : -1;
+    const activeOptionId = normalizedActiveIndex >= 0
+        ? `${listboxId}-option-${visibleOptions[normalizedActiveIndex].id}`
         : undefined;
     const canLoadCurrentSearch = canLoad(searchText, minSearchLength, loadOnOpen);
     const minimumMessage = open && !canLoadCurrentSearch
@@ -86,16 +88,24 @@ export function GenericLookupSelect<T extends NamedResource>({
         && searchText !== debouncedSearchText;
     const hasMore = Boolean(meta && meta.current_page < meta.last_page);
 
-    const abortRequest = useCallback((resetLoading = true) => {
+    useEffect(() => {
+        searchRef.current = search;
+    }, [search]);
+
+    const cancelRequest = useCallback(() => {
         requestRef.current?.abort();
         requestRef.current = null;
         inFlightKeyRef.current = null;
         requestSeqRef.current += 1;
+    }, []);
+
+    const abortRequest = useCallback((resetLoading = true) => {
+        cancelRequest();
         if (resetLoading) {
             setLoading(false);
             setLoadingMore(false);
         }
-    }, []);
+    }, [cancelRequest]);
 
     const clearResults = useCallback(() => {
         setOptions([]);
@@ -116,7 +126,8 @@ export function GenericLookupSelect<T extends NamedResource>({
         if (!disabled) setOpen(true);
     }, [disabled]);
 
-    const loadPage = useCallback((term: string, page: number, mode: 'replace' | 'append') => {
+    const loadPage = useCallback(async (term: string, page: number, mode: 'replace' | 'append') => {
+        await Promise.resolve();
         const requestKey = `${term}\n${page}\n${perPage}`;
         if (inFlightKeyRef.current === requestKey) return;
 
@@ -143,11 +154,11 @@ export function GenericLookupSelect<T extends NamedResource>({
 
         void (async () => {
             try {
-                const result = await search({ search: term, page, perPage, signal: controller.signal });
+                const result = await searchRef.current({ search: term, page, perPage, signal: controller.signal });
                 if (controller.signal.aborted || requestSeqRef.current !== requestSeq) return;
 
-                const filtered = dedupeById(filterExcluded(result.data, excludedIds));
-                setOptions((current) => mode === 'append' ? dedupeById([...current, ...filtered]) : filtered);
+                const nextOptions = dedupeById(result.data);
+                setOptions((current) => mode === 'append' ? dedupeById([...current, ...nextOptions]) : nextOptions);
                 setMeta(result.meta);
                 setLoadedSearch(term);
                 setHasLoaded(true);
@@ -174,23 +185,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 }
             }
         })();
-    }, [excludedIds, perPage, search]);
-
-    useEffect(() => {
-        if (skipNextValueSyncRef.current && value === null) {
-            skipNextValueSyncRef.current = false;
-            return;
-        }
-
-        setInputValue(selectedLabel);
-        setHasUserInput(false);
-        setActiveIndex(-1);
-    }, [selectedLabel, value]);
-
-    useEffect(() => {
-        abortRequest();
-        clearResults();
-    }, [abortRequest, clearResults, excludedKey, search]);
+    }, [perPage]);
 
     useEffect(() => {
         if (!open || disabled) return;
@@ -204,18 +199,14 @@ export function GenericLookupSelect<T extends NamedResource>({
     }, [closeDropdown, disabled, open]);
 
     useEffect(() => {
-        if (disabled) {
-            closeDropdown();
-            abortRequest();
-        }
-    }, [abortRequest, closeDropdown, disabled]);
+        if (disabled) cancelRequest();
+    }, [cancelRequest, disabled]);
 
-    useEffect(() => () => abortRequest(false), [abortRequest]);
+    useEffect(() => cancelRequest, [cancelRequest]);
 
     useEffect(() => {
         const message = required && value === null ? requiredSelectionMessage(label) : '';
         inputRef.current?.setCustomValidity(message);
-        if (value !== null) setSelectionError('');
     }, [label, required, value]);
 
     useEffect(() => {
@@ -235,16 +226,16 @@ export function GenericLookupSelect<T extends NamedResource>({
         if (!open || disabled) return;
 
         if (!canLoadCurrentSearch) {
-            abortRequest();
-            clearResults();
+            cancelRequest();
+            queueMicrotask(clearResults);
             return;
         }
 
         if (searchText.length > 0 && searchText !== debouncedSearchText) return;
 
-        loadPage(searchText, 1, 'replace');
+        void Promise.resolve().then(() => loadPage(searchText, 1, 'replace'));
     }, [
-        abortRequest,
+        cancelRequest,
         canLoadCurrentSearch,
         clearResults,
         debouncedSearchText,
@@ -260,9 +251,9 @@ export function GenericLookupSelect<T extends NamedResource>({
                 ref={inputRef}
                 id={inputId}
                 label={label}
-                value={inputValue}
+                value={hasUserInput ? inputValue : selectedLabel}
                 placeholder={placeholder}
-                error={error ?? selectionError}
+                error={error ?? (value === null ? selectionError : '')}
                 disabled={disabled}
                 required={required}
                 role="combobox"
@@ -297,14 +288,10 @@ export function GenericLookupSelect<T extends NamedResource>({
                     abortRequest();
                     clearResults();
 
-                    if (value) {
-                        skipNextValueSyncRef.current = true;
-                        if (onChange(null) === false) {
-                            skipNextValueSyncRef.current = false;
-                            setInputValue(selectedLabel);
-                            setHasUserInput(false);
-                            closeDropdown();
-                        }
+                    if (value && onChange(null) === false) {
+                        setInputValue('');
+                        setHasUserInput(false);
+                        closeDropdown();
                     }
                 }}
             />
@@ -318,7 +305,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                     className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
                 >
                     {minimumMessage && <LookupMessage>{minimumMessage}</LookupMessage>}
-                    {(loading || waitingForDebounce) && options.length === 0 && (
+                    {(loading || waitingForDebounce) && visibleOptions.length === 0 && (
                         <LookupMessage role="status">Searching...</LookupMessage>
                     )}
                     {searchError && (
@@ -334,18 +321,18 @@ export function GenericLookupSelect<T extends NamedResource>({
                             </button>
                         </div>
                     )}
-                    {!loading && !waitingForDebounce && hasLoaded && options.length === 0 && !searchError && (
+                    {!loading && !waitingForDebounce && hasLoaded && visibleOptions.length === 0 && !searchError && (
                         <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
                     )}
 
-                    {options.map((option, index) => (
+                    {visibleOptions.map((option, index) => (
                         <button
                             key={option.id}
                             id={`${listboxId}-option-${option.id}`}
                             type="button"
                             role="option"
                             aria-selected={Number(option.id) === Number(value?.id)}
-                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${activeIndex === index ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
+                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${normalizedActiveIndex === index ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
                             onMouseDown={(event) => event.preventDefault()}
                             onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => selectOption(option)}
@@ -354,7 +341,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                         </button>
                     ))}
 
-                    {options.length > 0 && hasMore && !searchError && (
+                    {visibleOptions.length > 0 && hasMore && !searchError && (
                         <div className="mt-1 border-t border-slate-100 pt-1">
                             <button
                                 type="button"
@@ -375,7 +362,7 @@ export function GenericLookupSelect<T extends NamedResource>({
 
     function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
         if (event.key === 'Escape') {
-            setInputValue(selectedLabel);
+            setInputValue('');
             setHasUserInput(false);
             setSelectionError('');
             closeDropdown();
@@ -394,7 +381,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 openDropdown();
                 return;
             }
-            if (options.length > 0) {
+            if (visibleOptions.length > 0) {
                 setActiveIndex((index) => index < options.length - 1 ? index + 1 : 0);
             }
             return;
@@ -406,21 +393,21 @@ export function GenericLookupSelect<T extends NamedResource>({
                 openDropdown();
                 return;
             }
-            if (options.length > 0) {
+            if (visibleOptions.length > 0) {
                 setActiveIndex((index) => index > 0 ? index - 1 : options.length - 1);
             }
             return;
         }
 
-        if (event.key === 'Enter' && open && activeIndex >= 0 && options[activeIndex]) {
+        if (event.key === 'Enter' && open && normalizedActiveIndex >= 0 && visibleOptions[normalizedActiveIndex]) {
             event.preventDefault();
-            selectOption(options[activeIndex]);
+            selectOption(visibleOptions[normalizedActiveIndex]);
         }
     }
 
     function selectOption(option: T) {
         if (onChange(option) === false) return;
-        setInputValue(formatLabel(option));
+        setInputValue('');
         setHasUserInput(false);
         setSelectionError('');
         closeDropdown();
@@ -428,7 +415,7 @@ export function GenericLookupSelect<T extends NamedResource>({
 
     function reconcileUnselectedText() {
         if (value !== null) {
-            setInputValue(selectedLabel);
+            setInputValue('');
             setHasUserInput(false);
             return;
         }

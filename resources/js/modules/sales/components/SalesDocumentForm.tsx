@@ -75,21 +75,23 @@ export function SalesDocumentForm({
     const errorFor = (name: string) => fieldError(error, name);
 
     useEffect(() => {
-        if (kind !== 'order' || document || warehouseTouched.current || warehouse || location) return;
+        if (kind !== 'order' || document || warehouseTouched.current) return;
 
         const controller = new AbortController();
-        setDefaultWarehouseLoading(true);
-        setDefaultWarehouseError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setDefaultWarehouseLoading(true);
+            setDefaultWarehouseError(null);
+        });
         void getDefaultWarehouse(controller.signal)
             .then(async (defaultWarehouse) => {
-                if (controller.signal.aborted || warehouseTouched.current || warehouse || !defaultWarehouse) return;
+                if (controller.signal.aborted || warehouseTouched.current || !defaultWarehouse) return;
+                const defaultLocation = locationTouched.current
+                    ? null
+                    : await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
+                if (controller.signal.aborted || warehouseTouched.current) return;
                 setWarehouse(defaultWarehouse);
-
-                if (locationTouched.current || location) return;
-                const defaultLocation = await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
-                if (!controller.signal.aborted && !locationTouched.current && !location && defaultLocation) {
-                    setLocation(defaultLocation);
-                }
+                if (!locationTouched.current && defaultLocation) setLocation(defaultLocation);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) setDefaultWarehouseError(toApiError(requestError));

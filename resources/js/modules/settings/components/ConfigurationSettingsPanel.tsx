@@ -5,6 +5,7 @@ import type { ReferenceCatalog, ReferenceRecord } from '@/modules/reference-data
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit, mode }: Props) {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const scopes = useMemo(() => availableScopes(hasOrganizationUnit, mode), [hasOrganizationUnit, mode]);
     const [scope, setScope] = useState<ConfigurationScope>(scopes[0]?.value ?? 'tenant');
     const [prefix, setPrefix] = useState('');
@@ -80,7 +82,7 @@ export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit, m
     ];
 
     async function remove(entry: ConfigurationEntry) {
-        if (!window.confirm(`Remove the ${entry.label} override from this scope? The inherited value will take effect.`)) return;
+        if (!await confirm({ title: 'Remove configuration override', message: `Remove the ${entry.label} override from this scope? The inherited value will take effect.`, confirmLabel: 'Remove override' })) return;
         setWorking(true);
         setActionError(null);
         try {
@@ -157,6 +159,7 @@ export function ConfigurationSettingsPanel({ permissions, hasOrganizationUnit, m
                     />
                 )}
             </Modal>
+            {confirmDialog}
         </section>
     );
 }

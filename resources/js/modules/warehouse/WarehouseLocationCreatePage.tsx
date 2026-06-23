@@ -43,11 +43,14 @@ export default function WarehouseLocationCreatePage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setDefaultWarehouseLoading(true);
-        setDefaultWarehouseError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setDefaultWarehouseLoading(true);
+            setDefaultWarehouseError(null);
+        });
         void getDefaultWarehouse(controller.signal)
             .then((defaultWarehouse) => {
-                if (controller.signal.aborted || warehouseTouched.current || form.warehouse_id || !defaultWarehouse) return;
+                if (controller.signal.aborted || warehouseTouched.current || !defaultWarehouse) return;
                 setWarehouse(defaultWarehouse);
                 setForm((current) => current.warehouse_id ? current : { ...current, warehouse_id: Number(defaultWarehouse.id) });
             })

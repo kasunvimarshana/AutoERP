@@ -37,7 +37,7 @@ export default function FinanceJournalDetailPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        load(controller.signal)
+        void Promise.resolve().then(() => load(controller.signal))
             .catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
             .finally(() => !controller.signal.aborted && setLoading(false));
         return () => controller.abort();

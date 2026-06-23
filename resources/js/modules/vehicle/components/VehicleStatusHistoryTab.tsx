@@ -14,7 +14,9 @@ export function VehicleStatusHistoryTab({ vehicleId }: { vehicleId: number }) {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         listVehicleStatusHistory(vehicleId, { per_page: 50 }, controller.signal)
             .then((response) => {
                 if (!controller.signal.aborted) setRows(response.data);

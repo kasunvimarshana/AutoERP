@@ -265,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!getStoredApiContext().hasSession || user || bootstrapError) return;
 
         const controller = new AbortController();
-        void loadCurrentUser(controller.signal);
+        void Promise.resolve().then(() => loadCurrentUser(controller.signal));
 
         return () => controller.abort();
     }, [bootstrapError, loadCurrentUser, user]);

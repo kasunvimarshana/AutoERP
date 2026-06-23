@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState, type DependencyList } from 'react';
 import { ApiError, toApiError } from '@/shared/api/apiError';
 
 interface ApiState<T> {
@@ -7,55 +7,74 @@ interface ApiState<T> {
     loading: boolean;
 }
 
+/**
+ * Loads an API resource and reloads it whenever a serializable dependency changes.
+ * Dependency values must be primitives, null, or JSON-serializable value objects.
+ */
 export function useApi<T>(
     request: (signal: AbortSignal) => Promise<T>,
     dependencies: DependencyList,
     enabled = true,
     clearOnLoad = true,
 ) {
-    const requestRef = useRef(request);
-    requestRef.current = request;
+    const executeRequest = useEffectEvent(request);
+    const dependencyKey = serializeDependencies(dependencies);
     const [state, setState] = useState<ApiState<T>>({ data: null, error: null, loading: enabled });
     const [version, setVersion] = useState(0);
 
     const reload = useCallback(() => setVersion((current) => current + 1), []);
 
     useEffect(() => {
+        const controller = new AbortController();
+
         if (!enabled) {
-            setState((current) => ({
-                data: clearOnLoad ? null : current.data,
-                error: null,
-                loading: false,
-            }));
-            return;
+            queueMicrotask(() => {
+                if (controller.signal.aborted) return;
+                setState((current) => ({
+                    data: clearOnLoad ? null : current.data,
+                    error: null,
+                    loading: false,
+                }));
+            });
+            return () => controller.abort();
         }
 
-        const controller = new AbortController();
-        setState((current) => ({
-            data: clearOnLoad ? null : current.data,
-            loading: true,
-            error: null,
-        }));
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setState((current) => ({
+                data: clearOnLoad ? null : current.data,
+                loading: true,
+                error: null,
+            }));
+        });
+
         void (async () => {
             try {
-                const data = await requestRef.current(controller.signal);
+                const data = await executeRequest(controller.signal);
                 if (!controller.signal.aborted) {
-                    setState((current) => ({ ...current, data, error: null }));
+                    setState({ data, error: null, loading: false });
                 }
             } catch (error: unknown) {
                 if (!controller.signal.aborted) {
-                    setState((current) => ({ ...current, error: toApiError(error) }));
-                }
-            } finally {
-                if (!controller.signal.aborted) {
-                    setState((current) => ({ ...current, loading: false }));
+                    setState((current) => ({ ...current, error: toApiError(error), loading: false }));
                 }
             }
         })();
 
         return () => controller.abort();
-        // Dependencies are deliberately supplied by each caller.
-    }, [...dependencies, enabled, clearOnLoad, version]);
+    }, [clearOnLoad, dependencyKey, enabled, version]);
 
-    return { ...state, reload, setData: (data: T) => setState({ data, error: null, loading: false }) };
+    const setData = useCallback((data: T) => {
+        setState({ data, error: null, loading: false });
+    }, []);
+
+    return { ...state, reload, setData };
+}
+
+function serializeDependencies(dependencies: DependencyList): string {
+    return JSON.stringify(dependencies, (_key, value: unknown) => {
+        if (typeof value === 'bigint') return value.toString();
+        if (value instanceof Date) return value.toISOString();
+        return value;
+    });
 }

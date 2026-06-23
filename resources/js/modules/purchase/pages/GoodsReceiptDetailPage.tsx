@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -21,6 +22,7 @@ import { hasPurchasePermission, purchasePermissions } from '../purchasePermissio
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
 export default function GoodsReceiptDetailPage() {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const id = Number(useParams().id);
     const auth = useAuth();
     const result = useApi((signal) => getGoodsReceipt(id, signal), [id]);
@@ -36,7 +38,12 @@ export default function GoodsReceiptDetailPage() {
     const reverseBlocker = capabilityDetail(capabilities, 'can_reverse');
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'post' | 'reverse') => {
-        if (!window.confirm(`Confirm ${action} for this goods receipt?`)) return;
+        if (!await confirm({
+            title: `${action[0].toUpperCase()}${action.slice(1)} goods receipt`,
+            message: `Confirm ${action} for this goods receipt?`,
+            confirmLabel: action[0].toUpperCase() + action.slice(1),
+            danger: action === 'reverse',
+        })) return;
         setBusy(true);
         setActionError(null);
         try {
@@ -58,6 +65,7 @@ export default function GoodsReceiptDetailPage() {
     ];
 
     return (
+        <>
         <PurchaseDocumentShell
             header={<PurchasePageHeader
                 title={grn.grn_number ?? 'Goods receipt'}
@@ -101,5 +109,7 @@ export default function GoodsReceiptDetailPage() {
                 </div>
             </Panel>
         </PurchaseDocumentShell>
+            {confirmDialog}
+        </>
     );
 }

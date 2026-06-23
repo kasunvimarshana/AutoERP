@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
-import { ApiError, toApiError } from '@/shared/api/apiError';
+import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -10,6 +10,7 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { getTenantProfile, updateTenantProfile } from '../tenantApi';
+import type { TenantRecord } from '../tenantTypes';
 
 type TenantProfilePanelProps = {
     canManage: boolean;
@@ -19,36 +20,51 @@ type TenantProfilePanelProps = {
 export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfilePanelProps) {
     const profile = useApi((signal) => getTenantProfile(signal), []);
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), []);
-    const [name, setName] = useState('');
-    const [currencyId, setCurrencyId] = useState('');
-    const [crossOrg, setCrossOrg] = useState(false);
+
+    if (profile.loading && !profile.data) return <LoadingState label="Loading tenant profile..." />;
+    if (!profile.data) return <ErrorAlert error={profile.error ?? new ApiError('Tenant profile is unavailable.', null)} />;
+
+    return (
+        <TenantProfileEditor
+            key={`${profile.data.id}-${profile.data.row_version}`}
+            tenant={profile.data}
+            currencyOptions={currencies.data ?? []}
+            loadError={profile.error ?? currencies.error}
+            canManage={canManage}
+            canManageCrossOrg={canManageCrossOrg}
+            onSaved={profile.setData}
+        />
+    );
+}
+
+function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, canManageCrossOrg, onSaved }: {
+    tenant: TenantRecord;
+    currencyOptions: Array<{ id: number; code?: string | null; name: string }>;
+    loadError: ApiError | null;
+    canManage: boolean;
+    canManageCrossOrg: boolean;
+    onSaved: (tenant: TenantRecord) => void;
+}) {
+    const [name, setName] = useState(tenant.name);
+    const [currencyId, setCurrencyId] = useState(tenant.base_currency_id ? String(tenant.base_currency_id) : '');
+    const [crossOrg, setCrossOrg] = useState(tenant.cross_org_transactions);
     const [logo, setLogo] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<ApiError | null>(null);
 
-    useEffect(() => {
-        if (!profile.data) return;
-        setName(profile.data.name);
-        setCurrencyId(profile.data.base_currency_id ? String(profile.data.base_currency_id) : '');
-        setCrossOrg(profile.data.cross_org_transactions);
-        setLogo(null);
-    }, [profile.data]);
-
     async function submit(event: FormEvent) {
         event.preventDefault();
-        if (!profile.data || !canManage) return;
+        if (!canManage) return;
         setSaving(true);
         setSaveError(null);
         try {
             const payload = new FormData();
-            payload.append('expected_version', String(profile.data.row_version));
+            payload.append('expected_version', String(tenant.row_version));
             payload.append('name', name.trim());
             payload.append('base_currency_id', currencyId);
-            if (canManageCrossOrg) {
-                payload.append('cross_org_transactions', crossOrg ? '1' : '0');
-            }
+            if (canManageCrossOrg) payload.append('cross_org_transactions', crossOrg ? '1' : '0');
             if (logo) payload.append('logo', logo);
-            profile.setData(await updateTenantProfile(payload));
+            onSaved(await updateTenantProfile(payload));
         } catch (error: unknown) {
             setSaveError(toApiError(error));
         } finally {
@@ -56,13 +72,9 @@ export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfi
         }
     }
 
-    if (profile.loading && !profile.data) return <LoadingState label="Loading tenant profile..." />;
-    if (!profile.data) return <ErrorAlert error={profile.error ?? new ApiError('Tenant profile is unavailable.', null)} />;
-
-    const tenant = profile.data;
     return (
         <form className="space-y-5" onSubmit={submit}>
-            <ErrorAlert error={profile.error ?? saveError} />
+            <ErrorAlert error={loadError ?? saveError} />
             <Panel title="Tenant identity">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-4">
                     <div>
@@ -72,19 +84,21 @@ export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfi
                     <StatusBadge status={tenant.status} />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Input label="Tenant name" value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage} required />
+                    <Input label="Tenant name" value={name} error={fieldError(saveError, 'name')} onChange={(event) => setName(event.target.value)} disabled={!canManage} required />
                     <Select
                         label="Base accounting currency"
                         value={currencyId}
+                        error={fieldError(saveError, 'base_currency_id')}
                         onChange={(event) => setCurrencyId(event.target.value)}
-                        disabled={!canManage || currencies.loading || tenant.activated_at !== null}
-                        options={(currencies.data ?? []).map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}` }))}
+                        disabled={!canManage || tenant.activated_at !== null}
+                        options={currencyOptions.map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}` }))}
                         placeholder="Select base currency"
                     />
                     <Input
                         label="Tenant logo"
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
+                        error={fieldError(saveError, 'logo')}
                         onChange={(event) => setLogo(event.target.files?.[0] ?? null)}
                         disabled={!canManage}
                         hint="PNG, JPEG, or WebP. Maximum 5 MB."

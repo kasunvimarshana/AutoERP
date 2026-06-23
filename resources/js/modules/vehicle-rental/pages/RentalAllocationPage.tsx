@@ -63,7 +63,9 @@ export default function RentalAllocationPage() {
         if (!initialAgreementId && !initialVehicleId) return;
 
         const controller = new AbortController();
-        setError(null);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
 
         void Promise.all([
             initialAgreementId

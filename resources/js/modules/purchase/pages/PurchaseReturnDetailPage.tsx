@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -20,6 +21,7 @@ import { hasPurchasePermission, purchasePermissions } from '../purchasePermissio
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
 export default function PurchaseReturnDetailPage() {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const id = Number(useParams().id);
     const auth = useAuth();
     const result = useApi((signal) => getPurchaseReturn(id, signal), [id]);
@@ -33,7 +35,12 @@ export default function PurchaseReturnDetailPage() {
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'approve' | 'post' | 'cancel') => {
         if (busy) return;
-        if (!window.confirm(`Confirm ${action} for this purchase return?`)) return;
+        if (!await confirm({
+            title: `${action[0].toUpperCase()}${action.slice(1)} purchase return`,
+            message: `Confirm ${action} for this purchase return?`,
+            confirmLabel: action[0].toUpperCase() + action.slice(1),
+            danger: action === 'cancel',
+        })) return;
         setBusy(true);
         setActionError(null);
         try {
@@ -59,6 +66,7 @@ export default function PurchaseReturnDetailPage() {
         { key: 'total', header: 'Total', render: (line) => formatMoney(line.line_total) },
     ];
     return (
+        <>
         <PurchaseDocumentShell
             header={<PurchasePageHeader
                 title={row.return_number ?? 'Purchase return'}
@@ -93,5 +101,7 @@ export default function PurchaseReturnDetailPage() {
                 </div>
             </Panel>
         </PurchaseDocumentShell>
+            {confirmDialog}
+        </>
     );
 }

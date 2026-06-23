@@ -61,8 +61,11 @@ export function PartyVehicleFormPage<P extends { id: number }, V extends { id: n
         if (relationshipId === null) return;
 
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError(null);
+        });
         void get(relationshipId, controller.signal)
             .then((relationship) => {
                 setParty((relationship[partyKey] ?? null) as P | null);

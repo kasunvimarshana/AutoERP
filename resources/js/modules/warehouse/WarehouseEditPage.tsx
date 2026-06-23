@@ -28,7 +28,9 @@ export default function WarehouseEditPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         getWarehouse(warehouseId, controller.signal)
             .then((record) => {
                 if (controller.signal.aborted) return;

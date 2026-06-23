@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton, Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -57,7 +57,7 @@ export default function UserListPage() {
         }
     };
 
-    const columns = useMemo<DataColumn<AccessUser>[]>(() => [
+    const columns: DataColumn<AccessUser>[] = [
         { key: 'name', header: 'Name', render: (row) => <div><p className="font-semibold text-slate-900">{row.name ?? [row.first_name, row.last_name].filter(Boolean).join(' ')}</p><p className="text-xs text-slate-500">{row.email}</p></div> },
         { key: 'username', header: 'Username or Email', render: (row) => row.username || row.email },
         { key: 'roles', header: 'Roles', render: (row) => labelList(row.roles?.map((role) => role.name) ?? []) },
@@ -85,7 +85,7 @@ export default function UserListPage() {
                 </div>
             ),
         },
-    ], [canActivate, canDeactivate, canUpdate, rowLoading]);
+    ];
 
     return (
         <>

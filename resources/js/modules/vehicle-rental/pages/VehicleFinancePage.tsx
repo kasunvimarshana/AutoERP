@@ -233,7 +233,7 @@ export default function VehicleFinancePage() {
                         Create payable
                     </Button>
                 ) : row.invoice_id ? (
-                    `Invoice #${row.invoice_id}`
+                    'Invoice number unavailable'
                 ) : null,
         },
     ];

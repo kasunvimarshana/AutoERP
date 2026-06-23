@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { FormDrawer } from '@/shared/components/Drawer';
@@ -26,6 +27,7 @@ import { PurchaseDocumentShell, PurchasePageHeader } from '../components/Purchas
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchaseDebitNoteDetailPage() {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const id = Number(useParams().id);
     const auth = useAuth();
     const result = useApi((signal) => getPurchaseDebitNote(id, signal), [id]);
@@ -40,7 +42,8 @@ export default function PurchaseDebitNoteDetailPage() {
     const capabilities = note.capabilities ?? {};
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     return (
-        <PurchaseDocumentShell
+        <>
+            <PurchaseDocumentShell
             header={<PurchasePageHeader
                 title={note.debit_note_number ?? 'Debit note'}
                 description={formatDate(note.debit_note_date)}
@@ -110,12 +113,19 @@ export default function PurchaseDebitNoteDetailPage() {
                     </div>
                 </form>
             </FormDrawer>
-        </PurchaseDocumentShell>
+            </PurchaseDocumentShell>
+            {confirmDialog}
+        </>
     );
 
     async function runAction(action: 'approve' | 'post') {
         if (busy) return;
-        if (!window.confirm(`Confirm ${action} for this debit note?`)) return;
+        if (!await confirm({
+            title: `${action[0].toUpperCase()}${action.slice(1)} debit note`,
+            message: `Confirm ${action} for this debit note?`,
+            confirmLabel: action[0].toUpperCase() + action.slice(1),
+            danger: false,
+        })) return;
         setBusy(true);
         setError(null);
         try {

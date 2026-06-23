@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
@@ -119,7 +119,6 @@ describe('VehicleMasterDataPage', () => {
 
     it('warns before discarding an unsaved form', async () => {
         const user = userEvent.setup();
-        const confirm = vi.mocked(window.confirm).mockReturnValue(false);
         renderPage('makes');
 
         await screen.findAllByText('Toyota');
@@ -127,8 +126,10 @@ describe('VehicleMasterDataPage', () => {
         fireEvent.change(screen.getByLabelText('Code *'), { target: { value: 'NISSAN' } });
         await user.click(screen.getByRole('button', { name: 'Close modal' }));
 
-        expect(screen.queryByRole('dialog', { name: 'Add Make' })).toBeInTheDocument();
-        expect(confirm).toHaveBeenCalledWith('You have unsaved changes. Leave this form and discard them?');
+        const discardDialog = screen.getByRole('dialog', { name: 'Discard unsaved changes?' });
+        expect(discardDialog).toBeInTheDocument();
+        await user.click(within(discardDialog).getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('dialog', { name: 'Add Make' })).toBeInTheDocument();
 
     });
 

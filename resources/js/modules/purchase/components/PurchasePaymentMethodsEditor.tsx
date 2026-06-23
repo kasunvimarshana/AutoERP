@@ -187,5 +187,5 @@ function MethodSpecificFields({ methodType, row, index, errorIndex, errorFor, up
 }
 
 function optionLabel(option: FastPurchaseOptionResource): string {
-    return `${option.code ?? ''} ${option.name ?? ''}`.trim() || `#${option.id}`;
+    return `${option.code ?? ''} ${option.name ?? ''}`.trim() || 'Unnamed payment method';
 }

@@ -5,6 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -19,6 +20,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 
 export default function ItemBrandListPage() {
     const auth = useAuth();
+    const { confirm, confirmDialog } = useConfirmDialog();
     const canManage = hasItemPermission(auth, itemPermissions.manageBrands);
     const [search, setSearch] = useState('');
     const [active, setActive] = useState('');
@@ -50,6 +52,7 @@ export default function ItemBrandListPage() {
         <ErrorAlert error={actionError ?? result.error} />
         {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item brands found." />}
         <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {confirmDialog}
     </>;
 
     async function toggle(row: ItemBrand) {
@@ -68,7 +71,7 @@ export default function ItemBrandListPage() {
     }
 
     async function remove(row: ItemBrand) {
-        if (!window.confirm(`Delete brand ${row.code}?`)) return;
+        if (!await confirm({ title: 'Delete brand', message: `Delete brand “${row.name}” (${row.code})? This cannot be undone.`, confirmLabel: 'Delete brand' })) return;
         setActionError(null);
         try {
             await deleteItemBrand(Number(row.id));

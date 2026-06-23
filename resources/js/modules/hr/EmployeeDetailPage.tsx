@@ -47,8 +47,11 @@ export default function EmployeeDetailPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError(null);
+        });
         getEmployee(id, controller.signal)
             .then((value) => {
                 if (!controller.signal.aborted) setEmployee(value);

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -47,8 +47,8 @@ export default function VehicleCreatePage() {
         vehicle_category_id: category?.id ?? null,
     }), [category, make, model, payload, type]);
     const snapshot = JSON.stringify({ finalPayload, documents: documentsForSnapshot(documents), attributes });
-    const initialSnapshot = useRef(snapshot);
-    const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot.current && !submitting);
+    const [initialSnapshot] = useState(snapshot);
+    const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot && !submitting);
 
     if (!canCreate) {
         return (

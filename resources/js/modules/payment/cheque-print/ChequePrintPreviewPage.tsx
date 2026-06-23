@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -21,10 +21,13 @@ export default function ChequePrintPreviewPage() {
     const lineId = Number(params.lineId);
     const templates = useApi((signal) => listChequeTemplates(true, signal), []);
     const [templateId, setTemplateId] = useState<number | null>(null);
+    const templateRows = templates.data?.data ?? [];
+    const defaultTemplateId = (templateRows.find((template) => template.is_default) ?? templateRows[0])?.id ?? null;
+    const selectedTemplateId = templateId ?? defaultTemplateId;
     const preview = useApi(
-        (signal) => previewCheque(paymentId, lineId, templateId ?? undefined, signal),
-        [paymentId, lineId, templateId],
-        templateId !== null,
+        (signal) => previewCheque(paymentId, lineId, selectedTemplateId ?? undefined, signal),
+        [paymentId, lineId, selectedTemplateId],
+        selectedTemplateId !== null,
     );
     const [adjustedTemplate, setAdjustedTemplate] = useState<ChequeTemplate | null>(null);
     const [notes, setNotes] = useState('');
@@ -32,21 +35,10 @@ export default function ChequePrintPreviewPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [message, setMessage] = useState('');
 
-    useEffect(() => {
-        const rows = templates.data?.data ?? [];
-        if (templateId === null && rows.length > 0) {
-            setTemplateId((rows.find((template) => template.is_default) ?? rows[0]).id);
-        }
-    }, [templateId, templates.data]);
 
-    useEffect(() => {
-        if (preview.data?.template) {
-            setAdjustedTemplate(preview.data.template);
-        }
-    }, [preview.data]);
 
     function changeCoordinate(key: ChequeCoordinateKey, value: string) {
-        setAdjustedTemplate((current) => current ? { ...current, [key]: value || null } : current);
+        setAdjustedTemplate((current) => ({ ...(current?.id === preview.data?.template.id ? current : preview.data?.template), [key]: value || null } as ChequeTemplate));
     }
 
     async function saveAlignment() {
@@ -82,11 +74,11 @@ export default function ChequePrintPreviewPage() {
         }
     }
 
-    const options = (templates.data?.data ?? []).map((template) => ({
+    const options = templateRows.map((template) => ({
         value: String(template.id),
         label: `${template.bank_name ? `${template.bank_name} - ` : ''}${template.template_name}${template.is_default ? ' (default)' : ''}`,
     }));
-    const activeTemplate = adjustedTemplate ?? preview.data?.template ?? null;
+    const activeTemplate = adjustedTemplate?.id === preview.data?.template.id ? adjustedTemplate : preview.data?.template ?? null;
 
     return (
         <div className="cheque-print-workspace">
@@ -101,7 +93,7 @@ export default function ChequePrintPreviewPage() {
                     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-end">
                         <Select
                             label="Cheque template"
-                            value={templateId ?? ''}
+                            value={selectedTemplateId ?? ''}
                             options={options}
                             onChange={(event) => setTemplateId(event.target.value ? Number(event.target.value) : null)}
                         />

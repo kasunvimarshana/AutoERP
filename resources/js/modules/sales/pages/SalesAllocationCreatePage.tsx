@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -28,6 +28,7 @@ interface AllocationDraftLine extends SalesLineSummary {
 export default function SalesAllocationCreatePage() {
     const navigate = useNavigate();
     const [params] = useSearchParams();
+    const [initialOrderId] = useState(() => parsePositiveInteger(params.get('order_id')));
     const [orderRef, setOrderRef] = useState<NamedResource | null>(null);
     const [order, setOrder] = useState<SalesOrder | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
@@ -39,7 +40,7 @@ export default function SalesAllocationCreatePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const errorFor = (name: string) => fieldError(error, name);
 
-    const loadOrder = async (selected: NamedResource | null) => {
+    const loadOrder = useCallback(async (selected: NamedResource | null) => {
         setOrderRef(selected);
         setOrder(null);
         setLines([]);
@@ -63,12 +64,12 @@ export default function SalesAllocationCreatePage() {
         } catch (requestError) {
             setError(toApiError(requestError));
         }
-    };
+    }, []);
 
     useEffect(() => {
-        const id = parsePositiveInteger(params.get('order_id'));
-        if (id !== null) void loadOrder({ id, name: 'Loading sales order...' });
-    }, []);
+        const id = initialOrderId;
+        if (id !== null) void Promise.resolve().then(() => loadOrder({ id, name: 'Loading sales order...' }));
+    }, [initialOrderId, loadOrder]);
 
     const columns: DataColumn<AllocationDraftLine>[] = [
         { key: 'item', header: 'Item', render: (row) => readableRelation(row.item) },

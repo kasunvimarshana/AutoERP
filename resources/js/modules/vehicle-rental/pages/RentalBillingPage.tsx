@@ -106,7 +106,7 @@ export default function RentalBillingPage() {
     };
 
     const columns: DataColumn<RentalCalculationRun>[] = [
-        { key: 'run', header: 'Run', render: (row) => `#${row.id} v${row.run_version}` },
+        { key: 'run', header: 'Run', render: (row) => `Billing run v${row.run_version}` },
         {
             key: 'agreement',
             header: 'Agreement',

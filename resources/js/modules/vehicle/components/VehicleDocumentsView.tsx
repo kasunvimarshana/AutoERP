@@ -20,7 +20,9 @@ export function VehicleDocumentsView({ vehicleId }: { vehicleId: number }) {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         listVehicleDocuments(vehicleId, { per_page: 50 }, controller.signal)
             .then((response) => {
                 if (!controller.signal.aborted) {

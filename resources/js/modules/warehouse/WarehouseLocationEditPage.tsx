@@ -30,7 +30,9 @@ export default function WarehouseLocationEditPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         getWarehouseLocation(locationId, controller.signal)
             .then((record) => {
                 if (controller.signal.aborted) return;

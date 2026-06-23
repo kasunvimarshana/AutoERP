@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import type { NamedResource } from '@/shared/types/common';
@@ -26,6 +27,7 @@ interface UseFastPurchaseFormOptions {
 }
 
 export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission }: UseFastPurchaseFormOptions) {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const context = useApi((signal) => getFastPurchaseContext(signal), []);
     const defaults = context.data?.defaults;
 
@@ -57,7 +59,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
     const warehouseTouched = useRef(false);
     const locationTouched = useRef(false);
     const exchangeRateTouched = useRef(false);
-    const lastPreviewKey = useRef<string | null>(null);
+    const [lastPreviewKey, setLastPreviewKey] = useState<string | null>(null);
     const previewController = useRef<AbortController | null>(null);
     const submittedLineKeys = useRef<string[]>([]);
     const submittedPaymentKeys = useRef<string[]>([]);
@@ -84,7 +86,9 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         if (!supplier?.id) return;
 
         const controller = new AbortController();
-        setSupplierContextError(null);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setSupplierContextError(null);
+        });
         void getPurchaseSupplierContext(supplier.id, controller.signal)
             .then((supplierContext) => {
                 if (controller.signal.aborted) return;
@@ -103,7 +107,9 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         if (!warehouse?.id) return;
 
         const controller = new AbortController();
-        setWarehouseLocationsError(null);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setWarehouseLocationsError(null);
+        });
         void getPurchaseWarehouseLocations(warehouse.id, controller.signal)
             .then((locations) => {
                 if (controller.signal.aborted || locationTouched.current) return;
@@ -117,11 +123,13 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         return () => controller.abort();
     }, [warehouse?.id, warehouseLocationsReload]);
 
-    const setSupplier = (next: NamedResource | null) => {
-        if (supplier?.id && next?.id && supplier.id !== next.id && lines.length > 0) {
-            const confirmed = window.confirm('Changing the supplier may refresh line UOM, price, and tax defaults.');
-            if (!confirmed) return;
-        }
+    const setSupplier = async (next: NamedResource | null) => {
+        if (supplier?.id && next?.id && supplier.id !== next.id && lines.length > 0 && !await confirm({
+            title: 'Change supplier?',
+            message: 'Changing the supplier may refresh line UOM, price, and tax defaults.',
+            confirmLabel: 'Change supplier',
+            danger: false,
+        })) return;
         setSupplierState(next);
         setLines((current) => current.map(invalidatePricingContext));
     };
@@ -221,7 +229,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
 
     const currentPayload = useMemo(() => buildPayload(), [buildPayload]);
     const payloadKey = useMemo(() => JSON.stringify(currentPayload), [currentPayload]);
-    const previewStale = Boolean(preview && !result && lastPreviewKey.current !== payloadKey);
+    const previewStale = Boolean(preview && !result && lastPreviewKey !== payloadKey);
 
     const canSubmit = useMemo(() => {
         const hasLine = lines.length > 0;
@@ -277,7 +285,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             if (controller.signal.aborted) return;
             setPreview(next);
             setResult(null);
-            lastPreviewKey.current = payloadKey;
+            setLastPreviewKey(payloadKey);
         } catch (requestError) {
             if (!controller.signal.aborted) setError(toApiError(requestError));
         } finally {
@@ -297,7 +305,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             const created = await createFastPurchase(currentPayload);
             setResult(created);
             setPreview(created);
-            lastPreviewKey.current = payloadKey;
+            setLastPreviewKey(payloadKey);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -315,11 +323,15 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         setPreview(null);
         setResult(null);
         setError(null);
-        lastPreviewKey.current = null;
+        setLastPreviewKey(null);
     };
 
-    const resetForm = () => {
-        if (!window.confirm('Reset this fast purchase form and clear entered data?')) return;
+    const resetForm = async () => {
+        if (!await confirm({
+            title: 'Reset fast purchase?',
+            message: 'Reset this fast purchase form and clear all entered data?',
+            confirmLabel: 'Reset form',
+        })) return;
         createAnother();
     };
 
@@ -392,6 +404,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         resetForm,
         errorIndexForLine,
         errorIndexForPaymentRow,
+        confirmDialog,
     };
 }
 

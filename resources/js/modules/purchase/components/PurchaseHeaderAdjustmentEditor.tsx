@@ -37,8 +37,10 @@ export function PurchaseHeaderAdjustmentEditor({ adjustments, allocationLines = 
 
     useEffect(() => {
         const controller = new AbortController();
-        setCatalogueLoading(true);
-        setCatalogueError(null);
+        queueMicrotask(() => {
+            setCatalogueLoading(true);
+            setCatalogueError(null);
+        });
         void getPurchaseAdjustmentCatalogue(controller.signal)
             .then((entries) => {
                 if (!controller.signal.aborted) setCatalogue(entries);
