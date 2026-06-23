@@ -8,6 +8,7 @@ use Illuminate\Routing\Router;
 use LogicException;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
 use Modules\Tenant\Console\Commands\TenantCreateCommand;
 use Modules\Tenant\Console\Commands\TenantDeactivateCommand;
@@ -47,7 +48,10 @@ final class TenantServiceProvider extends ServiceProvider
         $this->app->singleton(TenantRepositoryInterface::class, fn (): TenantRepositoryInterface => new EloquentTenantRepository(new TenantModel));
         $this->app->singleton(TenantPlanRepositoryInterface::class, fn (): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(new TenantPlanModel));
         $this->app->singleton(TenantDocumentRepositoryInterface::class, fn (): TenantDocumentRepositoryInterface => new EloquentTenantDocumentRepository(new TenantDocumentModel));
-        $this->app->singleton(TenantDomainRepositoryInterface::class, fn (): TenantDomainRepositoryInterface => new EloquentTenantDomainRepository(new TenantDomainModel));
+        $this->app->scoped(TenantDomainRepositoryInterface::class, fn ($app): TenantDomainRepositoryInterface => new EloquentTenantDomainRepository(
+            new TenantDomainModel,
+            $app->make(TenantExecutionContextInterface::class),
+        ));
     }
 
     public function boot(): void

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Tenant\Models;
 
 use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class TenantEventOutboxModel extends CoreModel
+final class TenantEventOutboxModel extends TenantOwnedModel
 {
     use HasImmutableTenantOwnership;
 

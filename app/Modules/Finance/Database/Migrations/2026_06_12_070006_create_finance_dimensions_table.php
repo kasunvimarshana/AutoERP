@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_dimensions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('code', 100);
             $table->string('name');
             $table->enum('dimension_type', [
@@ -32,6 +32,12 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'code'], 'finance_dimensions_tenant_code_uk');
+
+            $table->unique(['id', 'tenant_id'], 'finance_dimensions_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_dimensions_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
         });
     }
 

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('purchase_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->unsignedBigInteger('purchase_header_adjustment_id');
             $table->unsignedBigInteger('target_purchase_header_adjustment_id')->nullable();
             $table->string('stage', 80);
@@ -43,26 +43,6 @@ return new class extends Migration
             $table->json('provenance')->nullable();
             $table->timestamps();
 
-            $table->foreign('purchase_header_adjustment_id', 'purchase_adj_alloc_source_adj_fk')
-                ->references('id')
-                ->on('purchase_header_adjustments')
-                ->cascadeOnDelete();
-            $table->foreign('target_purchase_header_adjustment_id', 'purchase_adj_alloc_target_adj_fk')
-                ->references('id')
-                ->on('purchase_header_adjustments')
-                ->nullOnDelete();
-            $table->foreign('finance_posting_profile_id', 'purchase_adj_alloc_fin_profile_fk')
-                ->references('id')
-                ->on('finance_posting_profiles')
-                ->nullOnDelete();
-            $table->foreign('finance_account_id', 'purchase_adj_alloc_fin_account_fk')
-                ->references('id')
-                ->on('finance_accounts')
-                ->nullOnDelete();
-            $table->foreign('reversal_of_id', 'purchase_adj_alloc_reversal_fk')
-                ->references('id')
-                ->on('purchase_adjustment_allocations')
-                ->restrictOnDelete();
             $table->index(['tenant_id', 'organization_unit_id'], 'purchase_adj_alloc_tenant_org_idx');
             $table->index(['purchase_header_adjustment_id', 'stage'], 'purchase_adj_alloc_source_stage_idx');
             $table->index('target_purchase_header_adjustment_id', 'purchase_adj_alloc_target_adj_idx');
@@ -73,6 +53,32 @@ return new class extends Migration
             $table->index(['purchase_header_adjustment_id', 'entry_type', 'stage'], 'purchase_adj_alloc_effective_stage_idx');
             $table->index(['target_type', 'target_id', 'entry_type'], 'purchase_adj_alloc_target_effective_idx');
             $table->index(['event_type', 'entry_type'], 'purchase_adj_alloc_event_idx');
+
+            $table->unique(['id', 'tenant_id'], 'purchase_adjustment_allocations_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_adjustment_allocations_organization_uni_ff2af3ee_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['purchase_header_adjustment_id', 'tenant_id'], 'purchase_adj_alloc_source_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('purchase_header_adjustments')
+                ->cascadeOnDelete();
+            $table->foreign(['target_purchase_header_adjustment_id', 'tenant_id'], 'purchase_adj_alloc_target_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('purchase_header_adjustments')
+                ->restrictOnDelete();
+            $table->foreign(['finance_posting_profile_id', 'tenant_id'], 'purchase_adj_alloc_profile_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_posting_profiles')
+                ->restrictOnDelete();
+            $table->foreign(['finance_account_id', 'tenant_id'], 'purchase_adj_alloc_account_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_accounts')
+                ->restrictOnDelete();
+            $table->foreign(['reversal_of_id', 'tenant_id'], 'purchase_adj_alloc_reversal_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('purchase_adjustment_allocations')
+                ->restrictOnDelete();
         });
 
     }

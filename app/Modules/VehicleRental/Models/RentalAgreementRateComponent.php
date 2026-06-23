@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalAgreementRateComponent extends CoreModel
+final class RentalAgreementRateComponent extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_agreement_rate_components';

@@ -6,6 +6,7 @@ namespace Modules\User\Repositories;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Repositories\EloquentRepository;
@@ -13,33 +14,37 @@ use Modules\User\Models\UserModel;
 
 final class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
 {
-    public function __construct(UserModel $model)
-    {
+    public function __construct(
+        UserModel $model,
+        private readonly TenantExecutionContextInterface $executionContext,
+    ) {
         parent::__construct($model);
     }
 
     public function findActivePlatformOperatorCredentials(string $email): ?DataRecord
     {
-        $model = $this->query()
-            ->whereNull('tenant_id')
-            ->where('is_platform_operator', true)
-            ->where('status', 'active')
-            ->where('platform_login_email', strtolower(trim($email)))
-            ->first();
+        return $this->executionContext->runAsControlPlane(function () use ($email): ?DataRecord {
+            $model = $this->query()
+                ->whereNull('tenant_id')
+                ->where('is_platform_operator', true)
+                ->where('status', 'active')
+                ->where('platform_login_email', strtolower(trim($email)))
+                ->first();
 
-        if (! $model instanceof UserModel) {
-            return null;
-        }
+            if (! $model instanceof UserModel) {
+                return null;
+            }
 
-        return new DataRecord([
-            'id' => (int) $model->getKey(),
-            'first_name' => $model->getAttribute('first_name'),
-            'last_name' => $model->getAttribute('last_name'),
-            'email' => $model->getAttribute('platform_login_email'),
-            'password_hash' => $model->getAttribute('password'),
-            'status' => $model->getAttribute('status'),
-            'is_platform_operator' => true,
-        ]);
+            return new DataRecord([
+                'id' => (int) $model->getKey(),
+                'first_name' => $model->getAttribute('first_name'),
+                'last_name' => $model->getAttribute('last_name'),
+                'email' => $model->getAttribute('platform_login_email'),
+                'password_hash' => $model->getAttribute('password'),
+                'status' => $model->getAttribute('status'),
+                'is_platform_operator' => true,
+            ]);
+        });
     }
 
     public function countByTenant(int $tenantId): int

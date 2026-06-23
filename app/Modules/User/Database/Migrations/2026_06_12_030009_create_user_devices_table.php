@@ -34,6 +34,8 @@ return new class extends Migration
                 ->on('users')
                 ->cascadeOnDelete();
             $table->unique(['tenant_id', 'user_id', 'device_token'], 'user_devices_uk');
+
+            $table->unique(['id', 'tenant_id'], 'user_devices_id_tenant_uk');
         });
     }
 

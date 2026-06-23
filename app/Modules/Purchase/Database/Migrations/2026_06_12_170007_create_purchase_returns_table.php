@@ -13,11 +13,11 @@ return new class extends Migration
         Schema::create('purchase_returns', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('warehouse_id');
+            $table->foreignId('warehouse_location_id')->nullable();
             $table->string('return_number');
             $table->string('return_type')->default('referenced');
             $table->string('source_type')->nullable();
@@ -48,6 +48,33 @@ return new class extends Migration
             $table->index('status', 'purchase_returns_status_idx');
             $table->index('return_date', 'purchase_returns_date_idx');
             $table->index(['source_type', 'source_id'], 'purchase_returns_source_idx');
+
+            $table->unique(['id', 'tenant_id'], 'purchase_returns_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_returns_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_id', 'tenant_id'], 'purchase_returns_warehouse_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouses')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_location_id', 'tenant_id'], 'purchase_returns_warehouse_location_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouse_locations')
+                ->restrictOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'purchase_returns_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'purchase_returns_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['posted_by', 'tenant_id'], 'purchase_returns_posted_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
 
     }

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RequirePlatformOperatorMiddleware
@@ -17,6 +18,7 @@ final class RequirePlatformOperatorMiddleware
     public function __construct(
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly PlatformOperatorCheckerInterface $platformOperators,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -36,6 +38,8 @@ final class RequirePlatformOperatorMiddleware
             ], 403);
         }
 
-        return $next($request);
+        return $this->executionContext->runAsControlPlane(
+            static fn (): Response => $next($request),
+        );
     }
 }

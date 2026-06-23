@@ -13,14 +13,24 @@ return new class extends Migration
         Schema::create('hr_employee_skill_assignments', function (Blueprint $table): void {
             $table->id();
             $this->scope($table, 'hr_emp_skills');
-            $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
-            $table->foreignId('skill_id')->constrained('hr_skills')->cascadeOnDelete();
+            $table->foreignId('employee_id');
+            $table->foreignId('skill_id');
             $table->string('proficiency_level');
             $table->decimal('years_of_experience', 20, 6)->default('0.000000');
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
             $table->unique(['employee_id', 'skill_id'], 'hr_employee_skills_uk');
             $table->index(['tenant_id', 'skill_id'], 'hr_employee_skills_lookup_idx');
+
+            $table->unique(['id', 'tenant_id'], 'hr_employee_skill_assignments_id_tenant_uk');
+            $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_skill_assignments_employee_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employees')
+                ->cascadeOnDelete();
+            $table->foreign(['skill_id', 'tenant_id'], 'hr_employee_skill_assignments_skill_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_skills')
+                ->cascadeOnDelete();
         });
     }
 
@@ -37,9 +47,9 @@ return new class extends Migration
             ->on('tenants')
             ->cascadeOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
-            ->references('id')
+        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
+            ->references(['id', 'tenant_id'])
             ->on('organization_units')
-            ->nullOnDelete();
+            ->restrictOnDelete();
     }
 };

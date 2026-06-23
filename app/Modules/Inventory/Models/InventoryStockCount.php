@@ -7,12 +7,12 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\StockCountStatus;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventoryStockCount extends CoreModel
+final class InventoryStockCount extends TenantOwnedModel
 {
     use SoftDeletes;
 

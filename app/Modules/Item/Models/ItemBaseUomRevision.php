@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Enums\ItemBaseUomRevisionStatus;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\User\Models\UserModel;
 
-final class ItemBaseUomRevision extends CoreModel
+final class ItemBaseUomRevision extends TenantOwnedModel
 {
     protected $table = 'item_base_uom_revisions';
 

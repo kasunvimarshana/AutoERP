@@ -6,6 +6,7 @@ namespace Modules\Tenant\Services\Events;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Modules\Core\Contracts\ClockInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
 use Modules\Tenant\Models\TenantEventOutboxModel;
@@ -21,6 +22,7 @@ final class TenantEventOutboxService
         private readonly TenantEventOutboxModel $outbox,
         private readonly UuidGeneratorInterface $uuid,
         private readonly ClockInterface $clock,
+        private readonly TenantExecutionContextInterface $executionContext,
         private readonly Dispatcher $events,
         private readonly LoggerInterface $logger,
     ) {}
@@ -31,33 +33,43 @@ final class TenantEventOutboxService
         string $newStatus,
         ?string $reason,
     ): string {
-        $eventId = $this->uuid->generate();
-        $this->outbox->newQuery()->create([
-            'event_uuid' => $eventId,
-            'tenant_id' => $tenantId,
-            'event_type' => self::STATUS_CHANGED,
-            'payload' => [
-                'previous_status' => $previousStatus,
-                'new_status' => $newStatus,
-                'reason' => $reason,
-            ],
-            'status' => 'pending',
-            'attempts' => 0,
-            'available_at' => $this->clock->now(),
-        ]);
+        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $previousStatus, $newStatus, $reason): string {
+            $eventId = $this->uuid->generate();
+            $this->outbox->newQuery()->create([
+                'event_uuid' => $eventId,
+                'tenant_id' => $tenantId,
+                'event_type' => self::STATUS_CHANGED,
+                'payload' => [
+                    'previous_status' => $previousStatus,
+                    'new_status' => $newStatus,
+                    'reason' => $reason,
+                ],
+                'status' => 'pending',
+                'attempts' => 0,
+                'available_at' => $this->clock->now(),
+            ]);
 
-        return $eventId;
+            return $eventId;
+        });
     }
 
     /** @return array{checked:int,published:int,failed:int} */
     public function publish(?int $limit = null): array
+    {
+        return $this->executionContext->runAsControlPlane(
+            fn (): array => $this->publishAcrossTenants($limit),
+        );
+    }
+
+    /** @return array{checked:int,published:int,failed:int} */
+    private function publishAcrossTenants(?int $limit): array
     {
         $now = $this->clock->now();
         $batchSize = max(1, min($limit ?? 100, 500));
         $summary = ['checked' => 0, 'published' => 0, 'failed' => 0];
         $staleBefore = $now->modify('-'.self::CLAIM_TIMEOUT_MINUTES.' minutes');
 
-        $candidateIds = $this->outbox->newQuery()
+        $candidates = $this->outbox->newQuery()
             ->where('available_at', '<=', $now)
             ->where(function ($query) use ($staleBefore): void {
                 $query->where('status', 'pending')
@@ -69,13 +81,15 @@ final class TenantEventOutboxService
             ->orderBy('available_at')
             ->orderBy('id')
             ->limit($batchSize)
-            ->pluck('id')
-            ->all();
+            ->get(['id', 'tenant_id']);
 
-        foreach ($candidateIds as $eventId) {
+        foreach ($candidates as $candidate) {
+            $eventId = (int) $candidate->getKey();
+            $tenantId = (int) $candidate->tenant_id;
             $claimToken = $this->uuid->generate();
             $claimed = $this->outbox->newQuery()
                 ->whereKey($eventId)
+                ->where('tenant_id', $tenantId)
                 ->where('available_at', '<=', $now)
                 ->where(function ($query) use ($staleBefore): void {
                     $query->where('status', 'pending')
@@ -97,6 +111,7 @@ final class TenantEventOutboxService
 
             $event = $this->outbox->newQuery()
                 ->whereKey($eventId)
+                ->where('tenant_id', $tenantId)
                 ->where('claim_token', $claimToken)
                 ->first();
             if (! $event instanceof TenantEventOutboxModel) {
@@ -111,16 +126,20 @@ final class TenantEventOutboxService
                     throw new \RuntimeException('Unsupported tenant outbox event type.');
                 }
 
-                $this->events->dispatch(new TenantStatusChanged(
-                    eventId: (string) $event->event_uuid,
-                    tenantId: (int) $event->tenant_id,
-                    previousStatus: (string) ($payload['previous_status'] ?? ''),
-                    newStatus: (string) ($payload['new_status'] ?? ''),
-                    reason: isset($payload['reason']) ? (string) $payload['reason'] : null,
-                ));
+                $this->executionContext->runForTenant(
+                    $tenantId,
+                    fn (): mixed => $this->events->dispatch(new TenantStatusChanged(
+                        eventId: (string) $event->event_uuid,
+                        tenantId: $tenantId,
+                        previousStatus: (string) ($payload['previous_status'] ?? ''),
+                        newStatus: (string) ($payload['new_status'] ?? ''),
+                        reason: isset($payload['reason']) ? (string) $payload['reason'] : null,
+                    )),
+                );
 
                 $this->outbox->newQuery()
                     ->whereKey($eventId)
+                    ->where('tenant_id', $tenantId)
                     ->where('claim_token', $claimToken)
                     ->update([
                         'status' => 'published',
@@ -136,6 +155,7 @@ final class TenantEventOutboxService
                 $delayMinutes = min(60, 2 ** min($attempts, 6));
                 $this->outbox->newQuery()
                     ->whereKey($eventId)
+                    ->where('tenant_id', $tenantId)
                     ->where('claim_token', $claimToken)
                     ->update([
                         'status' => 'pending',

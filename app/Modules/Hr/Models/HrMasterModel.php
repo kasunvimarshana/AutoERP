@@ -6,10 +6,10 @@ namespace Modules\Hr\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\Concerns\ScopesHrTenant;
 
-abstract class HrMasterModel extends CoreModel
+abstract class HrMasterModel extends TenantOwnedModel
 {
     use ScopesHrTenant;
     use SoftDeletes;

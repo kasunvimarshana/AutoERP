@@ -102,6 +102,7 @@ final class TaxDeterminationService
     private function rateForDate(Tax $tax, string $date): string
     {
         $rate = TaxRate::query()
+            ->where('tenant_id', (int) $tax->tenant_id)
             ->where('tax_id', $tax->getKey())
             ->where('active', true)
             ->whereDate('effective_from', '<=', $date)

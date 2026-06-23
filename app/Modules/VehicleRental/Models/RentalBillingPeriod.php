@@ -6,12 +6,12 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\VehicleRental\Enums\RentalBillingPeriodStatus;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalBillingPeriod extends CoreModel
+final class RentalBillingPeriod extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_billing_periods';

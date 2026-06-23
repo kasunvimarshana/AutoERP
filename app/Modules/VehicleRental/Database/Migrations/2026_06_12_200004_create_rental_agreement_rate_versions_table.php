@@ -14,9 +14,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('agreement_id');
             $table->unsignedInteger('version_number');
             $table->dateTime('effective_from');
             $table->dateTime('effective_to')->nullable();
@@ -31,8 +31,8 @@ return new class extends Migration
             $table->unsignedInteger('saturday_included_minutes')->default(0);
             $table->unsignedInteger('holiday_included_minutes')->default(0);
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
-            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
-            $table->foreignId('withholding_tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
+            $table->foreignId('tax_group_id')->nullable();
+            $table->foreignId('withholding_tax_group_id')->nullable();
             $table->string('status', 30)->default('draft');
             $table->char('fingerprint', 64);
             $table->unsignedBigInteger('approved_by')->nullable();
@@ -44,6 +44,37 @@ return new class extends Migration
             $table->unique(['agreement_id', 'version_number'], 'rental_rate_versions_agreement_version_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_rate_versions_fingerprint_uk');
             $table->index(['agreement_id', 'effective_from', 'effective_to', 'status'], 'rental_rate_versions_period_idx');
+
+            $table->unique(['id', 'tenant_id'], 'rental_agreement_rate_versions_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_rate_versions_organization_unit_da3c849c_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['agreement_id', 'tenant_id'], 'rental_agreement_rate_versions_agreement_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('rental_agreements')
+                ->cascadeOnDelete();
+            $table->foreign(['tax_group_id', 'tenant_id'], 'rental_agreement_rate_versions_tax_group_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('tax_groups')
+                ->restrictOnDelete();
+            $table->foreign(['withholding_tax_group_id', 'tenant_id'], 'rental_agreement_rate_versions_withholding_tax_g_f2afbd68_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('tax_groups')
+                ->restrictOnDelete();
+
+            $table->foreign(['approved_by', 'tenant_id'], 'rental_agreement_rate_versions_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['created_by', 'tenant_id'], 'rental_agreement_rate_versions_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'rental_agreement_rate_versions_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

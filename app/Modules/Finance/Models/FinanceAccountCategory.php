@@ -6,10 +6,10 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceAccountCategory extends CoreModel
+final class FinanceAccountCategory extends TenantOwnedModel
 {
     protected $table = 'finance_account_categories';
 

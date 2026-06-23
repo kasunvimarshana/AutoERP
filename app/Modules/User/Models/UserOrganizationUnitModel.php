@@ -6,11 +6,11 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class UserOrganizationUnitModel extends CoreModel
+final class UserOrganizationUnitModel extends TenantOwnedModel
 {
     use HasImmutableTenantOwnership;
 

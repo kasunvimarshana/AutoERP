@@ -31,6 +31,8 @@ return new class extends Migration
                 ->on('organization_units')
                 ->cascadeOnDelete();
             $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'organization_units_organization_unit_name_uk');
+
+            $table->unique(['id', 'tenant_id'], 'organization_unit_documents_id_tenant_uk');
         });
     }
 

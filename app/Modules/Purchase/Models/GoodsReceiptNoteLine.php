@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class GoodsReceiptNoteLine extends CoreModel
+final class GoodsReceiptNoteLine extends TenantOwnedModel
 {
     protected $table = 'goods_receipt_note_lines';
 

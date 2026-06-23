@@ -359,6 +359,6 @@ final class ChequePrintTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        $this->actingAs(UserModel::query()->findOrFail($userId));
+        $this->actingAs(UserModel::query()->where('tenant_id', $tenantId)->findOrFail($userId));
     }
 }

@@ -11,6 +11,7 @@ use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\TokenIssueData;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -24,9 +25,17 @@ final class PlatformLoginService
         private readonly TokenProviderInterface $tokens,
         private readonly RateLimiter $limiter,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
     public function login(string $email, string $password, string $ipAddress): Result
+    {
+        return $this->executionContext->runAsControlPlane(
+            fn (): Result => $this->loginAsPlatformOperator($email, $password, $ipAddress),
+        );
+    }
+
+    private function loginAsPlatformOperator(string $email, string $password, string $ipAddress): Result
     {
         $email = strtolower(trim($email));
         $rateKey = 'platform-login:'.hash('sha256', $email.'|'.$ipAddress);

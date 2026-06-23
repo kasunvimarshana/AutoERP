@@ -31,6 +31,8 @@ return new class extends Migration
 
             $table->timestamps();
 
+            $table->unique(['id', 'tenant_id'], 'auth_login_attempts_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_login_attempts_org_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')

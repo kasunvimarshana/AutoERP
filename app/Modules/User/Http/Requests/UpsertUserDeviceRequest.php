@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\User\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertUserDeviceRequest extends FormRequest
+final class UpsertUserDeviceRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -24,7 +24,7 @@ final class UpsertUserDeviceRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
-            'user_id' => array_merge($required, ['integer', 'min:1', 'exists:users,id']),
+            'user_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('users', 'id')]),
             'device_token' => array_merge($required, ['string', 'max:255']),
             'platform' => ['nullable', 'string', 'max:50'],
             'device_name' => ['nullable', 'string', 'max:255'],

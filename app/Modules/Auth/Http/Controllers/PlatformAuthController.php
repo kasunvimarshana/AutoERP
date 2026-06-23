@@ -16,6 +16,7 @@ use Modules\Auth\Http\Resources\AuthPayloadResource;
 use Modules\Auth\Services\PlatformLoginService;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Results\Result;
 
@@ -27,6 +28,7 @@ final class PlatformAuthController extends Controller
         private readonly TokenProviderInterface $tokens,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly ApiErrorResponseFactory $errors,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
     public function login(PlatformLoginRequest $request): JsonResponse
@@ -47,8 +49,10 @@ final class PlatformAuthController extends Controller
         $payload['token_scope'] = AuthTokenScope::PLATFORM;
         $payload['scopes'] = ['platform'];
 
-        return $this->respond(
-            $this->refreshTokens->refreshToken(TokenRefreshData::fromArray($payload)),
+        return $this->executionContext->runAsControlPlane(
+            fn (): JsonResponse => $this->respond(
+                $this->refreshTokens->refreshToken(TokenRefreshData::fromArray($payload)),
+            ),
         );
     }
 

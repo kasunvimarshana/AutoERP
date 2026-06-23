@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Extension\Models;
 
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class EntityAttributeModel extends CoreModel
+final class EntityAttributeModel extends TenantOwnedModel
 {
     protected $table = 'entity_attributes';
 

@@ -45,6 +45,7 @@ use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Services\UserAccessResolver;
 use Modules\User\Services\UserPermissionChecker;
 
@@ -62,9 +63,12 @@ final class UserServiceProvider extends ServiceProvider
         $this->app->scoped(PermissionCheckerInterface::class, UserPermissionChecker::class);
 
         $this->app->singleton(UserDomainServiceInterface::class, UserDomainService::class);
-        $this->app->singleton(
+        $this->app->scoped(
             UserRepositoryInterface::class,
-            fn (): UserRepositoryInterface => new EloquentUserRepository(new UserModel),
+            fn ($app): UserRepositoryInterface => new EloquentUserRepository(
+                new UserModel,
+                $app->make(TenantExecutionContextInterface::class),
+            ),
         );
         $this->app->singleton(
             RoleRepositoryInterface::class,

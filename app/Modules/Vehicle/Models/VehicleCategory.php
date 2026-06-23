@@ -7,9 +7,9 @@ namespace Modules\Vehicle\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class VehicleCategory extends CoreModel
+final class VehicleCategory extends TenantOwnedModel
 {
     use SoftDeletes;
 

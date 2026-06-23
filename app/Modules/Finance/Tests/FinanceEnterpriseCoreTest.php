@@ -251,6 +251,7 @@ final class FinanceEnterpriseCoreTest extends TestCase
         ]);
         foreach ($rules as $key => $account) {
             FinancePostingProfileRule::query()->create([
+                'tenant_id' => (int) $profile->tenant_id,
                 'posting_profile_id' => $profile->getKey(),
                 'line_key' => $key,
                 'account_id' => $account->getKey(),

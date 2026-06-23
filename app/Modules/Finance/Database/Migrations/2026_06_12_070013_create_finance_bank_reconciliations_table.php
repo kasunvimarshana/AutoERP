@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('finance_bank_reconciliations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->foreignId('bank_account_id')->constrained('finance_accounts', 'id')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('bank_account_id');
             $table->string('statement_reference', 150);
             $table->date('statement_date');
             $table->date('start_date')->nullable();
@@ -34,6 +34,21 @@ return new class extends Migration
             );
             $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_recon_scope_account_idx');
             $table->index('status', 'finance_bank_recon_status_idx');
+
+            $table->unique(['id', 'tenant_id'], 'finance_bank_reconciliations_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_bank_reconciliations_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['bank_account_id', 'tenant_id'], 'finance_bank_reconciliations_bank_account_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_accounts')
+                ->restrictOnDelete();
+
+            $table->foreign(['completed_by', 'tenant_id'], 'finance_bank_reconciliations_completed_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

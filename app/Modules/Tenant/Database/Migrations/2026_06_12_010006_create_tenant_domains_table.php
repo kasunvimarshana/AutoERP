@@ -37,6 +37,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'primary_marker'], 'tenant_domains_one_primary_uk');
             $table->index(['tenant_id', 'status'], 'tenant_domains_tenant_status_idx');
             $table->index(['status', 'revalidation_due_at'], 'tenant_domains_revalidation_idx');
+
+            $table->unique(['id', 'tenant_id'], 'tenant_domains_id_tenant_uk');
         });
     }
 

@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class AuthVerificationChallengeModel extends CoreModel
+final class AuthVerificationChallengeModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
     use SoftDeletes;
 
     protected $table = 'auth_verification_challenges';

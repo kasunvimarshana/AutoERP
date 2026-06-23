@@ -29,6 +29,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'name'], 'tenant_documents_tenant_name_uk');
             $table->unique(['storage_disk', 'storage_path'], 'tenant_documents_storage_uk');
             $table->index(['tenant_id', 'document_type'], 'tenant_documents_tenant_type_idx');
+
+            $table->unique(['id', 'tenant_id'], 'tenant_documents_id_tenant_uk');
         });
     }
 

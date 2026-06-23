@@ -6,12 +6,12 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceAccountType extends CoreModel
+final class FinanceAccountType extends TenantOwnedModel
 {
     protected $table = 'finance_account_types';
 

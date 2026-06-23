@@ -25,7 +25,12 @@ final class DeleteCommentService
 
             return Result::success(null);
         } catch (Throwable $exception) {
-            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(
+                ExtensionErrorCode::INVALID_VALUE,
+                'Unable to delete the comment for the active tenant.',
+            ));
         }
     }
 }

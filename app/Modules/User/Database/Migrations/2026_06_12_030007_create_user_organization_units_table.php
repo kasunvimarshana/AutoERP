@@ -42,6 +42,8 @@ return new class extends Migration
                 ['tenant_id', 'user_id', 'status'],
                 'user_org_units_access_idx',
             );
+
+            $table->unique(['id', 'tenant_id'], 'user_organization_units_id_tenant_uk');
         });
     }
 

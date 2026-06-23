@@ -6,6 +6,7 @@ namespace Modules\Tenant\Repositories;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Models\TenantDomainModel;
 use RuntimeException;
@@ -14,7 +15,10 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
 {
     private const VERSION_CONFLICT = 'tenant-domain-version-conflict';
 
-    public function __construct(private readonly TenantDomainModel $model) {}
+    public function __construct(
+        private readonly TenantDomainModel $model,
+        private readonly TenantExecutionContextInterface $executionContext,
+    ) {}
 
     public function listByTenant(int $tenantId): array
     {
@@ -39,11 +43,13 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
 
     public function findByDomain(string $domain): ?DataRecord
     {
-        $model = $this->model->newQuery()
-            ->where('domain', strtolower(trim($domain)))
-            ->first();
+        return $this->executionContext->runAsControlPlane(function () use ($domain): ?DataRecord {
+            $model = $this->model->newQuery()
+                ->where('domain', strtolower(trim($domain)))
+                ->first();
 
-        return $model instanceof TenantDomainModel ? $this->record($model) : null;
+            return $model instanceof TenantDomainModel ? $this->record($model) : null;
+        });
     }
 
     public function findPrimaryByTenant(int $tenantId): ?DataRecord
@@ -182,7 +188,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
 
     public function listDueForRevalidation(\DateTimeInterface $dueAt, int $limit): array
     {
-        return $this->model->newQuery()
+        return $this->executionContext->runAsControlPlane(fn (): array => $this->model->newQuery()
             ->where('status', 'active')
             ->whereNotNull('verified_token_hash')
             ->whereNotNull('revalidation_due_at')
@@ -192,7 +198,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             ->get()
             ->map(fn (Model $model): DataRecord => $this->record($model))
             ->values()
-            ->all();
+            ->all());
     }
 
     private function record(Model $model): DataRecord

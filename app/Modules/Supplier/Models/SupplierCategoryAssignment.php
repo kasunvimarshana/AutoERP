@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class SupplierCategoryAssignment extends CoreModel
+final class SupplierCategoryAssignment extends TenantOwnedModel
 {
     protected $table = 'supplier_category_assignments';
 

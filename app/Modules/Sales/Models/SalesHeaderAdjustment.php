@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Sales\Enums\SalesAdjustmentAllocationMethod;
 use Modules\Sales\Enums\SalesAdjustmentCalculationBase;
 use Modules\Sales\Enums\SalesAdjustmentCalculationType;
 use Modules\Sales\Enums\SalesAdjustmentEffect;
 use Modules\Sales\Enums\SalesAdjustmentType;
 
-final class SalesHeaderAdjustment extends CoreModel
+final class SalesHeaderAdjustment extends TenantOwnedModel
 {
     use SoftDeletes;
 

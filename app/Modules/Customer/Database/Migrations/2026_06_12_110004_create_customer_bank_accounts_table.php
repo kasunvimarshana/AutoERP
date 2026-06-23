@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('customer_bank_accounts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('customer_id');
             $table->string('bank_name');
             $table->string('branch_name')->nullable();
             $table->string('account_name');
@@ -32,6 +32,16 @@ return new class extends Migration
             $table->index('customer_id', 'customer_bank_accounts_customer_idx');
             $table->index('account_number', 'customer_bank_accounts_number_idx');
             $table->unique(['customer_id', 'account_number'], 'customer_bank_accounts_customer_number_uk');
+
+            $table->unique(['id', 'tenant_id'], 'customer_bank_accounts_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_bank_accounts_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['customer_id', 'tenant_id'], 'customer_bank_accounts_customer_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('customers')
+                ->cascadeOnDelete();
         });
     }
 

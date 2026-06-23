@@ -2,13 +2,24 @@
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\Authorize;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Modules\Core\Exceptions\DomainException;
 use Modules\Core\Http\Middleware\CurrentOrganizationUnitMiddleware;
 use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
@@ -36,6 +47,25 @@ return Application::configure(basePath: dirname(__DIR__))
             (string) env('CORE_CURRENT_USER_MIDDLEWARE_ALIAS', 'current.user') => CurrentUserMiddleware::class,
             (string) env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant') => CurrentTenantMiddleware::class,
             (string) env('CORE_CURRENT_ORGANIZATION_UNIT_MIDDLEWARE_ALIAS', 'current.organization-unit') => CurrentOrganizationUnitMiddleware::class,
+        ]);
+
+        // Route model binding must never query tenant-owned models before the
+        // authenticated tenant execution context has been established.
+        $middleware->priority([
+            HandlePrecognitiveRequests::class,
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            ValidateCsrfToken::class,
+            ThrottleRequests::class,
+            ThrottleRequestsWithRedis::class,
+            AuthenticatesRequests::class,
+            CurrentUserMiddleware::class,
+            CurrentTenantMiddleware::class,
+            CurrentOrganizationUnitMiddleware::class,
+            SubstituteBindings::class,
+            Authorize::class,
         ]);
 
         $middleware->append(EnsureApiErrorResponseMiddleware::class);

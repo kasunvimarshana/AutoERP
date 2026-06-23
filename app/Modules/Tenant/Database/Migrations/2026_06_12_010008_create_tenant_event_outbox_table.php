@@ -28,6 +28,8 @@ return new class extends Migration
             $table->index(['status', 'available_at'], 'tenant_event_outbox_due_idx');
             $table->index(['status', 'claimed_at'], 'tenant_event_outbox_claim_idx');
             $table->index(['tenant_id', 'event_type'], 'tenant_event_outbox_tenant_type_idx');
+
+            $table->unique(['id', 'tenant_id'], 'tenant_event_outbox_id_tenant_uk');
         });
     }
 

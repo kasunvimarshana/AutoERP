@@ -6,9 +6,9 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class InventoryAllocationLine extends CoreModel
+final class InventoryAllocationLine extends TenantOwnedModel
 {
     protected $table = 'inventory_allocation_lines';
 

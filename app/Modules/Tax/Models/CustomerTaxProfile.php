@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class CustomerTaxProfile extends CoreModel
+final class CustomerTaxProfile extends TenantOwnedModel
 {
     protected $table = 'customer_tax_profiles';
 

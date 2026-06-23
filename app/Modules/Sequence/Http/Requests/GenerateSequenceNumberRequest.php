@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 use Illuminate\Support\Facades\Auth;
 
-final class GenerateSequenceNumberRequest extends FormRequest
+final class GenerateSequenceNumberRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -21,7 +21,7 @@ final class GenerateSequenceNumberRequest extends FormRequest
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1', 'exists:tenants,id'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units', 'id')],
             'document_type' => ['required', 'string', 'max:255'],
             'period_type' => ['nullable', 'string', 'in:yearly,monthly,infinite'],
             'period_value' => ['nullable', 'string', 'max:255'],

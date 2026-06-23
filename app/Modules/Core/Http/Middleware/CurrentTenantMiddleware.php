@@ -7,6 +7,7 @@ namespace Modules\Core\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,6 +17,7 @@ final class CurrentTenantMiddleware
     public function __construct(
         private readonly CurrentTenantContextResolverInterface $resolver,
         private readonly ApiErrorResponseFactory $responses,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
     /** @param Closure(Request): Response $next */
@@ -52,7 +54,10 @@ final class CurrentTenantMiddleware
         $request->attributes->set($this->configString('application_attribute', 'current_application_id'), $context->applicationId());
         $request->attributes->set($this->configString('source_attribute', 'current_tenant_source'), $context->source());
 
-        return $next($request);
+        return $this->executionContext->runForTenant(
+            $context->tenantId(),
+            static fn (): Response => $next($request),
+        );
     }
 
     private function currentTenantRequired(): bool

@@ -37,6 +37,17 @@ return new class extends Migration
                 ->on('roles')
                 ->cascadeOnDelete();
             $table->unique(['tenant_id', 'user_id', 'role_id'], 'user_roles_uk');
+
+            $table->unique(['id', 'tenant_id'], 'user_roles_id_tenant_uk');
+
+            $table->foreign(['created_by', 'tenant_id'], 'user_roles_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'user_roles_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

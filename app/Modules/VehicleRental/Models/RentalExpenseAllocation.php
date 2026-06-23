@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Supplier\Models\Supplier;
@@ -13,7 +13,7 @@ use Modules\Tax\Models\TaxGroup;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalExpenseAllocation extends CoreModel
+final class RentalExpenseAllocation extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_expense_allocations';

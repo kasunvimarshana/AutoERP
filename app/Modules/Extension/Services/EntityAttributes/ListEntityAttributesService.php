@@ -27,7 +27,12 @@ final class ListEntityAttributesService
 
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
-            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(
+                ExtensionErrorCode::INVALID_VALUE,
+                'Unable to list entity attributes for the active tenant.',
+            ));
         }
     }
 }

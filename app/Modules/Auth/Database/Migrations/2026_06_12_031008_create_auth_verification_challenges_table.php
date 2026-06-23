@@ -36,6 +36,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['id', 'tenant_id'], 'auth_verification_challenges_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_verification_challenges_org_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')

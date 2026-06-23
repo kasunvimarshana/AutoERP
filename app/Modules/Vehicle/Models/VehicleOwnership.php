@@ -6,12 +6,12 @@ namespace Modules\Vehicle\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Supplier\Models\Supplier;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 
-final class VehicleOwnership extends CoreModel
+final class VehicleOwnership extends TenantOwnedModel
 {
     public const OWNER_TYPE_CUSTOMER = 'customer';
     public const OWNER_TYPE_SUPPLIER = 'supplier';

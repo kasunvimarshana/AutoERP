@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Sales\Enums\SalesAdjustmentEffect;
 use Modules\Sales\Enums\SalesAdjustmentType;
 
-final class SalesReturnAdjustmentAllocation extends CoreModel
+final class SalesReturnAdjustmentAllocation extends TenantOwnedModel
 {
     protected $guarded = ['id'];
 

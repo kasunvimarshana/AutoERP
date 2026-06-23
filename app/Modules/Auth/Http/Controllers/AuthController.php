@@ -54,6 +54,7 @@ use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
@@ -85,6 +86,7 @@ final class AuthController extends Controller
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentTenantContextResolverInterface $tenantResolver,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
+        private readonly TenantExecutionContextInterface $tenantExecution,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse|AuthPayloadResource
@@ -94,7 +96,10 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->loginService->login(LoginData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->loginService->login(LoginData::fromArray($payload)),
+        );
 
         return $this->respond($result);
     }
@@ -106,7 +111,10 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->registerService->register(RegistrationData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->registerService->register(RegistrationData::fromArray($payload)),
+        );
 
         return $this->respond($result, 201);
     }
@@ -146,7 +154,10 @@ final class AuthController extends Controller
         }
         $payload['token_scope'] = AuthTokenScope::TENANT;
 
-        $result = $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($payload)),
+        );
 
         return $this->respond($result);
     }
@@ -197,9 +208,12 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->validateTokenService->validateToken(
-            (string) $payload['access_token'],
+        $result = $this->tenantExecution->runForTenant(
             (int) $payload['tenant_id'],
+            fn (): Result => $this->validateTokenService->validateToken(
+                (string) $payload['access_token'],
+                (int) $payload['tenant_id'],
+            ),
         );
 
         return $this->respond($result);
@@ -213,8 +227,11 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->requestVerificationService
-            ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->requestVerificationService
+                ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($payload)),
+        );
 
         return $this->respond($result, 201);
     }
@@ -226,8 +243,11 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->verifyChallengeService
-            ->verifyChallenge(VerificationChallengeVerifyData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->verifyChallengeService
+                ->verifyChallenge(VerificationChallengeVerifyData::fromArray($payload)),
+        );
 
         return $this->respond($result);
     }
@@ -249,8 +269,11 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->exchangeAuthorizationCodeService->exchangeAuthorizationCode(
-            ExchangeAuthorizationCodeData::fromArray($payload),
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->exchangeAuthorizationCodeService->exchangeAuthorizationCode(
+                ExchangeAuthorizationCodeData::fromArray($payload),
+            ),
         );
 
         return $this->respond($result, 201);
@@ -416,7 +439,10 @@ final class AuthController extends Controller
     {
         $organizationUnitId = $this->toNullableInt($requestedOrganizationUnitId);
         if ($organizationUnitId !== null) {
-            $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+            $organizationUnit = $this->tenantExecution->runForTenant(
+                $tenantId,
+                fn (): ?DataRecord => $this->organizationUnits->findById($organizationUnitId),
+            );
             if (! $organizationUnit instanceof DataRecord
                 || $this->toNullableInt($organizationUnit->get('tenant_id')) !== $tenantId
             ) {

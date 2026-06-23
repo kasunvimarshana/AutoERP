@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class TaxDocumentSnapshot extends CoreModel
+final class TaxDocumentSnapshot extends TenantOwnedModel
 {
     protected $table = 'tax_document_snapshots';
 

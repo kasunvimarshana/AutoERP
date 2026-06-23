@@ -14,9 +14,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
-            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('agreement_id');
             $table->decimal('required_amount', 20, 6);
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
             $table->date('due_date')->nullable();
@@ -34,6 +34,25 @@ return new class extends Migration
 
             $table->unique('agreement_id', 'rental_deposit_requirements_agreement_uk');
             $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_idx');
+
+            $table->unique(['id', 'tenant_id'], 'rental_deposit_requirements_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_requirements_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['agreement_id', 'tenant_id'], 'rental_deposit_requirements_agreement_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('rental_agreements')
+                ->cascadeOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'rental_deposit_requirements_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'rental_deposit_requirements_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

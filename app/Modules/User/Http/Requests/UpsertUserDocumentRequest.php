@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\User\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertUserDocumentRequest extends FormRequest
+final class UpsertUserDocumentRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -24,7 +24,7 @@ final class UpsertUserDocumentRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
-            'user_id' => array_merge($required, ['integer', 'min:1', 'exists:users,id']),
+            'user_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('users', 'id')]),
             'name' => array_merge($required, ['string', 'max:255']),
             'file_path' => array_merge($required, ['string', 'max:500']),
             'mime_type' => ['nullable', 'string', 'max:255'],

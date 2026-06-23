@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('hr_departments', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('hr_departments')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('parent_id')->nullable();
             $table->string('code');
             $table->string('name');
             $table->text('description')->nullable();
@@ -24,6 +24,16 @@ return new class extends Migration
             $table->softDeletes();
             $table->unique(['tenant_id', 'code'], 'hr_departments_tenant_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'hr_departments_tenant_org_idx');
+
+            $table->unique(['id', 'tenant_id'], 'hr_departments_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_departments_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['parent_id', 'tenant_id'], 'hr_departments_parent_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_departments')
+                ->restrictOnDelete();
         });
     }
 

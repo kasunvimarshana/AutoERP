@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\User\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Requests\Concerns\AuthorizesUserPermission;
 
-final class UpsertUserRoleRequest extends FormRequest
+final class UpsertUserRoleRequest extends TenantScopedRequest
 {
     use AuthorizesUserPermission;
 
@@ -28,8 +28,8 @@ final class UpsertUserRoleRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
-            'user_id' => array_merge($required, ['integer', 'min:1', 'exists:users,id']),
-            'role_id' => array_merge($required, ['integer', 'min:1', 'exists:roles,id']),
+            'user_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('users', 'id')]),
+            'role_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('roles', 'id')]),
         ];
     }
 }

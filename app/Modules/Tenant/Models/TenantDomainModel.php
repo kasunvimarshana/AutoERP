@@ -6,9 +6,9 @@ namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class TenantDomainModel extends CoreModel
+final class TenantDomainModel extends TenantOwnedModel
 {
     use HasImmutableTenantOwnership;
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Models\PermissionModel;
@@ -146,9 +147,11 @@ final class UserSeeder extends Seeder
     private function seedPlatformOperator(): void
     {
         $email = $this->platformAdminEmail();
-        $operator = UserModel::query()
-            ->where('platform_login_email', $email)
-            ->firstOrNew();
+        $operator = app(TenantExecutionContextInterface::class)->runAsControlPlane(
+            fn (): UserModel => UserModel::query()
+                ->where('platform_login_email', $email)
+                ->firstOrNew(),
+        );
 
         $operator->forceFill([
             'tenant_id' => null,

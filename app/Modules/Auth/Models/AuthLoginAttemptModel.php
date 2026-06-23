@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class AuthLoginAttemptModel extends CoreModel
+final class AuthLoginAttemptModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
     protected $table = 'auth_login_attempts';
 
     protected $fillable = [

@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\ChequePrintStatus;
 use Modules\Tenant\Models\TenantModel;
 use Modules\User\Models\UserModel;
 
-final class ChequePrintLog extends CoreModel
+final class ChequePrintLog extends TenantOwnedModel
 {
     protected $table = 'cheque_print_logs';
 

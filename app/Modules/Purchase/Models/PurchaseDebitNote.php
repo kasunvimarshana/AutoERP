@@ -6,11 +6,11 @@ namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Supplier\Models\Supplier;
 
-final class PurchaseDebitNote extends CoreModel
+final class PurchaseDebitNote extends TenantOwnedModel
 {
     use SoftDeletes;
 

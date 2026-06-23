@@ -16,7 +16,6 @@ final class UpsertWarehouseRequest extends TenantScopedRequest
     public function rules(): array
     {
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
-        $tenantId = $this->tenantId();
 
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
@@ -24,7 +23,7 @@ final class UpsertWarehouseRequest extends TenantScopedRequest
                 'nullable',
                 'integer',
                 'min:1',
-                Rule::exists('organization_units', 'id')->where('tenant_id', $tenantId),
+                $this->tenantExists('organization_units', 'id'),
             ],
             'row_version' => [$this->isMethod('post') ? 'nullable' : 'required', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],

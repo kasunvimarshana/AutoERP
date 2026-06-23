@@ -26,6 +26,8 @@ return new class extends Migration
             $table->unique(['storage_disk', 'storage_path'], 'tenant_storage_cleanup_path_uk');
             $table->index(['status', 'next_attempt_at'], 'tenant_storage_cleanup_due_idx');
             $table->index(['tenant_id', 'status'], 'tenant_storage_cleanup_tenant_idx');
+
+            $table->unique(['id', 'tenant_id'], 'tenant_storage_cleanup_jobs_id_tenant_uk');
         });
     }
 

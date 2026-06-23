@@ -7,6 +7,7 @@ namespace Modules\Auth\Providers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -170,12 +171,12 @@ final class AuthServiceProvider extends ServiceProvider
                     return null;
                 }
 
-                $user = UserModel::query()
-                    ->whereKey((int) $userId)
-                    ->where('tenant_id', (int) $tenantId)
-                    ->where('status', 'active')
-                    ->where('is_platform_operator', false)
-                    ->first();
+                $user = $this->app->make(TenantExecutionContextInterface::class)
+                    ->runForTenant((int) $tenantId, static fn (): ?UserModel => UserModel::query()
+                        ->whereKey((int) $userId)
+                        ->where('status', 'active')
+                        ->where('is_platform_operator', false)
+                        ->first());
                 if (! $user instanceof UserModel) {
                     return null;
                 }
@@ -199,13 +200,14 @@ final class AuthServiceProvider extends ServiceProvider
                     return null;
                 }
 
-                $user = UserModel::query()
-                    ->whereKey((int) $userId)
-                    ->whereNull('tenant_id')
-                    ->where('status', 'active')
-                    ->where('is_platform_operator', true)
-                    ->whereNotNull('platform_login_email')
-                    ->first();
+                $user = $this->app->make(TenantExecutionContextInterface::class)
+                    ->runAsControlPlane(fn (): ?UserModel => UserModel::query()
+                        ->whereKey((int) $userId)
+                        ->whereNull('tenant_id')
+                        ->where('status', 'active')
+                        ->where('is_platform_operator', true)
+                        ->whereNotNull('platform_login_email')
+                        ->first());
                 if (! $user instanceof UserModel) {
                     return null;
                 }

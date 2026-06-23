@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Models\Invoice;
 use Modules\Payment\Models\Payment;
 use Modules\VehicleRental\Enums\RentalDepositLinkType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalDepositLink extends CoreModel
+final class RentalDepositLink extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_deposit_links';

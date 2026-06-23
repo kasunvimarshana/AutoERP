@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 
-final class PurchaseReturnAdjustmentAllocation extends CoreModel
+final class PurchaseReturnAdjustmentAllocation extends TenantOwnedModel
 {
     protected $table = 'purchase_return_adjustment_allocations';
 

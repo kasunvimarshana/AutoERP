@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('customer_vehicles', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
-            $table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();
-            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('customer_id');
+            $table->foreignId('vehicle_id');
             $table->string('relationship_type')->nullable();
             $table->timestamp('started_at');
             $table->timestamp('ended_at')->nullable();
@@ -31,6 +31,20 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'customer_id'], 'customer_vehicles_scope_customer_idx');
             $table->index(['vehicle_id', 'is_current'], 'customer_vehicles_current_idx');
             $table->index(['started_at', 'ended_at'], 'customer_vehicles_dates_idx');
+
+            $table->unique(['id', 'tenant_id'], 'customer_vehicles_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_vehicles_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['customer_id', 'tenant_id'], 'customer_vehicles_customer_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('customers')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_id', 'tenant_id'], 'customer_vehicles_vehicle_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicles')
+                ->restrictOnDelete();
         });
 
     }

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Tenant\Models;
 
 use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class TenantStorageCleanupJobModel extends CoreModel
+final class TenantStorageCleanupJobModel extends TenantOwnedModel
 {
     use HasImmutableTenantOwnership;
 

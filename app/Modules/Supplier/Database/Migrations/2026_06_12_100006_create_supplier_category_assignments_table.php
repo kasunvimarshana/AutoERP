@@ -13,13 +13,27 @@ return new class extends Migration
         Schema::create('supplier_category_assignments', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
-            $table->foreignId('supplier_category_id')->constrained('supplier_categories')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('supplier_id');
+            $table->foreignId('supplier_category_id');
             $table->timestamps();
 
             $table->unique(['supplier_id', 'supplier_category_id'], 'supplier_category_assignments_pair_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'supplier_category_assignments_tenant_org_idx');
+
+            $table->unique(['id', 'tenant_id'], 'supplier_category_assignments_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_category_assignments_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_category_assignments_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->cascadeOnDelete();
+            $table->foreign(['supplier_category_id', 'tenant_id'], 'supplier_category_assignments_supplier_category_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('supplier_categories')
+                ->cascadeOnDelete();
         });
     }
 

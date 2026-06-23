@@ -6,10 +6,10 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\CostAdjustmentStatus;
 
-final class InventoryCostAdjustment extends CoreModel
+final class InventoryCostAdjustment extends TenantOwnedModel
 {
     use SoftDeletes;
 

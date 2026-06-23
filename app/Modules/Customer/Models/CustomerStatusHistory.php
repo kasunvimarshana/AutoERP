@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Enums\CustomerStatus;
 
-final class CustomerStatusHistory extends CoreModel
+final class CustomerStatusHistory extends TenantOwnedModel
 {
     protected $table = 'customer_status_histories';
 
