@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -18,8 +20,6 @@ use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Modules\Tenant\Services\TenantReferenceValidator;
-use DateTimeImmutable;
-use DateTimeInterface;
 use Throwable;
 
 final class UpdateTenantPlanService
@@ -68,12 +68,14 @@ final class UpdateTenantPlanService
             }
 
             $revision = $this->revisionAttributes($payload, $latest);
-            $this->references->assertPlanPricing(
-                (string) $revision['price'],
-                is_int($revision['currency_id']) ? $revision['currency_id'] : null,
-            );
             $createRevision = $this->hasRevisionInput($payload)
                 && $this->revisionChanged($latest, $revision, $payload);
+            if ($createRevision) {
+                $this->references->assertPlanPricing(
+                    (string) $revision['price'],
+                    is_int($revision['currency_id']) ? $revision['currency_id'] : null,
+                );
+            }
 
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
@@ -90,9 +92,6 @@ final class UpdateTenantPlanService
                         ? $this->rules->normalizeName((string) $payload['name'])
                         : $existing->get('name'),
                     'slug' => $slug,
-                    'is_active' => array_key_exists('is_active', $payload)
-                        ? (bool) $payload['is_active']
-                        : (bool) $existing->get('is_active'),
                     'metadata' => array_key_exists('metadata', $payload)
                         ? $this->rules->normalizeMetadata($payload['metadata'])
                         : $this->rules->normalizeMetadata($existing->get('metadata')),

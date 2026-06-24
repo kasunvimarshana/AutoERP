@@ -1119,7 +1119,7 @@ export const platformNavigationSections: NavigationSection[] = [
                 label: "Platform Defaults",
                 to: "/administration/platform-configuration",
                 icon: "settings",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.configurationManage] },
+                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.configurationView] },
             },
         ],
     },

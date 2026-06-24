@@ -8,6 +8,7 @@ export const PLATFORM_PERMISSION = {
     tenantSubscriptionsManage: 'platform.tenant_subscriptions.manage',
     plansView: 'platform.plans.view',
     plansManage: 'platform.plans.manage',
+    configurationView: 'platform.configuration.view',
     configurationManage: 'platform.configuration.manage',
     secretsManage: 'platform.secrets.manage',
     auditView: 'platform.audit.view',

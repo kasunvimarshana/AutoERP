@@ -54,7 +54,7 @@ final class CreateTenantPlanService
                 $plan = $this->plans->create([
                     'name' => $this->rules->normalizeName((string) ($payload['name'] ?? '')),
                     'slug' => $slug,
-                    'is_active' => (bool) ($payload['is_active'] ?? true),
+                    'is_active' => true,
                     'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),

@@ -17,7 +17,7 @@ use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Throwable;
 
-final class DeleteTenantPlanService
+final class DeactivateTenantPlanService
 {
     public function __construct(
         private readonly TenantPlanRepositoryInterface $plans,
@@ -33,6 +33,15 @@ final class DeleteTenantPlanService
             $existing = $this->plans->findById($id);
             if ($existing === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.'));
+            }
+            if ((int) $existing->require('row_version') !== $expectedVersion) {
+                return Result::failure(new Error(
+                    TenantErrorCode::VERSION_CONFLICT,
+                    'Tenant plan changed since it was loaded. Refresh and try again.',
+                ));
+            }
+            if (! (bool) $existing->get('is_active')) {
+                return Result::success($existing);
             }
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (

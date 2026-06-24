@@ -19,26 +19,33 @@ $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platfo
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
 $platformStepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
 
-$registerScope = static function (string $path, string $scope, ?string $writeMiddleware = null): void {
-    Route::prefix($path)->group(function () use ($scope, $writeMiddleware): void {
+$registerScope = static function (
+    string $path,
+    string $scope,
+    array $readMiddleware = [],
+    array $writeMiddleware = [],
+): void {
+    Route::prefix($path)->group(function () use ($scope, $readMiddleware, $writeMiddleware): void {
         Route::get('entries', [ConfigurationController::class, 'index'])
+            ->middleware($readMiddleware)
             ->defaults('scope', $scope)
             ->name($scope.'.index');
         Route::post('entries', [ConfigurationController::class, 'store'])
-            ->middleware(array_filter([$writeMiddleware]))
+            ->middleware($writeMiddleware)
             ->defaults('scope', $scope)
             ->name($scope.'.store');
         Route::get('entries/{key}', [ConfigurationController::class, 'show'])
+            ->middleware($readMiddleware)
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', $scope)
             ->name($scope.'.show');
         Route::put('entries/{key}', [ConfigurationController::class, 'update'])
-            ->middleware(array_filter([$writeMiddleware]))
+            ->middleware($writeMiddleware)
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', $scope)
             ->name($scope.'.update');
         Route::delete('entries/{key}', [ConfigurationController::class, 'destroy'])
-            ->middleware(array_filter([$writeMiddleware]))
+            ->middleware($writeMiddleware)
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', $scope)
             ->name($scope.'.destroy');
@@ -52,14 +59,19 @@ Route::prefix('api/v1/platform/configuration')
         'auth:'.$platformGuard,
         $currentUser,
         $platformOperator,
-        'platform.permission:'.PlatformPermission::CONFIGURATION_MANAGE,
     ])
     ->name('api.v1.platform.configuration.')
     ->group(function () use ($registerScope, $platformStepUp): void {
         Route::get('definitions', [ConfigurationController::class, 'definitions'])
+            ->middleware('platform.permission:'.PlatformPermission::CONFIGURATION_VIEW)
             ->defaults('scope', ConfigurationScope::GLOBAL)
             ->name('definitions');
-        $registerScope('global', ConfigurationScope::GLOBAL, $platformStepUp);
+        $registerScope(
+            'global',
+            ConfigurationScope::GLOBAL,
+            ['platform.permission:'.PlatformPermission::CONFIGURATION_VIEW],
+            [$platformStepUp, 'platform.permission:'.PlatformPermission::CONFIGURATION_MANAGE],
+        );
     });
 
 Route::prefix('api/v1/configuration')

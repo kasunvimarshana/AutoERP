@@ -37,17 +37,12 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
 
     public function paginate(
         ConfigurationScopeContext $context,
-        ?string $prefix,
+        array $keys,
         int $page,
         int $perPage,
     ): LengthAwarePaginator {
         $query = $this->scopedQuery($context);
-        $prefix = strtolower(trim((string) $prefix));
-
-        if ($prefix !== '') {
-            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $prefix);
-            $query->whereRaw("key LIKE ? ESCAPE '!'", [$escaped.'%']);
-        }
+        $keys === [] ? $query->whereRaw('1 = 0') : $query->whereIn('key', $keys);
 
         $paginator = $query
             ->orderBy('key')
@@ -67,6 +62,15 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
         );
 
         return $paginator;
+    }
+
+    public function keys(ConfigurationScopeContext $context): array
+    {
+        return $this->scopedQuery($context)
+            ->orderBy('key')
+            ->pluck('key')
+            ->map(static fn (mixed $key): string => (string) $key)
+            ->all();
     }
 
     public function create(

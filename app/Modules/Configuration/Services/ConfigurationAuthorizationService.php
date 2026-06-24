@@ -24,7 +24,7 @@ final class ConfigurationAuthorizationService
     public function canViewScopeCurrent(string $scope): bool
     {
         if ($scope === ConfigurationScope::GLOBAL) {
-            return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE);
+            return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
         }
 
         return $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_VIEW);

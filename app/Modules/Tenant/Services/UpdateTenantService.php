@@ -64,18 +64,23 @@ final class UpdateTenantService
             $baseCurrencyId = array_key_exists('base_currency_id', $payload)
                 ? $this->positiveInt($payload['base_currency_id'])
                 : $this->positiveInt($existing->get('base_currency_id'));
+            $existingBaseCurrencyId = $this->positiveInt($existing->get('base_currency_id'));
             if (
                 $existing->get('status') !== TenantStatus::DRAFT
-                && $baseCurrencyId !== $this->positiveInt($existing->get('base_currency_id'))
+                && $baseCurrencyId !== $existingBaseCurrencyId
             ) {
                 return Result::failure(new Error(
                     TenantErrorCode::INVALID_VALUE,
                     'Base accounting currency can only be changed while the tenant is in draft status.',
                 ));
             }
-            $this->references->assertActiveCurrency($baseCurrencyId);
+            if ($baseCurrencyId !== $existingBaseCurrencyId) {
+                $this->references->assertActiveCurrency($baseCurrencyId);
+            }
 
-            $logoPath = is_string($existing->get('logo_path')) ? $existing->get('logo_path') : null;
+            $oldLogoPath = is_string($existing->get('logo_path')) ? $existing->get('logo_path') : null;
+            $removeLogo = (bool) ($payload['remove_logo'] ?? false);
+            $logoPath = $removeLogo ? null : $oldLogoPath;
             if (isset($payload['logo_tmp_path'])) {
                 $newLogoPath = $this->storeLogo((string) $payload['logo_tmp_path'], $slug);
                 $logoPath = $newLogoPath;
@@ -137,8 +142,11 @@ final class UpdateTenantService
                 ));
             }
 
-            $oldLogoPath = $existing->get('logo_path');
-            if ($newLogoPath !== null && is_string($oldLogoPath) && $oldLogoPath !== '' && $oldLogoPath !== $newLogoPath) {
+            if (
+                is_string($oldLogoPath)
+                && $oldLogoPath !== ''
+                && $oldLogoPath !== $logoPath
+            ) {
                 $this->removeLogo($oldLogoPath, 'replaced logo cleanup');
             }
 

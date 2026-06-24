@@ -452,7 +452,7 @@ const appRouter = createBrowserRouter(
                         <Route path="/administration/tenant-plans" element={<PermissionRoute permission={PLATFORM_PERMISSION.plansView}><TenantPlansPage /></PermissionRoute>} />
                         <Route
                             path="/administration/platform-configuration"
-                            element={<PermissionRoute permission={PLATFORM_PERMISSION.configurationManage}><SettingsPage mode="platform" /></PermissionRoute>}
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.configurationView}><SettingsPage mode="platform" /></PermissionRoute>}
                         />
                     </Route>
                 </Route>

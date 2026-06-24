@@ -12,26 +12,30 @@ use Modules\Tenant\Http\Requests\ListTenantPlanRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantPlanRequest;
 use Modules\Tenant\Http\Resources\TenantPlanResource;
+use Modules\Tenant\Http\Resources\TenantPlanRevisionResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
+use Modules\Tenant\Services\Plans\ActivateTenantPlanService;
 use Modules\Tenant\Services\Plans\CreateTenantPlanService;
-use Modules\Tenant\Services\Plans\DeleteTenantPlanService;
+use Modules\Tenant\Services\Plans\DeactivateTenantPlanService;
 use Modules\Tenant\Services\Plans\GetTenantPlanService;
 use Modules\Tenant\Services\Plans\ListTenantPlansService;
+use Modules\Tenant\Services\Plans\ListTenantPlanRevisionsService;
 use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
 
 final class TenantPlanController extends Controller
 {
     public function __construct(
         private readonly ListTenantPlansService $listPlans,
+        private readonly ListTenantPlanRevisionsService $listRevisions,
         private readonly GetTenantPlanService $getPlan,
         private readonly CreateTenantPlanService $createPlan,
         private readonly UpdateTenantPlanService $updatePlan,
-        private readonly DeleteTenantPlanService $deactivatePlan,
+        private readonly DeactivateTenantPlanService $deactivatePlan,
+        private readonly ActivateTenantPlanService $activatePlan,
     ) {}
 
     public function index(ListTenantPlanRequest $request): JsonResponse
     {
-
         $result = $this->listPlans->execute($request->validated());
         if ($result->isFailure()) {
             return TenantApiResponder::error($result->errorOrFail());
@@ -48,13 +52,23 @@ final class TenantPlanController extends Controller
 
     public function show(int|string $tenantPlan): JsonResponse|TenantPlanResource
     {
-
         return $this->planResponse($this->getPlan->execute($tenantPlan));
+    }
+
+    public function revisions(int|string $tenantPlan): JsonResponse
+    {
+        $result = $this->listRevisions->execute($tenantPlan);
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        return response()->json([
+            'data' => TenantPlanRevisionResource::collection($result->valueOrFail())->resolve(),
+        ]);
     }
 
     public function store(UpsertTenantPlanRequest $request): JsonResponse|TenantPlanResource
     {
-
         $result = $this->createPlan->execute($request->validated());
         if ($result->isFailure()) {
             return TenantApiResponder::error($result->errorOrFail());
@@ -69,7 +83,6 @@ final class TenantPlanController extends Controller
         UpsertTenantPlanRequest $request,
         int|string $tenantPlan,
     ): JsonResponse|TenantPlanResource {
-
         return $this->planResponse(
             $this->updatePlan->execute($tenantPlan, $request->validated()),
         );
@@ -79,8 +92,17 @@ final class TenantPlanController extends Controller
         TenantVersionRequest $request,
         int|string $tenantPlan,
     ): JsonResponse|TenantPlanResource {
-
         return $this->planResponse($this->deactivatePlan->execute(
+            $tenantPlan,
+            (int) $request->validated('expected_version'),
+        ));
+    }
+
+    public function activate(
+        TenantVersionRequest $request,
+        int|string $tenantPlan,
+    ): JsonResponse|TenantPlanResource {
+        return $this->planResponse($this->activatePlan->execute(
             $tenantPlan,
             (int) $request->validated('expected_version'),
         ));
@@ -92,5 +114,4 @@ final class TenantPlanController extends Controller
             ? TenantApiResponder::error($result->errorOrFail())
             : new TenantPlanResource($result->valueOrFail());
     }
-
 }

@@ -53,6 +53,11 @@ final class TenantModel extends CoreModel
         return $this->hasOne(TenantOnboardingStateModel::class, 'tenant_id');
     }
 
+    public function primaryDomainAssignment(): HasOne
+    {
+        return $this->hasOne(TenantPrimaryDomainModel::class, 'tenant_id');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(TenantDocumentModel::class, 'tenant_id');

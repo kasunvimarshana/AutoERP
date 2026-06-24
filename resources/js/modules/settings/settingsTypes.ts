@@ -1,3 +1,5 @@
+import type { PaginationMeta } from '@/shared/types/pagination';
+
 export type ConfigurationScope = 'global' | 'tenant' | 'organization_unit';
 export type ConfigurationValueType = 'string' | 'integer' | 'decimal' | 'boolean' | 'json';
 
@@ -27,7 +29,22 @@ export interface ConfigurationEntry {
     scope: ConfigurationScope;
     value: unknown;
     display_value: string | null;
+    effective_value: unknown;
+    effective_display_value: string | null;
+    source_scope: ConfigurationScope;
+    inherited_value: unknown;
+    inherited_display_value: string | null;
+    inherited_configured: boolean;
+    inherited_source_scope: ConfigurationScope | 'default';
+    inherited_uses_default: boolean;
     sensitive: boolean;
+    runtime_mutable: boolean;
     row_version: number;
     updated_at: string;
+}
+
+export interface ConfigurationEntryPage {
+    data: ConfigurationEntry[];
+    meta: PaginationMeta;
+    existing_keys: string[];
 }

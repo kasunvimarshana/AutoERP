@@ -34,6 +34,7 @@ final class TenantResource extends JsonResource
             'base_currency',
             'current_subscription',
             'onboarding',
+            'primary_domain',
             'created_at',
             'updated_at',
         ]));

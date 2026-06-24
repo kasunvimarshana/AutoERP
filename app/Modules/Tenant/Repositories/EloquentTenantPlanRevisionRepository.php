@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Models\TenantPlanModel;
@@ -34,6 +35,24 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
             ->first();
 
         return $model instanceof TenantPlanRevisionModel ? $this->record($model) : null;
+    }
+
+    public function listByPlan(int|string $planId): array
+    {
+        return $this->revisions->newQuery()
+            ->with(['plan:id,name,slug,is_active', 'currency:id,code,name,symbol,is_active'])
+            ->withCount([
+                'subscriptions as total_subscription_count',
+                'subscriptions as current_subscription_count' => fn (Builder $query) => $query
+                    ->whereHas('currentAssignment'),
+                'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
+                    ->whereDoesntHave('currentAssignment'),
+            ])
+            ->where('tenant_plan_id', $planId)
+            ->orderByDesc('revision_number')
+            ->get()
+            ->map(fn (TenantPlanRevisionModel $model): DataRecord => $this->record($model))
+            ->all();
     }
 
     public function createNext(int|string $planId, array $attributes): DataRecord

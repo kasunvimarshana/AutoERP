@@ -15,6 +15,7 @@ final class PlatformPermission
     public const TENANT_SUBSCRIPTIONS_MANAGE = 'platform.tenant_subscriptions.manage';
     public const PLANS_VIEW = 'platform.plans.view';
     public const PLANS_MANAGE = 'platform.plans.manage';
+    public const CONFIGURATION_VIEW = 'platform.configuration.view';
     public const CONFIGURATION_MANAGE = 'platform.configuration.manage';
     public const SECRETS_MANAGE = 'platform.secrets.manage';
     public const AUDIT_VIEW = 'platform.audit.view';
@@ -33,6 +34,7 @@ final class PlatformPermission
             self::TENANT_SUBSCRIPTIONS_MANAGE => 'Assign and replace immutable tenant subscriptions.',
             self::PLANS_VIEW => 'View tenant plans and immutable plan revisions.',
             self::PLANS_MANAGE => 'Create, revise, and deactivate tenant plans.',
+            self::CONFIGURATION_VIEW => 'View approved global configuration values and inheritance metadata.',
             self::CONFIGURATION_MANAGE => 'Manage approved global configuration values.',
             self::SECRETS_MANAGE => 'Manage encrypted platform and tenant infrastructure secrets.',
             self::AUDIT_VIEW => 'View platform and tenant audit records permitted to the operator.',

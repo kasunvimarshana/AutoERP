@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { CopyButton } from '@/shared/components/CopyButton';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { useApi } from '@/shared/hooks/useApi';
-import { getTenantOnboardingReadiness, provisionTenantOnboarding } from '../tenantApi';
-import type { TenantOnboardingProvisionResult, TenantRecord } from '../tenantTypes';
+import { SuccessAlert } from '@/shared/components/SuccessAlert';
+import { provisionTenantOnboarding } from '../tenantApi';
+import type { TenantOnboardingProvisionResult, TenantOnboardingSummary, TenantRecord } from '../tenantTypes';
+import { formatTenantDateTime } from '../tenantPresentation';
 
 interface Props {
     tenant: TenantRecord;
@@ -17,15 +18,16 @@ interface Props {
 }
 
 export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled = false, onTenantChanged }: Props) {
-    const readiness = useApi(
-        (signal) => getTenantOnboardingReadiness(tenant.id, signal),
-        [tenant.id, tenant.row_version, tenant.onboarding?.row_version],
-    );
     const [emailInput, setEmailInput] = useState(tenant.onboarding?.initial_admin_email ?? '');
-    const email = tenant.onboarding?.initial_admin_email ?? emailInput;
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const [provisioned, setProvisioned] = useState<TenantOnboardingProvisionResult | null>(null);
+    const [invitationAcknowledged, setInvitationAcknowledged] = useState(false);
+    const state = provisioned?.state ?? tenant.onboarding;
+    const email = state?.initial_admin_email ?? emailInput;
+    const completedSteps = useMemo(() => new Set(state?.completed_steps ?? []), [state?.completed_steps]);
+    const canRun = canProvision && tenant.status === 'draft' && state?.status !== 'completed';
 
     async function provision() {
         const normalized = email.trim().toLowerCase();
@@ -33,49 +35,67 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
 
         setSaving(true);
         setError(null);
+        setSuccess(null);
         try {
             const result = await provisionTenantOnboarding(tenant, normalized);
             setProvisioned(result);
-            readiness.setData(result.readiness);
+            setInvitationAcknowledged(false);
+            setSuccess(result.invitation_token
+                ? 'Tenant foundation was provisioned. Copy the one-time administrator invitation before continuing.'
+                : 'Tenant foundation is complete and ready for domain verification.');
             onTenantChanged();
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
-            readiness.reload();
-            onTenantChanged();
         } finally {
             setSaving(false);
         }
     }
 
-    const state = provisioned?.state ?? tenant.onboarding;
-    const currentReadiness = provisioned?.readiness ?? readiness.data;
-    const canStart = canProvision && tenant.status === 'draft' && state?.status !== 'completed';
-
     return (
-        <section className="space-y-4" aria-labelledby="tenant-onboarding-title">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+        <section id="tenant-foundation-step" className="scroll-mt-24 space-y-4" aria-labelledby="tenant-onboarding-title">
+            <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h3 id="tenant-onboarding-title" className="font-semibold text-slate-900">1. Provision tenant foundation</h3>
-                    <p className="mt-1 text-sm text-slate-500">Creates the root organization, access catalogue, authentication provider, Super Admin role, and first administrator invitation.</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 2</p>
+                    <h3 id="tenant-onboarding-title" className="mt-1 font-semibold text-slate-900">Provision tenant foundation</h3>
+                    <p className="mt-1 text-sm text-slate-500">Creates the root organization, permissions, Super Admin role, authentication provider, and first administrator invitation.</p>
                 </div>
                 <StatusBadge status={state?.status ?? 'pending'} />
             </div>
 
-            <ErrorAlert error={readiness.error ?? error} />
-            {readiness.loading && !currentReadiness ? <LoadingState label="Checking onboarding readiness..." /> : null}
+            <SuccessAlert message={success} onDismiss={() => setSuccess(null)} />
+            <ErrorAlert error={error} title="Foundation provisioning failed" />
 
-            {canStart ? (
-                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {FOUNDATION_STEPS.map((step) => {
+                    const completed = completedSteps.has(step.key);
+                    return (
+                        <div key={step.key} className={`rounded-lg border p-3 text-sm ${completed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <p className="font-medium text-slate-900">{step.label}</p>
+                            <p className={`mt-1 text-xs font-semibold ${completed ? 'text-emerald-700' : 'text-slate-500'}`}>{completed ? 'Completed' : 'Pending'}</p>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {state?.last_error ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                    <p className="font-semibold">Previous provisioning attempt failed</p>
+                    <p className="mt-1">{state.last_error}</p>
+                </div>
+            ) : null}
+
+            {canRun ? (
+                <div className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-[1fr_auto] md:items-end">
                     <Input
                         label="Initial administrator email"
                         type="email"
                         autoComplete="email"
                         value={email}
                         onChange={(event) => setEmailInput(event.target.value)}
-                        disabled={disabled || saving || Boolean(tenant.onboarding?.initial_admin_email)}
-                        hint={tenant.onboarding?.initial_admin_email
-                            ? 'The initial administrator is fixed after provisioning starts. Revoke the invitation through the authentication workflow before changing it.'
-                            : 'A one-time invitation will be created. The raw invitation token is shown only immediately after provisioning.'}
+                        disabled={disabled || saving || Boolean(state?.initial_admin_email)}
+                        hint={state?.initial_admin_email
+                            ? 'This invitation identity is fixed once provisioning starts. Revoke it through the authentication workflow before changing it.'
+                            : 'A single-use invitation is created. The raw token is shown only immediately after provisioning.'}
                         required
                     />
                     <Button
@@ -83,35 +103,44 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                         disabled={disabled || email.trim() === ''}
                         onClick={() => void provision()}
                     >
-                        Provision foundation
+                        {provisionButtonLabel(state?.status)}
                     </Button>
                 </div>
             ) : null}
 
-            {provisioned?.invitation_token ? (
+            {provisioned?.invitation_token && !invitationAcknowledged ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-                    <p className="font-semibold">Copy this one-time invitation token now</p>
-                    <code className="mt-2 block break-all rounded bg-white p-3 font-mono text-xs">{provisioned.invitation_token}</code>
-                    <p className="mt-2">Expires: {provisioned.invitation_expires_at ?? 'Not provided'}. It will not be returned again.</p>
-                </div>
-            ) : null}
-
-            {currentReadiness ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                    {Object.entries(currentReadiness.checks).map(([key, passed]) => (
-                        <div key={key} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                            <span className="capitalize text-slate-700">{key.replaceAll('_', ' ')}</span>
-                            <span className={passed ? 'font-medium text-emerald-700' : 'font-medium text-amber-700'}>{passed ? 'Ready' : 'Required'}</span>
+                    <p className="font-semibold">One-time administrator invitation</p>
+                    <p className="mt-1">Copy and store this token securely. It is not returned by later API responses.</p>
+                    <code className="mt-3 block break-all rounded bg-white p-3 font-mono text-xs">{provisioned.invitation_token}</code>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p>Expires {formatTenantDateTime(provisioned.invitation_expires_at, 'at an unknown time')}.</p>
+                        <div className="flex gap-2">
+                            <CopyButton value={provisioned.invitation_token} label="Copy invitation token" />
+                            <Button variant="secondary" onClick={() => setInvitationAcknowledged(true)}>I stored it</Button>
                         </div>
-                    ))}
+                    </div>
                 </div>
             ) : null}
 
-            {currentReadiness?.blockers.length ? (
-                <ul className="space-y-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                    {currentReadiness.blockers.map((blocker) => <li key={blocker.code}>• {blocker.message}</li>)}
-                </ul>
+            {state?.provisioned_at ? (
+                <p className="text-xs text-slate-500">Foundation provisioned {formatTenantDateTime(state.provisioned_at)}.</p>
             ) : null}
         </section>
     );
+}
+
+const FOUNDATION_STEPS = [
+    { key: 'organization_structure', label: 'Root organization' },
+    { key: 'permission_catalogue', label: 'Permission catalogue' },
+    { key: 'super_admin_role', label: 'Super Admin role' },
+    { key: 'authentication_provider', label: 'Authentication provider' },
+    { key: 'initial_admin_invitation', label: 'Administrator invitation' },
+] as const;
+
+function provisionButtonLabel(status: TenantOnboardingSummary['status'] | undefined): string {
+    if (status === 'failed') return 'Retry foundation provisioning';
+    if (status === 'provisioning') return 'Resume foundation provisioning';
+    if (status === 'awaiting_domain' || status === 'ready') return 'Recheck foundation';
+    return 'Provision foundation';
 }

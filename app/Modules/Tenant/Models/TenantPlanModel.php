@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\CoreModel;
 
@@ -34,5 +35,15 @@ final class TenantPlanModel extends CoreModel
     {
         return $this->hasOne(TenantPlanRevisionModel::class, 'tenant_plan_id')
             ->ofMany('revision_number', 'max');
+    }
+
+    public function subscriptions(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            TenantSubscriptionModel::class,
+            TenantPlanRevisionModel::class,
+            'tenant_plan_id',
+            'tenant_plan_revision_id',
+        );
     }
 }

@@ -93,7 +93,16 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
 
     private function query(): Builder
     {
-        return $this->model->newQuery()->with('latestRevision.currency');
+        return $this->model->newQuery()
+            ->with('latestRevision.currency')
+            ->withCount([
+                'revisions',
+                'subscriptions as total_subscription_count',
+                'subscriptions as current_subscription_count' => fn (Builder $query) => $query
+                    ->whereHas('currentAssignment'),
+                'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
+                    ->whereDoesntHave('currentAssignment'),
+            ]);
     }
 
     private function record(TenantPlanModel $model): DataRecord

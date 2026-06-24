@@ -55,7 +55,7 @@ final class ConfigurationValueValidator
             ]);
         }
 
-        if (is_int($normalized) || is_float($normalized)) {
+        if (is_int($normalized)) {
             if (
                 $definition->minimum !== null
                 && $normalized < $definition->minimum
@@ -69,6 +69,19 @@ final class ConfigurationValueValidator
                 $definition->maximum !== null
                 && $normalized > $definition->maximum
             ) {
+                throw ValidationException::withMessages([
+                    'value' => ["The value may not exceed {$definition->maximum}."],
+                ]);
+            }
+        }
+
+        if ($definition->valueType === ConfigurationValueType::DECIMAL && is_string($normalized)) {
+            if ($definition->minimum !== null && $this->compareDecimals($normalized, (string) $definition->minimum) < 0) {
+                throw ValidationException::withMessages([
+                    'value' => ["The value must be at least {$definition->minimum}."],
+                ]);
+            }
+            if ($definition->maximum !== null && $this->compareDecimals($normalized, (string) $definition->maximum) > 0) {
                 throw ValidationException::withMessages([
                     'value' => ["The value may not exceed {$definition->maximum}."],
                 ]);
@@ -154,23 +167,58 @@ final class ConfigurationValueValidator
         return $normalized;
     }
 
-    private function decimal(mixed $value): float
+    private function decimal(mixed $value): string
     {
-        $isNumericString = is_string($value) && is_numeric(trim($value));
-        if (! is_int($value) && ! is_float($value) && ! $isNumericString) {
+        if (! is_int($value) && ! is_string($value)) {
             throw ValidationException::withMessages([
-                'value' => ['Enter a valid number.'],
+                'value' => ['Enter a plain decimal value without scientific notation.'],
             ]);
         }
-
-        $normalized = (float) $value;
-        if (! is_finite($normalized)) {
+        $normalized = trim((string) $value);
+        if ($normalized === '' || preg_match('/^-?\d+(?:\.\d+)?$/D', $normalized) !== 1) {
             throw ValidationException::withMessages([
-                'value' => ['Enter a finite number.'],
+                'value' => ['Enter a plain decimal value without scientific notation.'],
             ]);
         }
+        $negative = str_starts_with($normalized, '-');
+        $unsigned = $negative ? substr($normalized, 1) : $normalized;
+        [$whole, $fraction] = array_pad(explode('.', $unsigned, 2), 2, '');
+        $whole = ltrim($whole, '0');
+        $whole = $whole === '' ? '0' : $whole;
+        $fraction = rtrim($fraction, '0');
+        $canonical = $fraction === '' ? $whole : $whole.'.'.$fraction;
 
-        return $normalized;
+        return $negative && $canonical !== '0' ? '-'.$canonical : $canonical;
+    }
+
+    private function compareDecimals(string $left, string $right): int
+    {
+        $left = $this->decimal($left);
+        $right = $this->decimal($right);
+        $leftNegative = str_starts_with($left, '-');
+        $rightNegative = str_starts_with($right, '-');
+        if ($leftNegative !== $rightNegative) return $leftNegative ? -1 : 1;
+
+        $comparison = $this->compareUnsignedDecimals(
+            $leftNegative ? substr($left, 1) : $left,
+            $rightNegative ? substr($right, 1) : $right,
+        );
+
+        return $leftNegative ? -$comparison : $comparison;
+    }
+
+    private function compareUnsignedDecimals(string $left, string $right): int
+    {
+        [$leftWhole, $leftFraction] = array_pad(explode('.', $left, 2), 2, '');
+        [$rightWhole, $rightFraction] = array_pad(explode('.', $right, 2), 2, '');
+        if (strlen($leftWhole) !== strlen($rightWhole)) {
+            return strlen($leftWhole) <=> strlen($rightWhole);
+        }
+        $wholeComparison = strcmp($leftWhole, $rightWhole);
+        if ($wholeComparison !== 0) return $wholeComparison <=> 0;
+        $scale = max(strlen($leftFraction), strlen($rightFraction));
+
+        return strcmp(str_pad($leftFraction, $scale, '0'), str_pad($rightFraction, $scale, '0')) <=> 0;
     }
 
     private function boolean(mixed $value): bool

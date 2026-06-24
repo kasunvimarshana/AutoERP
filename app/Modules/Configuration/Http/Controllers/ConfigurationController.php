@@ -38,7 +38,8 @@ final class ConfigurationController extends Controller
         $validated = $request->validated();
         $page = $this->entries->list(
             $this->scope($request),
-            isset($validated['prefix']) ? (string) $validated['prefix'] : null,
+            isset($validated['search']) ? (string) $validated['search'] : null,
+            isset($validated['owner']) ? (string) $validated['owner'] : null,
             $request->page(),
             $request->perPage(),
         );
@@ -53,6 +54,7 @@ final class ConfigurationController extends Controller
                 'to' => $page->lastItem(),
                 'total' => $page->total(),
             ],
+            'existing_keys' => $this->entries->existingKeys($this->scope($request)),
         ]);
     }
 

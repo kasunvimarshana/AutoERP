@@ -40,16 +40,31 @@ final class ConfigurationEntryService
     ) {}
 
     /** @return LengthAwarePaginator<int, ConfigurationEntryView> */
-    public function list(string $scope, ?string $prefix, int $page, int $perPage): LengthAwarePaginator
+    public function list(
+        string $scope,
+        ?string $search,
+        ?string $owner,
+        int $page,
+        int $perPage,
+    ): LengthAwarePaginator
     {
         $this->assertCanView($scope);
         $context = $this->scopes->current($scope);
-        $paginator = $this->repository->paginate($context, $prefix, $page, $perPage);
+        $keys = $this->matchingDefinitionKeys($scope, $search, $owner);
+        $paginator = $this->repository->paginate($context, $keys, $page, $perPage);
         $paginator->setCollection($paginator->getCollection()->map(
             fn (StoredConfigurationValue $stored): ConfigurationEntryView => $this->view($stored),
         ));
 
         return $paginator;
+    }
+
+    /** @return list<string> */
+    public function existingKeys(string $scope): array
+    {
+        $this->assertCanView($scope);
+
+        return $this->repository->keys($this->scopes->current($scope));
     }
 
     public function exact(string $scope, string $key): ConfigurationEntryView
@@ -215,6 +230,13 @@ final class ConfigurationEntryService
             );
         }
 
+        $context = new ConfigurationScopeContext(
+            scope: $stored->scope,
+            tenantId: $stored->tenantId,
+            organizationUnitId: $stored->organizationUnitId,
+        );
+        $inherited = $this->resolver->resolveBelow($context, $definition->key);
+
         return new ConfigurationEntryView(
             definition: $definition,
             scope: $stored->scope,
@@ -223,9 +245,45 @@ final class ConfigurationEntryService
             value: $definition->sensitive
                 ? null
                 : $this->codec->decode($definition, $stored->storedValue),
+            inheritedValue: $definition->sensitive ? null : $inherited->value,
+            inheritedConfigured: ! $inherited->usesDefault || $inherited->value !== null,
+            inheritedSourceScope: $inherited->sourceScope,
+            inheritedUsesDefault: $inherited->usesDefault,
             rowVersion: $stored->rowVersion,
             updatedAt: $stored->updatedAt,
         );
+    }
+
+    /** @return list<string> */
+    private function matchingDefinitionKeys(
+        string $scope,
+        ?string $search,
+        ?string $owner,
+    ): array {
+        $search = strtolower(trim((string) $search));
+        $owner = strtolower(trim((string) $owner));
+
+        return array_values(array_map(
+            static fn (ConfigurationDefinition $definition): string => $definition->key,
+            array_filter(
+                $this->definitions->all(),
+                static function (ConfigurationDefinition $definition) use ($scope, $search, $owner): bool {
+                    if (! in_array($scope, $definition->allowedScopes, true)) {
+                        return false;
+                    }
+                    if ($owner !== '' && strtolower($definition->owner) !== $owner) {
+                        return false;
+                    }
+                    if ($search === '') {
+                        return true;
+                    }
+
+                    return str_contains(strtolower($definition->key), $search)
+                        || str_contains(strtolower($definition->label), $search)
+                        || str_contains(strtolower($definition->description), $search);
+                },
+            ),
+        ));
     }
 
     private function recordChange(

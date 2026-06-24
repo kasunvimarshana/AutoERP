@@ -7,6 +7,7 @@ import type {
     TenantPage,
     TenantPlan,
     TenantPlanPage,
+    TenantPlanRevision,
     TenantRecord,
     TenantSubscription,
     TenantSubscriptionReadiness,
@@ -205,6 +206,16 @@ export async function updateTenantPlan(plan: TenantPlan, payload: Record<string,
 
 export async function deactivateTenantPlan(plan: TenantPlan): Promise<TenantPlan> {
     const response = await apiClient.patch<ApiResource<TenantPlan>>(`/api/v1/platform/tenant-plans/${plan.id}/deactivate`, { expected_version: plan.row_version });
+    return response.data.data;
+}
+
+export async function activateTenantPlan(plan: TenantPlan): Promise<TenantPlan> {
+    const response = await apiClient.patch<ApiResource<TenantPlan>>(`/api/v1/platform/tenant-plans/${plan.id}/activate`, { expected_version: plan.row_version });
+    return response.data.data;
+}
+
+export async function listTenantPlanRevisions(planId: number, signal?: AbortSignal): Promise<TenantPlanRevision[]> {
+    const response = await apiClient.get<ApiCollection<TenantPlanRevision>>(`/api/v1/platform/tenant-plans/${planId}/revisions`, { signal });
     return response.data.data;
 }
 

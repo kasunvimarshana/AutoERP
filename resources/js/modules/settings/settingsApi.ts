@@ -3,6 +3,7 @@ import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import type {
     ConfigurationDefinition,
     ConfigurationEntry,
+    ConfigurationEntryPage,
     ConfigurationScope,
 } from './settingsTypes';
 
@@ -19,10 +20,26 @@ export async function listConfigurationDefinitions(scope: ConfigurationScope, si
     return response.data.data;
 }
 
-export async function listConfigurationEntries(scope: ConfigurationScope, prefix: string, page: number, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiCollection<ConfigurationEntry>>(
+export async function listConfigurationEntries(
+    scope: ConfigurationScope,
+    filters: { search?: string; owner?: string; page: number; per_page?: number },
+    signal?: AbortSignal,
+): Promise<ConfigurationEntryPage> {
+    const response = await apiClient.get<{
+        data: ConfigurationEntry[];
+        meta: ConfigurationEntryPage['meta'];
+        existing_keys: string[];
+    }>(
         `${configurationBase(scope)}/${scopePath[scope]}/entries`,
-        { params: { prefix: prefix || undefined, page, per_page: 25 }, signal },
+        {
+            params: {
+                search: filters.search || undefined,
+                owner: filters.owner || undefined,
+                page: filters.page,
+                per_page: filters.per_page ?? 25,
+            },
+            signal,
+        },
     );
     return response.data;
 }

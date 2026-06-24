@@ -12,6 +12,9 @@ interface TenantPlanRevisionRepositoryInterface
 
     public function findLatestByPlan(int|string $planId): ?DataRecord;
 
+    /** @return list<DataRecord> */
+    public function listByPlan(int|string $planId): array;
+
     /** @param array<string, mixed> $attributes */
     public function createNext(int|string $planId, array $attributes): DataRecord;
 }

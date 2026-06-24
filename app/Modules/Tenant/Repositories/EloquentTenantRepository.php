@@ -92,6 +92,8 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
             'currentSubscription.subscription.revision.currency:id,code,name,symbol,is_active',
             'baseCurrency:id,code,name,symbol,is_active',
             'onboardingState:tenant_id,status,initial_admin_email,completed_steps,last_error,provisioned_at,completed_at,row_version',
+            'primaryDomainAssignment:tenant_id,tenant_domain_id',
+            'primaryDomainAssignment.domain:id,tenant_id,domain,status,verified_at',
         ]);
     }
 
@@ -127,6 +129,12 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                 'row_version',
             ])
             : null;
+        $primaryDomain = $model->relationLoaded('primaryDomainAssignment')
+            ? $model->primaryDomainAssignment?->domain
+            : null;
+        $payload['primary_domain'] = $primaryDomain?->only([
+            'id', 'domain', 'status', 'verified_at',
+        ]);
         return new DataRecord($payload);
     }
 }

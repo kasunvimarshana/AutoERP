@@ -120,6 +120,9 @@ Route::prefix('api/v1/platform')
         Route::get('tenant-plans/{tenantPlan}', [TenantPlanController::class, 'show'])
             ->middleware('platform.permission:'.PlatformPermission::PLANS_VIEW)
             ->name('tenant-plans.show');
+        Route::get('tenant-plans/{tenantPlan}/revisions', [TenantPlanController::class, 'revisions'])
+            ->middleware('platform.permission:'.PlatformPermission::PLANS_VIEW)
+            ->name('tenant-plans.revisions');
         Route::post('tenant-plans', [TenantPlanController::class, 'store'])
             ->middleware([$platformStepUpMiddleware, 'platform.permission:'.PlatformPermission::PLANS_MANAGE])
             ->name('tenant-plans.store');
@@ -129,6 +132,9 @@ Route::prefix('api/v1/platform')
         Route::patch('tenant-plans/{tenantPlan}/deactivate', [TenantPlanController::class, 'deactivate'])
             ->middleware([$platformStepUpMiddleware, 'platform.permission:'.PlatformPermission::PLANS_MANAGE])
             ->name('tenant-plans.deactivate');
+        Route::patch('tenant-plans/{tenantPlan}/activate', [TenantPlanController::class, 'activate'])
+            ->middleware([$platformStepUpMiddleware, 'platform.permission:'.PlatformPermission::PLANS_MANAGE])
+            ->name('tenant-plans.activate');
     });
 
 Route::prefix('api/v1/tenant')

@@ -28,12 +28,13 @@ final class UpsertTenantRequest extends FormRequest
             'name' => [...$required, 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_logo' => ['sometimes', 'boolean'],
             'cross_org_transactions' => ['sometimes', 'boolean'],
             'base_currency_id' => [
                 'nullable',
                 'integer',
                 'min:1',
-                Rule::exists('currencies', 'id')->where('is_active', true),
+                Rule::exists('currencies', 'id'),
             ],
             'metadata' => ['nullable', 'array'],
         ];

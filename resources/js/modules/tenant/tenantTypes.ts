@@ -37,6 +37,9 @@ export interface TenantPlanRevision {
     billing_interval: 'month' | 'quarter' | 'year';
     effective_at: string;
     plan?: Pick<TenantPlan, 'id' | 'name' | 'slug' | 'is_active'> | null;
+    total_subscription_count?: number;
+    current_subscription_count?: number;
+    historical_subscription_count?: number;
     created_at: string;
 }
 
@@ -83,6 +86,7 @@ export interface TenantRecord {
     base_currency: NamedReference | null;
     current_subscription: TenantSubscription | null;
     onboarding: TenantOnboardingSummary | null;
+    primary_domain: TenantDomain | null;
     created_at: string;
     updated_at: string;
 }
@@ -93,6 +97,10 @@ export interface TenantPlan {
     slug: string;
     is_active: boolean;
     row_version: number;
+    revisions_count: number;
+    total_subscription_count: number;
+    current_subscription_count: number;
+    historical_subscription_count: number;
     latest_revision: TenantPlanRevision | null;
     features: TenantPlanFeatures | null;
     limits: TenantPlanLimits | null;
@@ -172,4 +180,8 @@ export interface TenantPage {
 export interface TenantPlanPage {
     data: TenantPlan[];
     meta: PaginationMeta;
+}
+
+export interface TenantPlanRevisionCollection {
+    data: TenantPlanRevision[];
 }
