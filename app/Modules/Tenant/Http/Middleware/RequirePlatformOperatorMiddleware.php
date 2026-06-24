@@ -7,7 +7,6 @@ namespace Modules\Tenant\Http\Middleware;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -25,11 +24,8 @@ final class RequirePlatformOperatorMiddleware
     {
         $context = $this->currentUser->current();
         $userId = $context?->userId();
-        $tokenScope = $context?->tokenPayload()['token_scope'] ?? null;
-
         if (
             $userId === null
-            || $tokenScope !== AuthTokenScope::PLATFORM
             || ! $this->platformOperators->isPlatformOperator($userId)
         ) {
             return new JsonResponse([

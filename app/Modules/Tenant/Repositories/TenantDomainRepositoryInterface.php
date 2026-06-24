@@ -14,7 +14,8 @@ interface TenantDomainRepositoryInterface
 
     public function findByIdForTenant(int|string $id, int $tenantId): ?DataRecord;
 
-    public function findByDomain(string $domain): ?DataRecord;
+    /** Global lookup for trusted host resolution and platform workflows only. */
+    public function findByDomainFromControlPlane(string $domain): ?DataRecord;
 
     public function findPrimaryByTenant(int $tenantId): ?DataRecord;
 
@@ -39,13 +40,47 @@ interface TenantDomainRepositoryInterface
     public function recordVerificationAttempt(
         int|string $id,
         int $tenantId,
+        int $expectedVersion,
         bool $verified,
         ?string $error,
         DateTimeInterface $attemptedAt,
         ?DateTimeInterface $revalidationDueAt = null,
         ?DateTimeInterface $graceExpiresAt = null,
-    ): void;
+    ): ?DataRecord;
 
-    /** @return list<DataRecord> */
-    public function listDueForRevalidation(DateTimeInterface $dueAt, int $limit): array;
+    /**
+     * Atomically claims due records so concurrent schedulers cannot process the same domain.
+     *
+     * @return list<DataRecord>
+     */
+    public function claimDueForRevalidation(
+        DateTimeInterface $dueAt,
+        DateTimeInterface $claimedAt,
+        DateTimeInterface $staleBefore,
+        string $claimToken,
+        int $limit,
+    ): array;
+
+
+    public function releaseRevalidationClaim(
+        int|string $id,
+        int $tenantId,
+        int $expectedVersion,
+        string $claimToken,
+        ?string $error,
+        DateTimeInterface $releasedAt,
+    ): ?DataRecord;
+
+    /**
+     * @return array{domain:DataRecord,fallback_primary:DataRecord|null,primary_lost:bool}|null
+     */
+    public function disableAfterFailedRevalidation(
+        int|string $id,
+        int $tenantId,
+        int $expectedVersion,
+        string $claimToken,
+        ?string $error,
+        DateTimeInterface $attemptedAt,
+        ?int $updatedBy,
+    ): ?array;
 }

@@ -10,7 +10,8 @@ use Modules\Configuration\Services\ConfigurationAuthorizationService;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
-use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
+use Modules\Tenant\Constants\PlatformPermission;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigurationAuthorizationServiceTest extends TestCase
@@ -26,14 +27,27 @@ final class ConfigurationAuthorizationServiceTest extends TestCase
         self::assertFalse($service->canManageScopeCurrent(ConfigurationScope::ORGANIZATION_UNIT));
     }
 
-    public function test_platform_operator_can_manage_global_but_not_tenant_scope_without_tenant_permission(): void
+    public function test_platform_permissions_authorize_global_configuration_without_tenant_scope(): void
     {
-        $service = $this->service(isPlatformOperator: true);
+        $service = $this->service(allowedPlatformPermissions: [
+            PlatformPermission::CONFIGURATION_MANAGE,
+            PlatformPermission::SECRETS_MANAGE,
+        ]);
 
         self::assertTrue($service->canViewScopeCurrent(ConfigurationScope::GLOBAL));
         self::assertTrue($service->canManageScopeCurrent(ConfigurationScope::GLOBAL));
         self::assertTrue($service->canManageSensitiveCurrent(ConfigurationScope::GLOBAL));
         self::assertFalse($service->canManageScopeCurrent(ConfigurationScope::TENANT));
+    }
+
+    public function test_sensitive_global_configuration_requires_the_separate_secret_permission(): void
+    {
+        $service = $this->service(allowedPlatformPermissions: [
+            PlatformPermission::CONFIGURATION_MANAGE,
+        ]);
+
+        self::assertTrue($service->canManageScopeCurrent(ConfigurationScope::GLOBAL));
+        self::assertFalse($service->canManageSensitiveCurrent(ConfigurationScope::GLOBAL));
     }
 
     public function test_missing_trusted_context_denies_all_scopes(): void
@@ -43,13 +57,13 @@ final class ConfigurationAuthorizationServiceTest extends TestCase
         $tenant = $this->createMock(CurrentTenantContextAccessorInterface::class);
         $tenant->method('currentTenantId')->willReturn(null);
         $permissions = $this->createMock(PermissionCheckerInterface::class);
-        $platformOperators = $this->createMock(PlatformOperatorCheckerInterface::class);
+        $platformPermissions = $this->createMock(PlatformPermissionCheckerInterface::class);
 
         $service = new ConfigurationAuthorizationService(
             $user,
             $tenant,
             $permissions,
-            $platformOperators,
+            $platformPermissions,
         );
 
         self::assertFalse($service->canViewScopeCurrent(ConfigurationScope::GLOBAL));
@@ -59,7 +73,7 @@ final class ConfigurationAuthorizationServiceTest extends TestCase
     /** @param list<string> $allowedTenantPermissions */
     private function service(
         array $allowedTenantPermissions = [],
-        bool $isPlatformOperator = false,
+        array $allowedPlatformPermissions = [],
     ): ConfigurationAuthorizationService {
         $user = $this->createMock(CurrentUserContextAccessorInterface::class);
         $user->method('currentUserId')->willReturn(5);
@@ -71,14 +85,17 @@ final class ConfigurationAuthorizationServiceTest extends TestCase
                 && $tenantId === 10
                 && in_array($permission, $allowedTenantPermissions, true),
         );
-        $platformOperators = $this->createMock(PlatformOperatorCheckerInterface::class);
-        $platformOperators->method('isPlatformOperator')->willReturn($isPlatformOperator);
+        $platformPermissions = $this->createMock(PlatformPermissionCheckerInterface::class);
+        $platformPermissions->method('hasPermission')->willReturnCallback(
+            static fn (int $userId, string $permission): bool => $userId === 5
+                && in_array($permission, $allowedPlatformPermissions, true),
+        );
 
         return new ConfigurationAuthorizationService(
             $user,
             $tenant,
             $permissions,
-            $platformOperators,
+            $platformPermissions,
         );
     }
 }

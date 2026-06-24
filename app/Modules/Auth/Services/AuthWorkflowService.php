@@ -21,6 +21,8 @@ use Modules\Auth\Repositories\AuthIdentityRepositoryInterface;
 use Modules\Auth\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
 use Modules\Auth\Services\Contracts\AuthDomainServiceInterface;
+use Modules\Auth\Services\Registration\RegistrationInvitationService;
+use Modules\Auth\Services\Registration\RegistrationPolicyService;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Results\Error;
@@ -45,6 +47,8 @@ final class AuthWorkflowService
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly UserOrganizationUnitRepositoryInterface $userOrganizationUnits,
+        private readonly RegistrationPolicyService $registrationPolicy,
+        private readonly RegistrationInvitationService $registrationInvitations,
     ) {}
 
     public function login(LoginData $data): Result
@@ -167,6 +171,21 @@ final class AuthWorkflowService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($data): Result {
+                $authorization = $this->registrationPolicy->authorize($data);
+                if ($authorization->isFailure()) {
+                    return Result::failure($authorization->errorOrFail());
+                }
+
+                $invitation = $authorization->valueOrFail();
+                $organizationUnitId = $invitation instanceof \Modules\Core\DTOs\DataRecord
+                    && is_numeric($invitation->get('organization_unit_id'))
+                        ? (int) $invitation->get('organization_unit_id')
+                        : null;
+                $roleIds = $invitation instanceof \Modules\Core\DTOs\DataRecord
+                    && is_numeric($invitation->get('role_id'))
+                        ? [(int) $invitation->get('role_id')]
+                        : [];
+
                 $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
                 if ($provider === null) {
                     return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
@@ -179,8 +198,9 @@ final class AuthWorkflowService
 
                 $createdUser = $this->userService->create([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_ids' => $data->organizationUnitId === null ? [] : [$data->organizationUnitId],
-                    'default_organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_ids' => $organizationUnitId === null ? [] : [$organizationUnitId],
+                    'default_organization_unit_id' => $organizationUnitId,
+                    'role_ids' => $roleIds,
                     'first_name' => $data->firstName,
                     'last_name' => $data->lastName,
                     'email' => $data->email,
@@ -205,7 +225,7 @@ final class AuthWorkflowService
                     if ($existingIdentity === null) {
                         $identity = $this->identities->create([
                             'tenant_id' => $data->tenantId,
-                            'organization_unit_id' => $data->organizationUnitId,
+                            'organization_unit_id' => $organizationUnitId,
                             'provider_id' => (int) $providerRecord->id(),
                             'user_id' => (int) $userRecord['id'],
                             'provider_user_key' => strtolower($data->email),
@@ -216,6 +236,15 @@ final class AuthWorkflowService
                         ]);
 
                     }
+                }
+
+                if ($invitation instanceof \Modules\Core\DTOs\DataRecord) {
+                    $this->registrationInvitations->accept(
+                        (int) $data->tenantId,
+                        (int) $invitation->id(),
+                        (int) $userRecord['id'],
+                        (int) $invitation->require('row_version'),
+                    );
                 }
 
                 return Result::success($userRecord);

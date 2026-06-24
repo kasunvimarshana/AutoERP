@@ -561,7 +561,10 @@ final class UserService extends AbstractUserCrudService
 
         if ($tenantId !== null) {
             $payload['roles'] = DB::table('user_roles')
-                ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+                ->join('roles', function ($join): void {
+                    $join->on('roles.id', '=', 'user_roles.role_id')
+                        ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
+                })
                 ->where('user_roles.tenant_id', $tenantId)
                 ->where('user_roles.user_id', $userId)
                 ->whereNull('roles.deleted_at')
@@ -576,7 +579,10 @@ final class UserService extends AbstractUserCrudService
                 ->all();
 
             $payload['organization_units'] = DB::table('user_organization_units')
-                ->leftJoin('organization_units', 'organization_units.id', '=', 'user_organization_units.organization_unit_id')
+                ->leftJoin('organization_units', function ($join): void {
+                    $join->on('organization_units.id', '=', 'user_organization_units.organization_unit_id')
+                        ->on('organization_units.tenant_id', '=', 'user_organization_units.tenant_id');
+                })
                 ->where('user_organization_units.tenant_id', $tenantId)
                 ->where('user_organization_units.user_id', $userId)
                 ->whereNull('organization_units.deleted_at')
@@ -601,14 +607,23 @@ final class UserService extends AbstractUserCrudService
                 ->firstWhere('is_default', true)['id'] ?? null;
 
             $directPermissions = DB::table('user_permissions')
-                ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
+                ->join('permissions', function ($join): void {
+                    $join->on('permissions.id', '=', 'user_permissions.permission_id')
+                        ->on('permissions.tenant_id', '=', 'user_permissions.tenant_id');
+                })
                 ->where('user_permissions.tenant_id', $tenantId)
                 ->where('user_permissions.user_id', $userId)
                 ->whereNull('permissions.deleted_at')
                 ->get(['permissions.id', 'permissions.name', 'permissions.module', 'permissions.description']);
             $rolePermissions = DB::table('role_permissions')
-                ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-                ->join('user_roles', 'user_roles.role_id', '=', 'role_permissions.role_id')
+                ->join('permissions', function ($join): void {
+                    $join->on('permissions.id', '=', 'role_permissions.permission_id')
+                        ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
+                })
+                ->join('user_roles', function ($join): void {
+                    $join->on('user_roles.role_id', '=', 'role_permissions.role_id')
+                        ->on('user_roles.tenant_id', '=', 'role_permissions.tenant_id');
+                })
                 ->where('role_permissions.tenant_id', $tenantId)
                 ->where('user_roles.tenant_id', $tenantId)
                 ->where('user_roles.user_id', $userId)
@@ -884,7 +899,10 @@ final class UserService extends AbstractUserCrudService
     private function hasProtectedAdminRole(int $userId, int $tenantId): bool
     {
         return DB::table('user_roles')
-            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->join('roles', function ($join): void {
+                $join->on('roles.id', '=', 'user_roles.role_id')
+                    ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
+            })
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
@@ -912,8 +930,14 @@ final class UserService extends AbstractUserCrudService
     private function activeProtectedAdminCount(int $tenantId): int
     {
         return DB::table('users')
-            ->join('user_roles', 'user_roles.user_id', '=', 'users.id')
-            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->join('user_roles', function ($join): void {
+                $join->on('user_roles.user_id', '=', 'users.id')
+                    ->on('user_roles.tenant_id', '=', 'users.tenant_id');
+            })
+            ->join('roles', function ($join): void {
+                $join->on('roles.id', '=', 'user_roles.role_id')
+                    ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
+            })
             ->where('users.status', UserStatus::ACTIVE)
             ->where('users.tenant_id', $tenantId)
             ->where('user_roles.tenant_id', $tenantId)

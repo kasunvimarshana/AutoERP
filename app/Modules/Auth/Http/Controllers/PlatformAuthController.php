@@ -14,9 +14,10 @@ use Modules\Auth\Http\Requests\PlatformLoginRequest;
 use Modules\Auth\Http\Requests\PlatformRefreshTokenRequest;
 use Modules\Auth\Http\Resources\AuthPayloadResource;
 use Modules\Auth\Services\PlatformLoginService;
-use Modules\Auth\Services\RefreshTokenCookie;
+use Modules\Auth\Services\PlatformRefreshTokenCookie;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Results\Result;
@@ -26,11 +27,12 @@ final class PlatformAuthController extends Controller
     public function __construct(
         private readonly PlatformLoginService $login,
         private readonly RefreshTokenService $refreshTokens,
-        private readonly RefreshTokenCookie $refreshTokenCookie,
+        private readonly PlatformRefreshTokenCookie $refreshTokenCookie,
         private readonly TokenProviderInterface $tokens,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly ApiErrorResponseFactory $errors,
         private readonly TenantExecutionContextInterface $executionContext,
+        private readonly PlatformPermissionCheckerInterface $platformPermissions,
     ) {}
 
     public function login(PlatformLoginRequest $request): JsonResponse
@@ -39,6 +41,8 @@ final class PlatformAuthController extends Controller
             (string) $request->validated('email'),
             (string) $request->validated('password'),
             (string) $request->ip(),
+            is_string($request->validated('totp_code')) ? $request->validated('totp_code') : null,
+            is_string($request->validated('backup_code')) ? $request->validated('backup_code') : null,
         );
 
         return $this->respondWithRefreshCookie($result);
@@ -99,7 +103,7 @@ final class PlatformAuthController extends Controller
             'tenant' => null,
             'organization_unit' => null,
             'roles' => ['Platform Operator'],
-            'permissions' => [],
+            'permissions' => $this->platformPermissions->permissions($context->userId()),
             'enabled_modules' => null,
             'is_platform_operator' => true,
         ]))->resolve(request()));
@@ -143,7 +147,7 @@ final class PlatformAuthController extends Controller
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
 
-            return $this->errors->make($error->code, $error->message, 401, 'authentication');
+            return $this->errors->make($error->code, $error->message, 401, 'authentication', $error->context);
         }
 
         return response()->json(

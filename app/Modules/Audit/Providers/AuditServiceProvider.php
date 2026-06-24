@@ -13,6 +13,8 @@ use Modules\Audit\Repositories\EloquentAuditLogReader;
 use Modules\Audit\Repositories\EloquentAuditLogWriter;
 use Modules\Audit\Services\AuditRequestContextResolver;
 use Modules\Audit\Services\RecordAuditEvent;
+use Modules\Audit\Constants\AuditPermission;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class AuditServiceProvider extends ServiceProvider
 {
@@ -34,6 +36,9 @@ final class AuditServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(PermissionDefinitionRegistryInterface::class)
+            ->register('audit', AuditPermission::descriptions());
+
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

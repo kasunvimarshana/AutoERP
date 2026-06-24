@@ -15,6 +15,8 @@ use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
+use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Tests\TestCase;
 
 final class CurrentTenantContextResolverTest extends TestCase
@@ -95,8 +97,12 @@ final class CurrentTenantContextResolverTest extends TestCase
             'name' => 'AutoERP',
             'slug' => 'autoerp',
             'status' => 'active',
-            'trial_ends_at' => null,
-            'subscription_ends_at' => null,
+            'current_subscription' => [
+                'status' => 'active',
+                'starts_at' => '2020-01-01 00:00:00',
+                'ends_at' => null,
+                'trial_ends_at' => null,
+            ],
         ]);
         $tenants = $this->createMock(TenantRepositoryInterface::class);
         $tenants->expects(self::once())->method('findByCode')->with('AUTOERP')->willReturn($tenant);
@@ -165,6 +171,8 @@ final class CurrentTenantContextResolverTest extends TestCase
             $domains ?? $this->createMock(TenantDomainRepositoryInterface::class),
             $userAccess ?? $this->createMock(TenantUserAccessCheckerInterface::class),
             new SystemClock(),
+            new PlatformHostPolicy($this->app),
+            new TenantExecutionContext(),
         );
     }
 
@@ -192,8 +200,12 @@ final class CurrentTenantContextResolverTest extends TestCase
             'name' => 'Tenant 10',
             'slug' => 'tenant-10',
             'status' => 'active',
-            'trial_ends_at' => null,
-            'subscription_ends_at' => null,
+            'current_subscription' => [
+                'status' => 'active',
+                'starts_at' => '2020-01-01 00:00:00',
+                'ends_at' => null,
+                'trial_ends_at' => null,
+            ],
         ]);
     }
 }

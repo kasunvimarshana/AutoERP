@@ -20,8 +20,8 @@ use Modules\ReferenceData\Database\Seeders\ReferenceDataSeeder;
 use Modules\Sales\Database\Seeders\SalesSeeder;
 use Modules\Sequence\Database\Seeders\SequenceSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
-use Modules\Tenant\Database\Seeders\TenantBootstrapFinalizerSeeder;
 use Modules\Tenant\Database\Seeders\TenantDomainSeeder;
+use Modules\Tenant\Database\Seeders\TenantReferenceAssignmentSeeder;
 use Modules\Tenant\Database\Seeders\TenantSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
 use Modules\User\Database\Seeders\SuperAdminPermissionSeeder;
@@ -48,7 +48,7 @@ class DatabaseSeeder extends Seeder
                 UserSeeder::class,
                 AuthSeeder::class,
                 ReferenceDataSeeder::class,
-                TenantBootstrapFinalizerSeeder::class,
+                TenantReferenceAssignmentSeeder::class,
                 ConfigurationSeeder::class,
                 SequenceSeeder::class,
                 UomSeeder::class,

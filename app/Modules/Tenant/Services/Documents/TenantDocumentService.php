@@ -22,6 +22,7 @@ use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
 
@@ -39,6 +40,7 @@ final class TenantDocumentService
         private readonly AuditRecorderInterface $auditRecorder,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly LoggerInterface $logger,
     ) {}
 
     public function list(int $tenantId): Result
@@ -186,6 +188,15 @@ final class TenantDocumentService
                     return null;
                 }
 
+                if ($replacementFile !== null) {
+                    $this->storageCleanup->schedule(
+                        $tenantId,
+                        (string) $existing->require('storage_disk'),
+                        (string) $existing->require('storage_path'),
+                        'document replacement cleanup',
+                    );
+                }
+
                 $this->recordAudit('tenant.document.updated', $updated);
 
                 return $updated;
@@ -201,11 +212,10 @@ final class TenantDocumentService
             }
 
             if ($replacementFile !== null) {
-                $this->deleteOrQueue(
+                $this->storageCleanup->processPath(
                     $tenantId,
-                    (string) $existing->require('storage_path'),
                     (string) $existing->require('storage_disk'),
-                    'document replacement cleanup',
+                    (string) $existing->require('storage_path'),
                 );
             }
 
@@ -242,6 +252,12 @@ final class TenantDocumentService
                     return false;
                 }
 
+                $this->storageCleanup->schedule(
+                    $tenantId,
+                    (string) $record->require('storage_disk'),
+                    (string) $record->require('storage_path'),
+                    'document deletion cleanup',
+                );
                 $this->recordAudit('tenant.document.deleted', $record);
 
                 return true;
@@ -254,11 +270,10 @@ final class TenantDocumentService
                 ));
             }
 
-            $this->deleteOrQueue(
+            $this->storageCleanup->processPath(
                 $tenantId,
-                (string) $record->require('storage_path'),
                 (string) $record->require('storage_disk'),
-                'document deletion cleanup',
+                (string) $record->require('storage_path'),
             );
 
             return Result::success(true);
@@ -392,20 +407,24 @@ final class TenantDocumentService
             return;
         }
 
-        $path = (string) ($file['storage_path'] ?? '');
-        $disk = (string) ($file['storage_disk'] ?? $this->disk());
-        if ($path !== '') {
-            $this->deleteOrQueue($tenantId, $path, $disk, $reason);
-        }
-    }
-
-    private function deleteOrQueue(int $tenantId, string $path, string $disk, string $reason): void
-    {
-        if (! $this->files->exists($path, $disk) || $this->files->delete($path, $disk)) {
+        $path = trim((string) ($file['storage_path'] ?? ''));
+        $disk = trim((string) ($file['storage_disk'] ?? $this->disk()));
+        if ($path === '' || $disk === '') {
             return;
         }
 
-        $this->storageCleanup->enqueue($tenantId, $disk, $path, $reason);
+        try {
+            $this->storageCleanup->schedule($tenantId, $disk, $path, $reason);
+            $this->storageCleanup->processPath($tenantId, $disk, $path);
+        } catch (Throwable $exception) {
+            $this->logger->critical('Orphaned tenant file cleanup could not be persisted.', [
+                'tenant_id' => $tenantId,
+                'disk' => $disk,
+                'path' => $path,
+                'reason' => $reason,
+                'exception' => $exception,
+            ]);
+        }
     }
 
     private function disk(): string

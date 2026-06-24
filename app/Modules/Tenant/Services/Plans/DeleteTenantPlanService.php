@@ -34,13 +34,6 @@ final class DeleteTenantPlanService
             if ($existing === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.'));
             }
-            if ($this->plans->isAssigned($id)) {
-                return Result::failure(new Error(
-                    TenantErrorCode::CONFLICT,
-                    'A tenant plan assigned to tenants cannot be deactivated. Reassign those tenants first.',
-                ));
-            }
-
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
                 $id,

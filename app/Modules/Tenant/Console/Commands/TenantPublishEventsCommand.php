@@ -19,12 +19,15 @@ final class TenantPublishEventsCommand extends Command
         $summary = $service->publish(is_numeric($limit) ? (int) $limit : null);
 
         $this->info(sprintf(
-            'Checked %d; published %d; failed %d.',
+            'Checked %d; published %d; failed %d; dead %d; purged %d; recovered %d.',
             $summary['checked'],
             $summary['published'],
             $summary['failed'],
+            $summary['dead'],
+            $summary['purged'],
+            $summary['recovered'],
         ));
 
-        return $summary['failed'] > 0 ? self::FAILURE : self::SUCCESS;
+        return ($summary['failed'] + $summary['dead']) > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

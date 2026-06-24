@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { AuthSession, CurrentUserResponse, LoginPayload } from './authTypes';
+import type { AuthSession, CurrentUserResponse, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment } from './authTypes';
 
 const platformAuthEndpoint = '/api/v1/platform/auth';
 
@@ -10,6 +10,8 @@ export const authApi = {
             const { data } = await apiClient.post<AuthSession>(`${platformAuthEndpoint}/login`, {
                 email: payload.login_identifier,
                 password: payload.password,
+                totp_code: payload.totp_code || undefined,
+                backup_code: payload.backup_code || undefined,
             });
             return data;
         }
@@ -22,6 +24,17 @@ export const authApi = {
             device_name: payload.device_name,
         };
         const { data } = await apiClient.post<AuthSession>(`${endpoints.auth}/login`, tenantPayload);
+        return data;
+    },
+
+
+    async startPlatformMfaEnrollment(email: string, password: string): Promise<PlatformMfaEnrollment> {
+        const { data } = await apiClient.post<PlatformMfaEnrollment>(`${platformAuthEndpoint}/mfa/enrollment`, { email, password });
+        return data;
+    },
+
+    async confirmPlatformMfaEnrollment(email: string, password: string, code: string): Promise<PlatformMfaConfirmation> {
+        const { data } = await apiClient.post<PlatformMfaConfirmation>(`${platformAuthEndpoint}/mfa/enrollment/confirm`, { email, password, code });
         return data;
     },
 

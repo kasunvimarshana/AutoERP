@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\TenantOwnedModel;
 
 final class TenantStorageCleanupJobModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
-
     protected $table = 'tenant_storage_cleanup_jobs';
 
     protected $fillable = [
@@ -22,6 +19,8 @@ final class TenantStorageCleanupJobModel extends TenantOwnedModel
         'attempts',
         'last_error',
         'next_attempt_at',
+        'claim_token',
+        'claimed_at',
         'completed_at',
     ];
 
@@ -31,6 +30,7 @@ final class TenantStorageCleanupJobModel extends TenantOwnedModel
             'tenant_id' => 'integer',
             'attempts' => 'integer',
             'next_attempt_at' => 'datetime',
+            'claimed_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);
     }

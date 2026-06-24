@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\TenantOwnedModel;
 
 final class TenantEventOutboxModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
-
     protected $table = 'tenant_event_outbox';
 
     protected $fillable = [
@@ -25,6 +22,7 @@ final class TenantEventOutboxModel extends TenantOwnedModel
         'claim_token',
         'claimed_at',
         'published_at',
+        'dead_at',
     ];
 
     protected function casts(): array
@@ -36,6 +34,7 @@ final class TenantEventOutboxModel extends TenantOwnedModel
             'available_at' => 'datetime',
             'claimed_at' => 'datetime',
             'published_at' => 'datetime',
+            'dead_at' => 'datetime',
         ]);
     }
 }

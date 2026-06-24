@@ -19,20 +19,29 @@ final class TenantPlanResource extends JsonResource
             ? $this->resource->toArray()
             : (is_array($this->resource) ? $this->resource : []);
 
-        return array_intersect_key($values, array_flip([
+        $resource = array_intersect_key($values, array_flip([
             'id',
             'name',
             'slug',
-            'features',
-            'limits',
-            'price',
-            'currency_id',
-            'currency',
-            'billing_interval',
             'is_active',
             'row_version',
+            'latest_revision',
             'created_at',
             'updated_at',
         ]));
+
+        $latest = is_array($resource['latest_revision'] ?? null)
+            ? $resource['latest_revision']
+            : null;
+        if ($latest !== null) {
+            $resource['features'] = $latest['features'] ?? null;
+            $resource['limits'] = $latest['limits'] ?? null;
+            $resource['price'] = $latest['price'] ?? null;
+            $resource['currency_id'] = $latest['currency_id'] ?? null;
+            $resource['currency'] = $latest['currency'] ?? null;
+            $resource['billing_interval'] = $latest['billing_interval'] ?? null;
+        }
+
+        return $resource;
     }
 }

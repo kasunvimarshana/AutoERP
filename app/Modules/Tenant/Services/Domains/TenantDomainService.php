@@ -6,6 +6,7 @@ namespace Modules\Tenant\Services\Domains;
 
 use Modules\Audit\Constants\AuditEventCategory;
 use DateTimeImmutable;
+use Illuminate\Database\QueryException;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
@@ -53,13 +54,6 @@ final class TenantDomainService
     {
         try {
             $domain = $this->rules->normalizeDomain((string) ($payload['domain'] ?? ''));
-            if ($this->domains->findByDomain($domain) !== null) {
-                return Result::failure(new Error(
-                    TenantErrorCode::DUPLICATE_DOMAIN,
-                    'This domain is already assigned.',
-                ));
-            }
-
             /** @var DataRecord $record */
             $record = $this->transactions->runInTransaction(function () use (
                 $tenantId,
@@ -69,8 +63,6 @@ final class TenantDomainService
                 $record = $this->domains->create([
                     'tenant_id' => $tenantId,
                     'domain' => $domain,
-                    'is_primary' => false,
-                    'primary_marker' => null,
                     'status' => 'pending',
                     'verification_method' => 'dns_txt',
                     'verification_failure_count' => 0,
@@ -91,6 +83,19 @@ final class TenantDomainService
             });
 
             return Result::success($record);
+        } catch (QueryException $exception) {
+            if ($this->isUniqueConstraintViolation($exception)) {
+                return Result::failure(new Error(
+                    TenantErrorCode::DUPLICATE_DOMAIN,
+                    'This domain is already assigned.',
+                ));
+            }
+
+            return Result::failure($this->errors->normalize(
+                $exception,
+                TenantErrorCode::INVALID_VALUE,
+                ['operation' => 'tenant.domain.create'],
+            ));
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -130,8 +135,6 @@ final class TenantDomainService
                     'verified_at' => null,
                     'verified_by' => null,
                     'verified_token_hash' => null,
-                    'is_primary' => false,
-                    'primary_marker' => null,
                 ];
             }
 
@@ -215,13 +218,17 @@ final class TenantDomainService
                 $pendingHash,
             );
             if (! $verification->verified) {
-                $this->domains->recordVerificationAttempt(
+                $failed = $this->domains->recordVerificationAttempt(
                     $id,
                     $tenantId,
+                    $expectedVersion,
                     false,
                     $verification->message,
                     $now,
                 );
+                if ($failed === null) {
+                    return $this->versionConflict();
+                }
 
                 return Result::failure(new Error(
                     TenantErrorCode::DOMAIN_NOT_VERIFIED,
@@ -448,6 +455,13 @@ final class TenantDomainService
             '+%d days',
             max((int) config('tenant.domains.verification_grace_days', 7), 1),
         ));
+    }
+
+    private function isUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+
+        return in_array($sqlState, ['23000', '23505'], true);
     }
 
     private function versionConflict(): Result

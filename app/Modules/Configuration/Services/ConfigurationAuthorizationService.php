@@ -9,7 +9,8 @@ use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
-use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
+use Modules\Tenant\Constants\PlatformPermission;
 
 final class ConfigurationAuthorizationService
 {
@@ -17,13 +18,13 @@ final class ConfigurationAuthorizationService
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly PermissionCheckerInterface $permissions,
-        private readonly PlatformOperatorCheckerInterface $platformOperators,
+        private readonly PlatformPermissionCheckerInterface $platformPermissions,
     ) {}
 
     public function canViewScopeCurrent(string $scope): bool
     {
         if ($scope === ConfigurationScope::GLOBAL) {
-            return $this->isPlatformOperator();
+            return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE);
         }
 
         return $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_VIEW);
@@ -32,7 +33,9 @@ final class ConfigurationAuthorizationService
     public function canManageScopeCurrent(string $scope): bool
     {
         return match ($scope) {
-            ConfigurationScope::GLOBAL => $this->isPlatformOperator(),
+            ConfigurationScope::GLOBAL => $this->allowsPlatformPermission(
+                PlatformPermission::CONFIGURATION_MANAGE,
+            ),
             ConfigurationScope::TENANT => $this->allowsTenantPermission(
                 ConfigurationPermission::ENTRIES_MANAGE_TENANT,
             ),
@@ -46,15 +49,17 @@ final class ConfigurationAuthorizationService
     public function canManageSensitiveCurrent(string $scope): bool
     {
         return $scope === ConfigurationScope::GLOBAL
-            ? $this->isPlatformOperator()
+            ? $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE)
+                && $this->allowsPlatformPermission(PlatformPermission::SECRETS_MANAGE)
             : $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_MANAGE_SENSITIVE);
     }
 
-    private function isPlatformOperator(): bool
+    private function allowsPlatformPermission(string $permission): bool
     {
         $userId = $this->currentUser->currentUserId();
 
-        return $userId !== null && $this->platformOperators->isPlatformOperator($userId);
+        return $userId !== null
+            && $this->platformPermissions->hasPermission($userId, $permission);
     }
 
     private function allowsTenantPermission(string $permission): bool

@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\TenantOwnedModel;
 
 final class TenantDocumentModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
-
     protected $table = 'tenant_documents';
 
     protected $fillable = [

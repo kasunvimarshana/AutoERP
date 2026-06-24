@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
-use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use DateTimeImmutable;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantEntitlementService
 {
-    /** @var array<int, array{modules:list<string>,limits:array<string,int>}> */
-    private array $cache = [];
-
     public function __construct(
-        private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantPlanRepositoryInterface $plans,
+        private readonly TenantSubscriptionRepositoryInterface $subscriptions,
         private readonly TenantPlanSchema $schema,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
     /** @return list<string> */
@@ -41,27 +39,56 @@ final class TenantEntitlementService
         if ($tenantId < 1) {
             return ['modules' => [], 'limits' => []];
         }
-        if (isset($this->cache[$tenantId])) {
-            return $this->cache[$tenantId];
+
+        $subscription = $this->executionContext->runForTenant(
+            $tenantId,
+            fn () => $this->subscriptions->findCurrentByTenant($tenantId),
+        );
+        if ($subscription === null || ! $this->isUsable($subscription->toArray())) {
+            return ['modules' => [], 'limits' => []];
         }
 
-        $tenant = $this->tenants->findById($tenantId);
-        $planId = $tenant?->get('tenant_plan_id');
-        if (! is_numeric($planId) || (int) $planId < 1) {
-            return $this->cache[$tenantId] = ['modules' => [], 'limits' => []];
+        $revision = $subscription->get('revision');
+        if (! is_array($revision)) {
+            return ['modules' => [], 'limits' => []];
         }
 
-        $plan = $this->plans->findById((int) $planId);
-        if ($plan === null || ! (bool) $plan->get('is_active', false)) {
-            return $this->cache[$tenantId] = ['modules' => [], 'limits' => []];
-        }
+        $features = $this->schema->normalizeFeatures($revision['features'] ?? null);
 
-        $features = $this->schema->normalizeFeatures($plan->get('features'));
-        $limits = $this->schema->normalizeLimits($plan->get('limits'));
-
-        return $this->cache[$tenantId] = [
+        return [
             'modules' => $features['enabled_modules'],
-            'limits' => $limits,
+            'limits' => $this->schema->normalizeLimits($revision['limits'] ?? null),
         ];
+    }
+
+    /** @param array<string, mixed> $subscription */
+    private function isUsable(array $subscription): bool
+    {
+        $now = new DateTimeImmutable('now');
+        $startsAt = $this->dateTime($subscription['starts_at'] ?? null);
+        if ($startsAt === null || $startsAt > $now) {
+            return false;
+        }
+
+        $status = strtolower(trim((string) ($subscription['status'] ?? '')));
+        if ($status === 'trial') {
+            $trialEndsAt = $this->dateTime($subscription['trial_ends_at'] ?? null);
+
+            return $trialEndsAt !== null && $trialEndsAt > $now;
+        }
+        if ($status !== 'active') {
+            return false;
+        }
+
+        $endsAt = $this->dateTime($subscription['ends_at'] ?? null);
+
+        return $endsAt === null || $endsAt > $now;
+    }
+
+    private function dateTime(mixed $value): ?DateTimeImmutable
+    {
+        return $value === null || trim((string) $value) === ''
+            ? null
+            : new DateTimeImmutable((string) $value);
     }
 }

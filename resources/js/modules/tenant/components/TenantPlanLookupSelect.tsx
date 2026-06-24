@@ -33,7 +33,7 @@ export function TenantPlanLookupSelect({ value, onChange, disabled = false, erro
             value={value}
             onChange={onChange}
             search={search}
-            formatLabel={(plan) => `${plan.name} · ${plan.billing_interval}`}
+            formatLabel={(plan) => plan.latest_revision ? `${plan.name} · revision ${plan.latest_revision.revision_number} · ${plan.latest_revision.billing_interval}` : `${plan.name} · no revision`}
             placeholder="Search active plans"
             disabled={disabled}
             error={error}

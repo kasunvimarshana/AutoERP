@@ -179,7 +179,7 @@ final class GetCurrentAuthProfileService
 
     private function configuredTimezone(int $tenantId, ?int $organizationUnitId): string
     {
-        $value = $this->configuration->value('app.timezone', $tenantId, $organizationUnitId);
+        $value = $this->configuration->value('localization.timezone', $tenantId, $organizationUnitId);
 
         return is_string($value) && in_array($value, timezone_identifiers_list(), true)
             ? $value

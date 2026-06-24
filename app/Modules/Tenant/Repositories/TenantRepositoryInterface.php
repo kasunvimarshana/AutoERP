@@ -17,6 +17,4 @@ interface TenantRepositoryInterface
     public function create(array $attributes): DataRecord;
     public function updateWithVersion(int|string $id, int $expectedVersion, array $attributes): ?DataRecord;
     public function pageByFilters(?string $status, ?string $search, int $perPage, int $page): PagedResult;
-    /** @return list<DataRecord> */
-    public function listExpiredActive(\DateTimeInterface $now, int $limit): array;
 }

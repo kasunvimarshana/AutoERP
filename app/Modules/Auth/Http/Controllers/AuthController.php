@@ -44,7 +44,7 @@ use Modules\Auth\Services\LinkExternalIdentityService;
 use Modules\Auth\Services\ListSessionsService;
 use Modules\Auth\Services\LoginService;
 use Modules\Auth\Services\LogoutService;
-use Modules\Auth\Services\RefreshTokenCookie;
+use Modules\Auth\Services\TenantRefreshTokenCookie;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Auth\Services\RegisterService;
 use Modules\Auth\Services\RequestVerificationChallengeService;
@@ -74,7 +74,7 @@ final class AuthController extends Controller
         private readonly LinkExternalIdentityService $linkExternalIdentityService,
         private readonly UnlinkExternalIdentityService $unlinkExternalIdentityService,
         private readonly RefreshTokenService $refreshTokenService,
-        private readonly RefreshTokenCookie $refreshTokenCookie,
+        private readonly TenantRefreshTokenCookie $refreshTokenCookie,
         private readonly TokenProviderInterface $tokens,
         private readonly RevokeSessionService $revokeSessionService,
         private readonly ListSessionsService $listSessionsService,

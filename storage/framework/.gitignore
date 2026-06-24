@@ -1,3 +1,6 @@
+*
+!.gitignore
+
 compiled.php
 config.php
 down

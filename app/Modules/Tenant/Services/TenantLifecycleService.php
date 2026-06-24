@@ -5,94 +5,151 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use Modules\Audit\Constants\AuditEventCategory;
-use DateTimeImmutable;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
+use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
+use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
-use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
-use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
+use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Events\TenantEventOutboxService;
+use Modules\Tenant\Services\Onboarding\TenantReadinessService;
+use RuntimeException;
 
 final class TenantLifecycleService
 {
+    private const OUTCOME_SUCCESS = 'success';
+    private const OUTCOME_NOT_FOUND = 'not_found';
+    private const OUTCOME_VERSION_CONFLICT = 'version_conflict';
+    private const OUTCOME_INVALID_TRANSITION = 'invalid_transition';
+    private const OUTCOME_READINESS_BLOCKED = 'readiness_blocked';
+
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantDomainRepositoryInterface $domains,
-        private readonly TenantPlanRepositoryInterface $plans,
+        private readonly TenantReadinessService $readiness,
+        private readonly TenantOnboardingStateModel $onboardingStates,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TenantEventOutboxService $outbox,
         private readonly ClockInterface $clock,
         private readonly TransactionManagerInterface $transactions,
+        private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
-    public function transition(int|string $id, int $expectedVersion, string $targetStatus, ?string $reason = null): Result
-    {
+    public function transition(
+        int|string $id,
+        int $expectedVersion,
+        string $targetStatus,
+        ?string $reason = null,
+    ): Result {
         $tenant = $this->tenants->findById($id);
         if ($tenant === null) {
-            return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
+            return $this->notFound();
         }
+
         $current = (string) $tenant->require('status');
         if (! $this->transitionAllowed($current, $targetStatus)) {
-            return Result::failure(new Error(TenantErrorCode::INVALID_TRANSITION, "Tenant cannot transition from {$current} to {$targetStatus}."));
+            return $this->invalidTransition($current, $targetStatus);
         }
+        if ($expectedVersion < 1 || (int) $tenant->require('row_version') !== $expectedVersion) {
+            return $this->versionConflict();
+        }
+
         if ($targetStatus === TenantStatus::ACTIVE) {
-            if ($tenant->get('base_currency_id') === null) {
-                return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, 'A base accounting currency is required before activation.'));
-            }
-            if ($this->domains->findPrimaryByTenant((int) $tenant->id()) === null) {
-                return Result::failure(new Error(TenantErrorCode::DOMAIN_NOT_VERIFIED, 'A verified primary domain is required before activation.'));
-            }
-            $planId = $tenant->get('tenant_plan_id');
-            $plan = is_numeric($planId) ? $this->plans->findById((int) $planId) : null;
-            if ($plan === null || ! (bool) $plan->get('is_active', false)) {
-                return Result::failure(new Error(
-                    TenantErrorCode::INVALID_VALUE,
-                    'An active subscription plan is required before activation.',
-                ));
-            }
-
-            $subscriptionEndsAt = $tenant->get('subscription_ends_at');
-            $trialEndsAt = $tenant->get('trial_ends_at');
-            if ($this->isPast($subscriptionEndsAt)) {
-                return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, 'An expired subscription cannot be activated.'));
-            }
-            if ($subscriptionEndsAt === null && $this->isPast($trialEndsAt)) {
-                return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, 'An expired trial cannot be activated without a subscription.'));
+            $preflight = $this->readiness->inspect((int) $tenant->id());
+            if (! $preflight['ready']) {
+                return $this->readinessFailure($preflight);
             }
         }
-        $now = $this->clock->now();
-        $attributes = [
-            'status' => $targetStatus,
-            'status_reason' => $reason === null || trim($reason) === '' ? null : trim($reason),
-            'activated_at' => $targetStatus === TenantStatus::ACTIVE
-                ? ($tenant->get('activated_at') ?? $now)
-                : $tenant->get('activated_at'),
-            'suspended_at' => $targetStatus === TenantStatus::SUSPENDED ? $now : null,
-            'archived_at' => $targetStatus === TenantStatus::ARCHIVED ? $now : null,
-            'updated_by' => $this->currentUser->currentUserId(),
-        ];
 
-        $updated = $this->transactions->runInTransaction(function () use (
+        $normalizedReason = $reason === null || trim($reason) === '' ? null : trim($reason);
+
+        /**
+         * @var array{
+         *   status:string,
+         *   tenant?:DataRecord,
+         *   current_status?:string,
+         *   readiness?:array<string,mixed>
+         * } $outcome
+         */
+        $outcome = $this->transactions->runInTransaction(function () use (
             $id,
             $expectedVersion,
-            $attributes,
-            $current,
             $targetStatus,
-        ) {
-            $updated = $this->tenants->updateWithVersion($id, $expectedVersion, $attributes);
-            if ($updated === null) {
-                return null;
+            $normalizedReason,
+        ): array {
+            $locked = $this->tenants->lockById($id);
+            if ($locked === null) {
+                return ['status' => self::OUTCOME_NOT_FOUND];
+            }
+            if ((int) $locked->require('row_version') !== $expectedVersion) {
+                return ['status' => self::OUTCOME_VERSION_CONFLICT];
             }
 
-            $tenantId = (int) $updated->id();
+            $currentStatus = (string) $locked->require('status');
+            if (! $this->transitionAllowed($currentStatus, $targetStatus)) {
+                return [
+                    'status' => self::OUTCOME_INVALID_TRANSITION,
+                    'current_status' => $currentStatus,
+                ];
+            }
+
+            $tenantId = (int) $locked->id();
+            if ($targetStatus === TenantStatus::ACTIVE) {
+                // Domain, subscription, and onboarding readiness may change after the
+                // preflight response. Activation therefore rechecks every invariant
+                // while the tenant row is locked.
+                $readiness = $this->readiness->inspect($tenantId);
+                if (! $readiness['ready']) {
+                    return [
+                        'status' => self::OUTCOME_READINESS_BLOCKED,
+                        'readiness' => $readiness,
+                    ];
+                }
+            }
+
+            $now = $this->clock->now();
+            $attributes = [
+                'status' => $targetStatus,
+                'status_reason' => $normalizedReason,
+                'activated_at' => $targetStatus === TenantStatus::ACTIVE
+                    ? ($locked->get('activated_at') ?? $now)
+                    : $locked->get('activated_at'),
+                'suspended_at' => $targetStatus === TenantStatus::SUSPENDED ? $now : null,
+                'archived_at' => $targetStatus === TenantStatus::ARCHIVED ? $now : null,
+                'updated_by' => $this->currentUser->currentUserId(),
+            ];
+
+            $updated = $this->tenants->updateWithVersion($id, $expectedVersion, $attributes);
+            if ($updated === null) {
+                throw new RuntimeException('Locked tenant could not be versioned during lifecycle transition.');
+            }
+
+            if ($targetStatus === TenantStatus::ACTIVE) {
+                $this->executionContext->runForTenant($tenantId, function () use ($tenantId): void {
+                    $state = $this->onboardingStates->newQuery()
+                        ->where('tenant_id', $tenantId)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($state instanceof TenantOnboardingStateModel) {
+                        $state->forceFill([
+                            'status' => TenantOnboardingStatus::COMPLETED,
+                            'completed_at' => now(),
+                            'last_error' => null,
+                            'row_version' => (int) $state->getAttribute('row_version') + 1,
+                            'updated_by' => $this->currentUser->currentUserId(),
+                        ])->save();
+                    }
+                });
+            }
+
             $this->audit->recordPlatform(new AuditEventData(
                 eventName: 'tenant.status_changed',
                 eventCategory: AuditEventCategory::SECURITY,
@@ -101,41 +158,40 @@ final class TenantLifecycleService
                 subjectId: (string) $tenantId,
                 subjectReference: (string) $updated->get('code'),
                 changes: [
-                    'old' => ['status' => $current],
+                    'old' => ['status' => $currentStatus],
                     'new' => [
                         'status' => $targetStatus,
-                        'reason' => $attributes['status_reason'],
+                        'reason' => $normalizedReason,
                     ],
                 ],
                 tags: ['tenant', 'lifecycle'],
             ), $tenantId);
             $this->outbox->enqueueStatusChanged(
                 tenantId: $tenantId,
-                previousStatus: $current,
+                previousStatus: $currentStatus,
                 newStatus: $targetStatus,
-                reason: $attributes['status_reason'],
+                reason: $normalizedReason,
             );
 
-            return $updated;
+            return [
+                'status' => self::OUTCOME_SUCCESS,
+                'tenant' => $updated,
+            ];
         });
 
-        if ($updated === null) {
-            return Result::failure(new Error(
-                TenantErrorCode::VERSION_CONFLICT,
-                'Tenant changed since it was loaded. Refresh and try again.',
-            ));
-        }
-
-        return Result::success($updated);
-    }
-
-    private function isPast(mixed $value): bool
-    {
-        if ($value === null || trim((string) $value) === '') {
-            return false;
-        }
-
-        return new DateTimeImmutable((string) $value) < $this->clock->now();
+        return match ($outcome['status']) {
+            self::OUTCOME_SUCCESS => ($outcome['tenant'] ?? null) instanceof DataRecord
+                ? Result::success($outcome['tenant'])
+                : throw new RuntimeException('Lifecycle transition completed without an updated tenant record.'),
+            self::OUTCOME_NOT_FOUND => $this->notFound(),
+            self::OUTCOME_VERSION_CONFLICT => $this->versionConflict(),
+            self::OUTCOME_INVALID_TRANSITION => $this->invalidTransition(
+                (string) ($outcome['current_status'] ?? 'unknown'),
+                $targetStatus,
+            ),
+            self::OUTCOME_READINESS_BLOCKED => $this->readinessFailure($outcome['readiness'] ?? []),
+            default => throw new RuntimeException('Unknown tenant lifecycle transition outcome.'),
+        };
     }
 
     private function transitionAllowed(string $from, string $to): bool
@@ -148,5 +204,36 @@ final class TenantLifecycleService
             TenantStatus::ARCHIVED => [],
             default => [],
         }, true);
+    }
+
+    private function notFound(): Result
+    {
+        return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
+    }
+
+    private function versionConflict(): Result
+    {
+        return Result::failure(new Error(
+            TenantErrorCode::VERSION_CONFLICT,
+            'Tenant changed since it was loaded. Refresh and try again.',
+        ));
+    }
+
+    private function invalidTransition(string $currentStatus, string $targetStatus): Result
+    {
+        return Result::failure(new Error(
+            TenantErrorCode::INVALID_TRANSITION,
+            "Tenant cannot transition from {$currentStatus} to {$targetStatus}.",
+        ));
+    }
+
+    /** @param array<string, mixed> $readiness */
+    private function readinessFailure(array $readiness): Result
+    {
+        return Result::failure(new Error(
+            TenantErrorCode::INVALID_VALUE,
+            'Tenant activation is blocked until onboarding readiness checks pass.',
+            ['readiness' => $readiness],
+        ));
     }
 }

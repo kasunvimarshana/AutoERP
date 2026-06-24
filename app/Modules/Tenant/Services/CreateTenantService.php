@@ -5,20 +5,22 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use Modules\Audit\Constants\AuditEventCategory;
-use DateTimeImmutable;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
+use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Throwable;
@@ -36,6 +38,8 @@ final class CreateTenantService
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly TenantExecutionContextInterface $executionContext,
+        private readonly TenantOnboardingStateModel $onboardingStates,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -53,25 +57,14 @@ final class CreateTenantService
             ));
 
             if ($this->tenants->findByCode($code) !== null) {
-                return Result::failure(new Error(
-                    TenantErrorCode::DUPLICATE_CODE,
-                    'Tenant code already exists.',
-                ));
+                return Result::failure(new Error(TenantErrorCode::DUPLICATE_CODE, 'Tenant code already exists.'));
             }
             if ($this->tenants->findBySlug($slug) !== null) {
-                return Result::failure(new Error(
-                    TenantErrorCode::CONFLICT,
-                    'Tenant slug already exists.',
-                ));
+                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant slug already exists.'));
             }
 
-            $planId = $this->positiveInt($payload['tenant_plan_id'] ?? null);
             $baseCurrencyId = $this->positiveInt($payload['base_currency_id'] ?? null);
-            $trialEndsAt = $this->dateTime($payload['trial_ends_at'] ?? null);
-            $subscriptionEndsAt = $this->dateTime($payload['subscription_ends_at'] ?? null);
-            $this->references->assertActivePlan($planId);
             $this->references->assertActiveCurrency($baseCurrencyId);
-            $this->references->assertPeriod($trialEndsAt, $subscriptionEndsAt);
 
             if (isset($payload['logo_tmp_path'])) {
                 $logoPath = $this->storeLogo(
@@ -88,10 +81,7 @@ final class CreateTenantService
                 $name,
                 $slug,
                 $logoPath,
-                $planId,
                 $baseCurrencyId,
-                $trialEndsAt,
-                $subscriptionEndsAt,
             ): DataRecord {
                 $record = $this->tenants->create([
                     'uuid' => $this->uuid->generate(),
@@ -100,16 +90,24 @@ final class CreateTenantService
                     'slug' => $slug,
                     'logo_path' => $logoPath,
                     'cross_org_transactions' => (bool) ($payload['cross_org_transactions'] ?? false),
-                    'tenant_plan_id' => $planId,
                     'base_currency_id' => $baseCurrencyId,
                     'status' => TenantStatus::DRAFT,
-                    'trial_ends_at' => $trialEndsAt,
-                    'subscription_ends_at' => $subscriptionEndsAt,
                     'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
+
+                $tenantId = (int) $record->id();
+                $this->executionContext->runForTenant($tenantId, function () use ($tenantId): void {
+                    $this->onboardingStates->newQuery()->create([
+                        'tenant_id' => $tenantId,
+                        'status' => TenantOnboardingStatus::PENDING,
+                        'row_version' => 1,
+                        'created_by' => $this->currentUser->currentUserId(),
+                        'updated_by' => $this->currentUser->currentUserId(),
+                    ]);
+                });
 
                 $this->audit->recordPlatform(new AuditEventData(
                     eventName: 'tenant.created',
@@ -118,20 +116,19 @@ final class CreateTenantService
                     subjectType: 'tenant',
                     subjectId: (string) $record->id(),
                     subjectReference: $code,
-                    changes: [
-                        'new' => [
-                            'code' => $code,
-                            'name' => $name,
-                            'status' => TenantStatus::DRAFT,
-                        ],
-                    ],
+                    changes: ['new' => [
+                        'code' => $code,
+                        'name' => $name,
+                        'status' => TenantStatus::DRAFT,
+                        'base_currency_id' => $baseCurrencyId,
+                    ]],
                     tags: ['tenant', 'platform'],
-                ), (int) $record->id());
+                ), $tenantId);
 
                 return $record;
             });
 
-            return Result::success($record);
+            return Result::success($this->tenants->findById($record->id()) ?? $record);
         } catch (Throwable $exception) {
             if ($logoPath !== null && $this->files->exists($logoPath)) {
                 $this->files->delete($logoPath);
@@ -159,14 +156,5 @@ final class CreateTenantService
     private function positiveInt(mixed $value): ?int
     {
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
-    }
-
-    private function dateTime(mixed $value): ?string
-    {
-        $value = is_scalar($value) ? trim((string) $value) : '';
-
-        return $value === ''
-            ? null
-            : (new DateTimeImmutable($value))->format('Y-m-d H:i:s');
     }
 }

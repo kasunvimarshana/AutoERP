@@ -9,6 +9,8 @@ import { TenantRoute } from "@/modules/auth/TenantRoute";
 import { TenantEntitlementRoute } from "@/modules/auth/TenantEntitlementRoute";
 import { AuthenticatedHomeRedirect } from "@/modules/auth/AuthenticatedHomeRedirect";
 import { PlatformOperatorRoute } from "@/modules/auth/PlatformOperatorRoute";
+import { PermissionRoute } from "@/modules/auth/PermissionRoute";
+import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -446,11 +448,11 @@ const appRouter = createBrowserRouter(
                 <Route index element={<AuthenticatedHomeRedirect />} />
                 <Route element={<PlatformOperatorRoute />}>
                     <Route element={<PlatformLayout />}>
-                        <Route path={PLATFORM_HOME_PATH} element={<PlatformTenantsPage />} />
-                        <Route path="/administration/tenant-plans" element={<TenantPlansPage />} />
+                        <Route path={PLATFORM_HOME_PATH} element={<PermissionRoute permission={PLATFORM_PERMISSION.tenantsView}><PlatformTenantsPage /></PermissionRoute>} />
+                        <Route path="/administration/tenant-plans" element={<PermissionRoute permission={PLATFORM_PERMISSION.plansView}><TenantPlansPage /></PermissionRoute>} />
                         <Route
                             path="/administration/platform-configuration"
-                            element={<SettingsPage mode="platform" />}
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.configurationManage}><SettingsPage mode="platform" /></PermissionRoute>}
                         />
                     </Route>
                 </Route>

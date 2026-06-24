@@ -8,7 +8,23 @@ use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
 {
-    /** @var list<string> */
+    /**
+     * Foundation capabilities are required for every tenant workspace and are
+     * never toggled by commercial subscriptions.
+     *
+     * @var list<string>
+     */
+    public const ALWAYS_ON_MODULES = [
+        'auth',
+        'tenant',
+        'user',
+        'organization-unit',
+        'configuration',
+        'reference-data',
+        'audit',
+    ];
+
+    /** Plan-controlled commercial feature modules. @var list<string> */
     public const SUPPORTED_MODULES = [
         'customer',
         'supplier',

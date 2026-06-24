@@ -9,8 +9,9 @@ use Illuminate\Http\Request;
 use Modules\Core\DTOs\DataRecord;
 use Symfony\Component\HttpFoundation\Cookie;
 
-final class RefreshTokenCookie
+class RefreshTokenCookie
 {
+    public function __construct(private readonly string $configurationKey) {}
     public function read(Request $request): ?string
     {
         $value = $request->cookie($this->name());
@@ -78,17 +79,21 @@ final class RefreshTokenCookie
 
     private function name(): string
     {
-        return (string) config('module-auth.web_refresh_cookie.name', 'autoerp_refresh_token');
+        $name = trim((string) config($this->configurationKey.'.name', ''));
+
+        return $name !== '' ? $name : throw new \LogicException('Refresh-token cookie name is not configured.');
     }
 
     private function path(): string
     {
-        return (string) config('module-auth.web_refresh_cookie.path', '/api');
+        $path = trim((string) config($this->configurationKey.'.path', ''));
+
+        return str_starts_with($path, '/') ? $path : throw new \LogicException('Refresh-token cookie path must be absolute.');
     }
 
     private function domain(): ?string
     {
-        $domain = config('module-auth.web_refresh_cookie.domain');
+        $domain = config($this->configurationKey.'.domain');
 
         return is_string($domain) && trim($domain) !== '' ? trim($domain) : null;
     }
@@ -99,12 +104,12 @@ final class RefreshTokenCookie
             return true;
         }
 
-        return (bool) config('module-auth.web_refresh_cookie.secure', app()->environment('production'));
+        return (bool) config($this->configurationKey.'.secure', app()->environment('production'));
     }
 
     private function sameSite(): string
     {
-        $sameSite = strtolower((string) config('module-auth.web_refresh_cookie.same_site', 'strict'));
+        $sameSite = strtolower((string) config($this->configurationKey.'.same_site', 'strict'));
 
         return in_array($sameSite, ['lax', 'strict', 'none'], true) ? $sameSite : 'strict';
     }

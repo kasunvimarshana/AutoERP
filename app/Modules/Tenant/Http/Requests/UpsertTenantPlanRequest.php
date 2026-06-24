@@ -46,6 +46,7 @@ final class UpsertTenantPlanRequest extends FormRequest
                 'string',
                 'in:month,quarter,year',
             ],
+            'effective_at' => [$creating ? 'nullable' : 'sometimes', 'date'],
             'is_active' => ['sometimes', 'boolean'],
             'metadata' => ['nullable', 'array'],
         ];

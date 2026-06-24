@@ -8,6 +8,10 @@ import type {
     TenantPlan,
     TenantPlanPage,
     TenantRecord,
+    TenantSubscription,
+    TenantSubscriptionReadiness,
+    TenantOnboardingReadiness,
+    TenantOnboardingProvisionResult,
 } from './tenantTypes';
 
 export interface TenantListParams {
@@ -42,6 +46,73 @@ export async function updatePlatformTenant(id: number, payload: FormData): Promi
 export async function changeTenantStatus(id: number, action: 'activate' | 'suspend' | 'deactivate' | 'archive', expectedVersion: number, reason: string): Promise<TenantRecord> {
     const response = await apiClient.patch<ApiResource<TenantRecord>>(`/api/v1/platform/tenants/${id}/${action}`, { expected_version: expectedVersion, reason });
     return response.data.data;
+}
+
+
+export async function getTenantOnboardingReadiness(tenantId: number, signal?: AbortSignal): Promise<TenantOnboardingReadiness> {
+    const response = await apiClient.get<ApiResource<TenantOnboardingReadiness>>(`/api/v1/platform/tenants/${tenantId}/onboarding/readiness`, { signal });
+    return response.data.data;
+}
+
+export async function provisionTenantOnboarding(tenant: TenantRecord, initialAdminEmail: string): Promise<TenantOnboardingProvisionResult> {
+    const response = await apiClient.post<ApiResource<TenantOnboardingProvisionResult>>(`/api/v1/platform/tenants/${tenant.id}/onboarding/provision`, {
+        expected_version: tenant.row_version,
+        initial_admin_email: initialAdminEmail,
+    });
+    return response.data.data;
+}
+
+export async function getTenantSubscription(tenantId: number, signal?: AbortSignal): Promise<TenantSubscription | null> {
+    const response = await apiClient.get<ApiResource<TenantSubscription | null>>(`/api/v1/platform/tenants/${tenantId}/subscription`, { signal });
+    return response.data.data;
+}
+
+export async function getTenantSubscriptionReadiness(tenantId: number, planRevisionId: number, signal?: AbortSignal): Promise<TenantSubscriptionReadiness> {
+    const response = await apiClient.get<ApiResource<TenantSubscriptionReadiness>>(`/api/v1/platform/tenants/${tenantId}/subscription/readiness/${planRevisionId}`, { signal });
+    return response.data.data;
+}
+
+export async function assignTenantSubscription(tenant: TenantRecord, payload: {
+    tenant_plan_revision_id: number;
+    status: 'trial' | 'active';
+    starts_at?: string | null;
+    trial_ends_at?: string | null;
+    ends_at?: string | null;
+}): Promise<TenantSubscription> {
+    const response = await apiClient.put<ApiResource<TenantSubscription>>(`/api/v1/platform/tenants/${tenant.id}/subscription`, {
+        ...payload,
+        expected_tenant_version: tenant.row_version,
+    });
+    return response.data.data;
+}
+
+export async function listPlatformTenantDomains(tenantId: number, signal?: AbortSignal): Promise<TenantDomain[]> {
+    const response = await apiClient.get<ApiCollection<TenantDomain>>(`/api/v1/platform/tenants/${tenantId}/domains`, { signal });
+    return response.data.data;
+}
+
+export async function createPlatformTenantDomain(tenantId: number, domain: string): Promise<TenantDomain> {
+    const response = await apiClient.post<ApiResource<TenantDomain>>(`/api/v1/platform/tenants/${tenantId}/domains`, { domain });
+    return response.data.data;
+}
+
+export async function requestPlatformDomainVerification(tenantId: number, domain: TenantDomain): Promise<{ data: TenantDomain; challenge: DomainVerificationChallenge }> {
+    const response = await apiClient.post<{ data: TenantDomain; challenge: DomainVerificationChallenge }>(`/api/v1/platform/tenants/${tenantId}/domains/${domain.id}/verification-challenge`, { expected_version: domain.row_version });
+    return response.data;
+}
+
+export async function verifyPlatformTenantDomain(tenantId: number, domain: TenantDomain): Promise<TenantDomain> {
+    const response = await apiClient.post<ApiResource<TenantDomain>>(`/api/v1/platform/tenants/${tenantId}/domains/${domain.id}/verify`, { expected_version: domain.row_version });
+    return response.data.data;
+}
+
+export async function changePlatformTenantDomain(tenantId: number, domain: TenantDomain, action: 'primary' | 'disable'): Promise<TenantDomain> {
+    const response = await apiClient.patch<ApiResource<TenantDomain>>(`/api/v1/platform/tenants/${tenantId}/domains/${domain.id}/${action}`, { expected_version: domain.row_version });
+    return response.data.data;
+}
+
+export async function deletePlatformTenantDomain(tenantId: number, domain: TenantDomain): Promise<void> {
+    await apiClient.delete(`/api/v1/platform/tenants/${tenantId}/domains/${domain.id}`, { data: { expected_version: domain.row_version } });
 }
 
 export async function getTenantProfile(signal?: AbortSignal): Promise<TenantRecord> {

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use Modules\Auth\Services\InternalAuthenticationProvider;
 
 return [
@@ -17,15 +18,42 @@ return [
     ],
     'access_token_ttl_seconds' => (int) env('AUTH_ACCESS_TOKEN_TTL', 3600),
     'refresh_token_ttl_seconds' => (int) env('AUTH_REFRESH_TOKEN_TTL', 2592000),
-    'web_refresh_cookie' => [
-        'name' => env('AUTH_REFRESH_COOKIE_NAME', 'autoerp_refresh_token'),
-        'path' => env('AUTH_REFRESH_COOKIE_PATH', '/api'),
-        'domain' => env('AUTH_REFRESH_COOKIE_DOMAIN'),
-        'secure' => (bool) env('AUTH_REFRESH_COOKIE_SECURE', env('APP_ENV') === 'production'),
-        'same_site' => env('AUTH_REFRESH_COOKIE_SAME_SITE', 'strict'),
+    'cookies' => [
+        'tenant_refresh' => [
+            'name' => env('AUTH_TENANT_REFRESH_COOKIE_NAME', 'autoerp_tenant_refresh'),
+            'path' => env('AUTH_TENANT_REFRESH_COOKIE_PATH', '/api/v1/auth'),
+            'domain' => env('AUTH_TENANT_REFRESH_COOKIE_DOMAIN'),
+            'secure' => filter_var(
+                env('AUTH_TENANT_REFRESH_COOKIE_SECURE', env('APP_ENV') === 'production'),
+                FILTER_VALIDATE_BOOL,
+            ),
+            'same_site' => env('AUTH_TENANT_REFRESH_COOKIE_SAME_SITE', 'strict'),
+        ],
+        'platform_refresh' => [
+            'name' => env('AUTH_PLATFORM_REFRESH_COOKIE_NAME', 'autoerp_platform_refresh'),
+            'path' => env('AUTH_PLATFORM_REFRESH_COOKIE_PATH', '/api/v1/platform/auth'),
+            'domain' => env('AUTH_PLATFORM_REFRESH_COOKIE_DOMAIN'),
+            'secure' => filter_var(
+                env('AUTH_PLATFORM_REFRESH_COOKIE_SECURE', env('APP_ENV') === 'production'),
+                FILTER_VALIDATE_BOOL,
+            ),
+            'same_site' => env('AUTH_PLATFORM_REFRESH_COOKIE_SAME_SITE', 'strict'),
+        ],
     ],
     'authorization_code_ttl_seconds' => (int) env('AUTH_AUTHORIZATION_CODE_TTL', 300),
     'verification_ttl_seconds' => (int) env('AUTH_VERIFICATION_TTL', 600),
+    'registration' => [
+        'invitation_expiry_hours' => (int) env('AUTH_REGISTRATION_INVITATION_EXPIRY_HOURS', 72),
+    ],
+    'platform_mfa' => [
+        'required' => filter_var(
+            env('AUTH_PLATFORM_MFA_REQUIRED', env('APP_ENV') === 'production'),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'issuer' => env('AUTH_PLATFORM_MFA_ISSUER', env('APP_NAME', 'AutoERP')),
+        'step_up_ttl_seconds' => (int) env('AUTH_PLATFORM_STEP_UP_TTL_SECONDS', 900),
+        'middleware_alias' => env('AUTH_PLATFORM_STEP_UP_MIDDLEWARE_ALIAS', 'platform.step-up'),
+    ],
     'max_login_attempts' => (int) env('AUTH_MAX_LOGIN_ATTEMPTS', 5),
     'login_attempt_window_seconds' => (int) env('AUTH_LOGIN_ATTEMPT_WINDOW', 900),
     'middleware' => [

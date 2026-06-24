@@ -40,7 +40,7 @@ final class UpsertUserRequest extends TenantScopedRequest
             'username' => ['nullable', 'string', 'max:100', 'regex:/^[a-zA-Z0-9._-]+$/'],
             'email' => array_merge($required, ['email:rfc,dns', 'max:255']),
             'email_verified_at' => $this->isMethod('post') ? ['nullable', 'date'] : ['prohibited'],
-            'password' => $this->isMethod('post') ? ['required', 'string', 'min:8', 'max:255'] : ['prohibited'],
+            'password' => $this->isMethod('post') ? ['required', 'string', 'max:255', PasswordPolicy::rule()] : ['prohibited'],
             'status' => ['nullable', 'string', 'in:'.implode(',', UserStatus::values())],
             'avatar_path' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:100'],

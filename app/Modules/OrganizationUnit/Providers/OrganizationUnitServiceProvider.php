@@ -23,16 +23,21 @@ use Modules\OrganizationUnit\Services\CurrentOrganizationUnitContextResolver;
 use Modules\OrganizationUnit\Services\OrganizationUnitOwnershipChecker;
 use Modules\OrganizationUnit\Services\Rules\OrganizationUnitDomainService;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
+use Modules\OrganizationUnit\Services\Provisioning\TenantOrganizationProvisioner;
+use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
+use Modules\OrganizationUnit\Services\TenantLimits\OrganizationUnitLimitUsageContributor;
 
 final class OrganizationUnitServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/organization-unit.php', 'organization-unit');
+        $this->app->tag([OrganizationUnitLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->bind(CurrentOrganizationUnitContextResolverInterface::class, CurrentOrganizationUnitContextResolver::class);
         $this->app->singleton(OrganizationUnitDomainServiceInterface::class, OrganizationUnitDomainService::class);
         $this->app->singleton(OrganizationUnitOwnershipCheckerInterface::class, OrganizationUnitOwnershipChecker::class);
         $this->app->singleton(OrganizationUnitContext::class, OrganizationUnitContext::class);
+        $this->app->singleton(TenantOrganizationProvisionerInterface::class, TenantOrganizationProvisioner::class);
         $this->app->singleton(OrganizationUnitTypeRepositoryInterface::class, fn (): OrganizationUnitTypeRepositoryInterface => new EloquentOrganizationUnitTypeRepository(new OrganizationUnitTypeModel));
         $this->app->singleton(OrganizationUnitRepositoryInterface::class, fn (): OrganizationUnitRepositoryInterface => new EloquentOrganizationUnitRepository(new OrganizationUnitModel));
         $this->app->singleton(OrganizationUnitDocumentRepositoryInterface::class, fn (): OrganizationUnitDocumentRepositoryInterface => new EloquentOrganizationUnitDocumentRepository(new OrganizationUnitDocumentModel));

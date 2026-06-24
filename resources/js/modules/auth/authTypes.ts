@@ -51,4 +51,16 @@ export interface LoginPayload {
     tenant_code?: string | null;
     organization_unit_id?: number | null;
     device_name?: string | null;
+    totp_code?: string | null;
+    backup_code?: string | null;
+}
+
+export interface PlatformMfaEnrollment {
+    secret: string;
+    provisioning_uri: string;
+}
+
+export interface PlatformMfaConfirmation {
+    enabled: true;
+    backup_codes: string[];
 }

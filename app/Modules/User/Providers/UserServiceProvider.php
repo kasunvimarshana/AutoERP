@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\User\Console\Commands\UserCreateCommand;
 use Modules\User\Contracts\AuthenticatedUserProviderInterface;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\User\Http\Middleware\RequirePlatformPermissionMiddleware;
 use Modules\User\Http\Middleware\UserContextResolutionMiddleware;
 use Modules\User\Models\PermissionModel;
+use Modules\User\Models\PlatformOperatorPermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\RolePermissionModel;
 use Modules\User\Models\UserDeviceModel;
@@ -39,25 +42,36 @@ use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserRoleRepositoryInterface;
 use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Services\AuthenticatedUserProvider;
+use Modules\User\Services\PermissionDefinitionRegistry;
+use Modules\User\Services\PlatformPermissionChecker;
+use Modules\User\Services\Provisioning\TenantAccessProvisioner;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Modules\User\Services\Rules\UserDomainService;
 use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Services\UserAccessResolver;
 use Modules\User\Services\UserPermissionChecker;
+use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Services\TenantLimits\UserLimitUsageContributor;
 
 final class UserServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/user.php', 'user');
+        $this->app->tag([UserLimitUsageContributor::class], 'tenant.limit_usage');
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
+        $this->app->singleton(PermissionDefinitionRegistryInterface::class, PermissionDefinitionRegistry::class);
+        $this->app->singleton(TenantAccessProvisionerInterface::class, TenantAccessProvisioner::class);
         $this->app->scoped(UserAccessResolver::class);
         $this->app->scoped(PlatformOperatorCheckerInterface::class, UserAccessResolver::class);
+        $this->app->scoped(PlatformPermissionCheckerInterface::class, fn (): PlatformPermissionCheckerInterface => new PlatformPermissionChecker(new UserModel, new PlatformOperatorPermissionModel));
         $this->app->scoped(TenantUserAccessCheckerInterface::class, UserAccessResolver::class);
         $this->app->scoped(OrganizationUnitUserAccessCheckerInterface::class, UserAccessResolver::class);
         $this->app->scoped(PermissionCheckerInterface::class, UserPermissionChecker::class);
@@ -106,7 +120,14 @@ final class UserServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(PermissionDefinitionRegistryInterface::class)
+            ->register('user', UserPermission::descriptions());
+
         $router = $this->app->make(Router::class);
+        $router->aliasMiddleware(
+            (string) config('user.platform.permission_middleware_alias', 'platform.permission'),
+            RequirePlatformPermissionMiddleware::class,
+        );
         $router->aliasMiddleware(
             (string) config('user.context.middleware_alias', 'current.user-record'),
             UserContextResolutionMiddleware::class,

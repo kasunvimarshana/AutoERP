@@ -242,7 +242,10 @@ final class RoleService extends AbstractUserCrudService
             ->where('role_id', $roleId)
             ->count();
         $payload['permissions'] = DB::table('role_permissions')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->join('permissions', function ($join): void {
+                $join->on('permissions.id', '=', 'role_permissions.permission_id')
+                    ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
+            })
             ->where('role_permissions.tenant_id', $tenantId)
             ->where('role_permissions.role_id', $roleId)
             ->whereNull('permissions.deleted_at')

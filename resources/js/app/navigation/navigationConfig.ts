@@ -1,5 +1,6 @@
 import type { NavigationSection } from "./navigationTypes";
 import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "../routePaths";
+import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';
 import {
     accessPermissions,
     protectedAccessRoles,
@@ -1102,7 +1103,7 @@ export const platformNavigationSections: NavigationSection[] = [
                 label: "SaaS Tenants",
                 to: PLATFORM_HOME_PATH,
                 icon: "users",
-                access: { requiresPlatformOperator: true },
+                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.tenantsView] },
             },
             {
                 id: "tenant-plans",
@@ -1110,7 +1111,7 @@ export const platformNavigationSections: NavigationSection[] = [
                 label: "Tenant Plans",
                 to: "/administration/tenant-plans",
                 icon: "list",
-                access: { requiresPlatformOperator: true },
+                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.plansView] },
             },
             {
                 id: "platform-configuration",
@@ -1118,7 +1119,7 @@ export const platformNavigationSections: NavigationSection[] = [
                 label: "Platform Defaults",
                 to: "/administration/platform-configuration",
                 icon: "settings",
-                access: { requiresPlatformOperator: true },
+                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.configurationManage] },
             },
         ],
     },

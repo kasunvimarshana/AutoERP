@@ -124,7 +124,10 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
                 $join->on('roles.id', '=', 'user_roles.role_id')
                     ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
             })
-            ->join('users', 'users.id', '=', 'user_roles.user_id')
+            ->join('users', function ($join): void {
+                $join->on('users.id', '=', 'user_roles.user_id')
+                    ->on('users.tenant_id', '=', 'user_roles.tenant_id');
+            })
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('users.status', 'active')
@@ -372,8 +375,14 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
     private function directPermissions(int $userId, int $tenantId): array
     {
         return DB::table('user_permissions')
-            ->join('users', 'users.id', '=', 'user_permissions.user_id')
-            ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
+            ->join('users', function ($join): void {
+                $join->on('users.id', '=', 'user_permissions.user_id')
+                    ->on('users.tenant_id', '=', 'user_permissions.tenant_id');
+            })
+            ->join('permissions', function ($join): void {
+                $join->on('permissions.id', '=', 'user_permissions.permission_id')
+                    ->on('permissions.tenant_id', '=', 'user_permissions.tenant_id');
+            })
             ->where('user_permissions.tenant_id', $tenantId)
             ->where('user_permissions.user_id', $userId)
             ->where('users.status', 'active')
@@ -400,7 +409,10 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
     private function rolePermissions(int $userId, int $tenantId): array
     {
         return DB::table('role_permissions')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->join('permissions', function ($join): void {
+                $join->on('permissions.id', '=', 'role_permissions.permission_id')
+                    ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
+            })
             ->join('roles', function ($join): void {
                 $join->on('roles.id', '=', 'role_permissions.role_id')
                     ->on('roles.tenant_id', '=', 'role_permissions.tenant_id');
@@ -409,7 +421,10 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
                 $join->on('user_roles.role_id', '=', 'roles.id')
                     ->on('user_roles.tenant_id', '=', 'roles.tenant_id');
             })
-            ->join('users', 'users.id', '=', 'user_roles.user_id')
+            ->join('users', function ($join): void {
+                $join->on('users.id', '=', 'user_roles.user_id')
+                    ->on('users.tenant_id', '=', 'user_roles.tenant_id');
+            })
             ->where('role_permissions.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('users.status', 'active')

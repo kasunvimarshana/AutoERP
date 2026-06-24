@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -14,9 +15,13 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { PlatformTenantDomainsPanel } from './components/PlatformTenantDomainsPanel';
 import { PlatformTenantForm } from './components/PlatformTenantForm';
+import { PlatformTenantOnboardingPanel } from './components/PlatformTenantOnboardingPanel';
+import { PlatformTenantSubscriptionPanel } from './components/PlatformTenantSubscriptionPanel';
+import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';
 import {
     changeTenantStatus,
     createPlatformTenant,
@@ -38,8 +43,13 @@ const ACTION_LABELS: Record<LifecycleAction, string> = {
 
 export default function PlatformTenantsPage() {
     const auth = useAuth();
-    const canManage = auth.isPlatformOperator;
-    const canLifecycle = auth.isPlatformOperator;
+    const canCreate = hasPermission(auth, PLATFORM_PERMISSION.tenantsCreate);
+    const canUpdate = hasPermission(auth, PLATFORM_PERMISSION.tenantsUpdate);
+    const canOnboard = hasPermission(auth, PLATFORM_PERMISSION.tenantsOnboard);
+    const canManageDomains = hasPermission(auth, PLATFORM_PERMISSION.tenantDomainsManage);
+    const canManageSubscriptions = hasPermission(auth, PLATFORM_PERMISSION.tenantSubscriptionsManage);
+    const canLifecycle = hasPermission(auth, PLATFORM_PERMISSION.tenantsLifecycle);
+
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
@@ -64,6 +74,11 @@ export default function PlatformTenantsPage() {
         selectedId !== null,
     );
     const selected = selectedTenant.data;
+
+    function refreshSelected() {
+        selectedTenant.reload();
+        tenants.reload();
+    }
 
     function selectTenant(id: number) {
         setSelectedId(id);
@@ -107,19 +122,13 @@ export default function PlatformTenantsPage() {
         setError(null);
 
         try {
-            const updated = await changeTenantStatus(
-                selected.id,
-                action,
-                selected.row_version,
-                reason.trim(),
-            );
+            const updated = await changeTenantStatus(selected.id, action, selected.row_version, reason.trim());
             selectedTenant.setData(updated);
             setReason('');
             tenants.reload();
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
-            selectedTenant.reload();
-            tenants.reload();
+            refreshSelected();
         } finally {
             setBusyAction(null);
         }
@@ -132,11 +141,14 @@ export default function PlatformTenantsPage() {
 
     return (
         <>
-            <ContentHeader title="SaaS tenants" description="Platform-only tenant provisioning and lifecycle controls. Tenant resource IDs never select the active request context." />
+            <ContentHeader
+                title="SaaS tenants"
+                description="Create tenant identities, provision their foundation, verify domains, assign immutable subscriptions, and activate only after readiness checks pass."
+            />
             <div className="space-y-5">
                 <ErrorAlert error={tenants.error ?? currencies.error ?? selectedTenant.error ?? error} />
-                {canManage && (
-                    <Panel title={editing ? `Edit ${editing.name}` : 'Create a tenant'}>
+                {(canCreate || (editing && canUpdate)) ? (
+                    <Panel title={editing ? `Edit ${editing.name}` : 'Create a draft tenant'}>
                         <PlatformTenantForm
                             key={formKey}
                             tenant={editing}
@@ -146,11 +158,12 @@ export default function PlatformTenantsPage() {
                             onSubmit={save}
                         />
                     </Panel>
-                )}
+                ) : null}
+
                 <Panel title="Tenant directory">
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">
                         <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Name, code, or slug" />
-                        <Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} options={TENANT_STATUSES.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} placeholder="All statuses" />
+                        <Select label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} options={TENANT_STATUSES.map((value) => ({ value, label: capitalize(value) }))} placeholder="All statuses" />
                     </div>
                     {tenants.loading && !tenants.data ? <LoadingState label="Loading tenants..." /> : (
                         <div className="space-y-3">
@@ -164,53 +177,67 @@ export default function PlatformTenantsPage() {
                                 >
                                     <div>
                                         <p className="font-semibold text-slate-900">{tenant.name}</p>
-                                        <p className="mt-1 text-sm text-slate-500">{tenant.code} · {tenant.plan?.name ?? 'No subscription plan'} · {tenant.base_currency?.code ?? 'Base currency required'}</p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            {tenant.code} · {tenant.current_subscription?.revision.plan?.name ?? 'No subscription'} · {tenant.base_currency?.code ?? 'Base currency required'}
+                                        </p>
                                     </div>
                                     <StatusBadge status={tenant.status} />
                                 </button>
                             ))}
-                            {(tenants.data?.data ?? []).length === 0 && <p className="py-8 text-center text-sm text-slate-500">No tenants match the current filters.</p>}
+                            {(tenants.data?.data ?? []).length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No tenants match the current filters.</p> : null}
                         </div>
                     )}
                     <Pagination meta={tenants.data?.meta} onPageChange={setPage} />
                 </Panel>
-                {selectedId !== null && selectedTenant.loading && !selected && <LoadingState label="Loading current tenant details..." />}
-                {selected && (
-                    <Panel title={selected.name}>
-                        <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
-                            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                                <Detail label="Code" value={selected.code} />
-                                <Detail label="Status" value={selected.status} />
-                                <Detail label="Plan" value={selected.plan?.name ?? 'Not assigned'} />
-                                <Detail label="Base currency" value={selected.base_currency ? `${selected.base_currency.code} — ${selected.base_currency.name}` : 'Required before activation'} />
-                                <Detail label="Trial ends" value={formatDate(selected.trial_ends_at)} />
-                                <Detail label="Subscription ends" value={formatDate(selected.subscription_ends_at)} />
-                            </dl>
-                            <div className="space-y-3">
-                                {canManage && <Button variant="secondary" className="w-full" disabled={allMutationsDisabled} onClick={() => setEditing(selected)}>Edit tenant</Button>}
-                                {canLifecycle && selected.status !== 'archived' && (
-                                    <>
-                                        <Textarea label="Lifecycle reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={allMutationsDisabled} placeholder="Explain why this lifecycle change is required." />
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {['draft', 'inactive', 'suspended'].includes(selected.status) && <Button disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('activate')}>Activate</Button>}
-                                            {selected.status === 'active' && <Button variant="secondary" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('suspend')}>Suspend</Button>}
-                                            {['active', 'suspended'].includes(selected.status) && <Button variant="secondary" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('deactivate')}>Deactivate</Button>}
-                                            {['draft', 'inactive', 'suspended'].includes(selected.status) && <Button variant="danger" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('archive')}>Archive</Button>}
-                                        </div>
-                                    </>
-                                )}
+
+                {selectedId !== null && selectedTenant.loading && !selected ? <LoadingState label="Loading tenant details..." /> : null}
+                {selected ? (
+                    <>
+                        <Panel title={selected.name}>
+                            <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+                                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                                    <Detail label="Code" value={selected.code} />
+                                    <Detail label="Status" value={capitalize(selected.status)} />
+                                    <Detail label="Plan" value={selected.current_subscription?.revision.plan?.name ?? 'Not assigned'} />
+                                    <Detail label="Subscription" value={selected.current_subscription ? capitalize(selected.current_subscription.status) : 'Not assigned'} />
+                                    <Detail label="Base currency" value={selected.base_currency ? `${selected.base_currency.code} — ${selected.base_currency.name}` : 'Required before activation'} />
+                                    <Detail label="Activated" value={formatDate(selected.activated_at)} />
+                                </dl>
+                                <div className="space-y-3">
+                                    {canUpdate ? <Button variant="secondary" className="w-full" disabled={allMutationsDisabled} onClick={() => setEditing(selected)}>Edit tenant identity</Button> : null}
+                                    {canLifecycle && selected.status !== 'archived' ? (
+                                        <>
+                                            <Textarea label="Lifecycle reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={allMutationsDisabled} placeholder="Explain the operational reason for this change." />
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {['draft', 'inactive', 'suspended'].includes(selected.status) ? <Button disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('activate')}>Activate</Button> : null}
+                                                {selected.status === 'active' ? <Button variant="secondary" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('suspend')}>Suspend</Button> : null}
+                                                {['active', 'suspended'].includes(selected.status) ? <Button variant="secondary" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('deactivate')}>Deactivate</Button> : null}
+                                                {['draft', 'inactive', 'suspended'].includes(selected.status) ? <Button variant="danger" disabled={!reason.trim() || allMutationsDisabled} onClick={() => requestTransition('archive')}>Archive</Button> : null}
+                                            </div>
+                                        </>
+                                    ) : null}
+                                </div>
                             </div>
-                        </div>
-                    </Panel>
-                )}
+                        </Panel>
+
+                        <Panel title="Tenant activation setup">
+                            <div className="space-y-8 divide-y divide-slate-200">
+                                <PlatformTenantOnboardingPanel key={`onboarding-${selected.id}`} tenant={selected} canProvision={canOnboard} disabled={allMutationsDisabled} onTenantChanged={refreshSelected} />
+                                <div className="pt-8"><PlatformTenantDomainsPanel key={`domains-${selected.id}`} tenant={selected} canManage={canManageDomains} disabled={allMutationsDisabled} onChanged={refreshSelected} /></div>
+                                <div className="pt-8"><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}`} tenant={selected} canManage={canManageSubscriptions} disabled={allMutationsDisabled} onChanged={refreshSelected} /></div>
+                            </div>
+                        </Panel>
+                    </>
+                ) : null}
             </div>
+
             <ConfirmDialog
                 open={Boolean(selected && pendingAction)}
                 title={pendingAction ? `${ACTION_LABELS[pendingAction]} tenant` : 'Change tenant status'}
                 message={selected && pendingAction ? (
                     <p>
                         Confirm <strong>{ACTION_LABELS[pendingAction].toLowerCase()}</strong> for <strong>{selected.name}</strong>.
-                        This lifecycle action will be recorded with the reason: “{reason.trim()}”.
+                        The backend will enforce readiness and record this reason: “{reason.trim()}”.
                     </p>
                 ) : null}
                 confirmLabel={pendingAction ? ACTION_LABELS[pendingAction] : 'Confirm'}
@@ -229,4 +256,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function formatDate(value: string | null): string {
     return formatBusinessDateTime(value, 'Not set');
+}
+
+function capitalize(value: string): string {
+    return value.length === 0 ? value : value[0].toUpperCase() + value.slice(1).replaceAll('_', ' ');
 }

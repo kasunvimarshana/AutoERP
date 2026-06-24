@@ -14,6 +14,8 @@ use Modules\Configuration\Services\ConfigurationDefinitionRegistry;
 use Modules\Configuration\Services\ConfigurationEntryService;
 use Modules\Configuration\Services\ConfigurationScopeResolver;
 use Modules\Configuration\Services\ResolveConfiguration;
+use Modules\Configuration\Constants\ConfigurationPermission;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ConfigurationServiceProvider extends ServiceProvider
 {
@@ -42,6 +44,14 @@ final class ConfigurationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(PermissionDefinitionRegistryInterface::class)
+            ->register('configuration', ConfigurationPermission::descriptions());
+
+        /** @var array{definitions: array<string, array<string, mixed>>} $configuration */
+        $configuration = require __DIR__.'/../Config/configuration.php';
+        $this->app->make(ConfigurationDefinitionRegistryInterface::class)
+            ->register('Configuration', $configuration['definitions']);
+
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

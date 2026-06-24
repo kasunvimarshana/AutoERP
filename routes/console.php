@@ -10,16 +10,20 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tenant:domains:revalidate')
     ->hourly()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command('tenant:expire')
     ->hourly()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command('tenant:storage:cleanup')
     ->everyTenMinutes()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command('tenant:events:publish')
     ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->onOneServer();

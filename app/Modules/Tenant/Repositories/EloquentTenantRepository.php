@@ -85,41 +85,47 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
     }
 
-    public function listExpiredActive(\DateTimeInterface $now, int $limit): array
-    {
-        return $this->query()
-            ->where('status', 'active')
-            ->where(function (Builder $query) use ($now): void {
-                $query->where(function (Builder $subscription) use ($now): void {
-                    $subscription->whereNotNull('subscription_ends_at')
-                        ->where('subscription_ends_at', '<=', $now);
-                })->orWhere(function (Builder $trial) use ($now): void {
-                    $trial->whereNull('subscription_ends_at')
-                        ->whereNotNull('trial_ends_at')
-                        ->where('trial_ends_at', '<=', $now);
-                });
-            })
-            ->orderByRaw('COALESCE(subscription_ends_at, trial_ends_at)')
-            ->limit(max(1, min($limit, 500)))
-            ->get()
-            ->map(fn (Model $model): DataRecord => $this->record($model))
-            ->values()
-            ->all();
-    }
-
     private function query(): Builder
     {
-        return $this->model->newQuery()->with(['plan:id,name,slug,is_active', 'baseCurrency:id,code,name,symbol,is_active']);
+        return $this->model->newQuery()->with([
+            'currentSubscription.subscription.revision.plan:id,name,slug,is_active',
+            'currentSubscription.subscription.revision.currency:id,code,name,symbol,is_active',
+            'baseCurrency:id,code,name,symbol,is_active',
+            'onboardingState:tenant_id,status,initial_admin_email,completed_steps,last_error,provisioned_at,completed_at,row_version',
+        ]);
     }
 
     private function record(TenantModel $model): DataRecord
     {
         $payload = $model->attributesToArray();
-        $payload['plan'] = $model->relationLoaded('plan') && $model->plan !== null
-            ? $model->plan->only(['id', 'name', 'slug', 'is_active'])
+        $current = $model->relationLoaded('currentSubscription')
+            ? $model->currentSubscription?->subscription
             : null;
+        $payload['current_subscription'] = $current?->toArray();
+        if (is_array($payload['current_subscription'] ?? null)) {
+            $payload['current_subscription']['revision'] = $current?->revision?->toArray();
+            if (is_array($payload['current_subscription']['revision'] ?? null)) {
+                $payload['current_subscription']['revision']['plan'] = $current?->revision?->plan?->only([
+                    'id', 'name', 'slug', 'is_active',
+                ]);
+                $payload['current_subscription']['revision']['currency'] = $current?->revision?->currency?->only([
+                    'id', 'code', 'name', 'symbol', 'is_active',
+                ]);
+            }
+        }
         $payload['base_currency'] = $model->relationLoaded('baseCurrency') && $model->baseCurrency !== null
             ? $model->baseCurrency->only(['id', 'code', 'name', 'symbol', 'is_active'])
+            : null;
+        $payload['onboarding'] = $model->relationLoaded('onboardingState') && $model->onboardingState !== null
+            ? $model->onboardingState->only([
+                'status',
+                'initial_admin_email',
+                'completed_steps',
+                'last_error',
+                'provisioned_at',
+                'completed_at',
+                'row_version',
+            ])
             : null;
         return new DataRecord($payload);
     }

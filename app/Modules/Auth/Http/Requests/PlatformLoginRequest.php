@@ -18,7 +18,9 @@ final class PlatformLoginRequest extends FormRequest
     {
         return [
             'email' => ['required', 'email:rfc', 'max:320'],
-            'password' => ['required', 'string', 'min:1'],
+            'password' => ['required', 'string', 'max:1024'],
+            'totp_code' => ['nullable', 'string', 'regex:/^\d{6}$/', 'prohibits:backup_code'],
+            'backup_code' => ['nullable', 'string', 'max:32', 'prohibits:totp_code'],
         ];
     }
 }

@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Tenant\Constants\PlatformPermission;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Models\PermissionModel;
+use Modules\User\Models\PlatformOperatorPermissionModel;
+use Modules\User\Models\PlatformPermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserRoleModel;
@@ -81,7 +84,8 @@ final class UserSeeder extends Seeder
             ])->save();
 
             if ($this->shouldSeedPlatformOperator()) {
-                $this->seedPlatformOperator();
+                $operator = $this->seedPlatformOperator();
+                $this->seedPlatformPermissions($operator);
             }
 
             if (Schema::hasTable('user_organization_units')) {
@@ -144,29 +148,50 @@ final class UserSeeder extends Seeder
         }
     }
 
-    private function seedPlatformOperator(): void
+    private function seedPlatformOperator(): UserModel
     {
         $email = $this->platformAdminEmail();
-        $operator = app(TenantExecutionContextInterface::class)->runAsControlPlane(
-            fn (): UserModel => UserModel::query()
+        return app(TenantExecutionContextInterface::class)->runAsControlPlane(function () use ($email): UserModel {
+            $operator = UserModel::query()
                 ->where('platform_login_email', $email)
-                ->firstOrNew(),
-        );
+                ->firstOrNew();
 
-        $operator->forceFill([
-            'tenant_id' => null,
-            'platform_login_email' => $email,
-            'email' => $email,
-            'username' => null,
-            'first_name' => 'Platform',
-            'last_name' => 'Administrator',
-            'email_verified_at' => now(),
-            'password' => app(PasswordHasherInterface::class)->hash($this->platformAdminPassword()),
-            'status' => 'active',
-            'is_platform_operator' => true,
-            'row_version' => max(1, (int) ($operator->row_version ?? 0)),
-            'metadata' => ['seed_source' => 'user_module', 'account_scope' => 'platform'],
-        ])->save();
+            $operator->forceFill([
+                'tenant_id' => null,
+                'platform_login_email' => $email,
+                'email' => $email,
+                'username' => null,
+                'first_name' => 'Platform',
+                'last_name' => 'Administrator',
+                'email_verified_at' => now(),
+                'password' => app(PasswordHasherInterface::class)->hash($this->platformAdminPassword()),
+                'status' => 'active',
+                'is_platform_operator' => true,
+                'row_version' => max(1, (int) ($operator->row_version ?? 0)),
+                'metadata' => ['seed_source' => 'user_module', 'account_scope' => 'platform'],
+            ])->save();
+
+            return $operator;
+        });
+    }
+
+    private function seedPlatformPermissions(UserModel $operator): void
+    {
+        if (! Schema::hasTable('platform_permissions') || ! Schema::hasTable('platform_operator_permissions')) {
+            return;
+        }
+
+        foreach (PlatformPermission::descriptions() as $name => $description) {
+            $permission = PlatformPermissionModel::query()->updateOrCreate(
+                ['name' => $name],
+                ['description' => $description, 'is_active' => true],
+            );
+
+            PlatformOperatorPermissionModel::query()->firstOrCreate([
+                'user_id' => $operator->getKey(),
+                'platform_permission_id' => $permission->getKey(),
+            ]);
+        }
     }
 
     private function platformAdminEmail(): string

@@ -12,7 +12,13 @@ final class TenantApiResponder
 {
     public static function error(Error $error): JsonResponse
     {
-        return response()->json(['message' => $error->message, 'error' => ['code' => $error->code]], self::status($error->code));
+        return response()->json([
+            'message' => $error->message,
+            'error' => [
+                'code' => $error->code,
+                'context' => $error->context === [] ? null : $error->context,
+            ],
+        ], self::status($error->code));
     }
 
     private static function status(string $code): int

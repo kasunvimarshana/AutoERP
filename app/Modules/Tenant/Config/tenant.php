@@ -3,8 +3,17 @@
 declare(strict_types=1);
 
 return [
-    'platform' => ['middleware_alias' => 'platform.operator'],
+    'platform' => [
+        'host_middleware_alias' => 'platform.host',
+        'operator_middleware_alias' => 'platform.operator',
+    ],
     'entitlements' => ['middleware_alias' => 'tenant.feature'],
+    'infrastructure' => [
+        // This application currently guarantees tenant isolation through one shared
+        // database schema and mandatory tenant ownership. Dedicated databases require
+        // a separate migration, connection lifecycle, and worker-reset implementation.
+        'database_strategy' => env('TENANT_DATABASE_STRATEGY', 'shared_schema'),
+    ],
     'pagination' => ['default_per_page' => 20, 'max_per_page' => 100],
     'resolution' => [
         'central_hosts' => array_values(array_filter(array_map(
@@ -23,6 +32,17 @@ return [
         'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN'),
         'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
     ],
+    'event_outbox' => [
+        'batch_size' => (int) env('TENANT_EVENT_OUTBOX_BATCH_SIZE', 100),
+        'max_attempts' => (int) env('TENANT_EVENT_OUTBOX_MAX_ATTEMPTS', 10),
+        'claim_timeout_seconds' => (int) env('TENANT_EVENT_OUTBOX_CLAIM_TIMEOUT_SECONDS', 600),
+        'published_retention_days' => (int) env('TENANT_EVENT_OUTBOX_PUBLISHED_RETENTION_DAYS', 30),
+    ],
+    'storage_cleanup' => [
+        'batch_size' => (int) env('TENANT_STORAGE_CLEANUP_BATCH_SIZE', 100),
+        'max_attempts' => (int) env('TENANT_STORAGE_CLEANUP_MAX_ATTEMPTS', 10),
+        'claim_timeout_seconds' => (int) env('TENANT_STORAGE_CLEANUP_CLAIM_TIMEOUT_SECONDS', 900),
+    ],
     'documents' => [
         'disk' => env('TENANT_DOCUMENT_DISK', 'tenant_private'),
         'max_size_kb' => (int) env('TENANT_DOCUMENT_MAX_SIZE_KB', 10240),
@@ -35,5 +55,6 @@ return [
         'revalidation_interval_hours' => (int) env('TENANT_DOMAIN_REVALIDATION_INTERVAL_HOURS', 24),
         'verification_grace_days' => (int) env('TENANT_DOMAIN_VERIFICATION_GRACE_DAYS', 7),
         'revalidation_batch_size' => (int) env('TENANT_DOMAIN_REVALIDATION_BATCH_SIZE', 100),
+        'revalidation_claim_timeout_minutes' => (int) env('TENANT_DOMAIN_REVALIDATION_CLAIM_TIMEOUT_MINUTES', 30),
     ],
 ];

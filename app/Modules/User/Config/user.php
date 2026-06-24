@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 return [
     'guard' => env('USER_MODULE_GUARD', (string) config('auth.defaults.guard', 'api')),
+    'platform' => [
+        'permission_middleware_alias' => env('PLATFORM_PERMISSION_MIDDLEWARE_ALIAS', 'platform.permission'),
+    ],
     'context' => [
         'middleware_alias' => env('USER_CONTEXT_MIDDLEWARE_ALIAS', 'current.user-record'),
         'request_attribute' => env('USER_CONTEXT_REQUEST_ATTRIBUTE', 'current_user_record'),

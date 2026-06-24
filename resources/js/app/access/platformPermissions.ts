@@ -1,0 +1,15 @@
+export const PLATFORM_PERMISSION = {
+    tenantsView: 'platform.tenants.view',
+    tenantsCreate: 'platform.tenants.create',
+    tenantsUpdate: 'platform.tenants.update',
+    tenantsOnboard: 'platform.tenants.onboard',
+    tenantsLifecycle: 'platform.tenants.lifecycle',
+    tenantDomainsManage: 'platform.tenant_domains.manage',
+    tenantSubscriptionsManage: 'platform.tenant_subscriptions.manage',
+    plansView: 'platform.plans.view',
+    plansManage: 'platform.plans.manage',
+    configurationManage: 'platform.configuration.manage',
+    secretsManage: 'platform.secrets.manage',
+    auditView: 'platform.audit.view',
+    operatorsManage: 'platform.operators.manage',
+} as const;

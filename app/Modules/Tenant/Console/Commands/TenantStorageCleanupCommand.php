@@ -19,12 +19,14 @@ final class TenantStorageCleanupCommand extends Command
         $summary = $service->process(is_numeric($limit) ? (int) $limit : null);
 
         $this->info(sprintf(
-            'Checked %d; completed %d; failed %d.',
+            'Checked %d; completed %d; failed %d; dead %d; recovered %d.',
             $summary['checked'],
             $summary['completed'],
             $summary['failed'],
+            $summary['dead'],
+            $summary['recovered'],
         ));
 
-        return $summary['failed'] > 0 ? self::FAILURE : self::SUCCESS;
+        return ($summary['failed'] + $summary['dead']) > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

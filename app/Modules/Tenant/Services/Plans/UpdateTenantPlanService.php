@@ -15,14 +15,22 @@ use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
+use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Modules\Tenant\Services\TenantReferenceValidator;
+use DateTimeImmutable;
+use DateTimeInterface;
 use Throwable;
 
 final class UpdateTenantPlanService
 {
+    private const REVISION_FIELDS = [
+        'features', 'limits', 'price', 'currency_id', 'billing_interval', 'effective_at',
+    ];
+
     public function __construct(
         private readonly TenantPlanRepositoryInterface $plans,
+        private readonly TenantPlanRevisionRepositoryInterface $revisions,
         private readonly TenantValueNormalizerInterface $rules,
         private readonly TenantPlanSchema $schema,
         private readonly TenantReferenceValidator $references,
@@ -43,10 +51,7 @@ final class UpdateTenantPlanService
 
             $expectedVersion = (int) ($payload['expected_version'] ?? 0);
             if ($expectedVersion < 1) {
-                return Result::failure(new Error(
-                    TenantErrorCode::VERSION_CONFLICT,
-                    'The current tenant plan version is required.',
-                ));
+                return Result::failure(new Error(TenantErrorCode::VERSION_CONFLICT, 'The current tenant plan version is required.'));
             }
 
             $slug = array_key_exists('slug', $payload)
@@ -54,36 +59,53 @@ final class UpdateTenantPlanService
                 : (string) $existing->require('slug');
             $duplicate = $this->plans->findBySlug($slug);
             if ($duplicate !== null && (int) $duplicate->id() !== (int) $existing->id()) {
-                return Result::failure(new Error(
-                    TenantErrorCode::CONFLICT,
-                    'Tenant plan slug already exists.',
-                ));
+                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan slug already exists.'));
             }
 
-            $attributes = $this->attributes($payload, $existing, $slug);
-            if (! (bool) $attributes['is_active'] && $this->plans->isAssigned($id)) {
-                return Result::failure(new Error(
-                    TenantErrorCode::CONFLICT,
-                    'A tenant plan assigned to tenants cannot be deactivated. Reassign those tenants first.',
-                ));
+            $latest = $this->revisions->findLatestByPlan($id);
+            if ($latest === null) {
+                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan has no immutable revision.'));
             }
+
+            $revision = $this->revisionAttributes($payload, $latest);
             $this->references->assertPlanPricing(
-                (string) $attributes['price'],
-                is_numeric($attributes['currency_id']) ? (int) $attributes['currency_id'] : null,
+                (string) $revision['price'],
+                is_int($revision['currency_id']) ? $revision['currency_id'] : null,
             );
+            $createRevision = $this->hasRevisionInput($payload)
+                && $this->revisionChanged($latest, $revision, $payload);
 
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
                 $id,
                 $expectedVersion,
-                $attributes,
+                $payload,
                 $existing,
                 $slug,
+                $revision,
+                $createRevision,
             ): ?DataRecord {
-                $updated = $this->plans->updateWithVersion($id, $expectedVersion, $attributes);
+                $updated = $this->plans->updateWithVersion($id, $expectedVersion, [
+                    'name' => array_key_exists('name', $payload)
+                        ? $this->rules->normalizeName((string) $payload['name'])
+                        : $existing->get('name'),
+                    'slug' => $slug,
+                    'is_active' => array_key_exists('is_active', $payload)
+                        ? (bool) $payload['is_active']
+                        : (bool) $existing->get('is_active'),
+                    'metadata' => array_key_exists('metadata', $payload)
+                        ? $this->rules->normalizeMetadata($payload['metadata'])
+                        : $this->rules->normalizeMetadata($existing->get('metadata')),
+                    'updated_by' => $this->currentUser->currentUserId(),
+                ]);
                 if ($updated === null) {
                     return null;
                 }
+
+                $newRevision = $createRevision
+                    ? $this->revisions->createNext($id, $revision)
+                    : null;
+                $updated = $this->plans->findById($id) ?? $updated;
 
                 $this->audit->recordPlatform(new AuditEventData(
                     eventName: 'tenant.plan.updated',
@@ -93,9 +115,10 @@ final class UpdateTenantPlanService
                     subjectId: (string) $updated->id(),
                     subjectReference: $slug,
                     changes: [
-                        'old' => $this->summary($existing),
-                        'new' => $this->summary($updated),
+                        'old' => $existing->toArray(),
+                        'new' => $updated->toArray(),
                     ],
+                    metadata: ['revision_created' => $newRevision?->get('revision_number')],
                     tags: ['tenant', 'plan', 'platform'],
                 ));
 
@@ -117,40 +140,51 @@ final class UpdateTenantPlanService
         }
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
-     */
-    private function attributes(array $payload, DataRecord $existing, string $slug): array
+    /** @param array<string, mixed> $payload @return array<string, mixed> */
+    private function revisionAttributes(array $payload, DataRecord $latest): array
     {
         return [
-            'name' => array_key_exists('name', $payload)
-                ? $this->rules->normalizeName((string) $payload['name'])
-                : $existing->get('name'),
-            'slug' => $slug,
             'features' => array_key_exists('features', $payload)
                 ? $this->schema->normalizeFeatures($payload['features'])
-                : $this->schema->normalizeFeatures($existing->get('features')),
+                : $this->schema->normalizeFeatures($latest->get('features')),
             'limits' => array_key_exists('limits', $payload)
                 ? $this->schema->normalizeLimits($payload['limits'])
-                : $this->schema->normalizeLimits($existing->get('limits')),
+                : $this->schema->normalizeLimits($latest->get('limits')),
             'price' => array_key_exists('price', $payload)
                 ? $this->schema->normalizePrice($payload['price'])
-                : $this->schema->normalizePrice($existing->get('price')),
+                : $this->schema->normalizePrice($latest->get('price')),
             'currency_id' => array_key_exists('currency_id', $payload)
                 ? $this->positiveInt($payload['currency_id'])
-                : $existing->get('currency_id'),
+                : $this->positiveInt($latest->get('currency_id')),
             'billing_interval' => array_key_exists('billing_interval', $payload)
                 ? $this->rules->normalizeBillingInterval((string) $payload['billing_interval'])
-                : $existing->get('billing_interval'),
-            'is_active' => array_key_exists('is_active', $payload)
-                ? (bool) $payload['is_active']
-                : (bool) $existing->get('is_active'),
-            'metadata' => array_key_exists('metadata', $payload)
-                ? $this->rules->normalizeMetadata($payload['metadata'])
-                : $this->rules->normalizeMetadata($existing->get('metadata')),
-            'updated_by' => $this->currentUser->currentUserId(),
+                : (string) $latest->require('billing_interval'),
+            'effective_at' => array_key_exists('effective_at', $payload)
+                ? $this->dateTime($payload['effective_at'])
+                : new DateTimeImmutable('now'),
+            'created_by' => $this->currentUser->currentUserId(),
         ];
+    }
+
+    /** @param array<string, mixed> $revision @param array<string, mixed> $payload */
+    private function revisionChanged(DataRecord $latest, array $revision, array $payload): bool
+    {
+        return $this->schema->normalizeFeatures($latest->get('features')) !== $revision['features']
+            || $this->schema->normalizeLimits($latest->get('limits')) !== $revision['limits']
+            || $this->schema->normalizePrice($latest->get('price')) !== $revision['price']
+            || $this->positiveInt($latest->get('currency_id')) !== $revision['currency_id']
+            || (string) $latest->get('billing_interval') !== $revision['billing_interval']
+            || (
+                array_key_exists('effective_at', $payload)
+                && $this->dateTime($latest->get('effective_at'))->format('Y-m-d H:i:s')
+                    !== $this->dateTime($revision['effective_at'])->format('Y-m-d H:i:s')
+            );
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function hasRevisionInput(array $payload): bool
+    {
+        return array_intersect(self::REVISION_FIELDS, array_keys($payload)) !== [];
     }
 
     private function positiveInt(mixed $value): ?int
@@ -158,18 +192,17 @@ final class UpdateTenantPlanService
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 
-    /** @return array<string, mixed> */
-    private function summary(DataRecord $record): array
+    private function dateTime(mixed $value): DateTimeImmutable
     {
-        return [
-            'name' => $record->get('name'),
-            'slug' => $record->get('slug'),
-            'features' => $record->get('features'),
-            'limits' => $record->get('limits'),
-            'price' => $record->get('price'),
-            'currency_id' => $record->get('currency_id'),
-            'billing_interval' => $record->get('billing_interval'),
-            'is_active' => $record->get('is_active'),
-        ];
+        if ($value instanceof DateTimeInterface) {
+            return DateTimeImmutable::createFromInterface($value);
+        }
+
+        $value = is_scalar($value) ? trim((string) $value) : '';
+        if ($value === '') {
+            throw new \InvalidArgumentException('Plan revision effective date is required.');
+        }
+
+        return new DateTimeImmutable($value);
     }
 }
