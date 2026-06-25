@@ -4,37 +4,31 @@ declare(strict_types=1);
 
 namespace Modules\Extension\Http\Requests;
 
-use Illuminate\Validation\Rule;
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-final class UpsertEntityAttributeRequest extends TenantScopedRequest
+final class UpsertEntityAttributeRequest extends FormRequest
 {
-    /** @return array<string, mixed> */
+    public function authorize(): bool
+    {
+        return auth()->check();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'row_version' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units')],
+            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
+            'row_version' => ['nullable', 'integer', 'min:0'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
-            'entity_type' => [...$required, 'string', Rule::in($this->allowedEntityTypes())],
-            'entity_id' => [...$required, 'integer', 'min:1'],
-            'attribute_key' => [...$required, 'string', 'max:255'],
+            'entity_type' => array_merge($required, ['string', 'max:255']),
+            'entity_id' => array_merge($required, ['integer', 'min:1']),
+            'attribute_key' => array_merge($required, ['string', 'max:255']),
             'attribute_value' => ['nullable', 'string'],
         ];
-    }
-
-    private function tenantExists(string $table): mixed
-    {
-        return Rule::exists($table, 'id')->where(
-            fn ($query) => $query->where('tenant_id', $this->tenantId()),
-        );
-    }
-
-    /** @return list<string> */
-    private function allowedEntityTypes(): array
-    {
-        return array_map('strval', array_keys((array) config('extension.entity_types', [])));
     }
 }

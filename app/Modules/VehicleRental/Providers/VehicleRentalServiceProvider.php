@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class VehicleRentalServiceProvider extends ServiceProvider
 {
@@ -17,9 +15,6 @@ final class VehicleRentalServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('vehicle-rental', VehicleRentalAuthorizationService::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

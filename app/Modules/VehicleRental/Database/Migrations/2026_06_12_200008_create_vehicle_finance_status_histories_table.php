@@ -14,10 +14,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('finance_agreement_id')->nullable();
-            $table->foreignId('installment_id')->nullable();
+            $table->foreignId('finance_agreement_id')->nullable()->constrained('vehicle_finance_agreements')->cascadeOnDelete();
+            $table->foreignId('installment_id')->nullable()->constrained('vehicle_finance_installments')->cascadeOnDelete();
             $table->string('old_status', 30)->nullable();
             $table->string('new_status', 30);
             $table->text('reason')->nullable();
@@ -27,20 +27,6 @@ return new class extends Migration
 
             $table->index(['finance_agreement_id', 'changed_at'], 'vehicle_finance_history_agreement_idx');
             $table->index(['installment_id', 'changed_at'], 'vehicle_finance_history_installment_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_finance_status_histories_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_status_histories_organization_un_fa664031_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['finance_agreement_id', 'tenant_id'], 'vehicle_finance_status_histories_finance_agreeme_f2d9f3fa_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_finance_agreements')
-                ->cascadeOnDelete();
-            $table->foreign(['installment_id', 'tenant_id'], 'vehicle_finance_status_histories_installment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_finance_installments')
-                ->cascadeOnDelete();
         });
     }
 

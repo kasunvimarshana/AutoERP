@@ -15,11 +15,6 @@ final class EloquentWarehouseRepository extends EloquentRepository implements Wa
         parent::__construct($model);
     }
 
-    public function countByTenant(int $tenantId): int
-    {
-        return $this->query()->where('tenant_id', $tenantId)->count();
-    }
-
     protected function applyCriteria(Builder $query, array $criteria): Builder
     {
         $search = trim((string) ($criteria['search'] ?? ''));

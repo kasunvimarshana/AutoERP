@@ -36,8 +36,6 @@ return new class extends Migration
                 ['tenant_id', 'organization_unit_id', 'updated_at'],
                 'organization_configuration_values_scope_updated_idx',
             );
-
-            $table->unique(['id', 'tenant_id'], 'organization_unit_configuration_values_id_tenant_uk');
         });
     }
 

@@ -13,15 +13,15 @@ return new class extends Migration
         Schema::create('sales_order_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('sales_order_id');
-            $table->foreignId('quotation_line_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('sales_order_id')->constrained('sales_orders')->cascadeOnDelete();
+            $table->foreignId('quotation_line_id')->nullable()->constrained('sales_quotation_lines')->nullOnDelete();
             $table->unsignedInteger('line_number');
-            $table->foreignId('item_id');
-            $table->foreignId('item_variant_id')->nullable();
+            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->text('description')->nullable();
-            $table->foreignId('ordered_uom_id');
-            $table->foreignId('base_uom_id')->nullable();
+            $table->foreignId('ordered_uom_id')->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->decimal('uom_conversion_factor', 20, 6)->default('1.000000');
             $table->decimal('ordered_quantity', 20, 6);
             $table->decimal('base_quantity', 20, 6);
@@ -46,46 +46,12 @@ return new class extends Migration
             $table->decimal('charge_rate', 20, 6)->default('0.000000');
             $table->decimal('charge_amount', 20, 6)->default('0.000000');
             $table->decimal('line_total', 20, 6);
-            $table->foreignId('inventory_allocation_id')->nullable();
+            $table->foreignId('inventory_allocation_id')->nullable()->constrained('inventory_allocations')->nullOnDelete();
             $table->string('status')->default('open');
             $table->timestamps();
 
             $table->unique(['sales_order_id', 'line_number'], 'sales_order_lines_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'sales_order_lines_scope_idx');
-
-            $table->unique(['id', 'tenant_id'], 'sales_order_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_order_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['sales_order_id', 'tenant_id'], 'sales_order_lines_sales_order_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('sales_orders')
-                ->cascadeOnDelete();
-            $table->foreign(['quotation_line_id', 'tenant_id'], 'sales_order_lines_quotation_line_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('sales_quotation_lines')
-                ->restrictOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'sales_order_lines_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->restrictOnDelete();
-            $table->foreign(['item_variant_id', 'tenant_id'], 'sales_order_lines_item_variant_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('item_variants')
-                ->restrictOnDelete();
-            $table->foreign(['ordered_uom_id', 'tenant_id'], 'sales_order_lines_ordered_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['base_uom_id', 'tenant_id'], 'sales_order_lines_base_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['inventory_allocation_id', 'tenant_id'], 'sales_order_lines_inventory_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_allocations')
-                ->restrictOnDelete();
         });
     }
 

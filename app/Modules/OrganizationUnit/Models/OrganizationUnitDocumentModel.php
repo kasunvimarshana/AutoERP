@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class OrganizationUnitDocumentModel extends TenantOwnedModel
+final class OrganizationUnitDocumentModel extends CoreModel
 {
     protected $table = 'organization_unit_documents';
 

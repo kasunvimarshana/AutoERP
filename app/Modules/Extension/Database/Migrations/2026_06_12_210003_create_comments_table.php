@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('commentable_type')->comment('polymorphic target type (e.g., Document, Product, Party)');
@@ -26,21 +26,12 @@ return new class extends Migration
             $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
             $table->text('body')->comment('the actual comment content');
             $table->unsignedBigInteger('author_id')->nullable();
+            $table->foreign('author_id')->references('id')->on('users')->nullOnDelete();
 
             $table->timestamps();
 
             $table->index(['tenant_id', 'commentable_type', 'commentable_id'], 'comments_type_id_idx');
             $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'comments_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'comments_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'comments_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['author_id', 'tenant_id'], 'comments_author_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

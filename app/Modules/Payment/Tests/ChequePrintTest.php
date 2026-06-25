@@ -322,6 +322,7 @@ final class ChequePrintTest extends TestCase
         $now = now();
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Cheque',
             'last_name' => 'Administrator',
             'email' => 'cheque-admin-'.Str::lower(Str::random(8)).'@example.test',
@@ -359,6 +360,6 @@ final class ChequePrintTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        $this->actingAs(UserModel::query()->where('tenant_id', $tenantId)->findOrFail($userId));
+        $this->actingAs(UserModel::query()->findOrFail($userId));
     }
 }

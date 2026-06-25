@@ -12,17 +12,21 @@ return new class extends Migration
     {
         Schema::create('finance_bank_statement_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('reconciliation_id');
+            $table->foreignId('reconciliation_id')
+                ->constrained('finance_bank_reconciliations', 'id')
+                ->cascadeOnDelete();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('bank_account_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('bank_account_id')->constrained('finance_accounts', 'id')->restrictOnDelete();
             $table->date('statement_date');
             $table->string('reference', 150)->nullable();
             $table->string('description')->nullable();
             $table->decimal('debit', 20, 6)->default('0.000000');
             $table->decimal('credit', 20, 6)->default('0.000000');
             $table->foreignId('matched_ledger_entry_id')
-                ->nullable();
+                ->nullable()
+                ->constrained('finance_ledger_entries', 'id')
+                ->restrictOnDelete();
             $table->string('status', 30)->default('unmatched');
             $table->timestamp('matched_at')->nullable();
             $table->timestamps();
@@ -30,24 +34,6 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_stmt_scope_account_idx');
             $table->index(['reconciliation_id', 'status'], 'finance_bank_stmt_recon_status_idx');
             $table->index('matched_ledger_entry_id', 'finance_bank_stmt_ledger_idx');
-
-            $table->unique(['id', 'tenant_id'], 'finance_bank_statement_lines_id_tenant_uk');
-            $table->foreign(['reconciliation_id', 'tenant_id'], 'finance_bank_statement_lines_reconciliation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_bank_reconciliations')
-                ->cascadeOnDelete();
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_bank_statement_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['bank_account_id', 'tenant_id'], 'finance_bank_statement_lines_bank_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
-                ->restrictOnDelete();
-            $table->foreign(['matched_ledger_entry_id', 'tenant_id'], 'finance_bank_statement_lines_matched_ledger_entr_16443ecc_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_ledger_entries')
-                ->restrictOnDelete();
         });
     }
 

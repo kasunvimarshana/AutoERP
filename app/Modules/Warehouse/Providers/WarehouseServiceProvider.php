@@ -11,16 +11,12 @@ use Modules\Warehouse\Repositories\EloquentWarehouseLocationRepository;
 use Modules\Warehouse\Repositories\EloquentWarehouseRepository;
 use Modules\Warehouse\Repositories\WarehouseLocationRepositoryInterface;
 use Modules\Warehouse\Repositories\WarehouseRepositoryInterface;
-use Modules\Warehouse\Services\WarehouseAuthorizationService;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Warehouse\Services\TenantLimits\WarehouseLimitUsageContributor;
 
 final class WarehouseServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/warehouse.php', 'warehouse');
-        $this->app->tag([WarehouseLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->singleton(WarehouseRepositoryInterface::class, function (): WarehouseRepositoryInterface {
             return new EloquentWarehouseRepository(new WarehouseModel);
         });
@@ -31,9 +27,6 @@ final class WarehouseServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('warehouse', WarehouseAuthorizationService::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

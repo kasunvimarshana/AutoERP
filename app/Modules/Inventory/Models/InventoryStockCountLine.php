@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class InventoryStockCountLine extends TenantOwnedModel
+final class InventoryStockCountLine extends CoreModel
 {
     protected $table = 'inventory_stock_count_lines';
 

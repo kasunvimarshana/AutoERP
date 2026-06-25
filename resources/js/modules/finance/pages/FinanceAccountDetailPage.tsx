@@ -41,9 +41,9 @@ export default function FinanceAccountDetailPage() {
                         { label: 'Postable', value: value.is_posting_account ? 'Yes' : 'No' },
                         { label: 'Current balance', value: <MoneyDisplay value={value.current_balance} /> },
                     ]} />}
-                    {tabState.activeTab === 'children' && <RecordTable rows={value.children ?? []} fields={['code', 'name', 'normal_balance', 'is_active']} rowKey={(row, index) => String(row.id ?? row.code ?? `child-account-${index}`)} />}
-                    {tabState.activeTab === 'balance' && (balance.loading ? <LoadingState /> : balance.error ? <ErrorAlert error={balance.error} /> : <RecordTable rows={balance.data ? [balance.data] : []} fields={['opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit', 'balance']} rowKey={() => `account-${id}-balance`} />)}
-                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'debit', 'credit', 'balance_after', 'source_number']} rowKey={(row, index) => String(row.id ?? `${String(row.journal_entry ?? row.source_number ?? 'ledger')}-${String(row.entry_date ?? index)}`)} />)}
+                    {tabState.activeTab === 'children' && <RecordTable rows={value.children ?? []} fields={['code', 'name', 'normal_balance', 'is_active']} />}
+                    {tabState.activeTab === 'balance' && (balance.loading ? <LoadingState /> : balance.error ? <ErrorAlert error={balance.error} /> : <RecordTable rows={balance.data ? [balance.data] : []} fields={['opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit', 'balance']} />)}
+                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'debit', 'credit', 'balance_after', 'source_number']} />)}
                 </div>
             </Panel>
         </>

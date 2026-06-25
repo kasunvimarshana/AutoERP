@@ -46,10 +46,6 @@ return [
             'driver' => env('MODULE_AUTH_TOKEN_GUARD_DRIVER', 'module-auth-token'),
             'provider' => 'users',
         ],
-        'platform-api' => [
-            'driver' => env('MODULE_PLATFORM_AUTH_TOKEN_GUARD_DRIVER', 'module-platform-token'),
-            'provider' => 'users',
-        ],
     ],
 
     /*

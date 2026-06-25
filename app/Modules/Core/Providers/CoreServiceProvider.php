@@ -17,7 +17,6 @@ use Modules\Core\Contracts\ExceptionParserInterface;
 use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
@@ -31,7 +30,6 @@ use Modules\Core\Support\LaravelTransactionManager;
 use Modules\Core\Support\LaravelUuidGenerator;
 use Modules\Core\Support\RequestCurrentOrganizationUnitContextAccessor;
 use Modules\Core\Support\RequestCurrentTenantContextAccessor;
-use Modules\Core\Support\TenantExecutionContext;
 use Modules\Core\Support\RequestCurrentUserContextAccessor;
 use Modules\Core\Support\SystemClock;
 
@@ -51,7 +49,6 @@ final class CoreServiceProvider extends ServiceProvider
 
         $this->app->bind(CurrentUserContextAccessorInterface::class, RequestCurrentUserContextAccessor::class);
         $this->app->bind(CurrentTenantContextAccessorInterface::class, RequestCurrentTenantContextAccessor::class);
-        $this->app->scoped(TenantExecutionContextInterface::class, TenantExecutionContext::class);
         $this->app->bind(
             CurrentOrganizationUnitContextAccessorInterface::class,
             RequestCurrentOrganizationUnitContextAccessor::class,

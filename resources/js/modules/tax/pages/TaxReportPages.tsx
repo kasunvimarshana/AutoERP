@@ -33,7 +33,7 @@ export default function TaxReportPages() {
         tax_code: taxCode || undefined,
     }, signal), [dateFrom, dateTo, report, taxCode, taxType]);
 
-    const rows = useMemo(() => result.data?.rows ?? [], [result.data?.rows]);
+    const rows = result.data?.rows ?? [];
     const columns = useMemo<DataColumn<Row>[]>(() => {
         const keys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
         return keys.map((key) => ({

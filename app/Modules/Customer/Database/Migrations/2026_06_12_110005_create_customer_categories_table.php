@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('customer_categories', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('parent_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('customer_categories')->nullOnDelete();
             $table->string('code');
             $table->string('name');
             $table->text('description')->nullable();
@@ -26,16 +26,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'code'], 'customer_categories_tenant_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'customer_categories_tenant_org_idx');
             $table->index('parent_id', 'customer_categories_parent_idx');
-
-            $table->unique(['id', 'tenant_id'], 'customer_categories_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_categories_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['parent_id', 'tenant_id'], 'customer_categories_parent_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('customer_categories')
-                ->restrictOnDelete();
         });
     }
 

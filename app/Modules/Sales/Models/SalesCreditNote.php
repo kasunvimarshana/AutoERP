@@ -6,11 +6,11 @@ namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\Sales\Enums\SalesCreditNoteStatus;
 
-final class SalesCreditNote extends TenantOwnedModel
+final class SalesCreditNote extends CoreModel
 {
     use SoftDeletes;
 

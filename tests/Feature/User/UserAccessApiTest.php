@@ -71,7 +71,7 @@ final class UserAccessApiTest extends TestCase
             'user_id' => $userId,
             'role_id' => $roleId,
         ]);
-        $this->assertDatabaseHas('user_organization_units', [
+        $this->assertDatabaseHas('user_tenants', [
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $branchId,
             'user_id' => $userId,
@@ -406,6 +406,7 @@ final class UserAccessApiTest extends TestCase
     {
         return (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
             'first_name' => $overrides['first_name'] ?? 'Test',
             'last_name' => $overrides['last_name'] ?? 'User',
             'username' => $overrides['username'] ?? null,
@@ -460,13 +461,12 @@ final class UserAccessApiTest extends TestCase
 
     private function assignOrganizationUnit(int $tenantId, int $userId, int $organizationUnitId, bool $default): void
     {
-        DB::table('user_organization_units')->insert([
+        DB::table('user_tenants')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
-            'status' => 'active',
+            'role_id' => null,
             'is_default' => $default,
-            'default_marker' => $default ? 'default' : null,
             'row_version' => 1,
             'created_at' => now(),
             'updated_at' => now(),

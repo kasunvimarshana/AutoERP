@@ -14,8 +14,8 @@ final class UpsertCustomerTaxProfileRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'customer_id' => ['required', 'integer', 'min:1', $this->tenantExists('customers', 'id')],
-            'tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
+            'customer_id' => ['required', 'integer', 'min:1', 'exists:customers,id'],
+            'tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
             'registration_number' => ['nullable', 'string', 'max:255'],
             'exemption_status' => ['required', Rule::in(config('tax.exemption_statuses', []))],
             'active' => ['nullable', 'boolean'],

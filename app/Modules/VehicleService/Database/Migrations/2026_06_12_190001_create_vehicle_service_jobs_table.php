@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('vehicle_service_jobs', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('job_number', 100);
             $table->date('job_date');
             $table->date('expected_delivery_date')->nullable();
-            $table->foreignId('customer_id');
-            $table->foreignId('vehicle_id');
-            $table->foreignId('supervisor_employee_id')->nullable();
+            $table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('supervisor_employee_id')->nullable()->constrained('hr_employees')->nullOnDelete();
             $table->string('supervisor_commission_type', 20)->default('none');
             $table->decimal('supervisor_commission_value', 20, 6)->default('0.000000');
             $table->decimal('supervisor_commission_amount', 20, 6)->default('0.000000');
@@ -45,37 +45,6 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_idx');
             $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_idx');
             $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_service_jobs_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_jobs_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['customer_id', 'tenant_id'], 'vehicle_service_jobs_customer_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('customers')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'vehicle_service_jobs_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['supervisor_employee_id', 'tenant_id'], 'vehicle_service_jobs_supervisor_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'vehicle_service_jobs_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['approved_by', 'tenant_id'], 'vehicle_service_jobs_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['completed_by', 'tenant_id'], 'vehicle_service_jobs_completed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

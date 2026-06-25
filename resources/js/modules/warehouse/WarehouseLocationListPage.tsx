@@ -22,10 +22,10 @@ import { warehouseLocationTypes, type WarehouseLocationSummary, type WarehouseSu
 
 export default function WarehouseLocationListPage() {
     const auth = useAuth();
-    const canCreate = hasWarehousePermission(auth, warehousePermissions.locationsCreate);
-    const canUpdate = hasWarehousePermission(auth, warehousePermissions.locationsUpdate);
-    const canActivate = hasWarehousePermission(auth, warehousePermissions.locationsActivate);
-    const canDeactivate = hasWarehousePermission(auth, warehousePermissions.locationsDeactivate);
+    const canCreate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsCreate);
+    const canUpdate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsUpdate);
+    const canActivate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsActivate);
+    const canDeactivate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsDeactivate);
     const [search, setSearch] = useState('');
     const [warehouse, setWarehouse] = useState<WarehouseSummary | null>(null);
     const [parent, setParent] = useState<WarehouseLocationSummary | null>(null);

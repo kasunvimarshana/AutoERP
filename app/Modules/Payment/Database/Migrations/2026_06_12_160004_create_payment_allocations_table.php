@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('payment_allocations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('payment_id');
-            $table->foreignId('invoice_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('payment_id')->constrained('payments', 'id')->cascadeOnDelete();
+            $table->foreignId('invoice_id')->constrained('invoices', 'id')->cascadeOnDelete();
             $table->decimal('invoice_total', 20, 6);
             $table->decimal('invoice_balance_before', 20, 6);
             $table->decimal('previously_allocated_amount', 20, 6)->default('0');
@@ -31,20 +31,6 @@ return new class extends Migration
 
             $table->index(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_idx');
             $table->index('invoice_id', 'payment_allocations_invoice_idx');
-
-            $table->unique(['id', 'tenant_id'], 'payment_allocations_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_allocations_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['payment_id', 'tenant_id'], 'payment_allocations_payment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('payments')
-                ->cascadeOnDelete();
-            $table->foreign(['invoice_id', 'tenant_id'], 'payment_allocations_invoice_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('invoices')
-                ->cascadeOnDelete();
         });
     }
 

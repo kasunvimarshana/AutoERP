@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('invoice_adjustments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('invoice_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('invoice_id')->constrained('invoices', 'id')->cascadeOnDelete();
             $table->string('source_adjustment_type')->nullable();
             $table->unsignedBigInteger('source_adjustment_id')->nullable();
             $table->string('source_type')->nullable();
@@ -43,16 +43,6 @@ return new class extends Migration
             $table->index('invoice_id', 'invoice_adjustments_invoice_idx');
             $table->index(['source_adjustment_type', 'source_adjustment_id'], 'invoice_adjustments_source_adjustment_idx');
             $table->index(['source_type', 'source_id'], 'invoice_adjustments_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'invoice_adjustments_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_adjustments_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['invoice_id', 'tenant_id'], 'invoice_adjustments_invoice_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('invoices')
-                ->cascadeOnDelete();
         });
     }
 

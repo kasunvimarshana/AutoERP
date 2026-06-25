@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { TestRouter } from '@/test/TestRouter';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { NavigationSection } from '@/app/navigation/navigationTypes';
 import { Sidebar } from './Sidebar';
+
 const sections: NavigationSection[] = [
     {
         id: 'operations',
@@ -31,34 +32,43 @@ const sections: NavigationSection[] = [
         ],
     },
 ];
+
 describe('Sidebar', () => {
     it('keeps only one module expanded and highlights the active child', async () => {
         const user = userEvent.setup();
         render(<SidebarHarness />);
+
         expect(screen.getByRole('link', { name: 'Purchase Orders' })).toHaveAttribute('aria-current', 'page');
         expect(screen.queryByRole('link', { name: 'Sales Orders' })).not.toBeInTheDocument();
+
         await user.click(screen.getByRole('button', { name: 'Sales' }));
+
         expect(screen.queryByRole('link', { name: 'Purchase Orders' })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Sales Orders' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Purchase' })).toHaveAttribute('aria-expanded', 'false');
         expect(screen.getByRole('button', { name: 'Sales' })).toHaveAttribute('aria-expanded', 'true');
     });
+
     it('uses drawer visibility classes and a close backdrop on mobile', async () => {
         const onClose = vi.fn();
         const { rerender } = renderSidebar(false, onClose);
+
         expect(screen.getByLabelText('Application sidebar')).toHaveClass('-translate-x-full');
         expect(screen.queryByRole('button', { name: 'Close navigation' })).toBeInTheDocument();
+
         rerender(sidebarElement(true, onClose));
         expect(screen.getByLabelText('Application sidebar')).toHaveClass('translate-x-0');
+
         const closeButtons = screen.getAllByRole('button', { name: 'Close navigation' });
         await userEvent.click(closeButtons[0]);
         expect(onClose).toHaveBeenCalledOnce();
     });
 });
+
 function SidebarHarness() {
     const [expanded, setExpanded] = useState<string | null>('purchase');
     return (
-        <TestRouter>
+        <MemoryRouter>
             <Sidebar
                 sections={sections}
                 activeItemId="purchase-orders"
@@ -69,21 +79,21 @@ function SidebarHarness() {
                 user={{ id: 1, name: 'Admin User', email: 'admin@example.com' }}
                 tenant={{ id: 1, name: 'AutoERP' }}
                 organizationUnit={{ id: 1, name: 'Main Branch' }}
-                homePath="/dashboard"
-                workspaceLabel="Business workspace"
                 onCloseMobile={() => undefined}
                 onExpandDesktop={() => undefined}
                 onToggleModule={(moduleId) => setExpanded((current) => current === moduleId ? null : moduleId)}
             />
-        </TestRouter>
+        </MemoryRouter>
     );
 }
+
 function renderSidebar(mobileOpen: boolean, onClose: () => void) {
     return render(sidebarElement(mobileOpen, onClose));
 }
+
 function sidebarElement(mobileOpen: boolean, onClose: () => void) {
     return (
-        <TestRouter>
+        <MemoryRouter>
             <Sidebar
                 sections={sections}
                 activeItemId={null}
@@ -94,12 +104,10 @@ function sidebarElement(mobileOpen: boolean, onClose: () => void) {
                 user={null}
                 tenant={null}
                 organizationUnit={null}
-                homePath="/dashboard"
-                workspaceLabel="Business workspace"
                 onCloseMobile={onClose}
                 onExpandDesktop={() => undefined}
                 onToggleModule={() => undefined}
             />
-        </TestRouter>
+        </MemoryRouter>
     );
 }

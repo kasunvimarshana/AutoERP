@@ -6,11 +6,11 @@ namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Enums\CustomerDocumentStatus;
 use Modules\Customer\Enums\CustomerDocumentType;
 
-final class CustomerDocument extends TenantOwnedModel
+final class CustomerDocument extends CoreModel
 {
     use SoftDeletes;
 

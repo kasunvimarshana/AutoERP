@@ -18,7 +18,7 @@ final class EloquentUserRoleRepository extends EloquentRepository implements Use
         parent::__construct($model);
     }
 
-    public function findByTenantUserRole(int $tenantId, int $userId, int $roleId, ?int $excludeId = null): ?DataRecord
+    public function findByTenantUserRole(?int $tenantId, int $userId, int $roleId, ?int $excludeId = null): ?DataRecord
     {
         $query = $this->query()
             ->where('user_id', $userId)
@@ -35,18 +35,19 @@ final class EloquentUserRoleRepository extends EloquentRepository implements Use
         return $model instanceof Model ? $this->toRecord($model) : null;
     }
 
-    public function listRoleSummariesForTenantUser(int $tenantId, int $userId): array
+    public function listRoleSummariesForTenantUser(?int $tenantId, int $userId): array
     {
         $query = DB::table('user_roles')
-            ->join('roles', function ($join): void {
-                $join->on('roles.id', '=', 'user_roles.role_id')
-                    ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
-            })
-            ->where('user_roles.tenant_id', $tenantId)
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
             ->where('user_roles.user_id', $userId)
             ->whereNull('roles.deleted_at')
             ->select(['roles.id', 'roles.name']);
 
+        if ($tenantId === null) {
+            $query->whereNull('user_roles.tenant_id');
+        } else {
+            $query->where('user_roles.tenant_id', $tenantId);
+        }
 
         return $query
             ->orderBy('roles.name')
@@ -59,8 +60,14 @@ final class EloquentUserRoleRepository extends EloquentRepository implements Use
             ->all();
     }
 
-    private function applyTenantScope(Builder $query, int $tenantId): void
+    private function applyTenantScope(Builder $query, ?int $tenantId): void
     {
+        if ($tenantId === null) {
+            $query->whereNull('tenant_id');
+
+            return;
+        }
+
         $query->where('tenant_id', $tenantId);
     }
 }

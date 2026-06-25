@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class PurchaseReturnLine extends TenantOwnedModel
+final class PurchaseReturnLine extends CoreModel
 {
     protected $table = 'purchase_return_lines';
 

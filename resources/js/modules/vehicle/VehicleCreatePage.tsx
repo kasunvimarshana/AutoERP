@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -27,7 +27,7 @@ const tabs = [
 export default function VehicleCreatePage() {
     const navigate = useNavigate();
     const auth = useAuth();
-    const canCreate = hasVehiclePermission(auth, vehiclePermissions.create);
+    const canCreate = hasVehiclePermission(auth.permissions, vehiclePermissions.create);
     const [activeTab, setActiveTab] = useState<CreateTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);
@@ -47,8 +47,8 @@ export default function VehicleCreatePage() {
         vehicle_category_id: category?.id ?? null,
     }), [category, make, model, payload, type]);
     const snapshot = JSON.stringify({ finalPayload, documents: documentsForSnapshot(documents), attributes });
-    const [initialSnapshot] = useState(snapshot);
-    const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot && !submitting);
+    const initialSnapshot = useRef(snapshot);
+    const confirmDiscard = useUnsavedChanges(snapshot !== initialSnapshot.current && !submitting);
 
     if (!canCreate) {
         return (

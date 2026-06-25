@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 
-final class VehicleServiceStatusHistory extends TenantOwnedModel
+final class VehicleServiceStatusHistory extends CoreModel
 {
     protected $table = 'vehicle_service_status_histories';
 

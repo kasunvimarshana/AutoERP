@@ -34,7 +34,7 @@ export default function ItemDetailPage() {
     const requestedTab = tabs.some((entry) => entry.id === searchParams.get('tab')) ? searchParams.get('tab') as Tab : 'summary';
     const item = useApi((signal) => getItem(itemId, signal), [itemId], Number.isFinite(itemId));
     const tab = useOnDemandTab<Tab>(requestedTab);
-    const canEdit = hasItemPermission(auth, itemPermissions.update);
+    const canEdit = hasItemPermission(auth.permissions, itemPermissions.update);
     if (item.loading) return <LoadingState />;
     if (!item.data) return <ErrorAlert error={item.error} />;
 

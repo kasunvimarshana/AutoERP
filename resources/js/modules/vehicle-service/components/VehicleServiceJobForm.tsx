@@ -12,7 +12,6 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
@@ -40,8 +39,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(submitting);
-    const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
     const errorFor = (key: string) => fieldError(error, key);
 
     const searchCustomer = useCallback((params: LookupLoadParams) => {
@@ -79,7 +76,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                 const saved = job
                     ? await updateVehicleServiceJob(job.id, payload())
                     : await createVehicleServiceJob(payload());
-                formGuard.markSaved();
                 navigate(`/vehicle-service/jobs/${saved.id}`);
             } catch (requestError) {
                 setError(toApiError(requestError));
@@ -90,31 +86,30 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             <ErrorAlert error={error} />
             <Panel title="Service job">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { formGuard.markDirty(); setCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
+                    <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
                     <GenericLookupSelect label="Vehicle" value={vehicle} onChange={(value) => {
-                        formGuard.markDirty();
                         setVehicle(value);
                         if (value?.odometer_reading && !form.odometer_reading) {
-                            updateForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
+                            setForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
                         }
                     }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} disabled={!customer} loadOnOpen={Boolean(customer)} minSearchLength={0} />
-                    <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
-                    <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
-                    <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
-                    <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => updateForm({ ...form, odometer_reading: event.target.value })} />
-                    <Input label="Fuel level" value={form.fuel_level} error={errorFor('fuel_level')} onChange={(event) => updateForm({ ...form, fuel_level: event.target.value })} />
+                    <GenericLookupSelect label="Supervisor" value={supervisor} onChange={setSupervisor} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
+                    <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => setForm({ ...form, job_date: event.target.value })} />
+                    <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setForm({ ...form, expected_delivery_date: event.target.value })} />
+                    <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => setForm({ ...form, odometer_reading: event.target.value })} />
+                    <Input label="Fuel level" value={form.fuel_level} error={errorFor('fuel_level')} onChange={(event) => setForm({ ...form, fuel_level: event.target.value })} />
                     <Select label="Priority" value={form.priority} options={[
                         { value: 'low', label: 'Low' },
                         { value: 'normal', label: 'Normal' },
                         { value: 'high', label: 'High' },
                         { value: 'urgent', label: 'Urgent' },
-                    ]} onChange={(event) => updateForm({ ...form, priority: event.target.value })} />
+                    ]} onChange={(event) => setForm({ ...form, priority: event.target.value })} />
                     <Select label="Supervisor commission" value={form.supervisor_commission_type} options={[
                         { value: 'none', label: 'None' },
                         { value: 'fixed', label: 'Fixed' },
                         { value: 'percentage', label: 'Percentage' },
-                    ]} onChange={(event) => updateForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
-                    <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })} />
+                    ]} onChange={(event) => setForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
+                    <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => setForm({ ...form, supervisor_commission_value: event.target.value })} />
                 </div>
                 {vehicle && (
                     <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
@@ -126,8 +121,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     </div>
                 )}
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <Textarea label="Customer complaint" value={form.customer_complaint} error={errorFor('customer_complaint')} onChange={(event) => updateForm({ ...form, customer_complaint: event.target.value })} />
-                    <Textarea label="Notes" value={form.notes} error={errorFor('notes')} onChange={(event) => updateForm({ ...form, notes: event.target.value })} />
+                    <Textarea label="Customer complaint" value={form.customer_complaint} error={errorFor('customer_complaint')} onChange={(event) => setForm({ ...form, customer_complaint: event.target.value })} />
+                    <Textarea label="Notes" value={form.notes} error={errorFor('notes')} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                 </div>
             </Panel>
             <div className="flex justify-end gap-2">

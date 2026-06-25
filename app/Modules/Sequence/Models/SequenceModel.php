@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Sequence\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class SequenceModel extends TenantOwnedModel
+final class SequenceModel extends CoreModel
 {
     protected $table = 'sequences';
 

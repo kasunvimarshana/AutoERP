@@ -303,7 +303,6 @@ final class FinanceSeeder extends Seeder
 
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
-                        'tenant_id' => $tenantId,
                         'posting_profile_id' => $profile->getKey(),
                         'line_key' => $lineKey,
                     ],

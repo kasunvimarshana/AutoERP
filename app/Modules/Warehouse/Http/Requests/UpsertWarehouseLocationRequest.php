@@ -16,6 +16,7 @@ final class UpsertWarehouseLocationRequest extends TenantScopedRequest
     public function rules(): array
     {
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
+        $tenantId = $this->tenantId();
 
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
@@ -23,20 +24,20 @@ final class UpsertWarehouseLocationRequest extends TenantScopedRequest
                 'nullable',
                 'integer',
                 'min:1',
-                $this->tenantExists('organization_units', 'id'),
+                Rule::exists('organization_units', 'id')->where('tenant_id', $tenantId),
             ],
             'row_version' => [$this->isMethod('post') ? 'nullable' : 'required', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'warehouse_id' => array_merge($required, [
                 'integer',
                 'min:1',
-                $this->tenantExists('warehouses', 'id'),
+                Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId),
             ]),
             'parent_id' => [
                 'nullable',
                 'integer',
                 'min:1',
-                $this->tenantExists('warehouse_locations', 'id'),
+                Rule::exists('warehouse_locations', 'id')->where('tenant_id', $tenantId),
             ],
             'name' => array_merge($required, [
                 'string',

@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\Sales\Enums\SalesQuotationStatus;
 
-final class SalesQuotation extends TenantOwnedModel
+final class SalesQuotation extends CoreModel
 {
     use SoftDeletes;
 

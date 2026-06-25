@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toApiError } from '@/shared/api/apiError';
 import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
@@ -13,31 +13,27 @@ export function SupplierItemVariantSelect({ item, value, onChange, error }: {
     const [options, setOptions] = useState<NamedResource[]>([]);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
-    const emitChange = useEffectEvent(onChange);
-    const getSelectedValue = useEffectEvent(() => value);
-    const itemId = item?.id ?? null;
+    const onChangeRef = useRef(onChange);
+    const valueRef = useRef(value);
+    onChangeRef.current = onChange;
+    valueRef.current = value;
 
     useEffect(() => {
-        if (itemId === null) {
-            queueMicrotask(() => {
-                setOptions([]);
-                setMessage('');
-                if (getSelectedValue()) emitChange(null);
-            });
+        if (!item) {
+            setOptions([]);
+            setMessage('');
+            if (valueRef.current) onChangeRef.current(null);
             return;
         }
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (!controller.signal.aborted) setLoading(true);
-        });
-        listItemVariantsForLookup(Number(itemId), controller.signal)
+        setLoading(true);
+        listItemVariantsForLookup(Number(item.id), controller.signal)
             .then((rows) => {
                 if (controller.signal.aborted) return;
                 setOptions(rows);
                 setMessage('');
-                const selected = getSelectedValue();
-                if (selected && !rows.some((row) => Number(row.id) === Number(selected.id))) {
-                    emitChange(null);
+                if (valueRef.current && !rows.some((row) => Number(row.id) === Number(valueRef.current?.id))) {
+                    onChangeRef.current(null);
                 }
             })
             .catch((requestError) => {
@@ -47,7 +43,7 @@ export function SupplierItemVariantSelect({ item, value, onChange, error }: {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [itemId]);
+    }, [item?.id]);
 
     return <div>
         <Select

@@ -6,9 +6,9 @@ namespace Modules\UOM\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class UomConversionModel extends TenantOwnedModel
+final class UomConversionModel extends CoreModel
 {
     use SoftDeletes;
 

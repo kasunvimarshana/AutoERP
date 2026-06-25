@@ -13,9 +13,13 @@ return new class extends Migration
         Schema::create('inventory_cost_adjustment_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('inventory_cost_adjustment_id');
-            $table->foreignId('valuation_layer_id');
+            $table->foreign('inventory_cost_adjustment_id', 'inventory_cost_adj_lines_header_fk')
+                ->references('id')
+                ->on('inventory_cost_adjustments')
+                ->restrictOnDelete();
+            $table->foreignId('valuation_layer_id')->constrained('inventory_valuation_layers')->restrictOnDelete();
             $table->decimal('adjustment_amount', 20, 6);
             $table->decimal('remaining_quantity', 20, 6)->default('0.000000');
             $table->decimal('unit_cost_before', 20, 6)->default('0.000000');
@@ -27,20 +31,6 @@ return new class extends Migration
 
             $table->index('inventory_cost_adjustment_id', 'inventory_cost_adj_lines_header_idx');
             $table->index('valuation_layer_id', 'inventory_cost_adj_lines_layer_idx');
-
-            $table->unique(['id', 'tenant_id'], 'inventory_cost_adjustment_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_cost_adjustment_lines_organization_uni_d10a6a53_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['inventory_cost_adjustment_id', 'tenant_id'], 'inventory_cost_adj_lines_header_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_cost_adjustments')
-                ->restrictOnDelete();
-            $table->foreign(['valuation_layer_id', 'tenant_id'], 'inventory_cost_adjustment_lines_valuation_layer_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_valuation_layers')
-                ->restrictOnDelete();
         });
     }
 

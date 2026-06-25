@@ -5,8 +5,6 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { Pagination } from '@/shared/components/Pagination';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
 import {
@@ -19,9 +17,7 @@ import {
 import type { TenantDocument } from '../tenantTypes';
 
 export function TenantDocumentsPanel({ canManage }: { canManage: boolean }) {
-    const [page, setPage] = useState(1);
-    const documents = useApi((signal) => listTenantDocuments({ page, per_page: 20 }, signal), [page], true, false);
-    const items = documents.data?.data ?? [];
+    const documents = useApi((signal) => listTenantDocuments(signal), []);
     const [editing, setEditing] = useState<TenantDocument | null>(null);
     const [name, setName] = useState('');
     const [type, setType] = useState('');
@@ -46,11 +42,10 @@ export function TenantDocumentsPanel({ canManage }: { canManage: boolean }) {
             if (file) payload.append('file', file);
             if (editing) {
                 payload.append('expected_version', String(editing.row_version));
-                await updateTenantDocument(editing.id, payload);
-                documents.reload();
+                const updated = await updateTenantDocument(editing.id, payload);
+                documents.setData((documents.data ?? []).map((document) => document.id === updated.id ? updated : document));
             } else {
-                await createTenantDocument(payload);
-                documents.reload();
+                documents.setData([...(documents.data ?? []), await createTenantDocument(payload)]);
             }
             reset();
         } catch (requestError: unknown) { setError(toApiError(requestError)); }
@@ -62,7 +57,7 @@ export function TenantDocumentsPanel({ canManage }: { canManage: boolean }) {
         setBusy(removeTarget.id); setError(null);
         try {
             await deleteTenantDocument(removeTarget);
-            documents.reload();
+            documents.setData((documents.data ?? []).filter((document) => document.id !== removeTarget.id));
             if (editing?.id === removeTarget.id) reset();
             setRemoveTarget(null);
         } catch (requestError: unknown) { setError(toApiError(requestError)); }
@@ -93,15 +88,14 @@ export function TenantDocumentsPanel({ canManage }: { canManage: boolean }) {
                 </form>
             </Panel>}
             <div className="space-y-3">
-                {items.map((document) => <Panel key={document.id}>
+                {(documents.data ?? []).map((document) => <Panel key={document.id}>
                     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                        <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{document.name}</p><StatusBadge status={document.scanned_at ? 'scanned' : 'pending_scan'} /></div><p className="mt-1 text-sm text-slate-500">{document.document_type ?? 'General document'} · {document.original_filename} · {formatBytes(document.size_bytes)}</p>{document.scanned_at ? <p className="mt-1 text-xs text-slate-500">Scanned by {document.scan_engine ?? 'configured scanner'}</p> : null}</div>
+                        <div><p className="font-semibold text-slate-900">{document.name}</p><p className="mt-1 text-sm text-slate-500">{document.document_type ?? 'General document'} · {document.original_filename} · {formatBytes(document.size_bytes)}</p></div>
                         <div className="flex flex-wrap gap-2"><Button variant="secondary" loading={busy === document.id} onClick={() => void download(document)}>Download</Button>{canManage && <><Button variant="secondary" onClick={() => edit(document)}>Edit</Button><Button variant="danger" onClick={() => setRemoveTarget(document)}>Remove</Button></>}</div>
                     </div>
                 </Panel>)}
-                {items.length === 0 && <Panel><p className="text-sm text-slate-500">No private tenant documents have been uploaded.</p></Panel>}
+                {(documents.data ?? []).length === 0 && <Panel><p className="text-sm text-slate-500">No private tenant documents have been uploaded.</p></Panel>}
             </div>
-            <Pagination meta={documents.data?.meta} onPageChange={setPage} />
             <ConfirmDialog open={removeTarget !== null} title="Remove document?" message="The database record and private stored file will be removed." confirmLabel="Remove document" loading={removeTarget !== null && busy === removeTarget.id} onCancel={() => setRemoveTarget(null)} onConfirm={() => void remove()} />
         </div>
     );

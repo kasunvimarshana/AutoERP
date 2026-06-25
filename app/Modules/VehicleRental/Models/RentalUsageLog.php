@@ -6,13 +6,13 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalUsageLog extends TenantOwnedModel
+final class RentalUsageLog extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_usage_logs';

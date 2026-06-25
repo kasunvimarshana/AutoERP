@@ -20,8 +20,8 @@ export default function RoleCreatePage() {
     const [form, setForm] = useState<RoleFormState>(() => emptyRoleForm());
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const canCreate = hasAccessPermission(auth, accessPermissions.rolesCreate);
-    const canAssignPermissions = hasAccessPermission(auth, accessPermissions.rolesAssignPermissions);
+    const canCreate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesCreate);
+    const canAssignPermissions = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesAssignPermissions);
     const permissions = useApi((signal) => accessApi.listPermissions({ per_page: 100 }, signal), []);
     const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(emptyRoleForm()), [form]);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);

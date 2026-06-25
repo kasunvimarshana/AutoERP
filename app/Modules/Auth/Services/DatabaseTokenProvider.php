@@ -8,8 +8,6 @@ use Illuminate\Support\Str;
 use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\TokenIssueData;
 use Modules\Auth\DTOs\TokenRefreshData;
-use Modules\Auth\Models\AuthPlatformSessionModel;
-use LogicException;
 use Modules\Auth\Repositories\AuthAccessTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthRefreshTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthSessionRepositoryInterface;
@@ -21,7 +19,6 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         private readonly AuthAccessTokenRepositoryInterface $accessTokens,
         private readonly AuthRefreshTokenRepositoryInterface $refreshTokens,
         private readonly AuthSessionRepositoryInterface $sessions,
-        private readonly AuthPlatformSessionModel $platformSessions,
         private readonly PasswordHasherInterface $passwordHasher,
     ) {}
 
@@ -30,14 +27,6 @@ final class DatabaseTokenProvider implements TokenProviderInterface
      */
     public function issue(TokenIssueData $data): array
     {
-        $isPlatform = $data->tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM;
-        if ($isPlatform !== ($data->platformSessionId !== null)) {
-            throw new LogicException('Platform tokens require a platform session and tenant tokens must not reference one.');
-        }
-        if ($isPlatform && ! $this->platformSessionUsable($data->platformSessionId, $data->userId, false)) {
-            throw new LogicException('Platform session is not active.');
-        }
-
         $accessKey = Str::random(48);
         $accessSecret = Str::random(72);
         $refreshKey = Str::random(48);
@@ -54,13 +43,11 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'client_id' => $data->clientId,
             'identity_id' => $data->identityId,
             'session_id' => $data->sessionId,
-            'platform_session_id' => $data->platformSessionId,
             'user_id' => $data->userId,
             'token_key' => $accessKey,
             'token_hash' => $this->passwordHasher->hash($accessSecret),
             'scopes' => $data->scopes,
             'grant_type' => $data->grantType,
-            'token_scope' => $data->tokenScope,
             'status' => 'active',
             'issued_at' => $issuedAt,
             'expires_at' => $accessExpiresAt,
@@ -72,15 +59,12 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'access_token_id' => (int) $access->id(),
-            'provider_id' => $data->providerId,
             'client_id' => $data->clientId,
             'identity_id' => $data->identityId,
             'session_id' => $data->sessionId,
-            'platform_session_id' => $data->platformSessionId,
             'user_id' => $data->userId,
             'refresh_key' => $refreshKey,
             'refresh_hash' => $this->passwordHasher->hash($refreshSecret),
-            'token_scope' => $data->tokenScope,
             'status' => 'active',
             'issued_at' => $issuedAt,
             'expires_at' => $refreshExpiresAt,
@@ -109,21 +93,8 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $existing = $this->refreshTokens->findActiveByRefreshKey($refreshKey);
-        if (
-            $existing === null
-            || (string) $existing->get('token_scope', '') !== $data->tokenScope
-            || ! $this->tenantMatches($existing->get('tenant_id'), $data->tenantId, $data->tokenScope)
-        ) {
-            return null;
-        }
-        if (
-            $data->tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM
-            && ! $this->platformSessionUsable(
-                is_numeric($existing->get('platform_session_id')) ? (int) $existing->get('platform_session_id') : null,
-                is_numeric($existing->get('user_id')) ? (int) $existing->get('user_id') : null,
-            )
-        ) {
+        $existing = $this->refreshTokens->findActiveByRefreshKey($data->tenantId, $refreshKey);
+        if ($existing === null) {
             return null;
         }
 
@@ -163,37 +134,22 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $rowVersion = (int) $existing->get('row_version', 1);
-        if (! $this->refreshTokens->rotateIfActive((int) $existing->id(), $rowVersion)) {
-            return null;
-        }
-
-        $accessToken = $this->accessTokens->findById((int) $existing->get('access_token_id'));
-        if ($accessToken === null
-            || (string) $accessToken->get('token_scope', '') !== $data->tokenScope
-            || (int) $accessToken->get('user_id', 0) !== (int) $existing->get('user_id', 0)
-        ) {
-            return null;
-        }
-
-        $existingScopes = $this->normalizeScopes($accessToken->get('scopes'));
-        $requestedScopes = $this->normalizeScopes($data->scopes);
-        $scopes = $requestedScopes === []
-            ? $existingScopes
-            : array_values(array_intersect($existingScopes, $requestedScopes));
+        $this->refreshTokens->update($existing->id(), [
+            'status' => 'revoked',
+            'rotated' => true,
+            'rotated_at' => now(),
+            'row_version' => ((int) $existing->get('row_version', 1)) + 1,
+        ]);
 
         return $this->issue(TokenIssueData::fromArray([
             'tenant_id' => $existing->get('tenant_id'),
             'organization_unit_id' => $existing->get('organization_unit_id'),
-            'provider_id' => $existing->get('provider_id'),
             'client_id' => $existing->get('client_id'),
             'identity_id' => $existing->get('identity_id'),
             'session_id' => $existing->get('session_id'),
-            'platform_session_id' => $existing->get('platform_session_id'),
             'user_id' => $existing->get('user_id'),
-            'token_scope' => $existing->get('token_scope', 'tenant'),
             'grant_type' => 'refresh_token',
-            'scopes' => $scopes,
+            'scopes' => $data->scopes,
             'access_token_ttl_seconds' => $data->accessTokenTtlSeconds,
             'refresh_token_ttl_seconds' => $data->refreshTokenTtlSeconds,
             'metadata' => $existing->get('metadata'),
@@ -210,21 +166,12 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return null;
         }
 
-        $record = $this->accessTokens->findActiveByTokenKey($tokenKey);
-        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
+        $record = $this->accessTokens->findActiveByTokenKey($tenantId, $tokenKey);
+        if ($record === null) {
             return null;
         }
 
         if (! $this->passwordHasher->verify($tokenSecret, (string) $record->get('token_hash', ''))) {
-            return null;
-        }
-        if (
-            (string) $record->get('token_scope', '') === \Modules\Auth\Constants\AuthTokenScope::PLATFORM
-            && ! $this->platformSessionUsable(
-                is_numeric($record->get('platform_session_id')) ? (int) $record->get('platform_session_id') : null,
-                is_numeric($record->get('user_id')) ? (int) $record->get('user_id') : null,
-            )
-        ) {
             return null;
         }
 
@@ -248,8 +195,8 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             return false;
         }
 
-        $record = $this->accessTokens->findActiveByTokenKey($tokenKey);
-        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
+        $record = $this->accessTokens->findActiveByTokenKey($tenantId, $tokenKey);
+        if ($record === null) {
             return false;
         }
 
@@ -266,109 +213,10 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         return true;
     }
 
-    public function revokeRefreshToken(string $plainRefreshToken, ?int $tenantId = null): bool
-    {
-        [$refreshKey, $refreshSecret] = $this->splitToken($plainRefreshToken);
-        if ($refreshKey === null || $refreshSecret === null) {
-            return false;
-        }
-
-        $record = $this->refreshTokens->findActiveByRefreshKey($refreshKey);
-        if ($record === null || ! $this->tenantMatchesForOptionalValidation($record->get('tenant_id'), $tenantId)) {
-            return false;
-        }
-
-        if (! $this->passwordHasher->verify($refreshSecret, (string) $record->get('refresh_hash', ''))) {
-            return false;
-        }
-
-        $this->refreshTokens->update($record->id(), [
-            'status' => 'revoked',
-            'revoked_at' => now(),
-            'row_version' => ((int) $record->get('row_version', 1)) + 1,
-        ]);
-
-        return true;
-    }
-
     public function revokeSessionTokens(int $sessionId, ?int $tenantId = null): void
     {
         $this->accessTokens->revokeBySessionId($sessionId, $tenantId);
         $this->refreshTokens->revokeBySessionId($sessionId, $tenantId);
-    }
-
-    private function tenantMatches(mixed $recordTenantId, ?int $expectedTenantId, string $tokenScope): bool
-    {
-        if ($tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM) {
-            return $recordTenantId === null && $expectedTenantId === null;
-        }
-
-        return $expectedTenantId !== null
-            && is_numeric($recordTenantId)
-            && (int) $recordTenantId === $expectedTenantId;
-    }
-
-    private function tenantMatchesForOptionalValidation(mixed $recordTenantId, ?int $expectedTenantId): bool
-    {
-        if ($expectedTenantId === null) {
-            return true;
-        }
-
-        return is_numeric($recordTenantId) && (int) $recordTenantId === $expectedTenantId;
-    }
-
-    private function platformSessionUsable(?int $sessionId, ?int $userId, bool $touch = true): bool
-    {
-        if ($sessionId === null || $sessionId < 1 || $userId === null || $userId < 1) {
-            return false;
-        }
-
-        $session = $this->platformSessions->newQuery()
-            ->whereKey($sessionId)
-            ->where('user_id', $userId)
-            ->where('status', 'active')
-            ->first();
-        if (! $session instanceof AuthPlatformSessionModel) {
-            return false;
-        }
-
-        $expiresAt = $session->getAttribute('expires_at');
-        if ($expiresAt !== null && now()->greaterThanOrEqualTo($expiresAt)) {
-            $session->forceFill([
-                'status' => 'expired',
-                'row_version' => ((int) $session->getAttribute('row_version')) + 1,
-            ])->save();
-
-            return false;
-        }
-
-        if ($touch) {
-            $session->forceFill(['last_activity_at' => now()])->save();
-        }
-
-        return true;
-    }
-
-    /** @return list<string> */
-    private function normalizeScopes(mixed $scopes): array
-    {
-        if (! is_array($scopes)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($scopes as $scope) {
-            if (! is_string($scope)) {
-                continue;
-            }
-
-            $scope = trim($scope);
-            if ($scope !== '') {
-                $normalized[$scope] = $scope;
-            }
-        }
-
-        return array_values($normalized);
     }
 
     /**

@@ -1,5 +1,3 @@
-import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
-
 export const warehousePermissions = {
     warehousesView: 'warehouse.view',
     warehousesCreate: 'warehouse.create',
@@ -17,6 +15,6 @@ export const warehousePermissions = {
     locationsManageDefaults: 'warehouse.locations.defaults.manage',
 } as const;
 
-export function hasWarehousePermission(subject: AccessSubject, permission: string): boolean {
-    return hasPermission(subject, permission);
+export function hasWarehousePermission(permissions: string[], permission: string): boolean {
+    return permissions.length === 0 || permissions.includes(permission);
 }

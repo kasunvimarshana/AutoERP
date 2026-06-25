@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Supplier\Enums\SupplierStatus;
 
-final class SupplierStatusHistory extends TenantOwnedModel
+final class SupplierStatusHistory extends CoreModel
 {
     protected $table = 'supplier_status_histories';
 

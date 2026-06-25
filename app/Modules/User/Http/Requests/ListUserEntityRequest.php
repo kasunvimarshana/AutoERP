@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\User\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Requests\Concerns\AuthorizesUserPermission;
 
-final class ListUserEntityRequest extends TenantScopedRequest
+final class ListUserEntityRequest extends FormRequest
 {
     use AuthorizesUserPermission;
 

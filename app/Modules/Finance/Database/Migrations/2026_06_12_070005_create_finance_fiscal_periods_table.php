@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('finance_fiscal_periods', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('fiscal_year_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('fiscal_year_id')->constrained('finance_fiscal_years', 'id')->cascadeOnDelete();
             $table->string('name');
             $table->unsignedSmallInteger('period_number');
             $table->date('start_date');
@@ -30,16 +30,6 @@ return new class extends Migration
             );
             $table->index('fiscal_year_id', 'finance_periods_year_idx');
             $table->index('status', 'finance_periods_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'finance_fiscal_periods_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_fiscal_periods_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_fiscal_periods_fiscal_year_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_years')
-                ->cascadeOnDelete();
         });
     }
 

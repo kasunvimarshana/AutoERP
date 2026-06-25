@@ -1,6 +1,5 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/modules/auth/AuthProvider";
-import { hasPermission } from "@/modules/auth/accessControl";
 import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
 
 const items = [
@@ -94,7 +93,9 @@ const items = [
 export function RentalModuleNav() {
     const auth = useAuth();
     const visible = items.filter((item) =>
-        item.permissions.some((permission) => hasPermission(auth, permission)),
+        item.permissions.some((permission) =>
+            auth.permissions.includes(permission),
+        ),
     );
 
     return (

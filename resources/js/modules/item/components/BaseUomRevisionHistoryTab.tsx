@@ -4,7 +4,6 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { listBaseUomRevisions } from '../itemApi';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 
 export default function BaseUomRevisionHistoryTab({ itemId, refreshKey = 0 }: { itemId: number; refreshKey?: number }) {
     const revisions = useApi((signal) => listBaseUomRevisions(itemId, signal), [itemId, refreshKey]);
@@ -23,7 +22,7 @@ export default function BaseUomRevisionHistoryTab({ itemId, refreshKey = 0 }: { 
                         <tbody className="divide-y divide-slate-100">
                             {revisions.data.map((revision) => (
                                 <tr key={revision.id}>
-                                    <td className="px-3 py-2">{formatBusinessDateTime(revision.effective_at)}</td>
+                                    <td className="px-3 py-2">{new Date(revision.effective_at).toLocaleString()}</td>
                                     <td className="px-3 py-2 font-semibold">{revision.old_base_uom?.code ?? '-'} to {revision.new_base_uom?.code ?? '-'}</td>
                                     <td className="px-3 py-2 font-mono">{revision.conversion_factor}</td>
                                     <td className="px-3 py-2">{revision.reason || '-'}</td>

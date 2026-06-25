@@ -138,6 +138,7 @@ final class BooleanQueryFilterTest extends TestCase
         $now = now();
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Warehouse',
             'last_name' => 'Filter',
             'email' => 'warehouse-filter-'.Str::lower($suffix).'@example.test',

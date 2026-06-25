@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class WarehouseModel extends TenantOwnedModel
+final class WarehouseModel extends CoreModel
 {
     use SoftDeletes;
 

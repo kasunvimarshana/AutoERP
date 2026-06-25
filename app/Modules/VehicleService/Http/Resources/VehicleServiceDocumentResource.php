@@ -14,9 +14,7 @@ final class VehicleServiceDocumentResource extends JsonResource
         return [
             'id' => (int) $this->getKey(),
             'document_type' => $this->document_type,
-            'original_filename' => $this->original_filename,
-            'mime_type' => $this->mime_type,
-            'size_bytes' => (int) $this->size_bytes,
+            'file_path' => $this->file_path,
             'description' => $this->description,
             'uploaded_by' => $this->uploaded_by,
             'created_at' => $this->created_at?->toISOString(),

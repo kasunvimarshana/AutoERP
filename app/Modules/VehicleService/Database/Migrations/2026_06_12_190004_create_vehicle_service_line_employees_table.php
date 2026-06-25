@@ -13,10 +13,14 @@ return new class extends Migration
         Schema::create('vehicle_service_line_employees', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('vehicle_service_job_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('vehicle_service_job_id')->constrained('vehicle_service_jobs')->cascadeOnDelete();
             $table->foreignId('vehicle_service_job_line_id');
-            $table->foreignId('employee_id');
+            $table->foreign('vehicle_service_job_line_id', 'vehicle_service_line_employees_job_line_fk')
+                ->references('id')
+                ->on('vehicle_service_job_lines')
+                ->cascadeOnDelete();
+            $table->foreignId('employee_id')->constrained('hr_employees')->restrictOnDelete();
             $table->string('role_type', 30);
             $table->decimal('assigned_hours', 20, 6)->default('0.000000');
             $table->decimal('rate', 20, 6)->default('0.000000');
@@ -33,24 +37,6 @@ return new class extends Migration
                 'vehicle_service_line_employees_assignment_uk',
             );
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_line_employees_tenant_org_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_service_line_employees_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_line_employees_organization_unit_6c5ed7af_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_line_employees_vehicle_service_j_ad8bb866_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_service_jobs')
-                ->cascadeOnDelete();
-            $table->foreign(['vehicle_service_job_line_id', 'tenant_id'], 'vehicle_service_line_employees_job_line_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_service_job_lines')
-                ->cascadeOnDelete();
-            $table->foreign(['employee_id', 'tenant_id'], 'vehicle_service_line_employees_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
         });
     }
 

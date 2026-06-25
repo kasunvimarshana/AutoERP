@@ -6,7 +6,6 @@ namespace Modules\User\Repositories;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Repositories\EloquentRepository;
@@ -14,42 +13,9 @@ use Modules\User\Models\UserModel;
 
 final class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
 {
-    public function __construct(
-        UserModel $model,
-        private readonly TenantExecutionContextInterface $executionContext,
-    ) {
+    public function __construct(UserModel $model)
+    {
         parent::__construct($model);
-    }
-
-    public function findActivePlatformOperatorCredentials(string $email): ?DataRecord
-    {
-        return $this->executionContext->runAsControlPlane(function () use ($email): ?DataRecord {
-            $model = $this->query()
-                ->whereNull('tenant_id')
-                ->where('is_platform_operator', true)
-                ->where('status', 'active')
-                ->where('platform_login_email', strtolower(trim($email)))
-                ->first();
-
-            if (! $model instanceof UserModel) {
-                return null;
-            }
-
-            return new DataRecord([
-                'id' => (int) $model->getKey(),
-                'first_name' => $model->getAttribute('first_name'),
-                'last_name' => $model->getAttribute('last_name'),
-                'email' => $model->getAttribute('platform_login_email'),
-                'password_hash' => $model->getAttribute('password'),
-                'status' => $model->getAttribute('status'),
-                'is_platform_operator' => true,
-            ]);
-        });
-    }
-
-    public function countByTenant(int $tenantId): int
-    {
-        return $this->query()->where('tenant_id', $tenantId)->count();
     }
 
     public function findByTenantAndEmail(?int $tenantId, string $email, ?int $excludeId = null): ?DataRecord
@@ -129,16 +95,20 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         }
 
         if ($organizationUnitId !== null) {
-            $query->whereExists(function ($subquery) use ($organizationUnitId, $tenantId): void {
-                $subquery->selectRaw('1')
-                    ->from('user_organization_units')
-                    ->whereColumn('user_organization_units.user_id', 'users.id')
-                    ->where('user_organization_units.organization_unit_id', $organizationUnitId)
-                    ->where('user_organization_units.status', 'active');
+            $query->where(function (Builder $builder) use ($organizationUnitId, $tenantId): void {
+                $builder->where('organization_unit_id', $organizationUnitId)
+                    ->orWhereExists(function ($subquery) use ($organizationUnitId, $tenantId): void {
+                        $subquery->selectRaw('1')
+                            ->from('user_tenants')
+                            ->whereColumn('user_tenants.user_id', 'users.id')
+                            ->where('user_tenants.organization_unit_id', $organizationUnitId);
 
-                if ($tenantId !== null) {
-                    $subquery->where('user_organization_units.tenant_id', $tenantId);
-                }
+                        if ($tenantId === null) {
+                            $subquery->whereNull('user_tenants.tenant_id');
+                        } else {
+                            $subquery->where('user_tenants.tenant_id', $tenantId);
+                        }
+                    });
             });
         }
 

@@ -6,7 +6,6 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -32,7 +31,6 @@ const statuses = [
 ].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 export default function PurchaseOrderListPage() {
-    const { confirm, confirmDialog } = useConfirmDialog();
     const auth = useAuth();
     const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
@@ -56,12 +54,7 @@ export default function PurchaseOrderListPage() {
 
     const canCreate = hasPurchasePermission(auth.permissions, purchasePermissions.ordersCreate);
     const runAction = async (order: PurchaseOrder, action: 'submit' | 'approve' | 'cancel' | 'close') => {
-        if (!await confirm({
-            title: `${action[0].toUpperCase()}${action.slice(1)} purchase order`,
-            message: `Confirm ${action} for ${order.purchase_order_number ?? 'this purchase order'}?`,
-            confirmLabel: action[0].toUpperCase() + action.slice(1),
-            danger: action === 'cancel',
-        })) return;
+        if (!window.confirm(`Confirm ${action} for ${order.purchase_order_number ?? 'this purchase order'}?`)) return;
         setBusyId(order.id);
         setActionError(null);
         try {
@@ -118,7 +111,6 @@ export default function PurchaseOrderListPage() {
             <ErrorAlert error={actionError ?? result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
-            {confirmDialog}
         </>
     );
 }

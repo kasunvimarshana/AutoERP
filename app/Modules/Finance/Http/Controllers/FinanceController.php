@@ -349,12 +349,12 @@ final class FinanceController
         $organizationUnitId = $request->organizationUnitId();
 
         $types = FinanceAccountType::query()
-            ->where('tenant_id', $tenantId)
+            ->where(fn (Builder $query): Builder => $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get(['id', 'code', 'name', 'normal_balance', 'statement_type']);
         $categories = FinanceAccountCategory::query()
-            ->where('tenant_id', $tenantId)
+            ->where(fn (Builder $query): Builder => $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get(['id', 'account_type_id', 'code', 'name']);

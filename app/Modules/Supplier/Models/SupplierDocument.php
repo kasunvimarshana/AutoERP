@@ -6,11 +6,11 @@ namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Supplier\Enums\SupplierDocumentStatus;
 use Modules\Supplier\Enums\SupplierDocumentType;
 
-final class SupplierDocument extends TenantOwnedModel
+final class SupplierDocument extends CoreModel
 {
     use SoftDeletes;
 

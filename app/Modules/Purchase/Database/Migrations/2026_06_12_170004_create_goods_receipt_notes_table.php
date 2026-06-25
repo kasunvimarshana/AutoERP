@@ -13,12 +13,12 @@ return new class extends Migration
         Schema::create('goods_receipt_notes', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('purchase_order_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders')->nullOnDelete();
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
-            $table->foreignId('warehouse_id');
-            $table->foreignId('warehouse_location_id')->nullable();
+            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->string('grn_number');
             $table->date('received_date');
             $table->string('status')->default('draft');
@@ -43,37 +43,6 @@ return new class extends Migration
             $table->index('status', 'goods_receipt_notes_status_idx');
             $table->index('received_date', 'goods_receipt_notes_date_idx');
             $table->index(['tenant_id', 'organization_unit_id', 'status'], 'goods_receipt_notes_scope_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'goods_receipt_notes_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'goods_receipt_notes_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['purchase_order_id', 'tenant_id'], 'goods_receipt_notes_purchase_order_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('purchase_orders')
-                ->restrictOnDelete();
-            $table->foreign(['warehouse_id', 'tenant_id'], 'goods_receipt_notes_warehouse_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('warehouses')
-                ->restrictOnDelete();
-            $table->foreign(['warehouse_location_id', 'tenant_id'], 'goods_receipt_notes_warehouse_location_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('warehouse_locations')
-                ->restrictOnDelete();
-
-            $table->foreign(['received_by', 'tenant_id'], 'goods_receipt_notes_received_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['posted_by', 'tenant_id'], 'goods_receipt_notes_posted_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['reversed_by', 'tenant_id'], 'goods_receipt_notes_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
 
     }

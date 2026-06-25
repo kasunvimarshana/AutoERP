@@ -8,13 +8,11 @@ import { Breadcrumbs } from './Breadcrumbs';
 export function AppHeader({
     collapsed,
     match,
-    mode,
     onToggleCollapsed,
     onOpenMobile,
 }: {
     collapsed: boolean;
     match: NavigationMatch | null;
-    mode: 'tenant' | 'platform';
     onToggleCollapsed: () => void;
     onOpenMobile: () => void;
 }) {
@@ -50,12 +48,8 @@ export function AppHeader({
 
             <div className="hidden min-w-0 items-center gap-3 md:flex">
                 <div className="min-w-0 text-right">
-                    <p className="truncate text-sm font-semibold text-slate-800">
-                        {mode === 'platform' ? 'Platform Administration' : auth.organizationUnit?.name ?? auth.tenant?.name ?? 'Tenant workspace'}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                        {mode === 'platform' ? 'SaaS control plane' : auth.tenant?.name ?? 'Tenant context'}
-                    </p>
+                    <p className="truncate text-sm font-semibold text-slate-800">{auth.organizationUnit?.name ?? auth.tenant?.name ?? 'Current workspace'}</p>
+                    <p className="truncate text-xs text-slate-500">{auth.tenant?.name ?? 'Tenant context'}</p>
                 </div>
                 <span className="h-8 w-px bg-slate-200" aria-hidden="true" />
             </div>

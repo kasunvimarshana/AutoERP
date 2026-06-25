@@ -4,7 +4,6 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { getEmployee, updateEmployee } from './hrApi';
 import { EmployeeForm } from './components/EmployeeForm';
 import type { Employee, EmployeePayload } from './hrTypes';
@@ -16,7 +15,6 @@ export default function EmployeeEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(submitting);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -43,14 +41,12 @@ export default function EmployeeEditPage() {
                 initial={employee}
                 submitting={submitting}
                 error={error}
-                onDirty={formGuard.markDirty}
                 onSubmit={async (payload: EmployeePayload) => {
                     if (submitting) return;
                     setSubmitting(true);
                     setError(null);
                     try {
                         await updateEmployee(id, payload);
-                        formGuard.markSaved();
                         navigate(`/hr/employees/${id}`);
                     } catch (requestError) {
                         setError(toApiError(requestError));

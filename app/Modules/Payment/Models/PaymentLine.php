@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class PaymentLine extends TenantOwnedModel
+final class PaymentLine extends CoreModel
 {
     protected $table = 'payment_lines';
 

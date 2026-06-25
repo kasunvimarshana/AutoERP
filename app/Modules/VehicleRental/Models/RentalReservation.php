@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -19,7 +19,7 @@ use Modules\VehicleRental\Enums\RentalMode;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalReservation extends TenantOwnedModel
+final class RentalReservation extends CoreModel
 {
     use ScopesRentalContext;
     use SoftDeletes;

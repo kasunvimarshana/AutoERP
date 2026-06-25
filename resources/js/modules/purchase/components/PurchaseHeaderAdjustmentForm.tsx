@@ -17,6 +17,18 @@ export interface HeaderAdjustmentAllocationLine {
     label: string;
 }
 
+const fallbackAdjustmentTypes = [
+    'discount',
+    'tax',
+    'freight',
+    'charge',
+    'credit_note',
+    'debit_note',
+    'withholding',
+    'rounding',
+    'other',
+].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+
 const calculationOptions = [
     { value: 'fixed', label: 'Fixed' },
     { value: 'percentage', label: 'Percentage' },
@@ -54,7 +66,9 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, allo
     };
     const formError = (field: keyof AdjustmentFormErrors) => errors[field] ?? errorFor(field);
     const selectedCatalogue = catalogue.find((entry) => entry.type === draft.adjustment_type);
-    const adjustmentTypes = catalogue.map((entry) => ({ value: entry.type, label: entry.default_name }));
+    const adjustmentTypes = catalogue.length
+        ? catalogue.map((entry) => ({ value: entry.type, label: entry.default_name }))
+        : fallbackAdjustmentTypes;
     const effectChoices = selectedCatalogue?.allowed_effects.length
         ? selectedCatalogue.allowed_effects.map((value) => ({ value, label: value === 'increase' ? 'Increase' : 'Decrease' }))
         : effectOptions;
@@ -105,7 +119,7 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, allo
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Input label="Name" value={draft.name} error={formError('name')} onChange={(event) => set('name', event.target.value)} />
-                    <Select label="Type" value={draft.adjustment_type} options={adjustmentTypes} disabled={catalogue.length === 0} error={errorFor('adjustment_type')} onChange={(event) => applyCatalogue(event.target.value)} />
+                    <Select label="Type" value={draft.adjustment_type} options={adjustmentTypes} error={errorFor('adjustment_type')} onChange={(event) => applyCatalogue(event.target.value)} />
                     <Select label="Effect" value={draft.effect} options={effectChoices} disabled={effectReadonly} error={errorFor('effect')} onChange={(event) => set('effect', event.target.value as 'increase' | 'decrease')} />
                     <Select label="Calculation" value={draft.calculation_type} options={calculationOptions} error={errorFor('calculation_type')} onChange={(event) => set('calculation_type', event.target.value as 'fixed' | 'percentage')} />
                     {draft.calculation_type === 'percentage' && <Select label="Base" value={draft.calculation_base} options={calculationBases} error={errorFor('calculation_base')} onChange={(event) => set('calculation_base', event.target.value as EditableHeaderAdjustment['calculation_base'])} />}

@@ -32,10 +32,6 @@ final class AuditLogSummaryResource extends JsonResource
                 'id' => (string) $record->require('subject_id'),
                 'reference' => $record->get('subject_reference'),
             ],
-            'tenant' => [
-                'id' => $record->get('tenant_id'),
-                'name' => $record->get('tenant_name'),
-            ],
             'organization_unit' => [
                 'id' => $record->get('organization_unit_id'),
                 'name' => $record->get('organization_unit_name'),

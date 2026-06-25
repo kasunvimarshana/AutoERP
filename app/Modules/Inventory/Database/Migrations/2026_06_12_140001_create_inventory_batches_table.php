@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('inventory_batches', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('item_id');
-            $table->foreignId('item_variant_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
             $table->string('batch_number', 120);
             $table->string('lot_number', 120)->nullable();
             $table->date('manufacture_date')->nullable();
@@ -32,20 +32,6 @@ return new class extends Migration
             $table->index('batch_number', 'inventory_batches_batch_idx');
             $table->index('lot_number', 'inventory_batches_lot_idx');
             $table->index('status', 'inventory_batches_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'inventory_batches_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_batches_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'inventory_batches_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->restrictOnDelete();
-            $table->foreign(['item_variant_id', 'tenant_id'], 'inventory_batches_item_variant_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('item_variants')
-                ->restrictOnDelete();
         });
     }
 

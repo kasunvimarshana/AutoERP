@@ -57,10 +57,7 @@ final class AuditSeeder extends Seeder
                         && $existing->deleted_at === null;
 
                     if (! $isCurrent) {
-                        DB::table('permissions')
-                            ->where('tenant_id', (int) $tenantId)
-                            ->where('id', $existing->id)
-                            ->update([
+                        DB::table('permissions')->where('id', $existing->id)->update([
                             ...$catalogueValues,
                             'row_version' => max(1, (int) $existing->row_version) + 1,
                             'updated_at' => now(),

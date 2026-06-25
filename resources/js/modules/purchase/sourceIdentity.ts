@@ -1,7 +1,10 @@
-import { parsePositiveInteger } from '@/shared/utils/routeParams';
-
 export function normalizeSourceId(id: number | string | null | undefined): number | null {
-    return parsePositiveInteger(id);
+    if (id === null || id === undefined) return null;
+
+    const numericId = typeof id === 'number' ? id : Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return null;
+
+    return numericId;
 }
 
 export function sourceKey(sourceType: string, sourceId: number | string | null | undefined): string | null {

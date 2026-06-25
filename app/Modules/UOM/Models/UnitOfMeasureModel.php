@@ -6,9 +6,9 @@ namespace Modules\UOM\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class UnitOfMeasureModel extends TenantOwnedModel
+final class UnitOfMeasureModel extends CoreModel
 {
     use SoftDeletes;
 

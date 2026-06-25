@@ -63,9 +63,9 @@ Tables: `countries`, `currencies`, `languages`, `timezones`, `global_configurati
 
 ### Tenant
 
-Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_documents_table`, `create_tenant_domains_table`, `create_tenant_storage_cleanup_jobs_table`, `create_tenant_event_outbox_table`.
+Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_documents_table`, `create_tenant_domains_table`.
 
-Tables: `tenant_plans`, `tenants`, `tenant_documents`, `tenant_domains`, `tenant_storage_cleanup_jobs`, `tenant_event_outbox`.
+Tables: `tenant_plans`, `tenants`, `tenant_documents`, `tenant_domains`.
 
 ### OrganizationUnit
 
@@ -75,9 +75,9 @@ Tables: `organization_unit_types`, `organization_units`, `organization_unit_docu
 
 ### User
 
-Migrations: `create_users_table`, `create_roles_table`, `create_permissions_table`, `create_role_permissions_table`, `create_user_roles_table`, `create_user_permissions_table`, `create_user_organization_units_table`, `create_user_documents_table`, `create_user_devices_table`.
+Migrations: `create_users_table`, `create_roles_table`, `create_permissions_table`, `create_role_permissions_table`, `create_user_roles_table`, `create_user_permissions_table`, `create_user_tenants_table`, `create_user_documents_table`, `create_user_devices_table`.
 
-Tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`.
+Tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_tenants`, `user_documents`, `user_devices`.
 
 ### Auth
 

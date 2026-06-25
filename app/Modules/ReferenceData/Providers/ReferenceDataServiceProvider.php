@@ -7,10 +7,6 @@ namespace Modules\ReferenceData\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
 use Modules\ReferenceData\Services\ReferenceValueLookup;
-use Modules\ReferenceData\Services\TenantBaseCurrencyReadiness;
-use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
-use Modules\ReferenceData\Constants\ReferenceDataPermission;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ReferenceDataServiceProvider extends ServiceProvider
 {
@@ -20,17 +16,10 @@ final class ReferenceDataServiceProvider extends ServiceProvider
             ReferenceValueLookupInterface::class,
             ReferenceValueLookup::class,
         );
-        $this->app->singleton(
-            TenantBaseCurrencyReadinessInterface::class,
-            TenantBaseCurrencyReadiness::class,
-        );
     }
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('reference-data', ReferenceDataPermission::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace Modules\User\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
-use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\User\Constants\UserPermission;
+use Modules\User\Constants\UserTenantStatus;
 
-final class UserAccessResolver implements PlatformOperatorCheckerInterface, TenantUserAccessCheckerInterface, OrganizationUnitUserAccessCheckerInterface
+final class UserAccessResolver implements PlatformOperatorCheckerInterface
 {
+    private const TENANT_PLATFORM_PERMISSION_PREFIX = 'tenant.platform.';
+
+    private const CONFIGURATION_PLATFORM_PERMISSION_PREFIX = 'configuration.platform_defaults.';
+
     /**
      * @var array<string, bool>
      */
@@ -37,66 +40,6 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
      * @var array<string, list<array{id:int,name:string,module:string|null,description:string|null}>>
      */
     private array $catalogueCache = [];
-
-    public function isActiveTenantUser(int $userId, int $tenantId): bool
-    {
-        if ($userId < 1 || $tenantId < 1) {
-            return false;
-        }
-
-        return DB::table('users')
-            ->where('id', $userId)
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->where('is_platform_operator', false)
-            ->whereNull('deleted_at')
-            ->exists();
-    }
-
-    /** @return list<int> */
-    public function defaultOrganizationUnitIds(int $userId, int $tenantId): array
-    {
-        if (! $this->isActiveTenantUser($userId, $tenantId)) {
-            return [];
-        }
-
-        return DB::table('user_organization_units')
-            ->join('organization_units', function ($join): void {
-                $join->on('organization_units.id', '=', 'user_organization_units.organization_unit_id')
-                    ->on('organization_units.tenant_id', '=', 'user_organization_units.tenant_id');
-            })
-            ->where('user_organization_units.user_id', $userId)
-            ->where('user_organization_units.tenant_id', $tenantId)
-            ->where('user_organization_units.status', 'active')
-            ->where('user_organization_units.default_marker', 'default')
-            ->where('organization_units.is_active', true)
-            ->whereNull('organization_units.deleted_at')
-            ->orderBy('user_organization_units.id')
-            ->pluck('user_organization_units.organization_unit_id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->values()
-            ->all();
-    }
-
-    public function canAccessOrganizationUnit(int $userId, int $tenantId, int $organizationUnitId): bool
-    {
-        if ($organizationUnitId < 1 || ! $this->isActiveTenantUser($userId, $tenantId)) {
-            return false;
-        }
-
-        return DB::table('user_organization_units')
-            ->join('organization_units', function ($join): void {
-                $join->on('organization_units.id', '=', 'user_organization_units.organization_unit_id')
-                    ->on('organization_units.tenant_id', '=', 'user_organization_units.tenant_id');
-            })
-            ->where('user_organization_units.user_id', $userId)
-            ->where('user_organization_units.tenant_id', $tenantId)
-            ->where('user_organization_units.organization_unit_id', $organizationUnitId)
-            ->where('user_organization_units.status', 'active')
-            ->where('organization_units.is_active', true)
-            ->whereNull('organization_units.deleted_at')
-            ->exists();
-    }
 
     public function can(int $userId, int $tenantId, string $permission): bool
     {
@@ -124,14 +67,18 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
                 $join->on('roles.id', '=', 'user_roles.role_id')
                     ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
             })
-            ->join('users', function ($join): void {
-                $join->on('users.id', '=', 'user_roles.user_id')
-                    ->on('users.tenant_id', '=', 'user_roles.tenant_id');
-            })
+            ->join('users', 'users.id', '=', 'user_roles.user_id')
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('users.status', 'active')
-            ->where('users.tenant_id', $tenantId)
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')
@@ -152,8 +99,6 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
 
         $this->platformOperatorCache[$userId] = DB::table('users')
             ->where('id', $userId)
-            ->whereNull('tenant_id')
-            ->whereNotNull('platform_login_email')
             ->where('status', 'active')
             ->where('is_platform_operator', true)
             ->whereNull('deleted_at')
@@ -186,7 +131,7 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
         if (! $this->isPlatformOperator($userId)) {
             $names = array_values(array_filter(
                 $names,
-                static fn (string $name): bool => ! str_starts_with($name, 'tenant.platform.'),
+                static fn (string $name): bool => ! self::isPlatformPermission($name),
             ));
         }
 
@@ -215,10 +160,7 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
 
         return array_values(array_filter(
             $permissions,
-            static fn (array $permission): bool => ! str_starts_with(
-                $permission['name'],
-                'tenant.platform.',
-            ),
+            static fn (array $permission): bool => ! self::isPlatformPermission($permission['name']),
         ));
     }
 
@@ -375,18 +317,19 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
     private function directPermissions(int $userId, int $tenantId): array
     {
         return DB::table('user_permissions')
-            ->join('users', function ($join): void {
-                $join->on('users.id', '=', 'user_permissions.user_id')
-                    ->on('users.tenant_id', '=', 'user_permissions.tenant_id');
-            })
-            ->join('permissions', function ($join): void {
-                $join->on('permissions.id', '=', 'user_permissions.permission_id')
-                    ->on('permissions.tenant_id', '=', 'user_permissions.tenant_id');
-            })
+            ->join('users', 'users.id', '=', 'user_permissions.user_id')
+            ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
             ->where('user_permissions.tenant_id', $tenantId)
             ->where('user_permissions.user_id', $userId)
             ->where('users.status', 'active')
-            ->where('users.tenant_id', $tenantId)
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('permissions.tenant_id', $tenantId)
             ->whereNull('users.deleted_at')
             ->whereNull('permissions.deleted_at')
@@ -409,10 +352,7 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
     private function rolePermissions(int $userId, int $tenantId): array
     {
         return DB::table('role_permissions')
-            ->join('permissions', function ($join): void {
-                $join->on('permissions.id', '=', 'role_permissions.permission_id')
-                    ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
-            })
+            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
             ->join('roles', function ($join): void {
                 $join->on('roles.id', '=', 'role_permissions.role_id')
                     ->on('roles.tenant_id', '=', 'role_permissions.tenant_id');
@@ -421,14 +361,18 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
                 $join->on('user_roles.role_id', '=', 'roles.id')
                     ->on('user_roles.tenant_id', '=', 'roles.tenant_id');
             })
-            ->join('users', function ($join): void {
-                $join->on('users.id', '=', 'user_roles.user_id')
-                    ->on('users.tenant_id', '=', 'user_roles.tenant_id');
-            })
+            ->join('users', 'users.id', '=', 'user_roles.user_id')
             ->where('role_permissions.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('users.status', 'active')
-            ->where('users.tenant_id', $tenantId)
+            ->whereExists(function ($membership) use ($tenantId, $userId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.user_id', $userId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('permissions.tenant_id', $tenantId)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')
@@ -450,4 +394,11 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
     {
         return $userId.':'.$tenantId;
     }
+
+    private static function isPlatformPermission(string $permission): bool
+    {
+        return str_starts_with($permission, self::TENANT_PLATFORM_PERMISSION_PREFIX)
+            || str_starts_with($permission, self::CONFIGURATION_PLATFORM_PERMISSION_PREFIX);
+    }
+
 }

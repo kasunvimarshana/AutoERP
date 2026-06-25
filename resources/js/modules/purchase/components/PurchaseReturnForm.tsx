@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -21,7 +20,6 @@ const initialSourceParams: Array<InitialSourceParamDefinition<'goods_receipt_not
 ];
 
 export function PurchaseReturnForm() {
-    const { confirm, confirmDialog } = useConfirmDialog();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [source, setSourceState] = useState<NamedResource | null>(null);
@@ -119,7 +117,7 @@ export function PurchaseReturnForm() {
     }, [cancelSourceRequest, setSource]);
 
     const processInitialSource = useCallback(async (command: InitialSourceCommand<'goods_receipt_note'>) => {
-        await loadGoodsReceiptSource(command.sourceId, 'Selected goods receipt');
+        await loadGoodsReceiptSource(command.sourceId, `Goods Receipt #${command.sourceId}`);
     }, [loadGoodsReceiptSource]);
 
     useInitialSourceParam({
@@ -155,12 +153,10 @@ export function PurchaseReturnForm() {
             reason: line.reason || undefined,
         })),
     });
-    const changeSource = async (next: NamedResource | null) => {
-        if (source?.id && next?.id !== source.id && hasEnteredLines && !await confirm({
-            title: 'Change goods receipt?',
-            message: 'Changing the goods receipt clears all entered return quantities.',
-            confirmLabel: 'Change goods receipt',
-        })) return;
+    const changeSource = (next: NamedResource | null) => {
+        if (source?.id && next?.id !== source.id && hasEnteredLines && !window.confirm('Changing the goods receipt clears entered return quantities.')) {
+            return;
+        }
 
         if (!next?.id) {
             clearSource();
@@ -197,7 +193,7 @@ export function PurchaseReturnForm() {
             <ErrorAlert error={error} />
             <Panel title="Referenced source">
                 <div className="grid gap-4 md:grid-cols-4">
-                    <GoodsReceiptLookupSelect eligibility="returnable" value={source} onChange={(value) => void changeSource(value)} excludeIds={excludedGoodsReceiptIds} error={errorFor('source_id')} />
+                    <GoodsReceiptLookupSelect eligibility="returnable" value={source} onChange={changeSource} excludeIds={excludedGoodsReceiptIds} error={errorFor('source_id')} />
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Warehouse</span><br />{warehouse?.name ?? '-'}</div>
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Supplier</span><br />{supplier?.name ?? '-'}</div>
@@ -213,7 +209,6 @@ export function PurchaseReturnForm() {
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/returns')}>Cancel</Button>
                 <Button type="submit" loading={submitting} disabled={sourceLoading}>Save Draft</Button>
             </div>
-            {confirmDialog}
         </form>
     );
 }
@@ -222,7 +217,7 @@ function goodsReceiptLabel(grn: GoodsReceipt): NamedResource {
     return {
         id: grn.id,
         code: grn.grn_number,
-        name: grn.grn_number ?? 'Goods receipt number unavailable',
+        name: grn.grn_number ?? `Goods Receipt #${grn.id}`,
     };
 }
 

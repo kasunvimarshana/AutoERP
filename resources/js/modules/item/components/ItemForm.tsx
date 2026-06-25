@@ -1,8 +1,6 @@
 import type { ApiError } from '@/shared/api/apiError';
 import { fieldError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
-import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
@@ -106,19 +104,13 @@ export function ItemForm({
                         <ReadOnlyFact label="Tax basis" value="Exclusive" />
                     </div>
                 </div>
-                {taxLookups.error && (
-                    <div className="md:col-span-2 xl:col-span-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
-                        <ErrorAlert error={taxLookups.error} />
-                        <Button type="button" variant="secondary" onClick={taxLookups.reload}>Retry tax groups</Button>
-                    </div>
-                )}
                 <Select
                     label="Default tax group"
                     value={value.default_tax_group_id ?? ''}
                     onChange={(event) => set('default_tax_group_id', event.target.value ? Number(event.target.value) : null)}
                     options={taxGroupOptions}
                     error={fieldError(error, 'default_tax_group_id') ?? fieldError(error, 'item.default_tax_group_id')}
-                    disabled={taxLookups.loading || Boolean(taxLookups.error)}
+                    disabled={taxLookups.loading}
                 />
                 <Select
                     label="Purchase tax group"
@@ -126,7 +118,7 @@ export function ItemForm({
                     onChange={(event) => set('purchase_tax_group_id', event.target.value ? Number(event.target.value) : null)}
                     options={taxGroupOptions}
                     error={fieldError(error, 'purchase_tax_group_id') ?? fieldError(error, 'item.purchase_tax_group_id')}
-                    disabled={taxLookups.loading || Boolean(taxLookups.error)}
+                    disabled={taxLookups.loading}
                 />
                 <Select
                     label="Sales tax group"
@@ -134,7 +126,7 @@ export function ItemForm({
                     onChange={(event) => set('sales_tax_group_id', event.target.value ? Number(event.target.value) : null)}
                     options={taxGroupOptions}
                     error={fieldError(error, 'sales_tax_group_id') ?? fieldError(error, 'item.sales_tax_group_id')}
-                    disabled={taxLookups.loading || Boolean(taxLookups.error)}
+                    disabled={taxLookups.loading}
                 />
             </div>
             <div className="mt-4">

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('hr_employee_status_histories', function (Blueprint $table): void {
             $table->id();
             $this->scope($table, 'hr_emp_status_history');
-            $table->foreignId('employee_id');
+            $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('old_status')->nullable();
             $table->string('new_status');
             $table->text('reason')->nullable();
@@ -21,12 +21,6 @@ return new class extends Migration
             $table->timestamp('changed_at');
             $table->timestamps();
             $table->index(['tenant_id', 'employee_id', 'changed_at'], 'hr_employee_status_history_idx');
-
-            $table->unique(['id', 'tenant_id'], 'hr_employee_status_histories_id_tenant_uk');
-            $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_status_histories_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->cascadeOnDelete();
         });
     }
 
@@ -43,9 +37,9 @@ return new class extends Migration
             ->on('tenants')
             ->cascadeOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
-            ->references(['id', 'tenant_id'])
+        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
+            ->references('id')
             ->on('organization_units')
-            ->restrictOnDelete();
+            ->nullOnDelete();
     }
 };

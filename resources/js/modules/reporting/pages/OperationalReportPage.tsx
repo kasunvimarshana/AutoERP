@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -60,14 +60,8 @@ const LINE_SOURCES = [
     ['combo_child', 'Combo child'],
 ] as const;
 
-const INITIAL_OPERATIONAL_REPORT_PARAMS: OperationalReportParams = { page: 1, per_page: 25 };
-
-export default function OperationalReportPage(props: OperationalReportPageProps) {
-    return <OperationalReportContent key={props.reportKey} {...props} />;
-}
-
-function OperationalReportContent({ reportKey, kind }: OperationalReportPageProps) {
-    const initialParams = INITIAL_OPERATIONAL_REPORT_PARAMS;
+export default function OperationalReportPage({ reportKey, kind }: OperationalReportPageProps) {
+    const initialParams = useMemo<OperationalReportParams>(() => ({ page: 1, per_page: 25 }), [reportKey]);
     const [params, setParams] = useState<OperationalReportParams>(initialParams);
     const [draft, setDraft] = useState<OperationalReportParams>(initialParams);
     const [result, setResult] = useState<OperationalReportResult | null>(null);
@@ -81,12 +75,21 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
     const [department, setDepartment] = useState<HrDepartment | null>(null);
 
     useEffect(() => {
+        setParams(initialParams);
+        setDraft(initialParams);
+        setResult(null);
+        setSupplier(null);
+        setItem(null);
+        setCustomer(null);
+        setVehicle(null);
+        setEmployee(null);
+        setDepartment(null);
+    }, [initialParams]);
+
+    useEffect(() => {
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (controller.signal.aborted) return;
-            setLoading(true);
-            setError(null);
-        });
+        setLoading(true);
+        setError(null);
         runOperationalReport(reportKey, params, controller.signal)
             .then((data) => {
                 if (!controller.signal.aborted) setResult(data);

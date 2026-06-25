@@ -15,7 +15,7 @@ import { ItemBrandForm } from './components/ItemBrandForm';
 export default function ItemBrandEditPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
-    const canManage = hasItemPermission(auth, itemPermissions.manageBrands);
+    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageBrands);
     const navigate = useNavigate();
     const brand = useApi((signal) => getItemBrand(id, signal), [id], Number.isFinite(id));
     const [submitting, setSubmitting] = useState(false);

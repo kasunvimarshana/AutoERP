@@ -14,13 +14,13 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('first_name');
             $table->string('last_name')->nullable();
             $table->string('username', 100)->nullable();
             $table->string('email');
-            $table->string('platform_login_email')->nullable()->comment('Unique login identifier for tenant-independent platform operator identities');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
@@ -36,9 +36,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['id', 'tenant_id'], 'users_id_tenant_uk');
             $table->unique(['tenant_id', 'email'], 'users_email_uk');
-            $table->unique('platform_login_email', 'users_platform_login_email_uk');
             $table->unique(['tenant_id', 'username'], 'users_tenant_username_uk');
         });
     }

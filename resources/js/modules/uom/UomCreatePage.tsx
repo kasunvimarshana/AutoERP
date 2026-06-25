@@ -4,7 +4,6 @@ import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
@@ -31,7 +30,6 @@ export default function UomCreatePage() {
     const [form, setForm] = useState<UomPayload>(initialForm);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
-    const formGuard = useMutationFormGuard(saving);
 
     return (
         <>
@@ -44,7 +42,6 @@ export default function UomCreatePage() {
                     setError(null);
                     try {
                         const created = await createUom(form);
-                        formGuard.markSaved();
                         navigate(`/uoms/${created.id}`);
                     } catch (nextError) {
                         setError(nextError instanceof ApiError ? nextError : new ApiError('Unable to save UOM.', null));
@@ -52,7 +49,7 @@ export default function UomCreatePage() {
                         setSaving(false);
                     }
                 }}>
-                    <UomFields form={form} setForm={(next) => { formGuard.markDirty(); setForm(next); }} error={error} />
+                    <UomFields form={form} setForm={setForm} error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => navigate('/uoms')}>Cancel</Button>
                         <Button type="submit" loading={saving}>Create UOM</Button>

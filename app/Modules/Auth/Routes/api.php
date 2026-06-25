@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Auth\Http\Controllers\AuthController;
-use Modules\Auth\Http\Controllers\PlatformAuthController;
-use Modules\Auth\Http\Controllers\PlatformMfaController;
-use Modules\Auth\Http\Controllers\PlatformSecurityController;
-use Modules\User\Constants\PlatformPermission;
-use Modules\Auth\Http\Controllers\InitialAdministratorInvitationController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -45,7 +40,9 @@ $registerAuthRoutes = static function (string $prefix, string $namePrefix) use (
         Route::post('login', [AuthController::class, 'login'])->name('login');
         Route::post('register', [AuthController::class, 'register'])->name('register');
         Route::post('refresh', [AuthController::class, 'refreshToken'])->name('refresh');
+        Route::post('token/refresh', [AuthController::class, 'refreshToken'])->name('token.refresh');
         Route::post('token/exchange', [AuthController::class, 'exchangeAuthorizationCode'])->name('token.exchange');
+        Route::post('validate', [AuthController::class, 'validateToken'])->name('validate');
         Route::post('token/validate', [AuthController::class, 'validateToken'])->name('token.validate');
         Route::match(['get', 'post'], 'sso/callback', [AuthController::class, 'ssoCallback'])
             ->middleware([$ssoContextMiddleware])
@@ -80,74 +77,5 @@ $registerAuthRoutes = static function (string $prefix, string $namePrefix) use (
     });
 };
 
+$registerAuthRoutes('api/auth', 'auth.');
 $registerAuthRoutes('api/v1/auth', 'api.v1.auth.');
-
-$platformHostMiddleware = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
-Route::prefix('api/v1/auth/initial-administrator')
-    ->middleware(['api', $platformHostMiddleware, 'throttle:10,1'])
-    ->name('api.v1.auth.initial-administrator.')
-    ->group(function (): void {
-        Route::post('inspect', [InitialAdministratorInvitationController::class, 'inspect'])->name('inspect');
-        Route::post('accept', [InitialAdministratorInvitationController::class, 'accept'])->name('accept');
-    });
-
-$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
-$platformOperatorMiddleware = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
-
-Route::prefix('api/v1/platform/auth')
-    ->middleware(['api', $platformHostMiddleware])
-    ->name('api.v1.platform.auth.')
-    ->group(function () use (
-        $platformGuard,
-        $currentUserMiddleware,
-        $tokenValidationMiddleware,
-        $platformOperatorMiddleware,
-    ): void {
-        Route::post('login', [PlatformAuthController::class, 'login'])
-            ->middleware('throttle:5,1')
-            ->name('login');
-        Route::post('mfa/enrollment', [PlatformMfaController::class, 'start'])
-            ->middleware('throttle:5,1')
-            ->name('mfa.enrollment.start');
-        Route::post('mfa/enrollment/confirm', [PlatformMfaController::class, 'confirm'])
-            ->middleware('throttle:5,1')
-            ->name('mfa.enrollment.confirm');
-        Route::post('refresh', [PlatformAuthController::class, 'refresh'])
-            ->middleware('throttle:20,1')
-            ->name('refresh');
-
-        Route::middleware([
-            'throttle:60,1',
-            $tokenValidationMiddleware,
-            'auth:'.$platformGuard,
-            $currentUserMiddleware,
-            $platformOperatorMiddleware,
-        ])->group(function (): void {
-            Route::get('me', [PlatformAuthController::class, 'me'])->name('me');
-            Route::post('logout', [PlatformAuthController::class, 'logout'])->name('logout');
-            Route::get('sessions', [PlatformSecurityController::class, 'sessions'])
-                ->middleware('platform.permission:'.PlatformPermission::SESSIONS_VIEW)
-                ->name('sessions.index');
-            Route::delete('sessions/{session}', [PlatformSecurityController::class, 'revoke'])
-                ->middleware([
-                    (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
-                    'platform.permission:'.PlatformPermission::SESSIONS_MANAGE,
-                ])
-                ->whereUuid('session')
-                ->name('sessions.revoke');
-            Route::delete('operators/{operator}/sessions', [PlatformSecurityController::class, 'revokeOperatorSessions'])
-                ->middleware([
-                    (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
-                    'platform.permission:'.PlatformPermission::SESSIONS_MANAGE,
-                ])
-                ->whereNumber('operator')
-                ->name('operators.sessions.revoke');
-            Route::post('operators/{operator}/mfa/reset', [PlatformSecurityController::class, 'resetMfa'])
-                ->middleware([
-                    (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
-                    'platform.permission:'.PlatformPermission::MFA_MANAGE,
-                ])
-                ->whereNumber('operator')
-                ->name('operators.mfa.reset');
-        });
-    });

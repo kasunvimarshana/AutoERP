@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalUsageEvent extends TenantOwnedModel
+final class RentalUsageEvent extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_usage_events';

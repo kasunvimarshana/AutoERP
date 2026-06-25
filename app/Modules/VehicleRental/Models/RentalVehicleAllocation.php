@@ -7,14 +7,14 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalVehicleSourceType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalVehicleAllocation extends TenantOwnedModel
+final class RentalVehicleAllocation extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_vehicle_allocations';

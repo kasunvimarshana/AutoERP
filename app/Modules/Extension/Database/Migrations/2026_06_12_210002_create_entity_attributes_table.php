@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('entity_type')->comment('the entity class (e.g., Document, Product, Party)');
@@ -25,12 +25,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'entity_type', 'entity_id', 'attribute_key'], 'entity_attributes_type_id_key_idx');
-
-            $table->unique(['id', 'tenant_id'], 'entity_attributes_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'entity_attributes_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

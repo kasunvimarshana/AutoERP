@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventoryStockStateChange extends TenantOwnedModel
+final class InventoryStockStateChange extends CoreModel
 {
     protected $table = 'inventory_stock_state_changes';
 

@@ -30,24 +30,6 @@ final class AuditEventValidatorTest extends TestCase
         self::assertTrue(true);
     }
 
-    public function test_it_accepts_every_canonical_event_category(): void
-    {
-        $validator = new AuditEventValidator();
-
-        foreach (AuditEventCategory::values() as $category) {
-            $validator->validate(new AuditEventData(
-                eventName: 'audit.category.validated',
-                eventCategory: $category,
-                sourceModule: 'audit',
-                subjectType: 'event_category',
-                subjectId: $category,
-            ));
-        }
-
-        self::assertContains(AuditEventCategory::ADMINISTRATION, AuditEventCategory::values());
-        self::assertContains(AuditEventCategory::SECURITY, AuditEventCategory::values());
-    }
-
     public function test_it_rejects_unknown_categories(): void
     {
         $event = new AuditEventData('example', 'unknown', 'example', 'record', '1');

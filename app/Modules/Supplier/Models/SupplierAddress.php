@@ -6,10 +6,10 @@ namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Supplier\Enums\SupplierAddressType;
 
-final class SupplierAddress extends TenantOwnedModel
+final class SupplierAddress extends CoreModel
 {
     use SoftDeletes;
 

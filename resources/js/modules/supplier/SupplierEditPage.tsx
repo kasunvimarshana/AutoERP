@@ -5,7 +5,6 @@ import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import { getSupplier, updateSupplier } from './supplierApi';
 import type { SupplierPayload } from './supplierTypes';
@@ -19,7 +18,6 @@ export default function SupplierEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(submitting);
     useEffect(() => {
         const controller = new AbortController();
         getSupplier(supplierId, controller.signal).then((supplier) => {
@@ -34,9 +32,9 @@ export default function SupplierEditPage() {
     async function save() {
         if (!form) return;
         setSubmitting(true); setError(null);
-        try { const saved = await updateSupplier(supplierId, form); formGuard.markSaved(); navigate(`/suppliers/${saved.id}`); }
+        try { const saved = await updateSupplier(supplierId, form); navigate(`/suppliers/${saved.id}`); }
         catch (requestError) { setError(toApiError(requestError)); }
         finally { setSubmitting(false); }
     }
-    return <><ContentHeader title="Edit supplier" description="Basic supplier profile only; owned relations remain on-demand in detail tabs." /><ErrorAlert error={error} /><form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}><SupplierForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} currency={currency} onCurrencyChange={(next) => { formGuard.markDirty(); setCurrency(next); }} error={error} /><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save supplier</Button></div></form></>;
+    return <><ContentHeader title="Edit supplier" description="Basic supplier profile only; owned relations remain on-demand in detail tabs." /><ErrorAlert error={error} /><form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}><SupplierForm value={form} onChange={setForm} currency={currency} onCurrencyChange={setCurrency} error={error} /><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save supplier</Button></div></form></>;
 }

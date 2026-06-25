@@ -7,10 +7,10 @@ namespace Modules\OrganizationUnit\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class OrganizationUnitTypeModel extends TenantOwnedModel
+final class OrganizationUnitTypeModel extends CoreModel
 {
     use SoftDeletes;
 

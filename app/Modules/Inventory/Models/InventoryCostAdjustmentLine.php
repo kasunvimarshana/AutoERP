@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class InventoryCostAdjustmentLine extends TenantOwnedModel
+final class InventoryCostAdjustmentLine extends CoreModel
 {
     protected $table = 'inventory_cost_adjustment_lines';
 

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('hr_employee_rates', function (Blueprint $table): void {
             $table->id();
             $this->scope($table, 'hr_emp_rates');
-            $table->foreignId('employee_id');
+            $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
             $table->string('rate_type');
             $table->decimal('amount', 20, 6);
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
@@ -23,12 +23,6 @@ return new class extends Migration
             $table->timestamps();
             $table->index(['tenant_id', 'employee_id', 'rate_type'], 'hr_employee_rates_lookup_idx');
             $table->index(['effective_from', 'effective_to'], 'hr_employee_rates_dates_idx');
-
-            $table->unique(['id', 'tenant_id'], 'hr_employee_rates_id_tenant_uk');
-            $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_rates_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->cascadeOnDelete();
         });
     }
 
@@ -45,9 +39,9 @@ return new class extends Migration
             ->on('tenants')
             ->cascadeOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
-            ->references(['id', 'tenant_id'])
+        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
+            ->references('id')
             ->on('organization_units')
-            ->restrictOnDelete();
+            ->nullOnDelete();
     }
 };

@@ -1,11 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { TestRouter } from '@/test/TestRouter';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { FastPurchaseLines, blankFastPurchaseLine } from './FastPurchaseLines';
 import { PurchaseOrderLineEditor, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { fastPurchaseLineToPayload, purchaseOrderLineFromResource, purchaseOrderLineToPayload } from './purchaseLineAdapters';
 import type { FastPurchaseContext } from '../purchaseTypes';
+
 vi.mock('./PurchaseLookups', () => ({
     ItemLookupSelect: ({ value, onChange, error }: {
         value: { id: number; code?: string; name?: string } | null;
@@ -22,6 +23,7 @@ vi.mock('./PurchaseLookups', () => ({
         </div>
     ),
 }));
+
 vi.mock('../purchaseApi', () => ({
     getPurchaseItemContext: vi.fn().mockResolvedValue({
         item: { id: 1, code: 'ITEM-1', name: 'Brake pad' },
@@ -33,17 +35,19 @@ vi.mock('../purchaseApi', () => ({
         tax_defaults: {},
     }),
 }));
+
 describe('Purchase line entry', () => {
     it('uses the expected PO line columns including separate Variant and UOM labels', () => {
         render(
-            <TestRouter>
+            <MemoryRouter>
                 <PurchaseOrderLineEditor
                     lines={[purchaseOrderLine()]}
                     onChange={vi.fn()}
                     errorFor={() => undefined}
                 />
-            </TestRouter>,
+            </MemoryRouter>,
         );
+
         expect(columnHeaders()).toEqual(expect.arrayContaining([
             'Item',
             'Variant',
@@ -56,9 +60,10 @@ describe('Purchase line entry', () => {
             'Actions',
         ]));
     });
+
     it('uses the same visible Fast Purchase line columns and keeps Variant separate from UOM', () => {
         render(
-            <TestRouter>
+            <MemoryRouter>
                 <FastPurchaseLines
                     rows={[{
                         ...blankFastPurchaseLine(),
@@ -73,8 +78,9 @@ describe('Purchase line entry', () => {
                     errorFor={() => undefined}
                     onChange={vi.fn()}
                 />
-            </TestRouter>,
+            </MemoryRouter>,
         );
+
         expect(columnHeaders()).toEqual(expect.arrayContaining([
             'Item',
             'Variant',
@@ -89,53 +95,66 @@ describe('Purchase line entry', () => {
         expect(screen.getAllByText('UOM').length).toBeGreaterThan(0);
         expect(screen.getAllByText('23.000000').length).toBeGreaterThan(0);
     });
+
     it('keeps an invalid new line in the drawer until it can be saved', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         renderEditor([], onChange);
+
         await user.click(screen.getByRole('button', { name: 'Add line' }));
         const dialog = await screen.findByRole('dialog', { name: 'Add line' });
         await user.click(within(dialog).getByRole('button', { name: 'Add line' }));
+
         expect(await screen.findByText('Select an item.')).toBeInTheDocument();
         expect(onChange).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog', { name: 'Add line' })).toBeInTheDocument();
     });
+
     it('adds a valid line only after drawer save', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         renderEditor([], onChange);
+
         await user.click(screen.getByRole('button', { name: 'Add line' }));
         const dialog = await screen.findByRole('dialog', { name: 'Add line' });
         await user.click(within(dialog).getByRole('button', { name: 'Choose brake pad' }));
         await waitFor(() => expect(within(dialog).getByLabelText('UOM')).toHaveValue('21'));
         await user.click(within(dialog).getByRole('button', { name: 'Add line' }));
+
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0][0]).toHaveLength(1);
         expect(onChange.mock.calls[0][0][0].item?.name).toBe('Brake pad');
     });
+
     it('edit cancel preserves the original row', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         renderEditor([purchaseOrderLine()], onChange);
+
         await user.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
         const dialog = await screen.findByRole('dialog', { name: 'Edit line' });
         fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '3.000000' } });
         await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
         expect(onChange).not.toHaveBeenCalled();
         expect(screen.getAllByText('2.000000').length).toBeGreaterThan(0);
     });
+
     it('edit save replaces the intended row', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         renderEditor([purchaseOrderLine()], onChange);
+
         await user.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
         const dialog = await screen.findByRole('dialog', { name: 'Edit line' });
         fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '3.000000' } });
         await user.click(within(dialog).getByRole('button', { name: 'Save line' }));
+
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0][0][0].quantity).toBe('3.000000');
         expect(onChange.mock.calls[0][0][0].client_key).toBe('po-line-1');
     });
+
     it('saves an unchanged persisted PO line without manual price confirmation', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
@@ -154,12 +173,15 @@ describe('Purchase line entry', () => {
             tax_amount: '2.000000',
             charge_amount: '0.000000',
         });
+
         expect(persisted.pricing_state).toBe('persisted');
         expect(persisted.manual_price_confirmed).toBe(true);
+
         renderEditor([persisted], onChange);
         await user.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
         const dialog = await screen.findByRole('dialog', { name: 'Edit line' });
         await user.click(within(dialog).getByRole('button', { name: 'Save line' }));
+
         expect(screen.queryByText('Manual price must be confirmed for the current line context.')).not.toBeInTheDocument();
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(purchaseOrderLineToPayload(onChange.mock.calls[0][0][0])).toMatchObject({
@@ -167,15 +189,19 @@ describe('Purchase line entry', () => {
             unit_price: '10.000000',
         });
     });
+
     it('removes a line after confirmation', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         renderEditor([purchaseOrderLine()], onChange);
+
         await user.click(screen.getAllByRole('button', { name: 'Remove line' })[0]);
         const dialog = await screen.findByRole('dialog', { name: 'Remove line' });
         await user.click(within(dialog).getByRole('button', { name: 'Remove line' }));
+
         expect(onChange).toHaveBeenCalledWith([]);
     });
+
     it('maps shared editable lines to PO and Fast Purchase payload fields explicitly', () => {
         const line = {
             ...purchaseOrderLine(),
@@ -183,6 +209,7 @@ describe('Purchase line entry', () => {
             manual_price_confirmed: true,
             pricing_context_hash: 'a'.repeat(64),
         };
+
         expect(purchaseOrderLineToPayload(line)).toMatchObject({
             item_id: 1,
             item_variant_id: 12,
@@ -191,6 +218,7 @@ describe('Purchase line entry', () => {
             unit_price: '10.000000',
             tax_amount: '2.000000',
         });
+
         const fastPurchasePayload = fastPurchaseLineToPayload(line);
         expect(fastPurchasePayload).toMatchObject({
             client_line_key: 'po-line-1',
@@ -208,20 +236,23 @@ describe('Purchase line entry', () => {
         expect(fastPurchasePayload).not.toHaveProperty('tax_calculation_type');
     });
 });
+
 function columnHeaders(): string[] {
     return screen.getAllByRole('columnheader').map((header) => header.textContent ?? '');
 }
+
 function renderEditor(lines: EditablePurchaseLine[], onChange = vi.fn()) {
     return render(
-        <TestRouter>
+        <MemoryRouter>
             <PurchaseOrderLineEditor
                 lines={lines}
                 onChange={onChange}
                 errorFor={() => undefined}
             />
-        </TestRouter>,
+        </MemoryRouter>,
     );
 }
+
 function purchaseOrderLine(): EditablePurchaseLine {
     return {
         client_key: 'po-line-1',

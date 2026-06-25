@@ -6,7 +6,6 @@ namespace Modules\Configuration\Services;
 
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
-use LogicException;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Constants\ConfigurationValueType;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
@@ -16,47 +15,13 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRegistryInterface
 {
-    /** @var array<string, array<string, mixed>> */
-    private array $registeredDefinitions = [];
-
     /** @var array<string, ConfigurationDefinition>|null */
     private ?array $definitions = null;
-
-    private bool $frozen = false;
 
     public function __construct(
         private readonly ReferenceValueLookupInterface $referenceValues,
         private readonly ConfigurationValueValidator $values,
     ) {}
-
-    public function register(string $owner, array $definitions): void
-    {
-        if ($this->frozen || $this->definitions !== null) {
-            throw new LogicException('Configuration definitions cannot be registered after the registry is frozen.');
-        }
-
-        $owner = trim($owner);
-        if ($owner === '') {
-            throw new InvalidArgumentException('Configuration definition owner is required.');
-        }
-
-        foreach ($definitions as $key => $raw) {
-            if (! is_string($key) || ! is_array($raw)) {
-                throw new InvalidArgumentException('Configuration definitions must use string keys and array metadata.');
-            }
-            if (array_key_exists($key, $this->registeredDefinitions)) {
-                throw new LogicException("Configuration definition [{$key}] is already registered.");
-            }
-
-            $declaredOwner = trim((string) ($raw['owner'] ?? $owner));
-            if ($declaredOwner !== $owner) {
-                throw new InvalidArgumentException("Configuration definition [{$key}] owner does not match its registering module.");
-            }
-
-            $raw['owner'] = $owner;
-            $this->registeredDefinitions[$key] = $raw;
-        }
-    }
 
     public function get(string $key): ConfigurationDefinition
     {
@@ -82,10 +47,13 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             return $this->definitions;
         }
 
-        $this->frozen = true;
+        $rawDefinitions = config('configuration.definitions', []);
+        if (! is_array($rawDefinitions)) {
+            throw new InvalidArgumentException('Configuration definitions must be an array.');
+        }
 
         $definitions = [];
-        foreach ($this->registeredDefinitions as $key => $raw) {
+        foreach ($rawDefinitions as $key => $raw) {
             $definition = $this->buildDefinition($key, $raw);
             $this->validateDefinitionValues($definition);
             $definitions[$definition->key] = $definition;
@@ -182,14 +150,6 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             );
         }
 
-        foreach (['sensitive', 'runtime_mutable'] as $requiredFlag) {
-            if (! array_key_exists($requiredFlag, $raw) || ! is_bool($raw[$requiredFlag])) {
-                throw new InvalidArgumentException(
-                    "Configuration definition [{$key}] must explicitly declare boolean [{$requiredFlag}].",
-                );
-            }
-        }
-
         return new ConfigurationDefinition(
             key: $key,
             label: $label,
@@ -199,8 +159,8 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             allowedScopes: $scopes,
             defaultValue: $raw['default'] ?? null,
             nullable: (bool) ($raw['nullable'] ?? false),
-            sensitive: $raw['sensitive'],
-            runtimeMutable: $raw['runtime_mutable'],
+            sensitive: (bool) ($raw['sensitive'] ?? false),
+            runtimeMutable: (bool) ($raw['runtime_mutable'] ?? true),
             options: $options,
             minimum: $minimum,
             maximum: $maximum,

@@ -6,11 +6,11 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinancePostingProfile extends TenantOwnedModel
+final class FinancePostingProfile extends CoreModel
 {
     protected $table = 'finance_posting_profiles';
 

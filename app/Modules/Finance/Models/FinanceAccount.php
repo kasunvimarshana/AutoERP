@@ -7,12 +7,12 @@ namespace Modules\Finance\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceAccount extends TenantOwnedModel
+final class FinanceAccount extends CoreModel
 {
     use SoftDeletes;
 

@@ -6,7 +6,7 @@ namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -14,7 +14,7 @@ use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 
-final class VehicleServiceJobLine extends TenantOwnedModel
+final class VehicleServiceJobLine extends CoreModel
 {
     protected $table = 'vehicle_service_job_lines';
 

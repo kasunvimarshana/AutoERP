@@ -5,46 +5,33 @@ declare(strict_types=1);
 namespace Modules\User\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Services\UserService;
 
 final class UserCreateCommand extends Command
 {
     protected $signature = 'user:create
-        {tenant_id : Tenant identifier}
         {first_name : First name}
         {email : Email address}
-        {password : Plain-text password}
+        {password : Password hash or plain text depending on caller policy}
+        {--tenant_id= : Optional tenant id}
         {--status=active : active|inactive|suspended}';
 
-    protected $description = 'Create a tenant-owned user through the User module service.';
+    protected $description = 'Create a user through the User module service.';
 
-    public function __construct(
-        private readonly UserService $service,
-        private readonly TenantExecutionContextInterface $tenantExecution,
-    ) {
+    public function __construct(private readonly UserService $service)
+    {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $tenantId = (int) $this->argument('tenant_id');
-        if ($tenantId < 1) {
-            $this->error('Tenant identifier must be a positive integer.');
-
-            return self::FAILURE;
-        }
-
-        $result = $this->tenantExecution->runForTenant(
-            $tenantId,
-            fn () => $this->service->create([
-                'first_name' => (string) $this->argument('first_name'),
-                'email' => (string) $this->argument('email'),
-                'password' => (string) $this->argument('password'),
-                'tenant_id' => $tenantId,
-                'status' => (string) $this->option('status'),
-            ]),
-        );
+        $result = $this->service->create([
+            'first_name' => (string) $this->argument('first_name'),
+            'email' => (string) $this->argument('email'),
+            'password' => (string) $this->argument('password'),
+            'tenant_id' => $this->option('tenant_id'),
+            'status' => (string) $this->option('status'),
+        ]);
 
         if ($result->isFailure()) {
             $this->error($result->errorOrFail()->message);

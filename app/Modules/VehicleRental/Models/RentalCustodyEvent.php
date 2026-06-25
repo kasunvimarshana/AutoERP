@@ -7,7 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Extension\Models\AttachmentModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
@@ -15,7 +15,7 @@ use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalCustodyStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalCustodyEvent extends TenantOwnedModel
+final class RentalCustodyEvent extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_custody_events';

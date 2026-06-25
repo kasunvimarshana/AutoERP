@@ -61,21 +61,6 @@ final class FileStorageService implements FileStorageServiceInterface
         return $this->getDisk($disk)->mimeType($this->normalizeRelativePath($path));
     }
 
-    public function size(string $path, ?string $disk = null): int
-    {
-        return (int) $this->getDisk($disk)->size($this->normalizeRelativePath($path));
-    }
-
-    public function allFiles(string $directory, ?string $disk = null): array
-    {
-        $files = $this->getDisk($disk)->allFiles($this->normalizeRelativePath($directory));
-
-        return array_values(array_map(
-            fn (string $path): string => $this->normalizeRelativePath($path),
-            $files,
-        ));
-    }
-
     public function readStream(string $path, ?string $disk = null): mixed
     {
         $normalizedPath = $this->normalizeRelativePath($path);

@@ -10,19 +10,18 @@ final readonly class ConfigurationRevisionView
 {
     public function __construct(
         public int $id,
-        public string $operation,
         public string $scope,
-        public ?int $tenantId,
-        public ?int $organizationUnitId,
         public string $key,
-        public mixed $value,
-        public bool $configured,
+        public string $action,
+        public string $valueType,
         public bool $sensitive,
-        public ?int $resultingRowVersion,
-        public ?int $sourceRevisionId,
-        public ?int $actorUserId,
-        public ?string $actorName,
-        public ?string $reason,
+        public bool $beforeExists,
+        public mixed $beforeValue,
+        public bool $afterExists,
+        public mixed $afterValue,
+        public int $entryRowVersion,
+        public ?int $changedBy,
+        public ?string $changedByName,
         public DateTimeImmutable $createdAt,
     ) {}
 }

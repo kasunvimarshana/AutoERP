@@ -13,11 +13,11 @@ return new class extends Migration
         Schema::create('inventory_allocation_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('allocation_id');
-            $table->foreignId('stock_balance_id');
-            $table->foreignId('batch_id')->nullable();
-            $table->foreignId('serial_number_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('allocation_id')->constrained('inventory_allocations')->restrictOnDelete();
+            $table->foreignId('stock_balance_id')->constrained('inventory_stock_balances')->restrictOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->restrictOnDelete();
             $table->decimal('quantity_allocated', 20, 6);
             $table->decimal('quantity_issued', 20, 6)->default('0.000000');
             $table->decimal('quantity_reversed', 20, 6)->default('0.000000');
@@ -30,28 +30,6 @@ return new class extends Migration
             $table->index('stock_balance_id', 'inventory_allocation_lines_balance_idx');
             $table->index('batch_id', 'inventory_allocation_lines_batch_idx');
             $table->index('serial_number_id', 'inventory_allocation_lines_serial_idx');
-
-            $table->unique(['id', 'tenant_id'], 'inventory_allocation_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_allocation_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['allocation_id', 'tenant_id'], 'inventory_allocation_lines_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_allocations')
-                ->restrictOnDelete();
-            $table->foreign(['stock_balance_id', 'tenant_id'], 'inventory_allocation_lines_stock_balance_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_stock_balances')
-                ->restrictOnDelete();
-            $table->foreign(['batch_id', 'tenant_id'], 'inventory_allocation_lines_batch_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_batches')
-                ->restrictOnDelete();
-            $table->foreign(['serial_number_id', 'tenant_id'], 'inventory_allocation_lines_serial_number_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_serial_numbers')
-                ->restrictOnDelete();
         });
     }
 

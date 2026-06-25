@@ -14,17 +14,17 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('deposit_requirement_id');
+            $table->foreignId('deposit_requirement_id')->constrained('rental_deposit_requirements')->cascadeOnDelete();
             $table->string('link_type', 30);
-            $table->foreignId('payment_id')->nullable();
-            $table->foreignId('invoice_id')->nullable();
+            $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
+            $table->foreignId('invoice_id')->nullable()->constrained('invoices')->nullOnDelete();
             $table->decimal('amount', 20, 6);
             $table->string('status', 20)->default('active');
             $table->dateTime('linked_at');
             $table->unsignedBigInteger('linked_by')->nullable();
-            $table->foreignId('reverses_link_id')->nullable();
+            $table->foreignId('reverses_link_id')->nullable()->constrained('rental_deposit_links')->nullOnDelete();
             $table->char('fingerprint', 64);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -34,37 +34,6 @@ return new class extends Migration
             $table->index(['deposit_requirement_id', 'status', 'link_type'], 'rental_deposit_links_requirement_idx');
             $table->index(['payment_id', 'status'], 'rental_deposit_links_payment_idx');
             $table->index(['invoice_id', 'status'], 'rental_deposit_links_invoice_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_deposit_links_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_links_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['deposit_requirement_id', 'tenant_id'], 'rental_deposit_links_deposit_requirement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_deposit_requirements')
-                ->cascadeOnDelete();
-            $table->foreign(['payment_id', 'tenant_id'], 'rental_deposit_links_payment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('payments')
-                ->restrictOnDelete();
-            $table->foreign(['invoice_id', 'tenant_id'], 'rental_deposit_links_invoice_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('invoices')
-                ->restrictOnDelete();
-            $table->foreign(['reverses_link_id', 'tenant_id'], 'rental_deposit_links_reverses_link_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_deposit_links')
-                ->restrictOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'rental_deposit_links_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_deposit_links_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

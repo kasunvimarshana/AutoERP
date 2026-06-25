@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class FinancePostingProfileRule extends TenantOwnedModel
+final class FinancePostingProfileRule extends CoreModel
 {
     protected $table = 'finance_posting_profile_rules';
 
@@ -16,7 +16,6 @@ final class FinancePostingProfileRule extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
             'posting_profile_id' => 'integer',
             'account_id' => 'integer',
         ]);

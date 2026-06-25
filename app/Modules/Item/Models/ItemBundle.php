@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class ItemBundle extends TenantOwnedModel
+final class ItemBundle extends CoreModel
 {
     protected $table = 'item_bundles';
 

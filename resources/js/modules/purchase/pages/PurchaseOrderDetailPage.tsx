@@ -11,7 +11,6 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LinkButton } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -22,7 +21,6 @@ import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function PurchaseOrderDetailPage() {
-    const { confirm, confirmDialog } = useConfirmDialog();
     const id = Number(useParams().id);
     const navigate = useNavigate();
     const auth = useAuth();
@@ -32,12 +30,7 @@ export default function PurchaseOrderDetailPage() {
 
     const run = async (action: 'submit' | 'approve' | 'cancel' | 'close' | 'delete') => {
         if (!result.data) return;
-        if (!await confirm({
-            title: `${action.replace('_', ' ')[0].toUpperCase()}${action.replace('_', ' ').slice(1)} purchase order`,
-            message: `Confirm ${action.replace('_', ' ')} for this purchase order?`,
-            confirmLabel: `${action.replace('_', ' ')[0].toUpperCase()}${action.replace('_', ' ').slice(1)}`,
-            danger: action === 'cancel',
-        })) return;
+        if (!window.confirm(`Confirm ${action.replace('_', ' ')} for this purchase order?`)) return;
         setBusy(true);
         setActionError(null);
         try {
@@ -109,7 +102,6 @@ export default function PurchaseOrderDetailPage() {
             <Panel className="p-0">
                 <PurchaseOrderTabs order={order} summary={summary} />
             </Panel>
-            {confirmDialog}
         </>
     );
 }

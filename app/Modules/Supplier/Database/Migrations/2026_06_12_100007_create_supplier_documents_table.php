@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('supplier_documents', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('supplier_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
             $table->string('document_type');
             $table->string('document_number')->nullable();
             $table->date('issued_date')->nullable();
@@ -30,16 +30,6 @@ return new class extends Migration
             $table->index('document_type', 'supplier_documents_type_idx');
             $table->index('expiry_date', 'supplier_documents_expiry_idx');
             $table->index('status', 'supplier_documents_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'supplier_documents_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_documents_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_documents_supplier_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('suppliers')
-                ->cascadeOnDelete();
         });
     }
 

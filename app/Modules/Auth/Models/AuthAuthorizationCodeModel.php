@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class AuthAuthorizationCodeModel extends TenantOwnedModel
+final class AuthAuthorizationCodeModel extends CoreModel
 {
     use SoftDeletes;
 

@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
+use Modules\Tenant\Constants\TenantPermission;
 use Modules\Tenant\Http\Requests\ListTenantRequest;
 use Modules\Tenant\Http\Requests\TenantLifecycleRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantRequest;
@@ -21,13 +22,17 @@ use Modules\Tenant\Services\DeactivateTenantService;
 use Modules\Tenant\Services\GetTenantService;
 use Modules\Tenant\Services\ListTenantsService;
 use Modules\Tenant\Services\SuspendTenantService;
+use Modules\Tenant\Services\TenantAuthorizationService;
+use Modules\Tenant\Services\TenantReadinessService;
 use Modules\Tenant\Services\UpdateTenantService;
 
 final class TenantController extends Controller
 {
     public function __construct(
+        private readonly TenantAuthorizationService $authorization,
         private readonly ListTenantsService $listTenants,
         private readonly GetTenantService $getTenant,
+        private readonly TenantReadinessService $readiness,
         private readonly CreateTenantService $createTenant,
         private readonly UpdateTenantService $updateTenant,
         private readonly ActivateTenantService $activateTenant,
@@ -38,6 +43,7 @@ final class TenantController extends Controller
 
     public function index(ListTenantRequest $request): JsonResponse
     {
+        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
 
         $result = $this->listTenants->execute($request->validated());
         if ($result->isFailure()) {
@@ -55,12 +61,26 @@ final class TenantController extends Controller
 
     public function show(int|string $tenant): JsonResponse|TenantResource
     {
+        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
 
         return $this->tenantResponse($this->getTenant->execute($tenant));
     }
 
+
+    public function readiness(int|string $tenant): JsonResponse
+    {
+        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
+        $result = $this->readiness->get($tenant);
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        return response()->json(['data' => $result->valueOrFail()->toArray()]);
+    }
+
     public function store(UpsertTenantRequest $request): JsonResponse|TenantResource
     {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE);
 
         $result = $this->createTenant->execute($this->payload($request));
         if ($result->isFailure()) {
@@ -76,6 +96,7 @@ final class TenantController extends Controller
         UpsertTenantRequest $request,
         int|string $tenant,
     ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE);
 
         return $this->tenantResponse(
             $this->updateTenant->execute($tenant, $this->payload($request)),
@@ -86,6 +107,7 @@ final class TenantController extends Controller
         TenantLifecycleRequest $request,
         int|string $tenant,
     ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
         $data = $request->validated();
 
         return $this->tenantResponse($this->activateTenant->execute(
@@ -99,6 +121,7 @@ final class TenantController extends Controller
         TenantLifecycleRequest $request,
         int|string $tenant,
     ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
         $data = $request->validated();
 
         return $this->tenantResponse($this->suspendTenant->execute(
@@ -112,6 +135,7 @@ final class TenantController extends Controller
         TenantLifecycleRequest $request,
         int|string $tenant,
     ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
         $data = $request->validated();
 
         return $this->tenantResponse($this->deactivateTenant->execute(
@@ -125,6 +149,7 @@ final class TenantController extends Controller
         TenantLifecycleRequest $request,
         int|string $tenant,
     ): JsonResponse|TenantResource {
+        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_LIFECYCLE);
         $data = $request->validated();
 
         return $this->tenantResponse($this->archiveTenant->execute(
@@ -156,4 +181,12 @@ final class TenantController extends Controller
             : new TenantResource($result->valueOrFail());
     }
 
+    private function requirePermission(string $permission): void
+    {
+        abort_unless(
+            $this->authorization->allows($permission),
+            403,
+            'You are not authorized to perform this action.',
+        );
+    }
 }

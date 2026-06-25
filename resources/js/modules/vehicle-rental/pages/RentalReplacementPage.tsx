@@ -13,14 +13,7 @@ import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
-import type { NamedResource } from "@/shared/types/common";
-import { businessDateTimeInputValue } from "@/shared/utils/businessDate";
 import { readableRelation } from "@/shared/utils/object";
-import { parsePositiveInteger } from "@/shared/utils/routeParams";
-import {
-    RentalAllocationLookupSelect,
-    RentalFinanceAgreementLookupSelect,
-} from "../components/RentalLookups";
 import { RentalPage } from "../components/RentalPage";
 import { getRentalAllocation, replaceRentalVehicle } from "../vehicleRentalApi";
 
@@ -41,19 +34,18 @@ const emptyInspection = (): InspectionForm => ({
 });
 
 export default function RentalReplacementPage() {
-    const allocationId = parsePositiveInteger(useParams().id);
+    const allocationId = Number(useParams().id);
     const navigate = useNavigate();
     const allocation = useApi(
-        (signal) => getRentalAllocation(allocationId ?? 0, signal),
+        (signal) => getRentalAllocation(allocationId, signal),
         [allocationId],
-        allocationId !== null,
     );
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [sourceAllocation, setSourceAllocation] = useState<NamedResource | null>(null);
-    const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
     const [form, setForm] = useState({
         vehicle_source_type: "company_owned",
-        replacement_at: businessDateTimeInputValue(),
+        source_allocation_id: "",
+        vehicle_finance_agreement_id: "",
+        replacement_at: "",
         allocated_to: "",
         reason_code: "breakdown",
         reason: "",
@@ -67,18 +59,18 @@ export default function RentalReplacementPage() {
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
-        if (!allocationId || !vehicle) return;
+        if (!vehicle) return;
         setSaving(true);
         setActionError(null);
         try {
             await replaceRentalVehicle(allocationId, {
                 new_vehicle_id: vehicle.id,
                 vehicle_source_type: form.vehicle_source_type,
-                source_allocation_id: form.vehicle_source_type === "owner_supplied"
-                    ? sourceAllocation?.id ?? null
+                source_allocation_id: form.source_allocation_id
+                    ? Number(form.source_allocation_id)
                     : null,
-                vehicle_finance_agreement_id: form.vehicle_source_type === "financed"
-                    ? financeAgreement?.id ?? null
+                vehicle_finance_agreement_id: form.vehicle_finance_agreement_id
+                    ? Number(form.vehicle_finance_agreement_id)
                     : null,
                 replacement_at: form.replacement_at,
                 allocated_to: form.allocated_to || null,
@@ -101,19 +93,6 @@ export default function RentalReplacementPage() {
             setSaving(false);
         }
     };
-
-    if (!allocationId)
-        return (
-            <RentalPage>
-                <ContentHeader
-                    title="Invalid allocation"
-                    description="The replacement route requires a valid allocation identifier."
-                />
-                <Panel>
-                    <p className="text-sm text-slate-600">Open the replacement workflow from a valid rental allocation.</p>
-                </Panel>
-            </RentalPage>
-        );
 
     if (allocation.loading)
         return (
@@ -164,14 +143,12 @@ export default function RentalReplacementPage() {
                         <Select
                             label="Vehicle source"
                             value={form.vehicle_source_type}
-                            onChange={(event) => {
+                            onChange={(event) =>
                                 setForm({
                                     ...form,
                                     vehicle_source_type: event.target.value,
-                                });
-                                setSourceAllocation(null);
-                                setFinanceAgreement(null);
-                            }}
+                                })
+                            }
                             options={[
                                 {
                                     value: "company_owned",
@@ -185,18 +162,35 @@ export default function RentalReplacementPage() {
                             ]}
                         />
                         {form.vehicle_source_type === "owner_supplied" && (
-                            <RentalAllocationLookupSelect
-                                value={sourceAllocation}
-                                onChange={setSourceAllocation}
-                                excludeId={allocationId}
+                            <Input
+                                label="Owner source allocation ID"
+                                type="number"
+                                min="1"
                                 required
+                                value={form.source_allocation_id}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        source_allocation_id:
+                                            event.target.value,
+                                    })
+                                }
                             />
                         )}
                         {form.vehicle_source_type === "financed" && (
-                            <RentalFinanceAgreementLookupSelect
-                                value={financeAgreement}
-                                onChange={setFinanceAgreement}
+                            <Input
+                                label="Finance agreement ID"
+                                type="number"
+                                min="1"
                                 required
+                                value={form.vehicle_finance_agreement_id}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        vehicle_finance_agreement_id:
+                                            event.target.value,
+                                    })
+                                }
                             />
                         )}
                         <Input
@@ -281,9 +275,7 @@ export default function RentalReplacementPage() {
                             !vehicle ||
                             !form.replacement_at ||
                             !oldReturn.odometer ||
-                            !newHandover.odometer ||
-                            (form.vehicle_source_type === "owner_supplied" && !sourceAllocation) ||
-                            (form.vehicle_source_type === "financed" && !financeAgreement)
+                            !newHandover.odometer
                         }
                     >
                         Complete replacement

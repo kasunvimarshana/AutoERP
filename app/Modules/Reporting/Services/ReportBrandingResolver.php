@@ -25,7 +25,7 @@ final class ReportBrandingResolver
                 ->findOrFail($organizationUnitId);
 
         return [
-            'company_name' => (string) $this->configuration->value('branding.display_name', $tenantId, $organizationUnitId),
+            'company_name' => (string) $this->configuration->value('app.name', $tenantId, $organizationUnitId),
             'tenant_name' => (string) $tenant->name,
             'tenant_code' => (string) $tenant->code,
             'organization_unit_name' => $organizationUnit?->name,

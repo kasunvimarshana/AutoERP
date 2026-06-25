@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tenant\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Services\CreateTenantService;
 
@@ -15,25 +14,25 @@ final class TenantCreateCommand extends Command
         {code : Stable tenant code}
         {name : Tenant display name}
         {--slug=}
-        {--base-currency-id=}';
+        {--base-currency-id=}
+        {--plan-id=}';
 
     protected $description = 'Create a draft tenant';
 
-    public function __construct(
-        private readonly CreateTenantService $service,
-        private readonly TenantExecutionContextInterface $executionContext,
-    ) {
+    public function __construct(private readonly CreateTenantService $service)
+    {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $result = $this->executionContext->runAsControlPlane(fn () => $this->service->execute([
+        $result = $this->service->execute([
             'code' => (string) $this->argument('code'),
             'name' => (string) $this->argument('name'),
             'slug' => $this->option('slug'),
             'base_currency_id' => $this->option('base-currency-id'),
-        ]));
+            'tenant_plan_id' => $this->option('plan-id'),
+        ]);
 
         if ($result->isFailure()) {
             $this->error($result->errorOrFail()->message);

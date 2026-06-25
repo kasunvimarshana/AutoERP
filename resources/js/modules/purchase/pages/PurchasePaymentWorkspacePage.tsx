@@ -32,7 +32,7 @@ export default function PurchasePaymentWorkspacePage() {
     const canCreatePayment = hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute);
 
     const columns: DataColumn<Payment>[] = [
-        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? 'Payment number unavailable'}</Link> },
+        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? `Payment #${row.id}`}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Supplier', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },

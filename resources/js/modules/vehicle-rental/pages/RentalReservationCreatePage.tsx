@@ -12,22 +12,19 @@ import { Input } from "@/shared/components/Input";
 import { Panel } from "@/shared/components/Panel";
 import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
-import type { NamedResource } from "@/shared/types/common";
-import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
 import { RentalPage } from "../components/RentalPage";
-import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
 import { createRentalReservation } from "../vehicleRentalApi";
 
 export default function RentalReservationCreatePage() {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [form, setForm] = useState({
         rental_mode: "with_driver",
         billing_cycle: "monthly",
         requested_start_at: "",
         requested_end_at: "",
+        currency_id: "",
         estimated_amount: "0",
         estimated_deposit_amount: "0",
         source: "walk_in",
@@ -35,8 +32,6 @@ export default function RentalReservationCreatePage() {
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(saving);
-    const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         setSaving(true);
@@ -46,11 +41,10 @@ export default function RentalReservationCreatePage() {
                 ...form,
                 customer_id: customer?.id,
                 requested_vehicle_id: vehicle?.id || null,
-                currency_id: Number(currency?.id),
+                currency_id: Number(form.currency_id),
                 estimated_amount: form.estimated_amount,
                 estimated_deposit_amount: form.estimated_deposit_amount,
             });
-            formGuard.markSaved();
             navigate(`/vehicle-rental/reservations/${row.id}`);
         } catch (e) {
             setError(toApiError(e));
@@ -70,17 +64,17 @@ export default function RentalReservationCreatePage() {
                     <div className="grid gap-4 md:grid-cols-2">
                         <CustomerLookupSelect
                             value={customer}
-                            onChange={(next) => { formGuard.markDirty(); setCustomer(next); }}
+                            onChange={setCustomer}
                         />
                         <VehicleLookupSelect
                             value={vehicle}
-                            onChange={(next) => { formGuard.markDirty(); setVehicle(next); }}
+                            onChange={setVehicle}
                         />
                         <Select
                             label="Rental mode"
                             value={form.rental_mode}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     rental_mode: e.target.value,
                                 })
@@ -98,7 +92,7 @@ export default function RentalReservationCreatePage() {
                             label="Billing cycle"
                             value={form.billing_cycle}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     billing_cycle: e.target.value,
                                 })
@@ -120,7 +114,7 @@ export default function RentalReservationCreatePage() {
                             required
                             value={form.requested_start_at}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     requested_start_at: e.target.value,
                                 })
@@ -132,16 +126,24 @@ export default function RentalReservationCreatePage() {
                             required
                             value={form.requested_end_at}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     requested_end_at: e.target.value,
                                 })
                             }
                         />
-                        <RentalCurrencyLookupSelect
-                            value={currency}
-                            onChange={(next) => { formGuard.markDirty(); setCurrency(next); }}
+                        <Input
+                            label="Currency ID"
+                            type="number"
+                            min="1"
                             required
+                            value={form.currency_id}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    currency_id: e.target.value,
+                                })
+                            }
                         />
                         <Input
                             label="Estimated amount"
@@ -150,7 +152,7 @@ export default function RentalReservationCreatePage() {
                             min="0"
                             value={form.estimated_amount}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     estimated_amount: e.target.value,
                                 })
@@ -163,7 +165,7 @@ export default function RentalReservationCreatePage() {
                             min="0"
                             value={form.estimated_deposit_amount}
                             onChange={(e) =>
-                                updateForm({
+                                setForm({
                                     ...form,
                                     estimated_deposit_amount: e.target.value,
                                 })
@@ -173,7 +175,7 @@ export default function RentalReservationCreatePage() {
                             label="Remarks"
                             value={form.remarks}
                             onChange={(e) =>
-                                updateForm({ ...form, remarks: e.target.value })
+                                setForm({ ...form, remarks: e.target.value })
                             }
                         />
                     </div>
@@ -181,7 +183,7 @@ export default function RentalReservationCreatePage() {
                         <Button
                             type="submit"
                             loading={saving}
-                            disabled={!customer || !currency}
+                            disabled={!customer}
                         >
                             Create reservation
                         </Button>

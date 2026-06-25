@@ -6,11 +6,11 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceBankReconciliation extends TenantOwnedModel
+final class FinanceBankReconciliation extends CoreModel
 {
     protected $table = 'finance_bank_reconciliations';
 

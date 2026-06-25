@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('vehicle_service_status_histories', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('vehicle_service_job_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('vehicle_service_job_id')->constrained('vehicle_service_jobs')->cascadeOnDelete();
             $table->string('old_status', 30)->nullable();
             $table->string('new_status', 30);
             $table->text('reason')->nullable();
@@ -24,16 +24,6 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_status_histories_tenant_org_idx');
             $table->index(['vehicle_service_job_id', 'changed_at'], 'vehicle_service_status_histories_job_changed_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_service_status_histories_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_status_histories_organization_un_61382dac_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_status_histories_vehicle_service_66403583_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_service_jobs')
-                ->cascadeOnDelete();
         });
     }
 

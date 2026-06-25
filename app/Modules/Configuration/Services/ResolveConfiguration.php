@@ -93,50 +93,6 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
         return $this->resolve($key, $tenantId, $organizationUnitId)->value;
     }
 
-    public function resolveBelow(
-        ConfigurationScopeContext $context,
-        string $key,
-    ): ResolvedConfigurationValue {
-        $definition = $this->definitions->get($key);
-
-        if (
-            $context->scope === ConfigurationScope::ORGANIZATION_UNIT
-            && $context->tenantId !== null
-            && in_array(ConfigurationScope::TENANT, $definition->allowedScopes, true)
-        ) {
-            $stored = $this->exact(
-                $this->scopes->explicit(ConfigurationScope::TENANT, $context->tenantId, null),
-                $definition->key,
-            );
-            if ($stored !== null) {
-                return $this->resolved($definition, $stored);
-            }
-        }
-
-        if (
-            $context->scope !== ConfigurationScope::GLOBAL
-            && in_array(ConfigurationScope::GLOBAL, $definition->allowedScopes, true)
-        ) {
-            $stored = $this->exact(
-                $this->scopes->explicit(ConfigurationScope::GLOBAL, null, null),
-                $definition->key,
-            );
-            if ($stored !== null) {
-                return $this->resolved($definition, $stored);
-            }
-        }
-
-        return new ResolvedConfigurationValue(
-            definition: $definition,
-            value: $this->validator->validate($definition, $definition->defaultValue),
-            sourceScope: 'default',
-            tenantId: null,
-            organizationUnitId: null,
-            rowVersion: null,
-            usesDefault: true,
-        );
-    }
-
     public function exact(
         ConfigurationScopeContext $context,
         string $key,

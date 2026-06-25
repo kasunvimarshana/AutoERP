@@ -14,11 +14,4 @@ use Illuminate\Database\Eloquent\Model;
 abstract class CoreModel extends Model
 {
     protected $guarded = ['*'];
-
-    protected function casts(): array
-    {
-        return array_merge(parent::casts(), [
-            'metadata' => 'array',
-        ]);
-    }
 }

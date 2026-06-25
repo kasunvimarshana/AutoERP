@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class UserDeviceModel extends TenantOwnedModel
+final class UserDeviceModel extends CoreModel
 {
     protected $table = 'user_devices';
 

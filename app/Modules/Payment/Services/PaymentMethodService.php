@@ -44,7 +44,7 @@ final class PaymentMethodService
 
         if (($filters['effective'] ?? true) === true) {
             $rows = $query
-                ->orderByRaw('case when organization_unit_id is not null then 0 else 1 end')
+                ->orderByRaw('case when organization_unit_id is not null then 0 when tenant_id is not null then 1 else 2 end')
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
@@ -80,7 +80,7 @@ final class PaymentMethodService
         )
             ->where('is_active', true)
             ->whereIn('direction_allowed', [$direction->value, PaymentMethodDirection::Both->value])
-            ->orderByRaw('case when organization_unit_id is not null then 0 else 1 end')
+            ->orderByRaw('case when organization_unit_id is not null then 0 when tenant_id is not null then 1 else 2 end')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -166,7 +166,9 @@ final class PaymentMethodService
 
     private function scope(Builder $query, int $tenantId, ?int $organizationUnitId): Builder
     {
-        return $query->where('tenant_id', $tenantId)->where(function (Builder $scope) use ($organizationUnitId): void {
+        return $query->where(function (Builder $scope) use ($tenantId): void {
+            $scope->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
+        })->where(function (Builder $scope) use ($organizationUnitId): void {
             $scope->whereNull('organization_unit_id');
             if ($organizationUnitId !== null) {
                 $scope->orWhere('organization_unit_id', $organizationUnitId);
@@ -176,41 +178,42 @@ final class PaymentMethodService
 
     private function effectiveScope(Builder $query, int $tenantId, ?int $organizationUnitId): Builder
     {
-        return $query->where('tenant_id', $tenantId)->where(function (Builder $scope) use ($organizationUnitId): void {
-            $scope->whereNull('organization_unit_id');
+        return $query->where(function (Builder $scope) use ($tenantId, $organizationUnitId): void {
+            $scope->whereNull('tenant_id')
+                ->orWhere(fn (Builder $tenant) => $tenant->where('tenant_id', $tenantId)->whereNull('organization_unit_id'));
             if ($organizationUnitId !== null) {
-                $scope->orWhere('organization_unit_id', $organizationUnitId);
+                $scope->orWhere(fn (Builder $org) => $org->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId));
             }
         });
     }
 
     private function isInScope(PaymentMethod $method, ?int $tenantId, ?int $organizationUnitId): bool
     {
-        if ($tenantId === null || (int) $method->tenant_id !== $tenantId) {
+        if ($method->tenant_id !== null && $tenantId !== null && (int) $method->tenant_id !== $tenantId) {
             return false;
         }
         if ($method->organization_unit_id !== null && (int) $method->organization_unit_id !== (int) $organizationUnitId) {
             return false;
         }
 
-        return true;
+        return $method->tenant_id !== null || $method->organization_unit_id === null;
     }
 
     /** @return array<string, mixed> */
-    private function attributes(array $payload, int $tenantId, ?int $organizationUnitId): array
+    private function attributes(array $payload, ?int $tenantId, ?int $organizationUnitId): array
     {
         $code = strtoupper(trim((string) ($payload['code'] ?? '')));
         if ($code === '') {
             throw ValidationException::withMessages(['code' => ['Payment method code is required.']]);
         }
 
-        $resolvedTenantId = $tenantId;
-        $resolvedOrganizationUnitId = $organizationUnitId;
+        $resolvedTenantId = array_key_exists('tenant_id', $payload) ? $payload['tenant_id'] : $tenantId;
+        $resolvedOrganizationUnitId = array_key_exists('organization_unit_id', $payload) ? $payload['organization_unit_id'] : $organizationUnitId;
 
         return [
             'tenant_id' => $resolvedTenantId,
             'organization_unit_id' => $resolvedOrganizationUnitId,
-            'scope_key' => $this->scopeKey($resolvedTenantId, $resolvedOrganizationUnitId === null ? null : (int) $resolvedOrganizationUnitId),
+            'scope_key' => $this->scopeKey($resolvedTenantId === null ? null : (int) $resolvedTenantId, $resolvedOrganizationUnitId === null ? null : (int) $resolvedOrganizationUnitId),
             'code' => $code,
             'name' => trim((string) ($payload['name'] ?? '')),
             'method_type' => (string) $payload['method_type'],
@@ -223,12 +226,16 @@ final class PaymentMethodService
         ];
     }
 
-    private function scopeKey(int $tenantId, ?int $organizationUnitId): string
+    private function scopeKey(?int $tenantId, ?int $organizationUnitId): string
     {
+        if ($tenantId === null) {
+            return 'global';
+        }
+
         return $organizationUnitId === null ? 'tenant:'.$tenantId : 'org:'.$tenantId.':'.$organizationUnitId;
     }
 
-    private function assertUniqueCode(string $code, int $tenantId, ?int $organizationUnitId, ?int $exceptId = null): void
+    private function assertUniqueCode(string $code, ?int $tenantId, ?int $organizationUnitId, ?int $exceptId = null): void
     {
         $query = PaymentMethod::query()
             ->where('scope_key', $this->scopeKey($tenantId, $organizationUnitId))

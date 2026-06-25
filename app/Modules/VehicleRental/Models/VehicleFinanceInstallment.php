@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Invoice\Models\Invoice;
 use Modules\VehicleRental\Enums\VehicleFinanceInstallmentStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class VehicleFinanceInstallment extends TenantOwnedModel
+final class VehicleFinanceInstallment extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'vehicle_finance_installments';

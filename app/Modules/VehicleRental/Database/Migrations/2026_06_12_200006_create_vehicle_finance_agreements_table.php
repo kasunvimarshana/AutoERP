@@ -14,11 +14,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('agreement_number', 100);
-            $table->foreignId('supplier_id');
-            $table->foreignId('vehicle_id');
+            $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
             $table->date('agreement_date');
             $table->dateTime('starts_at');
             $table->dateTime('matures_at');
@@ -31,7 +31,7 @@ return new class extends Migration
             $table->string('installment_frequency', 30)->default('monthly');
             $table->unsignedInteger('installment_count');
             $table->unsignedSmallInteger('payment_term_days')->default(0);
-            $table->foreignId('tax_group_id')->nullable();
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
             $table->string('status', 30)->default('draft');
             $table->text('remarks')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
@@ -44,37 +44,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'agreement_number'], 'vehicle_finance_agreements_tenant_number_uk');
             $table->index(['vehicle_id', 'status', 'starts_at', 'matures_at'], 'vehicle_finance_agreements_vehicle_period_idx');
             $table->index(['supplier_id', 'status'], 'vehicle_finance_agreements_supplier_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_finance_agreements_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_agreements_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['supplier_id', 'tenant_id'], 'vehicle_finance_agreements_supplier_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('suppliers')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'vehicle_finance_agreements_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['tax_group_id', 'tenant_id'], 'vehicle_finance_agreements_tax_group_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('tax_groups')
-                ->restrictOnDelete();
-
-            $table->foreign(['approved_by', 'tenant_id'], 'vehicle_finance_agreements_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'vehicle_finance_agreements_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'vehicle_finance_agreements_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

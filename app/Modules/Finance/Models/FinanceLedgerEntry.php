@@ -6,11 +6,11 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceLedgerEntry extends TenantOwnedModel
+final class FinanceLedgerEntry extends CoreModel
 {
     protected $table = 'finance_ledger_entries';
 

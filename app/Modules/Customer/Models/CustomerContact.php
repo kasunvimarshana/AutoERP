@@ -6,9 +6,9 @@ namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class CustomerContact extends TenantOwnedModel
+final class CustomerContact extends CoreModel
 {
     use SoftDeletes;
 

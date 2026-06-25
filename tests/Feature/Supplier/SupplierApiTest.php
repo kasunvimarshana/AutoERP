@@ -411,6 +411,7 @@ final class SupplierApiTest extends TestCase
         $email = (string) ($overrides['email'] ?? 'supplier-admin@example.test');
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Supplier',
             'last_name' => 'Tester',
             'email' => $email,
@@ -420,13 +421,11 @@ final class SupplierApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        DB::table('user_organization_units')->insert([
+        DB::table('user_tenants')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
-            'status' => 'active',
             'is_default' => true,
-            'default_marker' => 'default',
             'row_version' => 1,
             'created_at' => $now,
             'updated_at' => $now,

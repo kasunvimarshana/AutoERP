@@ -6,9 +6,9 @@ namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class AuthProviderModel extends TenantOwnedModel
+final class AuthProviderModel extends CoreModel
 {
     use SoftDeletes;
 

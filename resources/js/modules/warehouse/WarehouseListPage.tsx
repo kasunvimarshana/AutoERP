@@ -20,10 +20,10 @@ import { warehouseTypes, type WarehouseSummary } from './warehouseTypes';
 
 export default function WarehouseListPage() {
     const auth = useAuth();
-    const canCreate = hasWarehousePermission(auth, warehousePermissions.warehousesCreate);
-    const canUpdate = hasWarehousePermission(auth, warehousePermissions.warehousesUpdate);
-    const canActivate = hasWarehousePermission(auth, warehousePermissions.warehousesActivate);
-    const canDeactivate = hasWarehousePermission(auth, warehousePermissions.warehousesDeactivate);
+    const canCreate = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesCreate);
+    const canUpdate = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesUpdate);
+    const canActivate = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesActivate);
+    const canDeactivate = hasWarehousePermission(auth.permissions, warehousePermissions.warehousesDeactivate);
     const [search, setSearch] = useState('');
     const [type, setType] = useState('');
     const [active, setActive] = useState('');

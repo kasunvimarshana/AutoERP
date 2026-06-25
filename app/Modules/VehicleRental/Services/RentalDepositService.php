@@ -207,7 +207,6 @@ final class RentalDepositService
                 $invoice = Invoice::query()->findOrFail($link->invoice_id);
                 if (! in_array($invoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
                     $activeAllocation = DB::table('payment_allocations')
-                        ->where('tenant_id', $link->tenant_id)
                         ->where('payment_id', $link->payment_id)
                         ->where('invoice_id', $link->invoice_id)
                         ->where('status', 'active')

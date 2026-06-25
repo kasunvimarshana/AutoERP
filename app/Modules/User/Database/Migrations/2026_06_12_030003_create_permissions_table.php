@@ -15,8 +15,8 @@ return new class extends Migration
         Schema::create('permissions', function (Blueprint $table) use ($guardName) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('name');
@@ -27,11 +27,6 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['id', 'tenant_id'], 'permissions_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'permissions_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
             $table->unique(['tenant_id', 'name', 'guard_name'], 'permissions_name_guard_uk');
         });
     }

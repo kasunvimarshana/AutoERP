@@ -57,10 +57,7 @@ final class ConfigurationSeeder extends Seeder
                         || $existing->description !== $description
                         || $existing->deleted_at !== null
                     ) {
-                        DB::table('permissions')
-                            ->where('tenant_id', (int) $tenantId)
-                            ->where('id', $existing->id)
-                            ->update([
+                        DB::table('permissions')->where('id', $existing->id)->update([
                             ...$values,
                             'row_version' => max(1, (int) $existing->row_version) + 1,
                             'updated_at' => now(),

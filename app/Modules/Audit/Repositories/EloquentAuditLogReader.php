@@ -69,18 +69,6 @@ final class EloquentAuditLogReader implements AuditLogReaderInterface
 
     private function applyScope(Builder $query, AuditReadScope $scope): Builder
     {
-        if ($scope->platformWide) {
-            if ($scope->tenantId !== null) {
-                $query->where('tenant_id', $scope->tenantId);
-            }
-
-            return $query;
-        }
-
-        if ($scope->tenantId === null) {
-            throw new InvalidArgumentException('Tenant audit scope requires a tenant identifier.');
-        }
-
         $query->where('tenant_id', $scope->tenantId);
 
         if (! $scope->tenantWide) {

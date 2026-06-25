@@ -6,12 +6,12 @@ namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class SupplierItemMapping extends TenantOwnedModel
+final class SupplierItemMapping extends CoreModel
 {
     use SoftDeletes;
 

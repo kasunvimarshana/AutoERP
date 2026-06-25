@@ -11,14 +11,14 @@ use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Constants\OrganizationUnitErrorCode;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
-use Modules\User\Services\UserOrganizationUnitService;
+use Modules\User\Services\UserTenantService;
 use Throwable;
 
 final class AssignUserToOrganizationUnitService
 {
     public function __construct(
         private readonly OrganizationUnitRepositoryInterface $units,
-        private readonly UserOrganizationUnitService $userOrganizationUnits,
+        private readonly UserTenantService $userTenants,
         private readonly OrganizationUnitContext $organizationUnitContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
@@ -56,10 +56,11 @@ final class AssignUserToOrganizationUnitService
                     ));
                 }
 
-                return $this->userOrganizationUnits->assign([
+                return $this->userTenants->create([
                     'tenant_id' => $resolvedTenantId,
                     'organization_unit_id' => $unitId,
                     'user_id' => $userId,
+                    'role_id' => $this->toNullableInt($payload['role_id'] ?? null),
                     'is_default' => (bool) ($payload['is_default'] ?? false),
                     'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : null,
                 ]);

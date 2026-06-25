@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('tax_transactions', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('tax_id')->nullable();
-            $table->foreignId('tax_document_snapshot_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('tax_id')->nullable()->constrained('taxes', 'id')->nullOnDelete();
+            $table->foreignId('tax_document_snapshot_id')->nullable()->constrained('tax_document_snapshots', 'id')->nullOnDelete();
             $table->date('transaction_date');
             $table->string('source_module', 100)->nullable();
             $table->string('source_type', 100);
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->boolean('recoverable')->default(false);
             $table->boolean('payable')->default(false);
             $table->boolean('receivable')->default(false);
-            $table->foreignId('account_id')->nullable();
+            $table->foreignId('account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
 
@@ -41,24 +41,6 @@ return new class extends Migration
             $table->index(['tax_type', 'tax_code', 'transaction_date'], 'tax_transactions_tax_date_idx');
             $table->index(['party_type', 'party_id'], 'tax_transactions_party_idx');
             $table->index(['source_type', 'source_id'], 'tax_transactions_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'tax_transactions_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'tax_transactions_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['tax_id', 'tenant_id'], 'tax_transactions_tax_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('taxes')
-                ->restrictOnDelete();
-            $table->foreign(['tax_document_snapshot_id', 'tenant_id'], 'tax_transactions_tax_document_snapshot_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('tax_document_snapshots')
-                ->restrictOnDelete();
-            $table->foreign(['account_id', 'tenant_id'], 'tax_transactions_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
-                ->restrictOnDelete();
         });
     }
 

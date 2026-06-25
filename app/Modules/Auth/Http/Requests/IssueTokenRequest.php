@@ -19,10 +19,13 @@ final class IssueTokenRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'provider_id' => ['nullable', 'integer', 'min:1'],
             'client_id' => ['nullable', 'integer', 'min:1'],
             'identity_id' => ['nullable', 'integer', 'min:1'],
             'session_id' => ['nullable', 'integer', 'min:1'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
             'scopes' => ['nullable', 'array'],
             'scopes.*' => ['string', 'max:100'],
             'grant_type' => ['required', 'string', 'max:80'],

@@ -14,11 +14,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('billing_period_id');
+            $table->foreignId('billing_period_id')->constrained('rental_billing_periods')->cascadeOnDelete();
             $table->unsignedInteger('run_version');
-            $table->foreignId('supersedes_run_id')->nullable();
+            $table->foreignId('supersedes_run_id')->nullable()->constrained('rental_calculation_runs')->nullOnDelete();
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
             $table->string('calculation_status', 30)->default('draft');
             $table->string('document_status', 30)->default('not_generated');
@@ -43,41 +43,6 @@ return new class extends Migration
             $table->unique(['billing_period_id', 'run_version'], 'rental_calculation_runs_period_version_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_runs_fingerprint_uk');
             $table->index(['billing_period_id', 'calculation_status'], 'rental_calculation_runs_period_status_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_calculation_runs_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_runs_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['billing_period_id', 'tenant_id'], 'rental_calculation_runs_billing_period_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_billing_periods')
-                ->cascadeOnDelete();
-            $table->foreign(['supersedes_run_id', 'tenant_id'], 'rental_calculation_runs_supersedes_run_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_calculation_runs')
-                ->restrictOnDelete();
-
-            $table->foreign(['submitted_by', 'tenant_id'], 'rental_calculation_runs_submitted_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['approved_by', 'tenant_id'], 'rental_calculation_runs_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['reversed_by', 'tenant_id'], 'rental_calculation_runs_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'rental_calculation_runs_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_calculation_runs_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

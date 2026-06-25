@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 use Modules\UOM\Constants\UomCategory;
 use Modules\UOM\Constants\UomType;
 
-class UpsertUnitOfMeasureRequest extends TenantScopedRequest
+class UpsertUnitOfMeasureRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        parent::prepareForValidation();
-
         $normalized = [];
         foreach (['type', 'category'] as $field) {
             if ($this->filled($field)) {
@@ -45,7 +43,7 @@ class UpsertUnitOfMeasureRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units', 'id')],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
             'code' => array_merge($required, ['string', 'max:50']),
             'name' => array_merge($required, ['string', 'max:255']),

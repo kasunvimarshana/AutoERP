@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class SupplierCreditProfile extends TenantOwnedModel
+final class SupplierCreditProfile extends CoreModel
 {
     protected $table = 'supplier_credit_profiles';
 

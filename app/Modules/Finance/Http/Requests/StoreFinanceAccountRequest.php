@@ -13,6 +13,7 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
+        $tenantId = $this->tenantId();
         $accountId = $this->route('account');
 
         return [
@@ -21,19 +22,21 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
             'account_type_id' => [
                 'required',
                 'integer',
-                $this->tenantExists('finance_account_types', 'id'),
+                Rule::exists('finance_account_types', 'id')
+                    ->where(fn ($query) => $query->whereNull('tenant_id')->orWhere('tenant_id', $tenantId)),
             ],
             'code' => [
                 'required',
                 'string',
                 'max:100',
-                $this->tenantUnique('finance_accounts', 'code')
+                Rule::unique('finance_accounts', 'code')
+                    ->where('tenant_id', $tenantId)
                     ->ignore(is_numeric($accountId) ? (int) $accountId : null),
             ],
             'name' => ['required', 'string', 'max:255'],
             'normal_balance' => ['required', Rule::enum(NormalBalance::class)],
-            'account_category_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('finance_account_categories', 'id')],
-            'parent_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('finance_accounts', 'id')],
+            'account_category_id' => ['nullable', 'integer', 'min:1', 'exists:finance_account_categories,id'],
+            'parent_id' => ['nullable', 'integer', 'min:1', 'exists:finance_accounts,id'],
             'description' => ['nullable', 'string'],
             'is_control_account' => ['nullable', 'boolean'],
             'is_posting_account' => ['nullable', 'boolean'],

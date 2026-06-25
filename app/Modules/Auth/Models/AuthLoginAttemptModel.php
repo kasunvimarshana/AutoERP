@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class AuthLoginAttemptModel extends TenantOwnedModel
+final class AuthLoginAttemptModel extends CoreModel
 {
     protected $table = 'auth_login_attempts';
 

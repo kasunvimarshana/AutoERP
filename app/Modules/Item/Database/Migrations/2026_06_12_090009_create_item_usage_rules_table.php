@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('item_usage_rules', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('item_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->string('module_code', 50);
             $table->boolean('is_enabled')->default(true);
             $table->timestamps();
@@ -22,16 +22,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'item_id', 'module_code'], 'item_usage_rules_item_module_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'item_usage_rules_tenant_org_idx');
             $table->index('item_id', 'item_usage_rules_item_idx');
-
-            $table->unique(['id', 'tenant_id'], 'item_usage_rules_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'item_usage_rules_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'item_usage_rules_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->cascadeOnDelete();
         });
     }
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-final class ListSessionsRequest extends TenantScopedRequest
+final class ListSessionsRequest extends FormRequest
 {
     public function authorize(): bool
     {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -29,7 +29,7 @@ export default function VehicleEditPage() {
     const vehicleId = Number(useParams().id);
     const navigate = useNavigate();
     const auth = useAuth();
-    const canUpdate = hasVehiclePermission(auth, vehiclePermissions.update);
+    const canUpdate = hasVehiclePermission(auth.permissions, vehiclePermissions.update);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [activeTab, setActiveTab] = useState<EditTab>('basic');
     const [make, setMake] = useState<VehicleMake | null>(null);
@@ -40,13 +40,11 @@ export default function VehicleEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
+    const initialSnapshot = useRef<string | null>(null);
 
     useEffect(() => {
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (!controller.signal.aborted) setLoading(true);
-        });
+        setLoading(true);
         getVehicle(vehicleId, controller.signal)
             .then((value) => {
                 if (controller.signal.aborted) return;
@@ -57,13 +55,13 @@ export default function VehicleEditPage() {
                 setCategory(value.category as VehicleCategory ?? null);
                 const mapped = vehicleToPayload(value);
                 setPayload(mapped);
-                setInitialSnapshot(JSON.stringify({
+                initialSnapshot.current = JSON.stringify({
                     payload: mapped,
                     makeId: value.make?.id ?? null,
                     modelId: value.model?.id ?? null,
                     typeId: value.type?.id ?? null,
                     categoryId: value.category?.id ?? null,
-                }));
+                });
                 setError(null);
             })
             .catch((requestError) => {
@@ -90,7 +88,7 @@ export default function VehicleEditPage() {
         typeId: type?.id ?? null,
         categoryId: category?.id ?? null,
     });
-    const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot && snapshot !== initialSnapshot && !submitting));
+    const confirmDiscard = useUnsavedChanges(Boolean(initialSnapshot.current && snapshot !== initialSnapshot.current && !submitting));
 
     if (!canUpdate) {
         return (

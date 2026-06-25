@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('purchase_header_adjustments', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('source_type');
             $table->unsignedBigInteger('source_id');
             $table->unsignedBigInteger('origin_purchase_header_adjustment_id')->nullable();
@@ -29,8 +29,8 @@ return new class extends Migration
             $table->decimal('remaining_amount', 20, 6);
             $table->string('allocation_method')->default('proportional');
             $table->boolean('is_allocatable')->default(true);
-            $table->foreignId('finance_posting_profile_id')->nullable();
-            $table->foreignId('finance_account_id')->nullable();
+            $table->foreignId('finance_posting_profile_id')->nullable()->constrained('finance_posting_profiles', 'id')->nullOnDelete();
+            $table->foreignId('finance_account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
             $table->string('cost_treatment', 80)->nullable();
             $table->string('tax_treatment', 80)->nullable();
             $table->string('mapping_source', 80)->default('catalogue');
@@ -45,25 +45,11 @@ return new class extends Migration
             $table->index('adjustment_type', 'purchase_header_adjustments_type_idx');
             $table->index('finance_posting_profile_id', 'purchase_header_adjustments_profile_idx');
             $table->index('finance_account_id', 'purchase_header_adjustments_account_idx');
-            $table->index('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_idx');
-
-            $table->unique(['id', 'tenant_id'], 'purchase_header_adjustments_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_header_adjustments_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['finance_posting_profile_id', 'tenant_id'], 'purchase_header_adjustments_finance_posting_prof_ba428243_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_posting_profiles')
-                ->restrictOnDelete();
-            $table->foreign(['finance_account_id', 'tenant_id'], 'purchase_header_adjustments_finance_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
-                ->restrictOnDelete();
-            $table->foreign(['origin_purchase_header_adjustment_id', 'tenant_id'], 'purchase_header_adjustments_origin_tenant_fk')
-                ->references(['id', 'tenant_id'])
+            $table->foreign('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_fk')
+                ->references('id')
                 ->on('purchase_header_adjustments')
-                ->restrictOnDelete();
+                ->nullOnDelete();
+            $table->index('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_idx');
         });
     }
 

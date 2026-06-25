@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Tax\Models\TaxGroup;
 use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalCalculationLine extends TenantOwnedModel
+final class RentalCalculationLine extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_calculation_lines';

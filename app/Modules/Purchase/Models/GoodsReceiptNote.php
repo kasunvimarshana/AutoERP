@@ -7,14 +7,14 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Supplier\Models\Supplier;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class GoodsReceiptNote extends TenantOwnedModel
+final class GoodsReceiptNote extends CoreModel
 {
     use SoftDeletes;
 

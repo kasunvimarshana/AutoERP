@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('cheque_templates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->string('bank_name')->nullable();
             $table->string('template_name');
             $table->decimal('page_width_mm', 8, 3);
@@ -40,12 +40,6 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'cheque_templates_tenant_org_idx');
             $table->index(['tenant_id', 'is_active', 'is_default'], 'cheque_templates_active_default_idx');
             $table->unique('default_scope_key', 'cheque_templates_default_scope_uk');
-
-            $table->unique(['id', 'tenant_id'], 'cheque_templates_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'cheque_templates_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

@@ -13,9 +13,7 @@ export function VehicleAttributesView({ vehicleId }: { vehicleId: number }) {
 
     useEffect(() => {
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (!controller.signal.aborted) setLoading(true);
-        });
+        setLoading(true);
         listVehicleAttributes(vehicleId, { per_page: 50 }, controller.signal)
             .then((response) => {
                 if (!controller.signal.aborted) {

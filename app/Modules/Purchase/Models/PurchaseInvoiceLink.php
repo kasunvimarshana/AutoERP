@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Invoice\Models\Invoice;
 
-final class PurchaseInvoiceLink extends TenantOwnedModel
+final class PurchaseInvoiceLink extends CoreModel
 {
     protected $table = 'purchase_invoice_links';
 

@@ -38,7 +38,8 @@ final class StorePaymentRequest extends TenantScopedRequest
             'bank_account_id' => [
                 'nullable',
                 'integer',
-                $this->tenantExists('finance_accounts', 'id')
+                Rule::exists('finance_accounts', 'id')
+                    ->where('tenant_id', $this->tenantId())
                     ->where('is_bank_account', true),
             ],
             'payee_name' => ['nullable', 'string', 'max:255'],
@@ -95,7 +96,8 @@ final class StorePaymentRequest extends TenantScopedRequest
             'lines.*.internal_bank_account_id' => [
                 'nullable',
                 'integer',
-                $this->tenantExists('finance_accounts', 'id')
+                Rule::exists('finance_accounts', 'id')
+                    ->where('tenant_id', $this->tenantId())
                     ->where('is_bank_account', true),
             ],
             'lines.*.instrument_direction' => ['nullable', Rule::in(['received', 'issued'])],

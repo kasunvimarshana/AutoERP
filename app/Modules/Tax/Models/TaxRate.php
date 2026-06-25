@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class TaxRate extends TenantOwnedModel
+final class TaxRate extends CoreModel
 {
     protected $table = 'tax_rates';
 
@@ -16,7 +16,6 @@ final class TaxRate extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
             'tax_id' => 'integer',
             'rate' => 'decimal:6',
             'effective_from' => 'date',

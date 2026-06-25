@@ -17,7 +17,6 @@ $middleware = [
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
-    'tenant.feature:vehicle-service',
 ];
 
 Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.vehicle-service.')->group(function (): void {
@@ -53,10 +52,8 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     Route::post('jobs/{job}/payments/prepare', [VehicleServicePaymentController::class, 'prepare'])->whereNumber('job')->name('payments.prepare');
     Route::post('jobs/{job}/payments', [VehicleServicePaymentController::class, 'store'])->whereNumber('job')->name('payments.store');
 
-    Route::get('jobs/{job}/documents/options', [VehicleServiceDocumentController::class, 'options'])->whereNumber('job')->name('documents.options');
     Route::get('jobs/{job}/documents', [VehicleServiceDocumentController::class, 'index'])->whereNumber('job')->name('documents.index');
     Route::post('jobs/{job}/documents', [VehicleServiceDocumentController::class, 'store'])->whereNumber('job')->name('documents.store');
-    Route::get('jobs/{job}/documents/{document}/download', [VehicleServiceDocumentController::class, 'download'])->whereNumber(['job', 'document'])->name('documents.download');
     Route::delete('jobs/{job}/documents/{document}', [VehicleServiceDocumentController::class, 'destroy'])->whereNumber(['job', 'document'])->name('documents.destroy');
     Route::get('jobs/{job}/status-history', [VehicleServiceJobController::class, 'statusHistory'])->whereNumber('job')->name('status-history.index');
 

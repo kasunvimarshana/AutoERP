@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class InvoiceCreditAllocation extends TenantOwnedModel
+final class InvoiceCreditAllocation extends CoreModel
 {
     protected $table = 'invoice_credit_allocations';
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -15,46 +15,26 @@ import { useApi } from '@/shared/hooks/useApi';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createVehicleServiceInvoice, getVehicleServiceJob, listBillableLines, previewVehicleServiceInvoice } from '../vehicleServiceApi';
-import type { VehicleServiceInvoicePreview, VehicleServiceJob, VehicleServiceJobLine } from '../vehicleServiceTypes';
+import type { VehicleServiceInvoicePreview } from '../vehicleServiceTypes';
+
+const today = businessDateInputValue;
 
 export default function VehicleServiceInvoiceCreatePage() {
     const jobId = Number(useParams().id);
+    const navigate = useNavigate();
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const lines = useApi((signal) => listBillableLines(jobId, signal), [jobId]);
-
-    if (job.loading || lines.loading) return <LoadingState />;
-    if (!job.data) return <ErrorAlert error={job.error} />;
-
-    return (
-        <VehicleServiceInvoiceEditor
-            key={jobId}
-            jobId={jobId}
-            job={job.data}
-            billableLines={lines.data ?? []}
-            loadError={job.error ?? lines.error}
-        />
-    );
-}
-
-function initialQuantities(lines: VehicleServiceJobLine[]): Record<number, string> {
-    return Object.fromEntries(lines
-        .filter((line) => line.invoice_state !== 'invoiced')
-        .map((line) => [line.id, line.remaining_billable_quantity ?? line.quantity]));
-}
-
-function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
-    jobId: number;
-    job: VehicleServiceJob;
-    billableLines: VehicleServiceJobLine[];
-    loadError: ApiError | null;
-}) {
-    const navigate = useNavigate();
-    const [form, setForm] = useState({ invoice_date: businessDateInputValue(), due_date: '', exchange_rate: '1.000000', notes: '' });
-    const [quantities, setQuantities] = useState<Record<number, string>>(() => initialQuantities(billableLines));
+    const [form, setForm] = useState({ invoice_date: today(), due_date: '', exchange_rate: '1.000000', notes: '' });
+    const [quantities, setQuantities] = useState<Record<number, string>>({});
     const [preview, setPreview] = useState<VehicleServiceInvoicePreview | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-
+    useEffect(() => {
+        if (!lines.data) return;
+        setQuantities(Object.fromEntries(lines.data
+            .filter((line) => line.invoice_state !== 'invoiced')
+            .map((line) => [line.id, line.remaining_billable_quantity ?? line.quantity])));
+    }, [lines.data]);
     const selectedQuantities = () => Object.fromEntries(
         Object.entries(quantities).filter(([, quantity]) => isPositiveDecimal(quantity)),
     );
@@ -66,34 +46,26 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
         line_quantities: selectedQuantities(),
     });
     const hasSelection = Object.values(quantities).some(isPositiveDecimal);
+    if (job.loading || lines.loading) return <LoadingState />;
+    if (!job.data) return <ErrorAlert error={job.error} />;
 
     return (
         <>
-            <ContentHeader title={`Invoice ${job.job_number}`} description="Creates, approves and posts the customer invoice in one transaction." />
-            <ErrorAlert error={error ?? loadError} />
+            <ContentHeader title={`Invoice ${job.data.job_number}`} description="Creates, approves and posts the customer invoice in one transaction." />
+            <ErrorAlert error={error ?? job.error ?? lines.error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <DataTable rows={billableLines} rowKey={(line) => line.id} columns={[
+                <DataTable rows={lines.data ?? []} rowKey={(line) => line.id} columns={[
                     { key: 'line', header: 'Line', render: (line) => line.line_number },
                     { key: 'description', header: 'Description', render: (line) => line.description },
                     { key: 'quantity', header: 'Job quantity', render: (line) => line.quantity },
                     { key: 'invoiced', header: 'Already invoiced', render: (line) => line.invoiced_quantity ?? '0.000000' },
                     { key: 'remaining', header: 'Remaining', render: (line) => line.remaining_billable_quantity ?? line.quantity },
-                    {
-                        key: 'invoice',
-                        header: 'Invoice now',
-                        render: (line) => line.invoice_state === 'invoiced'
-                            ? <span className="font-semibold text-slate-500">Complete</span>
-                            : (
-                                <DecimalInput
-                                    value={quantities[line.id] ?? ''}
-                                    max={line.remaining_billable_quantity ?? line.quantity}
-                                    onChange={(event) => {
-                                        setPreview(null);
-                                        setQuantities((current) => ({ ...current, [line.id]: event.target.value }));
-                                    }}
-                                />
-                            ),
-                    },
+                    { key: 'invoice', header: 'Invoice now', render: (line) => line.invoice_state === 'invoiced'
+                        ? <span className="font-semibold text-slate-500">Complete</span>
+                        : <DecimalInput value={quantities[line.id] ?? ''} max={line.remaining_billable_quantity ?? line.quantity} onChange={(event) => {
+                            setPreview(null);
+                            setQuantities((current) => ({ ...current, [line.id]: event.target.value }));
+                        }} /> },
                     { key: 'price', header: 'Unit price', render: (line) => line.unit_price },
                     { key: 'total', header: 'Total', render: (line) => line.line_total },
                 ]} />
@@ -105,28 +77,16 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                         <Textarea label="Notes" value={form.notes} error={fieldError(error, 'notes')} onChange={(event) => { setPreview(null); setForm({ ...form, notes: event.target.value }); }} />
                         <div className="flex gap-2">
                             <Button type="button" variant="secondary" loading={busy} disabled={!hasSelection} onClick={async () => {
-                                setBusy(true);
-                                setError(null);
-                                try {
-                                    setPreview(await previewVehicleServiceInvoice(jobId, payload()));
-                                } catch (requestError) {
-                                    setError(toApiError(requestError));
-                                } finally {
-                                    setBusy(false);
-                                }
+                                setBusy(true); setError(null);
+                                try { setPreview(await previewVehicleServiceInvoice(jobId, payload())); } catch (requestError) { setError(toApiError(requestError)); } finally { setBusy(false); }
                             }}>Preview</Button>
                             <Button type="button" loading={busy} disabled={!hasSelection} onClick={async () => {
-                                setBusy(true);
-                                setError(null);
+                                setBusy(true); setError(null);
                                 try {
                                     const invoice = await createVehicleServiceInvoice(jobId, payload());
                                     const invoiceId = Number(invoice.id);
                                     navigate(Number.isFinite(invoiceId) ? `/invoices/${invoiceId}` : `/vehicle-service/jobs/${jobId}`);
-                                } catch (requestError) {
-                                    setError(toApiError(requestError));
-                                } finally {
-                                    setBusy(false);
-                                }
+                                } catch (requestError) { setError(toApiError(requestError)); } finally { setBusy(false); }
                             }}>Create & post invoice</Button>
                         </div>
                         {preview && <DetailGrid items={[

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, fieldError, toApiError, type ApiError as ApiErrorType } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -50,7 +49,6 @@ function balanceOf(invoice: Invoice): string {
 }
 
 export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create' | 'prepare' }) {
-    const { confirm, confirmDialog } = useConfirmDialog();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedTab = searchParams.get('tab') as PaymentTab | null;
@@ -127,7 +125,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 setPaymentRows([blankPaymentMethodRow(balance)]);
                 setSupplierState(invoice.party ?? null);
                 setCurrencyState(invoice.currency ?? null);
-                setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? 'Invoice number unavailable'}.`);
+                setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? `#${invoice.id}`}.`);
                 return;
             }
 
@@ -136,7 +134,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
 
             setSupplierState(order.supplier ?? null);
             setCurrencyState(order.currency ?? null);
-            setSourceNotice(`${order.purchase_order_number ?? 'Selected purchase order'} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
+            setSourceNotice(`${order.purchase_order_number ?? `Purchase order #${order.id}`} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
         } catch (requestError) {
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
             setError(toApiError(requestError));
@@ -180,12 +178,10 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         }
     };
 
-    const setSupplier = async (next: NamedResource | null) => {
-        if (supplier?.id && next?.id !== supplier.id && hasAllocatedInvoices && !await confirm({
-            title: 'Change supplier?',
-            message: 'Changing the supplier clears all selected invoice allocations.',
-            confirmLabel: 'Change supplier',
-        })) return;
+    const setSupplier = (next: NamedResource | null) => {
+        if (supplier?.id && next?.id !== supplier.id && hasAllocatedInvoices && !window.confirm('Changing supplier clears selected invoice allocations.')) {
+            return;
+        }
         if (next?.id !== supplier?.id) cancelSourceRequest();
         setSupplierState(next);
         setInvoicePage(1);
@@ -198,13 +194,9 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         }
     };
 
-    const setCurrency = async (next: NamedResource | null) => {
+    const setCurrency = (next: NamedResource | null) => {
         if (currencyLocked && next?.id !== currency?.id) {
-            if (!await confirm({
-                title: 'Change currency?',
-                message: 'Changing the currency clears invoice allocations that established the current currency.',
-                confirmLabel: 'Change currency',
-            })) return;
+            if (!window.confirm('Changing currency clears invoice allocations that established the current currency.')) return;
             cancelSourceRequest();
             setAllocations({});
             setAllocatedInvoices({});
@@ -214,17 +206,13 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         setCurrencyState(next);
     };
 
-    const updateAllocation = async (invoice: Invoice, nextAmount: string) => {
+    const updateAllocation = (invoice: Invoice, nextAmount: string) => {
         const invoiceCurrencyId = invoice.currency?.id;
         const allocatedCurrencyIds = Object.values(allocatedInvoices)
             .filter((row) => row.id !== invoice.id && isPositiveDecimal(allocations[row.id] ?? '0.000000') && row.currency?.id)
             .map((row) => row.currency?.id);
         if (isPositiveDecimal(nextAmount) && invoiceCurrencyId && allocatedCurrencyIds.length > 0 && !allocatedCurrencyIds.includes(invoiceCurrencyId)) {
-            if (!await confirm({
-                title: 'Use a different currency?',
-                message: 'This invoice uses a different currency. Existing allocations will be cleared before continuing.',
-                confirmLabel: 'Clear and continue',
-            })) return;
+            if (!window.confirm('This invoice uses a different currency. Clear existing allocations and continue?')) return;
             const nextAllocations = { [invoice.id]: nextAmount };
             setAllocations(nextAllocations);
             setAllocatedInvoices({ [invoice.id]: invoice });
@@ -334,8 +322,8 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                     <h2 className="mb-4 text-base font-semibold text-slate-950">Payment Details</h2>
                     <div className="grid gap-4 md:grid-cols-2">
-                        <SupplierLookupSelect value={supplier} onChange={(value) => void setSupplier(value)} error={errorFor('supplier_id')} />
-                        <CurrencyLookupSelect value={currency} onChange={(value) => void setCurrency(value)} error={errorFor('currency_id')} disabled={currencyLocked} />
+                        <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
+                        <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} disabled={currencyLocked} />
                         <Input label="Payment date" type="date" value={paymentDate} error={errorFor('payment_date')} onChange={(event) => setPaymentDate(event.target.value)} />
                         <Input label="Reference" value={referenceNumber} error={errorFor('reference_number')} onChange={(event) => setReferenceNumber(event.target.value)} />
                         <DecimalInput label="Payment total" value={amount} error={errorFor('amount')} onChange={(event) => updateAmount(event.target.value)} />
@@ -367,7 +355,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {(invoiceResult.data?.data ?? []).map((invoice) => (
-                                                <AllocationRow key={invoice.id} invoice={invoice} value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(value) => void updateAllocation(invoice, value)} />
+                                                <AllocationRow key={invoice.id} invoice={invoice} value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(value) => updateAllocation(invoice, value)} />
                                             ))}
                                         </tbody>
                                     </table>
@@ -382,7 +370,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                                 <Summary label="Balance" value={<MoneyDisplay value={balanceOf(invoice)} />} />
                                             </dl>
                                             <div className="mt-3">
-                                                <DecimalInput label="Allocation" value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(event) => void updateAllocation(invoice, event.target.value)} />
+                                                <DecimalInput label="Allocation" value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(event) => updateAllocation(invoice, event.target.value)} />
                                             </div>
                                         </article>
                                     ))}
@@ -414,7 +402,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/payments')}>Cancel</Button>
                 <Button type="button" loading={busy} disabled={!canCreate} onClick={() => void submitPayment()}>{mode === 'prepare' ? 'Preview Payment' : 'Create Payment'}</Button>
             </div>
-            {confirmDialog}
         </div>
     );
 }
@@ -437,7 +424,7 @@ function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
                         <tbody className="divide-y divide-emerald-100">
                             {preview.allocations.map((allocation) => (
                                 <tr key={allocation.invoice_id}>
-                                    <td className="px-4 py-3">{allocation.invoice_number ?? 'Invoice number unavailable'}</td>
+                                    <td className="px-4 py-3">{allocation.invoice_number ?? `#${allocation.invoice_id}`}</td>
                                     <td className="px-4 py-3"><MoneyDisplay value={allocation.invoice_balance_before} /></td>
                                     <td className="px-4 py-3"><MoneyDisplay value={allocation.allocated_amount} /></td>
                                     <td className="px-4 py-3"><MoneyDisplay value={allocation.invoice_balance_after} /></td>

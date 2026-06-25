@@ -1,195 +1,135 @@
-import { useState } from 'react';
-import { platformAuditHref } from '@/modules/platform-administration/platformAdministrationPresentation';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button, LinkButton } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useEffect, useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { Textarea } from '@/shared/components/Textarea';
+import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
-import { listConfigurationHistory, rollbackConfigurationEntry } from '../settingsApi';
-import type {
-    ConfigurationEntry,
-    ConfigurationRevision,
-    ConfigurationScope,
-    PlatformConfigurationTarget,
-} from '../settingsTypes';
-
-interface Props {
-    entry: ConfigurationEntry | null;
-    scope: ConfigurationScope;
-    platformTarget?: PlatformConfigurationTarget;
-    canRollback: boolean;
-    canAudit: boolean;
-    onClose: () => void;
-    onChanged: (message: string) => void;
-}
+import { listConfigurationHistory } from '../settingsApi';
+import type { ConfigurationDefinition, ConfigurationRevision, ConfigurationScope } from '../settingsTypes';
 
 export function ConfigurationHistoryModal({
-    entry,
+    definitions,
+    selectedKey,
     scope,
-    platformTarget,
-    canRollback,
-    canAudit,
+    onSelectKey,
     onClose,
-    onChanged,
-}: Props) {
-    const { confirm, confirmDialog } = useConfirmDialog();
+}: {
+    definitions: ConfigurationDefinition[];
+    selectedKey: string | null;
+    scope: ConfigurationScope;
+    onSelectKey: (key: string) => void;
+    onClose: () => void;
+}) {
     const [page, setPage] = useState(1);
-    const [selected, setSelected] = useState<ConfigurationRevision | null>(null);
-    const [reason, setReason] = useState('');
-    const [working, setWorking] = useState(false);
-    const [error, setError] = useState<ApiError | null>(null);
+    const selected = definitions.find((definition) => definition.key === selectedKey) ?? null;
+
+    useEffect(() => {
+        setPage(1);
+    }, [selectedKey, scope]);
+
     const history = useApi(
-        (signal) => listConfigurationHistory(scope, entry?.key ?? '', page, signal, platformTarget),
-        [scope, entry?.key, page, platformTarget?.tenant_id, platformTarget?.organization_unit_id],
-        entry !== null,
-        true,
+        (signal) => listConfigurationHistory(scope, selectedKey ?? '', page, signal),
+        [scope, selectedKey, page],
+        selectedKey !== null,
     );
-
-    async function rollback() {
-        if (!entry || !selected || reason.trim().length < 10) return;
-        const accepted = await confirm({
-            title: 'Restore historical configuration',
-            message: (
-                <div className="space-y-2">
-                    <p>Restore the selected <strong>{entry.label}</strong> revision?</p>
-                    <p>This creates a new immutable revision. Existing history is never rewritten.</p>
-                    <p className="text-sm text-slate-600">Reason: “{reason.trim()}”</p>
-                </div>
-            ),
-            confirmLabel: selected.configured ? 'Restore revision' : 'Restore unconfigured state',
-            danger: false,
-        });
-        if (!accepted) return;
-
-        setWorking(true);
-        setError(null);
-        try {
-            const restored = await rollbackConfigurationEntry(
-                scope,
-                entry,
-                selected.id,
-                reason.trim(),
-                platformTarget,
-            );
-            onChanged(restored
-                ? `${entry.label} was restored as a new immutable revision.`
-                : `${entry.label} was restored to its unconfigured state.`);
-            setSelected(null);
-            setReason('');
-            history.reload();
-        } catch (requestError: unknown) {
-            setError(toApiError(requestError));
-            history.reload();
-        } finally {
-            setWorking(false);
-        }
-    }
-
-    const auditSubject = entry ? configurationAuditSubject(scope, platformTarget, entry.key) : null;
 
     return (
-        <>
-            <Modal
-                open={entry !== null}
-                title={entry ? `${entry.label} revision history` : 'Configuration revision history'}
-                onClose={onClose}
-                closeDisabled={working}
-            >
-                <div className="space-y-4">
-                    <ErrorAlert error={history.error ?? error} title="Unable to load or restore configuration history" />
-                    {history.loading && !history.data ? <LoadingState label="Loading immutable revision history..." /> : null}
-                    {(history.data?.data ?? []).map((revision) => (
-                        <article key={revision.id} className={`rounded-lg border p-4 ${selected?.id === revision.id ? 'border-blue-400 bg-blue-50' : 'border-slate-200'}`}>
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <StatusBadge status={revision.operation} />
-                                        <p className="text-sm font-semibold text-slate-900">{formatBusinessDateTime(revision.created_at)}</p>
-                                    </div>
-                                    <p className="mt-2 text-sm text-slate-700">{revisionValue(revision)}</p>
-                                    <p className="mt-1 text-xs text-slate-500">By {revision.actor?.name ?? 'System process'}{revision.resulting_row_version ? ` · resulting version ${revision.resulting_row_version}` : ''}</p>
-                                    {revision.reason ? <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600">{revision.reason}</p> : null}
-                                </div>
-                                {canRollback ? (
-                                    <Button
-                                        variant="secondary"
-                                        disabled={working}
-                                        onClick={() => { setSelected(revision); setReason(''); setError(null); }}
-                                    >
-                                        Select revision
-                                    </Button>
-                                ) : null}
-                            </div>
-                        </article>
-                    ))}
-                    {(history.data?.data ?? []).length === 0 && !history.loading ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No immutable revisions have been recorded for this setting.</p> : null}
-                    <Pagination meta={history.data?.meta} onPageChange={setPage} />
-
-                    {selected && canRollback ? (
-                        <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                            <p className="text-sm font-semibold text-blue-950">Restore revision from {formatBusinessDateTime(selected.created_at)}</p>
-                            <Textarea
-                                label="Rollback reason"
-                                value={reason}
-                                minLength={10}
-                                maxLength={1000}
-                                required
-                                disabled={working}
-                                onChange={(event) => setReason(event.target.value)}
-                                hint="At least 10 characters. The reason is stored in the new revision and platform audit trail."
-                            />
-                            <div className="flex flex-wrap justify-end gap-2">
-                                <Button variant="secondary" disabled={working} onClick={() => { setSelected(null); setReason(''); }}>Cancel rollback</Button>
-                                <Button loading={working} disabled={reason.trim().length < 10} onClick={() => void rollback()}>Restore as new revision</Button>
-                            </div>
-                        </div>
-                    ) : null}
-
-                    <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-                        {canAudit && auditSubject ? (
-                            <LinkButton
-                                variant="secondary"
-                                to={platformAuditHref({
-                                    source_module: 'configuration',
-                                    subject_type: 'configuration_entry',
-                                    subject_id: auditSubject,
-                                    tenant_id: platformTarget?.tenant_id,
-                                })}
-                            >
-                                View related platform audit
-                            </LinkButton>
-                        ) : null}
-                        <Button variant="secondary" disabled={working} onClick={onClose}>Close</Button>
+        <Modal
+            open={selectedKey !== null}
+            title={selected ? `${selected.label} history` : 'Configuration history'}
+            onClose={onClose}
+        >
+            <div className="space-y-4">
+                <Select
+                    label="Setting"
+                    value={selectedKey ?? ''}
+                    options={definitions.map((definition) => ({
+                        value: definition.key,
+                        label: `${definition.label} · ${definition.owner}`,
+                    }))}
+                    onChange={(event) => onSelectKey(event.target.value)}
+                />
+                <p className="text-sm text-slate-500">
+                    Immutable change history for this scope. Removed overrides remain available here.
+                    Protected values are never stored or displayed.
+                </p>
+                <ErrorAlert error={history.error} />
+                {history.loading && !history.data ? (
+                    <LoadingState label="Loading history..." />
+                ) : (
+                    <div className="space-y-3">
+                        {(history.data?.data ?? []).map((revision) => (
+                            <HistoryItem key={revision.id} revision={revision} />
+                        ))}
+                        {(history.data?.data ?? []).length === 0 && (
+                            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+                                No recorded changes exist for this setting.
+                            </p>
+                        )}
                     </div>
-                </div>
-            </Modal>
-            {confirmDialog}
-        </>
+                )}
+                <Pagination meta={history.data?.meta} onPageChange={setPage} />
+            </div>
+        </Modal>
     );
 }
 
-function revisionValue(revision: ConfigurationRevision): string {
-    if (revision.sensitive) return revision.display_value ?? (revision.configured ? 'Configured (protected)' : 'Not configured');
-    if (!revision.configured) return 'Not configured';
-    if (revision.value === null || revision.value === undefined) return 'Configured as empty';
-    if (typeof revision.value === 'boolean') return revision.value ? 'Enabled' : 'Disabled';
-    if (typeof revision.value === 'string') return revision.value;
-    if (Array.isArray(revision.value)) return revision.value.map(String).join(', ');
-    return JSON.stringify(revision.value);
+function HistoryItem({ revision }: { revision: ConfigurationRevision }) {
+    return (
+        <article className="rounded-lg border border-slate-200 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p className="font-medium text-slate-900">{humanize(revision.action)}</p>
+                    <p className="text-xs text-slate-500">
+                        {revision.changed_by_name ?? 'System'} · {new Date(revision.created_at).toLocaleString()}
+                    </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                    Version {revision.entry_row_version}
+                </span>
+            </div>
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <HistoryValue
+                    label="Before"
+                    exists={revision.before_exists}
+                    value={revision.before_value}
+                    protectedValue={revision.sensitive}
+                />
+                <HistoryValue
+                    label="After"
+                    exists={revision.after_exists}
+                    value={revision.after_value}
+                    protectedValue={revision.sensitive}
+                />
+            </div>
+        </article>
+    );
 }
 
-function configurationAuditSubject(
-    scope: ConfigurationScope,
-    platformTarget: PlatformConfigurationTarget | undefined,
-    key: string,
-): string {
-    return [scope, platformTarget?.tenant_id, platformTarget?.organization_unit_id, key]
-        .filter((part) => part !== undefined && part !== null && String(part) !== '')
-        .join(':');
+function HistoryValue({ label, exists, value, protectedValue }: {
+    label: string;
+    exists: boolean;
+    value: unknown;
+    protectedValue: boolean;
+}) {
+    return (
+        <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 break-words text-slate-800">
+                {!exists ? 'No override' : protectedValue ? 'Protected value' : formatHistoryValue(value)}
+            </p>
+        </div>
+    );
+}
+
+function formatHistoryValue(value: unknown): string {
+    if (value === null || value === undefined) return 'Null value';
+    if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+    if (typeof value === 'string') return value;
+    return JSON.stringify(value);
+}
+
+function humanize(value: string): string {
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

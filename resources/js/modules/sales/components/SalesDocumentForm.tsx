@@ -4,7 +4,6 @@ import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import type { NamedResource } from '@/shared/types/common';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import {
     createSalesOrder,
     createSalesQuotation,
@@ -62,10 +61,6 @@ export function SalesDocumentForm({
     );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [defaultWarehouseError, setDefaultWarehouseError] = useState<ApiError | null>(null);
-    const [defaultWarehouseLoading, setDefaultWarehouseLoading] = useState(false);
-    const [defaultWarehouseReload, setDefaultWarehouseReload] = useState(0);
-    const formGuard = useMutationFormGuard(submitting);
     const warehouseTouched = useRef(Boolean(order?.warehouse));
     const locationTouched = useRef(Boolean(order?.warehouse_location));
     const totals = useMemo(
@@ -75,33 +70,24 @@ export function SalesDocumentForm({
     const errorFor = (name: string) => fieldError(error, name);
 
     useEffect(() => {
-        if (kind !== 'order' || document || warehouseTouched.current) return;
+        if (kind !== 'order' || document || warehouseTouched.current || warehouse || location) return;
 
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (controller.signal.aborted) return;
-            setDefaultWarehouseLoading(true);
-            setDefaultWarehouseError(null);
-        });
         void getDefaultWarehouse(controller.signal)
             .then(async (defaultWarehouse) => {
-                if (controller.signal.aborted || warehouseTouched.current || !defaultWarehouse) return;
-                const defaultLocation = locationTouched.current
-                    ? null
-                    : await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
-                if (controller.signal.aborted || warehouseTouched.current) return;
+                if (controller.signal.aborted || warehouseTouched.current || warehouse || !defaultWarehouse) return;
                 setWarehouse(defaultWarehouse);
-                if (!locationTouched.current && defaultLocation) setLocation(defaultLocation);
+
+                if (locationTouched.current || location) return;
+                const defaultLocation = await getDefaultWarehouseLocation(Number(defaultWarehouse.id), controller.signal);
+                if (!controller.signal.aborted && !locationTouched.current && !location && defaultLocation) {
+                    setLocation(defaultLocation);
+                }
             })
-            .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setDefaultWarehouseError(toApiError(requestError));
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setDefaultWarehouseLoading(false);
-            });
+            .catch(() => undefined);
 
         return () => controller.abort();
-    }, [document, kind, defaultWarehouseReload]);
+    }, [document, kind, location, warehouse]);
 
     async function submit(payload: SalesDocumentPayload) {
         const saved = kind === 'quotation'
@@ -112,7 +98,6 @@ export function SalesDocumentForm({
                 ? await updateSalesOrder(document.id, payload)
                 : await createSalesOrder(payload);
 
-        formGuard.markSaved();
         navigate(`/sales/${kind === 'quotation' ? 'quotations' : 'orders'}/${saved.id}`);
     }
 
@@ -175,12 +160,6 @@ export function SalesDocumentForm({
         >
             <div className="space-y-5">
                 <ErrorAlert error={error} />
-                {defaultWarehouseError && (
-                    <div className="space-y-3">
-                        <ErrorAlert error={defaultWarehouseError} title="Default warehouse unavailable" />
-                        <Button type="button" variant="secondary" onClick={() => setDefaultWarehouseReload((current) => current + 1)}>Retry warehouse defaults</Button>
-                    </div>
-                )}
                 <SalesDocumentHeaderSection
                     kind={kind}
                     customer={customer}
@@ -191,28 +170,26 @@ export function SalesDocumentForm({
                     secondaryDate={secondaryDate}
                     exchangeRate={exchangeRate}
                     notes={notes}
-                    onCustomerChange={(value) => { formGuard.markDirty(); setCustomer(value); }}
+                    onCustomerChange={setCustomer}
                     onWarehouseChange={(value) => {
-                        formGuard.markDirty();
                         warehouseTouched.current = true;
                         setWarehouse(value);
                         setLocation(null);
                     }}
                     onLocationChange={(value) => {
-                        formGuard.markDirty();
                         locationTouched.current = true;
                         setLocation(value);
                     }}
-                    onCurrencyChange={(value) => { formGuard.markDirty(); setCurrency(value); }}
-                    onDocumentDateChange={(value) => { formGuard.markDirty(); setDocumentDate(value); }}
-                    onSecondaryDateChange={(value) => { formGuard.markDirty(); setSecondaryDate(value); }}
-                    onExchangeRateChange={(value) => { formGuard.markDirty(); setExchangeRate(value); }}
-                    onNotesChange={(value) => { formGuard.markDirty(); setNotes(value); }}
+                    onCurrencyChange={setCurrency}
+                    onDocumentDateChange={setDocumentDate}
+                    onSecondaryDateChange={setSecondaryDate}
+                    onExchangeRateChange={setExchangeRate}
+                    onNotesChange={setNotes}
                     errorFor={errorFor}
                 />
                 <SalesDocumentLinesSection
                     lines={lines}
-                    onChange={(value) => { formGuard.markDirty(); setLines(value); }}
+                    onChange={setLines}
                     errorFor={errorFor}
                     currencyId={currency?.id}
                     warehouseId={warehouse?.id}
@@ -220,14 +197,14 @@ export function SalesDocumentForm({
                 />
                 <SalesDocumentAdjustmentSection
                     adjustments={adjustments}
-                    onChange={(value) => { formGuard.markDirty(); setAdjustments(value); }}
+                    onChange={setAdjustments}
                     errorFor={errorFor}
                 />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
                         Cancel
                     </Button>
-                    <Button type="submit" loading={submitting || defaultWarehouseLoading}>
+                    <Button type="submit" loading={submitting}>
                         {document ? 'Save changes' : `Create ${kind}`}
                     </Button>
                 </div>

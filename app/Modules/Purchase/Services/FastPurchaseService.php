@@ -12,7 +12,6 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Enums\IdempotencyStatus;
 use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\IdempotencyService;
 use Modules\Finance\Models\FinanceAccount;
@@ -139,13 +138,13 @@ final class FastPurchaseService
                 $resolved['current_user_id'],
             );
 
-            if ($idempotency->status === IdempotencyStatus::Completed && is_array($idempotency->result)) {
+            if ((string) $idempotency->status === 'completed' && is_array($idempotency->result)) {
                 return $idempotency->result;
             }
-            if (! $idempotency->wasRecentlyCreated && $idempotency->status === IdempotencyStatus::InProgress) {
+            if (! $idempotency->wasRecentlyCreated && (string) $idempotency->status === 'in_progress') {
                 throw new InvalidArgumentException('Fast purchase request is already in progress for this supplier reference.');
             }
-            if ($idempotency->status !== IdempotencyStatus::InProgress) {
+            if ((string) $idempotency->status !== 'in_progress') {
                 throw new InvalidArgumentException('Fast purchase idempotency record is not executable.');
             }
 

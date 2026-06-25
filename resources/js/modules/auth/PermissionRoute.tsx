@@ -1,28 +1,23 @@
 import type { ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
-import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { hasPermission } from './accessControl';
 import { useAuth } from './AuthProvider';
 
 interface PermissionRouteProps {
-    permission?: string;
-    anyOf?: readonly string[];
+    permission: string;
     children?: ReactNode;
 }
 
-export function PermissionRoute({ permission, anyOf, children }: PermissionRouteProps) {
+export function PermissionRoute({ permission, children }: PermissionRouteProps) {
     const auth = useAuth();
+    const location = useLocation();
 
-    if (auth.isLoading || !auth.permissionsLoaded) {
+    if (auth.isLoading) {
         return <LoadingState label="Checking access..." fullPage />;
     }
 
-    const required = anyOf ?? (permission ? [permission] : []);
-    const allowed = required.length > 0 && required.some((candidate) => hasPermission(auth, candidate));
-
-    if (!allowed) {
-        return <AccessDeniedPage />;
+    if (!auth.permissions.includes(permission)) {
+        return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
     }
 
     return children ?? <Outlet />;

@@ -9,12 +9,12 @@ final class ListConfigurationEntriesRequest extends ViewConfigurationRequest
     public function rules(): array
     {
         return [
-            'search' => [
+            'prefix' => [
                 'nullable',
                 'string',
                 'max:100',
+                'regex:/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*[._-]?$/',
             ],
-            'owner' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

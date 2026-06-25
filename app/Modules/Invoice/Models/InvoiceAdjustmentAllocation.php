@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\AllocationMethod;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class InvoiceAdjustmentAllocation extends TenantOwnedModel
+final class InvoiceAdjustmentAllocation extends CoreModel
 {
     protected $table = 'invoice_adjustment_allocations';
 

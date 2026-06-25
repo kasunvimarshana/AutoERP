@@ -56,26 +56,23 @@ final class PaymentSeeder extends Seeder
             ['OTHER', 'Other', 'other', 'both', false, false, 999],
         ];
 
-        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
-            foreach ($methods as [$code, $name, $type, $direction, $requiresReference, $requiresBank, $sortOrder]) {
-                DB::table('payment_methods')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'organization_unit_id' => null, 'code' => $code],
-                    [
-                        'scope_key' => 'tenant:'.$tenantId,
-                        'name' => $name,
-                        'method_type' => $type,
-                        'direction_allowed' => $direction,
-                        'requires_reference' => $requiresReference,
-                        'requires_bank_account' => $requiresBank,
-                        'is_active' => true,
-                        'sort_order' => $sortOrder,
-                        'metadata' => json_encode(['seed_source' => 'payment_module'], JSON_THROW_ON_ERROR),
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
-            }
+        foreach ($methods as [$code, $name, $type, $direction, $requiresReference, $requiresBank, $sortOrder]) {
+            DB::table('payment_methods')->updateOrInsert(
+                ['tenant_id' => null, 'organization_unit_id' => null, 'code' => $code],
+                [
+                    'scope_key' => 'global',
+                    'name' => $name,
+                    'method_type' => $type,
+                    'direction_allowed' => $direction,
+                    'requires_reference' => $requiresReference,
+                    'requires_bank_account' => $requiresBank,
+                    'is_active' => true,
+                    'sort_order' => $sortOrder,
+                    'metadata' => json_encode(['seed_source' => 'payment_module'], JSON_THROW_ON_ERROR),
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
         }
     }
 }
-

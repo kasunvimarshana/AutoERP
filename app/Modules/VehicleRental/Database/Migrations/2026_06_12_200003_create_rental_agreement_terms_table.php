@@ -14,9 +14,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('agreement_id');
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
             $table->unsignedInteger('sequence');
             $table->string('term_code', 50)->nullable();
             $table->string('title', 150)->nullable();
@@ -29,25 +29,6 @@ return new class extends Migration
 
             $table->unique(['agreement_id', 'sequence'], 'rental_agreement_terms_sequence_uk');
             $table->index(['agreement_id', 'is_active'], 'rental_agreement_terms_active_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_agreement_terms_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_terms_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id'], 'rental_agreement_terms_agreement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_agreements')
-                ->cascadeOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'rental_agreement_terms_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_agreement_terms_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

@@ -7,13 +7,13 @@ namespace Modules\Sales\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\Sales\Enums\SalesAllocationStatus;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class SalesAllocation extends TenantOwnedModel
+final class SalesAllocation extends CoreModel
 {
     use SoftDeletes;
 

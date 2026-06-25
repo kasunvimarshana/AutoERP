@@ -7,8 +7,6 @@ namespace Modules\Reporting\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Reporting\Contracts\ReportDataProvider;
 use Modules\Reporting\Services\EloquentReportDataProvider;
-use Modules\Reporting\Services\ReportingAuthorizationService;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ReportingServiceProvider extends ServiceProvider
 {
@@ -20,9 +18,6 @@ final class ReportingServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('reporting', ReportingAuthorizationService::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
     }
 }

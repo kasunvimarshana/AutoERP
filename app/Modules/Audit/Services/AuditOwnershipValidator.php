@@ -10,16 +10,6 @@ use InvalidArgumentException;
 final class AuditOwnershipValidator
 {
     /** @return array{tenant_name:string|null,organization_unit_name:string|null} */
-    public function validatePlatformTarget(?int $tenantId): array
-    {
-        if ($tenantId === null) {
-            return ['tenant_name' => null, 'organization_unit_name' => null];
-        }
-
-        return $this->validateSystemScope($tenantId, null);
-    }
-
-    /** @return array{tenant_name:string|null,organization_unit_name:string|null} */
     public function validateSystemScope(int $tenantId, ?int $organizationUnitId): array
     {
         $tenant = DB::table('tenants')->where('id', $tenantId)->where('status', '!=', 'archived')->first(['name']);

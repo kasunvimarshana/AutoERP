@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-final class UpsertOrganizationUnitTypeRequest extends TenantScopedRequest
+final class UpsertOrganizationUnitTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {

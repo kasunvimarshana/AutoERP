@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-final class ListOrganizationUnitRequest extends TenantScopedRequest
+final class ListOrganizationUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,7 +16,7 @@ final class ListOrganizationUnitRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['sometimes', 'integer', 'min:1'],
+            'tenant_id' => ['required', 'integer', 'min:1'],
         ];
     }
 }

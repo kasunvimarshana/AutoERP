@@ -18,7 +18,6 @@ use Modules\Audit\Repositories\AuditLogWriterInterface;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Throwable;
 
 final class RecordAuditEvent implements AuditRecorderInterface
@@ -32,7 +31,6 @@ final class RecordAuditEvent implements AuditRecorderInterface
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly PlatformOperatorCheckerInterface $platformOperators,
     ) {}
 
     public function record(AuditEventData $event): void
@@ -55,41 +53,10 @@ final class RecordAuditEvent implements AuditRecorderInterface
         }
 
         $this->append($event, [
-            'scope_type' => 'tenant',
             'tenant_id' => $tenant->tenantId(),
             'tenant_name' => $tenantName,
             'organization_unit_id' => $organization?->organizationUnitId(),
             'organization_unit_name' => $organization?->name(),
-            'actor_type' => AuditActorType::USER,
-            'actor_id' => (string) $user->userId(),
-            'actor_name' => $this->actorName($actor),
-            'actor_guard' => $this->nullableTrim($user->guard()),
-            'actor_provider' => $this->nullableTrim($user->provider()),
-            'application_id' => $this->nullableTrim($user->applicationId()),
-            'impersonator_user_id' => $this->positiveInt($token['impersonator_user_id'] ?? null),
-            ...$this->requestContext->resolve(),
-        ]);
-    }
-
-    public function recordPlatform(AuditEventData $event, ?int $targetTenantId = null): void
-    {
-        $this->validator->validate($event);
-
-        $user = $this->currentUser->requireCurrent();
-        if (! $this->platformOperators->isPlatformOperator($user->userId())) {
-            throw new AuditWriteException('Platform audit events require an active platform operator.');
-        }
-
-        $scope = $this->ownership->validatePlatformTarget($targetTenantId);
-        $actor = $user->user();
-        $token = $user->tokenPayload();
-
-        $this->append($event, [
-            'scope_type' => 'platform',
-            'tenant_id' => $targetTenantId,
-            'tenant_name' => $scope['tenant_name'],
-            'organization_unit_id' => null,
-            'organization_unit_name' => null,
             'actor_type' => AuditActorType::USER,
             'actor_id' => (string) $user->userId(),
             'actor_name' => $this->actorName($actor),
@@ -107,7 +74,6 @@ final class RecordAuditEvent implements AuditRecorderInterface
         $scope = $this->ownership->validateSystemScope($event->tenantId, $event->organizationUnitId);
 
         $this->append($event->event, [
-            'scope_type' => 'tenant',
             'tenant_id' => $event->tenantId,
             'tenant_name' => $scope['tenant_name'],
             'organization_unit_id' => $event->organizationUnitId,

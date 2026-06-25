@@ -6,11 +6,11 @@ namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class Tax extends TenantOwnedModel
+final class Tax extends CoreModel
 {
     protected $table = 'taxes';
 

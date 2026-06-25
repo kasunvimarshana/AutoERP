@@ -7,12 +7,12 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\TransferStatus;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventoryTransfer extends TenantOwnedModel
+final class InventoryTransfer extends CoreModel
 {
     use SoftDeletes;
 

@@ -9,7 +9,7 @@ use Modules\Core\DTOs\DataRecord;
 
 interface AuthAccessTokenRepositoryInterface extends RepositoryPortInterface
 {
-    public function findActiveByTokenKey(string $tokenKey): ?DataRecord;
+    public function findActiveByTokenKey(?int $tenantId, string $tokenKey): ?DataRecord;
 
     public function revokeBySessionId(int $sessionId, ?int $tenantId = null): void;
 }

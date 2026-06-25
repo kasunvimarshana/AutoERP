@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_fiscal_years', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->string('name');
             $table->date('start_date');
             $table->date('end_date');
@@ -24,12 +24,6 @@ return new class extends Migration
                 ['tenant_id', 'organization_unit_id', 'start_date', 'end_date'],
                 'finance_fiscal_years_scope_dates_uk',
             );
-
-            $table->unique(['id', 'tenant_id'], 'finance_fiscal_years_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_fiscal_years_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

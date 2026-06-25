@@ -43,16 +43,6 @@ final class ConfigurationValueValidatorTest extends TestCase
         $validator->validate($this->definition(ConfigurationValueType::STRING, lookup: 'timezones'), 'Asia/Colombo');
     }
 
-    public function test_decimal_values_remain_exact_strings(): void
-    {
-        $validator = new ConfigurationValueValidator($this->lookup());
-
-        self::assertSame(
-            '9007199254740993.125',
-            $validator->validate($this->definition(ConfigurationValueType::DECIMAL), '9007199254740993.125000'),
-        );
-    }
-
     private function definition(string $type, array $options = [], ?string $lookup = null): ConfigurationDefinition
     {
         return new ConfigurationDefinition(

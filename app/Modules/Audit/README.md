@@ -21,21 +21,6 @@ Use `recordSystem()` only for trusted jobs or integrations without an authentica
 - Read access is tenant-scoped and organization-scoped unless the actor has `audit.logs.view_tenant`.
 - Changes, metadata, producer keys, and request context require `audit.logs.view_sensitive`.
 
-## Event categories
-
-Use the canonical values from `AuditEventCategory`; feature modules must not invent category strings.
-
-- `authentication`: sign-in, sign-out, credential, and session events
-- `authorization`: role, permission, and access-decision events
-- `administration`: platform or tenant control-plane administration
-- `configuration`: application and reference configuration changes
-- `data`: material business-data changes that do not fit a narrower category
-- `financial`: accounting, billing, settlement, and payment events
-- `inventory`: stock and inventory-control events
-- `security`: security posture, domain enforcement, and lifecycle enforcement events
-- `workflow`: business process transitions
-- `system`: infrastructure and system-operation events
-
 ## Current event producers
 
 - Purchase: `purchase.fast_purchase.completed`

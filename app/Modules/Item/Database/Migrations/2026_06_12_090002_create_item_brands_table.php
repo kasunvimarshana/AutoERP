@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('item_brands', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('code', 50);
             $table->string('name');
             $table->text('description')->nullable();
@@ -24,12 +24,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'code'], 'item_brands_tenant_code_uk');
             $table->index('tenant_id', 'item_brands_tenant_idx');
             $table->index('organization_unit_id', 'item_brands_org_idx');
-
-            $table->unique(['id', 'tenant_id'], 'item_brands_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'item_brands_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\VehicleFinanceAgreementStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class VehicleFinanceAgreement extends TenantOwnedModel
+final class VehicleFinanceAgreement extends CoreModel
 {
     use ScopesRentalContext;
     use SoftDeletes;

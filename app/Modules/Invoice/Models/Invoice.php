@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -18,7 +18,7 @@ use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tenant\Models\TenantModel;
 
-final class Invoice extends TenantOwnedModel
+final class Invoice extends CoreModel
 {
     use SoftDeletes;
 

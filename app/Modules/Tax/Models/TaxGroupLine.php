@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class TaxGroupLine extends TenantOwnedModel
+final class TaxGroupLine extends CoreModel
 {
     protected $table = 'tax_group_lines';
 
@@ -16,7 +16,6 @@ final class TaxGroupLine extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
             'tax_group_id' => 'integer',
             'tax_id' => 'integer',
             'sequence' => 'integer',

@@ -7,14 +7,14 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Purchase\Enums\PurchaseAdjustmentAllocationMethod;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 
-final class PurchaseHeaderAdjustment extends TenantOwnedModel
+final class PurchaseHeaderAdjustment extends CoreModel
 {
     use SoftDeletes;
 

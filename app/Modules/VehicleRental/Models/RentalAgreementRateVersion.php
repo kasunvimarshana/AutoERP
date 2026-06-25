@@ -7,7 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Tax\Models\TaxGroup;
 use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
@@ -17,7 +17,7 @@ use Modules\VehicleRental\Enums\RentalProrationRule;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalAgreementRateVersion extends TenantOwnedModel
+final class RentalAgreementRateVersion extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_agreement_rate_versions';

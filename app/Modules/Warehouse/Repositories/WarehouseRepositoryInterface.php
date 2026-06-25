@@ -6,7 +6,4 @@ namespace Modules\Warehouse\Repositories;
 
 use Modules\Core\Contracts\RepositoryPortInterface;
 
-interface WarehouseRepositoryInterface extends RepositoryPortInterface
-{
-    public function countByTenant(int $tenantId): int;
-}
+interface WarehouseRepositoryInterface extends RepositoryPortInterface {}

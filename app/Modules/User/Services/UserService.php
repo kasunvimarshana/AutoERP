@@ -17,14 +17,12 @@ use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\User\Constants\UserErrorCode;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
-use Modules\User\Constants\UserOrganizationUnitStatus;
+use Modules\User\Constants\UserTenantStatus;
 use Modules\User\Repositories\UserRepositoryInterface;
-use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
+use Modules\User\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Services\Contracts\UserDomainServiceInterface;
 use Throwable;
 
@@ -32,10 +30,8 @@ final class UserService extends AbstractUserCrudService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
-        private readonly UserOrganizationUnitRepositoryInterface $userOrganizationUnits,
+        private readonly UserTenantRepositoryInterface $userTenants,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
-        private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantEntitlementService $entitlements,
         private readonly UserDomainServiceInterface $domain,
         private readonly PasswordHasherInterface $passwordHasher,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
@@ -102,15 +98,6 @@ final class UserService extends AbstractUserCrudService
         try {
             return $this->transactions->runInTransaction(function () use ($payload): Result {
                 $tenantId = $this->resolveTenantId($this->toNullableInt($payload['tenant_id'] ?? null));
-                $this->tenants->lockById($tenantId);
-                $userLimit = $this->entitlements->limit($tenantId, 'max_users');
-                if ($userLimit !== null && $this->users->countByTenant($tenantId) >= $userLimit) {
-                    return $this->failure(
-                        UserErrorCode::PLAN_LIMIT_REACHED,
-                        'The tenant plan user limit has been reached.',
-                    );
-                }
-
                 $email = $this->domain->normalizeEmail((string) ($payload['email'] ?? ''));
                 $username = $this->normalizeUsername($payload['username'] ?? null);
                 $firstName = $this->domain->normalizeRequiredString(
@@ -127,7 +114,9 @@ final class UserService extends AbstractUserCrudService
 
                 $organizationUnitId = $this->resolveOrganizationUnitId(
                     $tenantId,
-                    $this->toNullableInt($payload['default_organization_unit_id'] ?? null),
+                    $this->toNullableInt(
+                        $payload['default_organization_unit_id'] ?? $payload['organization_unit_id'] ?? null,
+                    ),
                 );
                 $roleIds = $this->validateRoleIds($tenantId, $payload['role_ids'] ?? []);
                 $organizationUnitIds = $this->validateOrganizationUnitIds(
@@ -141,6 +130,7 @@ final class UserService extends AbstractUserCrudService
 
                 $created = $this->users->create([
                     'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
                     'metadata' => $metadata,
                     'first_name' => $firstName,
                     'last_name' => $this->domain->normalizeNullableString($payload['last_name'] ?? null),
@@ -228,13 +218,16 @@ final class UserService extends AbstractUserCrudService
 
                 $organizationUnitId = array_key_exists('default_organization_unit_id', $payload)
                     ? $this->toNullableInt($payload['default_organization_unit_id'])
-                    : $this->defaultOrganizationUnitId($tenantId, $targetId);
+                    : (array_key_exists('organization_unit_id', $payload)
+                        ? $this->toNullableInt($payload['organization_unit_id'])
+                        : $this->toNullableInt($existing->get('organization_unit_id')));
                 $organizationUnitId = $this->resolveOrganizationUnitId($tenantId, $organizationUnitId);
                 $roleIds = array_key_exists('role_ids', $payload)
                     ? $this->validateRoleIds($tenantId, $payload['role_ids'])
                     : null;
                 $organizationUnitIds = array_key_exists('organization_unit_ids', $payload)
                     || array_key_exists('default_organization_unit_id', $payload)
+                    || array_key_exists('organization_unit_id', $payload)
                         ? $this->validateOrganizationUnitIds(
                             $tenantId,
                             $payload['organization_unit_ids'] ?? [],
@@ -256,6 +249,7 @@ final class UserService extends AbstractUserCrudService
 
                 $updated = $this->users->update($id, [
                     'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
                     'metadata' => $metadata,
                     'first_name' => $firstName,
                     'last_name' => array_key_exists('last_name', $payload)
@@ -346,34 +340,39 @@ final class UserService extends AbstractUserCrudService
                     );
                 }
 
-                $existingAssignment = $this->userOrganizationUnits->findAssignment(
+                $existingAssignment = $this->userTenants->findByTenantOrganizationUser(
                     $tenantId,
                     $organizationUnitId,
                     (int) $user->id(),
                 );
                 if ($existingAssignment !== null) {
                     return $this->failure(
-                        UserErrorCode::DUPLICATE_ORGANIZATION_ASSIGNMENT,
+                        UserErrorCode::DUPLICATE_USER_TENANT,
                         'User is already assigned to this organization unit.',
                     );
                 }
 
-                $isDefault = $this->toBool($payload['is_default'] ?? false)
-                    || $this->defaultOrganizationUnitId($tenantId, (int) $user->id()) === null;
+                $isDefault = $this->toBool($payload['is_default'] ?? false);
                 if ($isDefault) {
-                    $this->userOrganizationUnits->clearDefaultForUser($tenantId, (int) $user->id());
+                    $this->userTenants->clearDefaultForUser($tenantId, (int) $user->id());
                 }
 
-                $assignment = $this->userOrganizationUnits->create([
+                $assignment = $this->userTenants->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                     'user_id' => (int) $user->id(),
-                    'status' => UserOrganizationUnitStatus::ACTIVE,
+                    'role_id' => $this->toNullableInt($payload['role_id'] ?? null),
                     'is_default' => $isDefault,
-                    'default_marker' => $isDefault ? 'default' : null,
                     'row_version' => 1,
                 ]);
+
+                if ($isDefault || $user->get('organization_unit_id') === null) {
+                    $this->users->update($id, [
+                        'organization_unit_id' => $organizationUnitId,
+                        'row_version' => (int) $user->get('row_version', 1) + 1,
+                    ]);
+                }
 
                 return $this->success($assignment);
             });
@@ -400,30 +399,18 @@ final class UserService extends AbstractUserCrudService
                     );
                 }
 
-                $assignment = $this->userOrganizationUnits->findAssignment($tenantId, $orgId, (int) $user->id());
+                $assignment = $this->userTenants->findByTenantOrganizationUser($tenantId, $orgId, (int) $user->id());
                 if ($assignment === null) {
                     return $this->failure(UserErrorCode::ASSIGNMENT_NOT_FOUND, 'Organization assignment not found.');
                 }
 
-                $removedDefault = (bool) $assignment->get('is_default', false);
-                $this->userOrganizationUnits->deleteAssignment(
-                    $assignment->id(),
-                    $tenantId,
-                    (int) $user->id(),
-                );
+                $this->userTenants->delete($assignment->id());
 
-                if ($removedDefault) {
-                    $replacement = $this->userOrganizationUnits->firstActiveForTenantAndUser(
-                        $tenantId,
-                        (int) $user->id(),
-                    );
-                    if ($replacement !== null) {
-                        $this->userOrganizationUnits->setDefault(
-                            $tenantId,
-                            (int) $user->id(),
-                            (int) $replacement->require('organization_unit_id'),
-                        );
-                    }
+                if ($this->toNullableInt($user->get('organization_unit_id')) === $orgId) {
+                    $this->users->update($id, [
+                        'organization_unit_id' => null,
+                        'row_version' => (int) $user->get('row_version', 1) + 1,
+                    ]);
                 }
 
                 return $this->success(true);
@@ -552,7 +539,7 @@ final class UserService extends AbstractUserCrudService
         $userId = (int) $record->id();
         $tenantId = $this->toNullableInt($record->get('tenant_id'));
         $payload = $record->toArray();
-        unset($payload['password'], $payload['remember_token'], $payload['organization_unit_id']);
+        unset($payload['password'], $payload['remember_token']);
 
         $payload['name'] = trim(implode(' ', array_filter([
             $payload['first_name'] ?? null,
@@ -561,10 +548,7 @@ final class UserService extends AbstractUserCrudService
 
         if ($tenantId !== null) {
             $payload['roles'] = DB::table('user_roles')
-                ->join('roles', function ($join): void {
-                    $join->on('roles.id', '=', 'user_roles.role_id')
-                        ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
-                })
+                ->join('roles', 'roles.id', '=', 'user_roles.role_id')
                 ->where('user_roles.tenant_id', $tenantId)
                 ->where('user_roles.user_id', $userId)
                 ->whereNull('roles.deleted_at')
@@ -578,21 +562,18 @@ final class UserService extends AbstractUserCrudService
                 ->values()
                 ->all();
 
-            $payload['organization_units'] = DB::table('user_organization_units')
-                ->leftJoin('organization_units', function ($join): void {
-                    $join->on('organization_units.id', '=', 'user_organization_units.organization_unit_id')
-                        ->on('organization_units.tenant_id', '=', 'user_organization_units.tenant_id');
-                })
-                ->where('user_organization_units.tenant_id', $tenantId)
-                ->where('user_organization_units.user_id', $userId)
+            $payload['organization_units'] = DB::table('user_tenants')
+                ->leftJoin('organization_units', 'organization_units.id', '=', 'user_tenants.organization_unit_id')
+                ->where('user_tenants.tenant_id', $tenantId)
+                ->where('user_tenants.user_id', $userId)
                 ->whereNull('organization_units.deleted_at')
-                ->orderByDesc('user_organization_units.is_default')
+                ->orderByDesc('user_tenants.is_default')
                 ->orderBy('organization_units.name')
                 ->get([
                     'organization_units.id',
                     'organization_units.name',
                     'organization_units.code',
-                    'user_organization_units.is_default',
+                    'user_tenants.is_default',
                 ])
                 ->map(static fn (object $row): array => [
                     'id' => $row->id !== null ? (int) $row->id : null,
@@ -603,27 +584,16 @@ final class UserService extends AbstractUserCrudService
                 ->filter(static fn (array $row): bool => $row['id'] !== null)
                 ->values()
                 ->all();
-            $payload['default_organization_unit_id'] = collect($payload['organization_units'])
-                ->firstWhere('is_default', true)['id'] ?? null;
 
             $directPermissions = DB::table('user_permissions')
-                ->join('permissions', function ($join): void {
-                    $join->on('permissions.id', '=', 'user_permissions.permission_id')
-                        ->on('permissions.tenant_id', '=', 'user_permissions.tenant_id');
-                })
+                ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
                 ->where('user_permissions.tenant_id', $tenantId)
                 ->where('user_permissions.user_id', $userId)
                 ->whereNull('permissions.deleted_at')
                 ->get(['permissions.id', 'permissions.name', 'permissions.module', 'permissions.description']);
             $rolePermissions = DB::table('role_permissions')
-                ->join('permissions', function ($join): void {
-                    $join->on('permissions.id', '=', 'role_permissions.permission_id')
-                        ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
-                })
-                ->join('user_roles', function ($join): void {
-                    $join->on('user_roles.role_id', '=', 'role_permissions.role_id')
-                        ->on('user_roles.tenant_id', '=', 'role_permissions.tenant_id');
-                })
+                ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+                ->join('user_roles', 'user_roles.role_id', '=', 'role_permissions.role_id')
                 ->where('role_permissions.tenant_id', $tenantId)
                 ->where('user_roles.tenant_id', $tenantId)
                 ->where('user_roles.user_id', $userId)
@@ -651,7 +621,6 @@ final class UserService extends AbstractUserCrudService
 
         $payload['roles'] ??= [];
         $payload['organization_units'] ??= [];
-        $payload['default_organization_unit_id'] ??= null;
         $payload['permissions'] ??= [];
         $payload['last_login_at'] ??= null;
 
@@ -776,7 +745,7 @@ final class UserService extends AbstractUserCrudService
         array $organizationUnitIds,
         ?int $defaultOrganizationUnitId,
     ): void {
-        $existing = DB::table('user_organization_units')
+        $existing = DB::table('user_tenants')
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->get(['id', 'organization_unit_id']);
@@ -790,7 +759,7 @@ final class UserService extends AbstractUserCrudService
 
         $removeIds = array_values(array_diff(array_keys($existingByOrganizationUnit), $organizationUnitIds));
         if ($removeIds !== []) {
-            DB::table('user_organization_units')
+            DB::table('user_tenants')
                 ->where('tenant_id', $tenantId)
                 ->where('user_id', $userId)
                 ->whereIn('organization_unit_id', $removeIds)
@@ -799,38 +768,31 @@ final class UserService extends AbstractUserCrudService
 
         $defaultOrganizationUnitId ??= $organizationUnitIds[0] ?? null;
         if ($defaultOrganizationUnitId !== null) {
-            DB::table('user_organization_units')
+            DB::table('user_tenants')
                 ->where('tenant_id', $tenantId)
                 ->where('user_id', $userId)
-                ->update(['is_default' => false, 'default_marker' => null, 'updated_at' => now()]);
+                ->update(['is_default' => false, 'updated_at' => now()]);
         }
 
         foreach ($organizationUnitIds as $organizationUnitId) {
-            DB::table('user_organization_units')->updateOrInsert(
+            DB::table('user_tenants')->updateOrInsert(
                 [
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'user_id' => $userId,
                 ],
                 [
-                    'status' => UserOrganizationUnitStatus::ACTIVE,
                     'is_default' => $organizationUnitId === $defaultOrganizationUnitId,
-                    'default_marker' => $organizationUnitId === $defaultOrganizationUnitId ? 'default' : null,
                     'row_version' => 1,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],
             );
         }
-    }
 
-    private function defaultOrganizationUnitId(int $tenantId, int $userId): ?int
-    {
-        $default = $this->userOrganizationUnits->findDefaultForTenantAndUser($tenantId, $userId);
-
-        return $default === null
-            ? null
-            : $this->toNullableInt($default->get('organization_unit_id'));
+        $this->users->update($userId, [
+            'organization_unit_id' => $defaultOrganizationUnitId,
+        ]);
     }
 
     private function guardStatusChange(DataRecord $target, string $nextStatus): ?Result
@@ -899,10 +861,7 @@ final class UserService extends AbstractUserCrudService
     private function hasProtectedAdminRole(int $userId, int $tenantId): bool
     {
         return DB::table('user_roles')
-            ->join('roles', function ($join): void {
-                $join->on('roles.id', '=', 'user_roles.role_id')
-                    ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
-            })
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
@@ -930,17 +889,17 @@ final class UserService extends AbstractUserCrudService
     private function activeProtectedAdminCount(int $tenantId): int
     {
         return DB::table('users')
-            ->join('user_roles', function ($join): void {
-                $join->on('user_roles.user_id', '=', 'users.id')
-                    ->on('user_roles.tenant_id', '=', 'users.tenant_id');
-            })
-            ->join('roles', function ($join): void {
-                $join->on('roles.id', '=', 'user_roles.role_id')
-                    ->on('roles.tenant_id', '=', 'user_roles.tenant_id');
-            })
+            ->join('user_roles', 'user_roles.user_id', '=', 'users.id')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
             ->where('users.status', UserStatus::ACTIVE)
-            ->where('users.tenant_id', $tenantId)
             ->where('user_roles.tenant_id', $tenantId)
+            ->whereExists(function ($membership) use ($tenantId): void {
+                $membership->selectRaw('1')
+                    ->from('user_tenants')
+                    ->whereColumn('user_tenants.user_id', 'users.id')
+                    ->where('user_tenants.tenant_id', $tenantId)
+                    ->where('user_tenants.status', UserTenantStatus::ACTIVE);
+            })
             ->where('roles.name', UserPermission::SUPER_ADMIN_ROLE)
             ->whereNull('users.deleted_at')
             ->whereNull('roles.deleted_at')

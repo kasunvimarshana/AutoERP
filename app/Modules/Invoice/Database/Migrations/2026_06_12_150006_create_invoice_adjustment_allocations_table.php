@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('invoice_adjustment_allocations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('invoice_id');
-            $table->foreignId('invoice_adjustment_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('invoice_id')->constrained('invoices', 'id')->cascadeOnDelete();
+            $table->foreignId('invoice_adjustment_id')->nullable()->constrained('invoice_adjustments', 'id')->nullOnDelete();
             $table->string('source_adjustment_type');
             $table->unsignedBigInteger('source_adjustment_id');
             $table->string('source_type');
@@ -33,20 +33,6 @@ return new class extends Migration
                 ['invoice_id', 'source_adjustment_type', 'source_adjustment_id'],
                 'invoice_adjustment_allocations_invoice_source_uk'
             );
-
-            $table->unique(['id', 'tenant_id'], 'invoice_adjustment_allocations_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_adjustment_allocations_organization_unit_028225a6_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['invoice_id', 'tenant_id'], 'invoice_adjustment_allocations_invoice_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('invoices')
-                ->cascadeOnDelete();
-            $table->foreign(['invoice_adjustment_id', 'tenant_id'], 'invoice_adjustment_allocations_invoice_adjustmen_e3ce9c12_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('invoice_adjustments')
-                ->restrictOnDelete();
         });
     }
 

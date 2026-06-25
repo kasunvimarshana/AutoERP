@@ -365,6 +365,7 @@ function GroupedTable({ rows, groups, sortKey, direction, onSort, onEmployee }: 
         return <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-500">No employee commissions found.</div>;
     }
 
+    let currentGroup = '';
     return (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
@@ -383,8 +384,9 @@ function GroupedTable({ rows, groups, sortKey, direction, onSort, onEmployee }: 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {rows.map((row, index) => {
-                            const showGroup = index === 0 || rows[index - 1].group_key !== row.group_key;
+                        {rows.map((row) => {
+                            const showGroup = row.group_key !== currentGroup;
+                            currentGroup = row.group_key;
                             const group = groups.get(row.group_key);
                             return [
                                 showGroup && (

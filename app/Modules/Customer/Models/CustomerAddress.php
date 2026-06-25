@@ -6,10 +6,10 @@ namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Customer\Enums\CustomerAddressType;
 
-final class CustomerAddress extends TenantOwnedModel
+final class CustomerAddress extends CoreModel
 {
     use SoftDeletes;
 

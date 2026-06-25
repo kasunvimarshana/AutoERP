@@ -91,7 +91,6 @@ final class TaxMasterDataService
 
         if ($active) {
             $overlap = TaxRate::query()
-                ->where('tenant_id', (int) $tax->tenant_id)
                 ->where('tax_id', $tax->getKey())
                 ->where('active', true)
                 ->when($rate instanceof TaxRate && $rate->exists, fn (Builder $query): Builder => $query->whereKeyNot($rate->getKey()))
@@ -108,7 +107,6 @@ final class TaxMasterDataService
 
         $rate ??= new TaxRate;
         $rate->forceFill([
-            'tenant_id' => (int) $tax->tenant_id,
             'tax_id' => $tax->getKey(),
             'rate' => $normalizedRate,
             'effective_from' => $effectiveFrom,
@@ -186,7 +184,6 @@ final class TaxMasterDataService
                 }
 
                 TaxGroupLine::query()->create([
-                    'tenant_id' => $tenantId,
                     'tax_group_id' => $group->getKey(),
                     'tax_id' => $tax->getKey(),
                     'sequence' => $sequence,

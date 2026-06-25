@@ -14,13 +14,13 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('calculation_run_id');
+            $table->foreignId('calculation_run_id')->constrained('rental_calculation_runs')->cascadeOnDelete();
             $table->unsignedInteger('line_number');
-            $table->foreignId('usage_context_id')->nullable();
-            $table->foreignId('expense_allocation_id')->nullable();
-            $table->foreignId('custody_event_item_id')->nullable();
+            $table->foreignId('usage_context_id')->nullable()->constrained('rental_usage_contexts')->nullOnDelete();
+            $table->foreignId('expense_allocation_id')->nullable()->constrained('rental_expense_allocations')->nullOnDelete();
+            $table->foreignId('custody_event_item_id')->nullable()->constrained('rental_custody_event_items')->nullOnDelete();
             $table->string('source_type', 80);
             $table->unsignedBigInteger('source_id');
             $table->string('component_code', 50);
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->decimal('multiplier', 20, 6)->default('1.000000');
             $table->decimal('net_amount', 20, 6)->default('0.000000');
             $table->decimal('discount_amount', 20, 6)->default('0.000000');
-            $table->foreignId('tax_group_id')->nullable();
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
             $table->decimal('withholding_amount', 20, 6)->default('0.000000');
             $table->decimal('total_amount', 20, 6)->default('0.000000');
@@ -49,41 +49,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_lines_fingerprint_uk');
             $table->index(['usage_context_id', 'component_code'], 'rental_calculation_lines_usage_component_idx');
             $table->index(['source_type', 'source_id'], 'rental_calculation_lines_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_calculation_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['calculation_run_id', 'tenant_id'], 'rental_calculation_lines_calculation_run_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_calculation_runs')
-                ->cascadeOnDelete();
-            $table->foreign(['usage_context_id', 'tenant_id'], 'rental_calculation_lines_usage_context_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_usage_contexts')
-                ->restrictOnDelete();
-            $table->foreign(['expense_allocation_id', 'tenant_id'], 'rental_calculation_lines_expense_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_expense_allocations')
-                ->restrictOnDelete();
-            $table->foreign(['custody_event_item_id', 'tenant_id'], 'rental_calculation_lines_custody_event_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_custody_event_items')
-                ->restrictOnDelete();
-            $table->foreign(['tax_group_id', 'tenant_id'], 'rental_calculation_lines_tax_group_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('tax_groups')
-                ->restrictOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'rental_calculation_lines_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_calculation_lines_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

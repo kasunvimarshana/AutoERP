@@ -1,23 +1,29 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { TestRouter } from '@/test/TestRouter';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import OperationalReportPage from './OperationalReportPage';
+
 const apiMocks = vi.hoisted(() => ({
     runOperationalReport: vi.fn(),
 }));
+
 vi.mock('../reportingApi', () => apiMocks);
+
 vi.mock('../components/ExportActions', () => ({
     ExportActions: ({ reportKey }: { reportKey: string }) => <div data-testid="export-actions">{reportKey}</div>,
 }));
+
 vi.mock('@/modules/purchase/components/PurchaseLookups', () => ({
     SupplierLookupSelect: () => <div data-testid="supplier-lookup" />,
     ItemLookupSelect: () => <div data-testid="item-lookup" />,
 }));
+
 vi.mock('@/shared/components/LookupSelect', () => ({ LookupSelect: () => null }));
 vi.mock('@/shared/components/GenericLookupSelect', () => ({ GenericLookupSelect: () => null }));
 vi.mock('@/modules/vehicle/components/VehicleLookupSelect', () => ({ VehicleLookupSelect: () => null }));
 vi.mock('@/modules/hr/components/HrDepartmentSelect', () => ({ HrDepartmentSelect: () => null }));
+
 describe('OperationalReportPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -53,13 +59,15 @@ describe('OperationalReportPage', () => {
             },
         });
     });
+
     it('loads the detailed Purchase report and applies server-side filters', async () => {
         const user = userEvent.setup();
         render(
-            <TestRouter>
+            <MemoryRouter>
                 <OperationalReportPage reportKey="purchase/detailed" kind="purchase" />
-            </TestRouter>,
+            </MemoryRouter>,
         );
+
         expect(await screen.findByRole('heading', { name: 'Detailed Purchase Report' })).toBeInTheDocument();
         expect(screen.getAllByText('PO-1001').length).toBeGreaterThan(0);
         expect(screen.getAllByText('123,456,789,012,345.50').length).toBeGreaterThan(0);
@@ -69,8 +77,10 @@ describe('OperationalReportPage', () => {
             { page: 1, per_page: 25 },
             expect.any(AbortSignal),
         );
+
         await user.type(screen.getByLabelText('Search'), 'brake');
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+
         await waitFor(() => {
             expect(apiMocks.runOperationalReport).toHaveBeenLastCalledWith(
                 'purchase/detailed',

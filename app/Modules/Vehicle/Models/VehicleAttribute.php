@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Vehicle\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Vehicle\Enums\VehicleAttributeDataType;
 
-final class VehicleAttribute extends TenantOwnedModel
+final class VehicleAttribute extends CoreModel
 {
     protected $table = 'vehicle_attributes';
     protected $guarded = ['id'];

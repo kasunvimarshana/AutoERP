@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class CustomerCategoryAssignment extends TenantOwnedModel
+final class CustomerCategoryAssignment extends CoreModel
 {
     protected $table = 'customer_category_assignments';
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Models;
 
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class SalesStatusHistory extends TenantOwnedModel
+final class SalesStatusHistory extends CoreModel
 {
     protected $guarded = ['id'];
 

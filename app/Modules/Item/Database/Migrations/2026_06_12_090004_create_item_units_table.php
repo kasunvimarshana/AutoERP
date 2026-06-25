@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('item_units', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('item_id');
-            $table->foreignId('uom_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('uom_id')->constrained('unit_of_measures')->restrictOnDelete();
             $table->string('unit_role', 30);
             $table->decimal('conversion_factor', 20, 6)->default('1.000000');
             $table->boolean('is_default')->default(false);
@@ -26,20 +26,6 @@ return new class extends Migration
             $table->index('item_id', 'item_units_item_idx');
             $table->index('uom_id', 'item_units_uom_idx');
             $table->unique(['item_id', 'uom_id', 'unit_role'], 'item_units_item_uom_role_uk');
-
-            $table->unique(['id', 'tenant_id'], 'item_units_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'item_units_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'item_units_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->cascadeOnDelete();
-            $table->foreign(['uom_id', 'tenant_id'], 'item_units_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
         });
     }
 

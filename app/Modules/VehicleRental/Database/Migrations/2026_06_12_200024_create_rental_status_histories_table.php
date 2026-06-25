@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('entity_type', 80);
             $table->unsignedBigInteger('entity_id');
@@ -26,12 +26,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'entity_type', 'entity_id', 'changed_at'], 'rental_status_histories_entity_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_status_histories_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_status_histories_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

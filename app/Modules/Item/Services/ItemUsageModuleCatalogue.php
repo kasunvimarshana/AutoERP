@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace Modules\Item\Services;
 
 use Modules\Item\Enums\ItemType;
-use Modules\Tenant\Services\TenantEntitlementService;
+use Modules\Tenant\Models\TenantModel;
 
 final class ItemUsageModuleCatalogue
 {
-    public function __construct(private readonly TenantEntitlementService $entitlements) {}
-
     private const SUPPORTED = [
         'inventory' => [ItemType::Stock, ItemType::Consumable, ItemType::Asset],
         'purchase' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable],
@@ -54,8 +52,35 @@ final class ItemUsageModuleCatalogue
 
     public function isEnabledForTenant(int $tenantId, string $moduleCode): bool
     {
-        return array_key_exists($moduleCode, self::SUPPORTED)
-            && $this->entitlements->featureEnabled($tenantId, $moduleCode);
+        if (! array_key_exists($moduleCode, self::SUPPORTED)) {
+            return false;
+        }
+
+        $tenant = TenantModel::query()->with('plan')->find($tenantId);
+        $features = $tenant?->plan?->features;
+        if (! is_array($features)) {
+            return true;
+        }
+
+        $configured = $features['enabled_modules'] ?? $features['modules'] ?? null;
+        if (! is_array($configured)) {
+            return true;
+        }
+
+        $enabled = [];
+        foreach ($configured as $key => $value) {
+            if (is_int($key) && is_scalar($value)) {
+                $enabled[] = strtolower(trim((string) $value));
+
+                continue;
+            }
+
+            if (is_string($key) && filter_var($value, FILTER_VALIDATE_BOOL)) {
+                $enabled[] = strtolower(trim($key));
+            }
+        }
+
+        return in_array($moduleCode, array_values(array_unique($enabled)), true);
     }
 
     public function supportsItemType(string $moduleCode, ItemType $itemType): bool

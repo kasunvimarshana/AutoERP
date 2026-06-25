@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Hr\Enums\EmployeeAvailabilityStatus;
 use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Enums\Gender;
 use Modules\Hr\Models\Concerns\ScopesHrTenant;
 
-final class HrEmployee extends TenantOwnedModel
+final class HrEmployee extends CoreModel
 {
     use ScopesHrTenant;
     use SoftDeletes;

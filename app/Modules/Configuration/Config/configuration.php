@@ -7,9 +7,9 @@ use Modules\Configuration\Constants\ConfigurationValueType;
 
 return [
     'definitions' => [
-        'branding.display_name' => [
-            'label' => 'Workspace display name',
-            'description' => 'Human-readable name shown in tenant-facing documents and screens.',
+        'app.name' => [
+            'label' => 'Application name',
+            'description' => 'Human-readable product or tenant-facing application name.',
             'owner' => 'Configuration',
             'type' => ConfigurationValueType::STRING,
             'scopes' => [ConfigurationScope::GLOBAL, ConfigurationScope::TENANT],
@@ -18,16 +18,12 @@ return [
             'sensitive' => false,
             'runtime_mutable' => true,
         ],
-        'localization.timezone' => [
-            'label' => 'Workspace timezone',
-            'description' => 'IANA timezone used when presenting local dates and times to users.',
+        'app.timezone' => [
+            'label' => 'Default timezone',
+            'description' => 'IANA timezone used when displaying local dates and times.',
             'owner' => 'Configuration',
             'type' => ConfigurationValueType::STRING,
-            'scopes' => [
-                ConfigurationScope::GLOBAL,
-                ConfigurationScope::TENANT,
-                ConfigurationScope::ORGANIZATION_UNIT,
-            ],
+            'scopes' => [ConfigurationScope::GLOBAL, ConfigurationScope::TENANT, ConfigurationScope::ORGANIZATION_UNIT],
             'default' => 'UTC',
             'nullable' => false,
             'sensitive' => false,

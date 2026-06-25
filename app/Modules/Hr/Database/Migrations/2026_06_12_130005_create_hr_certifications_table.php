@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('hr_certifications', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('code');
             $table->string('name');
             $table->text('description')->nullable();
@@ -22,12 +22,6 @@ return new class extends Migration
             $table->softDeletes();
             $table->unique(['tenant_id', 'code'], 'hr_certifications_tenant_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'hr_certifications_tenant_org_idx');
-
-            $table->unique(['id', 'tenant_id'], 'hr_certifications_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_certifications_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

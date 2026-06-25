@@ -21,8 +21,7 @@ final class AuthFoundationTest extends TestCase
     {
         $context = $this->createAuthContext();
 
-        $response = $this->withHeaders(['Host' => 'acme.example.test'])
-            ->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $context['organization_unit_id'],
             'login_identifier' => 'admin@example.test',
@@ -35,10 +34,9 @@ final class AuthFoundationTest extends TestCase
             ->assertJsonPath('user.email', 'admin@example.test')
             ->assertJsonPath('tenant.name', 'Acme ERP')
             ->assertJsonPath('organization_unit.name', 'Head Office')
-            ->assertJsonMissingPath('refresh_token')
-            ->assertPlainCookie($this->refreshCookieName())
             ->assertJsonStructure([
                 'token',
+                'refresh_token',
                 'user' => ['id', 'name', 'email'],
                 'tenant' => ['id', 'name'],
                 'organization_unit' => ['id', 'name'],
@@ -152,8 +150,7 @@ final class AuthFoundationTest extends TestCase
     {
         $context = $this->createAuthContext();
 
-        $response = $this->withHeaders(['Host' => 'acme.example.test'])
-            ->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $context['organization_unit_id'],
             'login_identifier' => 'admin@example.test',
@@ -183,8 +180,7 @@ final class AuthFoundationTest extends TestCase
     {
         $context = $this->createAuthContext(['status' => 'inactive']);
 
-        $response = $this->withHeaders(['Host' => 'acme.example.test'])
-            ->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $context['organization_unit_id'],
             'login_identifier' => 'admin@example.test',
@@ -242,93 +238,6 @@ final class AuthFoundationTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
-    public function test_platform_token_cannot_authenticate_against_tenant_routes(): void
-    {
-        $context = $this->createAuthContext();
-        $this->createPlatformOperator();
-
-        $login = $this->postJson('/api/v1/platform/auth/login', [
-            'email' => 'platform@example.test',
-            'password' => 'platform-password',
-        ]);
-
-        $login->assertOk()
-            ->assertJsonPath('is_platform_operator', true)
-            ->assertJsonPath('tenant', null);
-
-        $this->withToken((string) $login->json('token'))
-            ->withHeaders([
-                'X-Tenant-Id' => (string) $context['tenant_id'],
-                'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
-            ])
-            ->getJson('/api/v1/auth/me')
-            ->assertUnauthorized();
-    }
-
-    public function test_tenant_token_cannot_authenticate_against_platform_routes(): void
-    {
-        $context = $this->createAuthContext();
-        $session = $this->login($context);
-
-        $this->withToken($session['token'])
-            ->getJson('/api/v1/platform/auth/me')
-            ->assertUnauthorized();
-    }
-
-    public function test_platform_refresh_token_is_single_use(): void
-    {
-        $this->createPlatformOperator();
-
-        $login = $this->postJson('/api/v1/platform/auth/login', [
-            'email' => 'platform@example.test',
-            'password' => 'platform-password',
-        ])->assertOk()
-            ->assertJsonMissingPath('refresh_token')
-            ->assertPlainCookie($this->refreshCookieName());
-
-        $refreshCookie = $login->getCookie($this->refreshCookieName(), false);
-        $this->assertNotNull($refreshCookie);
-        $refreshToken = (string) $refreshCookie->getValue();
-
-        $refresh = $this->withUnencryptedCookie($this->refreshCookieName(), $refreshToken)
-            ->postJson('/api/v1/platform/auth/refresh')
-            ->assertOk()
-            ->assertJsonMissingPath('refresh_token')
-            ->assertPlainCookie($this->refreshCookieName());
-
-        $rotatedCookie = $refresh->getCookie($this->refreshCookieName(), false);
-        $this->assertNotNull($rotatedCookie);
-        $this->assertNotSame($refreshToken, (string) $rotatedCookie->getValue());
-
-        $this->withUnencryptedCookie($this->refreshCookieName(), $refreshToken)
-            ->postJson('/api/v1/platform/auth/refresh')
-            ->assertUnauthorized();
-    }
-
-    private function refreshCookieName(): string
-    {
-        return (string) config('module-auth.web_refresh_cookie.name', 'autoerp_refresh_token');
-    }
-
-    private function createPlatformOperator(): int
-    {
-        $now = now();
-
-        return (int) DB::table('users')->insertGetId([
-            'tenant_id' => null,
-            'first_name' => 'Platform',
-            'last_name' => 'Operator',
-            'email' => 'platform@example.test',
-            'platform_login_email' => 'platform@example.test',
-            'password' => app(PasswordHasherInterface::class)->hash('platform-password'),
-            'status' => 'active',
-            'is_platform_operator' => true,
-            'row_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-    }
-
     /**
      * @param  array<string,mixed>  $userOverrides
      * @return array{tenant_id:int,organization_unit_id:int,user_id:int}
@@ -345,20 +254,6 @@ final class AuthFoundationTest extends TestCase
             'row_version' => 1,
             'created_at' => $now,
             'updated_at' => $now]);
-        DB::table('tenant_domains')->insert([
-            'tenant_id' => $tenantId,
-            'domain' => 'acme.example.test',
-            'is_primary' => true,
-            'primary_marker' => 'primary',
-            'status' => 'active',
-            'verification_method' => 'dns_txt',
-            'verified_at' => $now,
-            'last_verified_at' => $now,
-            'row_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
         $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Head Office',
@@ -371,6 +266,7 @@ final class AuthFoundationTest extends TestCase
         ]);
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Ada',
             'last_name' => 'Lovelace',
             'email' => 'admin@example.test',
@@ -381,13 +277,11 @@ final class AuthFoundationTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        DB::table('user_organization_units')->insert([
+        DB::table('user_tenants')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
-            'status' => 'active',
             'is_default' => true,
-            'default_marker' => 'default',
             'row_version' => 1,
             'created_at' => $now,
             'updated_at' => $now,
@@ -420,8 +314,7 @@ final class AuthFoundationTest extends TestCase
      */
     private function login(array $context): array
     {
-        $response = $this->withHeaders(['Host' => 'acme.example.test'])
-            ->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $context['organization_unit_id'],
             'login_identifier' => 'admin@example.test',

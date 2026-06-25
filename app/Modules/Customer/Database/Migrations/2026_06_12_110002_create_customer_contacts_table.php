@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('customer_contacts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('customer_id');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
             $table->string('contact_name');
             $table->string('designation')->nullable();
             $table->string('department')->nullable();
@@ -31,16 +31,6 @@ return new class extends Migration
             $table->index('customer_id', 'customer_contacts_customer_idx');
             $table->index('email', 'customer_contacts_email_idx');
             $table->index('phone', 'customer_contacts_phone_idx');
-
-            $table->unique(['id', 'tenant_id'], 'customer_contacts_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_contacts_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['customer_id', 'tenant_id'], 'customer_contacts_customer_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('customers')
-                ->cascadeOnDelete();
         });
     }
 

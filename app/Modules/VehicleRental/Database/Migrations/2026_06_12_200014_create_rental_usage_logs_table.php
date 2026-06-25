@@ -14,13 +14,13 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('usage_number', 100);
-            $table->foreignId('vehicle_allocation_id');
-            $table->foreignId('vehicle_id');
-            $table->foreignId('driver_assignment_id')->nullable();
-            $table->foreignId('driver_id')->nullable();
+            $table->foreignId('vehicle_allocation_id')->constrained('rental_vehicle_allocations')->cascadeOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('driver_assignment_id')->nullable()->constrained('rental_driver_assignments')->nullOnDelete();
+            $table->foreignId('driver_id')->nullable()->constrained('hr_employees')->nullOnDelete();
             $table->date('usage_date');
             $table->dateTime('started_at')->nullable();
             $table->dateTime('ended_at')->nullable();
@@ -61,49 +61,6 @@ return new class extends Migration
             $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_vehicle_date_idx');
             $table->index(['driver_id', 'usage_date', 'status'], 'rental_usage_logs_driver_date_idx');
             $table->index(['vehicle_id', 'status', 'started_at', 'id'], 'rental_usage_logs_odometer_chain_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_usage_logs_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_logs_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_allocation_id', 'tenant_id'], 'rental_usage_logs_vehicle_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_allocations')
-                ->cascadeOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'rental_usage_logs_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['driver_assignment_id', 'tenant_id'], 'rental_usage_logs_driver_assignment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_driver_assignments')
-                ->restrictOnDelete();
-            $table->foreign(['driver_id', 'tenant_id'], 'rental_usage_logs_driver_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
-
-            $table->foreign(['submitted_by', 'tenant_id'], 'rental_usage_logs_submitted_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['approved_by', 'tenant_id'], 'rental_usage_logs_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['reversed_by', 'tenant_id'], 'rental_usage_logs_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'rental_usage_logs_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_usage_logs_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

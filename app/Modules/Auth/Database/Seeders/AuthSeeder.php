@@ -27,11 +27,12 @@ final class AuthSeeder extends Seeder
         }
 
         DB::transaction(function () use ($tenant, $organizationUnit): void {
+            $this->seedInternalProvider(null, null);
             $this->seedInternalProvider((int) $tenant->getKey(), $organizationUnit?->getKey());
         }, 3);
     }
 
-    private function seedInternalProvider(int $tenantId, ?int $organizationUnitId): void
+    private function seedInternalProvider(?int $tenantId, ?int $organizationUnitId): void
     {
         AuthProviderModel::query()->updateOrCreate(
             [

@@ -13,14 +13,14 @@ return new class extends Migration
         Schema::create('vehicle_service_job_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('vehicle_service_job_id');
-            $table->foreignId('parent_line_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('vehicle_service_job_id')->constrained('vehicle_service_jobs')->cascadeOnDelete();
+            $table->foreignId('parent_line_id')->nullable()->constrained('vehicle_service_job_lines')->cascadeOnDelete();
             $table->unsignedInteger('line_number');
             $table->string('line_source_type', 30);
-            $table->foreignId('item_id')->nullable();
-            $table->foreignId('item_variant_id')->nullable();
-            $table->foreignId('uom_id')->nullable();
+            $table->foreignId('item_id')->nullable()->constrained('items')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->text('description');
             $table->decimal('quantity', 20, 6);
             $table->decimal('unit_cost', 20, 6)->default('0.000000');
@@ -40,7 +40,7 @@ return new class extends Migration
             $table->boolean('is_external')->default(false);
             $table->boolean('is_billable')->default(true);
             $table->boolean('is_employee_assignable')->default(false);
-            $table->foreignId('inventory_movement_id')->nullable();
+            $table->foreignId('inventory_movement_id')->nullable()->constrained('inventory_movements')->nullOnDelete();
             $table->string('status', 30)->default('pending');
             $table->timestamps();
 
@@ -48,36 +48,6 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_job_lines_tenant_org_idx');
             $table->index(['vehicle_service_job_id', 'line_source_type'], 'vehicle_service_job_lines_job_type_idx');
             $table->index('parent_line_id', 'vehicle_service_job_lines_parent_idx');
-
-            $table->unique(['id', 'tenant_id'], 'vehicle_service_job_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_job_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_job_lines_vehicle_service_job_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_service_jobs')
-                ->cascadeOnDelete();
-            $table->foreign(['parent_line_id', 'tenant_id'], 'vehicle_service_job_lines_parent_line_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_service_job_lines')
-                ->cascadeOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'vehicle_service_job_lines_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->restrictOnDelete();
-            $table->foreign(['item_variant_id', 'tenant_id'], 'vehicle_service_job_lines_item_variant_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('item_variants')
-                ->restrictOnDelete();
-            $table->foreign(['uom_id', 'tenant_id'], 'vehicle_service_job_lines_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['inventory_movement_id', 'tenant_id'], 'vehicle_service_job_lines_inventory_movement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_movements')
-                ->restrictOnDelete();
         });
     }
 

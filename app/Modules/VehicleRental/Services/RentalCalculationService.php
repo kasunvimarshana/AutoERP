@@ -195,8 +195,8 @@ final class RentalCalculationService
             ]);
             if ($to === RentalCalculationStatus::Approved) {
                 $contextIds = $run->lines()->whereNotNull('usage_context_id')->pluck('usage_context_id')->unique();
-                $this->syncUsageStatuses((int) $run->tenant_id, $contextIds, $userId);
-                $this->syncExpenseAllocationStatuses((int) $run->tenant_id, $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
+                $this->syncUsageStatuses($contextIds, $userId);
+                $this->syncExpenseAllocationStatuses($run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
                 $run->billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Finalized->value,
                     'is_final' => true,
@@ -208,8 +208,8 @@ final class RentalCalculationService
                 $run->document_status = RentalDocumentStatus::NotGenerated;
                 $run->save();
                 $contextIds = $run->lines()->whereNotNull('usage_context_id')->pluck('usage_context_id')->unique();
-                $this->syncUsageStatuses((int) $run->tenant_id, $contextIds, $userId);
-                $this->syncExpenseAllocationStatuses((int) $run->tenant_id, $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
+                $this->syncUsageStatuses($contextIds, $userId);
+                $this->syncExpenseAllocationStatuses($run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
                 $run->billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Reopened->value,
                     'is_final' => false,
@@ -680,7 +680,7 @@ final class RentalCalculationService
         }
     }
 
-    private function syncExpenseAllocationStatuses(int $tenantId, Collection $allocationIds, ?int $userId): void
+    private function syncExpenseAllocationStatuses(Collection $allocationIds, ?int $userId): void
     {
         foreach ($allocationIds as $allocationId) {
             $consumed = RentalCalculationLine::query()
@@ -691,7 +691,6 @@ final class RentalCalculationService
                 ->exists();
 
             DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
                 ->where('id', $allocationId)
                 ->whereIn('status', ['approved', 'consumed'])
                 ->update([
@@ -702,23 +701,19 @@ final class RentalCalculationService
         }
 
         $expenseIds = DB::table('rental_expense_allocations')
-            ->where('tenant_id', $tenantId)
             ->whereIn('id', $allocationIds)
             ->pluck('expense_id')
             ->unique();
         foreach ($expenseIds as $expenseId) {
             $hasApproved = DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
                 ->where('expense_id', $expenseId)
                 ->where('status', 'approved')
                 ->exists();
             $hasConsumed = DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
                 ->where('expense_id', $expenseId)
                 ->where('status', 'consumed')
                 ->exists();
             DB::table('rental_expenses')
-                ->where('tenant_id', $tenantId)
                 ->where('id', $expenseId)
                 ->whereIn('status', ['approved', 'allocated'])
                 ->update([
@@ -750,21 +745,19 @@ final class RentalCalculationService
             ->exists();
     }
 
-    private function syncUsageStatuses(int $tenantId, Collection $contextIds, ?int $userId): void
+    private function syncUsageStatuses(Collection $contextIds, ?int $userId): void
     {
         $usageIds = DB::table('rental_usage_contexts')
-            ->where('tenant_id', $tenantId)
             ->whereIn('id', $contextIds)
             ->pluck('usage_log_id')
             ->unique();
         foreach ($usageIds as $usageId) {
             $hasApprovedCalculation = RentalCalculationLine::query()
-                ->whereIn('usage_context_id', DB::table('rental_usage_contexts')->where('tenant_id', $tenantId)->where('usage_log_id', $usageId)->select('id'))
+                ->whereIn('usage_context_id', DB::table('rental_usage_contexts')->where('usage_log_id', $usageId)->select('id'))
                 ->where('status', RentalCalculationLineStatus::Approved->value)
                 ->whereHas('run', fn (Builder $query) => $query->where('calculation_status', RentalCalculationStatus::Approved->value))
                 ->exists();
             DB::table('rental_usage_logs')
-                ->where('tenant_id', $tenantId)
                 ->where('id', $usageId)
                 ->whereIn('status', [RentalUsageStatus::Approved->value, RentalUsageStatus::Consumed->value])
                 ->update([

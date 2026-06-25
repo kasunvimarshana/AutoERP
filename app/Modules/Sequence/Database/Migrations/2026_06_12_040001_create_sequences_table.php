@@ -18,7 +18,10 @@ return new class extends Migration
                 ->cascadeOnDelete()
                 ->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')
-                ->nullable();
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('document_type')->comment('Generic sequence key supplied by the calling module.');
@@ -40,21 +43,6 @@ return new class extends Migration
                 ['tenant_id', 'document_type', 'scope_key'],
                 'sequences_document_period_uk'
             );
-
-            $table->unique(['id', 'tenant_id'], 'sequences_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'sequences_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'sequences_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'sequences_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

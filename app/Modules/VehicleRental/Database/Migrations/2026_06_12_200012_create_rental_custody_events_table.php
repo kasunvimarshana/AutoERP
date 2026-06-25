@@ -14,12 +14,12 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('event_number', 100);
-            $table->foreignId('vehicle_allocation_id');
-            $table->foreignId('replacement_id')->nullable();
-            $table->foreignId('vehicle_id');
+            $table->foreignId('vehicle_allocation_id')->constrained('rental_vehicle_allocations')->cascadeOnDelete();
+            $table->foreignId('replacement_id')->nullable()->constrained('rental_vehicle_replacements')->nullOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
             $table->string('event_type', 40);
             $table->dateTime('occurred_at');
             $table->decimal('odometer', 20, 6);
@@ -27,8 +27,8 @@ return new class extends Migration
             $table->string('location')->nullable();
             $table->string('from_role', 30);
             $table->string('to_role', 30);
-            $table->foreignId('handed_over_by_employee_id')->nullable();
-            $table->foreignId('received_by_employee_id')->nullable();
+            $table->foreignId('handed_over_by_employee_id')->nullable()->constrained('hr_employees')->nullOnDelete();
+            $table->foreignId('received_by_employee_id')->nullable()->constrained('hr_employees')->nullOnDelete();
             $table->string('external_handed_over_name', 150)->nullable();
             $table->string('external_received_by_name', 150)->nullable();
             $table->text('condition_summary')->nullable();
@@ -47,45 +47,6 @@ return new class extends Migration
             $table->index(['vehicle_id', 'occurred_at'], 'rental_custody_events_vehicle_at_idx');
             $table->index(['vehicle_allocation_id', 'event_type', 'occurred_at'], 'rental_custody_events_allocation_type_idx');
             $table->index(['status', 'occurred_at'], 'rental_custody_events_status_at_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_custody_events_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_custody_events_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_allocation_id', 'tenant_id'], 'rental_custody_events_vehicle_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_allocations')
-                ->cascadeOnDelete();
-            $table->foreign(['replacement_id', 'tenant_id'], 'rental_custody_events_replacement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_replacements')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'rental_custody_events_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['handed_over_by_employee_id', 'tenant_id'], 'rental_custody_events_handed_over_by_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
-            $table->foreign(['received_by_employee_id', 'tenant_id'], 'rental_custody_events_received_by_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
-
-            $table->foreign(['reversed_by', 'tenant_id'], 'rental_custody_events_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'rental_custody_events_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_custody_events_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

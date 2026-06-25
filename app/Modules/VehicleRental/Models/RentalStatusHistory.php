@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Models;
 
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalStatusHistory extends TenantOwnedModel
+final class RentalStatusHistory extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_status_histories';

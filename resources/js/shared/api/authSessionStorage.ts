@@ -1,32 +1,17 @@
-export type AuthMode = 'tenant' | 'platform';
-
 export interface StoredApiContext {
     accessToken: string | null;
+    refreshToken: string | null;
     sessionId: number | null;
     tenantId: number | null;
     organizationUnitId: number | null;
-    authMode: AuthMode;
-    hasSession: boolean;
 }
 
-export interface AuthSessionContext {
-    accessToken: string;
-    sessionId: number | null;
-    tenantId: number | null;
-    organizationUnitId: number | null;
-    authMode: AuthMode;
-}
-
-export const AUTH_SESSION_MARKER_KEY = 'autoerp.auth_session';
-export const AUTH_SESSION_INVALIDATED_EVENT = 'autoerp:auth-session-invalidated';
-
+const TOKEN_KEY = 'autoerp.access_token';
+const REFRESH_TOKEN_KEY = 'autoerp.refresh_token';
 const SESSION_KEY = 'autoerp.session_id';
 const TENANT_KEY = 'autoerp.tenant_id';
 const ORG_KEY = 'autoerp.organization_unit_id';
-const AUTH_MODE_KEY = 'autoerp.auth_mode';
 const LEGACY_AUTH_KEYS = [
-    'autoerp.access_token',
-    'autoerp.refresh_token',
     'autoerp.user',
     'autoerp.current_user',
     'autoerp.permissions',
@@ -35,96 +20,50 @@ const LEGACY_AUTH_KEYS = [
     'autoerp.organization_unit',
 ];
 
-let accessTokenInMemory: string | null = null;
+function storedNumber(key: string): number | null {
+    const value = window.localStorage.getItem(key);
+    return value && Number.isFinite(Number(value)) ? Number(value) : null;
+}
 
 export function getStoredApiContext(): StoredApiContext {
     return {
-        accessToken: accessTokenInMemory,
-        sessionId: storedPositiveInteger(SESSION_KEY),
-        tenantId: storedPositiveInteger(TENANT_KEY),
-        organizationUnitId: storedPositiveInteger(ORG_KEY),
-        authMode: storedAuthMode(),
-        hasSession: window.localStorage.getItem(AUTH_SESSION_MARKER_KEY) !== null,
+        accessToken: window.localStorage.getItem(TOKEN_KEY),
+        refreshToken: window.localStorage.getItem(REFRESH_TOKEN_KEY),
+        sessionId: storedNumber(SESSION_KEY),
+        tenantId: storedNumber(TENANT_KEY),
+        organizationUnitId: storedNumber(ORG_KEY),
     };
 }
 
-export function setTransientAccessToken(accessToken: string | null): void {
-    accessTokenInMemory = normalizeToken(accessToken);
-}
-
-export function commitAuthSession(context: AuthSessionContext): void {
-    const accessToken = normalizeToken(context.accessToken);
-    if (accessToken === null) {
-        throw new Error('An access token is required to commit an authenticated session.');
-    }
-
-    accessTokenInMemory = accessToken;
-    setPositiveInteger(SESSION_KEY, context.sessionId);
-    setPositiveInteger(TENANT_KEY, context.authMode === 'tenant' ? context.tenantId : null);
-    setPositiveInteger(ORG_KEY, context.authMode === 'tenant' ? context.organizationUnitId : null);
-    window.localStorage.setItem(AUTH_MODE_KEY, context.authMode);
-    LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
-    window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, createSessionMarker());
-}
-
-export function updateRefreshedSession(accessToken: string, sessionId?: number | null): void {
-    const normalizedToken = normalizeToken(accessToken);
-    if (normalizedToken === null) {
-        throw new Error('A refreshed access token is required.');
-    }
-
-    accessTokenInMemory = normalizedToken;
-    if (sessionId !== undefined) {
-        setPositiveInteger(SESSION_KEY, sessionId);
-    }
+export function storeAuthSession(context: StoredApiContext): void {
+    setString(TOKEN_KEY, context.accessToken);
+    setString(REFRESH_TOKEN_KEY, context.refreshToken);
+    setNumber(SESSION_KEY, context.sessionId);
+    setNumber(TENANT_KEY, context.tenantId);
+    setNumber(ORG_KEY, context.organizationUnitId);
 }
 
 export function clearStoredAuthSession(): void {
-    accessTokenInMemory = null;
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     window.localStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem(TENANT_KEY);
     window.localStorage.removeItem(ORG_KEY);
-    window.localStorage.removeItem(AUTH_MODE_KEY);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
-    window.localStorage.removeItem(AUTH_SESSION_MARKER_KEY);
 }
 
-export function invalidateStoredAuthSession(): void {
-    clearStoredAuthSession();
-    window.dispatchEvent(new Event(AUTH_SESSION_INVALIDATED_EVENT));
+function setString(key: string, value: string | null): void {
+    if (value) {
+        window.localStorage.setItem(key, value);
+    } else {
+        window.localStorage.removeItem(key);
+    }
 }
 
-function storedPositiveInteger(key: string): number | null {
-    const rawValue = window.localStorage.getItem(key);
-    if (rawValue === null) return null;
-
-    const value = Number(rawValue);
-    return Number.isSafeInteger(value) && value > 0 ? value : null;
-}
-
-function storedAuthMode(): AuthMode {
-    return window.localStorage.getItem(AUTH_MODE_KEY) === 'platform' ? 'platform' : 'tenant';
-}
-
-function setPositiveInteger(key: string, value: number | null): void {
-    if (Number.isSafeInteger(value) && Number(value) > 0) {
+function setNumber(key: string, value: number | null): void {
+    if (value) {
         window.localStorage.setItem(key, String(value));
-        return;
+    } else {
+        window.localStorage.removeItem(key);
     }
-
-    window.localStorage.removeItem(key);
-}
-
-function normalizeToken(value: string | null): string | null {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim();
-    return normalized !== '' ? normalized : null;
-}
-
-function createSessionMarker(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }

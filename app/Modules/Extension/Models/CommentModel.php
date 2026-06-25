@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Extension\Models;
 
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class CommentModel extends TenantOwnedModel
+final class CommentModel extends CoreModel
 {
     protected $table = 'comments';
 

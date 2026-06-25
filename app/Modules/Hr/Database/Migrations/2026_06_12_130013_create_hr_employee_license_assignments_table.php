@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('hr_employee_license_assignments', function (Blueprint $table): void {
             $table->id();
             $this->scope($table, 'hr_emp_licenses');
-            $table->foreignId('employee_id');
-            $table->foreignId('license_id');
+            $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
+            $table->foreignId('license_id')->constrained('hr_licenses')->cascadeOnDelete();
             $table->string('license_number')->nullable();
             $table->date('issued_date')->nullable();
             $table->date('expiry_date')->nullable();
@@ -22,16 +22,6 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['employee_id', 'license_id'], 'hr_employee_licenses_uk');
             $table->index(['tenant_id', 'license_id'], 'hr_employee_licenses_lookup_idx');
-
-            $table->unique(['id', 'tenant_id'], 'hr_employee_license_assignments_id_tenant_uk');
-            $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_license_assignments_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->cascadeOnDelete();
-            $table->foreign(['license_id', 'tenant_id'], 'hr_employee_license_assignments_license_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_licenses')
-                ->cascadeOnDelete();
         });
     }
 
@@ -48,9 +38,9 @@ return new class extends Migration
             ->on('tenants')
             ->cascadeOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
-            ->references(['id', 'tenant_id'])
+        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
+            ->references('id')
             ->on('organization_units')
-            ->restrictOnDelete();
+            ->nullOnDelete();
     }
 };

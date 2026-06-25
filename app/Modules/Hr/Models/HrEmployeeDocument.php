@@ -3,10 +3,10 @@ declare(strict_types=1);
 namespace Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Hr\Enums\EmployeeDocumentStatus;
 use Modules\Hr\Enums\EmployeeDocumentType;
-final class HrEmployeeDocument extends TenantOwnedModel
+final class HrEmployeeDocument extends CoreModel
 {
     use SoftDeletes;
     protected $table = 'hr_employee_documents';

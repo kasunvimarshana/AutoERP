@@ -13,41 +13,18 @@ return new class extends Migration
         Schema::create('role_permissions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->unsignedBigInteger('role_id');
-            $table->unsignedBigInteger('permission_id');
+            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+            $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
             $table->unsignedBigInteger('created_by')->nullable()->index('role_permissions_created_by_idx');
             $table->unsignedBigInteger('updated_by')->nullable()->index('role_permissions_updated_by_idx');
 
             $table->timestamps();
 
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rp_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['role_id', 'tenant_id'], 'rp_role_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('roles')
-                ->cascadeOnDelete();
-            $table->foreign(['permission_id', 'tenant_id'], 'rp_permission_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('permissions')
-                ->cascadeOnDelete();
             $table->unique(['tenant_id', 'role_id', 'permission_id'], 'role_permissions_uk');
-
-            $table->unique(['id', 'tenant_id'], 'role_permissions_id_tenant_uk');
-
-            $table->foreign(['created_by', 'tenant_id'], 'role_permissions_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'role_permissions_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

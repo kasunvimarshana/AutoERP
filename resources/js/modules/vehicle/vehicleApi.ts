@@ -37,7 +37,8 @@ export const createVehicle = (payload: VehiclePayload) =>
 export const createVehicleWithRelations = (payload: VehicleWithRelationsPayload) =>
     apiClient.post<ApiResource<Vehicle>>(
         `${endpoints.vehicles}/with-relations`,
-        hasDocumentFiles(payload.documents) ? vehicleWithRelationsFormData(payload) : payload
+        hasDocumentFiles(payload.documents) ? vehicleWithRelationsFormData(payload) : payload,
+        hasDocumentFiles(payload.documents) ? multipartConfig : undefined,
     ).then((response) => response.data.data);
 
 export const updateVehicle = (id: number, payload: Partial<VehiclePayload>) =>
@@ -111,11 +112,12 @@ export const listVehicleDocuments = (vehicleId: number, params: ListParams, sign
 export const createVehicleDocument = (vehicleId: number, payload: VehicleDocumentPayload) =>
     apiClient.post<ApiResource<VehicleDocument>>(
         relationPath(vehicleId, 'documents'),
-        payload.file ? documentFormData(payload) : payload
+        payload.file ? documentFormData(payload) : payload,
+        payload.file ? multipartConfig : undefined,
     ).then((response) => response.data.data);
 export const updateVehicleDocument = (vehicleId: number, id: number, payload: VehicleDocumentPayload) =>
     payload.file
-        ? apiClient.post<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, documentFormData(payload, 'PUT')).then((response) => response.data.data)
+        ? apiClient.post<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, documentFormData(payload, 'PUT'), multipartConfig).then((response) => response.data.data)
         : apiClient.put<ApiResource<VehicleDocument>>(`${relationPath(vehicleId, 'documents')}/${id}`, payload).then((response) => response.data.data);
 export const deleteVehicleDocument = (vehicleId: number, id: number) => apiClient.delete(`${relationPath(vehicleId, 'documents')}/${id}`);
 export const previewVehicleDocumentUrl = (vehicleId: number, id: number) => `${relationPath(vehicleId, 'documents')}/${id}/preview`;
@@ -143,6 +145,7 @@ export const deleteVehicleAttribute = (vehicleId: number, id: number) => apiClie
 export const listVehicleStatusHistory = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleStatusHistory>>(relationPath(vehicleId, 'status-history'), { params, signal }).then((response) => response.data);
 
+const multipartConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
 
 function hasDocumentFiles(documents: VehicleDocumentPayload[]): boolean {
     return documents.some((document) => Boolean(document.file));

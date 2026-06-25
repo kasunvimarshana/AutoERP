@@ -7,7 +7,7 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Enums\InventoryStatus;
@@ -18,7 +18,7 @@ use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventoryMovement extends TenantOwnedModel
+final class InventoryMovement extends CoreModel
 {
     use SoftDeletes;
 

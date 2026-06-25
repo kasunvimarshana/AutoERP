@@ -6,11 +6,11 @@ namespace Modules\Customer\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Vehicle\Models\Vehicle;
 
-final class CustomerVehicle extends TenantOwnedModel
+final class CustomerVehicle extends CoreModel
 {
     protected $table = 'customer_vehicles';
 

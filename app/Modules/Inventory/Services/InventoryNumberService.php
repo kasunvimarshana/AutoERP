@@ -35,7 +35,6 @@ final class InventoryNumberService
             $next = ((int) $sequence->last_number) + 1;
 
             DB::table('inventory_number_sequences')
-                ->where('tenant_id', $tenantId)
                 ->where('id', $sequence->id)
                 ->update([
                     'last_number' => $next,

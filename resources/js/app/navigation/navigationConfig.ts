@@ -1,6 +1,4 @@
 import type { NavigationSection } from "./navigationTypes";
-import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "../routePaths";
-import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';
 import {
     accessPermissions,
     protectedAccessRoles,
@@ -9,6 +7,7 @@ import { itemPermissions } from "@/modules/item/itemPermissions";
 import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
+import { settingsPermissions } from "@/modules/settings/settingsPermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -72,7 +71,7 @@ const warehouseNavigationPermissions = [
     warehousePermissions.locationsCreate,
 ];
 
-export const tenantNavigationSections: NavigationSection[] = [
+export const navigationSections: NavigationSection[] = [
     {
         id: "primary",
         items: [
@@ -80,9 +79,9 @@ export const tenantNavigationSections: NavigationSection[] = [
                 id: "dashboard",
                 type: "link",
                 label: "Dashboard",
-                to: DASHBOARD_PATH,
+                to: "/dashboard",
                 icon: "dashboard",
-                match: [DASHBOARD_PATH],
+                match: ["/dashboard"],
             },
         ],
     },
@@ -346,7 +345,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                 label: "Users",
                 icon: "users",
                 access: {
-                    ...tenantAccess([]),
+                    ...tenantAccess(["user"]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
                 },
@@ -357,7 +356,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         label: "User List",
                         to: "/access/users",
                         access: {
-                            ...tenantAccess([]),
+                            ...tenantAccess(["user"]),
                             permissions: [accessPermissions.usersView],
                         },
                     },
@@ -368,7 +367,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         to: "/access/roles",
                         icon: "role",
                         access: {
-                            ...tenantAccess([]),
+                            ...tenantAccess(["user"]),
                             permissions: [accessPermissions.rolesView],
                         },
                     },
@@ -379,7 +378,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         to: "/access/permissions",
                         icon: "permission",
                         access: {
-                            ...tenantAccess([]),
+                            ...tenantAccess(["user"]),
                             permissions: [accessPermissions.permissionsView],
                         },
                     },
@@ -1019,7 +1018,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                 label: "Vouchers",
                 to: "/vouchers",
                 icon: "voucher",
-                access: tenantAccess([]),
+                access: tenantAccess(["voucher"]),
             },
         ],
     },
@@ -1034,7 +1033,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                 to: "/administration/access",
                 icon: "users",
                 access: {
-                    ...tenantAccess([]),
+                    ...tenantAccess(["user"]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
                 },
@@ -1047,11 +1046,40 @@ export const tenantNavigationSections: NavigationSection[] = [
                 icon: "settings",
                 access: {
                     requiresTenant: true,
-                    permissions: [
-                        tenantPermissions.profileView,
-                        tenantPermissions.domainsView,
-                        tenantPermissions.documentsView,
-                    ],
+                    permissions: [tenantPermissions.profileView],
+                },
+            },
+            {
+                id: "saas-tenants",
+                type: "link",
+                label: "SaaS Tenants",
+                to: "/administration/saas-tenants",
+                icon: "users",
+                access: {
+                    requiresTenant: true,
+                    permissions: [tenantPermissions.platformView],
+                },
+            },
+            {
+                id: "tenant-plans",
+                type: "link",
+                label: "Tenant Plans",
+                to: "/administration/tenant-plans",
+                icon: "list",
+                access: {
+                    requiresTenant: true,
+                    permissions: [tenantPermissions.platformManagePlans],
+                },
+            },
+            {
+                id: "platform-defaults",
+                type: "link",
+                label: "Platform Defaults",
+                to: "/administration/platform-defaults",
+                icon: "settings",
+                access: {
+                    requiresTenant: true,
+                    permissions: [settingsPermissions.platformDefaultsView],
                 },
             },
             {
@@ -1083,75 +1111,9 @@ export const tenantNavigationSections: NavigationSection[] = [
                 to: "/settings",
                 icon: "settings",
                 access: {
-                    ...tenantAccess([]),
+                    ...tenantAccess(["configuration"]),
                     permissions: ["configuration.entries.view"],
                 },
-            },
-        ],
-    },
-];
-
-
-export const platformNavigationSections: NavigationSection[] = [
-    {
-        id: "platform",
-        label: "Platform Administration",
-        items: [
-            {
-                id: "saas-tenants",
-                type: "link",
-                label: "SaaS Tenants",
-                to: PLATFORM_HOME_PATH,
-                icon: "users",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.tenantsView] },
-            },
-            {
-                id: "tenant-plans",
-                type: "link",
-                label: "Tenant Plans",
-                to: "/administration/tenant-plans",
-                icon: "list",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.plansView] },
-            },
-            {
-                id: "platform-configuration",
-                type: "link",
-                label: "Platform Defaults",
-                to: "/administration/platform-configuration",
-                icon: "settings",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.configurationView] },
-            },
-            {
-                id: "platform-operators",
-                type: "link",
-                label: "Operators & Permissions",
-                to: "/administration/platform-operators",
-                icon: "users",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.operatorsView] },
-            },
-            {
-                id: "platform-security",
-                type: "link",
-                label: "Sessions & MFA",
-                to: "/administration/platform-security",
-                icon: "permission",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.sessionsView] },
-            },
-            {
-                id: "platform-audit",
-                type: "link",
-                label: "Platform Audit",
-                to: "/administration/platform-audit",
-                icon: "list",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.auditView] },
-            },
-            {
-                id: "platform-health",
-                type: "link",
-                label: "Platform Health",
-                to: "/administration/platform-health",
-                icon: "dashboard",
-                access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.healthView] },
             },
         ],
     },

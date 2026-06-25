@@ -2,8 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
-import { TestRouter } from '@/test/TestRouter';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import WarehouseCreatePage from './WarehouseCreatePage';
 import WarehouseDetailPage from './WarehouseDetailPage';
@@ -16,6 +15,7 @@ import WarehouseLocationListPage from './WarehouseLocationListPage';
 import { WarehouseLocationForm } from './components/WarehouseLocationForm';
 import { warehousePermissions } from './warehousePermissions';
 import type { WarehouseLocationPayload, WarehouseLocationSummary, WarehouseSummary } from './warehouseTypes';
+
 const apiMocks = vi.hoisted(() => ({
     createWarehouse: vi.fn(),
     createWarehouseLocation: vi.fn(),
@@ -32,10 +32,13 @@ const apiMocks = vi.hoisted(() => ({
     updateWarehouse: vi.fn(),
     updateWarehouseLocation: vi.fn(),
 }));
+
 const authState = vi.hoisted(() => ({
     permissions: [] as string[],
 }));
+
 vi.mock('./warehouseApi', () => apiMocks);
+
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
         user: { id: 1, name: 'Warehouse User', email: 'warehouse@example.test' },
@@ -44,7 +47,6 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
         organizationUnit: { id: 1, name: 'Head Office' },
         roles: [],
         permissions: authState.permissions,
-        permissionsLoaded: true,
         enabledModules: ['warehouse'],
         isAuthenticated: true,
         isLoading: false,
@@ -53,6 +55,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
         loadCurrentUser: vi.fn(),
     }),
 }));
+
 describe('Warehouse pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -70,6 +73,7 @@ describe('Warehouse pages', () => {
         apiMocks.searchWarehouseOptions.mockResolvedValue(collection([warehouse(), warehouse({ id: 2, code: 'WH2', name: 'Warehouse Two' })]));
         apiMocks.searchWarehouseLocationOptions.mockResolvedValue(collection([location({ id: 20, code: 'PA', name: 'Parent A', path: '/pa' })]));
     });
+
     it('renders the requested route-level pages', async () => {
         const cases: Array<[ReactElement, string, string]> = [
             [<WarehouseListPage />, '/warehouses', 'Warehouses'],
@@ -81,32 +85,40 @@ describe('Warehouse pages', () => {
             [<RoutePage path="/warehouse-locations/:id/edit" page={<WarehouseLocationEditPage />} />, '/warehouse-locations/10/edit', 'Edit Bin A'],
             [<RoutePage path="/warehouse-locations/:id" page={<WarehouseLocationDetailPage />} />, '/warehouse-locations/10', 'BIN-A - Bin A'],
         ];
+
         for (const [page, path, heading] of cases) {
             cleanup();
             renderPage(page, [path]);
             expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
         }
     });
+
     it('keeps detail pages read-only', async () => {
         renderPage(<RoutePage path="/warehouses/:id" page={<WarehouseDetailPage />} />, ['/warehouses/1']);
+
         expect(await screen.findByRole('heading', { name: 'WH1 - Main Warehouse' })).toBeInTheDocument();
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /save|create|deactivate|activate/i })).not.toBeInTheDocument();
+
         cleanup();
         renderPage(<RoutePage path="/warehouse-locations/:id" page={<WarehouseLocationDetailPage />} />, ['/warehouse-locations/10']);
+
         expect(await screen.findByRole('heading', { name: 'BIN-A - Bin A' })).toBeInTheDocument();
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /save|create|deactivate|activate/i })).not.toBeInTheDocument();
     });
+
     it('uses permission-aware list actions and server filters', async () => {
         authState.permissions = [warehousePermissions.warehousesView];
         const user = userEvent.setup();
         renderPage(<WarehouseListPage />, ['/warehouses']);
+
         expect(await screen.findAllByText('Main Warehouse')).not.toHaveLength(0);
         expect(screen.queryByRole('link', { name: 'Create Warehouse' })).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+
         await user.selectOptions(screen.getByLabelText('Status'), 'false');
         await waitFor(() => {
             expect(apiMocks.listWarehouses).toHaveBeenLastCalledWith(
@@ -115,44 +127,56 @@ describe('Warehouse pages', () => {
             );
         });
     });
+
     it('normalizes default checkbox UX on Warehouse create', async () => {
         const user = userEvent.setup();
         renderPage(<WarehouseCreatePage />, ['/warehouses/create']);
+
         const active = screen.getByLabelText('Active');
         const defaultWarehouse = screen.getByLabelText('Default Warehouse');
+
         await user.click(defaultWarehouse);
         expect(active).toBeChecked();
         expect(defaultWarehouse).toBeChecked();
+
         await user.click(active);
         expect(active).not.toBeChecked();
         expect(defaultWarehouse).not.toBeChecked();
     });
+
     it('normalizes Location default UX and clears Parent Location when Warehouse changes', async () => {
         const user = userEvent.setup();
         renderPage(<LocationFormHarness />, ['/warehouse-location-form']);
+
         const defaultLocation = screen.getByLabelText('Default Location');
         const active = screen.getByLabelText('Active');
         await user.click(defaultLocation);
         expect(active).toBeChecked();
         await user.click(active);
         expect(defaultLocation).not.toBeChecked();
+
         await user.click(screen.getByLabelText('Warehouse'));
         await user.click(await screen.findByRole('option', { name: 'WH1 - Main Warehouse' }));
         await user.click(screen.getByLabelText('Parent Location'));
         await user.click(await screen.findByRole('option', { name: 'PA - Parent A (/pa)' }));
         expect(screen.getByLabelText('Parent Location')).toHaveValue('PA - Parent A (/pa)');
+
         await user.click(screen.getByLabelText('Warehouse'));
         await user.click(await screen.findByRole('option', { name: 'WH2 - Warehouse Two' }));
         expect(screen.getByLabelText('Parent Location')).toHaveValue('');
     });
+
     it('preselects default Warehouse only for an empty Location create form', async () => {
         apiMocks.getDefaultWarehouse.mockResolvedValue(warehouse());
+
         renderPage(<WarehouseLocationCreatePage />, ['/warehouse-locations/create']);
+
         await waitFor(() => {
             expect(screen.getByLabelText('Warehouse')).toHaveValue('WH1 - Main Warehouse');
         });
     });
 });
+
 function LocationFormHarness() {
     const [form, setForm] = useState<WarehouseLocationPayload>({
         warehouse_id: null,
@@ -168,6 +192,7 @@ function LocationFormHarness() {
     });
     const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseSummary | null>(null);
     const [parent, setParent] = useState<WarehouseLocationSummary | null>(null);
+
     return (
         <WarehouseLocationForm
             value={form}
@@ -180,6 +205,7 @@ function LocationFormHarness() {
         />
     );
 }
+
 function RoutePage({ page, path }: { page: ReactElement; path: string }) {
     return (
         <Routes>
@@ -187,13 +213,15 @@ function RoutePage({ page, path }: { page: ReactElement; path: string }) {
         </Routes>
     );
 }
+
 function renderPage(page: ReactElement, initialEntries: string[]) {
     return render(
-        <TestRouter initialEntries={initialEntries}>
+        <MemoryRouter initialEntries={initialEntries}>
             {page}
-        </TestRouter>,
+        </MemoryRouter>,
     );
 }
+
 function warehouse(overrides: Partial<WarehouseSummary> & { locations?: WarehouseLocationSummary[] } = {}): WarehouseSummary & { locations?: WarehouseLocationSummary[] } {
     return {
         id: 1,
@@ -210,6 +238,7 @@ function warehouse(overrides: Partial<WarehouseSummary> & { locations?: Warehous
         ...overrides,
     };
 }
+
 function location(overrides: Partial<WarehouseLocationSummary> = {}): WarehouseLocationSummary {
     return {
         id: 10,
@@ -231,6 +260,7 @@ function location(overrides: Partial<WarehouseLocationSummary> = {}): WarehouseL
         ...overrides,
     };
 }
+
 function collection<T>(data: T[]) {
     return {
         data,

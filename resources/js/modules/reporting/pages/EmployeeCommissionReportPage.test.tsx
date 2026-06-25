@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { TestRouter } from '@/test/TestRouter';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EmployeeCommissionReportPage from './EmployeeCommissionReportPage';
+
 const apiMocks = vi.hoisted(() => ({
     runEmployeeCommissionReport: vi.fn(),
 }));
+
 vi.mock('../reportingApi', () => apiMocks);
 vi.mock('../components/ExportActions', () => ({
     ExportActions: ({ reportKey }: { reportKey: string }) => <div data-testid="export-actions">{reportKey}</div>,
@@ -21,6 +23,7 @@ vi.mock('@/modules/hr/hrApi', () => ({
     searchDesignations: vi.fn(),
     searchEmployees: vi.fn(),
 }));
+
 describe('EmployeeCommissionReportPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -115,20 +118,24 @@ describe('EmployeeCommissionReportPage', () => {
             meta: { current_page: 1, from: 1, last_page: 1, per_page: 25, to: 1, total: 1 },
         });
     });
+
     it('renders technician and supervisor commission fields and applies source filters', async () => {
         const user = userEvent.setup();
         render(
-            <TestRouter>
+            <MemoryRouter>
                 <EmployeeCommissionReportPage />
-            </TestRouter>,
+            </MemoryRouter>,
         );
+
         expect(await screen.findByRole('heading', { name: 'Employee Commission Report' })).toBeInTheDocument();
         expect(screen.getAllByText('Nimal Supervisor').length).toBeGreaterThan(0);
         expect(screen.getAllByText(/50/).length).toBeGreaterThan(0);
         expect(screen.getByText('Supervisor commission')).toBeInTheDocument();
         expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/employee-commissions');
+
         await user.selectOptions(screen.getByLabelText('Commission source'), 'supervisor');
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+
         await waitFor(() => {
             expect(apiMocks.runEmployeeCommissionReport).toHaveBeenLastCalledWith(
                 expect.objectContaining({ commission_source: 'supervisor', page: 1 }),

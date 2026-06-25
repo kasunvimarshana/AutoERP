@@ -6,11 +6,11 @@ namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Vehicle\Models\Vehicle;
 
-final class SupplierVehicle extends TenantOwnedModel
+final class SupplierVehicle extends CoreModel
 {
     protected $table = 'supplier_vehicles';
 

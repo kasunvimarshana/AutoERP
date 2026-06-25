@@ -14,7 +14,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 export default function ItemBrandDetailPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
-    const canManage = hasItemPermission(auth, itemPermissions.manageBrands);
+    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageBrands);
     const brand = useApi((signal) => getItemBrand(id, signal), [id], Number.isFinite(id));
 
     if (brand.loading) return <LoadingState />;

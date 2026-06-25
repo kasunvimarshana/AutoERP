@@ -6,11 +6,11 @@ namespace Modules\Vehicle\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 
-final class VehicleDocument extends TenantOwnedModel
+final class VehicleDocument extends CoreModel
 {
     use SoftDeletes;
 

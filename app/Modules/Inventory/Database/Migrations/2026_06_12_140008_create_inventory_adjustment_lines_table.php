@@ -13,14 +13,14 @@ return new class extends Migration
         Schema::create('inventory_adjustment_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('inventory_adjustment_id');
-            $table->foreignId('item_id');
-            $table->foreignId('base_uom_id')->nullable();
-            $table->foreignId('entered_uom_id')->nullable();
-            $table->foreignId('item_variant_id')->nullable();
-            $table->foreignId('batch_id')->nullable();
-            $table->foreignId('serial_number_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('inventory_adjustment_id')->constrained('inventory_adjustments')->restrictOnDelete();
+            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
+            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('entered_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('serial_number_id')->nullable()->constrained('inventory_serial_numbers')->restrictOnDelete();
             $table->decimal('entered_system_quantity', 20, 6)->default('0.000000');
             $table->decimal('entered_counted_quantity', 20, 6)->default('0.000000');
             $table->decimal('entered_adjustment_quantity', 20, 6);
@@ -36,40 +36,6 @@ return new class extends Migration
 
             $table->index('inventory_adjustment_id', 'inventory_adjustment_lines_adjustment_idx');
             $table->index('item_id', 'inventory_adjustment_lines_item_idx');
-
-            $table->unique(['id', 'tenant_id'], 'inventory_adjustment_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_adjustment_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['inventory_adjustment_id', 'tenant_id'], 'inventory_adjustment_lines_inventory_adjustment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_adjustments')
-                ->restrictOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'inventory_adjustment_lines_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->restrictOnDelete();
-            $table->foreign(['base_uom_id', 'tenant_id'], 'inventory_adjustment_lines_base_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['entered_uom_id', 'tenant_id'], 'inventory_adjustment_lines_entered_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['item_variant_id', 'tenant_id'], 'inventory_adjustment_lines_item_variant_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('item_variants')
-                ->restrictOnDelete();
-            $table->foreign(['batch_id', 'tenant_id'], 'inventory_adjustment_lines_batch_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_batches')
-                ->restrictOnDelete();
-            $table->foreign(['serial_number_id', 'tenant_id'], 'inventory_adjustment_lines_serial_number_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_serial_numbers')
-                ->restrictOnDelete();
         });
     }
 

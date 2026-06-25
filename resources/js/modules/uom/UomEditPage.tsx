@@ -4,7 +4,6 @@ import { ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { getUom, updateUom } from './uomApi';
@@ -19,13 +18,10 @@ export default function UomEditPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const formGuard = useMutationFormGuard(saving);
 
     useEffect(() => {
         const controller = new AbortController();
-        queueMicrotask(() => {
-            if (!controller.signal.aborted) setLoading(true);
-        });
+        setLoading(true);
         getUom(uomId, controller.signal)
             .then((uom) => {
                 if (controller.signal.aborted) return;
@@ -61,7 +57,6 @@ export default function UomEditPage() {
                     setError(null);
                     try {
                         const updated = await updateUom(uomId, form);
-                        formGuard.markSaved();
                         navigate(`/uoms/${updated.id}`);
                     } catch (nextError) {
                         setError(nextError instanceof ApiError ? nextError : new ApiError('Unable to save UOM.', null));
@@ -69,7 +64,7 @@ export default function UomEditPage() {
                         setSaving(false);
                     }
                 }}>
-                    <UomFields form={form} setForm={(next) => { formGuard.markDirty(); setForm(next); }} error={error} />
+                    <UomFields form={form} setForm={setForm} error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => navigate(`/uoms/${uomId}`)}>Cancel</Button>
                         <Button type="submit" loading={saving}>Save UOM</Button>

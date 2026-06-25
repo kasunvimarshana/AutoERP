@@ -19,6 +19,7 @@ final class ExchangeAuthorizationCodeRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
             'authorization_code' => ['required', 'string', 'min:10'],
             'client_key' => ['required', 'string', 'max:120'],
             'client_secret' => ['nullable', 'string', 'min:1'],

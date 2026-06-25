@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Extension\Models\AttachmentModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Supplier\Models\Supplier;
@@ -18,7 +18,7 @@ use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalExpense extends TenantOwnedModel
+final class RentalExpense extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_expenses';

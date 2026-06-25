@@ -6,12 +6,12 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Finance\Enums\AccountDimensionType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceDimension extends TenantOwnedModel
+final class FinanceDimension extends CoreModel
 {
     protected $table = 'finance_dimensions';
 

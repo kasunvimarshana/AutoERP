@@ -1,16 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
-import { TestRouter } from '@/test/TestRouter';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VehicleServiceInvoiceCreatePage from './VehicleServiceInvoiceCreatePage';
+
 const apiMocks = vi.hoisted(() => ({
     createVehicleServiceInvoice: vi.fn(),
     getVehicleServiceJob: vi.fn(),
     listBillableLines: vi.fn(),
     previewVehicleServiceInvoice: vi.fn(),
 }));
+
 vi.mock('../vehicleServiceApi', () => apiMocks);
+
 describe('VehicleServiceInvoiceCreatePage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -30,11 +32,14 @@ describe('VehicleServiceInvoiceCreatePage', () => {
             posted_at: '2026-06-20T10:00:00Z',
         });
     });
+
     it('creates and posts the selected service-job quantities', async () => {
         const user = userEvent.setup();
         renderPage();
+
         expect(await screen.findByText('Invoice JOB-1')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: 'Create & post invoice' }));
+
         await waitFor(() => expect(apiMocks.createVehicleServiceInvoice).toHaveBeenCalledWith(
             9,
             expect.objectContaining({
@@ -44,27 +49,33 @@ describe('VehicleServiceInvoiceCreatePage', () => {
         ));
         expect(await screen.findByText('Posted invoice')).toBeInTheDocument();
     });
+
     it('clears an old preview when an invoice header value changes', async () => {
         const user = userEvent.setup();
         renderPage();
+
         expect(await screen.findByText('Invoice JOB-1')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: 'Preview' }));
         expect(await screen.findByText('Grand total')).toBeInTheDocument();
+
         await user.clear(screen.getByLabelText('Notes'));
         await user.type(screen.getByLabelText('Notes'), 'Changed');
+
         expect(screen.queryByText('Grand total')).not.toBeInTheDocument();
     });
 });
+
 function renderPage() {
     return render(
-        <TestRouter initialEntries={['/vehicle-service/jobs/9/invoice']}>
+        <MemoryRouter initialEntries={['/vehicle-service/jobs/9/invoice']}>
             <Routes>
                 <Route path="/vehicle-service/jobs/:id/invoice" element={<VehicleServiceInvoiceCreatePage />} />
                 <Route path="/invoices/:id" element={<div>Posted invoice</div>} />
             </Routes>
-        </TestRouter>,
+        </MemoryRouter>,
     );
 }
+
 function job() {
     return {
         id: 9,
@@ -85,6 +96,7 @@ function job() {
         payment_links: [],
     };
 }
+
 function billableLine() {
     return {
         id: 21,

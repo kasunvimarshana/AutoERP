@@ -6,9 +6,9 @@ namespace Modules\Vehicle\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class VehicleType extends TenantOwnedModel
+final class VehicleType extends CoreModel
 {
     use SoftDeletes;
 

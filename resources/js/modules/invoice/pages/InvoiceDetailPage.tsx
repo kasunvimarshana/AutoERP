@@ -57,7 +57,7 @@ export default function InvoiceDetailPage() {
                         { label: 'Credits', value: <MoneyDisplay value={value.credit_total} /> },
                         { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
                     ]} />}
-                    {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} rowKey={(row, index) => String(row.id ?? row.line_number ?? `invoice-line-${index}`)} />}
+                    {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} />}
                     {tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
                     {tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
                     {tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
@@ -97,11 +97,11 @@ function SourceRecords({ loading, error, data }: {
         <div className="space-y-6">
             <section>
                 <h3 className="mb-2 font-semibold text-slate-900">Source documents</h3>
-                <RecordTable rows={data?.sources ?? []} fields={['source_type', 'source_document_number', 'source_document_date', 'source_subtotal', 'source_adjustment_total', 'source_grand_total', 'invoiced_amount']} rowKey={(row, index) => String(row.id ?? `${String(row.source_type ?? 'source')}-${String(row.source_document_number ?? index)}`)} />
+                <RecordTable rows={data?.sources ?? []} fields={['source_type', 'source_document_number', 'source_document_date', 'source_subtotal', 'source_adjustment_total', 'source_grand_total', 'invoiced_amount']} />
             </section>
             <section>
                 <h3 className="mb-2 font-semibold text-slate-900">Source lines</h3>
-                <RecordTable rows={data?.source_lines ?? []} fields={['source_line_type', 'source_quantity', 'previously_invoiced_quantity', 'invoiced_quantity', 'remaining_quantity', 'invoiced_line_total']} rowKey={(row, index) => String(row.id ?? row.source_line_id ?? `${String(row.source_line_type ?? 'source-line')}-${index}`)} />
+                <RecordTable rows={data?.source_lines ?? []} fields={['source_line_type', 'source_quantity', 'previously_invoiced_quantity', 'invoiced_quantity', 'remaining_quantity', 'invoiced_line_total']} />
             </section>
         </div>
     );
@@ -117,11 +117,11 @@ function AdjustmentRecords({ loading, error, rows }: {
     const allocations = rows.flatMap((row) => row.allocations ?? []);
     return (
         <div className="space-y-6">
-            <RecordTable rows={rows} fields={['name', 'adjustment_type', 'effect', 'calculation_type', 'rate', 'amount', 'allocation_method']} rowKey={(row, index) => String(row.id ?? `${String(row.name ?? 'adjustment')}-${index}`)} />
+            <RecordTable rows={rows} fields={['name', 'adjustment_type', 'effect', 'calculation_type', 'rate', 'amount', 'allocation_method']} />
             {allocations.length > 0 && (
                 <section>
                     <h3 className="mb-2 font-semibold text-slate-900">Allocation trace</h3>
-                    <RecordTable rows={allocations} fields={['source_type', 'allocation_method', 'source_amount', 'previously_allocated_amount', 'allocated_amount', 'remaining_amount']} rowKey={(row, index) => String(row.id ?? `${String(row.source_type ?? 'allocation')}-${index}`)} />
+                    <RecordTable rows={allocations} fields={['source_type', 'allocation_method', 'source_amount', 'previously_allocated_amount', 'allocated_amount', 'remaining_amount']} />
                 </section>
             )}
         </div>

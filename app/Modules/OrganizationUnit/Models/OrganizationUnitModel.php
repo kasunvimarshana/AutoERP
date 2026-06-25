@@ -7,31 +7,16 @@ namespace Modules\OrganizationUnit\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class OrganizationUnitModel extends TenantOwnedModel
+final class OrganizationUnitModel extends CoreModel
 {
     use SoftDeletes;
 
     protected $table = 'organization_units';
 
-    /**
-     * path, depth, and root_marker are hierarchy-owned derived fields and are
-     * intentionally excluded from mass assignment.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'type_id',
-        'parent_id',
-        'name',
-        'code',
-        'image_path',
-        'is_active',
-        'description',
-        'metadata',
-    ];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

@@ -77,7 +77,6 @@ final class PostingProfileService
                 }
 
                 FinancePostingProfileRule::query()->create([
-                    'tenant_id' => $tenantId,
                     'posting_profile_id' => $profile->getKey(),
                     'line_key' => trim($rule['line_key']),
                     'account_id' => $account->getKey(),

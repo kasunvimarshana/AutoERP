@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -8,7 +8,6 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import type { NamedResource } from '@/shared/types/common';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { createItemWithRelations } from './itemApi';
 import { hasItemPermission, itemPermissions } from './itemPermissions';
@@ -46,7 +45,7 @@ const initialItem: ItemPayload = {
 
 export default function ItemCreatePage() {
     const auth = useAuth();
-    const canCreate = hasItemPermission(auth, itemPermissions.create);
+    const canCreate = hasItemPermission(auth.permissions, itemPermissions.create);
     const navigate = useNavigate();
     const [item, setItem] = useState(initialItem);
     const [category, setCategory] = useState<NamedResource | null>(null);
@@ -56,22 +55,25 @@ export default function ItemCreatePage() {
     const [draft, setDraft] = useState<OneShotDraft>(emptyOneShotDraft);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(submitting);
     const visibleTabs = useMemo(
         () => tabs.filter((entry) => entry.id !== 'bundles' || ['combo', 'package'].includes(item.item_type)),
         [item.item_type],
     );
 
-    const displayedTab = visibleTabs.some((entry) => entry.id === activeTab) ? activeTab : 'basic';
+    useEffect(() => {
+        if (!visibleTabs.some((entry) => entry.id === activeTab)) {
+            setActiveTab('basic');
+        }
+    }, [activeTab, visibleTabs]);
 
     return <>
         <ContentHeader title="Create Item" description="Capture catalog setup, units, variants, pricing, codes, and usage rules from one screen." />
         {!canCreate && <CapabilityNotice>You do not have permission to create items.</CapabilityNotice>}
         <ErrorAlert error={error} />
         {canCreate && <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <Panel className="p-0"><Tabs tabs={visibleTabs} active={displayedTab} onChange={setActiveTab} /></Panel>
-            {displayedTab === 'basic' && <ItemForm value={item} onChange={(next) => { formGuard.markDirty(); setItem(next); }} category={category} onCategoryChange={(next) => { formGuard.markDirty(); setCategory(next); }} brand={brand} onBrandChange={(next) => { formGuard.markDirty(); setBrand(next); }} baseUom={baseUom} onBaseUomChange={(next) => { formGuard.markDirty(); setBaseUom(next); }} error={error} />}
-            {displayedTab !== 'basic' && <Panel><ItemOneShotBuilder section={displayedTab} value={draft} onChange={(next) => { formGuard.markDirty(); setDraft(next); }} /></Panel>}
+            <Panel className="p-0"><Tabs tabs={visibleTabs} active={activeTab} onChange={setActiveTab} /></Panel>
+            {activeTab === 'basic' && <ItemForm value={item} onChange={setItem} category={category} onCategoryChange={setCategory} brand={brand} onBrandChange={setBrand} baseUom={baseUom} onBaseUomChange={setBaseUom} error={error} />}
+            {activeTab !== 'basic' && <Panel><ItemOneShotBuilder section={activeTab} value={draft} onChange={setDraft} /></Panel>}
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button type="submit" loading={submitting}>Create Item</Button>
@@ -84,7 +86,6 @@ export default function ItemCreatePage() {
         setError(null);
         try {
             const saved = await createItemWithRelations(toPayload(item, draft));
-            formGuard.markSaved();
             navigate(`/items/${saved.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));

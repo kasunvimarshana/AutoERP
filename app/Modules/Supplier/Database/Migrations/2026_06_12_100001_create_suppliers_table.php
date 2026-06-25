@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('suppliers', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->string('supplier_number');
             $table->string('code');
             $table->string('name');
@@ -48,17 +48,6 @@ return new class extends Migration
             $table->index('status', 'suppliers_status_idx');
             $table->index('email', 'suppliers_email_idx');
             $table->index('phone', 'suppliers_phone_idx');
-
-            $table->unique(['id', 'tenant_id'], 'suppliers_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'suppliers_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-
-            $table->foreign(['approved_by', 'tenant_id'], 'suppliers_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

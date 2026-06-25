@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class InventoryAdjustmentLine extends TenantOwnedModel
+final class InventoryAdjustmentLine extends CoreModel
 {
     protected $table = 'inventory_adjustment_lines';
 

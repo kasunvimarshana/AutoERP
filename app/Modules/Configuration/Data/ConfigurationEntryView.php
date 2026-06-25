@@ -14,10 +14,6 @@ final readonly class ConfigurationEntryView
         public ?int $tenantId,
         public ?int $organizationUnitId,
         public mixed $value,
-        public mixed $inheritedValue,
-        public bool $inheritedConfigured,
-        public string $inheritedSourceScope,
-        public bool $inheritedUsesDefault,
         public int $rowVersion,
         public DateTimeImmutable $updatedAt,
     ) {}

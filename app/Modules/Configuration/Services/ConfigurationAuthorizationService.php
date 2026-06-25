@@ -9,8 +9,7 @@ use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
-use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 
 final class ConfigurationAuthorizationService
 {
@@ -18,69 +17,59 @@ final class ConfigurationAuthorizationService
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly PermissionCheckerInterface $permissions,
-        private readonly PlatformPermissionCheckerInterface $platformPermissions,
+        private readonly PlatformOperatorCheckerInterface $platformOperators,
     ) {}
+
+    public function canViewCurrent(): bool
+    {
+        return $this->allows(ConfigurationPermission::ENTRIES_VIEW);
+    }
 
     public function canViewScopeCurrent(string $scope): bool
     {
-        if ($scope === ConfigurationScope::GLOBAL) {
-            return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
-        }
-
-        return $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_VIEW);
+        return $scope === ConfigurationScope::GLOBAL
+            ? $this->canViewPlatformDefaultsCurrent()
+            : $this->canViewCurrent();
     }
 
     public function canManageScopeCurrent(string $scope): bool
     {
-        return match ($scope) {
-            ConfigurationScope::GLOBAL => $this->allowsPlatformPermission(
-                PlatformPermission::CONFIGURATION_MANAGE,
-            ),
-            ConfigurationScope::TENANT => $this->allowsTenantPermission(
-                ConfigurationPermission::ENTRIES_MANAGE_TENANT,
-            ),
-            ConfigurationScope::ORGANIZATION_UNIT => $this->allowsTenantPermission(
-                ConfigurationPermission::ENTRIES_MANAGE_ORGANIZATION,
-            ),
-            default => false,
+        $permission = match ($scope) {
+            ConfigurationScope::GLOBAL => ConfigurationPermission::PLATFORM_DEFAULTS_MANAGE,
+            ConfigurationScope::TENANT => ConfigurationPermission::ENTRIES_MANAGE_TENANT,
+            ConfigurationScope::ORGANIZATION_UNIT => ConfigurationPermission::ENTRIES_MANAGE_ORGANIZATION,
+            default => null,
         };
+
+        return $permission !== null
+            && ($scope !== ConfigurationScope::GLOBAL || $this->isPlatformOperator())
+            && $this->allows($permission);
     }
 
     public function canManageSensitiveCurrent(string $scope): bool
     {
-        return $scope === ConfigurationScope::GLOBAL
-            ? $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE)
-                && $this->allowsPlatformPermission(PlatformPermission::SECRETS_MANAGE)
-            : $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_MANAGE_SENSITIVE);
+        if ($scope === ConfigurationScope::GLOBAL) {
+            return $this->isPlatformOperator()
+                && $this->allows(ConfigurationPermission::PLATFORM_DEFAULTS_MANAGE_SENSITIVE);
+        }
+
+        return $this->allows(ConfigurationPermission::ENTRIES_MANAGE_SENSITIVE);
     }
 
-    public function canViewPlatformScope(string $scope): bool
+    public function canViewPlatformDefaultsCurrent(): bool
     {
-        return in_array($scope, ConfigurationScope::values(), true)
-            && $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
+        return $this->isPlatformOperator()
+            && $this->allows(ConfigurationPermission::PLATFORM_DEFAULTS_VIEW);
     }
 
-    public function canManagePlatformScope(string $scope): bool
-    {
-        return in_array($scope, ConfigurationScope::values(), true)
-            && $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE);
-    }
-
-    public function canManagePlatformSensitive(): bool
-    {
-        return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE)
-            && $this->allowsPlatformPermission(PlatformPermission::SECRETS_MANAGE);
-    }
-
-    private function allowsPlatformPermission(string $permission): bool
+    private function isPlatformOperator(): bool
     {
         $userId = $this->currentUser->currentUserId();
 
-        return $userId !== null
-            && $this->platformPermissions->hasPermission($userId, $permission);
+        return $userId !== null && $this->platformOperators->isPlatformOperator($userId);
     }
 
-    private function allowsTenantPermission(string $permission): bool
+    private function allows(string $permission): bool
     {
         $userId = $this->currentUser->currentUserId();
         $tenantId = $this->currentTenant->currentTenantId();

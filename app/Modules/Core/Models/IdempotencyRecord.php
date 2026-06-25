@@ -6,7 +6,7 @@ namespace Modules\Core\Models;
 
 use Modules\Core\Enums\IdempotencyStatus;
 
-final class IdempotencyRecord extends TenantOwnedModel
+final class IdempotencyRecord extends CoreModel
 {
     protected $table = 'idempotency_records';
 

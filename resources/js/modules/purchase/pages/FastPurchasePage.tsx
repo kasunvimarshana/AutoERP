@@ -36,8 +36,6 @@ export default function FastPurchasePage() {
         context,
         defaults,
         currentError,
-        contextRecoveryError,
-        retryContext,
         errorFor,
         supplier,
         setSupplier,
@@ -78,7 +76,6 @@ export default function FastPurchasePage() {
         submit,
         createAnother,
         resetForm,
-        confirmDialog,
         errorIndexForLine,
         errorIndexForPaymentRow,
     } = form;
@@ -106,7 +103,7 @@ export default function FastPurchasePage() {
                 <Button type="button" onClick={createAnother}>Create Another Fast Purchase</Button>
             ) : (
                 <>
-                    <Button type="button" variant="secondary" onClick={() => void resetForm()} disabled={submitting || previewing}>Reset</Button>
+                    <Button type="button" variant="secondary" onClick={resetForm} disabled={submitting || previewing}>Reset</Button>
                     <Button type="button" variant="secondary" loading={previewing} disabled={!canPreview || previewing} onClick={() => void runPreview()}>Preview</Button>
                     <Button type="submit" loading={submitting} disabled={!canExecute || previewStale}>Create Fast Purchase</Button>
                 </>
@@ -126,9 +123,6 @@ export default function FastPurchasePage() {
                 />}
             >
                 <ErrorAlert error={currentError} />
-                {contextRecoveryError && (
-                    <Button type="button" variant="secondary" onClick={retryContext}>Retry purchase defaults</Button>
-                )}
                 {result ? <FastPurchaseCompletedSummary result={result} /> : <>
                     {activeTab === 'details' && (
                         <FastPurchaseDetailsSection
@@ -199,7 +193,6 @@ export default function FastPurchasePage() {
                     {activeTab === 'impact' && <FastPurchaseImpactSection preset={preset} result={preview ?? result} />}
                 </>}
             </PurchaseDocumentShell>
-            {confirmDialog}
         </form>
     );
 }

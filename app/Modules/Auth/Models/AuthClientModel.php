@@ -6,9 +6,9 @@ namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 
-final class AuthClientModel extends TenantOwnedModel
+final class AuthClientModel extends CoreModel
 {
     use SoftDeletes;
 

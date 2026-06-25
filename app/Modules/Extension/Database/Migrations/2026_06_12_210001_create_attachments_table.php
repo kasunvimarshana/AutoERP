@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('attachable_type')->comment('polymorphic target type (e.g., Document, Product, Party)');
@@ -33,12 +33,6 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'attachable_type', 'attachable_id'], 'attachments_type_id_idx');
             $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'attachments_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'attachments_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'attachments_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
         });
     }
 

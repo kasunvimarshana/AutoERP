@@ -14,9 +14,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
-            $table->foreignId('custody_event_id');
+            $table->foreignId('custody_event_id')->constrained('rental_custody_events')->cascadeOnDelete();
             $table->unsignedInteger('sequence');
             $table->string('item_type', 30);
             $table->string('item_code', 50)->nullable();
@@ -34,25 +34,6 @@ return new class extends Migration
 
             $table->unique(['custody_event_id', 'sequence'], 'rental_custody_event_items_sequence_uk');
             $table->index(['custody_event_id', 'item_type'], 'rental_custody_event_items_type_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_custody_event_items_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_custody_event_items_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['custody_event_id', 'tenant_id'], 'rental_custody_event_items_custody_event_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_custody_events')
-                ->cascadeOnDelete();
-
-            $table->foreign(['created_by', 'tenant_id'], 'rental_custody_event_items_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_custody_event_items_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

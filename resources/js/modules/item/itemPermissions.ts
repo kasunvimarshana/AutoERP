@@ -1,5 +1,3 @@
-import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
-
 export const itemPermissions = {
     view: 'item.view',
     create: 'item.create',
@@ -18,6 +16,6 @@ export const itemPermissions = {
     manageBrands: 'item.brands.manage',
 } as const;
 
-export function hasItemPermission(subject: AccessSubject, permission: string): boolean {
-    return hasPermission(subject, permission);
+export function hasItemPermission(permissions: string[], permission: string): boolean {
+    return permissions.length === 0 || permissions.includes(permission);
 }

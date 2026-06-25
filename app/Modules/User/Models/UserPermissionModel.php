@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class UserPermissionModel extends TenantOwnedModel
+final class UserPermissionModel extends CoreModel
 {
     protected $table = 'user_permissions';
 

@@ -25,12 +25,7 @@ final class GetAttachmentService
 
             return Result::success($record);
         } catch (Throwable $exception) {
-            report($exception);
-
-            return Result::failure(new Error(
-                ExtensionErrorCode::INVALID_VALUE,
-                'Unable to retrieve the attachment for the active tenant.',
-            ));
+            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
     }
 }

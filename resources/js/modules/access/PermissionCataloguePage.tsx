@@ -20,7 +20,7 @@ export default function PermissionCataloguePage() {
     const [module, setModule] = useState('');
     const [page, setPage] = useState(1);
     const debouncedSearch = useDebounce(search);
-    const canView = hasAccessPermission(auth, accessPermissions.permissionsView);
+    const canView = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.permissionsView);
     const permissions = useApi((signal) => accessApi.listPermissions({
         search: debouncedSearch || undefined,
         module: module || undefined,

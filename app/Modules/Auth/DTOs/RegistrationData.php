@@ -14,7 +14,6 @@ final readonly class RegistrationData
         public ?string $lastName,
         public string $email,
         public string $password,
-        public ?string $invitationToken,
         public ?array $metadata,
     ) {}
 
@@ -31,7 +30,6 @@ final readonly class RegistrationData
             isset($payload['last_name']) ? (string) $payload['last_name'] : null,
             (string) ($payload['email'] ?? ''),
             (string) ($payload['password'] ?? ''),
-            isset($payload['invitation_token']) ? (string) $payload['invitation_token'] : null,
             isset($payload['metadata']) && is_array($payload['metadata']) ? $payload['metadata'] : null,
         );
     }

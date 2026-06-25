@@ -14,20 +14,20 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('expense_number', 100);
-            $table->foreignId('agreement_id')->nullable();
-            $table->foreignId('vehicle_allocation_id')->nullable();
-            $table->foreignId('usage_log_id')->nullable();
-            $table->foreignId('vehicle_id');
-            $table->foreignId('supplier_id')->nullable();
-            $table->foreignId('employee_id')->nullable();
+            $table->foreignId('agreement_id')->nullable()->constrained('rental_agreements')->nullOnDelete();
+            $table->foreignId('vehicle_allocation_id')->nullable()->constrained('rental_vehicle_allocations')->nullOnDelete();
+            $table->foreignId('usage_log_id')->nullable()->constrained('rental_usage_logs')->nullOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
+            $table->foreignId('employee_id')->nullable()->constrained('hr_employees')->nullOnDelete();
             $table->string('expense_type', 30);
             $table->date('expense_date');
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
             $table->decimal('net_amount', 20, 6);
-            $table->foreignId('tax_group_id')->nullable();
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
             $table->decimal('gross_amount', 20, 6);
             $table->string('reference_number', 100)->nullable();
@@ -52,61 +52,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'fingerprint'], 'rental_expenses_fingerprint_uk');
             $table->index(['vehicle_id', 'expense_date', 'status'], 'rental_expenses_vehicle_date_idx');
             $table->index(['agreement_id', 'expense_type', 'status'], 'rental_expenses_agreement_type_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_expenses_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_expenses_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id'], 'rental_expenses_agreement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_agreements')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_allocation_id', 'tenant_id'], 'rental_expenses_vehicle_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_allocations')
-                ->restrictOnDelete();
-            $table->foreign(['usage_log_id', 'tenant_id'], 'rental_expenses_usage_log_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_usage_logs')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'rental_expenses_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['supplier_id', 'tenant_id'], 'rental_expenses_supplier_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('suppliers')
-                ->restrictOnDelete();
-            $table->foreign(['employee_id', 'tenant_id'], 'rental_expenses_employee_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('hr_employees')
-                ->restrictOnDelete();
-            $table->foreign(['tax_group_id', 'tenant_id'], 'rental_expenses_tax_group_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('tax_groups')
-                ->restrictOnDelete();
-
-            $table->foreign(['submitted_by', 'tenant_id'], 'rental_expenses_submitted_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['approved_by', 'tenant_id'], 'rental_expenses_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['reversed_by', 'tenant_id'], 'rental_expenses_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'rental_expenses_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_expenses_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

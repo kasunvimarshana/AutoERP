@@ -53,8 +53,8 @@ final class CurrencyCatalogService extends AbstractCatalogService
         }
 
         $isTenantBaseCurrency = DB::table('tenants')
-            ->where('base_currency_id', $model->getKey())
-            ->where('status', '!=', 'archived')
+            ->where('currency_id', $model->getKey())
+            ->whereNull('deleted_at')
             ->exists();
 
         if ($isTenantBaseCurrency) {

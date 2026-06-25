@@ -7,14 +7,14 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventorySerialNumber extends TenantOwnedModel
+final class InventorySerialNumber extends CoreModel
 {
     use SoftDeletes;
 

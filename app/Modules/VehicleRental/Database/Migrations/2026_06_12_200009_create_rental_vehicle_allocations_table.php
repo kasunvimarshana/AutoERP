@@ -14,16 +14,16 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->string('allocation_number', 100);
-            $table->foreignId('agreement_id');
-            $table->foreignId('vehicle_id');
-            $table->foreignId('vehicle_ownership_id')->nullable();
+            $table->foreignId('agreement_id')->constrained('rental_agreements')->cascadeOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('vehicle_ownership_id')->nullable()->constrained('vehicle_ownerships')->nullOnDelete();
             $table->string('vehicle_source_type', 30);
-            $table->foreignId('source_allocation_id')->nullable();
-            $table->foreignId('vehicle_finance_agreement_id')->nullable();
-            $table->foreignId('replaces_allocation_id')->nullable();
+            $table->foreignId('source_allocation_id')->nullable()->constrained('rental_vehicle_allocations')->nullOnDelete();
+            $table->foreignId('vehicle_finance_agreement_id')->nullable()->constrained('vehicle_finance_agreements')->nullOnDelete();
+            $table->foreignId('replaces_allocation_id')->nullable()->constrained('rental_vehicle_allocations')->nullOnDelete();
             $table->dateTime('allocated_from');
             $table->dateTime('allocated_to')->nullable();
             $table->dateTime('actual_returned_at')->nullable();
@@ -43,49 +43,6 @@ return new class extends Migration
             $table->index(['vehicle_id', 'allocated_from', 'allocated_to', 'status'], 'rental_vehicle_allocations_vehicle_period_idx');
             $table->index(['agreement_id', 'status', 'allocated_from'], 'rental_vehicle_allocations_agreement_status_idx');
             $table->index(['source_allocation_id', 'allocated_from', 'allocated_to'], 'rental_vehicle_allocations_source_period_idx');
-
-            $table->unique(['id', 'tenant_id'], 'rental_vehicle_allocations_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_vehicle_allocations_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id'], 'rental_vehicle_allocations_agreement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_agreements')
-                ->cascadeOnDelete();
-            $table->foreign(['vehicle_id', 'tenant_id'], 'rental_vehicle_allocations_vehicle_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_ownership_id', 'tenant_id'], 'rental_vehicle_allocations_vehicle_ownership_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_ownerships')
-                ->restrictOnDelete();
-            $table->foreign(['source_allocation_id', 'tenant_id'], 'rental_vehicle_allocations_source_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_allocations')
-                ->restrictOnDelete();
-            $table->foreign(['vehicle_finance_agreement_id', 'tenant_id'], 'rental_vehicle_allocations_vehicle_finance_agree_3a7f95a2_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('vehicle_finance_agreements')
-                ->restrictOnDelete();
-            $table->foreign(['replaces_allocation_id', 'tenant_id'], 'rental_vehicle_allocations_replaces_allocation_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_vehicle_allocations')
-                ->restrictOnDelete();
-
-            $table->foreign(['closed_by', 'tenant_id'], 'rental_vehicle_allocations_closed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'rental_vehicle_allocations_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['updated_by', 'tenant_id'], 'rental_vehicle_allocations_updated_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
         });
     }
 

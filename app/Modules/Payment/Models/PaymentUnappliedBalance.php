@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Tenant\Models\TenantModel;
 
-final class PaymentUnappliedBalance extends TenantOwnedModel
+final class PaymentUnappliedBalance extends CoreModel
 {
     protected $table = 'payment_unapplied_balances';
 

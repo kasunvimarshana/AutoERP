@@ -25,12 +25,7 @@ final class DeleteEntityAttributeService
 
             return Result::success(null);
         } catch (Throwable $exception) {
-            report($exception);
-
-            return Result::failure(new Error(
-                ExtensionErrorCode::INVALID_VALUE,
-                'Unable to delete the entity attribute for the active tenant.',
-            ));
+            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
     }
 }

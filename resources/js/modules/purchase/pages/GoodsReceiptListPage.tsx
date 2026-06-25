@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -19,7 +18,6 @@ import { listGoodsReceipts, postGoodsReceipt, reverseGoodsReceipt, type GoodsRec
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
 
 export default function GoodsReceiptListPage() {
-    const { confirm, confirmDialog } = useConfirmDialog();
     const auth = useAuth();
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
@@ -32,12 +30,7 @@ export default function GoodsReceiptListPage() {
 
     const run = async (row: GoodsReceipt, action: 'post' | 'reverse') => {
         if (busyId !== null) return;
-        if (!await confirm({
-            title: `${action[0].toUpperCase()}${action.slice(1)} goods receipt`,
-            message: `Confirm ${action} for this goods receipt?`,
-            confirmLabel: action[0].toUpperCase() + action.slice(1),
-            danger: action === 'reverse',
-        })) return;
+        if (!window.confirm(`Confirm ${action} for this goods receipt?`)) return;
         setBusyId(row.id);
         setActionError(null);
         try {
@@ -67,7 +60,6 @@ export default function GoodsReceiptListPage() {
     ];
 
     return (
-        <>
         <div className="space-y-5">
             <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : null} />
             <ErrorAlert error={result.error ?? actionError} />
@@ -78,7 +70,5 @@ export default function GoodsReceiptListPage() {
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </div>
-            {confirmDialog}
-        </>
     );
 }

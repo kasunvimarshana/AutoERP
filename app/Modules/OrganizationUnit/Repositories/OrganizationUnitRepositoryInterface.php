@@ -9,11 +9,7 @@ use Modules\Core\DTOs\DataRecord;
 
 interface OrganizationUnitRepositoryInterface extends RepositoryPortInterface
 {
-    public function countByTenant(int $tenantId): int;
-
-    /**
-     * @return list<DataRecord>
-     */
+    /** @return list<DataRecord> */
     public function listByTenant(int|string $tenantId): array;
 
     public function findByTenantAndName(int|string $tenantId, string $name): ?DataRecord;
@@ -21,4 +17,16 @@ interface OrganizationUnitRepositoryInterface extends RepositoryPortInterface
     public function findByTenantAndCode(int|string $tenantId, string $code): ?DataRecord;
 
     public function findByTenantAndPath(int|string $tenantId, string $path): ?DataRecord;
+
+    public function findRootByTenant(int|string $tenantId): ?DataRecord;
+
+    public function hasChildren(int|string $id, int|string $tenantId): bool;
+
+    public function moveHierarchy(
+        int|string $id,
+        int|string $tenantId,
+        string $oldPath,
+        string $newPath,
+        int $newDepth,
+    ): DataRecord;
 }

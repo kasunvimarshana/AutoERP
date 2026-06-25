@@ -3,7 +3,6 @@ import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
@@ -21,9 +20,8 @@ const emptyPayload: VehicleDocumentPayload = { document_type: 'registration', do
 
 export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
     const auth = useAuth();
-    const { confirm, confirmDialog } = useConfirmDialog();
-    const canManage = hasVehiclePermission(auth, vehiclePermissions.manageDocuments);
-    const canDownload = hasVehiclePermission(auth, vehiclePermissions.downloadDocuments);
+    const canManage = hasVehiclePermission(auth.permissions, vehiclePermissions.manageDocuments);
+    const canDownload = hasVehiclePermission(auth.permissions, vehiclePermissions.downloadDocuments);
     const [rows, setRows] = useState<VehicleDocument[]>([]);
     const [form, setForm] = useState<VehicleDocumentPayload>(emptyPayload);
     const [editing, setEditing] = useState<number | null>(null);
@@ -56,7 +54,7 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
     }, [vehicleId]);
 
     useEffect(() => {
-        void Promise.resolve().then(() => load());
+        void load();
         return () => controllerRef.current?.abort();
     }, [load]);
 
@@ -79,7 +77,7 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
 
     const destroy = async (row: VehicleDocument) => {
         if (deletingId !== null || !canManage) return;
-        if (!await confirm({ title: 'Delete vehicle document', message: 'This vehicle document will be permanently deleted.', confirmLabel: 'Delete' })) return;
+        if (!window.confirm('Delete this vehicle document?')) return;
         setDeletingId(row.id);
         setError(null);
         try {
@@ -157,7 +155,6 @@ export function VehicleDocumentTab({ vehicleId }: { vehicleId: number }) {
                     </div> },
                 ]}
             />
-            {confirmDialog}
         </div>
     );
 }

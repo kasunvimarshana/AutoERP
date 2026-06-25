@@ -35,7 +35,7 @@ export default function VehicleDetailPage() {
     if (result.loading) return <LoadingState label="Loading vehicle..." />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const vehicle = result.data;
-    const canEdit = hasVehiclePermission(auth, vehiclePermissions.update);
+    const canEdit = hasVehiclePermission(auth.permissions, vehiclePermissions.update);
 
     return (
         <div className="mx-auto max-w-6xl">

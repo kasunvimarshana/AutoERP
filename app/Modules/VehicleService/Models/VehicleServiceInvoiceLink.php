@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Invoice\Models\Invoice;
 
-final class VehicleServiceInvoiceLink extends TenantOwnedModel
+final class VehicleServiceInvoiceLink extends CoreModel
 {
     protected $table = 'vehicle_service_invoice_links';
 

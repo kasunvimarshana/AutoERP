@@ -122,14 +122,6 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const [submitting, setSubmitting] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [createContextError, setCreateContextError] = useState<ApiError | null>(null);
-    const [createContextLoading, setCreateContextLoading] = useState(!order);
-    const [createContextReload, setCreateContextReload] = useState(0);
-    const [supplierContextError, setSupplierContextError] = useState<ApiError | null>(null);
-    const [supplierContextLoading, setSupplierContextLoading] = useState(false);
-    const [supplierContextReload, setSupplierContextReload] = useState(0);
-    const [warehouseLocationsError, setWarehouseLocationsError] = useState<ApiError | null>(null);
-    const [warehouseLocationsReload, setWarehouseLocationsReload] = useState(0);
     const totals = useMemo(() => calculatePreview(lines, adjustments), [lines, adjustments]);
     const errorFor = (field: string) => fieldError(error, field);
     const supplierTouched = useRef(Boolean(order?.supplier));
@@ -147,14 +139,12 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
     const setSupplier = (next: NamedResource | null) => {
         setDirty(true);
         supplierTouched.current = true;
-        setSupplierContextError(null);
         setSupplierState(next);
     };
     const setWarehouse = (next: NamedResource | null) => {
         setDirty(true);
         warehouseTouched.current = true;
         locationTouched.current = false;
-        setWarehouseLocationsError(null);
         setWarehouseState(next);
         setWarehouseLocationState(null);
         setLocationSource('');
@@ -188,10 +178,6 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         if (order) return;
 
         const controller = new AbortController();
-        queueMicrotask(() => {
-            setCreateContextLoading(true);
-            setCreateContextError(null);
-        });
         void getPurchaseOrderCreateContext(controller.signal)
             .then((context) => {
                 if (controller.signal.aborted) return;
@@ -218,20 +204,14 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                     setLocationSource(context.defaults.warehouse_location_source ?? 'warehouse_default');
                 }
             })
-            .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setCreateContextError(toApiError(requestError));
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setCreateContextLoading(false);
-            });
+            .catch(() => undefined);
 
         return () => controller.abort();
-    }, [order, createContextReload]);
+    }, [order]);
 
     useEffect(() => {
         if (!warehouse?.id || locationTouched.current) return;
         const controller = new AbortController();
-        setWarehouseLocationsError(null);
         void getPurchaseWarehouseLocations(warehouse.id, controller.signal)
             .then((locations) => {
                 if (controller.signal.aborted || locationTouched.current) return;
@@ -239,18 +219,14 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                 setWarehouseLocationState(defaultLocation);
                 setLocationSource(defaultLocation ? 'warehouse_default' : '');
             })
-            .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setWarehouseLocationsError(toApiError(requestError));
-            });
+            .catch(() => undefined);
 
         return () => controller.abort();
-    }, [warehouse?.id, warehouseLocationsReload]);
+    }, [warehouse?.id]);
 
     useEffect(() => {
         if (!supplier?.id || !supplierTouched.current) return;
         const controller = new AbortController();
-        setSupplierContextLoading(true);
-        setSupplierContextError(null);
         void getPurchaseSupplierContext(supplier.id, controller.signal)
             .then((context) => {
                 if (controller.signal.aborted) return;
@@ -263,15 +239,10 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                     }
                 }
             })
-            .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setSupplierContextError(toApiError(requestError));
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setSupplierContextLoading(false);
-            });
+            .catch(() => undefined);
 
         return () => controller.abort();
-    }, [supplier?.id, baseCurrencyId, supplierContextReload]);
+    }, [supplier?.id, baseCurrencyId]);
 
     const payload = (): PurchaseOrderPayload => ({
         purchase_order_date: header.purchase_order_date,
@@ -304,7 +275,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (submitting || createContextLoading || supplierContextLoading || createContextError || supplierContextError) return;
+        if (submitting) return;
         setSubmitting(true);
         setError(null);
         try {
@@ -337,16 +308,13 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                     status={<span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{order?.status ?? 'draft'}</span>}
                     actions={<>
                         <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                        <Button type="submit" loading={submitting || createContextLoading || supplierContextLoading} disabled={Boolean(createContextError || supplierContextError)}>{order ? 'Save Draft' : 'Save Draft'}</Button>
+                        <Button type="submit" loading={submitting}>{order ? 'Save Draft' : 'Save Draft'}</Button>
                     </>}
                 />}
                 tabs={<PurchaseTabs tabs={tabItems} activeTab={activeTab} />}
                 summary={<PurchaseOrderSummaryPanel totals={totals} />}
             >
                 <ErrorAlert error={error} />
-                {createContextError && <ContextLoadError error={createContextError} title="Purchase defaults unavailable" onRetry={() => setCreateContextReload((current) => current + 1)} />}
-                {supplierContextError && <ContextLoadError error={supplierContextError} title="Supplier purchasing defaults unavailable" onRetry={() => setSupplierContextReload((current) => current + 1)} />}
-                {warehouseLocationsError && <ContextLoadError error={warehouseLocationsError} title="Warehouse locations unavailable" onRetry={() => setWarehouseLocationsReload((current) => current + 1)} />}
                 {activeTab === 'details' && (
                     <Panel title="Order Details">
                         <div className="grid gap-4 md:grid-cols-2">
@@ -388,14 +356,5 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                 )}
             </PurchaseDocumentShell>
         </form>
-    );
-}
-
-function ContextLoadError({ error, title, onRetry }: { error: ApiError; title: string; onRetry: () => void }) {
-    return (
-        <div className="space-y-3">
-            <ErrorAlert error={error} title={title} />
-            <Button type="button" variant="secondary" onClick={onRetry}>Retry</Button>
-        </div>
     );
 }

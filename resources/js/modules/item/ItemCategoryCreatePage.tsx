@@ -12,7 +12,7 @@ import { ItemCategoryForm } from './components/ItemCategoryForm';
 
 export default function ItemCategoryCreatePage() {
     const auth = useAuth();
-    const canManage = hasItemPermission(auth, itemPermissions.manageCategories);
+    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageCategories);
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);

@@ -13,11 +13,11 @@ return new class extends Migration
         Schema::create('sales_return_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('sales_return_id');
-            $table->foreignId('item_id')->nullable();
-            $table->foreignId('item_variant_id')->nullable();
-            $table->foreignId('uom_id')->nullable();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('sales_return_id')->constrained('sales_returns')->cascadeOnDelete();
+            $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
+            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
             $table->string('source_line_type')->nullable();
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->decimal('returned_quantity', 20, 6);
@@ -29,39 +29,13 @@ return new class extends Migration
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
             $table->decimal('charge_amount', 20, 6)->default('0.000000');
             $table->decimal('line_total', 20, 6)->default('0.000000');
-            $table->foreignId('inventory_movement_id')->nullable();
+            $table->foreignId('inventory_movement_id')->nullable()->constrained('inventory_movements')->nullOnDelete();
             $table->string('condition_status')->default('sellable');
             $table->text('reason')->nullable();
             $table->timestamps();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'sales_return_lines_scope_idx');
             $table->index(['source_line_type', 'source_line_id'], 'sales_return_lines_source_idx');
-
-            $table->unique(['id', 'tenant_id'], 'sales_return_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_return_lines_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['sales_return_id', 'tenant_id'], 'sales_return_lines_sales_return_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('sales_returns')
-                ->cascadeOnDelete();
-            $table->foreign(['item_id', 'tenant_id'], 'sales_return_lines_item_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('items')
-                ->restrictOnDelete();
-            $table->foreign(['item_variant_id', 'tenant_id'], 'sales_return_lines_item_variant_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('item_variants')
-                ->restrictOnDelete();
-            $table->foreign(['uom_id', 'tenant_id'], 'sales_return_lines_uom_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('unit_of_measures')
-                ->restrictOnDelete();
-            $table->foreign(['inventory_movement_id', 'tenant_id'], 'sales_return_lines_inventory_movement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('inventory_movements')
-                ->restrictOnDelete();
         });
     }
 

@@ -23,10 +23,10 @@ import { ItemCategorySelect } from './components/ItemCategorySelect';
 
 export default function ItemListPage() {
     const auth = useAuth();
-    const canCreate = hasItemPermission(auth, itemPermissions.create);
-    const canUpdate = hasItemPermission(auth, itemPermissions.update);
-    const canActivate = hasItemPermission(auth, itemPermissions.activate);
-    const canDeactivate = hasItemPermission(auth, itemPermissions.deactivate);
+    const canCreate = hasItemPermission(auth.permissions, itemPermissions.create);
+    const canUpdate = hasItemPermission(auth.permissions, itemPermissions.update);
+    const canActivate = hasItemPermission(auth.permissions, itemPermissions.activate);
+    const canDeactivate = hasItemPermission(auth.permissions, itemPermissions.deactivate);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);

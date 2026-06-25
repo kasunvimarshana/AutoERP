@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class ItemUsageRule extends TenantOwnedModel
+final class ItemUsageRule extends CoreModel
 {
     protected $table = 'item_usage_rules';
 

@@ -10,7 +10,6 @@ use Modules\Auth\DTOs\LoginData;
 use Modules\Auth\DTOs\RegistrationData;
 use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
-use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 
 final class InternalAuthenticationProvider implements AuthenticationProviderInterface
@@ -19,7 +18,6 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
         private readonly UserRepositoryInterface $users,
         private readonly AuthProviderRepositoryInterface $providers,
         private readonly IdentityProviderInterface $identities,
-        private readonly UserOrganizationUnitRepositoryInterface $organizationUnitAssignments,
         private readonly PasswordHasherInterface $passwordHasher,
     ) {}
 
@@ -58,15 +56,6 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
 
         $hashedPassword = (string) $user->get('password', '');
         if (! $this->passwordHasher->verify($data->password, $hashedPassword)) {
-            return null;
-        }
-
-        if ($data->organizationUnitId !== null && ! $this->organizationUnitAssignments
-            ->existsForTenantUserAndOrganizationUnit(
-                $data->tenantId,
-                (int) $user->id(),
-                $data->organizationUnitId,
-            )) {
             return null;
         }
 

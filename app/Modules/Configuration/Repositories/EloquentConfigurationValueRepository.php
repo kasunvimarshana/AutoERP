@@ -17,13 +17,11 @@ use Modules\Configuration\Data\StoredConfigurationValue;
 use Modules\Configuration\Models\GlobalConfigurationValue;
 use Modules\Configuration\Models\OrganizationUnitConfigurationValue;
 use Modules\Configuration\Models\TenantConfigurationValue;
-use Modules\Core\Contracts\ClockInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class EloquentConfigurationValueRepository implements ConfigurationValueRepositoryInterface
 {
-    public function __construct(private readonly ClockInterface $clock) {}
     public function findExact(
         ConfigurationScopeContext $context,
         string $key,
@@ -39,12 +37,17 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
 
     public function paginate(
         ConfigurationScopeContext $context,
-        array $keys,
+        ?string $prefix,
         int $page,
         int $perPage,
     ): LengthAwarePaginator {
         $query = $this->scopedQuery($context);
-        $keys === [] ? $query->whereRaw('1 = 0') : $query->whereIn('key', $keys);
+        $prefix = strtolower(trim((string) $prefix));
+
+        if ($prefix !== '') {
+            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $prefix);
+            $query->whereRaw("key LIKE ? ESCAPE '!'", [$escaped.'%']);
+        }
 
         $paginator = $query
             ->orderBy('key')
@@ -64,22 +67,6 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
         );
 
         return $paginator;
-    }
-
-    public function keys(ConfigurationScopeContext $context): array
-    {
-        return $this->scopedQuery($context)
-            ->orderBy('key')
-            ->pluck('key')
-            ->map(static fn (mixed $key): string => (string) $key)
-            ->all();
-    }
-
-    public function countTenantOverrides(string $key): int
-    {
-        return TenantConfigurationValue::query()
-            ->where('key', strtolower(trim($key)))
-            ->count();
     }
 
     public function create(
@@ -109,7 +96,7 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
             ->update([
                 ...$attributes,
                 'row_version' => $expectedVersion + 1,
-                'updated_at' => $this->clock->now(),
+                'updated_at' => now(),
             ]);
 
         if ($updated !== 1) {

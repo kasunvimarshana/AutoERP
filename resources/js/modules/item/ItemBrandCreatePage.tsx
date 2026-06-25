@@ -12,7 +12,7 @@ import { ItemBrandForm } from './components/ItemBrandForm';
 
 export default function ItemBrandCreatePage() {
     const auth = useAuth();
-    const canManage = hasItemPermission(auth, itemPermissions.manageBrands);
+    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageBrands);
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);

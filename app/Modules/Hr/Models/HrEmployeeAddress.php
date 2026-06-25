@@ -3,9 +3,9 @@ declare(strict_types=1);
 namespace Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\Hr\Enums\EmployeeAddressType;
-final class HrEmployeeAddress extends TenantOwnedModel
+final class HrEmployeeAddress extends CoreModel
 {
     use SoftDeletes;
     protected $table = 'hr_employee_addresses';

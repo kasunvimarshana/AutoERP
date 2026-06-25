@@ -18,7 +18,7 @@ final class EloquentUserPermissionRepository extends EloquentRepository implemen
         parent::__construct($model);
     }
 
-    public function findByTenantUserPermission(int $tenantId, int $userId, int $permissionId, ?int $excludeId = null): ?DataRecord
+    public function findByTenantUserPermission(?int $tenantId, int $userId, int $permissionId, ?int $excludeId = null): ?DataRecord
     {
         $query = $this->query()
             ->where('user_id', $userId)
@@ -35,18 +35,19 @@ final class EloquentUserPermissionRepository extends EloquentRepository implemen
         return $model instanceof Model ? $this->toRecord($model) : null;
     }
 
-    public function listPermissionNamesForTenantUser(int $tenantId, int $userId): array
+    public function listPermissionNamesForTenantUser(?int $tenantId, int $userId): array
     {
         $query = DB::table('user_permissions')
-            ->join('permissions', function ($join): void {
-                $join->on('permissions.id', '=', 'user_permissions.permission_id')
-                    ->on('permissions.tenant_id', '=', 'user_permissions.tenant_id');
-            })
-            ->where('user_permissions.tenant_id', $tenantId)
+            ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
             ->where('user_permissions.user_id', $userId)
             ->whereNull('permissions.deleted_at')
             ->select('permissions.name');
 
+        if ($tenantId === null) {
+            $query->whereNull('user_permissions.tenant_id');
+        } else {
+            $query->where('user_permissions.tenant_id', $tenantId);
+        }
 
         return $query
             ->orderBy('permissions.name')
@@ -57,8 +58,14 @@ final class EloquentUserPermissionRepository extends EloquentRepository implemen
             ->all();
     }
 
-    private function applyTenantScope(Builder $query, int $tenantId): void
+    private function applyTenantScope(Builder $query, ?int $tenantId): void
     {
+        if ($tenantId === null) {
+            $query->whereNull('tenant_id');
+
+            return;
+        }
+
         $query->where('tenant_id', $tenantId);
     }
 }

@@ -4,27 +4,41 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Model;
 use LogicException;
-use Modules\Core\Models\CoreModel;
-use Modules\User\Models\UserModel;
 
-final class ConfigurationValueRevision extends CoreModel
+final class ConfigurationValueRevision extends Model
 {
     public $timestamps = false;
 
     protected $table = 'configuration_value_revisions';
 
     protected $fillable = [
-        'scope', 'tenant_id', 'organization_unit_id', 'key', 'operation', 'stored_value',
-        'value_type', 'is_sensitive', 'resulting_row_version', 'source_revision_id',
-        'actor_user_id', 'reason', 'created_at',
+        'scope',
+        'tenant_id',
+        'organization_unit_id',
+        'key',
+        'action',
+        'value_type',
+        'is_sensitive',
+        'before_exists',
+        'before_value',
+        'after_exists',
+        'after_value',
+        'entry_row_version',
+        'changed_by',
+        'changed_by_name',
+        'created_at',
     ];
 
     protected static function booted(): void
     {
-        static::updating(static fn (): never => throw new LogicException('Configuration revisions are immutable.'));
-        static::deleting(static fn (): never => throw new LogicException('Configuration revisions cannot be deleted.'));
+        static::updating(static fn (): never => throw new LogicException(
+            'Configuration revisions are immutable.',
+        ));
+        static::deleting(static fn (): never => throw new LogicException(
+            'Configuration revisions cannot be deleted.',
+        ));
     }
 
     protected function casts(): array
@@ -32,21 +46,14 @@ final class ConfigurationValueRevision extends CoreModel
         return [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'resulting_row_version' => 'integer',
-            'source_revision_id' => 'integer',
-            'actor_user_id' => 'integer',
             'is_sensitive' => 'boolean',
+            'before_exists' => 'boolean',
+            'before_value' => 'json',
+            'after_exists' => 'boolean',
+            'after_value' => 'json',
+            'entry_row_version' => 'integer',
+            'changed_by' => 'integer',
             'created_at' => 'immutable_datetime',
         ];
-    }
-
-    public function actor(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'actor_user_id');
-    }
-
-    public function sourceRevision(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'source_revision_id');
     }
 }

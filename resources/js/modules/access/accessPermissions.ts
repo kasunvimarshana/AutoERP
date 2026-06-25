@@ -19,4 +19,7 @@ export const protectedAccessRoles = {
     superAdmin: 'super admin',
 } as const;
 
-export { hasPermission as hasAccessPermission } from '@/modules/auth/accessControl';
+export function hasAccessPermission(permissions: string[], roles: string[], permission: string): boolean {
+    return roles.map((role) => role.trim().toLowerCase()).includes(protectedAccessRoles.superAdmin)
+        || permissions.includes(permission);
+}

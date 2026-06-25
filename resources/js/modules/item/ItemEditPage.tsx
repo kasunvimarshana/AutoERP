@@ -9,7 +9,6 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { getBaseUomUsageAudit, getItem, updateItem } from './itemApi';
@@ -34,14 +33,14 @@ const tabs = [
 export default function ItemEditPage() {
     const itemId = Number(useParams().id);
     const auth = useAuth();
-    const canUpdate = hasItemPermission(auth, itemPermissions.update);
-    const canManageUnits = hasItemPermission(auth, itemPermissions.manageUnits);
-    const canChangeBaseUom = hasItemPermission(auth, itemPermissions.changeBaseUom);
-    const canManageVariants = hasItemPermission(auth, itemPermissions.manageVariants);
-    const canManageBundles = hasItemPermission(auth, itemPermissions.manageBundles);
-    const canManagePrices = hasItemPermission(auth, itemPermissions.managePrices);
-    const canManageCodes = hasItemPermission(auth, itemPermissions.manageCodes);
-    const canManageUsageRules = hasItemPermission(auth, itemPermissions.manageUsageRules);
+    const canUpdate = hasItemPermission(auth.permissions, itemPermissions.update);
+    const canManageUnits = hasItemPermission(auth.permissions, itemPermissions.manageUnits);
+    const canChangeBaseUom = hasItemPermission(auth.permissions, itemPermissions.changeBaseUom);
+    const canManageVariants = hasItemPermission(auth.permissions, itemPermissions.manageVariants);
+    const canManageBundles = hasItemPermission(auth.permissions, itemPermissions.manageBundles);
+    const canManagePrices = hasItemPermission(auth.permissions, itemPermissions.managePrices);
+    const canManageCodes = hasItemPermission(auth.permissions, itemPermissions.manageCodes);
+    const canManageUsageRules = hasItemPermission(auth.permissions, itemPermissions.manageUsageRules);
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const requestedTab = tabs.some((entry) => entry.id === searchParams.get('tab')) ? searchParams.get('tab') as Tab : 'basic';
@@ -55,7 +54,6 @@ export default function ItemEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const formGuard = useMutationFormGuard(submitting);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -107,13 +105,13 @@ export default function ItemEditPage() {
                     <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
                         <ItemForm
                             value={form}
-                            onChange={(next) => { formGuard.markDirty(); setForm(next); }}
+                            onChange={setForm}
                             category={category}
-                            onCategoryChange={(next) => { formGuard.markDirty(); setCategory(next); }}
+                            onCategoryChange={setCategory}
                             brand={brand}
-                            onBrandChange={(next) => { formGuard.markDirty(); setBrand(next); }}
+                            onBrandChange={setBrand}
                             baseUom={baseUom}
-                            onBaseUomChange={(next) => { formGuard.markDirty(); setBaseUom(next); }}
+                            onBaseUomChange={setBaseUom}
                             tenantBaseCurrency={tenantBaseCurrency}
                             error={error}
                             baseUomLocked={baseUomAudit?.has_usage === true}
@@ -143,7 +141,6 @@ export default function ItemEditPage() {
         setError(null);
         try {
             const saved = await updateItem(itemId, form);
-            formGuard.markSaved();
             navigate(`/items/${saved.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Models\CoreModel;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalAgreementTerm extends TenantOwnedModel
+final class RentalAgreementTerm extends CoreModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_agreement_terms';

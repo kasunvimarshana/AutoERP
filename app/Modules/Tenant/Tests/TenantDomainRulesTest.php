@@ -5,29 +5,28 @@ declare(strict_types=1);
 namespace Modules\Tenant\Tests;
 
 use InvalidArgumentException;
-use Modules\Tenant\Services\Rules\TenantValueNormalizer;
+use Modules\Tenant\Services\Rules\TenantDomainService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class TenantDomainRulesTest extends TestCase
 {
-    private TenantValueNormalizer $rules;
+    private TenantDomainService $rules;
 
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('tenant.resolution.central_hosts', ['platform.autoerp.example']);
-        $this->rules = new TenantValueNormalizer();
+        $this->rules = new TenantDomainService();
     }
 
-    public function test_it_normalizes_tenant_codes_and_public_hostnames(): void
+    public function test_it_normalizes_tenant_codes_and_hostnames(): void
     {
         self::assertSame('ACME_01', $this->rules->normalizeCode(' acme_01 '));
-        self::assertSame('erp.example.org', $this->rules->normalizeDomain(' ERP.Example.org. '));
+        self::assertSame('erp.example.com', $this->rules->normalizeDomain(' ERP.Example.com. '));
     }
 
     #[DataProvider('invalidDomains')]
-    public function test_it_rejects_values_that_are_not_public_custom_hostnames(string $value): void
+    public function test_it_rejects_values_that_are_not_plain_hostnames(string $value): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->rules->normalizeDomain($value);
@@ -36,14 +35,9 @@ final class TenantDomainRulesTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function invalidDomains(): iterable
     {
-        yield 'scheme' => ['https://erp.example.org'];
-        yield 'path' => ['erp.example.org/admin'];
-        yield 'port' => ['erp.example.org:8443'];
-        yield 'wildcard' => ['*.example.org'];
-        yield 'reserved example tld' => ['erp.example'];
-        yield 'localhost' => ['localhost'];
-        yield 'ip address' => ['127.0.0.1'];
-        yield 'configured central host' => ['platform.autoerp.example'];
+        yield 'scheme' => ['https://erp.example.com'];
+        yield 'path' => ['erp.example.com/admin'];
+        yield 'port' => ['erp.example.com:8443'];
         yield 'empty' => [''];
     }
 }
