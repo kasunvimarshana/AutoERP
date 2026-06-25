@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_journal_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('journal_number', 100);
             $table->date('journal_date');

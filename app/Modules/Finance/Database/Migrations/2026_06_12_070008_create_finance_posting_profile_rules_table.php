@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_posting_profile_rules', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('posting_profile_id');
             $table->string('line_key', 100);
             $table->foreignId('account_id');

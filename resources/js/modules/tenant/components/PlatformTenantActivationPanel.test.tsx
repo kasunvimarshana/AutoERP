@@ -36,18 +36,22 @@ const blocked: TenantOnboardingReadiness = {
     ready: false,
     tenant_id: 1,
     onboarding_status: 'pending',
-    checks: { base_currency: true, verified_primary_domain: false, subscription: false },
+    checks: { base_currency: true, primary_domain_ready: false, subscription_valid: false },
     blockers: [
-        { code: 'verified_primary_domain', stage: 'domain', message: 'Verify a primary domain.' },
-        { code: 'subscription', stage: 'subscription', message: 'Assign a subscription.' },
+        { code: 'PRIMARY_DOMAIN_READY', stage: 'domain', owner: 'Tenant domain', action: 'Verify tenant routing.', message: 'Verify a primary domain.' },
+        { code: 'SUBSCRIPTION_VALID', stage: 'subscription', owner: 'Tenant subscription', action: 'Assign a usable subscription.', message: 'Assign a subscription.' },
     ],
+    routing: { ready: false, mode: 'unavailable', message: 'Tenant routing is unavailable.' },
+    schema: { compatible: true, missing_tables: [], missing_columns: {} },
+    infrastructure: { database: { strategy: 'shared_schema', tenant_specific_profiles_supported: false }, storage: { strategy: 'shared_private_storage', isolation: 'tenant_object_key_prefix', disk: 'tenant_private', tenant_specific_profiles_supported: false }, mail: { strategy: 'platform_mailer', tenant_specific_profiles_supported: false }, configuration: { precedence: ['organization_unit', 'tenant', 'global', 'definition_default'], arbitrary_laravel_config_overrides_supported: false } },
 };
 
 const ready: TenantOnboardingReadiness = {
     ...blocked,
     ready: true,
-    checks: { base_currency: true, verified_primary_domain: true, subscription: true },
+    checks: { base_currency: true, primary_domain_ready: true, subscription_valid: true },
     blockers: [],
+    routing: { ready: true, mode: 'verified_domain', message: 'The verified primary tenant domain is operational.' },
 };
 
 describe('PlatformTenantActivationPanel', () => {

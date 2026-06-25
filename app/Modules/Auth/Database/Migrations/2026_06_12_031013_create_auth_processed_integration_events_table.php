@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('event_uuid');
             $table->string('consumer_name', 150);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->timestamp('processed_at');
 
             $table->unique(['event_uuid', 'consumer_name'], 'auth_processed_events_event_consumer_uk');

@@ -37,8 +37,7 @@ return [
             env('TENANT_LOCAL_FALLBACK_ENABLED', false),
             FILTER_VALIDATE_BOOL,
         ),
-        'local_fallback_domain' => env('TENANT_LOCAL_FALLBACK_DOMAIN'),
-        'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTH_LOCAL_TENANT_CODE', 'AUTOERP')),
+        'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTOERP_TENANT_CODE', 'AUTOERP')),
     ],
     'event_outbox' => [
         'batch_size' => (int) env('TENANT_EVENT_OUTBOX_BATCH_SIZE', 100),

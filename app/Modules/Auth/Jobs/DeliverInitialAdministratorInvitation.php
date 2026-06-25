@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Modules\Auth\Services\Registration\RegistrationInvitationDeliveryService;
 use Modules\Tenant\Queue\TenantAwareJobInterface;
 use Modules\Tenant\Queue\TenantJobContext;
+use Modules\Tenant\Queue\RestoreTenantJobContext;
 
 final class DeliverInitialAdministratorInvitation implements ShouldQueue, ShouldBeUniqueUntilProcessing, TenantAwareJobInterface
 {
@@ -42,6 +43,7 @@ final class DeliverInitialAdministratorInvitation implements ShouldQueue, Should
     public function middleware(): array
     {
         return [
+            app(RestoreTenantJobContext::class),
             (new WithoutOverlapping('auth-registration-delivery:'.$this->deliveryId))
                 ->expireAfter(600)
                 ->dontRelease(),

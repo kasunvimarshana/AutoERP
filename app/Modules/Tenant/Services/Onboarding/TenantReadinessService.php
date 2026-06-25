@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Onboarding;
 
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantReadinessCheck;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
@@ -15,8 +16,12 @@ use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
+use Modules\Tenant\Services\Domains\TenantRoutingReadinessPolicy;
+use Modules\Tenant\Services\Platform\TenantSchemaCompatibilityService;
+use Modules\Tenant\Services\Platform\TenantInfrastructureCapabilityService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
-use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 final class TenantReadinessService
 {
@@ -30,8 +35,11 @@ final class TenantReadinessService
         private readonly TenantAuthenticationProvisionerInterface $authentication,
         private readonly TenantBaseCurrencyReadinessInterface $baseCurrencies,
         private readonly TenantSubscriptionPolicy $subscriptionPolicy,
-        private readonly TenantDomainReadinessPolicy $domainReadiness,
+        private readonly TenantRoutingReadinessPolicy $routingReadiness,
+        private readonly TenantSchemaCompatibilityService $schemaCompatibility,
+        private readonly TenantInfrastructureCapabilityService $infrastructureCapabilities,
         private readonly TenantExecutionContextInterface $executionContext,
+        private readonly LoggerInterface $logger,
     ) {}
 
     /**
@@ -40,7 +48,10 @@ final class TenantReadinessService
      *   tenant_id:int,
      *   onboarding_status:string,
      *   checks:array<string,bool>,
-     *   blockers:list<array{code:string,stage:string,message:string}>
+     *   blockers:list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>,
+     *   routing:array{ready:bool,mode:string,message:string},
+     *   schema:array{compatible:bool,missing_tables:list<string>,missing_columns:array<string,list<string>>},
+     *   infrastructure:array<string,mixed>
      * }
      */
     public function inspect(int $tenantId, bool $lockForUpdate = false): array
@@ -49,23 +60,19 @@ final class TenantReadinessService
             ? $this->tenants->lockById($tenantId)
             : $this->tenants->findById($tenantId);
         if ($tenant === null) {
-            return [
-                'ready' => false,
-                'tenant_id' => $tenantId,
-                'onboarding_status' => 'missing',
-                'checks' => [],
-                'blockers' => [[
-                    'code' => 'TENANT_NOT_FOUND',
-                    'stage' => 'identity',
-                    'message' => 'Tenant was not found.',
-                ]],
-            ];
+            return $this->missingTenant($tenantId);
+        }
+
+        $schema = $this->schemaCompatibility->inspect();
+        if (! $schema['compatible']) {
+            return $this->schemaBlocked($tenantId, $schema);
         }
 
         return $this->executionContext->runForTenant($tenantId, function () use (
             $tenant,
             $tenantId,
             $lockForUpdate,
+            $schema,
         ): array {
             $stateQuery = $this->states->newQuery()->where('tenant_id', $tenantId);
             if ($lockForUpdate) {
@@ -73,8 +80,25 @@ final class TenantReadinessService
             }
             $state = $stateQuery->first();
 
-            $subscription = $this->subscriptions->findCurrentByTenant($tenantId, $lockForUpdate);
-            $subscriptionPayload = $subscription?->toArray();
+            $subscriptionPayload = null;
+            $subscriptionFailure = null;
+            try {
+                $subscription = $this->subscriptions->findCurrentByTenant($tenantId, $lockForUpdate);
+                $subscriptionPayload = $subscription?->toArray();
+            } catch (Throwable $exception) {
+                $subscriptionFailure = [
+                    'code' => 'SUBSCRIPTION_DATA_INVALID',
+                    'stage' => 'subscription',
+                    'owner' => 'Tenant subscription',
+                    'action' => 'Review the deployment schema and repair the persisted subscription revision.',
+                    'message' => 'Stored subscription data is invalid or unavailable. Review the deployment schema and persisted revision data.',
+                ];
+                $this->logger->error('Tenant readiness could not read subscription data.', [
+                    'tenant_id' => $tenantId,
+                    'exception' => $exception,
+                ]);
+            }
+
             $revision = is_array($subscriptionPayload['revision'] ?? null)
                 ? $subscriptionPayload['revision']
                 : null;
@@ -91,10 +115,10 @@ final class TenantReadinessService
             );
 
             $rootReady = $rootOrganizationUnitId !== null
-                && $this->organizations->isReady($tenantId, $lockForUpdate);
+                && $this->organizations->isReady($tenantId, $rootOrganizationUnitId, $lockForUpdate);
             $catalogueReady = $this->access->catalogueIsReady($tenantId, $lockForUpdate);
             $superAdminReady = $superAdminRoleId !== null
-                && $this->access->superAdminRoleIsReady($tenantId, $lockForUpdate);
+                && $this->access->superAdminRoleIsReady($tenantId, $superAdminRoleId, $lockForUpdate);
             $providerReady = $this->authentication->providerIsReady($tenantId, $lockForUpdate);
             $invitationAccepted = $acceptedAdministratorId !== null;
             $operationalAdministrator = $acceptedAdministratorId !== null
@@ -107,8 +131,32 @@ final class TenantReadinessService
                     $superAdminRoleId,
                     $lockForUpdate,
                 );
+            $routing = $this->routingReadiness->inspect(
+                (string) $tenant->get('code'),
+                $primaryDomain,
+            );
+
+            $subscriptionValid = false;
+            if ($subscriptionFailure === null) {
+                try {
+                    $subscriptionValid = $this->subscriptionPolicy->isUsable($subscriptionPayload);
+                } catch (Throwable $exception) {
+                    $subscriptionFailure = [
+                        'code' => 'SUBSCRIPTION_DATA_INVALID',
+                        'stage' => 'subscription',
+                        'owner' => 'Tenant subscription',
+                        'action' => 'Correct the stored subscription dates and current revision pointer.',
+                        'message' => 'Stored subscription dates or state are invalid. Correct the persisted subscription revision before activation.',
+                    ];
+                    $this->logger->error('Tenant readiness rejected malformed subscription data.', [
+                        'tenant_id' => $tenantId,
+                        'exception' => $exception,
+                    ]);
+                }
+            }
 
             $checks = [
+                TenantReadinessCheck::SCHEMA_COMPATIBLE => true,
                 TenantReadinessCheck::ROOT_ORGANIZATION => $rootReady,
                 TenantReadinessCheck::PERMISSION_CATALOGUE => $catalogueReady,
                 TenantReadinessCheck::SUPER_ADMIN_ACCESS => $superAdminReady,
@@ -120,12 +168,12 @@ final class TenantReadinessService
                     $lockForUpdate,
                 ),
                 TenantReadinessCheck::ACTIVE_PLAN => $plan !== null && (bool) ($plan['is_active'] ?? false),
-                TenantReadinessCheck::SUBSCRIPTION_VALID => $this->subscriptionPolicy->isUsable($subscriptionPayload),
-                TenantReadinessCheck::PRIMARY_DOMAIN_READY => $primaryDomain !== null
-                    && $this->domainReadiness->isReady($primaryDomain),
+                TenantReadinessCheck::SUBSCRIPTION_VALID => $subscriptionValid,
+                TenantReadinessCheck::PRIMARY_DOMAIN_READY => $routing['ready'],
             ];
 
-            $blockers = $this->blockers($checks);
+            $additionalBlockers = $subscriptionFailure === null ? [] : [$subscriptionFailure];
+            $blockers = $this->blockers($checks, $additionalBlockers);
 
             return [
                 'ready' => $blockers === [],
@@ -133,27 +181,35 @@ final class TenantReadinessService
                 'onboarding_status' => $this->resolveStatus($state, $checks, $blockers === []),
                 'checks' => $checks,
                 'blockers' => $blockers,
+                'routing' => $routing,
+                'schema' => $schema,
+                'infrastructure' => $this->infrastructureCapabilities->inspect(),
             ];
         });
     }
 
     /**
      * @param array<string, bool> $checks
-     * @return list<array{code:string,stage:string,message:string}>
+     * @param list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}> $additional
+     * @return list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>
      */
-    private function blockers(array $checks): array
+    private function blockers(array $checks, array $additional = []): array
     {
         $messages = TenantReadinessCheck::messages();
-        $blockers = [];
+        $blockers = $additional;
+        $additionalCodes = array_column($additional, 'code');
 
         foreach ($checks as $code => $passed) {
-            if ($passed) {
+            if ($passed || ($code === TenantReadinessCheck::SUBSCRIPTION_VALID
+                && in_array('SUBSCRIPTION_DATA_INVALID', $additionalCodes, true))) {
                 continue;
             }
 
             $blockers[] = [
                 'code' => strtoupper($code),
                 'stage' => $this->stage($code),
+                'owner' => $this->owner($code),
+                'action' => $this->action($code),
                 'message' => $messages[$code] ?? 'Complete the required tenant readiness step.',
             ];
         }
@@ -197,6 +253,7 @@ final class TenantReadinessService
     private function stage(string $check): string
     {
         return match ($check) {
+            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'deployment',
             TenantReadinessCheck::ROOT_ORGANIZATION,
             TenantReadinessCheck::PERMISSION_CATALOGUE,
             TenantReadinessCheck::SUPER_ADMIN_ACCESS,
@@ -209,6 +266,96 @@ final class TenantReadinessService
             TenantReadinessCheck::PRIMARY_DOMAIN_READY => 'domain',
             default => 'readiness',
         };
+    }
+
+    private function owner(string $check): string
+    {
+        return match ($check) {
+            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'Platform deployment',
+            TenantReadinessCheck::ROOT_ORGANIZATION => 'Organization Unit',
+            TenantReadinessCheck::PERMISSION_CATALOGUE,
+            TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'User access',
+            TenantReadinessCheck::AUTHENTICATION_PROVIDER,
+            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => 'Authentication',
+            TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'User access',
+            TenantReadinessCheck::BASE_CURRENCY => 'Tenant identity',
+            TenantReadinessCheck::ACTIVE_PLAN,
+            TenantReadinessCheck::SUBSCRIPTION_VALID => 'Tenant subscription',
+            TenantReadinessCheck::PRIMARY_DOMAIN_READY => 'Tenant domain',
+            default => 'Tenant onboarding',
+        };
+    }
+
+    private function action(string $check): string
+    {
+        return match ($check) {
+            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'Apply the reviewed migrations and deploy matching application assets.',
+            TenantReadinessCheck::ROOT_ORGANIZATION => 'Repair and recheck tenant foundation provisioning.',
+            TenantReadinessCheck::PERMISSION_CATALOGUE => 'Synchronize the tenant permission catalogue.',
+            TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'Repair the fully granted Super Admin role.',
+            TenantReadinessCheck::AUTHENTICATION_PROVIDER => 'Provision an active tenant authentication provider.',
+            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => 'Ask the invited administrator to accept the current invitation.',
+            TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'Ensure the accepted administrator is active and assigned to the protected root and Super Admin role.',
+            TenantReadinessCheck::BASE_CURRENCY => 'Select an active base accounting currency.',
+            TenantReadinessCheck::ACTIVE_PLAN => 'Select an active plan revision.',
+            TenantReadinessCheck::SUBSCRIPTION_VALID => 'Assign or correct a usable current subscription revision.',
+            TenantReadinessCheck::PRIMARY_DOMAIN_READY => 'Verify a public primary domain or configure the explicit local/testing fallback.',
+            default => 'Review and complete this readiness requirement.',
+        };
+    }
+
+    /** @return array<string, mixed> */
+    private function missingTenant(int $tenantId): array
+    {
+        return [
+            'ready' => false,
+            'tenant_id' => $tenantId,
+            'onboarding_status' => 'missing',
+            'checks' => [],
+            'blockers' => [[
+                'code' => 'TENANT_NOT_FOUND',
+                'stage' => 'identity',
+                'owner' => 'Tenant',
+                'action' => 'Refresh the tenant list and select an existing tenant.',
+                'message' => 'Tenant was not found.',
+            ]],
+            'routing' => [
+                'ready' => false,
+                'mode' => TenantRoutingReadinessPolicy::MODE_UNAVAILABLE,
+                'message' => 'Tenant routing cannot be evaluated.',
+            ],
+            'schema' => $this->schemaCompatibility->inspect(),
+            'infrastructure' => $this->infrastructureCapabilities->inspect(),
+        ];
+    }
+
+    /**
+     * @param array{compatible:bool,missing_tables:list<string>,missing_columns:array<string,list<string>>} $schema
+     * @return array<string, mixed>
+     */
+    private function schemaBlocked(int $tenantId, array $schema): array
+    {
+        return [
+            'ready' => false,
+            'tenant_id' => $tenantId,
+            'onboarding_status' => TenantOnboardingStatus::PENDING,
+            'checks' => [TenantReadinessCheck::SCHEMA_COMPATIBLE => false],
+            'blockers' => [[
+                'code' => 'SCHEMA_INCOMPATIBLE',
+                'stage' => 'deployment',
+                'owner' => 'Platform deployment',
+                'action' => 'Apply the reviewed migrations and deploy matching backend and frontend assets.',
+                'message' => TenantReadinessCheck::messages()[TenantReadinessCheck::SCHEMA_COMPATIBLE],
+                'context' => $schema,
+            ]],
+            'routing' => [
+                'ready' => false,
+                'mode' => TenantRoutingReadinessPolicy::MODE_UNAVAILABLE,
+                'message' => 'Tenant routing is not evaluated until the schema is compatible.',
+            ],
+            'schema' => $schema,
+            'infrastructure' => $this->infrastructureCapabilities->inspect(),
+        ];
     }
 
     private function positiveInt(mixed $value): ?int

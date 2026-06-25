@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Subscriptions;
 
 use DateTimeImmutable;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
@@ -26,6 +27,8 @@ use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
+use Modules\Tenant\Services\Platform\TenantSchemaCompatibilityService;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
 
@@ -43,6 +46,8 @@ final class TenantSubscriptionLifecycleService
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
         private readonly ClockInterface $clock,
+        private readonly TenantSchemaCompatibilityService $schemaCompatibility,
+        private readonly LoggerInterface $logger,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -72,6 +77,10 @@ final class TenantSubscriptionLifecycleService
     /** @param array<string, mixed> $payload */
     public function cancel(int $tenantId, array $payload): Result
     {
+        if (($schemaFailure = $this->schemaFailure()) !== null) {
+            return $schemaFailure;
+        }
+
         try {
             $expectedTenantVersion = $this->positiveInt($payload['expected_tenant_version'] ?? null);
             $expectedPointerVersion = $this->positiveInt($payload['expected_subscription_version'] ?? null);
@@ -142,17 +151,17 @@ final class TenantSubscriptionLifecycleService
                     : Result::success($outcome);
             });
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.subscription.cancel', 'tenant_id' => $tenantId],
-            ));
+            return $this->failure($exception, 'tenant.subscription.cancel', $tenantId);
         }
     }
 
     /** @param array<string, mixed> $payload */
     private function createRevision(string $operation, int $tenantId, array $payload): Result
     {
+        if (($schemaFailure = $this->schemaFailure()) !== null) {
+            return $schemaFailure;
+        }
+
         try {
             $expectedTenantVersion = $this->positiveInt($payload['expected_tenant_version'] ?? null);
             $expectedPointerVersion = $this->positiveInt($payload['expected_subscription_version'] ?? null);
@@ -277,11 +286,7 @@ final class TenantSubscriptionLifecycleService
                     : throw new RuntimeException('Subscription lifecycle operation completed without a current subscription.');
             });
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => "tenant.subscription.{$operation}", 'tenant_id' => $tenantId],
-            ));
+            return $this->failure($exception, 'tenant.subscription.'.$operation, $tenantId);
         }
     }
 
@@ -492,6 +497,45 @@ final class TenantSubscriptionLifecycleService
         $value = is_scalar($value) ? trim((string) $value) : '';
 
         return $value === '' ? null : mb_substr($value, 0, 500);
+    }
+
+    private function schemaFailure(): ?Result
+    {
+        $schema = $this->schemaCompatibility->inspect();
+        if ($schema['compatible']) {
+            return null;
+        }
+
+        return Result::failure(new Error(
+            TenantErrorCode::SCHEMA_INCOMPATIBLE,
+            'The deployed database schema is not compatible with tenant subscription management.',
+            $schema,
+        ));
+    }
+
+    private function failure(Throwable $exception, string $operation, int $tenantId): Result
+    {
+        if ($exception instanceof InvalidArgumentException) {
+            return Result::failure($this->errors->normalize(
+                $exception,
+                TenantErrorCode::INVALID_VALUE,
+                ['operation' => $operation, 'tenant_id' => $tenantId],
+            ));
+        }
+
+        $correlationId = (string) Str::uuid();
+        $this->logger->error('Tenant subscription mutation failed.', [
+            'tenant_id' => $tenantId,
+            'operation' => $operation,
+            'correlation_id' => $correlationId,
+            'exception' => $exception,
+        ]);
+
+        return Result::failure(new Error(
+            TenantErrorCode::SUBSCRIPTION_DATA_UNAVAILABLE,
+            'Tenant subscription data could not be changed.',
+            ['operation' => $operation, 'correlation_id' => $correlationId],
+        ));
     }
 
     private function positiveInt(mixed $value): ?int

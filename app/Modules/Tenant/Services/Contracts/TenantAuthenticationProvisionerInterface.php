@@ -21,10 +21,18 @@ interface TenantAuthenticationProvisionerInterface
 
     public function acceptedInitialAdministratorUserId(int $tenantId, ?int $invitationId = null, bool $lockForUpdate = false): ?int;
 
-    public function hasPendingInitialAdministratorInvitation(int $tenantId, ?int $invitationId = null): bool;
+    public function hasPendingInitialAdministratorInvitation(
+        int $tenantId,
+        ?int $invitationId = null,
+        bool $lockForUpdate = false,
+    ): bool;
 
     /** @return array<string, mixed>|null */
-    public function initialAdministratorInvitationStatus(int $tenantId, ?int $invitationId = null): ?array;
+    public function initialAdministratorInvitationStatus(
+        int $tenantId,
+        ?int $invitationId = null,
+        bool $lockForUpdate = false,
+    ): ?array;
 
     /** @return array<string, mixed> */
     public function resendInitialAdministratorInvitation(int $tenantId, int $invitationId, int $expectedVersion): array;

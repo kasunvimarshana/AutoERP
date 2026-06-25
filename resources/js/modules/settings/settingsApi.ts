@@ -27,7 +27,7 @@ export async function listConfigurationDefinitions(scope: ConfigurationScope, si
         `${platformMode ? platformConfigurationBase : configurationBase(scope)}/definitions`,
         { signal },
     );
-    return response.data.data;
+    return response.data.data.map(validateDefinition);
 }
 
 export async function listConfigurationEntries(
@@ -52,7 +52,11 @@ export async function listConfigurationEntries(
             signal,
         },
     );
-    return response.data;
+    return {
+        ...response.data,
+        data: response.data.data.map(validateEntry),
+        existing_keys: response.data.existing_keys.map(assertCanonicalConfigurationKey),
+    };
 }
 
 export async function exportGlobalConfiguration(signal?: AbortSignal): Promise<ConfigurationTransferDocument> {
@@ -84,6 +88,7 @@ export async function applyGlobalConfigurationImport(
 }
 
 export async function getGlobalConfigurationImpact(key: string, signal?: AbortSignal): Promise<ConfigurationGlobalImpact> {
+    assertCanonicalConfigurationKey(key);
     const response = await apiClient.get<ApiResource<ConfigurationGlobalImpact>>(
         `${platformConfigurationBase}/global/entries/${encodeURIComponent(key)}/impact`,
         { signal },
@@ -92,22 +97,25 @@ export async function getGlobalConfigurationImpact(key: string, signal?: AbortSi
 }
 
 export async function createConfigurationEntry(scope: ConfigurationScope, key: string, value: unknown, platformTarget?: PlatformConfigurationTarget) {
+    assertCanonicalConfigurationKey(key);
     const response = await apiClient.post<ApiResource<ConfigurationEntry>>(
         `${configurationScopeBase(scope, platformTarget)}/entries`,
         { key, value },
     );
-    return response.data.data;
+    return validateEntry(response.data.data);
 }
 
 export async function updateConfigurationEntry(scope: ConfigurationScope, entry: ConfigurationEntry, value: unknown, platformTarget?: PlatformConfigurationTarget) {
+    assertCanonicalConfigurationKey(entry.key);
     const response = await apiClient.put<ApiResource<ConfigurationEntry>>(
         `${configurationScopeBase(scope, platformTarget)}/entries/${encodeURIComponent(entry.key)}`,
         { expected_version: entry.row_version, value },
     );
-    return response.data.data;
+    return validateEntry(response.data.data);
 }
 
 export async function deleteConfigurationEntry(scope: ConfigurationScope, entry: ConfigurationEntry, platformTarget?: PlatformConfigurationTarget) {
+    assertCanonicalConfigurationKey(entry.key);
     await apiClient.delete(`${configurationScopeBase(scope, platformTarget)}/entries/${encodeURIComponent(entry.key)}`, {
         data: { expected_version: entry.row_version },
     });
@@ -120,6 +128,7 @@ export async function listConfigurationHistory(
     signal?: AbortSignal,
     platformTarget?: PlatformConfigurationTarget,
 ): Promise<ConfigurationRevisionPage> {
+    assertCanonicalConfigurationKey(key);
     const response = await apiClient.get<ConfigurationRevisionPage>(
         `${configurationScopeBase(scope, platformTarget)}/entries/${encodeURIComponent(key)}/history`,
         { params: { page, per_page: 20 }, signal },
@@ -134,11 +143,12 @@ export async function rollbackConfigurationEntry(
     reason: string,
     platformTarget?: PlatformConfigurationTarget,
 ): Promise<ConfigurationEntry | null> {
+    assertCanonicalConfigurationKey(entry.key);
     const response = await apiClient.post<ApiResource<ConfigurationEntry | null>>(
         `${configurationScopeBase(scope, platformTarget)}/entries/${encodeURIComponent(entry.key)}/rollback`,
         { revision_id: revisionId, expected_version: entry.row_version, reason },
     );
-    return response.data.data;
+    return response.data.data === null ? null : validateEntry(response.data.data);
 }
 
 export async function listPlatformConfigurationOrganizationTargets(
@@ -162,6 +172,25 @@ export async function getPlatformConfigurationOrganizationTarget(
         { signal },
     );
     return response.data.data;
+}
+
+const canonicalConfigurationKeyPattern = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$/;
+
+function assertCanonicalConfigurationKey(value: unknown): string {
+    if (typeof value !== 'string' || !canonicalConfigurationKeyPattern.test(value)) {
+        throw new Error('Configuration contract mismatch: the server returned a non-canonical setting key. Deploy matching backend/frontend builds and reconcile legacy configuration data.');
+    }
+    return value;
+}
+
+function validateDefinition(definition: ConfigurationDefinition): ConfigurationDefinition {
+    assertCanonicalConfigurationKey(definition.key);
+    return definition;
+}
+
+function validateEntry(entry: ConfigurationEntry): ConfigurationEntry {
+    assertCanonicalConfigurationKey(entry.key);
+    return entry;
 }
 
 function configurationBase(scope: ConfigurationScope): string {

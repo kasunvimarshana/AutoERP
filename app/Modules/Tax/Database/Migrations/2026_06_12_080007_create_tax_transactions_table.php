@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_transactions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('tax_id')->nullable();
             $table->foreignId('tax_document_snapshot_id')->nullable();

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_orders', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('sales_order_number');
             $table->date('sales_order_date');

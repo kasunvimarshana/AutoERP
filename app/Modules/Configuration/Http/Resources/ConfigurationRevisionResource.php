@@ -33,9 +33,11 @@ final class ConfigurationRevisionResource extends JsonResource
             'sensitive' => $revision->sensitive,
             'resulting_row_version' => $revision->resultingRowVersion,
             'source_revision_id' => $revision->sourceRevisionId,
-            'actor' => $revision->actorUserId === null ? null : [
-                'id' => $revision->actorUserId,
+            'actor' => [
+                'type' => $revision->actorType,
+                'id' => $revision->actorId,
                 'name' => $revision->actorName,
+                'email' => $revision->actorEmail,
             ],
             'reason' => $revision->reason,
             'created_at' => $revision->createdAt->format(DATE_ATOM),

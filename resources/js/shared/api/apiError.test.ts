@@ -10,8 +10,14 @@ describe('toApiError', () => {
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
         const readiness = {
             ready: false,
-            checks: { verified_primary_domain: false },
-            blockers: [{ code: 'verified_primary_domain', message: 'Verify a primary domain.' }],
+            checks: { primary_domain_ready: false },
+            blockers: [{
+                code: 'PRIMARY_DOMAIN_READY',
+                stage: 'domain',
+                owner: 'Tenant domain',
+                action: 'Verify a public primary domain or configure the explicit local/testing fallback.',
+                message: 'Verify tenant routing.',
+            }],
         };
         const error = toApiError({
             code: 'ERR_BAD_REQUEST',

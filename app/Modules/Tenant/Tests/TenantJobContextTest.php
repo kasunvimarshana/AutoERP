@@ -19,7 +19,7 @@ final class TenantJobContextTest extends TestCase
         $job = new class implements TenantAwareJobInterface {
             public function tenantJobContext(): TenantJobContext
             {
-                return new TenantJobContext(42, 7, 'test-correlation');
+                return new TenantJobContext(42);
             }
         };
 

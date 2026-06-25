@@ -22,7 +22,6 @@ final class TenantStoragePathPolicy
         return "tenants/{$tenantId}/branding";
     }
 
-
     public function objectKeyFromPath(int $tenantId, string $path): string
     {
         $canonicalPath = $this->canonicalize($tenantId, $path);
@@ -61,7 +60,6 @@ final class TenantStoragePathPolicy
 
         return $normalized;
     }
-
 
     private function normalizeObjectKey(string $objectKey): string
     {

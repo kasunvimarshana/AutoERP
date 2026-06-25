@@ -81,10 +81,11 @@ final class TenantOnboardingService
                     &$currentStep,
                 ): array {
                     $state = $this->progress->begin($tenantId, $email, $operationId, $correlationId);
-                    $completed = $this->progress->completedStepNames($tenantId);
-
                     $organizationUnitId = $this->positiveInt($state->getAttribute('root_organization_unit_id'));
-                    if (! in_array(TenantOnboardingStep::ROOT_ORGANIZATION, $completed, true) || $organizationUnitId === null) {
+                    if ($organizationUnitId === null || ! $this->organizations->isReady($tenantId, $organizationUnitId)) {
+                        $organizationUnitId = $this->organizations->protectedRootId($tenantId);
+                    }
+                    if ($organizationUnitId === null || ! $this->organizations->isReady($tenantId, $organizationUnitId)) {
                         $currentStep = TenantOnboardingStep::ROOT_ORGANIZATION;
                         $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
                         $organization = $this->organizations->provision(
@@ -93,42 +94,44 @@ final class TenantOnboardingService
                             (string) $tenant->require('name'),
                         );
                         $organizationUnitId = (int) $organization['organization_unit_id'];
-                        $this->progress->completeStep($tenantId, $currentStep, $operationId, [
-                            'root_organization_unit_id' => $organizationUnitId,
-                        ]);
                     }
+                    $this->progress->completeStep(
+                        $tenantId,
+                        TenantOnboardingStep::ROOT_ORGANIZATION,
+                        $operationId,
+                        ['root_organization_unit_id' => $organizationUnitId],
+                    );
 
                     $roleId = $this->positiveInt($state->getAttribute('super_admin_role_id'));
-                    if (
-                        ! in_array(TenantOnboardingStep::PERMISSION_CATALOGUE, $completed, true)
-                        || ! in_array(TenantOnboardingStep::SUPER_ADMIN_ROLE, $completed, true)
-                        || $roleId === null
-                        || ! $this->access->isReady($tenantId)
-                    ) {
+                    if ($roleId === null || ! $this->access->superAdminRoleIsReady($tenantId, $roleId)) {
+                        $roleId = $this->access->protectedSuperAdminRoleId($tenantId);
+                    }
+                    if ($roleId === null || ! $this->access->isReady($tenantId, $roleId)) {
                         $currentStep = TenantOnboardingStep::PERMISSION_CATALOGUE;
-                        $this->progress->startStep($tenantId, TenantOnboardingStep::PERMISSION_CATALOGUE, $operationId, $correlationId);
-                        $this->progress->startStep($tenantId, TenantOnboardingStep::SUPER_ADMIN_ROLE, $operationId, $correlationId);
+                        $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
                         $access = $this->access->provision($tenantId);
                         $roleId = (int) $access['role_id'];
-                        $this->progress->completeStep(
-                            $tenantId,
-                            TenantOnboardingStep::PERMISSION_CATALOGUE,
-                            $operationId,
-                        );
-                        $this->progress->completeStep(
-                            $tenantId,
-                            TenantOnboardingStep::SUPER_ADMIN_ROLE,
-                            $operationId,
-                            ['super_admin_role_id' => $roleId],
-                        );
                     }
+                    $this->progress->completeStep(
+                        $tenantId,
+                        TenantOnboardingStep::PERMISSION_CATALOGUE,
+                        $operationId,
+                    );
+                    $currentStep = TenantOnboardingStep::SUPER_ADMIN_ROLE;
+                    $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
+                    $this->progress->completeStep(
+                        $tenantId,
+                        $currentStep,
+                        $operationId,
+                        ['super_admin_role_id' => $roleId],
+                    );
 
                     if (! $this->authentication->providerIsReady($tenantId)) {
                         $currentStep = TenantOnboardingStep::AUTHENTICATION_PROVIDER;
                         $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
                         $this->authentication->provisionProvider($tenantId);
                         $this->progress->completeStep($tenantId, $currentStep, $operationId);
-                    } elseif (! in_array(TenantOnboardingStep::AUTHENTICATION_PROVIDER, $completed, true)) {
+                    } else {
                         $this->progress->completeStep(
                             $tenantId,
                             TenantOnboardingStep::AUTHENTICATION_PROVIDER,
@@ -139,11 +142,24 @@ final class TenantOnboardingService
                     $stateSnapshot = $this->progress->snapshot($tenantId) ?? [];
                     $invitationId = $this->positiveInt($stateSnapshot['invitation_id'] ?? null);
                     $invitation = $this->authentication->initialAdministratorInvitationStatus($tenantId, $invitationId);
-                    $invitationUsable = is_array($invitation)
-                        && in_array((string) ($invitation['status'] ?? ''), ['pending', 'accepted'], true)
-                        && strtolower((string) ($invitation['email'] ?? '')) === $email;
+                    $invitationUsable = $this->invitationMatchesFoundation(
+                        $tenantId,
+                        $invitation,
+                        $invitationId,
+                        $organizationUnitId,
+                        $roleId,
+                        $email,
+                    );
 
                     if (! $invitationUsable) {
+                        if (($invitation['status'] ?? null) === 'accepted') {
+                            throw new TenantOnboardingOperationException(
+                                TenantOnboardingErrorCode::FOUNDATION_INCOMPLETE,
+                                'The accepted administrator invitation targets obsolete foundation resources. Review the accepted administrator assignments before retrying.',
+                                TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
+                                $correlationId,
+                            );
+                        }
                         $currentStep = TenantOnboardingStep::INITIAL_ADMIN_INVITATION;
                         $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
                         $issued = $this->authentication->issueInitialAdministratorInvitation(
@@ -158,7 +174,7 @@ final class TenantOnboardingService
                             'invitation_id' => $invitationId,
                         ]);
                         $invitation = $this->authentication->initialAdministratorInvitationStatus($tenantId, $invitationId);
-                    } elseif (! in_array(TenantOnboardingStep::INITIAL_ADMIN_INVITATION, $completed, true)) {
+                    } else {
                         $this->progress->completeStep($tenantId, TenantOnboardingStep::INITIAL_ADMIN_INVITATION, $operationId, [
                             'initial_admin_email' => $email,
                             'invitation_id' => $invitationId,
@@ -277,6 +293,7 @@ final class TenantOnboardingService
                     'error_code' => $exception->errorCode,
                     'failed_step' => $exception->step,
                     'correlation_id' => $exception->correlationId ?? $correlationId,
+                    ...$exception->context,
                 ],
             ));
         } catch (Throwable $exception) {
@@ -343,6 +360,34 @@ final class TenantOnboardingService
         }
     }
 
+    /** @param array<string, mixed>|null $invitation */
+    private function invitationMatchesFoundation(
+        int $tenantId,
+        ?array $invitation,
+        ?int $invitationId,
+        int $organizationUnitId,
+        int $roleId,
+        string $email,
+    ): bool {
+        if (
+            $invitation === null
+            || $invitationId === null
+            || (int) ($invitation['id'] ?? 0) !== $invitationId
+            || (int) ($invitation['organization_unit_id'] ?? 0) !== $organizationUnitId
+            || (int) ($invitation['role_id'] ?? 0) !== $roleId
+            || strtolower(trim((string) ($invitation['email'] ?? ''))) !== $email
+        ) {
+            return false;
+        }
+
+        $status = (string) ($invitation['status'] ?? '');
+        if ($status === 'accepted') {
+            return $this->positiveInt($invitation['accepted_by_user_id'] ?? null) !== null;
+        }
+
+        return $status === 'pending'
+            && $this->authentication->hasPendingInitialAdministratorInvitation($tenantId, $invitationId);
+    }
 
     private function positiveInt(mixed $value): ?int
     {

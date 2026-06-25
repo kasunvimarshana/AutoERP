@@ -38,9 +38,9 @@ final class TenantResource extends JsonResource
             'created_at',
             'updated_at',
         ]));
-        $resource['has_logo'] = isset($values['logo_path'])
-            && is_string($values['logo_path'])
-            && trim($values['logo_path']) !== '';
+        $resource['has_logo'] = isset($values['logo_object_key'])
+            && is_string($values['logo_object_key'])
+            && trim($values['logo_object_key']) !== '';
 
         return $resource;
     }

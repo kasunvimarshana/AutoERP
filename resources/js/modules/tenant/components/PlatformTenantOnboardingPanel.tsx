@@ -117,7 +117,7 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 2</p>
                     <h3 id="tenant-onboarding-title" className="mt-1 font-semibold text-slate-900">Provision tenant foundation</h3>
-                    <p className="mt-1 text-sm text-slate-500">Creates the root organization, permission catalogue, fully granted Super Admin role, authentication provider, and first administrator invitation.</p>
+                    <p className="mt-1 text-sm text-slate-500">Creates and verifies the protected root organization, complete permission catalogue, fully granted Super Admin role, authentication provider, and initial administrator invitation.</p>
                 </div>
                 <StatusBadge status={state?.status ?? 'pending'} />
             </div>
@@ -185,6 +185,9 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                         <div><dt className="font-medium text-slate-800">Expires</dt><dd>{formatTenantDateTime(invitation.expires_at, 'No expiry recorded')}</dd></div>
                         <div><dt className="font-medium text-slate-800">Delivery attempts</dt><dd>{invitation.delivery?.attempt_number ?? 0}</dd></div>
                     </dl>
+                    <p className="rounded bg-blue-50 p-3 text-blue-900">
+                        Invitation issuance is complete, but tenant activation remains blocked until the recipient accepts it and becomes an active Super Admin assigned to the protected root organization.
+                    </p>
                     {invitation.delivery?.error_message ? <p className="rounded bg-rose-50 p-3 text-rose-800">{invitation.delivery.error_message}</p> : null}
                     {invitation.status === 'pending' && canProvision ? (
                         <div className="flex flex-wrap justify-end gap-2">
@@ -217,17 +220,17 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
 }
 
 const FOUNDATION_STEPS = [
-    { key: 'organization_structure', label: 'Root organization' },
+    { key: 'root_organization', label: 'Root organization' },
     { key: 'permission_catalogue', label: 'Permission catalogue' },
     { key: 'super_admin_role', label: 'Super Admin role' },
     { key: 'authentication_provider', label: 'Authentication provider' },
-    { key: 'initial_admin_invitation', label: 'Administrator invitation' },
+    { key: 'initial_admin_invitation', label: 'Administrator invitation issued' },
 ] as const;
 
 function provisionButtonLabel(status: TenantOnboardingSummary['status'] | undefined): string {
     if (status === 'failed') return 'Retry failed step';
     if (status === 'provisioning') return 'Resume provisioning';
-    if (status === 'awaiting_administrator') return 'Recheck foundation';
+    if (status === 'awaiting_administrator') return 'Repair and recheck foundation';
     if (status === 'awaiting_domain' || status === 'ready') return 'Refresh readiness';
     return 'Provision foundation';
 }

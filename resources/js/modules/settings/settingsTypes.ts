@@ -29,8 +29,8 @@ export interface ConfigurationDefinition {
     sensitive: boolean;
     runtime_mutable: boolean;
     options: Array<string | number | boolean>;
-    minimum: number | null;
-    maximum: number | null;
+    minimum: string | null;
+    maximum: string | null;
     lookup: string | null;
 }
 
@@ -117,7 +117,7 @@ export interface ConfigurationRevision {
     sensitive: boolean;
     resulting_row_version: number | null;
     source_revision_id: number | null;
-    actor: { id: number; name: string | null } | null;
+    actor: { type: 'system' | 'platform_operator' | 'tenant_user'; id: number | null; name: string | null; email: string | null };
     reason: string | null;
     created_at: string;
 }

@@ -7,10 +7,14 @@ namespace Modules\Reporting\Services;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
+use Modules\Tenant\Services\Contracts\TenantBrandingAssetReaderInterface;
 
 final class ReportBrandingResolver
 {
-    public function __construct(private readonly ConfigurationResolverInterface $configuration) {}
+    public function __construct(
+        private readonly ConfigurationResolverInterface $configuration,
+        private readonly TenantBrandingAssetReaderInterface $tenantBrandingAssets,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -31,9 +35,13 @@ final class ReportBrandingResolver
             'organization_unit_name' => $organizationUnit?->name,
             'organization_unit_code' => $organizationUnit?->code,
             'currency_code' => $tenant->baseCurrency?->code,
-            'logo_data_uri' => $this->imageDataUri(
-                (string) ($organizationUnit?->image_path ?: $tenant->logo_path ?: ''),
-            ),
+            'logo_data_uri' => $organizationUnit?->image_path
+                ? $this->imageDataUri((string) $organizationUnit->image_path)
+                : $this->tenantBrandingAssets->logoDataUri(
+                    $tenantId,
+                    is_string($tenant->logo_object_key) ? $tenant->logo_object_key : null,
+                    is_string($tenant->logo_mime_type) ? $tenant->logo_mime_type : null,
+                ),
         ];
     }
 

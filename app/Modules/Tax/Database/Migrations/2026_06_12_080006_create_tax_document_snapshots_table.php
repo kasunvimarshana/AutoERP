@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_document_snapshots', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('source_module', 100)->nullable();
             $table->string('source_type', 100);

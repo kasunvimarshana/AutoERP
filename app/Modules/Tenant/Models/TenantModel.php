@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
-use LogicException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use LogicException;
 use Modules\Core\Models\CoreModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Services\TenantLifecycleState;
@@ -17,7 +17,8 @@ final class TenantModel extends CoreModel
     protected $table = 'tenants';
 
     protected $fillable = [
-        'uuid', 'code', 'name', 'slug', 'logo_path',
+        'uuid', 'code', 'name', 'slug',
+        'logo_object_key', 'logo_mime_type', 'logo_size_bytes',
         'base_currency_id', 'status', 'status_reason', 'status_changed_at',
         'activated_at', 'suspended_at', 'archived_at',
         'row_version', 'created_by', 'updated_by',
@@ -37,6 +38,7 @@ final class TenantModel extends CoreModel
     {
         return array_merge(parent::casts(), [
             'base_currency_id' => 'integer',
+            'logo_size_bytes' => 'integer',
             'status_changed_at' => 'datetime',
             'activated_at' => 'datetime',
             'suspended_at' => 'datetime',

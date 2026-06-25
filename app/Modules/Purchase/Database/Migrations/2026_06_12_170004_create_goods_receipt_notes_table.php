@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('goods_receipt_notes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('purchase_order_id')->nullable();
             $table->string('supplier_type')->nullable();

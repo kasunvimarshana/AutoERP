@@ -22,8 +22,10 @@ final readonly class ConfigurationRevisionView
         public bool $sensitive,
         public ?int $resultingRowVersion,
         public ?int $sourceRevisionId,
-        public ?int $actorUserId,
+        public string $actorType,
+        public ?int $actorId,
         public ?string $actorName,
+        public ?string $actorEmail,
         public ?string $reason,
         public DateTimeImmutable $createdAt,
     ) {}

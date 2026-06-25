@@ -20,12 +20,10 @@ use Modules\ReferenceData\Database\Seeders\ReferenceDataSeeder;
 use Modules\Sales\Database\Seeders\SalesSeeder;
 use Modules\Sequence\Database\Seeders\SequenceSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
-use Modules\Tenant\Database\Seeders\TenantDomainSeeder;
 use Modules\Tenant\Database\Seeders\TenantReferenceAssignmentSeeder;
 use Modules\Tenant\Database\Seeders\TenantSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
-use Modules\User\Database\Seeders\SuperAdminPermissionSeeder;
-use Modules\User\Database\Seeders\UserSeeder;
+use Modules\User\Database\Seeders\PlatformOperatorSeeder;
 use Modules\Vehicle\Database\Seeders\VehicleSeeder;
 use Modules\VehicleRental\Database\Seeders\VehicleRentalSeeder;
 use Modules\Warehouse\Database\Seeders\WarehouseSeeder;
@@ -43,9 +41,8 @@ class DatabaseSeeder extends Seeder
         app(TenantExecutionContextInterface::class)->runAsControlPlane(function (): void {
             $this->call([
                 TenantSeeder::class,
-                TenantDomainSeeder::class,
                 OrganizationUnitSeeder::class,
-                UserSeeder::class,
+                PlatformOperatorSeeder::class,
                 AuthSeeder::class,
                 ReferenceDataSeeder::class,
                 TenantReferenceAssignmentSeeder::class,
@@ -66,7 +63,6 @@ class DatabaseSeeder extends Seeder
                 HrSeeder::class,
                 ReportingSeeder::class,
                 AuditSeeder::class,
-                SuperAdminPermissionSeeder::class,
             ]);
         });
     }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Models;
 
+use DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\Tenant\Models\TenantModel;
 
 final class OrganizationUnitModel extends TenantOwnedModel
@@ -32,6 +34,36 @@ final class OrganizationUnitModel extends TenantOwnedModel
         'description',
         'metadata',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(static function (self $unit): void {
+            $marker = $unit->getAttribute('root_marker');
+            $parentId = $unit->getAttribute('parent_id');
+            $depth = (int) $unit->getAttribute('depth');
+
+            if ($marker === OrganizationUnitHierarchy::ROOT_MARKER) {
+                if ($parentId !== null || $depth !== 0 || ! (bool) $unit->getAttribute('is_active')) {
+                    throw new DomainException('The protected root organization unit must be active, have no parent, and have depth zero.');
+                }
+
+                return;
+            }
+
+            if ($marker !== null) {
+                throw new DomainException('The organization unit root marker is invalid.');
+            }
+            if ($parentId === null || $depth < 1) {
+                throw new DomainException('A non-root organization unit must have a parent and a positive hierarchy depth.');
+            }
+        });
+
+        static::deleting(static function (self $unit): void {
+            if ($unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER) {
+                throw new DomainException('The protected root organization unit cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

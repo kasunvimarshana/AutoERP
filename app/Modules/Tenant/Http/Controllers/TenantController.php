@@ -143,7 +143,6 @@ final class TenantController extends Controller
 
         if ($file instanceof UploadedFile) {
             $payload['logo_tmp_path'] = $file->getRealPath();
-            $payload['logo_original_name'] = $file->getClientOriginalName();
         }
 
         return $payload;

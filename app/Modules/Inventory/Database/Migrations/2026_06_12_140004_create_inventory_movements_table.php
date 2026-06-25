@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_movements', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('movement_number', 80);
             $table->date('movement_date');

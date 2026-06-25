@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Configuration\Constants\ConfigurationActorType;
 use Modules\Configuration\Constants\ConfigurationRevisionOperation;
 use Modules\Configuration\Constants\ConfigurationValueType;
 
@@ -23,7 +24,10 @@ return new class extends Migration
             $table->boolean('is_sensitive')->default(false);
             $table->unsignedBigInteger('resulting_row_version')->nullable();
             $table->unsignedBigInteger('source_revision_id')->nullable();
-            $table->foreignId('actor_user_id')->nullable()->constrained('users')->restrictOnDelete();
+            $table->enum('actor_type', ConfigurationActorType::values());
+            $table->unsignedBigInteger('actor_id')->nullable();
+            $table->string('actor_name')->nullable();
+            $table->string('actor_email')->nullable();
             $table->string('reason', 1000)->nullable();
             $table->timestamp('created_at');
 

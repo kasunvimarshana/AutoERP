@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_unapplied_balances', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id')->unique('payment_unapplied_balances_payment_uk');
             $table->string('balance_type', 50)->default('credit');

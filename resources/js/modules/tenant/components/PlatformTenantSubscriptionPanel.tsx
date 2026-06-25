@@ -193,7 +193,7 @@ export function PlatformTenantSubscriptionPanel({ tenant, canManage, canAudit, d
 
             <SuccessAlert message={success} onDismiss={() => setSuccess(null)} />
             <ErrorAlert error={revisions.error ?? history.error} title="Unable to load subscription data" />
-            <ErrorAlert error={error} title="Subscription action failed" />
+            {revisions.error || history.error ? null : <ErrorAlert error={error} title="Subscription action failed" />}
 
             {current ? <CurrentSubscriptionSummary subscription={current} /> : (
                 <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">No subscription is assigned. A usable current subscription is required before activation.</p>

@@ -38,7 +38,7 @@ final class UpdateTenantService
     /** @param array<string, mixed> $payload */
     public function execute(int|string $id, array $payload): Result
     {
-        $newLogoPath = null;
+        $newLogoObjectKey = null;
 
         try {
             $existing = $this->tenants->findById($id);
@@ -72,18 +72,28 @@ final class UpdateTenantService
                 $this->references->assertActiveCurrency($baseCurrencyId);
             }
 
-            $oldLogoPath = is_string($existing->get('logo_path'))
-                ? trim((string) $existing->get('logo_path')) ?: null
+            $oldLogoObjectKey = is_string($existing->get('logo_object_key'))
+                ? trim((string) $existing->get('logo_object_key')) ?: null
                 : null;
+            $logoMimeType = is_string($existing->get('logo_mime_type'))
+                ? trim((string) $existing->get('logo_mime_type')) ?: null
+                : null;
+            $logoSizeBytes = $this->positiveInt($existing->get('logo_size_bytes'));
             $removeLogo = (bool) ($payload['remove_logo'] ?? false);
-            $logoPath = $removeLogo ? null : $oldLogoPath;
+            $logoObjectKey = $removeLogo ? null : $oldLogoObjectKey;
+            if ($removeLogo) {
+                $logoMimeType = null;
+                $logoSizeBytes = null;
+            }
             if (isset($payload['logo_tmp_path'])) {
-                $newLogoPath = $this->logos->store(
+                $storedLogo = $this->logos->store(
                     $tenantId,
                     (string) $payload['logo_tmp_path'],
-                    (string) ($payload['logo_original_name'] ?? 'logo.bin'),
                 );
-                $logoPath = $newLogoPath;
+                $newLogoObjectKey = $storedLogo['object_key'];
+                $logoObjectKey = $storedLogo['object_key'];
+                $logoMimeType = $storedLogo['mime_type'];
+                $logoSizeBytes = $storedLogo['size_bytes'];
             }
 
             /** @var DataRecord|null $updated */
@@ -95,15 +105,19 @@ final class UpdateTenantService
                 $code,
                 $name,
                 $slug,
-                $logoPath,
-                $oldLogoPath,
+                $logoObjectKey,
+                $logoMimeType,
+                $logoSizeBytes,
+                $oldLogoObjectKey,
                 $baseCurrencyId,
             ): ?DataRecord {
                 $updated = $this->tenants->updateWithVersion($id, $expectedVersion, [
                     'code' => $code,
                     'name' => $name,
                     'slug' => $slug,
-                    'logo_path' => $logoPath,
+                    'logo_object_key' => $logoObjectKey,
+                    'logo_mime_type' => $logoMimeType,
+                    'logo_size_bytes' => $logoSizeBytes,
                     'base_currency_id' => $baseCurrencyId,
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
@@ -111,8 +125,8 @@ final class UpdateTenantService
                     return null;
                 }
 
-                if ($oldLogoPath !== null && $oldLogoPath !== $logoPath) {
-                    $this->logos->scheduleCleanup($tenantId, $oldLogoPath, 'tenant logo replacement cleanup');
+                if ($oldLogoObjectKey !== null && $oldLogoObjectKey !== $logoObjectKey) {
+                    $this->logos->scheduleCleanup($tenantId, $oldLogoObjectKey, 'tenant logo replacement cleanup');
                 }
 
                 $this->audit->recordPlatform(new AuditEventData(
@@ -133,7 +147,7 @@ final class UpdateTenantService
             });
 
             if ($updated === null) {
-                $this->cleanupNewLogo($tenantId, $newLogoPath, 'tenant logo version conflict cleanup');
+                $this->cleanupNewLogo($tenantId, $newLogoObjectKey, 'tenant logo version conflict cleanup');
 
                 return Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
@@ -141,14 +155,14 @@ final class UpdateTenantService
                 ));
             }
 
-            if ($oldLogoPath !== null && $oldLogoPath !== $logoPath) {
-                $this->logos->processCleanup($tenantId, $oldLogoPath);
+            if ($oldLogoObjectKey !== null && $oldLogoObjectKey !== $logoObjectKey) {
+                $this->logos->processCleanup($tenantId, $oldLogoObjectKey);
             }
 
             return Result::success($updated);
         } catch (Throwable $exception) {
             if (isset($tenantId)) {
-                $this->cleanupNewLogo($tenantId, $newLogoPath, 'failed tenant logo update cleanup');
+                $this->cleanupNewLogo($tenantId, $newLogoObjectKey, 'failed tenant logo update cleanup');
             }
 
             return Result::failure($this->errors->normalize(
@@ -200,14 +214,14 @@ final class UpdateTenantService
         return null;
     }
 
-    private function cleanupNewLogo(int $tenantId, ?string $path, string $reason): void
+    private function cleanupNewLogo(int $tenantId, ?string $objectKey, string $reason): void
     {
-        if ($path === null) {
+        if ($objectKey === null) {
             return;
         }
 
-        $this->logos->scheduleCleanup($tenantId, $path, $reason);
-        $this->logos->processCleanup($tenantId, $path);
+        $this->logos->scheduleCleanup($tenantId, $objectKey, $reason);
+        $this->logos->processCleanup($tenantId, $objectKey);
     }
 
     private function positiveInt(mixed $value): ?int
@@ -223,7 +237,7 @@ final class UpdateTenantService
             'name' => $record->get('name'),
             'slug' => $record->get('slug'),
             'base_currency_id' => $record->get('base_currency_id'),
-            'has_logo' => is_string($record->get('logo_path')) && trim((string) $record->get('logo_path')) !== '',
+            'has_logo' => is_string($record->get('logo_object_key')) && trim((string) $record->get('logo_object_key')) !== '',
         ];
     }
 }

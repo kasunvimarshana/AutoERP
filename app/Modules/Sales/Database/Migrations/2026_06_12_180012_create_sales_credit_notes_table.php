@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_credit_notes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->foreignId('sales_return_id')->nullable();

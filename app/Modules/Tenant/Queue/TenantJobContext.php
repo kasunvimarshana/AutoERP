@@ -8,26 +8,16 @@ use InvalidArgumentException;
 
 final readonly class TenantJobContext
 {
-    public function __construct(
-        public int $tenantId,
-        public ?int $organizationUnitId = null,
-        public ?string $correlationId = null,
-    ) {
+    public function __construct(public int $tenantId)
+    {
         if ($this->tenantId < 1) {
             throw new InvalidArgumentException('A tenant job context requires a positive tenant identifier.');
         }
-        if ($this->organizationUnitId !== null && $this->organizationUnitId < 1) {
-            throw new InvalidArgumentException('Organization unit identifier must be positive when provided.');
-        }
     }
 
-    /** @return array{tenant_id:int,organization_unit_id:?int,correlation_id:?string} */
+    /** @return array{tenant_id:int} */
     public function toArray(): array
     {
-        return [
-            'tenant_id' => $this->tenantId,
-            'organization_unit_id' => $this->organizationUnitId,
-            'correlation_id' => $this->correlationId,
-        ];
+        return ['tenant_id' => $this->tenantId];
     }
 }

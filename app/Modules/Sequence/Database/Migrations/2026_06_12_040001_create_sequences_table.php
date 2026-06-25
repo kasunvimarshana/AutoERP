@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
                 ->constrained('tenants', 'id')
-                ->cascadeOnDelete()
+                ->restrictOnDelete()
                 ->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')
                 ->nullable();

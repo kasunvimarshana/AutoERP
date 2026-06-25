@@ -12,6 +12,7 @@ use Illuminate\Queue\SerializesModels;
 use Modules\Tenant\Constants\TenantDomainOperationalVerificationOutcome;
 use Modules\Tenant\Queue\TenantAwareJobInterface;
 use Modules\Tenant\Queue\TenantJobContext;
+use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Services\Domains\TenantDomainOperationalVerificationService;
 use RuntimeException;
 
@@ -31,6 +32,12 @@ final class VerifyTenantDomainOperationalReadiness implements ShouldQueue, Tenan
         public readonly int $tenantId,
         public readonly int $domainId,
     ) {}
+
+    /** @return list<object> */
+    public function middleware(): array
+    {
+        return [app(RestoreTenantJobContext::class)];
+    }
 
     public function tenantJobContext(): TenantJobContext
     {

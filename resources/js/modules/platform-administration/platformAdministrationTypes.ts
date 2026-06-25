@@ -133,6 +133,12 @@ export interface PlatformInfrastructureHealth {
         ready: boolean;
         origin: string | null;
     };
+    capabilities: {
+        database: { strategy: string; tenant_specific_profiles_supported: boolean };
+        storage: { strategy: string; isolation: string; disk: string; tenant_specific_profiles_supported: boolean };
+        mail: { strategy: string; tenant_specific_profiles_supported: boolean };
+        configuration: { precedence: string[]; arbitrary_laravel_config_overrides_supported: boolean };
+    };
 }
 
 export interface PlatformInvitationDeliveryHealth {

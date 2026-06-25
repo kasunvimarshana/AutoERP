@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_service_jobs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('job_number', 100);
             $table->date('job_date');

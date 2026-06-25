@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('user_organization_units', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('user_id');
             $table->json('metadata')->nullable();

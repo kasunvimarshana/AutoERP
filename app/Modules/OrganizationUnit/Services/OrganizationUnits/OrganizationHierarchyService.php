@@ -7,12 +7,11 @@ namespace Modules\OrganizationUnit\Services\OrganizationUnits;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 
 final class OrganizationHierarchyService
 {
-    public const ROOT_MARKER = 'root';
-
     private const MAX_PATH_LENGTH = 1024;
 
     public function __construct(private readonly OrganizationUnitModel $units) {}
@@ -29,7 +28,7 @@ final class OrganizationHierarchyService
         return DB::transaction(function () use ($tenantId, $typeId, $code, $name, $description, $metadata): OrganizationUnitModel {
             $existing = $this->units->newQuery()
                 ->where('tenant_id', $tenantId)
-                ->where('root_marker', self::ROOT_MARKER)
+                ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
                 ->lockForUpdate()
                 ->first();
 
@@ -48,7 +47,7 @@ final class OrganizationHierarchyService
                     'path' => $newPath,
                     'depth' => 0,
                     'parent_id' => null,
-                    'root_marker' => self::ROOT_MARKER,
+                    'root_marker' => OrganizationUnitHierarchy::ROOT_MARKER,
                     'is_active' => true,
                     'description' => $description,
                     'metadata' => $metadata,
@@ -89,7 +88,7 @@ final class OrganizationHierarchyService
                 'code' => $this->normalizeCode($code),
                 'path' => $path,
                 'depth' => 0,
-                'root_marker' => self::ROOT_MARKER,
+                'root_marker' => OrganizationUnitHierarchy::ROOT_MARKER,
                 'is_active' => true,
                 'description' => $description,
                 'metadata' => $metadata,
@@ -150,7 +149,7 @@ final class OrganizationHierarchyService
                 throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
             }
 
-            $isRoot = $unit->getAttribute('root_marker') === self::ROOT_MARKER;
+            $isRoot = $unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER;
             $parentId = array_key_exists('parent_id', $attributes)
                 ? ($attributes['parent_id'] === null ? null : (int) $attributes['parent_id'])
                 : ($unit->getAttribute('parent_id') === null ? null : (int) $unit->getAttribute('parent_id'));
@@ -223,7 +222,7 @@ final class OrganizationHierarchyService
             if ((int) $unit->getAttribute('row_version') !== $expectedVersion) {
                 throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
             }
-            if (! $active && $unit->getAttribute('root_marker') === self::ROOT_MARKER) {
+            if (! $active && $unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER) {
                 throw new DomainException('The protected root organization unit cannot be deactivated.');
             }
             if (! $active && $this->hasActiveDescendants($tenantId, (string) $unit->getAttribute('path'))) {
@@ -246,7 +245,7 @@ final class OrganizationHierarchyService
             if ((int) $unit->getAttribute('row_version') !== $expectedVersion) {
                 throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
             }
-            if ($unit->getAttribute('root_marker') === self::ROOT_MARKER) {
+            if ($unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER) {
                 throw new DomainException('The protected root organization unit cannot be deleted.');
             }
             if ($this->units->newQuery()->where('tenant_id', $tenantId)->where('parent_id', $unitId)->exists()) {
@@ -257,20 +256,38 @@ final class OrganizationHierarchyService
         }, 3);
     }
 
-    public function rootIsReady(int $tenantId, bool $lockForUpdate = false): bool
+    public function rootIsReady(int $tenantId, int $organizationUnitId, bool $lockForUpdate = false): bool
+    {
+        return $this->rootQuery($tenantId, $lockForUpdate)
+            ->whereKey($organizationUnitId)
+            ->exists();
+    }
+
+    public function protectedRootId(int $tenantId, bool $lockForUpdate = false): ?int
+    {
+        $value = $this->rootQuery($tenantId, $lockForUpdate)->value('id');
+
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function rootQuery(int $tenantId, bool $lockForUpdate): \Illuminate\Database\Eloquent\Builder
     {
         $query = $this->units->newQuery()
             ->where('tenant_id', $tenantId)
-            ->where('root_marker', self::ROOT_MARKER)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
             ->whereNull('parent_id')
             ->where('depth', 0)
             ->where('is_active', true)
-            ->whereNotNull('path');
+            ->whereNotNull('type_id')
+            ->whereNotNull('path')
+            ->whereHas('type', static fn ($type) => $type
+                ->where('is_active', true)
+                ->whereNull('deleted_at'));
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
 
-        return $query->exists();
+        return $query;
     }
 
     private function lockUnit(int $tenantId, int $unitId): OrganizationUnitModel

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Platform;
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -48,6 +46,8 @@ final class PlatformTenantHealthService
         private readonly TenantStorageReconciliationService $storageReconciliation,
         private readonly TenantDomainOperationalRetryService $domainRetries,
         private readonly TenantSubscriptionReadinessService $subscriptionReadiness,
+        private readonly PlatformOperationalInfrastructureHealthService $operationalInfrastructure,
+        private readonly TenantInfrastructureCapabilityService $infrastructureCapabilities,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
         private readonly AuditRecorderInterface $audit,
@@ -269,48 +269,9 @@ final class PlatformTenantHealthService
     /** @return array<string, mixed> */
     private function infrastructureHealth(): array
     {
-        $mailer = trim((string) config('mail.default', ''));
-        $fromAddress = trim((string) config('mail.from.address', ''));
-        $invitationUrl = trim((string) config('module-auth.registration.invitation_url', ''));
-        $queueConnection = trim((string) config('queue.default', ''));
-        $urlScheme = strtolower((string) parse_url($invitationUrl, PHP_URL_SCHEME));
-        $invitationUrlReady = filter_var($invitationUrl, FILTER_VALIDATE_URL) !== false
-            && in_array($urlScheme, ['http', 'https'], true);
-        $mailReady = $mailer !== ''
-            && ! in_array($mailer, ['log', 'array'], true)
-            && $fromAddress !== '';
-        $queueReady = $queueConnection !== '' && $queueConnection !== 'sync';
-
-        $pendingJobs = null;
-        $failedJobs = null;
-        if ($queueConnection === 'database' && Schema::hasTable('jobs')) {
-            $pendingJobs = DB::table('jobs')->count();
-        }
-        if (Schema::hasTable('failed_jobs')) {
-            $failedJobs = DB::table('failed_jobs')->count();
-        }
-
         return [
-            'ready' => $mailReady && $queueReady && $invitationUrlReady,
-            'mail' => [
-                'ready' => $mailReady,
-                'mailer' => $mailer === '' ? null : $mailer,
-                'from_address_configured' => $fromAddress !== '',
-                'external_transport' => ! in_array($mailer, ['', 'log', 'array'], true),
-            ],
-            'queue' => [
-                'ready' => $queueReady,
-                'connection' => $queueConnection === '' ? null : $queueConnection,
-                'requires_worker' => $queueConnection !== 'sync',
-                'pending_jobs' => $pendingJobs,
-                'failed_jobs' => $failedJobs,
-            ],
-            'administrator_invitation_url' => [
-                'ready' => $invitationUrlReady,
-                'origin' => $invitationUrlReady
-                    ? parse_url($invitationUrl, PHP_URL_SCHEME).'://'.parse_url($invitationUrl, PHP_URL_HOST)
-                    : null,
-            ],
+            ...$this->operationalInfrastructure->inspect(),
+            'capabilities' => $this->infrastructureCapabilities->inspect(),
         ];
     }
 

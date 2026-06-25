@@ -344,9 +344,9 @@ export default function PlatformTenantsPage() {
                             </section>
                         </Panel>
 
-                        <Panel><PlatformTenantOnboardingPanel key={`onboarding-${selected.id}`} tenant={selected} canProvision={canOnboard} disabled={allMutationsDisabled} onTenantChanged={refreshSelected} /></Panel>
+                        <Panel><PlatformTenantOnboardingPanel key={`onboarding-${selected.id}-${selected.onboarding?.row_version ?? 0}`} tenant={selected} canProvision={canOnboard} disabled={allMutationsDisabled} onTenantChanged={refreshSelected} /></Panel>
                         <Panel><PlatformTenantDomainsPanel key={`domains-${selected.id}`} tenant={selected} canManage={canManageDomains} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}`} tenant={selected} canManage={canManageSubscriptions} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
+                        <Panel><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}-${selected.current_subscription?.row_version ?? 0}`} tenant={selected} canManage={canManageSubscriptions} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
                         <Panel><PlatformTenantActivationPanel key={`activation-${selected.id}`} tenant={selected} canActivate={canLifecycle} disabled={allMutationsDisabled} onChanged={(updated) => { selectedTenant.setData(updated); tenants.reload(); }} /></Panel>
 
                         {canLifecycle && selected.status !== 'archived' ? (

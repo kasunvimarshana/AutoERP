@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_budget_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('budget_id');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_id');
             $table->foreignId('fiscal_period_id')->nullable();

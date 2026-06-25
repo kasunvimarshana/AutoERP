@@ -6,6 +6,7 @@ namespace Modules\Tenant\Constants;
 
 final class TenantReadinessCheck
 {
+    public const SCHEMA_COMPATIBLE = 'schema_compatible';
     public const ROOT_ORGANIZATION = 'root_organization';
     public const PERMISSION_CATALOGUE = 'permission_catalogue';
     public const SUPER_ADMIN_ACCESS = 'super_admin_access';
@@ -21,6 +22,7 @@ final class TenantReadinessCheck
     public static function messages(): array
     {
         return [
+            self::SCHEMA_COMPATIBLE => 'Apply the required application database schema before continuing.',
             self::ROOT_ORGANIZATION => 'Create a valid protected root organization.',
             self::PERMISSION_CATALOGUE => 'Synchronize the complete tenant permission catalogue.',
             self::SUPER_ADMIN_ACCESS => 'Assign the exact permission catalogue to the protected Super Admin role.',
@@ -30,7 +32,7 @@ final class TenantReadinessCheck
             self::BASE_CURRENCY => 'Select an active base accounting currency.',
             self::ACTIVE_PLAN => 'Assign a revision from an active tenant plan.',
             self::SUBSCRIPTION_VALID => 'Assign a current, unexpired tenant subscription.',
-            self::PRIMARY_DOMAIN_READY => 'The primary tenant domain must pass ownership, routing, TLS, and reachability checks.',
+            self::PRIMARY_DOMAIN_READY => 'Configure production domain readiness or an explicit local/testing tenant route.',
         ];
     }
 

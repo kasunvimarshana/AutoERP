@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 
 return new class extends Migration
 {
@@ -13,7 +14,7 @@ return new class extends Migration
         Schema::create('organization_units', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->json('metadata')->nullable();
 
             $table->unsignedBigInteger('type_id')->nullable();
@@ -23,7 +24,9 @@ return new class extends Migration
             $table->string('image_path')->nullable();
             $table->string('path', 1024)->comment('Server-derived materialized path.');
             $table->unsignedInteger('depth')->default(0)->comment('Server-derived hierarchy depth.');
-            $table->string('root_marker', 16)->nullable()->comment('Set to root only for the protected tenant root.');
+            $table->enum('root_marker', OrganizationUnitHierarchy::rootMarkerValues())
+                ->nullable()
+                ->comment('Set only for the protected tenant root.');
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
 

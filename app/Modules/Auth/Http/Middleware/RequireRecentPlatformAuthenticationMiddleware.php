@@ -7,12 +7,16 @@ namespace Modules\Auth\Http\Middleware;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Auth\Services\Mfa\PlatformMfaPolicy;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RequireRecentPlatformAuthenticationMiddleware
 {
-    public function __construct(private readonly CurrentUserContextAccessorInterface $currentUser) {}
+    public function __construct(
+        private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly PlatformMfaPolicy $mfaPolicy,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -24,17 +28,24 @@ final class RequireRecentPlatformAuthenticationMiddleware
         $maximumAge = max(60, (int) config('module-auth.platform_mfa.step_up_ttl_seconds', 900));
         $threshold = now()->subSeconds($maximumAge)->getTimestamp();
 
-        $requiresMfa = (bool) config('module-auth.platform_mfa.required', true);
-        if ($authenticatedAt === null
-            || $authenticatedAt < $threshold
-            || ($requiresMfa && ($mfaVerifiedAt === null || $mfaVerifiedAt < $threshold))
-        ) {
+        $passwordStepUpRequired = $authenticatedAt === null || $authenticatedAt < $threshold;
+        $mfaStepUpRequired = $this->mfaPolicy->isMfaStepUpRequired()
+            && ($mfaVerifiedAt === null || $mfaVerifiedAt < $threshold);
+
+        if ($passwordStepUpRequired || $mfaStepUpRequired) {
+            $factor = $passwordStepUpRequired ? 'password' : 'mfa';
+
             return new JsonResponse([
-                'message' => 'Recent platform authentication is required for this action.',
+                'message' => $factor === 'mfa'
+                    ? 'Recent multi-factor verification is required for this action.'
+                    : 'Recent platform authentication is required for this action.',
                 'error' => [
                     'code' => 'PLATFORM_STEP_UP_REQUIRED',
                     'type' => 'authentication',
-                    'details' => ['maximum_age_seconds' => $maximumAge],
+                    'details' => [
+                        'maximum_age_seconds' => $maximumAge,
+                        'required_factor' => $factor,
+                    ],
                 ],
             ], 401);
         }

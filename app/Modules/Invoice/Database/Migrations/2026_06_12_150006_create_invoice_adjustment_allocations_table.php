@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_adjustment_allocations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id');
             $table->foreignId('invoice_adjustment_id')->nullable();

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_ownerships', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_id');
             $table->string('owner_type')->nullable();

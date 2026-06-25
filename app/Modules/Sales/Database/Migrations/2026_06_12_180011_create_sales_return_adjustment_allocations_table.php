@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_return_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('sales_return_id');
             $table->foreignId('sales_header_adjustment_id');

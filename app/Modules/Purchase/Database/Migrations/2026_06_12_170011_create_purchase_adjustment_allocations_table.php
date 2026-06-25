@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->unsignedBigInteger('purchase_header_adjustment_id');
             $table->unsignedBigInteger('target_purchase_header_adjustment_id')->nullable();

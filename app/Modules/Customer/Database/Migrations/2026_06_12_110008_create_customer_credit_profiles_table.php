@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customer_credit_profiles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id')->unique();
             $table->decimal('credit_limit', 20, 6)->default('0.000000');

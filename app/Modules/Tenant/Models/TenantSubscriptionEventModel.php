@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Models\TenantOwnedModel;
 use LogicException;
 
-final class TenantSubscriptionEventModel extends Model
+final class TenantSubscriptionEventModel extends TenantOwnedModel
 {
     public $timestamps = false;
     protected $table = 'tenant_subscription_events';

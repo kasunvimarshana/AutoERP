@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 use Modules\Auth\Services\InternalAuthenticationProvider;
 
+$platformMfaRequired = filter_var(
+    env('AUTH_PLATFORM_MFA_REQUIRED', env('APP_ENV') === 'production'),
+    FILTER_VALIDATE_BOOL,
+);
+$platformMfaEnabled = filter_var(
+    env('AUTH_PLATFORM_MFA_ENABLED', $platformMfaRequired),
+    FILTER_VALIDATE_BOOL,
+);
+
 return [
     'default_provider_key' => env('AUTH_DEFAULT_PROVIDER_KEY', 'internal'),
     'protected_route_guard' => env('MODULE_AUTH_PROTECTED_GUARD', 'auth-api'),
@@ -52,8 +61,18 @@ return [
         ),
     ],
     'platform_mfa' => [
-        'required' => filter_var(
-            env('AUTH_PLATFORM_MFA_REQUIRED', env('APP_ENV') === 'production'),
+        // MFA capability and the policies that use it are intentionally separate.
+        // Disabling MFA stops login challenges and MFA step-up checks, even when an
+        // operator still has an enrolled method. Enrollment data is retained so it
+        // can be re-enabled safely without recreating secrets.
+        'enabled' => $platformMfaEnabled,
+        'required' => $platformMfaEnabled && $platformMfaRequired,
+        'login_challenge' => $platformMfaEnabled && filter_var(
+            env('AUTH_PLATFORM_MFA_LOGIN_CHALLENGE', true),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'step_up_required' => $platformMfaEnabled && filter_var(
+            env('AUTH_PLATFORM_MFA_STEP_UP_REQUIRED', $platformMfaRequired),
             FILTER_VALIDATE_BOOL,
         ),
         'issuer' => env('AUTH_PLATFORM_MFA_ISSUER', env('APP_NAME', 'AutoERP')),

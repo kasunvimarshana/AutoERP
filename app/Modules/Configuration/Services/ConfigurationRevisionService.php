@@ -15,7 +15,6 @@ use Modules\Configuration\Models\GlobalConfigurationValueRevision;
 use Modules\Configuration\Models\OrganizationUnitConfigurationValueRevision;
 use Modules\Configuration\Models\TenantConfigurationValueRevision;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 
 final class ConfigurationRevisionService
 {
@@ -23,7 +22,7 @@ final class ConfigurationRevisionService
         private readonly GlobalConfigurationValueRevision $globalRevisions,
         private readonly TenantConfigurationValueRevision $tenantRevisions,
         private readonly OrganizationUnitConfigurationValueRevision $organizationUnitRevisions,
-        private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly ConfigurationActorSnapshotFactory $actors,
         private readonly ClockInterface $clock,
     ) {}
 
@@ -38,6 +37,7 @@ final class ConfigurationRevisionService
         ?int $sourceRevisionId = null,
         ?string $reason = null,
     ): ConfigurationValueRevision {
+        $actor = $this->actors->current();
         $attributes = [
             ...$this->scopeIdentity($context),
             'key' => strtolower(trim($key)),
@@ -48,7 +48,10 @@ final class ConfigurationRevisionService
             'is_sensitive' => $sensitive,
             'resulting_row_version' => $result?->rowVersion,
             'source_revision_id' => $sourceRevisionId,
-            'actor_user_id' => $this->currentUser->currentUserId(),
+            'actor_type' => $actor['type'],
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
+            'actor_email' => $actor['email'],
             'reason' => $this->nullableReason($reason),
             'created_at' => $this->clock->now(),
         ];
@@ -61,7 +64,6 @@ final class ConfigurationRevisionService
     {
         return $this->scopeQuery($context)
             ->where('key', strtolower(trim($key)))
-            ->with('actor:id,first_name,last_name,email,platform_login_email')
             ->orderByDesc('id')
             ->paginate(min(max($perPage, 1), 100), ['*'], 'page', max($page, 1));
     }

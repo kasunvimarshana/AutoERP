@@ -160,13 +160,30 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         return $catalogueNames === $expectedNames;
     }
 
-    public function superAdminRoleIsReady(int $tenantId, bool $lockForUpdate = false): bool
+    public function protectedSuperAdminRoleId(int $tenantId, bool $lockForUpdate = false): ?int
+    {
+        $query = RoleModel::query()
+            ->where('tenant_id', $tenantId)
+            ->where('name', UserPermission::SUPER_ADMIN_ROLE)
+            ->where('guard_name', self::GUARD_NAME)
+            ->whereNull('deleted_at');
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $id = $query->value('id');
+
+        return is_numeric($id) && (int) $id > 0 ? (int) $id : null;
+    }
+
+    public function superAdminRoleIsReady(int $tenantId, int $roleId, bool $lockForUpdate = false): bool
     {
         $expectedNames = array_keys($this->permissionDefinitions->all());
         sort($expectedNames);
 
         $roleQuery = RoleModel::query()
             ->where('tenant_id', $tenantId)
+            ->whereKey($roleId)
             ->where('name', UserPermission::SUPER_ADMIN_ROLE)
             ->where('guard_name', self::GUARD_NAME)
             ->whereNull('deleted_at');
@@ -198,10 +215,10 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         return $assignedNames === $expectedNames;
     }
 
-    public function isReady(int $tenantId, bool $lockForUpdate = false): bool
+    public function isReady(int $tenantId, int $roleId, bool $lockForUpdate = false): bool
     {
         return $this->catalogueIsReady($tenantId, $lockForUpdate)
-            && $this->superAdminRoleIsReady($tenantId, $lockForUpdate);
+            && $this->superAdminRoleIsReady($tenantId, $roleId, $lockForUpdate);
     }
 
     public function permissionCount(int $tenantId): int
@@ -220,7 +237,7 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         int $superAdminRoleId,
         bool $lockForUpdate = false,
     ): bool {
-        if (! $this->isReady($tenantId, $lockForUpdate)) {
+        if (! $this->isReady($tenantId, $superAdminRoleId, $lockForUpdate)) {
             return false;
         }
 

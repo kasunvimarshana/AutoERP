@@ -46,7 +46,6 @@ final class TenantProfileController extends Controller
 
         if ($file instanceof UploadedFile) {
             $payload['logo_tmp_path'] = $file->getRealPath();
-            $payload['logo_original_name'] = $file->getClientOriginalName();
         }
 
         $result = $this->updateTenant->execute($this->tenantId(), $payload);

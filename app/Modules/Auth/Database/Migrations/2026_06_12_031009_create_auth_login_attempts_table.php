@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('auth_login_attempts', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
 

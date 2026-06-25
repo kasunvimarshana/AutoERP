@@ -43,7 +43,7 @@ export function PlatformTenantActivationPanel({ tenant, canActivate, disabled = 
             title: 'Activate tenant workspace',
             message: (
                 <div className="space-y-2">
-                    <p>Activate <strong>{tenant.name}</strong> and allow users to access its verified primary domain?</p>
+                    <p>Activate <strong>{tenant.name}</strong> using the routing mode confirmed by the backend?</p>
                     <p>The lifecycle reason recorded in the audit log is: “{reason.trim()}”.</p>
                 </div>
             ),
@@ -58,7 +58,7 @@ export function PlatformTenantActivationPanel({ tenant, canActivate, disabled = 
         try {
             const updated = await changeTenantStatus(tenant.id, 'activate', tenant.row_version, reason.trim());
             setReason('');
-            setSuccess(`${updated.name} is active and available on its verified primary domain.`);
+            setSuccess(`${updated.name} is active. Tenant routing is available through the backend-confirmed route.`);
             onChanged(updated);
         } catch (requestError: unknown) {
             const nextError = toApiError(requestError);
@@ -87,7 +87,7 @@ export function PlatformTenantActivationPanel({ tenant, canActivate, disabled = 
             {tenant.status === 'active' ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                     <p className="font-semibold">Tenant is active</p>
-                    <p className="mt-1">Users can access the workspace through {tenant.primary_domain?.domain ?? 'the verified primary domain'}.</p>
+                    <p className="mt-1">Users can access the workspace through {tenant.primary_domain?.domain ?? (readiness.data?.routing.mode === 'local_fallback' ? 'the configured local/testing route' : 'the backend-confirmed tenant route')}.</p>
                 </div>
             ) : tenant.status === 'archived' ? (
                 <p className="rounded-lg bg-slate-100 p-4 text-sm text-slate-600">Archived tenants cannot be activated or modified.</p>

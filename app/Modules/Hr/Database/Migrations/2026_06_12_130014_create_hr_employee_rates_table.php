@@ -43,7 +43,7 @@ return new class extends Migration
         $table->foreign('tenant_id', $constraintPrefix.'_tenant_fk')
             ->references('id')
             ->on('tenants')
-            ->cascadeOnDelete();
+            ->restrictOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
         $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
             ->references(['id', 'tenant_id'])

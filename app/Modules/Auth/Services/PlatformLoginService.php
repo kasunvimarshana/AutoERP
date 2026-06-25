@@ -9,6 +9,7 @@ use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\TokenIssueData;
+use Modules\Auth\Services\Mfa\PlatformMfaPolicy;
 use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
@@ -32,6 +33,7 @@ final class PlatformLoginService
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly PlatformPermissionCheckerInterface $platformPermissions,
         private readonly PlatformMfaService $mfa,
+        private readonly PlatformMfaPolicy $mfaPolicy,
         private readonly PlatformSessionService $sessions,
         private readonly TransactionManagerInterface $transactions,
         private readonly ClockInterface $clock,
@@ -96,9 +98,10 @@ final class PlatformLoginService
 
             $operatorId = (int) $operator->id();
             $mfaIsActive = $this->mfa->isActive($operatorId);
-            $mfaIsRequired = (bool) config('module-auth.platform_mfa.required', true);
+            $mfaEnrollmentRequired = $this->mfaPolicy->isEnrollmentRequired();
+            $mfaChallengeRequired = $this->mfaPolicy->shouldChallengeLogin($mfaIsActive);
 
-            if ($mfaIsRequired && ! $mfaIsActive) {
+            if ($mfaEnrollmentRequired && ! $mfaIsActive) {
                 return Result::failure(new Error(
                     AuthErrorCode::MFA_ENROLLMENT_REQUIRED,
                     'Multi-factor authentication enrollment is required before platform sign-in.',
@@ -106,7 +109,7 @@ final class PlatformLoginService
                 ));
             }
 
-            if ($mfaIsActive) {
+            if ($mfaChallengeRequired) {
                 if (($totpCode === null || trim($totpCode) === '')
                     && ($backupCode === null || trim($backupCode) === '')
                 ) {
@@ -134,7 +137,7 @@ final class PlatformLoginService
                 'application_id' => 'platform',
                 'authenticated_at' => $authenticatedAt,
             ];
-            if ($mfaIsActive) {
+            if ($mfaChallengeRequired) {
                 $metadata['mfa_verified_at'] = $authenticatedAt;
             }
 
@@ -184,7 +187,9 @@ final class PlatformLoginService
                 'permissions' => $this->platformPermissions->permissions($operatorId),
                 'enabled_modules' => null,
                 'is_platform_operator' => true,
-                'mfa_enabled' => $mfaIsActive,
+                'mfa_enabled' => $this->mfaPolicy->isEnabled(),
+                'mfa_enrolled' => $mfaIsActive,
+                'mfa_challenged' => $mfaChallengeRequired,
             ]);
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(

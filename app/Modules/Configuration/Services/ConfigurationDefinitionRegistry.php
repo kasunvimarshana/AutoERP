@@ -60,7 +60,13 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
 
     public function get(string $key): ConfigurationDefinition
     {
-        $key = strtolower(trim($key));
+        $key = trim($key);
+        if (preg_match('/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$/', $key) !== 1) {
+            throw ValidationException::withMessages([
+                'key' => ['Configuration keys must be canonical namespaced strings such as localization.timezone.'],
+            ]);
+        }
+
         $definition = $this->definitions()[$key] ?? null;
 
         return $definition instanceof ConfigurationDefinition

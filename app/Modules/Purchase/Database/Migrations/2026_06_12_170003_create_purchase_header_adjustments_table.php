@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_header_adjustments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('source_type');
             $table->unsignedBigInteger('source_id');

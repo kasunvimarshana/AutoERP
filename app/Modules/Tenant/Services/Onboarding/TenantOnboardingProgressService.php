@@ -25,6 +25,7 @@ final class TenantOnboardingProgressService
         private readonly TenantOnboardingStepModel $steps,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly TenantFoundationCompletionPolicy $completionPolicy,
     ) {}
 
     public function begin(int $tenantId, string $email, string $operationId, string $correlationId): TenantOnboardingStateModel
@@ -223,6 +224,16 @@ final class TenantOnboardingProgressService
     {
         return DB::transaction(function () use ($tenantId, $operationId): TenantOnboardingStateModel {
             $state = $this->lockOwnedState($tenantId, $operationId);
+            $completion = $this->completionPolicy->inspect($state, true);
+            if (! $completion['ready']) {
+                throw new TenantOnboardingOperationException(
+                    TenantOnboardingErrorCode::FOUNDATION_INCOMPLETE,
+                    'Tenant foundation cannot be finalized because one or more required resources are incomplete.',
+                    correlationId: (string) $state->getAttribute('correlation_id'),
+                    context: ['blockers' => $completion['blockers']],
+                );
+            }
+
             $state->forceFill([
                 'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
                 'operation_id' => null,
@@ -277,7 +288,7 @@ final class TenantOnboardingProgressService
             ])->save();
 
             $state->forceFill([
-                'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
+                'status' => TenantOnboardingStatus::PENDING,
                 'initial_admin_email' => strtolower(trim($email)),
                 'invitation_id' => (int) ($invitation['invitation_id'] ?? 0),
                 'failed_step' => null,
@@ -285,7 +296,16 @@ final class TenantOnboardingProgressService
                 'last_error_message' => null,
                 'row_version' => $expectedStateVersion + 1,
                 'updated_by' => $this->currentUser->currentUserId(),
-            ])->save();
+            ]);
+
+            $completion = $this->completionPolicy->inspect($state, true);
+            $state->setAttribute(
+                'status',
+                $completion['ready']
+                    ? TenantOnboardingStatus::AWAITING_ADMINISTRATOR
+                    : TenantOnboardingStatus::PENDING,
+            );
+            $state->save();
 
             return $state->fresh(['steps']) ?? $state;
         }, 3);
@@ -321,7 +341,7 @@ final class TenantOnboardingProgressService
                 ]);
 
             $state->forceFill([
-                'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
+                'status' => TenantOnboardingStatus::PENDING,
                 'initial_admin_email' => null,
                 'invitation_id' => null,
                 'failed_step' => null,

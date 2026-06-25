@@ -6,8 +6,8 @@ namespace Modules\Tenant\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Http\Requests\AssignTenantSubscriptionRequest;
 use Modules\Tenant\Http\Requests\CancelTenantSubscriptionRequest;
@@ -17,9 +17,8 @@ use Modules\Tenant\Http\Requests\ListTenantSubscriptionHistoryRequest;
 use Modules\Tenant\Http\Requests\RenewTenantSubscriptionRequest;
 use Modules\Tenant\Http\Resources\TenantSubscriptionResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionLifecycleService;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionQueryService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 
 final class TenantSubscriptionController extends Controller
@@ -27,18 +26,17 @@ final class TenantSubscriptionController extends Controller
     public function __construct(
         private readonly TenantSubscriptionLifecycleService $lifecycle,
         private readonly TenantSubscriptionReadinessService $readiness,
-        private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantSubscriptionRepositoryInterface $subscriptions,
-        private readonly TenantExecutionContextInterface $executionContext,
+        private readonly TenantSubscriptionQueryService $queries,
     ) {}
 
     public function current(int $tenant): JsonResponse|TenantSubscriptionResource
     {
-        $this->requireTenant($tenant);
-        $subscription = $this->executionContext->runForTenant(
-            $tenant,
-            fn () => $this->subscriptions->findCurrentByTenant($tenant),
-        );
+        $result = $this->queries->current($tenant);
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        $subscription = $result->valueOrFail();
 
         return $subscription === null
             ? response()->json(['data' => null])
@@ -47,15 +45,17 @@ final class TenantSubscriptionController extends Controller
 
     public function history(ListTenantSubscriptionHistoryRequest $request, int $tenant): JsonResponse
     {
-        $this->requireTenant($tenant);
-        $page = $this->executionContext->runForTenant(
+        $result = $this->queries->history(
             $tenant,
-            fn () => $this->subscriptions->pageHistory(
-                $tenant,
-                (int) ($request->validated('per_page') ?? config('tenant.pagination.default_per_page', 20)),
-                (int) ($request->validated('page') ?? 1),
-            ),
+            (int) ($request->validated('per_page') ?? config('tenant.pagination.default_per_page', 20)),
+            (int) ($request->validated('page') ?? 1),
         );
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        $page = $result->valueOrFail();
+        abort_unless($page instanceof PagedResult, 500, 'Unexpected tenant subscription history response.');
 
         return response()->json([
             'data' => TenantSubscriptionResource::collection($page->items)->resolve(),
@@ -95,14 +95,6 @@ final class TenantSubscriptionController extends Controller
         return $this->subscriptionResponse($this->lifecycle->cancel($tenant, $request->validated()));
     }
 
-    private function requireTenant(int $tenantId): void
-    {
-        if ($this->tenants->findById($tenantId) === null) {
-            throw (new \Illuminate\Database\Eloquent\ModelNotFoundException())
-                ->setModel(\Modules\Tenant\Models\TenantModel::class, [$tenantId]);
-        }
-    }
-
     private function subscriptionResponse(Result $result): JsonResponse|TenantSubscriptionResource
     {
         if ($result->isFailure()) {
@@ -114,5 +106,4 @@ final class TenantSubscriptionController extends Controller
 
         return new TenantSubscriptionResource($subscription);
     }
-
 }

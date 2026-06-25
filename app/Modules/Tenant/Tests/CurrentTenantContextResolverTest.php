@@ -89,7 +89,6 @@ final class CurrentTenantContextResolverTest extends TestCase
     {
         config()->set('tenant.resolution.central_hosts', []);
         config()->set('tenant.resolution.local_fallback_enabled', true);
-        config()->set('tenant.resolution.local_fallback_domain', null);
         config()->set('tenant.resolution.local_fallback_tenant_code', 'AUTOERP');
 
         $tenant = new DataRecord([
@@ -111,11 +110,7 @@ final class CurrentTenantContextResolverTest extends TestCase
         $tenants->expects(self::once())->method('findByCode')->with('AUTOERP')->willReturn($tenant);
 
         $domains = $this->createMock(TenantDomainRepositoryInterface::class);
-        $domains->expects(self::once())->method('findPrimaryByTenant')->with(10)->willReturn(new DataRecord([
-            'id' => 1,
-            'tenant_id' => 10,
-            'domain' => 'localhost',
-        ]));
+        $domains->expects(self::once())->method('findPrimaryByTenant')->with(10)->willReturn(null);
 
         $context = $this->resolver($tenants, $domains)->resolve(
             Request::create('http://localhost/api/v1/auth/login', 'POST'),

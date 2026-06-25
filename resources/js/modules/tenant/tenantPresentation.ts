@@ -5,37 +5,41 @@ import type {
 } from './tenantTypes';
 
 const READINESS_LABELS: Record<string, string> = {
-    onboarding_state: 'Foundation provisioning',
-    organization_structure: 'Root organization structure',
+    schema_compatible: 'Application database schema',
+    root_organization: 'Protected root organization',
     permission_catalogue: 'Permission catalogue',
-    super_admin_role: 'Super Admin access',
+    super_admin_access: 'Super Admin access',
     authentication_provider: 'Authentication provider',
-    initial_admin_invitation: 'Initial administrator invitation',
+    administrator_invitation_accepted: 'Administrator invitation accepted',
+    operational_administrator: 'Operational tenant administrator',
     base_currency: 'Base accounting currency',
-    verified_primary_domain: 'Verified primary domain',
-    subscription: 'Current subscription',
-    active_subscription: 'Active subscription period',
+    active_plan: 'Active plan revision',
+    subscription_valid: 'Current usable subscription',
+    primary_domain_ready: 'Tenant routing',
 };
 
 const READINESS_STEPS: Record<string, string> = {
-    onboarding_state: 'tenant-foundation-step',
-    organization_structure: 'tenant-foundation-step',
+    schema_compatible: 'tenant-activation-step',
+    schema_incompatible: 'tenant-activation-step',
+    root_organization: 'tenant-foundation-step',
     permission_catalogue: 'tenant-foundation-step',
-    super_admin_role: 'tenant-foundation-step',
+    super_admin_access: 'tenant-foundation-step',
     authentication_provider: 'tenant-foundation-step',
-    initial_admin_invitation: 'tenant-foundation-step',
+    administrator_invitation_accepted: 'tenant-foundation-step',
+    operational_administrator: 'tenant-foundation-step',
     base_currency: 'tenant-identity-step',
-    verified_primary_domain: 'tenant-domain-step',
-    subscription: 'tenant-subscription-step',
-    active_subscription: 'tenant-subscription-step',
+    active_plan: 'tenant-subscription-step',
+    subscription_valid: 'tenant-subscription-step',
+    subscription_data_invalid: 'tenant-subscription-step',
+    primary_domain_ready: 'tenant-domain-step',
 };
 
 export function readinessLabel(key: string): string {
-    return READINESS_LABELS[key] ?? humanize(key);
+    return READINESS_LABELS[key.toLowerCase()] ?? humanize(key);
 }
 
 export function readinessStepId(key: string): string | null {
-    return READINESS_STEPS[key] ?? null;
+    return READINESS_STEPS[key.toLowerCase()] ?? null;
 }
 
 export function firstReadinessStep(readiness: TenantOnboardingReadiness | null): string | null {

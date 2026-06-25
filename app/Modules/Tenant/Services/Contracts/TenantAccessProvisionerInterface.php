@@ -11,9 +11,11 @@ interface TenantAccessProvisionerInterface
 
     public function catalogueIsReady(int $tenantId, bool $lockForUpdate = false): bool;
 
-    public function superAdminRoleIsReady(int $tenantId, bool $lockForUpdate = false): bool;
+    public function protectedSuperAdminRoleId(int $tenantId, bool $lockForUpdate = false): ?int;
 
-    public function isReady(int $tenantId, bool $lockForUpdate = false): bool;
+    public function superAdminRoleIsReady(int $tenantId, int $roleId, bool $lockForUpdate = false): bool;
+
+    public function isReady(int $tenantId, int $roleId, bool $lockForUpdate = false): bool;
 
     public function permissionCount(int $tenantId): int;
 

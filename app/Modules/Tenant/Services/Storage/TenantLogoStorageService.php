@@ -23,7 +23,8 @@ final class TenantLogoStorageService
         private readonly LoggerInterface $logger,
     ) {}
 
-    public function store(int $tenantId, string $temporaryPath, string $originalFilename): string
+    /** @return array{object_key:string,mime_type:string,size_bytes:int} */
+    public function store(int $tenantId, string $temporaryPath): array
     {
         if ($temporaryPath === '' || ! is_file($temporaryPath) || ! is_readable($temporaryPath)) {
             throw new InvalidArgumentException('A valid tenant logo is required.');
@@ -65,30 +66,41 @@ final class TenantLogoStorageService
             $this->disk(),
         );
 
-        return $this->paths->canonicalize($tenantId, $path);
+        return [
+            'object_key' => $this->paths->objectKeyFromPath($tenantId, $path),
+            'mime_type' => $mimeType,
+            'size_bytes' => (int) $size,
+        ];
     }
 
-    public function scheduleCleanup(int $tenantId, ?string $path, string $reason): void
+    public function scheduleCleanup(int $tenantId, ?string $objectKey, string $reason): void
     {
-        if ($path === null || trim($path) === '') {
+        if ($objectKey === null || trim($objectKey) === '') {
             return;
         }
 
-        $this->cleanup->schedule($tenantId, $path, $reason);
+        $this->cleanup->schedule(
+            $tenantId,
+            $this->paths->resolveObjectKey($tenantId, $objectKey),
+            $reason,
+        );
     }
 
-    public function processCleanup(int $tenantId, ?string $path): void
+    public function processCleanup(int $tenantId, ?string $objectKey): void
     {
-        if ($path === null || trim($path) === '') {
+        if ($objectKey === null || trim($objectKey) === '') {
             return;
         }
 
         try {
-            $this->cleanup->processPath($tenantId, $path);
+            $this->cleanup->processPath(
+                $tenantId,
+                $this->paths->resolveObjectKey($tenantId, $objectKey),
+            );
         } catch (Throwable $exception) {
             $this->logger->warning('Immediate tenant logo cleanup attempt failed; durable cleanup remains queued.', [
                 'tenant_id' => $tenantId,
-                'storage_path' => $path,
+                'object_key' => $objectKey,
                 'exception' => $exception,
             ]);
         }

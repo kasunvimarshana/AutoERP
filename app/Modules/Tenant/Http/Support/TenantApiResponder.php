@@ -31,6 +31,7 @@ final class TenantApiResponder
             TenantErrorCode::DUPLICATE_CODE, TenantErrorCode::DUPLICATE_DOMAIN,
             TenantErrorCode::CONFLICT, TenantErrorCode::VERSION_CONFLICT => 409,
             TenantErrorCode::FILE_OPERATION_FAILED => 500,
+            TenantErrorCode::SUBSCRIPTION_DATA_UNAVAILABLE, TenantErrorCode::SCHEMA_INCOMPATIBLE => 503,
             default => 422,
         };
     }

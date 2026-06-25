@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_valuation_consumptions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('issue_movement_id');
             $table->foreignId('valuation_layer_id');

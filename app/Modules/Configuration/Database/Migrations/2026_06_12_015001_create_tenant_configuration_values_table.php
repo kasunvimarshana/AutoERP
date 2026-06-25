@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('tenant_configuration_values', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();

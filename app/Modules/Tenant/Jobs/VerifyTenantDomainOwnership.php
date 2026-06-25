@@ -12,7 +12,9 @@ use Illuminate\Queue\SerializesModels;
 use Modules\Tenant\Constants\TenantDomainOwnershipVerificationOutcome;
 use Modules\Tenant\Queue\TenantAwareJobInterface;
 use Modules\Tenant\Queue\TenantJobContext;
+use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Services\Domains\TenantDomainOwnershipVerificationService;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use RuntimeException;
 use Throwable;
 
@@ -35,6 +37,12 @@ final class VerifyTenantDomainOwnership implements ShouldQueue, TenantAwareJobIn
         public readonly ?int $requestedBy,
     ) {}
 
+    /** @return list<object> */
+    public function middleware(): array
+    {
+        return [app(RestoreTenantJobContext::class)];
+    }
+
     public function tenantJobContext(): TenantJobContext
     {
         return new TenantJobContext($this->tenantId);
@@ -50,10 +58,13 @@ final class VerifyTenantDomainOwnership implements ShouldQueue, TenantAwareJobIn
 
     public function failed(?Throwable $exception): void
     {
-        app(TenantDomainOwnershipVerificationService::class)->markFailed(
+        app(TenantExecutionContextInterface::class)->runForTenant(
             $this->tenantId,
-            $this->domainId,
-            $this->challengeHash,
+            fn (): mixed => app(TenantDomainOwnershipVerificationService::class)->markFailed(
+                $this->tenantId,
+                $this->domainId,
+                $this->challengeHash,
+            ),
         );
     }
 }

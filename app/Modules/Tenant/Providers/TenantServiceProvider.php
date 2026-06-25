@@ -7,7 +7,6 @@ namespace Modules\Tenant\Providers;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
-use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
@@ -45,6 +44,7 @@ use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Services\Contracts\TenantBrandingAssetReaderInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
@@ -59,6 +59,7 @@ use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Modules\Tenant\Services\Documents\Scanning\TrustedLocalTenantDocumentScanner;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
+use Modules\Tenant\Services\Storage\TenantBrandingAssetReader;
 use Modules\Tenant\Services\Subscriptions\TenantStorageLimitUsageContributor;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
@@ -73,6 +74,7 @@ final class TenantServiceProvider extends ServiceProvider
         $this->app->singleton(ConfigurationTargetPopulationInterface::class, TenantConfigurationTargetPopulation::class);
         $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
         $this->app->singleton(TenantValueNormalizerInterface::class, TenantValueNormalizer::class);
+        $this->app->singleton(TenantBrandingAssetReaderInterface::class, TenantBrandingAssetReader::class);
         $this->app->singleton(TenantDomainOwnershipVerifierInterface::class, DnsTenantDomainOwnershipVerifier::class);
         $this->app->singleton(TenantDocumentScannerInterface::class, function (): TenantDocumentScannerInterface {
             $driver = strtolower(trim((string) config('tenant.documents.scanner.driver', 'clamav')));
@@ -125,9 +127,6 @@ final class TenantServiceProvider extends ServiceProvider
     {
         $this->app->make(PermissionDefinitionRegistryInterface::class)
             ->register('tenant', TenantPermission::descriptions());
-        $this->app->make(ConfigurationDefinitionRegistryInterface::class)
-            ->register('Tenant', require __DIR__.'/../Config/configuration-definitions.php');
-
         $this->validateInfrastructureConfiguration();
         $this->validateDocumentDisk();
         $this->validateDocumentScanner();

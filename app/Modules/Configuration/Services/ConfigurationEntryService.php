@@ -753,14 +753,6 @@ final class ConfigurationEntryService
     ): ConfigurationRevisionView {
         $storedValue = $revision->getAttribute('stored_value');
         $storedValue = $storedValue === null ? null : (string) $storedValue;
-        $actor = $revision->relationLoaded('actor') ? $revision->getRelation('actor') : null;
-        $actorName = null;
-        if ($actor !== null) {
-            $actorName = trim((string) $actor->getAttribute('first_name').' '.(string) $actor->getAttribute('last_name'));
-            if ($actorName === '') {
-                $actorName = (string) ($actor->getAttribute('platform_login_email') ?? $actor->getAttribute('email'));
-            }
-        }
         $createdAt = $revision->getAttribute('created_at');
         $createdAt = $createdAt instanceof DateTimeInterface
             ? DateTimeImmutable::createFromInterface($createdAt)
@@ -786,8 +778,10 @@ final class ConfigurationEntryService
             sensitive: $definition->sensitive,
             resultingRowVersion: is_numeric($revision->getAttribute('resulting_row_version')) ? (int) $revision->getAttribute('resulting_row_version') : null,
             sourceRevisionId: is_numeric($revision->getAttribute('source_revision_id')) ? (int) $revision->getAttribute('source_revision_id') : null,
-            actorUserId: is_numeric($revision->getAttribute('actor_user_id')) ? (int) $revision->getAttribute('actor_user_id') : null,
-            actorName: $actorName,
+            actorType: (string) $revision->getAttribute('actor_type'),
+            actorId: is_numeric($revision->getAttribute('actor_id')) ? (int) $revision->getAttribute('actor_id') : null,
+            actorName: $revision->getAttribute('actor_name') !== null ? (string) $revision->getAttribute('actor_name') : null,
+            actorEmail: $revision->getAttribute('actor_email') !== null ? (string) $revision->getAttribute('actor_email') : null,
             reason: $revision->getAttribute('reason') !== null ? (string) $revision->getAttribute('reason') : null,
             createdAt: $createdAt,
         );

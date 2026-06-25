@@ -131,15 +131,6 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         if (! (bool) config('tenant.resolution.local_fallback_enabled', false) || ! app()->environment(['local', 'testing'])) {
             return null;
         }
-        $domainValue = trim((string) config('tenant.resolution.local_fallback_domain', ''));
-        if ($domainValue !== '') {
-            $domain = $this->domains->findByDomainFromControlPlane($domainValue);
-            $tenantId = $domain === null ? null : $this->positiveInt($domain->get('tenant_id'));
-            $tenant = $tenantId === null ? null : $this->findTenantById($tenantId);
-            if ($tenant !== null) {
-                return $this->context($tenant, $applicationId, 'local_fallback', $domainValue);
-            }
-        }
         $code = trim((string) config('tenant.resolution.local_fallback_tenant_code', ''));
         $tenant = $code === '' ? null : $this->findTenantByCode($code);
         return $tenant === null ? null : $this->context($tenant, $applicationId, 'local_fallback');

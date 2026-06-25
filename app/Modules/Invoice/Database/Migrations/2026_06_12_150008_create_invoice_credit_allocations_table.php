@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_credit_allocations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('credit_source_type');
             $table->unsignedBigInteger('credit_source_id');

@@ -25,8 +25,10 @@ describe('tenant presentation rules', () => {
     });
 
     it('maps readiness failures to meaningful setup steps', () => {
-        expect(readinessLabel('verified_primary_domain')).toBe('Verified primary domain');
-        expect(readinessStepId('verified_primary_domain')).toBe('tenant-domain-step');
-        expect(readinessStepId('subscription')).toBe('tenant-subscription-step');
+        expect(readinessLabel('PRIMARY_DOMAIN_READY')).toBe('Tenant routing');
+        expect(readinessStepId('PRIMARY_DOMAIN_READY')).toBe('tenant-domain-step');
+        expect(readinessStepId('SUBSCRIPTION_VALID')).toBe('tenant-subscription-step');
+        expect(readinessStepId('SUBSCRIPTION_DATA_INVALID')).toBe('tenant-subscription-step');
+        expect(readinessStepId('SCHEMA_INCOMPATIBLE')).toBe('tenant-activation-step');
     });
 });

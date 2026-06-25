@@ -416,6 +416,23 @@ function InfrastructureHealth({ health }: { health: PlatformHealthOverview['infr
                     guidance={health.administrator_invitation_url.ready ? 'Invitation links use the configured public Platform Administration origin.' : 'Configure a valid PLATFORM_PUBLIC_URL before sending invitations.'}
                 />
             </div>
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-950">Tenant isolation capabilities</h3>
+                <p className="mt-1 text-xs text-slate-600">These are explicit platform capabilities, not editable Laravel configuration keys.</p>
+                {health.capabilities ? (
+                    <>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                            <SmallMetric label="Database" value={health.capabilities.database.strategy} />
+                            <SmallMetric label="Storage" value={`${health.capabilities.storage.strategy} · ${health.capabilities.storage.isolation}`} />
+                            <SmallMetric label="Mail" value={health.capabilities.mail.strategy} />
+                            <SmallMetric label="Configuration precedence" value={health.capabilities.configuration.precedence.join(' → ')} />
+                        </div>
+                        <p className="mt-3 text-xs text-slate-600">Tenant-specific database, storage-provider, and mail-provider profiles are not supported by this release. Shared-schema isolation, private tenant object keys, and the platform mailer are authoritative.</p>
+                    </>
+                ) : (
+                    <p className="mt-3 text-sm text-amber-700">Capability data is unavailable. Deploy matching backend and frontend revisions before relying on this health result.</p>
+                )}
+            </div>
         </Panel>
     );
 }

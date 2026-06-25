@@ -17,7 +17,9 @@ return new class extends Migration
             $table->string('code', 50)->unique('tenants_code_uk');
             $table->string('name');
             $table->string('slug', 100)->unique('tenants_slug_uk');
-            $table->string('logo_path')->nullable();
+            $table->string('logo_object_key')->nullable();
+            $table->string('logo_mime_type', 100)->nullable();
+            $table->unsignedBigInteger('logo_size_bytes')->nullable();
             $table->foreignId('base_currency_id')->nullable()->constrained('currencies', 'id')->restrictOnDelete();
             $table->enum('status', ['draft', 'active', 'inactive', 'suspended', 'archived'])->default('draft');
             $table->string('status_reason', 500)->nullable();

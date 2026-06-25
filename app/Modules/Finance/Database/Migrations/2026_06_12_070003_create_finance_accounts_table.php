@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_accounts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_type_id');
             $table->foreignId('account_category_id')->nullable();

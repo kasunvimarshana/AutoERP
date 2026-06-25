@@ -285,7 +285,30 @@ export interface TenantOnboardingReadiness {
     tenant_id: number;
     onboarding_status: TenantOnboardingStatus | 'missing';
     checks: Record<string, boolean>;
-    blockers: Array<{ code: string; stage: string; message: string }>;
+    blockers: Array<{
+        code: string;
+        stage: string;
+        owner: string;
+        action: string;
+        message: string;
+        context?: Record<string, unknown>;
+    }>;
+    routing: {
+        ready: boolean;
+        mode: 'verified_domain' | 'local_fallback' | 'unavailable';
+        message: string;
+    };
+    schema: {
+        compatible: boolean;
+        missing_tables: string[];
+        missing_columns: Record<string, string[]>;
+    };
+    infrastructure: {
+        database: { strategy: string; tenant_specific_profiles_supported: boolean };
+        storage: { strategy: string; isolation: string; disk: string; tenant_specific_profiles_supported: boolean };
+        mail: { strategy: string; tenant_specific_profiles_supported: boolean };
+        configuration: { precedence: string[]; arbitrary_laravel_config_overrides_supported: boolean };
+    };
 }
 
 export interface TenantOnboardingProvisionResult {

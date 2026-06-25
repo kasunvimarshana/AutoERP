@@ -13,6 +13,8 @@ final class TenantOnboardingOperationException extends RuntimeException
         string $safeMessage,
         public readonly ?string $step = null,
         public readonly ?string $correlationId = null,
+        /** @var array<string, mixed> */
+        public readonly array $context = [],
     ) {
         parent::__construct($safeMessage);
     }

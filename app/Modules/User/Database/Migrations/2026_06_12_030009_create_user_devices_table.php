@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('user_devices', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
             $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 

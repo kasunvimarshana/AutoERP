@@ -191,8 +191,11 @@ final class RegistrationInvitationService
         return is_numeric($userId) && (int) $userId > 0 ? (int) $userId : null;
     }
 
-    public function hasPendingInitialAdministratorInvitation(int $tenantId, ?int $invitationId = null): bool
-    {
+    public function hasPendingInitialAdministratorInvitation(
+        int $tenantId,
+        ?int $invitationId = null,
+        bool $lockForUpdate = false,
+    ): bool {
         $query = $this->invitations->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('purpose', RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR)
@@ -201,19 +204,28 @@ final class RegistrationInvitationService
         if ($invitationId !== null) {
             $query->whereKey($invitationId);
         }
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
 
         return $query->exists();
     }
 
     /** @return array<string, mixed>|null */
-    public function initialAdministratorStatus(int $tenantId, ?int $invitationId = null): ?array
-    {
+    public function initialAdministratorStatus(
+        int $tenantId,
+        ?int $invitationId = null,
+        bool $lockForUpdate = false,
+    ): ?array {
         $query = $this->invitations->newQuery()
             ->with('latestDelivery')
             ->where('tenant_id', $tenantId)
             ->where('purpose', RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR);
         if ($invitationId !== null) {
             $query->whereKey($invitationId);
+        }
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
         }
 
         $invitation = $query->orderByDesc('id')->first();
@@ -227,6 +239,8 @@ final class RegistrationInvitationService
             'id' => (int) $invitation->getKey(),
             'public_id' => (string) $invitation->getAttribute('public_id'),
             'email' => (string) $invitation->getAttribute('email'),
+            'organization_unit_id' => (int) $invitation->getAttribute('organization_unit_id'),
+            'role_id' => (int) $invitation->getAttribute('role_id'),
             'status' => (string) $invitation->getAttribute('status'),
             'expires_at' => $invitation->getAttribute('expires_at')?->toAtomString(),
             'accepted_at' => $invitation->getAttribute('accepted_at')?->toAtomString(),

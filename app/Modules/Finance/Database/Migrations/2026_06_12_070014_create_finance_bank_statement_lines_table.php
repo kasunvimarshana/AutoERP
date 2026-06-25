@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_bank_statement_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('reconciliation_id');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('bank_account_id');
             $table->date('statement_date');
