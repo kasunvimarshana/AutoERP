@@ -10,10 +10,12 @@ use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\TokenIssueData;
 use Modules\Auth\Services\Mfa\PlatformMfaService;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\User\Repositories\UserRepositoryInterface;
@@ -30,6 +32,9 @@ final class PlatformLoginService
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly PlatformPermissionCheckerInterface $platformPermissions,
         private readonly PlatformMfaService $mfa,
+        private readonly PlatformSessionService $sessions,
+        private readonly TransactionManagerInterface $transactions,
+        private readonly ClockInterface $clock,
     ) {}
 
     public function login(
@@ -38,6 +43,8 @@ final class PlatformLoginService
         string $ipAddress,
         ?string $totpCode = null,
         ?string $backupCode = null,
+        ?string $userAgent = null,
+        ?string $deviceName = null,
     ): Result {
         return $this->executionContext->runAsControlPlane(
             fn (): Result => $this->loginAsPlatformOperator(
@@ -46,6 +53,8 @@ final class PlatformLoginService
                 $ipAddress,
                 $totpCode,
                 $backupCode,
+                $userAgent,
+                $deviceName,
             ),
         );
     }
@@ -56,6 +65,8 @@ final class PlatformLoginService
         string $ipAddress,
         ?string $totpCode,
         ?string $backupCode,
+        ?string $userAgent,
+        ?string $deviceName,
     ): Result {
         $email = strtolower(trim($email));
         $rateKey = 'platform-login:'.hash('sha256', $email.'|'.$ipAddress);
@@ -118,7 +129,7 @@ final class PlatformLoginService
             }
 
             $this->limiter->clear($rateKey);
-            $authenticatedAt = now()->getTimestamp();
+            $authenticatedAt = $this->clock->now()->getTimestamp();
             $metadata = [
                 'application_id' => 'platform',
                 'authenticated_at' => $authenticatedAt,
@@ -127,17 +138,36 @@ final class PlatformLoginService
                 $metadata['mfa_verified_at'] = $authenticatedAt;
             }
 
-            $tokenPair = $this->tokens->issue(TokenIssueData::fromArray([
-                'tenant_id' => null,
-                'organization_unit_id' => null,
-                'user_id' => $operatorId,
-                'token_scope' => AuthTokenScope::PLATFORM,
-                'grant_type' => 'platform_password',
-                'scopes' => ['platform'],
-                'access_token_ttl_seconds' => (int) config('module-auth.access_token_ttl_seconds', 3600),
-                'refresh_token_ttl_seconds' => (int) config('module-auth.refresh_token_ttl_seconds', 2592000),
-                'metadata' => $metadata,
-            ]));
+            $refreshTtl = (int) config('module-auth.refresh_token_ttl_seconds', 2592000);
+            $tokenPair = $this->transactions->runInTransaction(function () use (
+                $operatorId,
+                $ipAddress,
+                $userAgent,
+                $deviceName,
+                $refreshTtl,
+                $metadata,
+            ): array {
+                $session = $this->sessions->create(
+                    $operatorId,
+                    $ipAddress,
+                    $userAgent,
+                    $deviceName,
+                    $refreshTtl,
+                );
+
+                return $this->tokens->issue(TokenIssueData::fromArray([
+                    'tenant_id' => null,
+                    'organization_unit_id' => null,
+                    'platform_session_id' => (int) $session->getKey(),
+                    'user_id' => $operatorId,
+                    'token_scope' => AuthTokenScope::PLATFORM,
+                    'grant_type' => 'platform_password',
+                    'scopes' => ['platform'],
+                    'access_token_ttl_seconds' => (int) config('module-auth.access_token_ttl_seconds', 3600),
+                    'refresh_token_ttl_seconds' => $refreshTtl,
+                    'metadata' => $metadata,
+                ]));
+            });
 
             return Result::success([
                 'tokens' => $tokenPair,

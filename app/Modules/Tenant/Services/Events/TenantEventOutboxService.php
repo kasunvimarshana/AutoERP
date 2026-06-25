@@ -86,7 +86,8 @@ final class TenantEventOutboxService
                 ->update([
                     'status' => self::STATUS_PENDING,
                     'attempts' => 0,
-                    'last_error' => null,
+                    'last_error_code' => null,
+                    'last_error_message' => null,
                     'available_at' => $this->clock->now(),
                     'claim_token' => null,
                     'claimed_at' => null,
@@ -150,7 +151,8 @@ final class TenantEventOutboxService
                         'published_at' => $this->clock->now(),
                         'claim_token' => null,
                         'claimed_at' => null,
-                        'last_error' => null,
+                        'last_error_code' => null,
+                    'last_error_message' => null,
                         'updated_at' => $this->clock->now(),
                     ]);
                 if ($updated === 1) {
@@ -169,7 +171,8 @@ final class TenantEventOutboxService
                     ->update([
                         'status' => $dead ? self::STATUS_DEAD : self::STATUS_PENDING,
                         'attempts' => $attempts,
-                        'last_error' => mb_substr($exception->getMessage(), 0, 500),
+                        'last_error_code' => 'TENANT_EVENT_PUBLICATION_FAILED',
+                        'last_error_message' => 'The event could not be delivered to its registered consumers.',
                         'available_at' => $dead ? $this->clock->now() : $this->clock->now()->modify("+{$delayMinutes} minutes"),
                         'claim_token' => null,
                         'claimed_at' => null,

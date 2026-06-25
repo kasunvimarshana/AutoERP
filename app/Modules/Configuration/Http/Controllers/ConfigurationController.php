@@ -12,10 +12,13 @@ use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Configuration\Http\Requests\CreateConfigurationEntryRequest;
 use Modules\Configuration\Http\Requests\DeleteConfigurationEntryRequest;
 use Modules\Configuration\Http\Requests\ListConfigurationEntriesRequest;
+use Modules\Configuration\Http\Requests\ListConfigurationHistoryRequest;
+use Modules\Configuration\Http\Requests\RollbackConfigurationEntryRequest;
 use Modules\Configuration\Http\Requests\UpdateConfigurationEntryRequest;
 use Modules\Configuration\Http\Requests\ViewConfigurationRequest;
 use Modules\Configuration\Http\Resources\ConfigurationDefinitionResource;
 use Modules\Configuration\Http\Resources\ConfigurationEntryResource;
+use Modules\Configuration\Http\Resources\ConfigurationRevisionResource;
 use Modules\Configuration\Http\Resources\ResolvedConfigurationResource;
 use Modules\Configuration\Services\ConfigurationEntryService;
 
@@ -90,6 +93,42 @@ final class ConfigurationController extends Controller
             (int) $validated['expected_version'],
             $validated['value'],
         ));
+    }
+
+    public function history(ListConfigurationHistoryRequest $request, string $key): JsonResponse
+    {
+        $page = $this->entries->history(
+            $this->scope($request),
+            $key,
+            $request->page(),
+            $request->perPage(),
+        );
+
+        return response()->json([
+            'data' => ConfigurationRevisionResource::collection($page->items())->resolve($request),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => max(1, $page->lastPage()),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+            ],
+        ]);
+    }
+
+    public function rollback(RollbackConfigurationEntryRequest $request, string $key): JsonResponse|ConfigurationEntryResource
+    {
+        $validated = $request->validated();
+        $entry = $this->entries->rollback(
+            $this->scope($request),
+            $key,
+            (int) $validated['revision_id'],
+            (int) $validated['expected_version'],
+            (string) $validated['reason'],
+        );
+
+        return $entry === null
+            ? response()->json(['data' => null])
+            : new ConfigurationEntryResource($entry);
     }
 
     public function destroy(DeleteConfigurationEntryRequest $request, string $key): JsonResponse

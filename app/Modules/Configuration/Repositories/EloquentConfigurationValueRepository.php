@@ -17,11 +17,13 @@ use Modules\Configuration\Data\StoredConfigurationValue;
 use Modules\Configuration\Models\GlobalConfigurationValue;
 use Modules\Configuration\Models\OrganizationUnitConfigurationValue;
 use Modules\Configuration\Models\TenantConfigurationValue;
+use Modules\Core\Contracts\ClockInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class EloquentConfigurationValueRepository implements ConfigurationValueRepositoryInterface
 {
+    public function __construct(private readonly ClockInterface $clock) {}
     public function findExact(
         ConfigurationScopeContext $context,
         string $key,
@@ -73,6 +75,13 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
             ->all();
     }
 
+    public function countTenantOverrides(string $key): int
+    {
+        return TenantConfigurationValue::query()
+            ->where('key', strtolower(trim($key)))
+            ->count();
+    }
+
     public function create(
         ConfigurationScopeContext $context,
         array $attributes,
@@ -100,7 +109,7 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
             ->update([
                 ...$attributes,
                 'row_version' => $expectedVersion + 1,
-                'updated_at' => now(),
+                'updated_at' => $this->clock->now(),
             ]);
 
         if ($updated !== 1) {

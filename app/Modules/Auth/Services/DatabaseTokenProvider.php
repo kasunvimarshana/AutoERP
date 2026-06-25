@@ -8,6 +8,8 @@ use Illuminate\Support\Str;
 use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\TokenIssueData;
 use Modules\Auth\DTOs\TokenRefreshData;
+use Modules\Auth\Models\AuthPlatformSessionModel;
+use LogicException;
 use Modules\Auth\Repositories\AuthAccessTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthRefreshTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthSessionRepositoryInterface;
@@ -19,6 +21,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         private readonly AuthAccessTokenRepositoryInterface $accessTokens,
         private readonly AuthRefreshTokenRepositoryInterface $refreshTokens,
         private readonly AuthSessionRepositoryInterface $sessions,
+        private readonly AuthPlatformSessionModel $platformSessions,
         private readonly PasswordHasherInterface $passwordHasher,
     ) {}
 
@@ -27,6 +30,14 @@ final class DatabaseTokenProvider implements TokenProviderInterface
      */
     public function issue(TokenIssueData $data): array
     {
+        $isPlatform = $data->tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM;
+        if ($isPlatform !== ($data->platformSessionId !== null)) {
+            throw new LogicException('Platform tokens require a platform session and tenant tokens must not reference one.');
+        }
+        if ($isPlatform && ! $this->platformSessionUsable($data->platformSessionId, $data->userId, false)) {
+            throw new LogicException('Platform session is not active.');
+        }
+
         $accessKey = Str::random(48);
         $accessSecret = Str::random(72);
         $refreshKey = Str::random(48);
@@ -43,6 +54,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'client_id' => $data->clientId,
             'identity_id' => $data->identityId,
             'session_id' => $data->sessionId,
+            'platform_session_id' => $data->platformSessionId,
             'user_id' => $data->userId,
             'token_key' => $accessKey,
             'token_hash' => $this->passwordHasher->hash($accessSecret),
@@ -64,6 +76,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'client_id' => $data->clientId,
             'identity_id' => $data->identityId,
             'session_id' => $data->sessionId,
+            'platform_session_id' => $data->platformSessionId,
             'user_id' => $data->userId,
             'refresh_key' => $refreshKey,
             'refresh_hash' => $this->passwordHasher->hash($refreshSecret),
@@ -101,6 +114,15 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             $existing === null
             || (string) $existing->get('token_scope', '') !== $data->tokenScope
             || ! $this->tenantMatches($existing->get('tenant_id'), $data->tenantId, $data->tokenScope)
+        ) {
+            return null;
+        }
+        if (
+            $data->tokenScope === \Modules\Auth\Constants\AuthTokenScope::PLATFORM
+            && ! $this->platformSessionUsable(
+                is_numeric($existing->get('platform_session_id')) ? (int) $existing->get('platform_session_id') : null,
+                is_numeric($existing->get('user_id')) ? (int) $existing->get('user_id') : null,
+            )
         ) {
             return null;
         }
@@ -167,6 +189,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'client_id' => $existing->get('client_id'),
             'identity_id' => $existing->get('identity_id'),
             'session_id' => $existing->get('session_id'),
+            'platform_session_id' => $existing->get('platform_session_id'),
             'user_id' => $existing->get('user_id'),
             'token_scope' => $existing->get('token_scope', 'tenant'),
             'grant_type' => 'refresh_token',
@@ -193,6 +216,15 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
 
         if (! $this->passwordHasher->verify($tokenSecret, (string) $record->get('token_hash', ''))) {
+            return null;
+        }
+        if (
+            (string) $record->get('token_scope', '') === \Modules\Auth\Constants\AuthTokenScope::PLATFORM
+            && ! $this->platformSessionUsable(
+                is_numeric($record->get('platform_session_id')) ? (int) $record->get('platform_session_id') : null,
+                is_numeric($record->get('user_id')) ? (int) $record->get('user_id') : null,
+            )
+        ) {
             return null;
         }
 
@@ -283,6 +315,38 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
 
         return is_numeric($recordTenantId) && (int) $recordTenantId === $expectedTenantId;
+    }
+
+    private function platformSessionUsable(?int $sessionId, ?int $userId, bool $touch = true): bool
+    {
+        if ($sessionId === null || $sessionId < 1 || $userId === null || $userId < 1) {
+            return false;
+        }
+
+        $session = $this->platformSessions->newQuery()
+            ->whereKey($sessionId)
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->first();
+        if (! $session instanceof AuthPlatformSessionModel) {
+            return false;
+        }
+
+        $expiresAt = $session->getAttribute('expires_at');
+        if ($expiresAt !== null && now()->greaterThanOrEqualTo($expiresAt)) {
+            $session->forceFill([
+                'status' => 'expired',
+                'row_version' => ((int) $session->getAttribute('row_version')) + 1,
+            ])->save();
+
+            return false;
+        }
+
+        if ($touch) {
+            $session->forceFill(['last_activity_at' => now()])->save();
+        }
+
+        return true;
     }
 
     /** @return list<string> */

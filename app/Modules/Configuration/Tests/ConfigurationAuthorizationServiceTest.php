@@ -11,7 +11,7 @@ use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\Tenant\Constants\PlatformPermission;
+use Modules\User\Constants\PlatformPermission;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigurationAuthorizationServiceTest extends TestCase

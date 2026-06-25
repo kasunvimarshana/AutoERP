@@ -29,21 +29,22 @@ final class TenantPlanResource extends JsonResource
             'total_subscription_count',
             'current_subscription_count',
             'historical_subscription_count',
+            'current_revision',
             'latest_revision',
             'created_at',
             'updated_at',
         ]));
 
-        $latest = is_array($resource['latest_revision'] ?? null)
-            ? $resource['latest_revision']
+        $current = is_array($resource['current_revision'] ?? null)
+            ? $resource['current_revision']
             : null;
-        if ($latest !== null) {
-            $resource['features'] = $latest['features'] ?? null;
-            $resource['limits'] = $latest['limits'] ?? null;
-            $resource['price'] = $latest['price'] ?? null;
-            $resource['currency_id'] = $latest['currency_id'] ?? null;
-            $resource['currency'] = $latest['currency'] ?? null;
-            $resource['billing_interval'] = $latest['billing_interval'] ?? null;
+        if ($current !== null) {
+            $resource['features'] = $current['features'] ?? null;
+            $resource['limits'] = $current['limits'] ?? null;
+            $resource['price'] = $current['price'] ?? null;
+            $resource['currency_id'] = $current['currency_id'] ?? null;
+            $resource['currency'] = $current['currency'] ?? null;
+            $resource['billing_interval'] = $current['billing_interval'] ?? null;
         }
 
         return $resource;

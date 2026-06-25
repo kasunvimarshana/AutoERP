@@ -23,7 +23,6 @@ final class TenantResource extends JsonResource
             'code',
             'name',
             'slug',
-            'cross_org_transactions',
             'base_currency_id',
             'status',
             'status_reason',

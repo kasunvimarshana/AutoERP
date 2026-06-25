@@ -5,7 +5,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -24,10 +24,12 @@ import { PlatformTenantDomainsPanel } from './components/PlatformTenantDomainsPa
 import { PlatformTenantForm } from './components/PlatformTenantForm';
 import { PlatformTenantOnboardingPanel } from './components/PlatformTenantOnboardingPanel';
 import { PlatformTenantSubscriptionPanel } from './components/PlatformTenantSubscriptionPanel';
+import { TenantPlanLookupSelect } from './components/TenantPlanLookupSelect';
 import {
     changeTenantStatus,
     createPlatformTenant,
     getPlatformTenant,
+    getTenantPlan,
     listPlatformTenants,
     updatePlatformTenant,
 } from './tenantApi';
@@ -37,11 +39,17 @@ import {
     humanize,
 } from './tenantPresentation';
 import type { TenantRecord } from './tenantTypes';
+import { platformAuditHref } from '@/modules/platform-administration/platformAdministrationPresentation';
 
 type LifecycleAction = 'suspend' | 'deactivate' | 'archive';
 type FormMode = 'create' | 'edit' | null;
 
 const TENANT_STATUSES = ['draft', 'active', 'inactive', 'suspended', 'archived'] as const;
+const ONBOARDING_STATUSES = ['pending', 'provisioning', 'awaiting_administrator', 'awaiting_domain', 'ready', 'completed', 'failed'] as const;
+const DOMAIN_OPERATIONAL_STATUSES = ['pending', 'checking', 'ready', 'failed', 'disabled'] as const;
+const SUBSCRIPTION_STATES = ['assigned', 'cancelled', 'expired'] as const;
+const EXPIRY_WINDOWS = [7, 14, 30, 60, 90] as const;
+
 const ACTION_LABELS: Record<LifecycleAction, string> = {
     suspend: 'Suspend',
     deactivate: 'Deactivate',
@@ -56,11 +64,17 @@ export default function PlatformTenantsPage() {
     const canManageDomains = hasPermission(auth, PLATFORM_PERMISSION.tenantDomainsManage);
     const canManageSubscriptions = hasPermission(auth, PLATFORM_PERMISSION.tenantSubscriptionsManage);
     const canLifecycle = hasPermission(auth, PLATFORM_PERMISSION.tenantsLifecycle);
+    const canAudit = hasPermission(auth, PLATFORM_PERMISSION.auditView);
     const [searchParams, setSearchParams] = useSearchParams();
     const page = positiveInteger(searchParams.get('page')) ?? 1;
     const selectedId = positiveInteger(searchParams.get('tenant'));
     const search = searchParams.get('search') ?? '';
     const status = searchParams.get('status') ?? '';
+    const onboardingStatus = searchParams.get('onboarding_status') ?? '';
+    const domainOperationalStatus = searchParams.get('domain_operational_status') ?? '';
+    const subscriptionState = searchParams.get('subscription_state') ?? '';
+    const planId = positiveInteger(searchParams.get('plan_id'));
+    const expiresWithinDays = positiveInteger(searchParams.get('expires_within_days'));
     const debouncedSearch = useDebounce(search);
     const [formMode, setFormMode] = useState<FormMode>(null);
     const [formRevision, setFormRevision] = useState(0);
@@ -73,9 +87,25 @@ export default function PlatformTenantsPage() {
     const [busyAction, setBusyAction] = useState<LifecycleAction | null>(null);
 
     const tenants = useApi(
-        (signal) => listPlatformTenants({ page, per_page: 20, search: debouncedSearch || undefined, status: status || undefined }, signal),
-        [page, debouncedSearch, status],
+        (signal) => listPlatformTenants({
+            page,
+            per_page: 20,
+            search: debouncedSearch || undefined,
+            status: status || undefined,
+            onboarding_status: onboardingStatus || undefined,
+            domain_operational_status: domainOperationalStatus || undefined,
+            subscription_state: subscriptionState || undefined,
+            plan_id: planId ?? undefined,
+            expires_within_days: expiresWithinDays ?? undefined,
+        }, signal),
+        [page, debouncedSearch, status, onboardingStatus, domainOperationalStatus, subscriptionState, planId, expiresWithinDays],
         true,
+        false,
+    );
+    const selectedPlan = useApi(
+        (signal) => getTenantPlan(planId ?? 0, signal),
+        [planId],
+        planId !== null,
         false,
     );
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), [], true, false);
@@ -198,7 +228,7 @@ export default function PlatformTenantsPage() {
                 ) : null}
 
                 <Panel title="Tenant directory">
-                    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <Input
                             label="Search tenants"
                             value={search}
@@ -210,8 +240,60 @@ export default function PlatformTenantsPage() {
                             value={status}
                             onChange={(event) => updateQuery({ status: event.target.value, page: null })}
                             options={TENANT_STATUSES.map((value) => ({ value, label: humanize(value) }))}
-                            placeholder="All statuses"
+                            placeholder="All lifecycle statuses"
                         />
+                        <Select
+                            label="Foundation progress"
+                            value={onboardingStatus}
+                            onChange={(event) => updateQuery({ onboarding_status: event.target.value, page: null })}
+                            options={ONBOARDING_STATUSES.map((value) => ({ value, label: humanize(value) }))}
+                            placeholder="All foundation states"
+                        />
+                        <Select
+                            label="Primary domain health"
+                            value={domainOperationalStatus}
+                            onChange={(event) => updateQuery({ domain_operational_status: event.target.value, page: null })}
+                            options={DOMAIN_OPERATIONAL_STATUSES.map((value) => ({ value, label: humanize(value) }))}
+                            placeholder="All domain states"
+                        />
+                        <Select
+                            label="Subscription state"
+                            value={subscriptionState}
+                            onChange={(event) => updateQuery({ subscription_state: event.target.value, page: null })}
+                            options={SUBSCRIPTION_STATES.map((value) => ({ value, label: humanize(value) }))}
+                            placeholder="All subscription states"
+                        />
+                        <Select
+                            label="Subscription expiry"
+                            value={expiresWithinDays ? String(expiresWithinDays) : ''}
+                            onChange={(event) => updateQuery({ expires_within_days: event.target.value, page: null })}
+                            options={EXPIRY_WINDOWS.map((days) => ({ value: String(days), label: `Within ${days} days` }))}
+                            placeholder="Any expiry date"
+                        />
+                        <TenantPlanLookupSelect
+                            label="Current plan"
+                            value={selectedPlan.data ?? null}
+                            onChange={(plan) => updateQuery({ plan_id: plan ? String(plan.id) : null, page: null })}
+                            error={selectedPlan.error?.message}
+                        />
+                        <div className="flex items-end">
+                            <Button
+                                variant="ghost"
+                                disabled={!search && !status && !onboardingStatus && !domainOperationalStatus && !subscriptionState && planId === null && expiresWithinDays === null}
+                                onClick={() => updateQuery({
+                                    search: null,
+                                    status: null,
+                                    onboarding_status: null,
+                                    domain_operational_status: null,
+                                    subscription_state: null,
+                                    plan_id: null,
+                                    expires_within_days: null,
+                                    page: null,
+                                })}
+                            >
+                                Clear filters
+                            </Button>
+                        </div>
                     </div>
                     {tenants.loading && !tenants.data ? <LoadingState label="Loading tenants..." /> : null}
                     {tenants.loading && tenants.data ? <p className="mb-3 text-sm text-slate-500">Refreshing tenant directory...</p> : null}
@@ -236,6 +318,7 @@ export default function PlatformTenantsPage() {
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Button variant="ghost" onClick={() => updateQuery({ tenant: null })}>Close details</Button>
+                                    {canAudit ? <LinkButton variant="secondary" to={platformAuditHref({ tenant_id: selected.id, subject_type: 'tenant', subject_id: selected.id })}>View audit history</LinkButton> : null}
                                     {canUpdate && selected.status !== 'archived' ? <Button variant="secondary" disabled={allMutationsDisabled} onClick={() => { setFormMode('edit'); setFormError(null); focusTenantStep('tenant-identity-step'); }}>Edit identity</Button> : null}
                                 </div>
                             </div>
@@ -255,7 +338,6 @@ export default function PlatformTenantsPage() {
                                     <Detail label="Tenant code" value={selected.code} />
                                     <Detail label="URL slug" value={selected.slug} />
                                     <Detail label="Base currency" value={selected.base_currency ? `${selected.base_currency.code} — ${selected.base_currency.name}` : 'Required before activation'} warning={!selected.base_currency} />
-                                    <Detail label="Cross-unit transactions" value={selected.cross_org_transactions ? 'Allowed with authorization' : 'Not allowed'} />
                                     <Detail label="Tenant logo" value={selected.has_logo ? 'Configured' : 'Not configured'} />
                                     <Detail label="Last updated" value={formatTenantDateTime(selected.updated_at)} />
                                 </dl>
@@ -263,8 +345,8 @@ export default function PlatformTenantsPage() {
                         </Panel>
 
                         <Panel><PlatformTenantOnboardingPanel key={`onboarding-${selected.id}`} tenant={selected} canProvision={canOnboard} disabled={allMutationsDisabled} onTenantChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantDomainsPanel key={`domains-${selected.id}`} tenant={selected} canManage={canManageDomains} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}`} tenant={selected} canManage={canManageSubscriptions} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
+                        <Panel><PlatformTenantDomainsPanel key={`domains-${selected.id}`} tenant={selected} canManage={canManageDomains} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
+                        <Panel><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}`} tenant={selected} canManage={canManageSubscriptions} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
                         <Panel><PlatformTenantActivationPanel key={`activation-${selected.id}`} tenant={selected} canActivate={canLifecycle} disabled={allMutationsDisabled} onChanged={(updated) => { selectedTenant.setData(updated); tenants.reload(); }} /></Panel>
 
                         {canLifecycle && selected.status !== 'archived' ? (
@@ -330,8 +412,8 @@ function TenantDirectoryCard({ tenant, selected, onSelect }: { tenant: TenantRec
             </div>
             <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
                 <span>Foundation: <strong>{humanize(onboarding)}</strong></span>
-                <span>Plan: <strong>{subscription?.revision.plan?.name ?? 'Not assigned'}</strong></span>
-                <span>Period: <strong>{subscription?.ends_at ? `Ends ${formatTenantDateTime(subscription.ends_at)}` : subscription ? humanize(subscription.status) : 'Required'}</strong></span>
+                <span>Plan: <strong>{subscription?.plan_name ?? subscription?.revision?.plan?.name ?? 'Not assigned'}</strong></span>
+                <span>Period: <strong>{subscription?.ends_at ? `Ends ${formatTenantDateTime(subscription.ends_at)}` : subscription ? humanize(subscription.effective_status) : 'Required'}</strong></span>
             </div>
         </button>
     );

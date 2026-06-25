@@ -1,4 +1,4 @@
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
@@ -7,13 +7,15 @@ import { useApi } from '@/shared/hooks/useApi';
 import { listTenantPlanRevisions } from '../tenantApi';
 import { formatLimitLabel, formatPlanMoney, formatTenantDateTime, humanize } from '../tenantPresentation';
 import type { TenantPlan } from '../tenantTypes';
+import { platformAuditHref } from '@/modules/platform-administration/platformAdministrationPresentation';
 
 interface Props {
     plan: TenantPlan | null;
+    canAudit: boolean;
     onClose: () => void;
 }
 
-export function TenantPlanRevisionHistory({ plan, onClose }: Props) {
+export function TenantPlanRevisionHistory({ plan, canAudit, onClose }: Props) {
     const revisions = useApi(
         (signal) => listTenantPlanRevisions(plan?.id ?? 0, signal),
         [plan?.id],
@@ -40,6 +42,10 @@ export function TenantPlanRevisionHistory({ plan, onClose }: Props) {
                             </div>
                         </div>
                         <p className="mt-3 text-sm font-medium text-slate-900">{formatPlanMoney(revision)}</p>
+                        <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Revision reason</p>
+                            <p className="mt-1">{revision.change_note}</p>
+                        </div>
                         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Enabled modules</p>
@@ -55,7 +61,10 @@ export function TenantPlanRevisionHistory({ plan, onClose }: Props) {
                     </article>
                 ))}
                 {(revisions.data ?? []).length === 0 && !revisions.loading ? <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">This plan has no revisions.</p> : null}
-                <div className="flex justify-end"><Button variant="secondary" onClick={onClose}>Close</Button></div>
+                <div className="flex flex-wrap justify-end gap-2">
+                    {plan && canAudit ? <LinkButton variant="secondary" to={platformAuditHref({ source_module: 'tenant', subject_type: 'tenant_plan', subject_id: plan.id })}>View plan audit history</LinkButton> : null}
+                    <Button variant="secondary" onClick={onClose}>Close</Button>
+                </div>
             </div>
         </Modal>
     );

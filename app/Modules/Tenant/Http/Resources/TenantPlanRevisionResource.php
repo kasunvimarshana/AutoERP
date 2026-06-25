@@ -28,6 +28,7 @@ final class TenantPlanRevisionResource extends JsonResource
             'currency',
             'billing_interval',
             'effective_at',
+            'change_note',
             'plan',
             'total_subscription_count',
             'current_subscription_count',

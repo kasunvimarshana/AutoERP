@@ -43,6 +43,8 @@ final class PlatformAuthController extends Controller
             (string) $request->ip(),
             is_string($request->validated('totp_code')) ? $request->validated('totp_code') : null,
             is_string($request->validated('backup_code')) ? $request->validated('backup_code') : null,
+            $request->userAgent(),
+            is_string($request->validated('device_name')) ? $request->validated('device_name') : null,
         );
 
         return $this->respondWithRefreshCookie($result);

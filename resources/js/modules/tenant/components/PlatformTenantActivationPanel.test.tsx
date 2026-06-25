@@ -17,7 +17,6 @@ const tenant: TenantRecord = {
     name: 'Acme',
     slug: 'acme',
     has_logo: false,
-    cross_org_transactions: false,
     base_currency_id: 1,
     status: 'draft',
     status_reason: null,
@@ -39,8 +38,8 @@ const blocked: TenantOnboardingReadiness = {
     onboarding_status: 'pending',
     checks: { base_currency: true, verified_primary_domain: false, subscription: false },
     blockers: [
-        { code: 'verified_primary_domain', message: 'Verify a primary domain.' },
-        { code: 'subscription', message: 'Assign a subscription.' },
+        { code: 'verified_primary_domain', stage: 'domain', message: 'Verify a primary domain.' },
+        { code: 'subscription', stage: 'subscription', message: 'Assign a subscription.' },
     ],
 };
 

@@ -34,7 +34,7 @@ final class TenantPlanSchemaTest extends TestCase
     {
         self::assertSame([], array_values(array_intersect(
             TenantPlanSchema::ALWAYS_ON_MODULES,
-            TenantPlanSchema::SUPPORTED_MODULES,
+            array_keys(TenantPlanSchema::SUPPORTED_MODULES),
         )));
     }
 

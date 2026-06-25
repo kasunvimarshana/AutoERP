@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
+use Modules\Core\Contracts\ClockInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
 
@@ -15,13 +17,31 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
     public function __construct(
         private readonly TenantPlanModel $plans,
         private readonly TenantPlanRevisionModel $revisions,
+        private readonly ClockInterface $clock,
     ) {}
 
-    public function findById(int|string $id): ?DataRecord
+    public function findById(int|string $id, bool $lockForUpdate = false): ?DataRecord
     {
-        $model = $this->revisions->newQuery()
-            ->with(['plan:id,name,slug,is_active', 'currency:id,code,name,symbol,is_active'])
-            ->find($id);
+        $query = $this->revisions->newQuery()
+            ->with([
+                'plan' => function ($query) use ($lockForUpdate): void {
+                    $query->select(['id', 'name', 'slug', 'is_active']);
+                    if ($lockForUpdate) {
+                        $query->lockForUpdate();
+                    }
+                },
+                'currency' => function ($query) use ($lockForUpdate): void {
+                    $query->select(['id', 'code', 'name', 'symbol', 'is_active']);
+                    if ($lockForUpdate) {
+                        $query->lockForUpdate();
+                    }
+                },
+            ])
+            ->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $model = $query->first();
 
         return $model instanceof TenantPlanRevisionModel ? $this->record($model) : null;
     }
@@ -44,9 +64,11 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
             ->withCount([
                 'subscriptions as total_subscription_count',
                 'subscriptions as current_subscription_count' => fn (Builder $query) => $query
-                    ->whereHas('currentAssignment'),
+                    ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
+                        ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
                 'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
-                    ->whereDoesntHave('currentAssignment'),
+                    ->whereDoesntHave('currentAssignment', fn (Builder $assignment) => $assignment
+                        ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
             ])
             ->where('tenant_plan_id', $planId)
             ->orderByDesc('revision_number')
@@ -70,7 +92,7 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
             ...$attributes,
             'tenant_plan_id' => (int) $planId,
             'revision_number' => $lastNumber + 1,
-            'created_at' => now(),
+            'created_at' => $attributes['created_at'] ?? $this->clock->now(),
         ]);
 
         return $this->findById($model->getKey())

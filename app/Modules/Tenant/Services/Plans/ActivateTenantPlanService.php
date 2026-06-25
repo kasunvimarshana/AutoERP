@@ -30,28 +30,25 @@ final class ActivateTenantPlanService
     public function execute(int|string $id, int $expectedVersion): Result
     {
         try {
-            $existing = $this->plans->findById($id);
-            if ($existing === null) {
-                return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.'));
-            }
-            if ((int) $existing->require('row_version') !== $expectedVersion) {
-                return Result::failure(new Error(
-                    TenantErrorCode::VERSION_CONFLICT,
-                    'Tenant plan changed since it was loaded. Refresh and try again.',
-                ));
-            }
-            if ((bool) $existing->get('is_active')) {
-                return Result::success($existing);
-            }
+            /** @var array{status:string,record?:DataRecord} $outcome */
+            $outcome = $this->transactions->runInTransaction(function () use ($id, $expectedVersion): array {
+                $existing = $this->plans->findById($id, true);
+                if ($existing === null) {
+                    return ['status' => 'not_found'];
+                }
+                if ((int) $existing->require('row_version') !== $expectedVersion) {
+                    return ['status' => 'version_conflict'];
+                }
+                if ((bool) $existing->get('is_active')) {
+                    return ['status' => 'success', 'record' => $existing];
+                }
 
-            /** @var DataRecord|null $updated */
-            $updated = $this->transactions->runInTransaction(function () use ($id, $expectedVersion, $existing): ?DataRecord {
                 $updated = $this->plans->updateWithVersion($id, $expectedVersion, [
                     'is_active' => true,
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
                 if ($updated === null) {
-                    return null;
+                    return ['status' => 'version_conflict'];
                 }
 
                 $this->audit->recordPlatform(new AuditEventData(
@@ -62,21 +59,23 @@ final class ActivateTenantPlanService
                     subjectId: (string) $updated->id(),
                     subjectReference: (string) $updated->get('slug'),
                     changes: [
-                        'old' => ['is_active' => (bool) $existing->get('is_active')],
+                        'old' => ['is_active' => false],
                         'new' => ['is_active' => true],
                     ],
                     tags: ['tenant', 'plan', 'platform'],
                 ));
 
-                return $updated;
+                return ['status' => 'success', 'record' => $updated];
             });
 
-            return $updated === null
-                ? Result::failure(new Error(
+            return match ($outcome['status']) {
+                'success' => Result::success($outcome['record']),
+                'not_found' => Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.')),
+                default => Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
                     'Tenant plan changed since it was loaded. Refresh and try again.',
-                ))
-                : Result::success($updated);
+                )),
+            };
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(
                 $exception,

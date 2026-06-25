@@ -35,10 +35,12 @@ final class TenantSubscriptionReadinessService
      *   blockers:list<array{code:string,message:string,context:array<string,mixed>}>
      * }
      */
-    public function inspect(int $tenantId, int $planRevisionId): array
+    public function inspect(int $tenantId, int $planRevisionId, bool $lockForUpdate = false): array
     {
-        $tenant = $this->tenants->findById($tenantId);
-        $revision = $this->revisions->findById($planRevisionId);
+        $tenant = $lockForUpdate
+            ? $this->tenants->lockById($tenantId)
+            : $this->tenants->findById($tenantId);
+        $revision = $this->revisions->findById($planRevisionId, $lockForUpdate);
         $blockers = [];
 
         if ($tenant === null) {
@@ -87,12 +89,11 @@ final class TenantSubscriptionReadinessService
             ? null
             : $this->executionContext->runForTenant(
                 $tenantId,
-                fn () => $this->subscriptions->findCurrentByTenant($tenantId),
+                fn () => $this->subscriptions->findCurrentByTenant($tenantId, $lockForUpdate),
             );
-        $currentRevision = is_array($current?->get('revision')) ? $current?->get('revision') : null;
-        $currentModules = is_array($currentRevision)
-            ? $this->schema->normalizeFeatures($currentRevision['features'] ?? null)['enabled_modules']
-            : [];
+        $currentModules = $current === null
+            ? []
+            : $this->schema->normalizeFeatures($current->get('plan_features'))['enabled_modules'];
         $removedModules = array_values(array_diff($currentModules, $newModules));
         sort($removedModules);
 

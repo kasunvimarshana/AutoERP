@@ -8,6 +8,7 @@ final class TenantOnboardingStatus
 {
     public const PENDING = 'pending';
     public const PROVISIONING = 'provisioning';
+    public const AWAITING_ADMINISTRATOR = 'awaiting_administrator';
     public const AWAITING_DOMAIN = 'awaiting_domain';
     public const READY = 'ready';
     public const COMPLETED = 'completed';
@@ -19,6 +20,7 @@ final class TenantOnboardingStatus
         return [
             self::PENDING,
             self::PROVISIONING,
+            self::AWAITING_ADMINISTRATOR,
             self::AWAITING_DOMAIN,
             self::READY,
             self::COMPLETED,

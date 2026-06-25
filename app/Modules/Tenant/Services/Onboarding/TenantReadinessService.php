@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Onboarding;
 
-use DateTimeImmutable;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
+use Modules\Tenant\Constants\TenantReadinessCheck;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 
 final class TenantReadinessService
 {
@@ -25,6 +28,8 @@ final class TenantReadinessService
         private readonly TenantOrganizationProvisionerInterface $organizations,
         private readonly TenantAccessProvisionerInterface $access,
         private readonly TenantAuthenticationProvisionerInterface $authentication,
+        private readonly TenantBaseCurrencyReadinessInterface $baseCurrencies,
+        private readonly TenantSubscriptionPolicy $subscriptionPolicy,
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
@@ -34,103 +39,179 @@ final class TenantReadinessService
      *   tenant_id:int,
      *   onboarding_status:string,
      *   checks:array<string,bool>,
-     *   blockers:list<array{code:string,message:string}>
+     *   blockers:list<array{code:string,stage:string,message:string}>
      * }
      */
-    public function inspect(int $tenantId): array
+    public function inspect(int $tenantId, bool $lockForUpdate = false): array
     {
-        $tenant = $this->tenants->findById($tenantId);
+        $tenant = $lockForUpdate
+            ? $this->tenants->lockById($tenantId)
+            : $this->tenants->findById($tenantId);
         if ($tenant === null) {
             return [
                 'ready' => false,
                 'tenant_id' => $tenantId,
                 'onboarding_status' => 'missing',
                 'checks' => [],
-                'blockers' => [['code' => 'TENANT_NOT_FOUND', 'message' => 'Tenant was not found.']],
+                'blockers' => [[
+                    'code' => 'TENANT_NOT_FOUND',
+                    'stage' => 'identity',
+                    'message' => 'Tenant was not found.',
+                ]],
             ];
         }
 
-        return $this->executionContext->runForTenant($tenantId, function () use ($tenant, $tenantId): array {
-            $state = $this->states->newQuery()->where('tenant_id', $tenantId)->first();
-            $subscription = $this->subscriptions->findCurrentByTenant($tenantId);
-            $revision = is_array($subscription?->get('revision')) ? $subscription?->get('revision') : null;
+        return $this->executionContext->runForTenant($tenantId, function () use (
+            $tenant,
+            $tenantId,
+            $lockForUpdate,
+        ): array {
+            $stateQuery = $this->states->newQuery()->where('tenant_id', $tenantId);
+            if ($lockForUpdate) {
+                $stateQuery->lockForUpdate();
+            }
+            $state = $stateQuery->first();
+
+            $subscription = $this->subscriptions->findCurrentByTenant($tenantId, $lockForUpdate);
+            $subscriptionPayload = $subscription?->toArray();
+            $revision = is_array($subscriptionPayload['revision'] ?? null)
+                ? $subscriptionPayload['revision']
+                : null;
             $plan = is_array($revision['plan'] ?? null) ? $revision['plan'] : null;
-            $primaryDomain = $this->domains->findPrimaryByTenant($tenantId);
+            $primaryDomain = $this->domains->findPrimaryByTenant($tenantId, $lockForUpdate);
+
+            $rootOrganizationUnitId = $this->positiveInt($state?->getAttribute('root_organization_unit_id'));
+            $superAdminRoleId = $this->positiveInt($state?->getAttribute('super_admin_role_id'));
+            $invitationId = $this->positiveInt($state?->getAttribute('invitation_id'));
+            $acceptedAdministratorId = $this->authentication->acceptedInitialAdministratorUserId(
+                $tenantId,
+                $invitationId,
+                $lockForUpdate,
+            );
+
+            $rootReady = $rootOrganizationUnitId !== null
+                && $this->organizations->isReady($tenantId, $lockForUpdate);
+            $catalogueReady = $this->access->catalogueIsReady($tenantId, $lockForUpdate);
+            $superAdminReady = $superAdminRoleId !== null
+                && $this->access->superAdminRoleIsReady($tenantId, $lockForUpdate);
+            $providerReady = $this->authentication->providerIsReady($tenantId, $lockForUpdate);
+            $invitationAccepted = $acceptedAdministratorId !== null;
+            $operationalAdministrator = $acceptedAdministratorId !== null
+                && $rootOrganizationUnitId !== null
+                && $superAdminRoleId !== null
+                && $this->access->hasOperationalAdministrator(
+                    $tenantId,
+                    $acceptedAdministratorId,
+                    $rootOrganizationUnitId,
+                    $superAdminRoleId,
+                    $lockForUpdate,
+                );
 
             $checks = [
-                'organization_structure' => $this->organizations->isReady($tenantId),
-                'access_catalogue' => $this->access->isReady($tenantId),
-                'authentication' => $this->authentication->isReady($tenantId),
-                'base_currency' => is_numeric($tenant->get('base_currency_id')),
-                'active_plan' => $plan !== null && (bool) ($plan['is_active'] ?? false),
-                'subscription_valid' => $this->subscriptionIsValid($subscription?->toArray()),
-                'verified_primary_domain' => $primaryDomain !== null,
+                TenantReadinessCheck::ROOT_ORGANIZATION => $rootReady,
+                TenantReadinessCheck::PERMISSION_CATALOGUE => $catalogueReady,
+                TenantReadinessCheck::SUPER_ADMIN_ACCESS => $superAdminReady,
+                TenantReadinessCheck::AUTHENTICATION_PROVIDER => $providerReady,
+                TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => $invitationAccepted,
+                TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => $operationalAdministrator,
+                TenantReadinessCheck::BASE_CURRENCY => $this->baseCurrencies->isActive(
+                    $this->positiveInt($tenant->get('base_currency_id')),
+                    $lockForUpdate,
+                ),
+                TenantReadinessCheck::ACTIVE_PLAN => $plan !== null && (bool) ($plan['is_active'] ?? false),
+                TenantReadinessCheck::SUBSCRIPTION_VALID => $this->subscriptionPolicy->isUsable($subscriptionPayload),
+                TenantReadinessCheck::PRIMARY_DOMAIN_READY => $primaryDomain !== null
+                    && $primaryDomain->get('operational_status') === TenantDomainOperationalStatus::READY,
             ];
 
-            $messages = [
-                'organization_structure' => 'Create the tenant root organization unit.',
-                'access_catalogue' => 'Provision the permission catalogue and Super Admin role.',
-                'authentication' => 'Provision an authentication provider and initial administrator invitation.',
-                'base_currency' => 'Select an active base accounting currency.',
-                'active_plan' => 'Assign a revision from an active subscription plan.',
-                'subscription_valid' => 'Assign an unexpired current subscription.',
-                'verified_primary_domain' => 'Verify and select a primary tenant domain.',
-            ];
-
-            $blockers = [];
-            foreach ($checks as $code => $passed) {
-                if (! $passed) {
-                    $blockers[] = ['code' => strtoupper($code), 'message' => $messages[$code]];
-                }
-            }
-
-            $status = (string) ($state?->getAttribute('status') ?? TenantOnboardingStatus::PENDING);
-            if ($blockers === [] && $status !== TenantOnboardingStatus::COMPLETED) {
-                $status = TenantOnboardingStatus::READY;
-            }
+            $blockers = $this->blockers($checks);
 
             return [
                 'ready' => $blockers === [],
                 'tenant_id' => $tenantId,
-                'onboarding_status' => $status,
+                'onboarding_status' => $this->resolveStatus($state, $checks, $blockers === []),
                 'checks' => $checks,
                 'blockers' => $blockers,
             ];
         });
     }
 
-    /** @param array<string, mixed>|null $subscription */
-    private function subscriptionIsValid(?array $subscription): bool
+    /**
+     * @param array<string, bool> $checks
+     * @return list<array{code:string,stage:string,message:string}>
+     */
+    private function blockers(array $checks): array
     {
-        if ($subscription === null) {
-            return false;
+        $messages = TenantReadinessCheck::messages();
+        $blockers = [];
+
+        foreach ($checks as $code => $passed) {
+            if ($passed) {
+                continue;
+            }
+
+            $blockers[] = [
+                'code' => strtoupper($code),
+                'stage' => $this->stage($code),
+                'message' => $messages[$code] ?? 'Complete the required tenant readiness step.',
+            ];
         }
 
-        $now = new DateTimeImmutable('now');
-        $startsAt = $this->dateTime($subscription['starts_at'] ?? null);
-        if ($startsAt === null || $startsAt > $now) {
-            return false;
-        }
-
-        $status = strtolower(trim((string) ($subscription['status'] ?? '')));
-        if ($status === 'trial') {
-            $trialEndsAt = $this->dateTime($subscription['trial_ends_at'] ?? null);
-
-            return $trialEndsAt !== null && $trialEndsAt > $now;
-        }
-        if ($status !== 'active') {
-            return false;
-        }
-
-        $endsAt = $this->dateTime($subscription['ends_at'] ?? null);
-
-        return $endsAt === null || $endsAt > $now;
+        return $blockers;
     }
 
-    private function dateTime(mixed $value): ?DateTimeImmutable
+    /** @param array<string, bool> $checks */
+    private function resolveStatus(?TenantOnboardingStateModel $state, array $checks, bool $ready): string
     {
-        return $value === null || trim((string) $value) === ''
-            ? null
-            : new DateTimeImmutable((string) $value);
+        if ($ready) {
+            return $state?->getAttribute('status') === TenantOnboardingStatus::COMPLETED
+                ? TenantOnboardingStatus::COMPLETED
+                : TenantOnboardingStatus::READY;
+        }
+
+        if (
+            ($checks[TenantReadinessCheck::ROOT_ORGANIZATION] ?? false)
+            && ($checks[TenantReadinessCheck::PERMISSION_CATALOGUE] ?? false)
+            && ($checks[TenantReadinessCheck::SUPER_ADMIN_ACCESS] ?? false)
+            && ($checks[TenantReadinessCheck::AUTHENTICATION_PROVIDER] ?? false)
+            && ! ($checks[TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED] ?? false)
+        ) {
+            return TenantOnboardingStatus::AWAITING_ADMINISTRATOR;
+        }
+
+        if (
+            ($checks[TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR] ?? false)
+            && ! ($checks[TenantReadinessCheck::PRIMARY_DOMAIN_READY] ?? false)
+        ) {
+            return TenantOnboardingStatus::AWAITING_DOMAIN;
+        }
+
+        $stored = (string) ($state?->getAttribute('status') ?? TenantOnboardingStatus::PENDING);
+
+        return in_array($stored, [TenantOnboardingStatus::FAILED, TenantOnboardingStatus::PROVISIONING], true)
+            ? $stored
+            : TenantOnboardingStatus::PENDING;
+    }
+
+    private function stage(string $check): string
+    {
+        return match ($check) {
+            TenantReadinessCheck::ROOT_ORGANIZATION,
+            TenantReadinessCheck::PERMISSION_CATALOGUE,
+            TenantReadinessCheck::SUPER_ADMIN_ACCESS,
+            TenantReadinessCheck::AUTHENTICATION_PROVIDER,
+            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED,
+            TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'foundation',
+            TenantReadinessCheck::BASE_CURRENCY => 'identity',
+            TenantReadinessCheck::ACTIVE_PLAN,
+            TenantReadinessCheck::SUBSCRIPTION_VALID => 'subscription',
+            TenantReadinessCheck::PRIMARY_DOMAIN_READY => 'domain',
+            default => 'readiness',
+        };
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 }

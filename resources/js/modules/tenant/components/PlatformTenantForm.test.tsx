@@ -11,7 +11,6 @@ const tenant: TenantRecord = {
     name: 'Acme Ltd',
     slug: 'acme',
     has_logo: false,
-    cross_org_transactions: false,
     base_currency_id: 9,
     status: 'active',
     status_reason: null,

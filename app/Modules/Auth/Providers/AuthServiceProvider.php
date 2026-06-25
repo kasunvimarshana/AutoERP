@@ -74,6 +74,8 @@ use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
 use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
+use Modules\Auth\Services\PlatformSessionService;
 
 final class AuthServiceProvider extends ServiceProvider
 {
@@ -82,8 +84,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/auth.php', 'module-auth');
 
         $this->app->singleton(AuthDomainServiceInterface::class, AuthDomainService::class);
-        $this->app->singleton(RegistrationInvitationService::class, fn (): RegistrationInvitationService => new RegistrationInvitationService(new AuthRegistrationInvitationModel));
+        $this->app->singleton(RegistrationInvitationService::class);
         $this->app->singleton(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
+        $this->app->singleton(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
 
         $this->app->singleton(
             AuthProviderRepositoryInterface::class,

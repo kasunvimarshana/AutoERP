@@ -32,12 +32,10 @@ final class TenantSeeder extends Seeder
                     )->toString(),
                     'name' => trim((string) env('AUTOERP_TENANT_NAME', 'AutoERP')),
                     'slug' => Str::slug($code),
-                    'cross_org_transactions' => false,
                     'status' => TenantStatus::DRAFT,
                     'status_reason' => 'Awaiting platform onboarding.',
                     'activated_at' => null,
                     'row_version' => 1,
-                    'metadata' => ['seed_source' => 'tenant_module'],
                 ],
             );
         }, 3);

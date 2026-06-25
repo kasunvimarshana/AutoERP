@@ -8,9 +8,10 @@ interface TenantPlanLookupSelectProps {
     onChange: (plan: TenantPlan | null) => void;
     disabled?: boolean;
     error?: string;
+    label?: string;
 }
 
-export function TenantPlanLookupSelect({ value, onChange, disabled = false, error }: TenantPlanLookupSelectProps) {
+export function TenantPlanLookupSelect({ value, onChange, disabled = false, error, label = 'Subscription plan' }: TenantPlanLookupSelectProps) {
     const search = useCallback(async ({ search: term, page, perPage, signal }: {
         search: string;
         page: number;
@@ -29,7 +30,7 @@ export function TenantPlanLookupSelect({ value, onChange, disabled = false, erro
 
     return (
         <GenericLookupSelect
-            label="Subscription plan"
+            label={label}
             value={value}
             onChange={onChange}
             search={search}

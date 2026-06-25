@@ -24,22 +24,22 @@ final class TenantPlanSchema
         'audit',
     ];
 
-    /** Plan-controlled commercial feature modules. @var list<string> */
+    /** Plan-controlled commercial feature modules. @var array<string, string> */
     public const SUPPORTED_MODULES = [
-        'customer',
-        'supplier',
-        'item',
-        'warehouse',
-        'inventory',
-        'purchase',
-        'sales',
-        'vehicle',
-        'vehicle-service',
-        'vehicle-rental',
-        'invoice',
-        'payment',
-        'finance',
-        'reporting',
+        'customer' => 'Customers',
+        'supplier' => 'Suppliers',
+        'item' => 'Items',
+        'warehouse' => 'Warehouses',
+        'inventory' => 'Inventory',
+        'purchase' => 'Purchasing',
+        'sales' => 'Sales',
+        'vehicle' => 'Vehicles',
+        'vehicle-service' => 'Vehicle service',
+        'vehicle-rental' => 'Vehicle rental',
+        'invoice' => 'Invoicing',
+        'payment' => 'Payments',
+        'finance' => 'Finance',
+        'reporting' => 'Reporting',
     ];
 
     /** @var list<string> */
@@ -49,6 +49,24 @@ final class TenantPlanSchema
         'max_warehouses',
         'max_storage_mb',
     ];
+
+
+    /** @return list<array{code:string,label:string}> */
+    public function commercialModuleCatalogue(): array
+    {
+        $catalogue = [];
+        foreach (self::SUPPORTED_MODULES as $code => $label) {
+            $catalogue[] = ['code' => $code, 'label' => $label];
+        }
+
+        return $catalogue;
+    }
+
+    /** @return list<string> */
+    public function supportedModuleCodes(): array
+    {
+        return array_keys(self::SUPPORTED_MODULES);
+    }
 
     /** @return array{enabled_modules:list<string>} */
     public function normalizeFeatures(mixed $features): array
@@ -83,7 +101,7 @@ final class TenantPlanSchema
             }
 
             $module = strtolower(trim($module));
-            if (! in_array($module, self::SUPPORTED_MODULES, true)) {
+            if (! array_key_exists($module, self::SUPPORTED_MODULES)) {
                 throw ValidationException::withMessages([
                     'features.enabled_modules' => ["Unsupported module [{$module}]."],
                 ]);

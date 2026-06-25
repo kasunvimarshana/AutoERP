@@ -35,6 +35,11 @@ const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceD
 const TenantWorkspacePage = lazy(() => import("@/modules/tenant/TenantWorkspacePage"));
 const PlatformTenantsPage = lazy(() => import("@/modules/tenant/PlatformTenantsPage"));
 const TenantPlansPage = lazy(() => import("@/modules/tenant/TenantPlansPage"));
+const PlatformOperatorsPage = lazy(() => import("@/modules/platform-administration/PlatformOperatorsPage"));
+const PlatformSecurityPage = lazy(() => import("@/modules/platform-administration/PlatformSecurityPage"));
+const PlatformAuditPage = lazy(() => import("@/modules/platform-administration/PlatformAuditPage"));
+const PlatformAuditDetailPage = lazy(() => import("@/modules/platform-administration/PlatformAuditDetailPage"));
+const PlatformHealthPage = lazy(() => import("@/modules/platform-administration/PlatformHealthPage"));
 const UomListPage = lazy(() => import("@/modules/uom/UomListPage"));
 const UomCreatePage = lazy(() => import("@/modules/uom/UomCreatePage"));
 const UomEditPage = lazy(() => import("@/modules/uom/UomEditPage"));
@@ -453,6 +458,26 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/administration/platform-configuration"
                             element={<PermissionRoute permission={PLATFORM_PERMISSION.configurationView}><SettingsPage mode="platform" /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-operators"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.operatorsView}><PlatformOperatorsPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-security"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.sessionsView}><PlatformSecurityPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-audit"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.auditView}><PlatformAuditPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-audit/:id"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.auditView}><PlatformAuditDetailPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-health"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.healthView}><PlatformHealthPage /></PermissionRoute>}
                         />
                     </Route>
                 </Route>

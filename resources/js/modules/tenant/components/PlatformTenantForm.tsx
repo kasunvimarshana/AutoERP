@@ -32,13 +32,11 @@ export function PlatformTenantForm({
         name: tenant?.name ?? '',
         slug: tenant?.slug ?? '',
         currencyId: tenant?.base_currency_id ? String(tenant.base_currency_id) : '',
-        crossOrg: tenant?.cross_org_transactions ?? false,
     }), [tenant]);
     const [code, setCode] = useState(initial.code);
     const [name, setName] = useState(initial.name);
     const [slug, setSlug] = useState(initial.slug);
     const [currencyId, setCurrencyId] = useState(initial.currencyId);
-    const [crossOrg, setCrossOrg] = useState(initial.crossOrg);
     const [logo, setLogo] = useState<File | null>(null);
     const [removeLogo, setRemoveLogo] = useState(false);
     const [logoError, setLogoError] = useState('');
@@ -49,7 +47,6 @@ export function PlatformTenantForm({
         || name !== initial.name
         || slug !== initial.slug
         || currencyId !== initial.currencyId
-        || crossOrg !== initial.crossOrg
         || logo !== null
         || removeLogo;
     const confirmDiscard = useUnsavedChanges(dirty && !saving, 'Discard the unsaved tenant identity changes?');
@@ -88,13 +85,11 @@ export function PlatformTenantForm({
             if (name !== initial.name) payload.append('name', name.trim());
             if (slug !== initial.slug) payload.append('slug', slug.trim());
             if (currencyId !== initial.currencyId) payload.append('base_currency_id', currencyId);
-            if (crossOrg !== initial.crossOrg) payload.append('cross_org_transactions', crossOrg ? '1' : '0');
         } else {
             payload.append('code', code.trim());
             payload.append('name', name.trim());
             payload.append('slug', slug.trim());
             payload.append('base_currency_id', currencyId);
-            payload.append('cross_org_transactions', crossOrg ? '1' : '0');
         }
         if (logo) payload.append('logo', logo);
         if (removeLogo) payload.append('remove_logo', '1');
@@ -168,10 +163,6 @@ export function PlatformTenantForm({
                 ) : null}
             </div>
 
-            <label className="flex min-h-10 items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 md:col-span-2">
-                <input type="checkbox" checked={crossOrg} disabled={saving} onChange={(event) => setCrossOrg(event.target.checked)} />
-                Allow approved transactions across organization units
-            </label>
             <p className="text-sm text-slate-500 md:col-span-2">
                 This form manages tenant identity only. Foundation provisioning, domain verification, subscription assignment, and activation are separate controlled steps.
             </p>

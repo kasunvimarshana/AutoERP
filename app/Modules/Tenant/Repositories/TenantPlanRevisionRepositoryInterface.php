@@ -8,7 +8,7 @@ use Modules\Core\DTOs\DataRecord;
 
 interface TenantPlanRevisionRepositoryInterface
 {
-    public function findById(int|string $id): ?DataRecord;
+    public function findById(int|string $id, bool $lockForUpdate = false): ?DataRecord;
 
     public function findLatestByPlan(int|string $planId): ?DataRecord;
 

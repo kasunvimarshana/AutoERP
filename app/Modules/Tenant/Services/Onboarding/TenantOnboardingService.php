@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Onboarding;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -13,9 +14,10 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
-use Modules\Tenant\Constants\TenantOnboardingStatus;
+use Modules\Tenant\Constants\TenantOnboardingErrorCode;
+use Modules\Tenant\Constants\TenantOnboardingStep;
 use Modules\Tenant\Constants\TenantStatus;
-use Modules\Tenant\Models\TenantOnboardingStateModel;
+use Modules\Tenant\Exceptions\TenantOnboardingOperationException;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
@@ -33,10 +35,10 @@ final class TenantOnboardingService
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantOnboardingStateModel $states,
         private readonly TenantOrganizationProvisionerInterface $organizations,
         private readonly TenantAccessProvisionerInterface $access,
         private readonly TenantAuthenticationProvisionerInterface $authentication,
+        private readonly TenantOnboardingProgressService $progress,
         private readonly TenantReadinessService $readiness,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly CurrentUserContextAccessorInterface $currentUser,
@@ -60,178 +62,298 @@ final class TenantOnboardingService
             return $this->invalidStatus();
         }
 
-        $email = strtolower(trim($initialAdminEmail));
         $tenantId = (int) $tenant->id();
+        $email = strtolower(trim($initialAdminEmail));
+        $operationId = (string) Str::uuid();
+        $correlationId = (string) Str::uuid();
+        $currentStep = TenantOnboardingStep::ROOT_ORGANIZATION;
 
         try {
-            /** @var array{status:string,result?:array<string,mixed>} $outcome */
-            $outcome = $this->executionContext->runForTenant(
+            $result = $this->executionContext->runForTenant(
                 $tenantId,
-                fn (): array => DB::transaction(function () use ($tenantId, $expectedTenantVersion, $email): array {
-                    $lockedTenant = $this->tenants->lockById($tenantId);
-                    if ($lockedTenant === null) {
-                        return ['status' => self::OUTCOME_NOT_FOUND];
-                    }
-                    if ((int) $lockedTenant->require('row_version') !== $expectedTenantVersion) {
-                        return ['status' => self::OUTCOME_VERSION_CONFLICT];
-                    }
-                    if ((string) $lockedTenant->require('status') !== TenantStatus::DRAFT) {
-                        return ['status' => self::OUTCOME_INVALID_STATUS];
-                    }
+                function () use (
+                    $tenant,
+                    $tenantId,
+                    $expectedTenantVersion,
+                    $email,
+                    $operationId,
+                    $correlationId,
+                    &$currentStep,
+                ): array {
+                    $state = $this->progress->begin($tenantId, $email, $operationId, $correlationId);
+                    $completed = $this->completedSteps($state->getAttribute('completed_steps'));
 
-                    $state = $this->states->newQuery()
-                        ->where('tenant_id', $tenantId)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $state instanceof TenantOnboardingStateModel) {
-                        $state = $this->states->newQuery()->create([
-                            'tenant_id' => $tenantId,
-                            'status' => TenantOnboardingStatus::PENDING,
-                            'row_version' => 1,
-                            'created_by' => $this->currentUser->currentUserId(),
-                            'updated_by' => $this->currentUser->currentUserId(),
+                    $organizationUnitId = $this->positiveInt($state->getAttribute('root_organization_unit_id'));
+                    if (! in_array(TenantOnboardingStep::ROOT_ORGANIZATION, $completed, true) || $organizationUnitId === null) {
+                        $currentStep = TenantOnboardingStep::ROOT_ORGANIZATION;
+                        $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
+                        $organization = $this->organizations->provision(
+                            $tenantId,
+                            (string) $tenant->require('code'),
+                            (string) $tenant->require('name'),
+                        );
+                        $organizationUnitId = (int) $organization['organization_unit_id'];
+                        $this->progress->completeStep($tenantId, $currentStep, $operationId, [
+                            'root_organization_unit_id' => $organizationUnitId,
                         ]);
                     }
 
-                    $existingEmail = strtolower(trim((string) $state->getAttribute('initial_admin_email')));
-                    if ($existingEmail !== '' && $existingEmail !== $email) {
-                        throw new \DomainException(
-                            'The initial administrator email is already fixed for this onboarding. Revoke the existing invitation before changing it.',
+                    $roleId = $this->positiveInt($state->getAttribute('super_admin_role_id'));
+                    if (
+                        ! in_array(TenantOnboardingStep::PERMISSION_CATALOGUE, $completed, true)
+                        || ! in_array(TenantOnboardingStep::SUPER_ADMIN_ROLE, $completed, true)
+                        || $roleId === null
+                        || ! $this->access->isReady($tenantId)
+                    ) {
+                        $currentStep = TenantOnboardingStep::PERMISSION_CATALOGUE;
+                        $this->progress->startStep($tenantId, TenantOnboardingStep::PERMISSION_CATALOGUE, $operationId, $correlationId);
+                        $this->progress->startStep($tenantId, TenantOnboardingStep::SUPER_ADMIN_ROLE, $operationId, $correlationId);
+                        $access = $this->access->provision($tenantId);
+                        $roleId = (int) $access['role_id'];
+                        $this->progress->completeStep(
+                            $tenantId,
+                            TenantOnboardingStep::PERMISSION_CATALOGUE,
+                            $operationId,
+                        );
+                        $this->progress->completeStep(
+                            $tenantId,
+                            TenantOnboardingStep::SUPER_ADMIN_ROLE,
+                            $operationId,
+                            ['super_admin_role_id' => $roleId],
                         );
                     }
 
-                    $state->forceFill([
-                        'status' => TenantOnboardingStatus::PROVISIONING,
-                        'initial_admin_email' => $email,
-                        'last_error' => null,
-                        'row_version' => (int) $state->getAttribute('row_version') + 1,
-                        'updated_by' => $this->currentUser->currentUserId(),
-                    ])->save();
-
-                    $organization = $this->organizations->provision(
-                        $tenantId,
-                        (string) $lockedTenant->require('code'),
-                        (string) $lockedTenant->require('name'),
-                    );
-                    $access = $this->access->provision($tenantId);
-
-                    $invitationToken = null;
-                    $invitationId = $state->getAttribute('invitation_id');
-                    if (! is_numeric($invitationId) || ! $this->authentication->isReady($tenantId)) {
-                        $authentication = $this->authentication->provisionInitialAdministrator(
+                    if (! $this->authentication->providerIsReady($tenantId)) {
+                        $currentStep = TenantOnboardingStep::AUTHENTICATION_PROVIDER;
+                        $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
+                        $this->authentication->provisionProvider($tenantId);
+                        $this->progress->completeStep($tenantId, $currentStep, $operationId);
+                    } elseif (! in_array(TenantOnboardingStep::AUTHENTICATION_PROVIDER, $completed, true)) {
+                        $this->progress->completeStep(
                             $tenantId,
-                            $organization['organization_unit_id'],
-                            $access['role_id'],
+                            TenantOnboardingStep::AUTHENTICATION_PROVIDER,
+                            $operationId,
+                        );
+                    }
+
+                    $stateSnapshot = $this->progress->snapshot($tenantId) ?? [];
+                    $invitationId = $this->positiveInt($stateSnapshot['invitation_id'] ?? null);
+                    $invitation = $this->authentication->initialAdministratorInvitationStatus($tenantId, $invitationId);
+                    $invitationUsable = is_array($invitation)
+                        && in_array((string) ($invitation['status'] ?? ''), ['pending', 'accepted'], true)
+                        && strtolower((string) ($invitation['email'] ?? '')) === $email;
+
+                    if (! $invitationUsable) {
+                        $currentStep = TenantOnboardingStep::INITIAL_ADMIN_INVITATION;
+                        $this->progress->startStep($tenantId, $currentStep, $operationId, $correlationId);
+                        $issued = $this->authentication->issueInitialAdministratorInvitation(
+                            $tenantId,
+                            $organizationUnitId,
+                            $roleId,
                             $email,
                         );
-                        $invitationId = $authentication['invitation_id'];
-                        $invitationToken = $authentication['invitation_token'];
-                        $invitationExpiresAt = $authentication['invitation_expires_at'];
-                    } else {
-                        $invitationExpiresAt = null;
+                        $invitationId = (int) $issued['invitation_id'];
+                        $this->progress->completeStep($tenantId, $currentStep, $operationId, [
+                            'initial_admin_email' => $email,
+                            'invitation_id' => $invitationId,
+                        ]);
+                        $invitation = $this->authentication->initialAdministratorInvitationStatus($tenantId, $invitationId);
+                    } elseif (! in_array(TenantOnboardingStep::INITIAL_ADMIN_INVITATION, $completed, true)) {
+                        $this->progress->completeStep($tenantId, TenantOnboardingStep::INITIAL_ADMIN_INVITATION, $operationId, [
+                            'initial_admin_email' => $email,
+                            'invitation_id' => $invitationId,
+                        ]);
                     }
 
-                    $state->forceFill([
-                        'status' => TenantOnboardingStatus::AWAITING_DOMAIN,
-                        'root_organization_unit_id' => $organization['organization_unit_id'],
-                        'super_admin_role_id' => $access['role_id'],
-                        'invitation_id' => (int) $invitationId,
-                        'completed_steps' => [
-                            'organization_structure',
-                            'permission_catalogue',
-                            'super_admin_role',
-                            'authentication_provider',
-                            'initial_admin_invitation',
-                        ],
-                        'provisioned_at' => now(),
-                        'row_version' => (int) $state->getAttribute('row_version') + 1,
-                        'updated_by' => $this->currentUser->currentUserId(),
-                    ])->save();
+                    $currentStep = 'finalization';
+                    $finalized = DB::transaction(function () use (
+                        $tenantId,
+                        $expectedTenantVersion,
+                        $operationId,
+                        $correlationId,
+                        $email,
+                        $tenant,
+                    ): array {
+                        $lockedTenant = $this->tenants->lockById($tenantId);
+                        if ($lockedTenant === null) {
+                            return ['status' => self::OUTCOME_NOT_FOUND];
+                        }
+                        if ((int) $lockedTenant->require('row_version') !== $expectedTenantVersion) {
+                            return ['status' => self::OUTCOME_VERSION_CONFLICT];
+                        }
+                        if ((string) $lockedTenant->require('status') !== TenantStatus::DRAFT) {
+                            return ['status' => self::OUTCOME_INVALID_STATUS];
+                        }
 
-                    $updatedTenant = $this->tenants->updateWithVersion($tenantId, $expectedTenantVersion, [
-                        'updated_by' => $this->currentUser->currentUserId(),
-                    ]);
-                    if ($updatedTenant === null) {
-                        throw new RuntimeException('Locked tenant could not be versioned during onboarding.');
+                        $state = $this->progress->finishFoundation($tenantId, $operationId);
+                        $updatedTenant = $this->tenants->updateWithVersion($tenantId, $expectedTenantVersion, [
+                            'updated_by' => $this->currentUser->currentUserId(),
+                        ]);
+                        if ($updatedTenant === null) {
+                            throw new RuntimeException('Tenant changed before onboarding could be finalized.');
+                        }
+
+                        $this->audit->recordPlatform(new AuditEventData(
+                            eventName: 'tenant.onboarding.provisioned',
+                            eventCategory: AuditEventCategory::ADMINISTRATION,
+                            sourceModule: 'tenant',
+                            subjectType: 'tenant',
+                            subjectId: (string) $tenantId,
+                            subjectReference: (string) $tenant->get('code'),
+                            changes: ['new' => ['onboarding_status' => $state->getAttribute('status')]],
+                            metadata: [
+                                'initial_admin_email' => $email,
+                                'correlation_id' => $correlationId,
+                            ],
+                            tags: ['tenant', 'onboarding'],
+                        ), $tenantId);
+
+                        return [
+                            'status' => self::OUTCOME_SUCCESS,
+                            'state' => $this->progress->serialize($state),
+                            'tenant_row_version' => (int) $updatedTenant->require('row_version'),
+                        ];
+                    }, 3);
+
+                    if ($finalized['status'] !== self::OUTCOME_SUCCESS) {
+                        return $finalized;
                     }
 
                     return [
-                        'status' => self::OUTCOME_SUCCESS,
-                        'result' => [
-                            'state' => $state->fresh()?->attributesToArray() ?? $state->attributesToArray(),
-                            'invitation_token' => $invitationToken,
-                            'invitation_expires_at' => $invitationExpiresAt,
-                            'permission_count' => $access['permission_count'],
-                            'tenant_row_version' => (int) $updatedTenant->require('row_version'),
-                        ],
+                        ...$finalized,
+                        'permission_count' => $this->access->permissionCount($tenantId),
+                        'invitation' => $invitation,
+                        'correlation_id' => $correlationId,
                     ];
-                }, 3),
+                },
             );
 
-            if ($outcome['status'] === self::OUTCOME_NOT_FOUND) {
+            if (($result['status'] ?? null) === self::OUTCOME_NOT_FOUND) {
                 return $this->notFound();
             }
-            if ($outcome['status'] === self::OUTCOME_VERSION_CONFLICT) {
+            if (($result['status'] ?? null) === self::OUTCOME_VERSION_CONFLICT) {
+                $this->recordSafeFailure(
+                    $tenantId,
+                    'finalization',
+                    $operationId,
+                    $correlationId,
+                    TenantOnboardingErrorCode::FINALIZATION_FAILED,
+                    'Tenant details changed during foundation provisioning. Refresh and retry finalization.',
+                    null,
+                );
+
                 return $this->versionConflict();
             }
-            if ($outcome['status'] === self::OUTCOME_INVALID_STATUS) {
+            if (($result['status'] ?? null) === self::OUTCOME_INVALID_STATUS) {
                 return $this->invalidStatus();
             }
 
-            $result = $outcome['result'] ?? null;
-            if (! is_array($result)) {
-                throw new RuntimeException('Tenant onboarding completed without a result payload.');
+            try {
+                $result['readiness'] = $this->readiness->inspect($tenantId);
+            } catch (Throwable $readinessFailure) {
+                $this->logger->warning('Tenant onboarding readiness could not be refreshed after successful provisioning.', [
+                    'tenant_id' => $tenantId,
+                    'correlation_id' => $correlationId,
+                    'exception' => $readinessFailure,
+                ]);
+                $result['readiness'] = null;
             }
 
-            $this->audit->recordPlatform(new AuditEventData(
-                eventName: 'tenant.onboarding.provisioned',
-                eventCategory: AuditEventCategory::ADMINISTRATION,
-                sourceModule: 'tenant',
-                subjectType: 'tenant',
-                subjectId: (string) $tenantId,
-                subjectReference: (string) $tenant->get('code'),
-                changes: ['new' => ['onboarding_status' => TenantOnboardingStatus::AWAITING_DOMAIN]],
-                metadata: ['initial_admin_email' => $email],
-                tags: ['tenant', 'onboarding'],
-            ), $tenantId);
+            unset($result['status']);
 
-            return Result::success([
-                ...$result,
-                'readiness' => $this->readiness->inspect($tenantId),
+            return Result::success($result);
+        } catch (TenantOnboardingOperationException $exception) {
+            $this->logger->notice('Tenant onboarding operation was rejected.', [
+                'tenant_id' => $tenantId,
+                'correlation_id' => $exception->correlationId ?? $correlationId,
+                'error_code' => $exception->errorCode,
+                'step' => $exception->step,
             ]);
-        } catch (Throwable $exception) {
-            $this->markFailed($tenantId, $email, $exception->getMessage());
 
             return Result::failure(new Error(
                 TenantErrorCode::INVALID_VALUE,
                 $exception->getMessage(),
+                [
+                    'error_code' => $exception->errorCode,
+                    'failed_step' => $exception->step,
+                    'correlation_id' => $exception->correlationId ?? $correlationId,
+                ],
+            ));
+        } catch (Throwable $exception) {
+            $safeStep = $currentStep;
+            $errorCode = TenantOnboardingErrorCode::forStep($safeStep);
+            $safeMessage = TenantOnboardingErrorCode::safeMessage($safeStep);
+            $this->recordSafeFailure(
+                $tenantId,
+                $safeStep,
+                $operationId,
+                $correlationId,
+                $errorCode,
+                $safeMessage,
+                $exception,
+            );
+
+            return Result::failure(new Error(
+                TenantErrorCode::INVALID_VALUE,
+                $safeMessage,
+                [
+                    'error_code' => $errorCode,
+                    'failed_step' => $safeStep,
+                    'correlation_id' => $correlationId,
+                ],
             ));
         }
     }
 
-    private function markFailed(int $tenantId, string $email, string $message): void
-    {
+    private function recordSafeFailure(
+        int $tenantId,
+        string $step,
+        string $operationId,
+        string $correlationId,
+        string $errorCode,
+        string $safeMessage,
+        ?Throwable $exception,
+    ): void {
+        $this->logger->error('Tenant onboarding failed.', [
+            'tenant_id' => $tenantId,
+            'step' => $step,
+            'error_code' => $errorCode,
+            'correlation_id' => $correlationId,
+            'exception' => $exception,
+        ]);
+
         try {
-            $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $email, $message): void {
-                $state = $this->states->newQuery()->firstOrNew(['tenant_id' => $tenantId]);
-                $state->forceFill([
-                    'status' => TenantOnboardingStatus::FAILED,
-                    'initial_admin_email' => $email,
-                    'last_error' => mb_substr($message, 0, 1000),
-                    'row_version' => max(1, (int) $state->getAttribute('row_version')) + 1,
-                    'updated_by' => $this->currentUser->currentUserId(),
-                ])->save();
-            });
+            $this->executionContext->runForTenant(
+                $tenantId,
+                fn (): mixed => $this->progress->failStep(
+                    $tenantId,
+                    $step,
+                    $operationId,
+                    $correlationId,
+                    $errorCode,
+                    $safeMessage,
+                ),
+            );
         } catch (Throwable $secondaryFailure) {
             $this->logger->error('Tenant onboarding failure state could not be persisted.', [
                 'tenant_id' => $tenantId,
-                'initial_admin_email' => $email,
-                'original_error' => $message,
-                'secondary_error' => $secondaryFailure->getMessage(),
+                'correlation_id' => $correlationId,
                 'exception' => $secondaryFailure,
             ]);
         }
+    }
+
+    /** @return list<string> */
+    private function completedSteps(mixed $value): array
+    {
+        return is_array($value)
+            ? array_values(array_filter($value, static fn (mixed $step): bool => is_string($step)))
+            : [];
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 
     private function notFound(): Result

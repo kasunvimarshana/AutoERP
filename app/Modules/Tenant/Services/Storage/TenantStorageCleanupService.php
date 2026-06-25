@@ -20,38 +20,43 @@ final class TenantStorageCleanupService
     private const STATUS_COMPLETED = 'completed';
     private const STATUS_DEAD = 'dead';
 
+    private const ERROR_DELETE_FAILED = 'TENANT_STORAGE_DELETE_FAILED';
+    private const SAFE_DELETE_MESSAGE = 'The tenant file could not be removed from private storage.';
+
     public function __construct(
         private readonly TenantStorageCleanupJobModel $jobs,
         private readonly FileStorageServiceInterface $files,
         private readonly ClockInterface $clock,
         private readonly TenantExecutionContextInterface $executionContext,
+        private readonly TenantStoragePathPolicy $paths,
         private readonly LoggerInterface $logger,
     ) {}
 
     /**
-     * Persist the cleanup intent. Call this inside the same database transaction that
-     * removes or replaces the metadata referencing the file.
+     * Persist a cleanup intent inside the same transaction that removes or replaces
+     * the database record. The configured private disk and tenant prefix are resolved
+     * here and can never be supplied by callers.
      */
-    public function schedule(int $tenantId, string $disk, string $path, string $reason): void
+    public function schedule(int $tenantId, string $path, string $reason): void
     {
-        $disk = trim($disk);
-        $path = trim($path);
-        if ($tenantId < 1 || $disk === '' || $path === '') {
-            throw new RuntimeException('A tenant, storage disk and storage path are required for cleanup.');
+        $path = $this->paths->canonicalize($tenantId, $path);
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new RuntimeException('A cleanup reason is required.');
         }
 
-        $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $disk, $path, $reason): void {
+        $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $path, $reason): void {
             $this->jobs->newQuery()->updateOrCreate(
                 [
                     'tenant_id' => $tenantId,
-                    'storage_disk' => $disk,
                     'storage_path' => $path,
                 ],
                 [
-                    'reason' => mb_substr(trim($reason), 0, 255),
+                    'reason' => mb_substr($reason, 0, 255),
                     'status' => self::STATUS_PENDING,
                     'attempts' => 0,
-                    'last_error' => null,
+                    'last_error_code' => null,
+                    'last_error_message' => null,
                     'next_attempt_at' => $this->clock->now(),
                     'claim_token' => null,
                     'claimed_at' => null,
@@ -61,15 +66,16 @@ final class TenantStorageCleanupService
         });
     }
 
-    /** Try one already-persisted cleanup intent without weakening durability on failure. */
-    public function processPath(int $tenantId, string $disk, string $path): bool
+    /** Try one persisted cleanup intent without weakening durability on failure. */
+    public function processPath(int $tenantId, string $path): bool
     {
+        $path = $this->paths->canonicalize($tenantId, $path);
+
         return $this->executionContext->runForTenant(
             $tenantId,
-            function () use ($tenantId, $disk, $path): bool {
+            function () use ($tenantId, $path): bool {
                 $job = $this->jobs->newQuery()
                     ->where('tenant_id', $tenantId)
-                    ->where('storage_disk', $disk)
                     ->where('storage_path', $path)
                     ->first();
 
@@ -90,6 +96,42 @@ final class TenantStorageCleanupService
         return $this->executionContext->runAsControlPlane(
             fn (): array => $this->processAcrossTenants($limit),
         );
+    }
+
+    public function retryDead(?int $jobId = null, ?int $tenantId = null, ?int $limit = null): int
+    {
+        return $this->executionContext->runAsControlPlane(function () use ($jobId, $tenantId, $limit): int {
+            $query = $this->jobs->newQuery()->where('status', self::STATUS_DEAD);
+            if ($jobId !== null) {
+                $query->whereKey($jobId);
+            }
+            if ($tenantId !== null) {
+                $query->where('tenant_id', $tenantId);
+            }
+            if ($jobId === null) {
+                $query->limit(max(1, min($limit ?? 100, 500)));
+            }
+
+            $ids = $query->pluck('id')->all();
+            if ($ids === []) {
+                return 0;
+            }
+
+            return $this->jobs->newQuery()
+                ->whereIn('id', $ids)
+                ->where('status', self::STATUS_DEAD)
+                ->update([
+                    'status' => self::STATUS_PENDING,
+                    'attempts' => 0,
+                    'last_error_code' => null,
+                    'last_error_message' => null,
+                    'next_attempt_at' => $this->clock->now(),
+                    'claim_token' => null,
+                    'claimed_at' => null,
+                    'completed_at' => null,
+                    'updated_at' => $this->clock->now(),
+                ]);
+        });
     }
 
     /** @return array{checked:int,completed:int,failed:int,dead:int,recovered:int} */
@@ -128,11 +170,7 @@ final class TenantStorageCleanupService
             }
 
             $fresh = $this->jobs->newQuery()->find($claim->getKey());
-            if ($fresh?->getAttribute('status') === self::STATUS_DEAD) {
-                $summary['dead']++;
-            } else {
-                $summary['failed']++;
-            }
+            $summary[$fresh?->getAttribute('status') === self::STATUS_DEAD ? 'dead' : 'failed']++;
         }
 
         return $summary;
@@ -167,11 +205,12 @@ final class TenantStorageCleanupService
     private function processClaimed(TenantStorageCleanupJobModel $job): bool
     {
         try {
-            $disk = (string) $job->getAttribute('storage_disk');
-            $path = (string) $job->getAttribute('storage_path');
+            $tenantId = (int) $job->getAttribute('tenant_id');
+            $path = $this->paths->canonicalize($tenantId, (string) $job->getAttribute('storage_path'));
+            $disk = $this->disk();
             $deleted = ! $this->files->exists($path, $disk) || $this->files->delete($path, $disk);
             if (! $deleted) {
-                throw new RuntimeException('Storage adapter returned false while deleting the file.');
+                throw new RuntimeException('Storage adapter returned false while deleting a tenant file.');
             }
 
             $updated = $this->jobs->newQuery()
@@ -181,7 +220,8 @@ final class TenantStorageCleanupService
                 ->update([
                     'status' => self::STATUS_COMPLETED,
                     'completed_at' => $this->clock->now(),
-                    'last_error' => null,
+                    'last_error_code' => null,
+                    'last_error_message' => null,
                     'next_attempt_at' => null,
                     'claim_token' => null,
                     'claimed_at' => null,
@@ -202,7 +242,8 @@ final class TenantStorageCleanupService
                 ->update([
                     'status' => $dead ? self::STATUS_DEAD : self::STATUS_PENDING,
                     'attempts' => $attempts,
-                    'last_error' => mb_substr($exception->getMessage(), 0, 500),
+                    'last_error_code' => self::ERROR_DELETE_FAILED,
+                    'last_error_message' => self::SAFE_DELETE_MESSAGE,
                     'next_attempt_at' => $dead ? null : $this->clock->now()->modify("+{$delayMinutes} minutes"),
                     'claim_token' => null,
                     'claimed_at' => null,
@@ -212,8 +253,7 @@ final class TenantStorageCleanupService
             $this->logger->log($dead ? 'error' : 'warning', 'Tenant storage cleanup attempt failed.', [
                 'cleanup_job_id' => $job->getKey(),
                 'tenant_id' => $job->getAttribute('tenant_id'),
-                'disk' => $job->getAttribute('storage_disk'),
-                'path' => $job->getAttribute('storage_path'),
+                'storage_path' => $job->getAttribute('storage_path'),
                 'attempts' => $attempts,
                 'dead' => $dead,
                 'exception' => $exception,
@@ -239,5 +279,15 @@ final class TenantStorageCleanupService
                 'next_attempt_at' => $this->clock->now(),
                 'updated_at' => $this->clock->now(),
             ]);
+    }
+
+    private function disk(): string
+    {
+        $disk = trim((string) config('tenant.documents.disk', 'tenant_private'));
+        if ($disk === '') {
+            throw new RuntimeException('The tenant private storage disk is not configured.');
+        }
+
+        return $disk;
     }
 }

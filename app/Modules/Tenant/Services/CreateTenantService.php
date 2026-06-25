@@ -9,7 +9,6 @@ use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
@@ -33,7 +32,6 @@ final class CreateTenantService
         private readonly TenantReferenceValidator $references,
         private readonly SlugGeneratorInterface $slugger,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly FileStorageServiceInterface $files,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
@@ -45,8 +43,6 @@ final class CreateTenantService
     /** @param array<string, mixed> $payload */
     public function execute(array $payload): Result
     {
-        $logoPath = null;
-
         try {
             $code = $this->rules->normalizeCode((string) ($payload['code'] ?? ''));
             $name = $this->rules->normalizeName((string) ($payload['name'] ?? ''));
@@ -66,21 +62,11 @@ final class CreateTenantService
             $baseCurrencyId = $this->positiveInt($payload['base_currency_id'] ?? null);
             $this->references->assertActiveCurrency($baseCurrencyId);
 
-            if (isset($payload['logo_tmp_path'])) {
-                $logoPath = $this->storeLogo(
-                    (string) $payload['logo_tmp_path'],
-                    (string) ($payload['logo_original_name'] ?? 'logo.bin'),
-                    $slug,
-                );
-            }
-
             /** @var DataRecord $record */
             $record = $this->transactions->runInTransaction(function () use (
-                $payload,
                 $code,
                 $name,
                 $slug,
-                $logoPath,
                 $baseCurrencyId,
             ): DataRecord {
                 $record = $this->tenants->create([
@@ -88,11 +74,9 @@ final class CreateTenantService
                     'code' => $code,
                     'name' => $name,
                     'slug' => $slug,
-                    'logo_path' => $logoPath,
-                    'cross_org_transactions' => (bool) ($payload['cross_org_transactions'] ?? false),
+                    'logo_path' => null,
                     'base_currency_id' => $baseCurrencyId,
                     'status' => TenantStatus::DRAFT,
-                    'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),
                     'updated_by' => $this->currentUser->currentUserId(),
@@ -130,27 +114,12 @@ final class CreateTenantService
 
             return Result::success($this->tenants->findById($record->id()) ?? $record);
         } catch (Throwable $exception) {
-            if ($logoPath !== null && $this->files->exists($logoPath)) {
-                $this->files->delete($logoPath);
-            }
-
             return Result::failure($this->errors->normalize(
                 $exception,
                 TenantErrorCode::INVALID_VALUE,
                 ['operation' => 'tenant.create'],
             ));
         }
-    }
-
-    private function storeLogo(string $tmpPath, string $originalName, string $slug): string
-    {
-        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) ?: 'bin';
-
-        return $this->files->store(
-            $tmpPath,
-            'tenants/logos',
-            sprintf('%s-%s.%s', $slug, $this->uuid->generate(), $extension),
-        );
     }
 
     private function positiveInt(mixed $value): ?int

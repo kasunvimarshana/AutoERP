@@ -7,6 +7,7 @@ import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { Textarea } from '@/shared/components/Textarea';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { formatLimitLabel, formatPlanMoney, humanize } from '../tenantPresentation';
@@ -60,6 +61,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
     const [currencyId, setCurrencyId] = useState(initial.currencyId);
     const [interval, setInterval] = useState<'month' | 'quarter' | 'year'>(initial.interval);
     const [effectiveAt, setEffectiveAt] = useState('');
+    const [revisionNote, setRevisionNote] = useState('');
     const [enabledModules, setEnabledModules] = useState<TenantModuleCode[]>(initial.enabledModules);
     const [limits, setLimits] = useState<LimitFormState>(initial.limits);
     const [clientError, setClientError] = useState<ApiError | null>(null);
@@ -69,6 +71,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
         || currencyId !== initial.currencyId
         || interval !== initial.interval
         || effectiveAt !== ''
+        || revisionNote !== ''
         || JSON.stringify([...enabledModules].sort()) !== JSON.stringify([...initial.enabledModules].sort())
         || JSON.stringify(limits) !== JSON.stringify(initial.limits);
     const confirmDiscard = useUnsavedChanges(dirty && !saving, 'Discard the unsaved tenant plan changes?');
@@ -100,8 +103,20 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
             enabledModules,
             limits: validation.limits,
             effectiveAt: validation.effectiveAt,
+            revisionNote: revisionNote.trim(),
         };
         const payload = plan ? buildPlanUpdatePayload(plan, draft) : buildPlanCreatePayload(draft);
+        const revisionWillBeCreated = !plan || createsRevision(payload);
+        if (revisionWillBeCreated && revisionNote.trim().length < 5) {
+            setClientError(new ApiError(
+                'Explain why this immutable plan revision is being created.',
+                422,
+                'PLAN_REVISION_NOTE_REQUIRED',
+                'validation',
+                { change_note: ['Enter at least 5 characters describing the business reason.'] },
+            ));
+            return;
+        }
         if (plan && Object.keys(payload).length === 0) {
             setClientError(new ApiError('No meaningful plan changes were detected.', 422, 'NO_PLAN_CHANGES', 'validation'));
             return;
@@ -170,6 +185,18 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
                     />
                 </div>
 
+                <Textarea
+                    label="Revision reason"
+                    value={revisionNote}
+                    onChange={(event) => setRevisionNote(event.target.value)}
+                    error={fieldError(displayError, 'change_note')}
+                    hint={plan
+                        ? 'Required only when commercial terms, modules, limits, or the effective date create a new immutable revision.'
+                        : 'Required for the first immutable revision. Explain the business purpose of this plan.'}
+                    placeholder={plan ? 'Example: Increase storage allowance for the 2026 contract cycle.' : 'Example: Initial commercial terms for the Professional plan.'}
+                    disabled={saving}
+                />
+
                 <fieldset>
                     <legend className="text-sm font-semibold text-slate-900">Enabled business modules</legend>
                     <p className="mt-1 text-sm text-slate-500">Foundation capabilities are always available. These controls manage commercial feature access only.</p>
@@ -236,6 +263,7 @@ interface DraftValues {
     enabledModules: TenantModuleCode[];
     limits: TenantPlanLimits;
     effectiveAt: string | null;
+    revisionNote: string;
 }
 
 interface ChangeSummary {
@@ -245,6 +273,7 @@ interface ChangeSummary {
     limits: string[];
     commercial: string[];
     createsRevision: boolean;
+    revisionNote: string | null;
 }
 
 function buildPlanCreatePayload(draft: DraftValues): Record<string, unknown> {
@@ -256,6 +285,7 @@ function buildPlanCreatePayload(draft: DraftValues): Record<string, unknown> {
         billing_interval: draft.interval,
         features: { enabled_modules: draft.enabledModules },
         limits: draft.limits,
+        change_note: draft.revisionNote,
     };
     if (draft.effectiveAt !== null) payload.effective_at = draft.effectiveAt;
     return payload;
@@ -275,6 +305,7 @@ function buildPlanUpdatePayload(plan: TenantPlan, draft: DraftValues): Record<st
     }
     if (!current || !sameLimits(current.limits, draft.limits)) payload.limits = draft.limits;
     if (draft.effectiveAt !== null) payload.effective_at = draft.effectiveAt;
+    if (createsRevision(payload)) payload.change_note = draft.revisionNote;
     return payload;
 }
 
@@ -301,6 +332,7 @@ function describeChanges(plan: TenantPlan | null, draft: DraftValues): ChangeSum
             limits: Object.entries(draft.limits).map(([key, value]) => `${formatLimitLabel(key)}: ${value}`),
             commercial: [`${draft.price} ${draft.currencyLabel} / ${humanize(draft.interval)}`.trim(), draft.effectiveAt ? `Effective ${draft.effectiveAt}` : 'Effective immediately'],
             createsRevision: true,
+            revisionNote: draft.revisionNote,
         };
     }
     const current = plan.latest_revision;
@@ -329,6 +361,7 @@ function describeChanges(plan: TenantPlan | null, draft: DraftValues): ChangeSum
         limits,
         commercial,
         createsRevision: modulesAdded.length > 0 || modulesRemoved.length > 0 || limits.length > 0 || commercial.length > 0,
+        revisionNote: draft.revisionNote || null,
     };
 }
 
@@ -341,6 +374,9 @@ function PlanChangeReview({ plan, changes }: { plan: TenantPlan | null; changes:
             <ChangeList title="Modules removed" values={changes.modulesRemoved} />
             <ChangeList title="Limit changes" values={changes.limits} />
             <ChangeList title="Commercial changes" values={changes.commercial} />
+            {changes.createsRevision && changes.revisionNote ? (
+                <div><p className="font-semibold">Revision reason</p><p className="mt-1 text-slate-700">{changes.revisionNote}</p></div>
+            ) : null}
             {plan && plan.current_subscription_count > 0 ? <p className="rounded bg-amber-50 p-3 text-amber-900">{plan.current_subscription_count} current subscription(s) remain on their existing revision until explicitly reassigned.</p> : null}
         </div>
     );

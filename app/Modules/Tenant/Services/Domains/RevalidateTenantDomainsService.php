@@ -15,6 +15,7 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Jobs\VerifyTenantDomainOperationalReadiness;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
@@ -38,7 +39,7 @@ final class RevalidateTenantDomainsService
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
-    /** @return array{checked:int,verified:int,failed:int,disabled:int,suspended:int,conflicted:int} */
+    /** @return array{checked:int,verified:int,failed:int,disabled:int,suspended:int,conflicted:int,operational_queued:int} */
     public function execute(?int $limit = null): array
     {
         $now = $this->clock->now();
@@ -62,6 +63,7 @@ final class RevalidateTenantDomainsService
             'disabled' => 0,
             'suspended' => 0,
             'conflicted' => 0,
+            'operational_queued' => 0,
         ];
 
         foreach ($domains as $domain) {
@@ -86,12 +88,29 @@ final class RevalidateTenantDomainsService
                         $tenantId,
                         (int) $domain->require('row_version'),
                         $claimToken,
-                        $exception->getMessage(),
+                        'DOMAIN_REVALIDATION_PROCESSING_FAILED',
+                        'Domain ownership revalidation could not be completed and will be retried.',
                         $now,
                     ),
                 );
                 $this->recordProcessingFailure($domain, $tenantId, $exception);
             }
+        }
+
+        $operationalClaimToken = $this->claimToken();
+        $operationalDomains = $this->domains->claimDueForOperationalVerification(
+            dueAt: $now,
+            claimedAt: $now,
+            staleBefore: $now->modify("-{$claimTimeout} minutes"),
+            claimToken: $operationalClaimToken,
+            limit: $batchSize,
+        );
+        foreach ($operationalDomains as $operationalDomain) {
+            VerifyTenantDomainOperationalReadiness::dispatch(
+                (int) $operationalDomain->require('tenant_id'),
+                (int) $operationalDomain->id(),
+            );
+            $summary['operational_queued']++;
         }
 
         return $summary;
@@ -115,6 +134,7 @@ final class RevalidateTenantDomainsService
                 $expectedVersion,
                 true,
                 null,
+                null,
                 $now,
                 $this->nextDue($now),
                 $this->graceExpiry($now),
@@ -131,6 +151,7 @@ final class RevalidateTenantDomainsService
                 $tenantId,
                 $expectedVersion,
                 false,
+                $result->errorCode,
                 $result->message,
                 $now,
             );
@@ -153,6 +174,7 @@ final class RevalidateTenantDomainsService
                 $tenantId,
                 $expectedVersion,
                 $claimToken,
+                $result->errorCode,
                 $result->message,
                 $now,
                 null,

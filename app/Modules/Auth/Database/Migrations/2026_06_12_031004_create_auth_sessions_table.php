@@ -52,6 +52,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'session_key'], 'auth_sessions_key_uk');
             $table->index(['tenant_id', 'user_id', 'status'], 'auth_sessions_user_status_idx');
         });
+
     }
 
     public function down(): void

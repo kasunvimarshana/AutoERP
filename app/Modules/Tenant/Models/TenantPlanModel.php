@@ -14,14 +14,13 @@ final class TenantPlanModel extends CoreModel
     protected $table = 'tenant_plans';
 
     protected $fillable = [
-        'name', 'slug', 'is_active', 'metadata', 'row_version', 'created_by', 'updated_by',
+        'name', 'slug', 'is_active', 'row_version', 'created_by', 'updated_by',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'is_active' => 'boolean',
-            'metadata' => 'array',
         ]);
     }
 
@@ -35,6 +34,16 @@ final class TenantPlanModel extends CoreModel
     {
         return $this->hasOne(TenantPlanRevisionModel::class, 'tenant_plan_id')
             ->ofMany('revision_number', 'max');
+    }
+
+
+    public function currentRevision(): HasOne
+    {
+        return $this->hasOne(TenantPlanRevisionModel::class, 'tenant_plan_id')
+            ->ofMany(
+                ['effective_at' => 'max', 'revision_number' => 'max'],
+                static fn ($query) => $query->where('effective_at', '<=', now()),
+            );
     }
 
     public function subscriptions(): HasManyThrough

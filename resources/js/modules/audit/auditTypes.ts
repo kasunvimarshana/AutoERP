@@ -39,6 +39,7 @@ export interface AuditLogSummary {
     source_module: string;
     actor: AuditActor;
     subject: AuditSubject;
+    tenant: AuditNamedScope;
     organization_unit: AuditNamedScope;
     tags: string[];
     occurred_at: string;

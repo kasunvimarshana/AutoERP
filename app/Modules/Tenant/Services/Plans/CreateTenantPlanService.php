@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use DateTimeImmutable;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
@@ -32,6 +34,7 @@ final class CreateTenantPlanService
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly ClockInterface $clock,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -39,23 +42,22 @@ final class CreateTenantPlanService
     {
         try {
             $slug = $this->rules->normalizeSlug((string) ($payload['slug'] ?? ''));
-            if ($this->plans->findBySlug($slug) !== null) {
-                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan slug already exists.'));
-            }
-
             $revision = $this->revisionAttributes($payload);
             $this->references->assertPlanPricing(
                 (string) $revision['price'],
                 is_int($revision['currency_id']) ? $revision['currency_id'] : null,
             );
 
-            /** @var DataRecord $record */
-            $record = $this->transactions->runInTransaction(function () use ($payload, $slug, $revision): DataRecord {
+            /** @var array{status:string,record?:DataRecord} $outcome */
+            $outcome = $this->transactions->runInTransaction(function () use ($payload, $slug, $revision): array {
+                if ($this->plans->findBySlug($slug) !== null) {
+                    return ['status' => 'duplicate'];
+                }
+
                 $plan = $this->plans->create([
                     'name' => $this->rules->normalizeName((string) ($payload['name'] ?? '')),
                     'slug' => $slug,
                     'is_active' => true,
-                    'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),
                     'updated_by' => $this->currentUser->currentUserId(),
@@ -80,10 +82,13 @@ final class CreateTenantPlanService
                     tags: ['tenant', 'plan', 'platform'],
                 ));
 
-                return $complete;
+                return ['status' => 'success', 'record' => $complete];
             });
 
-            return Result::success($record);
+            return match ($outcome['status']) {
+                'success' => Result::success($outcome['record']),
+                default => Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan slug already exists.')),
+            };
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -96,6 +101,10 @@ final class CreateTenantPlanService
     /** @param array<string, mixed> $payload @return array<string, mixed> */
     private function revisionAttributes(array $payload): array
     {
+        $effectiveAt = isset($payload['effective_at'])
+            ? new DateTimeImmutable((string) $payload['effective_at'])
+            : $this->clock->now();
+
         return [
             'features' => $this->schema->normalizeFeatures($payload['features'] ?? null),
             'limits' => $this->schema->normalizeLimits($payload['limits'] ?? null),
@@ -104,11 +113,22 @@ final class CreateTenantPlanService
             'billing_interval' => $this->rules->normalizeBillingInterval(
                 isset($payload['billing_interval']) ? (string) $payload['billing_interval'] : null,
             ),
-            'effective_at' => isset($payload['effective_at'])
-                ? new \DateTimeImmutable((string) $payload['effective_at'])
-                : now(),
+            'effective_at' => $effectiveAt,
+            'change_note' => $this->changeNote($payload['change_note'] ?? null),
             'created_by' => $this->currentUser->currentUserId(),
+            'created_at' => $this->clock->now(),
         ];
+    }
+
+
+    private function changeNote(mixed $value): string
+    {
+        $note = is_scalar($value) ? trim((string) $value) : '';
+        if (mb_strlen($note) < 5) {
+            throw new \InvalidArgumentException('A meaningful plan revision note is required.');
+        }
+
+        return $note;
     }
 
     private function positiveInt(mixed $value): ?int

@@ -16,7 +16,22 @@ final class OrganizationUnitModel extends TenantOwnedModel
 
     protected $table = 'organization_units';
 
-    protected $guarded = ['id'];
+    /**
+     * path, depth, and root_marker are hierarchy-owned derived fields and are
+     * intentionally excluded from mass assignment.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'type_id',
+        'parent_id',
+        'name',
+        'code',
+        'image_path',
+        'is_active',
+        'description',
+        'metadata',
+    ];
 
     protected function casts(): array
     {
@@ -26,8 +41,6 @@ final class OrganizationUnitModel extends TenantOwnedModel
             'parent_id' => 'integer',
             'depth' => 'integer',
             'is_active' => 'boolean',
-            '_lft' => 'integer',
-            '_rgt' => 'integer',
         ]);
     }
 

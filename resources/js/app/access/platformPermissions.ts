@@ -12,5 +12,12 @@ export const PLATFORM_PERMISSION = {
     configurationManage: 'platform.configuration.manage',
     secretsManage: 'platform.secrets.manage',
     auditView: 'platform.audit.view',
+    auditSensitiveView: 'platform.audit.sensitive.view',
+    operatorsView: 'platform.operators.view',
     operatorsManage: 'platform.operators.manage',
+    sessionsView: 'platform.sessions.view',
+    sessionsManage: 'platform.sessions.manage',
+    mfaManage: 'platform.mfa.manage',
+    healthView: 'platform.health.view',
+    healthManage: 'platform.health.manage',
 } as const;

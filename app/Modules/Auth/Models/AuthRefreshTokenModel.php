@@ -26,6 +26,7 @@ final class AuthRefreshTokenModel extends CoreModel
         'client_id',
         'identity_id',
         'session_id',
+        'platform_session_id',
         'user_id',
         'refresh_key',
         'refresh_hash',

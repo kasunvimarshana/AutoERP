@@ -22,6 +22,7 @@ return new class extends Migration
             $table->unsignedBigInteger('client_id')->nullable();
             $table->unsignedBigInteger('identity_id')->nullable();
             $table->unsignedBigInteger('session_id')->nullable();
+            $table->unsignedBigInteger('platform_session_id')->nullable();
             $table->foreignId('user_id')->constrained('users', 'id')->cascadeOnDelete();
             $table->string('refresh_key', 120);
             $table->string('refresh_hash');
@@ -62,12 +63,17 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('auth_sessions')
                 ->cascadeOnDelete();
+            $table->foreign('platform_session_id', 'auth_refresh_tokens_platform_session_fk')
+                ->references('id')
+                ->on('auth_platform_sessions')
+                ->cascadeOnDelete();
             $table->foreign(['user_id', 'tenant_id'], 'auth_refresh_tokens_user_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->cascadeOnDelete();
             $table->unique('refresh_key', 'auth_refresh_tokens_key_uk');
             $table->index(['token_scope', 'user_id', 'status'], 'auth_refresh_tokens_scope_user_idx');
+            $table->index(['platform_session_id', 'status'], 'auth_refresh_tokens_platform_session_idx');
             $table->index(['tenant_id', 'session_id', 'status'], 'auth_refresh_tokens_session_idx');
         });
     }

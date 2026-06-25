@@ -6,6 +6,7 @@ namespace Modules\Tenant\Repositories;
 
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Tenant\Data\TenantDirectoryFilters;
 
 interface TenantRepositoryInterface
 {
@@ -16,5 +17,5 @@ interface TenantRepositoryInterface
     public function lockById(int|string $id): ?DataRecord;
     public function create(array $attributes): DataRecord;
     public function updateWithVersion(int|string $id, int $expectedVersion, array $attributes): ?DataRecord;
-    public function pageByFilters(?string $status, ?string $search, int $perPage, int $page): PagedResult;
+    public function pageByFilters(TenantDirectoryFilters $filters): PagedResult;
 }

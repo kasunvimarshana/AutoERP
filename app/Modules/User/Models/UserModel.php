@@ -113,6 +113,12 @@ final class UserModel extends Authenticatable
         return $this->hasMany(UserOrganizationUnitModel::class, 'user_id');
     }
 
+
+    public function platformPermissionAssignments(): HasMany
+    {
+        return $this->hasMany(PlatformOperatorPermissionModel::class, 'user_id');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(UserDocumentModel::class, 'user_id');

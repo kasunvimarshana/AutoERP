@@ -8,8 +8,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Results\Result;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Http\Requests\CreateTenantDomainRequest;
+use Modules\Tenant\Http\Requests\ListTenantDomainRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Resources\TenantDomainResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
@@ -25,15 +27,22 @@ final class PlatformTenantDomainController extends Controller
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
-    public function index(int|string $tenant): JsonResponse
+    public function index(ListTenantDomainRequest $request, int|string $tenant): JsonResponse
     {
-        $result = $this->forTenant($tenant, fn (int $tenantId): Result => $this->domains->list($tenantId));
+        $result = $this->forTenant(
+            $tenant,
+            fn (int $tenantId): Result => $this->domains->list($tenantId, $request->validated()),
+        );
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+        $page = $result->valueOrFail();
+        abort_unless($page instanceof PagedResult, 500, 'Unexpected tenant domain list response.');
 
-        return $result->isFailure()
-            ? TenantApiResponder::error($result->errorOrFail())
-            : response()->json([
-                'data' => TenantDomainResource::collection($result->valueOrFail())->resolve(),
-            ]);
+        return response()->json([
+            'data' => TenantDomainResource::collection($page->items)->resolve($request),
+            'meta' => $page->paginationMeta(),
+        ]);
     }
 
     public function store(

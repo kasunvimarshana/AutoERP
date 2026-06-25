@@ -12,9 +12,19 @@ final class TenantDocumentModel extends TenantOwnedModel
     protected $table = 'tenant_documents';
 
     protected $fillable = [
-        'tenant_id', 'name', 'document_type', 'storage_disk', 'storage_path',
-        'original_filename', 'mime_type', 'size_bytes', 'checksum_sha256',
-        'metadata', 'row_version', 'created_by', 'updated_by',
+        'tenant_id',
+        'name',
+        'document_type',
+        'storage_path',
+        'original_filename',
+        'mime_type',
+        'size_bytes',
+        'checksum_sha256',
+        'scan_engine',
+        'scanned_at',
+        'row_version',
+        'created_by',
+        'updated_by',
     ];
 
     protected function casts(): array
@@ -22,7 +32,7 @@ final class TenantDocumentModel extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'size_bytes' => 'integer',
-            'metadata' => 'array',
+            'scanned_at' => 'datetime',
         ]);
     }
 

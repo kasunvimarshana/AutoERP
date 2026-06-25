@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Database\Seeders\Concerns\ResolvesSeedContext;
-use Modules\Tenant\Constants\PlatformPermission;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Models\PermissionModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
@@ -19,6 +18,7 @@ use Modules\User\Models\RoleModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserRoleModel;
 use Modules\User\Models\UserOrganizationUnitModel;
+use Modules\User\Services\Platform\PlatformPermissionCatalogSynchronizer;
 use RuntimeException;
 
 final class UserSeeder extends Seeder
@@ -181,15 +181,21 @@ final class UserSeeder extends Seeder
             return;
         }
 
-        foreach (PlatformPermission::descriptions() as $name => $description) {
-            $permission = PlatformPermissionModel::query()->updateOrCreate(
-                ['name' => $name],
-                ['description' => $description, 'is_active' => true],
-            );
+        app(PlatformPermissionCatalogSynchronizer::class)->synchronize();
 
+        $permissionIds = PlatformPermissionModel::query()
+            ->where('is_active', true)
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+        PlatformOperatorPermissionModel::query()
+            ->where('user_id', $operator->getKey())
+            ->whereNotIn('platform_permission_id', $permissionIds)
+            ->delete();
+        foreach ($permissionIds as $permissionId) {
             PlatformOperatorPermissionModel::query()->firstOrCreate([
                 'user_id' => $operator->getKey(),
-                'platform_permission_id' => $permission->getKey(),
+                'platform_permission_id' => $permissionId,
             ]);
         }
     }

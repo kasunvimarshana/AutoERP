@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Domains;
 
-use Modules\Audit\Constants\AuditEventCategory;
 use DateTimeImmutable;
 use Illuminate\Database\QueryException;
+use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
@@ -16,9 +16,13 @@ use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\Tenant\Constants\TenantDomainCheckStatus;
+use Modules\Tenant\Constants\TenantDomainOperationalStatus;
+use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
+use Modules\Tenant\Constants\TenantDomainStatus;
 use Modules\Tenant\Constants\TenantErrorCode;
+use Modules\Tenant\Jobs\VerifyTenantDomainOwnership;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface as TenantRules;
 use Throwable;
 
@@ -27,7 +31,6 @@ final class TenantDomainService
     public function __construct(
         private readonly TenantDomainRepositoryInterface $domains,
         private readonly TenantRules $rules,
-        private readonly TenantDomainOwnershipVerifierInterface $verifier,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
@@ -35,9 +38,21 @@ final class TenantDomainService
         private readonly ClockInterface $clock,
     ) {}
 
-    public function list(int $tenantId): Result
+    /** @param array<string, mixed> $filters */
+    public function list(int $tenantId, array $filters = []): Result
     {
-        return Result::success($this->domains->listByTenant($tenantId));
+        $defaultPerPage = max(1, (int) config('tenant.pagination.default_per_page', 20));
+        $maximumPerPage = max($defaultPerPage, (int) config('tenant.pagination.max_per_page', 100));
+
+        return Result::success($this->domains->pageByTenant(
+            $tenantId,
+            $this->optionalString($filters['search'] ?? null),
+            $this->optionalString($filters['status'] ?? null),
+            $this->optionalString($filters['ownership_status'] ?? null),
+            $this->optionalString($filters['operational_status'] ?? null),
+            max(1, min((int) ($filters['per_page'] ?? $defaultPerPage), $maximumPerPage)),
+            max(1, (int) ($filters['page'] ?? 1)),
+        ));
     }
 
     public function get(int $tenantId, int|string $id): Result
@@ -54,29 +69,35 @@ final class TenantDomainService
     {
         try {
             $domain = $this->rules->normalizeDomain((string) ($payload['domain'] ?? ''));
+            $actorId = $this->currentUser->currentUserId();
+
             /** @var DataRecord $record */
-            $record = $this->transactions->runInTransaction(function () use (
-                $tenantId,
-                $payload,
-                $domain,
-            ): DataRecord {
+            $record = $this->transactions->runInTransaction(function () use ($tenantId, $domain, $actorId): DataRecord {
                 $record = $this->domains->create([
                     'tenant_id' => $tenantId,
                     'domain' => $domain,
-                    'status' => 'pending',
+                    'status' => TenantDomainStatus::PENDING,
+                    'ownership_status' => TenantDomainOwnershipStatus::PENDING,
+                    'routing_status' => TenantDomainCheckStatus::PENDING,
+                    'tls_status' => TenantDomainCheckStatus::PENDING,
+                    'reachability_status' => TenantDomainCheckStatus::PENDING,
+                    'operational_status' => TenantDomainOperationalStatus::PENDING,
                     'verification_method' => 'dns_txt',
                     'verification_failure_count' => 0,
-                    'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
-                    'created_by' => $this->currentUser->currentUserId(),
-                    'updated_by' => $this->currentUser->currentUserId(),
+                    'created_by' => $actorId,
+                    'updated_by' => $actorId,
                 ]);
 
                 $this->recordAudit(
                     'tenant.domain.created',
                     $record,
                     null,
-                    ['domain' => $domain, 'status' => 'pending'],
+                    [
+                        'domain' => $domain,
+                        'status' => TenantDomainStatus::PENDING,
+                        'ownership_status' => TenantDomainOwnershipStatus::PENDING,
+                    ],
                 );
 
                 return $record;
@@ -91,17 +112,9 @@ final class TenantDomainService
                 ));
             }
 
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.create'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.create'));
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.create'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.create'));
         }
     }
 
@@ -112,46 +125,58 @@ final class TenantDomainService
             if ($record === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant domain not found.'));
             }
+            if ($record->get('operational_status') === TenantDomainOperationalStatus::READY) {
+                return Result::failure(new Error(
+                    TenantErrorCode::CONFLICT,
+                    'This domain is already operationally verified. Disable it before starting a new ownership challenge.',
+                ));
+            }
 
             $token = bin2hex(random_bytes(24));
+            $tokenHash = hash('sha256', $token);
             $expiresAt = $this->clock->now()->modify(sprintf(
                 '+%d minutes',
                 max((int) config('tenant.domains.verification_ttl_minutes', 1440), 5),
             ));
-            $alreadyVerified = $record->get('status') === 'active'
-                && $record->get('verified_at') !== null
-                && trim((string) $record->get('verified_token_hash', '')) !== '';
-
-            $attributes = [
-                'verification_token_hash' => hash('sha256', $token),
-                'verification_expires_at' => $expiresAt,
-                'verification_last_error' => null,
-                'updated_by' => $this->currentUser->currentUserId(),
-            ];
-            if (! $alreadyVerified) {
-                $attributes = [
-                    ...$attributes,
-                    'status' => 'pending',
-                    'verified_at' => null,
-                    'verified_by' => null,
-                    'verified_token_hash' => null,
-                ];
-            }
+            $actorId = $this->currentUser->currentUserId();
 
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
                 $id,
                 $tenantId,
                 $expectedVersion,
-                $attributes,
                 $record,
+                $tokenHash,
+                $expiresAt,
+                $actorId,
             ): ?DataRecord {
-                $updated = $this->domains->updateWithVersion(
-                    $id,
-                    $tenantId,
-                    $expectedVersion,
-                    $attributes,
-                );
+                $updated = $this->domains->updateWithVersion($id, $tenantId, $expectedVersion, [
+                    'status' => TenantDomainStatus::PENDING,
+                    'ownership_status' => TenantDomainOwnershipStatus::PENDING,
+                    'verification_token_hash' => $tokenHash,
+                    'verified_token_hash' => null,
+                    'verification_expires_at' => $expiresAt,
+                    'verified_at' => null,
+                    'verified_by' => null,
+                    'last_verified_at' => null,
+                    'verification_failure_count' => 0,
+                    'verification_error_code' => null,
+                    'verification_error_message' => null,
+                    'revalidation_due_at' => null,
+                    'verification_grace_expires_at' => null,
+                    'operational_probe_token' => null,
+                    'operational_probe_token_hash' => null,
+                    'routing_status' => TenantDomainCheckStatus::PENDING,
+                    'tls_status' => TenantDomainCheckStatus::PENDING,
+                    'reachability_status' => TenantDomainCheckStatus::PENDING,
+                    'operational_status' => TenantDomainOperationalStatus::PENDING,
+                    'last_operational_check_at' => null,
+                    'operational_retry_at' => null,
+                    'tls_expires_at' => null,
+                    'operational_error_code' => null,
+                    'operational_error_message' => null,
+                    'updated_by' => $actorId,
+                ]);
                 if ($updated === null) {
                     return null;
                 }
@@ -159,8 +184,14 @@ final class TenantDomainService
                 $this->recordAudit(
                     'tenant.domain.verification_requested',
                     $updated,
-                    ['verification_expires_at' => $record->get('verification_expires_at')],
-                    ['verification_expires_at' => $updated->get('verification_expires_at')],
+                    [
+                        'ownership_status' => $record->get('ownership_status'),
+                        'verification_expires_at' => $record->get('verification_expires_at'),
+                    ],
+                    [
+                        'ownership_status' => TenantDomainOwnershipStatus::PENDING,
+                        'verification_expires_at' => $expiresAt->format(DATE_ATOM),
+                    ],
                 );
 
                 return $updated;
@@ -170,23 +201,19 @@ final class TenantDomainService
                 return $this->versionConflict();
             }
 
-            $prefix = (string) config('tenant.domains.verification_txt_prefix', '_autoerp-verification');
-            $valuePrefix = (string) config('tenant.domains.verification_value_prefix', 'autoerp-verification=');
-
             return Result::success([
                 'domain' => $updated,
                 'challenge' => [
                     'method' => 'dns_txt',
-                    'host' => $prefix.'.'.$updated->require('domain'),
-                    'value' => $valuePrefix.$token,
+                    'host' => $this->verificationHost((string) $updated->require('domain')),
+                    'value' => $this->verificationValue($token),
                     'expires_at' => $expiresAt->format(DATE_ATOM),
                 ],
             ]);
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
+            return Result::failure($this->normalizeFailure(
                 $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.request_verification'],
+                'tenant.domain.request_verification',
             ));
         }
     }
@@ -200,95 +227,58 @@ final class TenantDomainService
             }
 
             $pendingHash = trim((string) $record->get('verification_token_hash', ''));
-            $expiresAt = $record->get('verification_expires_at');
-            $now = $this->clock->now();
-            if (
-                $pendingHash === ''
-                || $expiresAt === null
-                || new DateTimeImmutable((string) $expiresAt) <= $now
-            ) {
+            $expiresAt = $this->asDateTime($record->get('verification_expires_at'));
+            if ($pendingHash === '' || $expiresAt === null || $expiresAt <= $this->clock->now()) {
                 return Result::failure(new Error(
                     TenantErrorCode::DOMAIN_NOT_VERIFIED,
                     'Generate a new DNS verification challenge first.',
                 ));
             }
 
-            $verification = $this->verifier->verify(
-                (string) $record->require('domain'),
-                $pendingHash,
-            );
-            if (! $verification->verified) {
-                $failed = $this->domains->recordVerificationAttempt(
-                    $id,
-                    $tenantId,
-                    $expectedVersion,
-                    false,
-                    $verification->message,
-                    $now,
-                );
-                if ($failed === null) {
-                    return $this->versionConflict();
-                }
-
-                return Result::failure(new Error(
-                    TenantErrorCode::DOMAIN_NOT_VERIFIED,
-                    $verification->message ?? 'Domain ownership could not be verified.',
-                    ['verification_error' => $verification->errorCode],
-                ));
-            }
-
-            $revalidationDueAt = $this->nextRevalidationAt($now);
-            $graceExpiresAt = $this->verificationGraceExpiresAt($now);
-
+            $actorId = $this->currentUser->currentUserId();
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
                 $id,
                 $tenantId,
                 $expectedVersion,
                 $record,
-                $pendingHash,
-                $now,
-                $revalidationDueAt,
-                $graceExpiresAt,
+                $actorId,
             ): ?DataRecord {
                 $updated = $this->domains->updateWithVersion($id, $tenantId, $expectedVersion, [
-                    'status' => 'active',
-                    'verified_at' => $now,
-                    'verified_by' => $this->currentUser->currentUserId(),
-                    'verified_token_hash' => $pendingHash,
-                    'verification_token_hash' => null,
-                    'verification_expires_at' => null,
-                    'last_verification_attempt_at' => $now,
-                    'last_verified_at' => $now,
-                    'verification_failure_count' => 0,
-                    'verification_last_error' => null,
-                    'revalidation_due_at' => $revalidationDueAt,
-                    'verification_grace_expires_at' => $graceExpiresAt,
-                    'updated_by' => $this->currentUser->currentUserId(),
+                    'ownership_status' => TenantDomainOwnershipStatus::CHECKING,
+                    'verification_error_code' => null,
+                    'verification_error_message' => null,
+                    'last_verification_attempt_at' => $this->clock->now(),
+                    'updated_by' => $actorId,
                 ]);
                 if ($updated === null) {
                     return null;
                 }
 
                 $this->recordAudit(
-                    'tenant.domain.verified',
+                    'tenant.domain.verification_queued',
                     $updated,
-                    ['status' => $record->get('status')],
-                    ['status' => 'active'],
+                    ['ownership_status' => $record->get('ownership_status')],
+                    ['ownership_status' => TenantDomainOwnershipStatus::CHECKING],
                 );
 
                 return $updated;
             });
 
-            return $updated === null
-                ? $this->versionConflict()
-                : Result::success($updated);
+            if ($updated === null) {
+                return $this->versionConflict();
+            }
+
+            VerifyTenantDomainOwnership::dispatch(
+                $tenantId,
+                (int) $updated->id(),
+                $pendingHash,
+                $actorId,
+            )->afterCommit();
+
+            return Result::success($updated);
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.verify'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.verify'));
         }
     }
 
@@ -299,19 +289,19 @@ final class TenantDomainService
             if ($record === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant domain not found.'));
             }
-            if ($record->get('status') !== 'active' || $record->get('verified_at') === null) {
+            if (
+                $record->get('status') !== TenantDomainStatus::ACTIVE
+                || $record->get('ownership_status') !== TenantDomainOwnershipStatus::VERIFIED
+                || $record->get('operational_status') !== TenantDomainOperationalStatus::READY
+            ) {
                 return Result::failure(new Error(
                     TenantErrorCode::DOMAIN_NOT_VERIFIED,
-                    'Only a verified active domain can be primary.',
+                    'Only an ownership-verified, operationally ready domain can be primary.',
                 ));
             }
 
             /** @var DataRecord|null $updated */
-            $updated = $this->transactions->runInTransaction(function () use (
-                $id,
-                $tenantId,
-                $expectedVersion,
-            ): ?DataRecord {
+            $updated = $this->transactions->runInTransaction(function () use ($id, $tenantId, $expectedVersion): ?DataRecord {
                 $updated = $this->domains->setPrimaryWithVersion(
                     $id,
                     $tenantId,
@@ -332,15 +322,9 @@ final class TenantDomainService
                 return $updated;
             });
 
-            return $updated === null
-                ? $this->versionConflict()
-                : Result::success($updated);
+            return $updated === null ? $this->versionConflict() : Result::success($updated);
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.set_primary'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.set_primary'));
         }
     }
 
@@ -366,7 +350,13 @@ final class TenantDomainService
                 $record,
             ): ?DataRecord {
                 $updated = $this->domains->updateWithVersion($id, $tenantId, $expectedVersion, [
-                    'status' => 'disabled',
+                    'status' => TenantDomainStatus::DISABLED,
+                    'operational_status' => TenantDomainOperationalStatus::DISABLED,
+                    'routing_status' => TenantDomainCheckStatus::PENDING,
+                    'tls_status' => TenantDomainCheckStatus::PENDING,
+                    'reachability_status' => TenantDomainCheckStatus::PENDING,
+                    'operational_probe_token' => null,
+                    'operational_probe_token_hash' => null,
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
                 if ($updated === null) {
@@ -376,22 +366,22 @@ final class TenantDomainService
                 $this->recordAudit(
                     'tenant.domain.disabled',
                     $updated,
-                    ['status' => $record->get('status')],
-                    ['status' => 'disabled'],
+                    [
+                        'status' => $record->get('status'),
+                        'operational_status' => $record->get('operational_status'),
+                    ],
+                    [
+                        'status' => TenantDomainStatus::DISABLED,
+                        'operational_status' => TenantDomainOperationalStatus::DISABLED,
+                    ],
                 );
 
                 return $updated;
             });
 
-            return $updated === null
-                ? $this->versionConflict()
-                : Result::success($updated);
+            return $updated === null ? $this->versionConflict() : Result::success($updated);
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.disable'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.disable'));
         }
     }
 
@@ -402,10 +392,10 @@ final class TenantDomainService
             if ($record === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant domain not found.'));
             }
-            if ((bool) $record->get('is_primary') || $record->get('status') === 'active') {
+            if ((bool) $record->get('is_primary') || $record->get('status') !== TenantDomainStatus::DISABLED) {
                 return Result::failure(new Error(
                     TenantErrorCode::CONFLICT,
-                    'Active or primary domains must be disabled before removal.',
+                    'Disable the non-primary domain before removing it.',
                 ));
             }
 
@@ -429,32 +419,34 @@ final class TenantDomainService
                 return true;
             });
 
-            return $deleted
-                ? Result::success(true)
-                : $this->versionConflict();
+            return $deleted ? Result::success(true) : $this->versionConflict();
         } catch (Throwable $exception) {
-            return Result::failure($this->errors->normalize(
-                $exception,
-                TenantErrorCode::INVALID_VALUE,
-                ['operation' => 'tenant.domain.delete'],
-            ));
+            return Result::failure($this->normalizeFailure($exception, 'tenant.domain.delete'));
         }
     }
 
-    private function nextRevalidationAt(DateTimeImmutable $now): DateTimeImmutable
+    private function verificationHost(string $domain): string
     {
-        return $now->modify(sprintf(
-            '+%d hours',
-            max((int) config('tenant.domains.revalidation_interval_hours', 24), 1),
-        ));
+        return (string) config('tenant.domains.verification_txt_prefix', '_autoerp-verification').'.'.$domain;
     }
 
-    private function verificationGraceExpiresAt(DateTimeImmutable $now): DateTimeImmutable
+    private function verificationValue(string $token): string
     {
-        return $now->modify(sprintf(
-            '+%d days',
-            max((int) config('tenant.domains.verification_grace_days', 7), 1),
-        ));
+        return (string) config('tenant.domains.verification_value_prefix', 'autoerp-verification=').$token;
+    }
+
+    private function asDateTime(mixed $value): ?DateTimeImmutable
+    {
+        if ($value instanceof DateTimeImmutable) {
+            return $value;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return DateTimeImmutable::createFromInterface($value);
+        }
+
+        $text = trim((string) $value);
+
+        return $text === '' ? null : new DateTimeImmutable($text);
     }
 
     private function isUniqueConstraintViolation(QueryException $exception): bool
@@ -470,6 +462,15 @@ final class TenantDomainService
             TenantErrorCode::VERSION_CONFLICT,
             'Domain changed since it was loaded. Refresh and try again.',
         ));
+    }
+
+    private function normalizeFailure(Throwable $exception, string $operation): Error
+    {
+        return $this->errors->normalize(
+            $exception,
+            TenantErrorCode::INVALID_VALUE,
+            ['operation' => $operation],
+        );
     }
 
     /** @param array<string, mixed>|null $old @param array<string, mixed>|null $new */
@@ -490,4 +491,12 @@ final class TenantDomainService
             tags: ['tenant', 'domain'],
         ));
     }
+
+    private function optionalString(mixed $value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+
+        return $value === '' ? null : $value;
+    }
+
 }

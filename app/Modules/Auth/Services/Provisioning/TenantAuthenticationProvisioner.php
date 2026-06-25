@@ -16,12 +16,8 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
         private readonly RegistrationInvitationService $invitations,
     ) {}
 
-    public function provisionInitialAdministrator(
-        int $tenantId,
-        int $organizationUnitId,
-        int $roleId,
-        string $email,
-    ): array {
+    public function provisionProvider(int $tenantId): array
+    {
         $provider = AuthProviderModel::query()->updateOrCreate(
             [
                 'tenant_id' => $tenantId,
@@ -41,25 +37,87 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
             ],
         );
 
-        return [
-            'provider_id' => (int) $provider->getKey(),
-            ...$this->invitations->issueInitialAdministrator(
-                $tenantId,
-                $organizationUnitId,
-                $roleId,
-                $email,
-            ),
-        ];
+        return ['provider_id' => (int) $provider->getKey()];
     }
 
-    public function isReady(int $tenantId): bool
+    public function issueInitialAdministratorInvitation(
+        int $tenantId,
+        int $organizationUnitId,
+        int $roleId,
+        string $email,
+    ): array {
+        return $this->invitations->issueInitialAdministrator(
+            $tenantId,
+            $organizationUnitId,
+            $roleId,
+            $email,
+        );
+    }
+
+    public function providerIsReady(int $tenantId, bool $lockForUpdate = false): bool
     {
         return AuthProviderModel::query()
             ->where('tenant_id', $tenantId)
             ->where('provider_key', self::INTERNAL_PROVIDER_KEY)
             ->where('status', 'active')
             ->whereNull('deleted_at')
-            ->exists()
-            && $this->invitations->hasUsableInitialAdministratorInvitation($tenantId);
+            ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
+            ->exists();
     }
+
+    public function acceptedInitialAdministratorUserId(
+        int $tenantId,
+        ?int $invitationId = null,
+        bool $lockForUpdate = false,
+    ): ?int {
+        return $this->invitations->acceptedInitialAdministratorUserId(
+            $tenantId,
+            $invitationId,
+            $lockForUpdate,
+        );
+    }
+
+    public function hasPendingInitialAdministratorInvitation(int $tenantId, ?int $invitationId = null): bool
+    {
+        return $this->invitations->hasPendingInitialAdministratorInvitation($tenantId, $invitationId);
+    }
+
+    public function initialAdministratorInvitationStatus(int $tenantId, ?int $invitationId = null): ?array
+    {
+        return $this->invitations->initialAdministratorStatus($tenantId, $invitationId);
+    }
+
+    public function resendInitialAdministratorInvitation(int $tenantId, int $invitationId, int $expectedVersion): array
+    {
+        return $this->invitations->resendInitialAdministrator($tenantId, $invitationId, $expectedVersion);
+    }
+
+    public function revokeInitialAdministratorInvitation(
+        int $tenantId,
+        int $invitationId,
+        int $expectedVersion,
+        string $reason,
+    ): void {
+        $this->invitations->revokeInitialAdministrator($tenantId, $invitationId, $expectedVersion, $reason);
+    }
+    public function replaceInitialAdministratorInvitation(
+        int $tenantId,
+        int $invitationId,
+        int $expectedVersion,
+        int $organizationUnitId,
+        int $roleId,
+        string $email,
+        string $reason,
+    ): array {
+        return $this->invitations->replaceInitialAdministrator(
+            $tenantId,
+            $invitationId,
+            $expectedVersion,
+            $organizationUnitId,
+            $roleId,
+            $email,
+            $reason,
+        );
+    }
+
 }

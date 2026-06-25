@@ -15,6 +15,9 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Tenant\Constants\TenantDomainOperationalStatus;
+use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
+use Modules\Tenant\Constants\TenantDomainStatus;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
@@ -86,7 +89,13 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return null;
         }
         $domain = $this->domains->findByDomainFromControlPlane($host);
-        if ($domain === null || $domain->get('status') !== 'active' || $domain->get('verified_at') === null) {
+        if (
+            $domain === null
+            || $domain->get('status') !== TenantDomainStatus::ACTIVE
+            || $domain->get('ownership_status') !== TenantDomainOwnershipStatus::VERIFIED
+            || $domain->get('operational_status') !== TenantDomainOperationalStatus::READY
+            || $domain->get('verified_at') === null
+        ) {
             return null;
         }
         $tenantId = $this->positiveInt($domain->get('tenant_id'));

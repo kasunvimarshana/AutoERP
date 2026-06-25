@@ -19,9 +19,9 @@ export default function SettingsPage({ mode = 'tenant' }: { mode?: 'tenant' | 'p
     return (
         <>
             <ContentHeader
-                title={platformMode ? 'Platform defaults' : 'Configuration'}
+                title={platformMode ? 'Platform defaults and overrides' : 'Configuration'}
                 description={platformMode
-                    ? 'Review global defaults, understand inheritance, and manage approved overrides without exposing protected values.'
+                    ? 'Review global defaults and guided tenant or organization-unit overrides, inspect immutable history, and manage approved values without exposing protected data.'
                     : 'Manage approved tenant and organization-unit settings through guided, validated overrides.'}
             />
             <ConfigurationSettingsPanel

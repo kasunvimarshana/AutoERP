@@ -14,8 +14,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     const textareaId = id ?? props.name ?? generatedId;
     const messageId = `${textareaId}-message`;
     return (
-        <label className="block text-sm text-slate-700" htmlFor={textareaId}>
-            {label && <span className="mb-1.5 block font-medium">{label}</span>}
+        <div className="block text-sm text-slate-700">
+            {label ? <label className="mb-1.5 block font-medium" htmlFor={textareaId}>{label}</label> : null}
             <textarea
                 ref={ref}
                 id={textareaId}
@@ -25,6 +25,6 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
                 {...props}
             />
             {error ? <span id={messageId} className="mt-1 block text-xs text-rose-600">{error}</span> : hint ? <span id={messageId} className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
-        </label>
+        </div>
     );
 });

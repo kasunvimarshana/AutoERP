@@ -32,7 +32,7 @@ final class UpsertTenantPlanRequest extends FormRequest
             'features.enabled_modules.*' => [
                 'string',
                 'distinct:strict',
-                Rule::in(TenantPlanSchema::SUPPORTED_MODULES),
+                Rule::in(array_keys(TenantPlanSchema::SUPPORTED_MODULES)),
             ],
             'limits' => ['nullable', 'array:'.implode(',', TenantPlanSchema::SUPPORTED_LIMITS)],
             'limits.max_users' => ['nullable', 'integer', 'min:1'],
@@ -47,7 +47,9 @@ final class UpsertTenantPlanRequest extends FormRequest
                 'in:month,quarter,year',
             ],
             'effective_at' => [$creating ? 'nullable' : 'sometimes', 'date'],
-            'metadata' => ['nullable', 'array'],
+            'change_note' => $creating
+                ? ['required', 'string', 'min:5', 'max:1000']
+                : ['required_with:features,limits,price,currency_id,billing_interval,effective_at', 'string', 'min:5', 'max:1000'],
         ];
     }
 }

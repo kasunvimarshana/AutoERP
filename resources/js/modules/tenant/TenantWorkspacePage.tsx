@@ -30,7 +30,6 @@ export default function TenantWorkspacePage() {
                 <TabPanel tabsId="tenant-workspace" tabId="profile" active={activeTab}>
                     <TenantProfilePanel
                         canManage={hasPermission(auth, tenantPermissions.profileManage)}
-                        canManageCrossOrg={hasPermission(auth, tenantPermissions.crossOrgPolicyManage)}
                     />
                 </TabPanel>
                 <TabPanel tabsId="tenant-workspace" tabId="domains" active={activeTab}>

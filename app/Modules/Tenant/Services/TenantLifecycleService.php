@@ -17,6 +17,7 @@ use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Models\TenantLifecycleEventModel;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Events\TenantEventOutboxService;
@@ -35,6 +36,7 @@ final class TenantLifecycleService
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantReadinessService $readiness,
         private readonly TenantOnboardingStateModel $onboardingStates,
+        private readonly TenantLifecycleEventModel $lifecycleEvents,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TenantEventOutboxService $outbox,
@@ -106,7 +108,7 @@ final class TenantLifecycleService
                 // Domain, subscription, and onboarding readiness may change after the
                 // preflight response. Activation therefore rechecks every invariant
                 // while the tenant row is locked.
-                $readiness = $this->readiness->inspect($tenantId);
+                $readiness = $this->readiness->inspect($tenantId, true);
                 if (! $readiness['ready']) {
                     return [
                         'status' => self::OUTCOME_READINESS_BLOCKED,
@@ -122,8 +124,12 @@ final class TenantLifecycleService
                 'activated_at' => $targetStatus === TenantStatus::ACTIVE
                     ? ($locked->get('activated_at') ?? $now)
                     : $locked->get('activated_at'),
-                'suspended_at' => $targetStatus === TenantStatus::SUSPENDED ? $now : null,
-                'archived_at' => $targetStatus === TenantStatus::ARCHIVED ? $now : null,
+                'suspended_at' => $targetStatus === TenantStatus::SUSPENDED
+                    ? $now
+                    : $locked->get('suspended_at'),
+                'archived_at' => $targetStatus === TenantStatus::ARCHIVED
+                    ? $now
+                    : $locked->get('archived_at'),
                 'updated_by' => $this->currentUser->currentUserId(),
             ];
 
@@ -141,14 +147,25 @@ final class TenantLifecycleService
                     if ($state instanceof TenantOnboardingStateModel) {
                         $state->forceFill([
                             'status' => TenantOnboardingStatus::COMPLETED,
-                            'completed_at' => now(),
-                            'last_error' => null,
+                            'completed_at' => $this->clock->now(),
+                            'failed_step' => null,
+                            'last_error_code' => null,
+                            'last_error_message' => null,
                             'row_version' => (int) $state->getAttribute('row_version') + 1,
                             'updated_by' => $this->currentUser->currentUserId(),
                         ])->save();
                     }
                 });
             }
+
+            $this->lifecycleEvents->newQuery()->create([
+                'tenant_id' => $tenantId,
+                'previous_status' => $currentStatus,
+                'new_status' => $targetStatus,
+                'reason' => $normalizedReason,
+                'actor_id' => $this->currentUser->currentUserId(),
+                'occurred_at' => $now,
+            ]);
 
             $this->audit->recordPlatform(new AuditEventData(
                 eventName: 'tenant.status_changed',

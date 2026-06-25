@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Tenant\Constants\TenantDomainCheckStatus;
+use Modules\Tenant\Constants\TenantDomainOperationalStatus;
+use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
+use Modules\Tenant\Constants\TenantDomainStatus;
 use Modules\Tenant\Models\TenantDomainModel;
 use Modules\Tenant\Models\TenantPrimaryDomainModel;
 
@@ -52,15 +56,18 @@ final class TenantDomainSeeder extends Seeder
                             ['domain' => $domain],
                             [
                                 'tenant_id' => $tenantId,
-                                'status' => 'active',
+                                'status' => TenantDomainStatus::ACTIVE,
+                                'ownership_status' => TenantDomainOwnershipStatus::VERIFIED,
+                                'routing_status' => TenantDomainCheckStatus::READY,
+                                'tls_status' => TenantDomainCheckStatus::READY,
+                                'reachability_status' => TenantDomainCheckStatus::READY,
+                                'operational_status' => TenantDomainOperationalStatus::READY,
                                 'verification_method' => 'dns_txt',
+                                'verified_token_hash' => hash('sha256', 'local-testing-domain-proof'),
                                 'verified_at' => now(),
                                 'last_verified_at' => now(),
+                                'last_operational_check_at' => now(),
                                 'row_version' => 1,
-                                'metadata' => [
-                                    'seed_source' => 'tenant_module',
-                                    'synthetic_verification' => true,
-                                ],
                             ],
                         );
 

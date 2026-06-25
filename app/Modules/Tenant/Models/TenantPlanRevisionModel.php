@@ -18,7 +18,7 @@ final class TenantPlanRevisionModel extends CoreModel
 
     protected $fillable = [
         'tenant_plan_id', 'revision_number', 'features', 'limits', 'price',
-        'currency_id', 'billing_interval', 'effective_at', 'created_by', 'created_at',
+        'currency_id', 'billing_interval', 'effective_at', 'change_note', 'created_by', 'created_at',
     ];
 
     protected static function booted(): void

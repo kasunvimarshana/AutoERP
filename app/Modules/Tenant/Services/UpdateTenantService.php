@@ -9,10 +9,8 @@ use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
-use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -20,7 +18,7 @@ use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
-use Psr\Log\LoggerInterface;
+use Modules\Tenant\Services\Storage\TenantLogoStorageService;
 use Throwable;
 
 final class UpdateTenantService
@@ -30,13 +28,11 @@ final class UpdateTenantService
         private readonly TenantValueNormalizerInterface $rules,
         private readonly TenantReferenceValidator $references,
         private readonly SlugGeneratorInterface $slugger,
-        private readonly UuidGeneratorInterface $uuid,
-        private readonly FileStorageServiceInterface $files,
+        private readonly TenantLogoStorageService $logos,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
-        private readonly LoggerInterface $logger,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -50,6 +46,7 @@ final class UpdateTenantService
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
             }
 
+            $tenantId = (int) $existing->id();
             $expectedVersion = (int) ($payload['expected_version'] ?? 0);
             if ($expectedVersion < 1) {
                 return Result::failure(new Error(TenantErrorCode::VERSION_CONFLICT, 'The current tenant version is required.'));
@@ -65,10 +62,7 @@ final class UpdateTenantService
                 ? $this->positiveInt($payload['base_currency_id'])
                 : $this->positiveInt($existing->get('base_currency_id'));
             $existingBaseCurrencyId = $this->positiveInt($existing->get('base_currency_id'));
-            if (
-                $existing->get('status') !== TenantStatus::DRAFT
-                && $baseCurrencyId !== $existingBaseCurrencyId
-            ) {
+            if ($existing->get('status') !== TenantStatus::DRAFT && $baseCurrencyId !== $existingBaseCurrencyId) {
                 return Result::failure(new Error(
                     TenantErrorCode::INVALID_VALUE,
                     'Base accounting currency can only be changed while the tenant is in draft status.',
@@ -78,24 +72,31 @@ final class UpdateTenantService
                 $this->references->assertActiveCurrency($baseCurrencyId);
             }
 
-            $oldLogoPath = is_string($existing->get('logo_path')) ? $existing->get('logo_path') : null;
+            $oldLogoPath = is_string($existing->get('logo_path'))
+                ? trim((string) $existing->get('logo_path')) ?: null
+                : null;
             $removeLogo = (bool) ($payload['remove_logo'] ?? false);
             $logoPath = $removeLogo ? null : $oldLogoPath;
             if (isset($payload['logo_tmp_path'])) {
-                $newLogoPath = $this->storeLogo((string) $payload['logo_tmp_path'], $slug);
+                $newLogoPath = $this->logos->store(
+                    $tenantId,
+                    (string) $payload['logo_tmp_path'],
+                    (string) ($payload['logo_original_name'] ?? 'logo.bin'),
+                );
                 $logoPath = $newLogoPath;
             }
 
             /** @var DataRecord|null $updated */
             $updated = $this->transactions->runInTransaction(function () use (
                 $id,
+                $tenantId,
                 $expectedVersion,
-                $payload,
                 $existing,
                 $code,
                 $name,
                 $slug,
                 $logoPath,
+                $oldLogoPath,
                 $baseCurrencyId,
             ): ?DataRecord {
                 $updated = $this->tenants->updateWithVersion($id, $expectedVersion, [
@@ -103,17 +104,15 @@ final class UpdateTenantService
                     'name' => $name,
                     'slug' => $slug,
                     'logo_path' => $logoPath,
-                    'cross_org_transactions' => array_key_exists('cross_org_transactions', $payload)
-                        ? (bool) $payload['cross_org_transactions']
-                        : (bool) $existing->get('cross_org_transactions'),
                     'base_currency_id' => $baseCurrencyId,
-                    'metadata' => array_key_exists('metadata', $payload)
-                        ? $this->rules->normalizeMetadata($payload['metadata'])
-                        : $this->rules->normalizeMetadata($existing->get('metadata')),
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
                 if ($updated === null) {
                     return null;
+                }
+
+                if ($oldLogoPath !== null && $oldLogoPath !== $logoPath) {
+                    $this->logos->scheduleCleanup($tenantId, $oldLogoPath, 'tenant logo replacement cleanup');
                 }
 
                 $this->audit->recordPlatform(new AuditEventData(
@@ -128,13 +127,13 @@ final class UpdateTenantService
                         'new' => $this->summary($updated),
                     ],
                     tags: ['tenant', 'platform'],
-                ), (int) $updated->id());
+                ), $tenantId);
 
                 return $updated;
             });
 
             if ($updated === null) {
-                $this->removeLogo($newLogoPath, 'version conflict cleanup');
+                $this->cleanupNewLogo($tenantId, $newLogoPath, 'tenant logo version conflict cleanup');
 
                 return Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
@@ -142,17 +141,15 @@ final class UpdateTenantService
                 ));
             }
 
-            if (
-                is_string($oldLogoPath)
-                && $oldLogoPath !== ''
-                && $oldLogoPath !== $logoPath
-            ) {
-                $this->removeLogo($oldLogoPath, 'replaced logo cleanup');
+            if ($oldLogoPath !== null && $oldLogoPath !== $logoPath) {
+                $this->logos->processCleanup($tenantId, $oldLogoPath);
             }
 
             return Result::success($updated);
         } catch (Throwable $exception) {
-            $this->removeLogo($newLogoPath, 'failed update cleanup');
+            if (isset($tenantId)) {
+                $this->cleanupNewLogo($tenantId, $newLogoPath, 'failed tenant logo update cleanup');
+            }
 
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -203,24 +200,14 @@ final class UpdateTenantService
         return null;
     }
 
-    private function storeLogo(string $temporaryPath, string $slug): string
+    private function cleanupNewLogo(int $tenantId, ?string $path, string $reason): void
     {
-        return $this->files->store(
-            $temporaryPath,
-            'tenants/logos',
-            sprintf('%s-%s', $slug, $this->uuid->generate()),
-        );
-    }
-
-    private function removeLogo(?string $path, string $reason): void
-    {
-        if ($path === null || $path === '' || ! $this->files->exists($path)) {
+        if ($path === null) {
             return;
         }
 
-        if (! $this->files->delete($path)) {
-            $this->logger->warning('Tenant logo cleanup failed.', ['path' => $path, 'reason' => $reason]);
-        }
+        $this->logos->scheduleCleanup($tenantId, $path, $reason);
+        $this->logos->processCleanup($tenantId, $path);
     }
 
     private function positiveInt(mixed $value): ?int
@@ -236,7 +223,7 @@ final class UpdateTenantService
             'name' => $record->get('name'),
             'slug' => $record->get('slug'),
             'base_currency_id' => $record->get('base_currency_id'),
-            'cross_org_transactions' => $record->get('cross_org_transactions'),
+            'has_logo' => is_string($record->get('logo_path')) && trim((string) $record->get('logo_path')) !== '',
         ];
     }
 }

@@ -11,7 +11,7 @@ final class TenantDomainRevalidateCommand extends Command
 {
     protected $signature = 'tenant:domains:revalidate {--limit= : Maximum domains to check}';
 
-    protected $description = 'Revalidate due tenant custom-domain DNS ownership proofs.';
+    protected $description = 'Revalidate tenant domain ownership proofs and queue due operational checks.';
 
     public function handle(RevalidateTenantDomainsService $service): int
     {
@@ -19,11 +19,12 @@ final class TenantDomainRevalidateCommand extends Command
         $summary = $service->execute(is_numeric($limit) ? (int) $limit : null);
 
         $this->info(sprintf(
-            'Checked %d; verified %d; failed %d; disabled %d.',
+            'Checked %d; verified %d; failed %d; disabled %d; operational checks queued %d.',
             $summary['checked'],
             $summary['verified'],
             $summary['failed'],
             $summary['disabled'],
+            $summary['operational_queued'],
         ));
 
         return self::SUCCESS;

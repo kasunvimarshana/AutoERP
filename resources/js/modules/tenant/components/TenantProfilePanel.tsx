@@ -14,10 +14,9 @@ import type { TenantRecord } from '../tenantTypes';
 
 type TenantProfilePanelProps = {
     canManage: boolean;
-    canManageCrossOrg: boolean;
 };
 
-export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfilePanelProps) {
+export function TenantProfilePanel({ canManage }: TenantProfilePanelProps) {
     const profile = useApi((signal) => getTenantProfile(signal), []);
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), []);
 
@@ -31,23 +30,20 @@ export function TenantProfilePanel({ canManage, canManageCrossOrg }: TenantProfi
             currencyOptions={currencies.data ?? []}
             loadError={profile.error ?? currencies.error}
             canManage={canManage}
-            canManageCrossOrg={canManageCrossOrg}
             onSaved={profile.setData}
         />
     );
 }
 
-function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, canManageCrossOrg, onSaved }: {
+function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, onSaved }: {
     tenant: TenantRecord;
     currencyOptions: Array<{ id: number; code?: string | null; name: string }>;
     loadError: ApiError | null;
     canManage: boolean;
-    canManageCrossOrg: boolean;
     onSaved: (tenant: TenantRecord) => void;
 }) {
     const [name, setName] = useState(tenant.name);
     const [currencyId, setCurrencyId] = useState(tenant.base_currency_id ? String(tenant.base_currency_id) : '');
-    const [crossOrg, setCrossOrg] = useState(tenant.cross_org_transactions);
     const [logo, setLogo] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<ApiError | null>(null);
@@ -62,7 +58,6 @@ function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, ca
             payload.append('expected_version', String(tenant.row_version));
             payload.append('name', name.trim());
             payload.append('base_currency_id', currencyId);
-            if (canManageCrossOrg) payload.append('cross_org_transactions', crossOrg ? '1' : '0');
             if (logo) payload.append('logo', logo);
             onSaved(await updateTenantProfile(payload));
         } catch (error: unknown) {
@@ -103,13 +98,9 @@ function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, ca
                         disabled={!canManage}
                         hint="PNG, JPEG, or WebP. Maximum 5 MB."
                     />
-                    <label className="flex min-h-10 items-center gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700">
-                        <input type="checkbox" checked={crossOrg} onChange={(event) => setCrossOrg(event.target.checked)} disabled={!canManageCrossOrg} />
-                        Allow approved transactions across organization units
-                    </label>
                 </div>
                 <p className="mt-4 text-xs leading-5 text-slate-500">
-                    Cross-organization transactions require a dedicated policy permission. Base accounting currency becomes immutable after the tenant is first activated. Document currencies and exchange rates remain controlled by their owning business modules.
+                    Base accounting currency becomes immutable after the tenant is first activated. Document currencies and exchange rates remain controlled by their owning business modules.
                 </p>
             </Panel>
             {canManage && <div className="flex justify-end"><Button type="submit" loading={saving}>Save tenant profile</Button></div>}

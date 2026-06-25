@@ -16,17 +16,24 @@ return new class extends Migration
             $table->enum('status', [
                 'pending',
                 'provisioning',
+                'awaiting_administrator',
                 'awaiting_domain',
                 'ready',
                 'completed',
                 'failed',
             ])->default('pending');
+            $table->uuid('operation_id')->nullable()->unique('tenant_onboarding_operation_uk');
+            $table->timestamp('operation_started_at')->nullable();
+            $table->timestamp('operation_lease_expires_at')->nullable();
             $table->string('initial_admin_email')->nullable();
             $table->unsignedBigInteger('root_organization_unit_id')->nullable();
             $table->unsignedBigInteger('super_admin_role_id')->nullable();
             $table->unsignedBigInteger('invitation_id')->nullable();
             $table->json('completed_steps')->nullable();
-            $table->string('last_error', 1000)->nullable();
+            $table->string('failed_step', 80)->nullable();
+            $table->string('last_error_code', 100)->nullable();
+            $table->string('last_error_message', 500)->nullable();
+            $table->uuid('correlation_id')->nullable()->index('tenant_onboarding_correlation_idx');
             $table->timestamp('provisioned_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -53,6 +60,7 @@ return new class extends Migration
                 ->restrictOnDelete();
             $table->index(['status', 'updated_at'], 'tenant_onboarding_status_idx');
         });
+
     }
 
     public function down(): void

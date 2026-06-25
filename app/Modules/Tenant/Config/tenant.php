@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 return [
+    'release' => [
+        'id' => env('APP_RELEASE'),
+        'commit' => env('APP_COMMIT_SHA'),
+    ],
+    'onboarding' => [
+        'operation_lease_minutes' => (int) env('TENANT_ONBOARDING_OPERATION_LEASE_MINUTES', 15),
+    ],
     'platform' => [
         'host_middleware_alias' => 'platform.host',
         'operator_middleware_alias' => 'platform.operator',
@@ -43,10 +50,22 @@ return [
         'max_attempts' => (int) env('TENANT_STORAGE_CLEANUP_MAX_ATTEMPTS', 10),
         'claim_timeout_seconds' => (int) env('TENANT_STORAGE_CLEANUP_CLAIM_TIMEOUT_SECONDS', 900),
     ],
+    'branding' => [
+        'max_logo_size_kb' => (int) env('TENANT_LOGO_MAX_SIZE_KB', 5120),
+        'allowed_logo_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
+    ],
     'documents' => [
         'disk' => env('TENANT_DOCUMENT_DISK', 'tenant_private'),
         'max_size_kb' => (int) env('TENANT_DOCUMENT_MAX_SIZE_KB', 10240),
         'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
+        'scanner' => [
+            'driver' => env('TENANT_DOCUMENT_SCANNER', 'clamav'),
+            'clamav' => [
+                'host' => env('TENANT_DOCUMENT_CLAMAV_HOST', '127.0.0.1'),
+                'port' => (int) env('TENANT_DOCUMENT_CLAMAV_PORT', 3310),
+                'timeout_seconds' => (float) env('TENANT_DOCUMENT_CLAMAV_TIMEOUT_SECONDS', 10),
+            ],
+        ],
     ],
     'domains' => [
         'verification_ttl_minutes' => (int) env('TENANT_DOMAIN_VERIFICATION_TTL_MINUTES', 1440),
@@ -56,5 +75,11 @@ return [
         'verification_grace_days' => (int) env('TENANT_DOMAIN_VERIFICATION_GRACE_DAYS', 7),
         'revalidation_batch_size' => (int) env('TENANT_DOMAIN_REVALIDATION_BATCH_SIZE', 100),
         'revalidation_claim_timeout_minutes' => (int) env('TENANT_DOMAIN_REVALIDATION_CLAIM_TIMEOUT_MINUTES', 30),
+        'operational_connect_timeout_seconds' => (int) env('TENANT_DOMAIN_OPERATIONAL_CONNECT_TIMEOUT_SECONDS', 5),
+        'operational_timeout_seconds' => (int) env('TENANT_DOMAIN_OPERATIONAL_TIMEOUT_SECONDS', 10),
+        'operational_retry_minutes' => (int) env('TENANT_DOMAIN_OPERATIONAL_RETRY_MINUTES', 15),
+        'minimum_tls_validity_days' => (int) env('TENANT_DOMAIN_MINIMUM_TLS_VALIDITY_DAYS', 1),
+        'probe_rate_limit_per_minute' => (int) env('TENANT_DOMAIN_PROBE_RATE_LIMIT_PER_MINUTE', 120),
+        'verification_rate_limit_per_minute' => (int) env('TENANT_DOMAIN_VERIFICATION_RATE_LIMIT_PER_MINUTE', 10),
     ],
 ];

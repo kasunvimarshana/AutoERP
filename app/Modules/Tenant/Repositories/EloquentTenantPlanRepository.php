@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
+use Modules\Core\Contracts\ClockInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Models\TenantPlanModel;
+use Modules\Tenant\Models\TenantPlanRevisionModel;
 
 final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterface
 {
-    public function __construct(private readonly TenantPlanModel $model) {}
+    public function __construct(
+        private readonly TenantPlanModel $model,
+        private readonly ClockInterface $clock,
+    ) {}
 
-    public function findById(int|string $id): ?DataRecord
+    public function findById(int|string $id, bool $lockForUpdate = false): ?DataRecord
     {
-        $model = $this->query()->find($id);
+        $query = $this->query()->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $model = $query->first();
 
         return $model instanceof TenantPlanModel ? $this->record($model) : null;
     }
@@ -30,13 +40,16 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
 
     public function create(array $attributes): DataRecord
     {
-        return $this->record($this->model->newQuery()->create($attributes)->load('latestRevision.currency'));
+        $model = $this->model->newQuery()->create($attributes);
+
+        return $this->findById($model->getKey()) ?? $this->record($model);
     }
 
     public function updateWithVersion(int|string $id, int $expectedVersion, array $attributes): ?DataRecord
     {
+        unset($attributes['id'], $attributes['row_version']);
         $attributes['row_version'] = $expectedVersion + 1;
-        $attributes['updated_at'] = now();
+        $attributes['updated_at'] = $this->clock->now();
         $updated = $this->model->newQuery()
             ->whereKey($id)
             ->where('row_version', $expectedVersion)
@@ -57,7 +70,7 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
             ->when(
                 $billingInterval !== null && trim($billingInterval) !== '',
                 fn (Builder $builder) => $builder->whereHas(
-                    'latestRevision',
+                    'currentRevision',
                     fn (Builder $revision) => $revision->where('billing_interval', trim($billingInterval)),
                 ),
             )
@@ -83,39 +96,54 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
         );
     }
 
-    public function isAssigned(int|string $id): bool
+    public function hasCurrentAssignments(int|string $id): bool
     {
         return $this->model->newQuery()
             ->whereKey($id)
-            ->whereHas('revisions', fn (Builder $revision) => $revision->whereHas('subscriptions'))
+            ->whereHas('revisions.subscriptions.currentAssignment', fn (Builder $query) => $query
+                ->where('state', TenantCurrentSubscriptionState::ASSIGNED))
             ->exists();
     }
 
     private function query(): Builder
     {
         return $this->model->newQuery()
-            ->with('latestRevision.currency')
+            ->with(['currentRevision.currency', 'latestRevision.currency'])
             ->withCount([
                 'revisions',
                 'subscriptions as total_subscription_count',
                 'subscriptions as current_subscription_count' => fn (Builder $query) => $query
-                    ->whereHas('currentAssignment'),
+                    ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
+                        ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
                 'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
-                    ->whereDoesntHave('currentAssignment'),
+                    ->whereDoesntHave('currentAssignment', fn (Builder $assignment) => $assignment
+                        ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
             ]);
     }
 
     private function record(TenantPlanModel $model): DataRecord
     {
         $payload = $model->attributesToArray();
-        $revision = $model->relationLoaded('latestRevision') ? $model->latestRevision : null;
-        $payload['latest_revision'] = $revision?->toArray();
-        if (is_array($payload['latest_revision'] ?? null)) {
-            $payload['latest_revision']['currency'] = $revision?->currency?->only([
-                'id', 'code', 'name', 'symbol', 'is_active',
-            ]);
-        }
+        $payload['current_revision'] = $this->revisionPayload(
+            $model->relationLoaded('currentRevision') ? $model->currentRevision : null,
+        );
+        $payload['latest_revision'] = $this->revisionPayload(
+            $model->relationLoaded('latestRevision') ? $model->latestRevision : null,
+        );
 
         return new DataRecord($payload);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function revisionPayload(?TenantPlanRevisionModel $revision): ?array
+    {
+        if ($revision === null) {
+            return null;
+        }
+
+        return [
+            ...$revision->attributesToArray(),
+            'currency' => $revision->currency?->only(['id', 'code', 'name', 'symbol', 'is_active']),
+        ];
     }
 }

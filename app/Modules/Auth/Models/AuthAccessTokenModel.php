@@ -25,6 +25,7 @@ final class AuthAccessTokenModel extends CoreModel
         'client_id',
         'identity_id',
         'session_id',
+        'platform_session_id',
         'user_id',
         'token_key',
         'token_hash',

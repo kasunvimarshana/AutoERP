@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import type { ReferenceCatalog, ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
+import { getPlatformTenantTarget, listPlatformTenantTargets } from '@/modules/tenant/tenantApi';
+import type { PlatformTenantTarget } from '@/modules/tenant/tenantTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
@@ -17,18 +21,25 @@ import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { ConfigurationTransferPanel } from './ConfigurationTransferPanel';
+import { ConfigurationHistoryModal } from './ConfigurationHistoryModal';
 import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import {
     createConfigurationEntry,
     deleteConfigurationEntry,
+    getPlatformConfigurationOrganizationTarget,
+    getGlobalConfigurationImpact,
     listConfigurationDefinitions,
     listConfigurationEntries,
+    listPlatformConfigurationOrganizationTargets,
     updateConfigurationEntry,
 } from '../settingsApi';
 import type {
     ConfigurationDefinition,
     ConfigurationEntry,
+    ConfigurationOrganizationTarget,
     ConfigurationScope,
+    PlatformConfigurationTarget,
 } from '../settingsTypes';
 
 interface Props {
@@ -55,16 +66,49 @@ export function ConfigurationSettingsPanel({
     const search = searchParams.get('search') ?? '';
     const owner = searchParams.get('owner') ?? '';
     const page = positivePage(searchParams.get('page'));
+    const selectedTenantId = positiveIdentifier(searchParams.get('tenant_id'));
+    const selectedOrganizationUnitId = positiveIdentifier(searchParams.get('organization_unit_id'));
     const debouncedSearch = useDebounce(search);
     const [editing, setEditing] = useState<EditorTarget>(null);
+    const [historyEntry, setHistoryEntry] = useState<ConfigurationEntry | null>(null);
     const [editorDirty, setEditorDirty] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [working, setWorking] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
 
+    const selectedTenant = useApi(
+        (signal) => getPlatformTenantTarget('configuration', selectedTenantId ?? 0, signal),
+        [selectedTenantId],
+        mode === 'platform' && scope !== 'global' && selectedTenantId !== null,
+        true,
+    );
+    const selectedOrganization = useApi(
+        (signal) => getPlatformConfigurationOrganizationTarget(
+            selectedTenantId ?? 0,
+            selectedOrganizationUnitId ?? 0,
+            signal,
+        ),
+        [selectedTenantId, selectedOrganizationUnitId],
+        mode === 'platform'
+            && scope === 'organization_unit'
+            && selectedTenantId !== null
+            && selectedOrganizationUnitId !== null,
+        true,
+    );
+    const platformTarget = platformConfigurationTarget(
+        mode,
+        scope,
+        selectedTenant.data,
+        selectedOrganization.data,
+    );
+    const targetReady = mode !== 'platform'
+        || scope === 'global'
+        || (scope === 'tenant' && platformTarget !== undefined)
+        || (scope === 'organization_unit' && platformTarget?.organization_unit_id !== undefined);
+
     const definitions = useApi(
-        (signal) => listConfigurationDefinitions(scope, signal),
-        [scope],
+        (signal) => listConfigurationDefinitions(scope, signal, mode === 'platform'),
+        [scope, mode],
         true,
         false,
     );
@@ -73,17 +117,21 @@ export function ConfigurationSettingsPanel({
             search: debouncedSearch || undefined,
             owner: owner || undefined,
             page,
-        }, signal),
-        [scope, debouncedSearch, owner, page],
+        }, signal, platformTarget),
+        [scope, debouncedSearch, owner, page, platformTarget?.tenant_id, platformTarget?.organization_unit_id],
+        targetReady,
         true,
-        false,
     );
 
-    const canManage = scope === 'global'
+    const hasManagePermission = mode === 'platform'
         ? canManageGlobal
         : scope === 'organization_unit'
             ? permissions.includes('configuration.entries.manage_organization')
             : permissions.includes('configuration.entries.manage_tenant');
+    const canManage = hasManagePermission
+        && targetReady
+        && !(mode === 'platform' && selectedTenant.data?.status === 'archived');
+    const canAudit = mode === 'platform' && permissions.includes(PLATFORM_PERMISSION.auditView);
     const owners = useMemo(() => {
         const values = (definitions.data ?? [])
             .filter((definition) => definition.allowed_scopes.includes(scope))
@@ -137,7 +185,7 @@ export function ConfigurationSettingsPanel({
         setActionError(null);
         setSuccess(null);
         try {
-            await deleteConfigurationEntry(scope, entry);
+            await deleteConfigurationEntry(scope, entry, platformTarget);
             entries.reload();
             setSuccess(`${entry.label} override was removed. ${scopeLabel(entry.inherited_source_scope)} is now effective.`);
         } catch (requestError: unknown) {
@@ -150,26 +198,30 @@ export function ConfigurationSettingsPanel({
     }
 
     const actions = (row: ConfigurationEntry) => {
-        if (!canManage) return null;
         const sensitiveDenied = row.sensitive && !canManageSensitive;
         return (
             <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    variant="secondary"
-                    disabled={working || sensitiveDenied}
-                    title={sensitiveDenied ? 'Sensitive settings require the platform secret-management permission.' : undefined}
-                    onClick={() => { setActionError(null); setSuccess(null); setEditorDirty(false); setEditing(row); }}
-                >
-                    Replace
-                </Button>
-                <Button
-                    variant="danger"
-                    disabled={working || sensitiveDenied}
-                    title={sensitiveDenied ? 'Sensitive settings require the platform secret-management permission.' : undefined}
-                    onClick={() => void remove(row)}
-                >
-                    Remove
-                </Button>
+                <Button variant="ghost" disabled={working} onClick={() => { setHistoryEntry(row); setActionError(null); }}>History</Button>
+                {canManage ? (
+                    <>
+                        <Button
+                            variant="secondary"
+                            disabled={working || sensitiveDenied}
+                            title={sensitiveDenied ? 'Sensitive settings require the platform secret-management permission.' : undefined}
+                            onClick={() => { setActionError(null); setSuccess(null); setEditorDirty(false); setEditing(row); }}
+                        >
+                            Replace
+                        </Button>
+                        <Button
+                            variant="danger"
+                            disabled={working || sensitiveDenied}
+                            title={sensitiveDenied ? 'Sensitive settings require the platform secret-management permission.' : undefined}
+                            onClick={() => void remove(row)}
+                        >
+                            Remove
+                        </Button>
+                    </>
+                ) : null}
             </div>
         );
     };
@@ -222,15 +274,24 @@ export function ConfigurationSettingsPanel({
                         <p className="mt-1">These values apply only when a tenant or organization unit has no more specific override. Protected values are replacement-only and never displayed.</p>
                     </div>
                 ) : null}
-                <div className={`grid gap-4 ${mode === 'platform' ? 'lg:grid-cols-[minmax(260px,1fr)_minmax(220px,0.6fr)_auto]' : 'lg:grid-cols-[minmax(220px,0.6fr)_minmax(260px,1fr)_minmax(220px,0.6fr)_auto]'} lg:items-end`}>
-                    {mode === 'tenant' ? (
-                        <Select
-                            label="Settings scope"
-                            value={scope}
-                            options={scopes}
-                            onChange={(event) => updateQuery({ scope: event.target.value, page: null })}
-                        />
-                    ) : null}
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,0.65fr)_minmax(260px,1fr)_minmax(220px,0.65fr)_auto] lg:items-end">
+                    <Select
+                        label="Settings scope"
+                        value={scope}
+                        options={scopes}
+                        onChange={(event) => {
+                            const nextScope = event.target.value as ConfigurationScope;
+                            setHistoryEntry(null);
+                            updateQuery({
+                                scope: nextScope,
+                                tenant_id: nextScope === 'global' ? null : selectedTenantId ? String(selectedTenantId) : null,
+                                organization_unit_id: nextScope === 'organization_unit' && selectedOrganizationUnitId
+                                    ? String(selectedOrganizationUnitId)
+                                    : null,
+                                page: null,
+                            });
+                        }}
+                    />
                     <Input
                         label="Search settings"
                         value={search}
@@ -255,7 +316,67 @@ export function ConfigurationSettingsPanel({
                         ) : null}
                     </div>
                 </div>
+                {mode === 'platform' && scope !== 'global' ? (
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                        <GenericLookupSelect<PlatformTenantTarget>
+                            label="Tenant configuration target"
+                            value={selectedTenant.data}
+                            onChange={(target) => {
+                                setHistoryEntry(null);
+                                updateQuery({
+                                    tenant_id: target ? String(target.id) : null,
+                                    organization_unit_id: null,
+                                    page: null,
+                                });
+                            }}
+                            search={(params) => listPlatformTenantTargets('configuration', params)}
+                            formatLabel={(target) => `${target.name} · ${target.code}`}
+                            placeholder="Search tenant name or code"
+                            minSearchLength={0}
+                            loadOnOpen
+                            required
+                            disabled={working}
+                        />
+                        {scope === 'organization_unit' ? (
+                            <GenericLookupSelect<ConfigurationOrganizationTarget>
+                                label="Organization-unit configuration target"
+                                value={selectedOrganization.data}
+                                onChange={(target) => {
+                                    setHistoryEntry(null);
+                                    updateQuery({
+                                        organization_unit_id: target ? String(target.id) : null,
+                                        page: null,
+                                    });
+                                }}
+                                search={(params) => selectedTenantId
+                                    ? listPlatformConfigurationOrganizationTargets(selectedTenantId, params)
+                                    : Promise.resolve({ data: [] })}
+                                formatLabel={(target) => `${target.name} · ${target.code}${target.is_active ? '' : ' · inactive'}`}
+                                placeholder={selectedTenantId ? 'Search organization unit' : 'Select a tenant first'}
+                                minSearchLength={0}
+                                loadOnOpen
+                                required
+                                disabled={working || selectedTenantId === null}
+                            />
+                        ) : null}
+                    </div>
+                ) : null}
+                <ErrorAlert error={selectedTenant.error ?? selectedOrganization.error} title="Unable to load configuration target" />
+                {mode === 'platform' && selectedTenant.data?.status === 'archived' ? (
+                    <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Archived tenant configuration is read-only. Existing effective values and revision history remain available for inspection.</p>
+                ) : null}
+                {mode === 'platform' && scope !== 'global' && !targetReady ? (
+                    <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Select the guided target above before loading or changing overrides.</p>
+                ) : null}
                 <p className="mt-3 text-sm text-slate-500">Only registered, runtime-mutable settings are available. The table shows exactly what becomes effective after an override is removed.</p>
+                {mode === 'platform' && scope === 'global' ? (
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                        <ConfigurationTransferPanel
+                            canManage={canManage}
+                            onApplied={(message) => { entries.reload(); setSuccess(message); }}
+                        />
+                    </div>
+                ) : null}
             </div>
 
             <SuccessAlert message={success} onDismiss={() => setSuccess(null)} />
@@ -311,9 +432,25 @@ export function ConfigurationSettingsPanel({
                             setActionError(null);
                             setSuccess(null);
                             try {
+                                if (scope === 'global') {
+                                    const impact = await getGlobalConfigurationImpact(definition.key);
+                                    const confirmed = await confirm({
+                                        title: 'Apply global configuration default',
+                                        message: (
+                                            <div className="space-y-2">
+                                                <p>Apply <strong>{definition.label}</strong> as the global default?</p>
+                                                <p><strong>{impact.inheriting_tenant_count}</strong> of {impact.tenant_count} tenant(s) currently inherit this value. {impact.tenant_override_count} tenant(s) have an explicit tenant override and will not change at tenant scope.</p>
+                                                <p className="text-sm text-slate-600">Organization-unit overrides remain authoritative where configured.</p>
+                                            </div>
+                                        ),
+                                        confirmLabel: editing === 'create' ? 'Add global default' : 'Replace global default',
+                                        danger: false,
+                                    });
+                                    if (!confirmed) return;
+                                }
                                 const saved = editing === 'create'
-                                    ? await createConfigurationEntry(scope, definition.key, value)
-                                    : await updateConfigurationEntry(scope, editing, value);
+                                    ? await createConfigurationEntry(scope, definition.key, value, platformTarget)
+                                    : await updateConfigurationEntry(scope, editing, value, platformTarget);
                                 setEditing(null);
                                 setEditorDirty(false);
                                 entries.reload();
@@ -333,6 +470,19 @@ export function ConfigurationSettingsPanel({
                     />
                 ) : null}
             </Modal>
+            <ConfigurationHistoryModal
+                entry={historyEntry}
+                scope={scope}
+                platformTarget={platformTarget}
+                canRollback={Boolean(historyEntry && canManage && (!historyEntry.sensitive || canManageSensitive))}
+                canAudit={canAudit}
+                onClose={() => setHistoryEntry(null)}
+                onChanged={(message) => {
+                    setHistoryEntry(null);
+                    entries.reload();
+                    setSuccess(message);
+                }}
+            />
             {confirmDialog}
         </section>
     );
@@ -384,6 +534,13 @@ function ConfigurationForm({
         false,
     );
 
+    const globalImpact = useApi(
+        (signal) => getGlobalConfigurationImpact(definition?.key ?? '', signal),
+        [definition?.key],
+        scope === 'global' && definition !== null,
+        false,
+    );
+
     if (candidates.length === 0 && entry === null) {
         return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No additional settings are available for this scope and permission set.</p>;
     }
@@ -424,6 +581,13 @@ function ConfigurationForm({
                     <p className="mt-3">{definition.description}</p>
                     <p className="mt-1 text-xs">This override applies to {scopeLabel(scope)}.</p>
                     {definition.sensitive ? <p className="mt-2 font-medium text-amber-800">The existing value is protected. Enter a complete replacement; leaving the field empty does not preserve the old value.</p> : null}
+                    {scope === 'global' ? (
+                        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">
+                            {globalImpact.loading ? <p>Calculating tenant impact…</p> : globalImpact.error ? <p>Tenant impact could not be loaded. Saving remains blocked by the confirmation-time impact check.</p> : globalImpact.data ? (
+                                <p><strong>{globalImpact.data.inheriting_tenant_count}</strong> of {globalImpact.data.tenant_count} tenant(s) currently inherit this global value. {globalImpact.data.tenant_override_count} tenant(s) have an explicit tenant override.</p>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
             {definition ? (
@@ -491,10 +655,30 @@ function ValueEditor({ definition, value, error, lookup, disabled, onChange }: {
 }
 
 function availableScopes(hasOrganizationUnit: boolean, mode: 'tenant' | 'platform'): Array<{ value: ConfigurationScope; label: string }> {
-    if (mode === 'platform') return [{ value: 'global', label: 'Global defaults' }];
+    if (mode === 'platform') return [
+        { value: 'global', label: 'Global defaults' },
+        { value: 'tenant', label: 'Selected tenant override' },
+        { value: 'organization_unit', label: 'Selected organization-unit override' },
+    ];
     const scopes: Array<{ value: ConfigurationScope; label: string }> = [{ value: 'tenant', label: 'Active tenant' }];
     if (hasOrganizationUnit) scopes.push({ value: 'organization_unit', label: 'Active organization unit' });
     return scopes;
+}
+
+function positiveIdentifier(value: string | null): number | null {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function platformConfigurationTarget(
+    mode: 'tenant' | 'platform',
+    scope: ConfigurationScope,
+    tenant: PlatformTenantTarget | null,
+    organization: ConfigurationOrganizationTarget | null,
+): PlatformConfigurationTarget | undefined {
+    if (mode !== 'platform' || scope === 'global' || !tenant) return undefined;
+    if (scope === 'tenant') return { tenant_id: tenant.id };
+    return organization ? { tenant_id: tenant.id, organization_unit_id: organization.id } : undefined;
 }
 
 function readScope(value: string | null, scopes: Array<{ value: ConfigurationScope }>): ConfigurationScope {

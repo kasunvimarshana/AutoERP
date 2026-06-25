@@ -9,7 +9,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Tenant\Constants\TenantPermission;
+use Modules\Tenant\Http\Requests\ListTenantDocumentRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantDocumentRequest;
 use Modules\Tenant\Http\Resources\TenantDocumentResource;
@@ -26,19 +28,22 @@ final class TenantDocumentController extends Controller
         private readonly TenantDocumentService $documents,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(ListTenantDocumentRequest $request): JsonResponse
     {
         $this->requirePermission(TenantPermission::DOCUMENTS_VIEW);
 
-        $result = $this->documents->list($this->tenantId());
+        $result = $this->documents->list($this->tenantId(), $request->validated());
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
 
-        return $result->isFailure()
-            ? TenantApiResponder::error($result->errorOrFail())
-            : response()->json([
-                'data' => TenantDocumentResource::collection(
-                    $result->valueOrFail(),
-                )->resolve(),
-            ]);
+        $page = $result->valueOrFail();
+        abort_unless($page instanceof PagedResult, 500, 'Unexpected tenant document list response.');
+
+        return response()->json([
+            'data' => TenantDocumentResource::collection($page->items)->resolve(),
+            'meta' => $page->paginationMeta(),
+        ]);
     }
 
     public function show(int|string $tenantDocument): JsonResponse|TenantDocumentResource

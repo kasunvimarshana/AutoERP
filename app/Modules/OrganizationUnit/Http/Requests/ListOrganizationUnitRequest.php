@@ -16,7 +16,7 @@ final class ListOrganizationUnitRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
+            'tenant_id' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 }

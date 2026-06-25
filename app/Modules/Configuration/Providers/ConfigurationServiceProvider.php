@@ -35,6 +35,9 @@ final class ConfigurationServiceProvider extends ServiceProvider
         $this->app->scoped(ConfigurationScopeResolver::class);
         $this->app->scoped(ConfigurationAuthorizationService::class);
         $this->app->scoped(ConfigurationEntryService::class);
+        $this->app->scoped(\Modules\Configuration\Services\ConfigurationGlobalImpactService::class);
+        $this->app->scoped(\Modules\Configuration\Services\ConfigurationTransferService::class);
+        $this->app->scoped(\Modules\Configuration\Services\ConfigurationRevisionService::class);
         $this->app->scoped(ResolveConfiguration::class);
         $this->app->scoped(
             ConfigurationResolverInterface::class,

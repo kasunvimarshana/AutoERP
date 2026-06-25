@@ -9,6 +9,7 @@ use DateTimeInterface;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
@@ -38,67 +39,64 @@ final class UpdateTenantPlanService
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly ClockInterface $clock,
     ) {}
 
     /** @param array<string, mixed> $payload */
     public function execute(int|string $id, array $payload): Result
     {
         try {
-            $existing = $this->plans->findById($id);
-            if ($existing === null) {
-                return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.'));
-            }
-
             $expectedVersion = (int) ($payload['expected_version'] ?? 0);
             if ($expectedVersion < 1) {
-                return Result::failure(new Error(TenantErrorCode::VERSION_CONFLICT, 'The current tenant plan version is required.'));
+                return Result::failure(new Error(
+                    TenantErrorCode::VERSION_CONFLICT,
+                    'The current tenant plan version is required.',
+                ));
             }
 
-            $slug = array_key_exists('slug', $payload)
-                ? $this->rules->normalizeSlug((string) $payload['slug'])
-                : (string) $existing->require('slug');
-            $duplicate = $this->plans->findBySlug($slug);
-            if ($duplicate !== null && (int) $duplicate->id() !== (int) $existing->id()) {
-                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan slug already exists.'));
-            }
+            /** @var array{status:string,record?:DataRecord} $outcome */
+            $outcome = $this->transactions->runInTransaction(function () use ($id, $payload, $expectedVersion): array {
+                $existing = $this->plans->findById($id, true);
+                if ($existing === null) {
+                    return ['status' => 'not_found'];
+                }
+                if ((int) $existing->require('row_version') !== $expectedVersion) {
+                    return ['status' => 'version_conflict'];
+                }
 
-            $latest = $this->revisions->findLatestByPlan($id);
-            if ($latest === null) {
-                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan has no immutable revision.'));
-            }
+                $slug = array_key_exists('slug', $payload)
+                    ? $this->rules->normalizeSlug((string) $payload['slug'])
+                    : (string) $existing->require('slug');
+                $duplicate = $this->plans->findBySlug($slug);
+                if ($duplicate !== null && (int) $duplicate->id() !== (int) $existing->id()) {
+                    return ['status' => 'duplicate'];
+                }
 
-            $revision = $this->revisionAttributes($payload, $latest);
-            $createRevision = $this->hasRevisionInput($payload)
-                && $this->revisionChanged($latest, $revision, $payload);
-            if ($createRevision) {
-                $this->references->assertPlanPricing(
-                    (string) $revision['price'],
-                    is_int($revision['currency_id']) ? $revision['currency_id'] : null,
-                );
-            }
+                $latest = $this->revisions->findLatestByPlan($id);
+                if ($latest === null) {
+                    return ['status' => 'missing_revision'];
+                }
 
-            /** @var DataRecord|null $updated */
-            $updated = $this->transactions->runInTransaction(function () use (
-                $id,
-                $expectedVersion,
-                $payload,
-                $existing,
-                $slug,
-                $revision,
-                $createRevision,
-            ): ?DataRecord {
+                $revision = $this->revisionAttributes($payload, $latest);
+                $createRevision = $this->hasRevisionInput($payload)
+                    && $this->revisionChanged($latest, $revision, $payload);
+                if ($createRevision) {
+                    $revision['change_note'] = $this->changeNote($payload['change_note'] ?? null);
+                    $this->references->assertPlanPricing(
+                        (string) $revision['price'],
+                        is_int($revision['currency_id']) ? $revision['currency_id'] : null,
+                    );
+                }
+
                 $updated = $this->plans->updateWithVersion($id, $expectedVersion, [
                     'name' => array_key_exists('name', $payload)
                         ? $this->rules->normalizeName((string) $payload['name'])
                         : $existing->get('name'),
                     'slug' => $slug,
-                    'metadata' => array_key_exists('metadata', $payload)
-                        ? $this->rules->normalizeMetadata($payload['metadata'])
-                        : $this->rules->normalizeMetadata($existing->get('metadata')),
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
                 if ($updated === null) {
-                    return null;
+                    return ['status' => 'version_conflict'];
                 }
 
                 $newRevision = $createRevision
@@ -121,15 +119,19 @@ final class UpdateTenantPlanService
                     tags: ['tenant', 'plan', 'platform'],
                 ));
 
-                return $updated;
+                return ['status' => 'success', 'record' => $updated];
             });
 
-            return $updated === null
-                ? Result::failure(new Error(
+            return match ($outcome['status']) {
+                'success' => Result::success($outcome['record']),
+                'not_found' => Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.')),
+                'duplicate' => Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan slug already exists.')),
+                'missing_revision' => Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant plan has no immutable revision.')),
+                default => Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
                     'Tenant plan changed since it was loaded. Refresh and try again.',
-                ))
-                : Result::success($updated);
+                )),
+            };
         } catch (Throwable $exception) {
             return Result::failure($this->errors->normalize(
                 $exception,
@@ -160,8 +162,10 @@ final class UpdateTenantPlanService
                 : (string) $latest->require('billing_interval'),
             'effective_at' => array_key_exists('effective_at', $payload)
                 ? $this->dateTime($payload['effective_at'])
-                : new DateTimeImmutable('now'),
+                : $this->clock->now(),
+            'change_note' => (string) ($latest->get('change_note') ?? ''),
             'created_by' => $this->currentUser->currentUserId(),
+            'created_at' => $this->clock->now(),
         ];
     }
 
@@ -184,6 +188,17 @@ final class UpdateTenantPlanService
     private function hasRevisionInput(array $payload): bool
     {
         return array_intersect(self::REVISION_FIELDS, array_keys($payload)) !== [];
+    }
+
+
+    private function changeNote(mixed $value): string
+    {
+        $note = is_scalar($value) ? trim((string) $value) : '';
+        if (mb_strlen($note) < 5) {
+            throw new \InvalidArgumentException('A meaningful plan revision note is required.');
+        }
+
+        return $note;
     }
 
     private function positiveInt(mixed $value): ?int

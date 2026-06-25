@@ -62,6 +62,30 @@ MUST design all user interfaces for speed, clarity, and task completion efficien
 
 Avoid hardcoded magic values. Use enums for predefined choices, constants for shared fixed values, and configuration or environment variables for configurable settings. Always use descriptive identifiers instead of raw literals to improve readability, maintainability, and consistency.
 
+Use portable Laravel migration APIs.
+
+Assume multiple actors can modify the same data at any time. Every write must be atomic, version-checked, and conflict-aware.
+
+Assume things happen simultaneously; design so the result stays correct.
+
+Concurrency = Multiple actors interacting with the same resources at overlapping times.
+
+Concurrency = Multiple actors operating on the same system or shared data during overlapping periods of time. Therefore, never assume exclusive access or a guaranteed execution order.
+
+Store every transaction with its original values and never modify historical records. Any later changes must be recorded separately and tracked through an audit trail. This ensures data integrity and accurate reporting.
+
+Keep the implementation DRY and maintainable, but avoid overengineering.
+
+Move tables to their correct owning module when clearly misplaced.
+
+Split migrations that create or modify multiple unrelated tables.
+
+Avoid generic migration frameworks, unnecessary abstractions and overengineering.
+
+Merge later `Schema::table()` patch migrations into the original table-creation migration where safe.
+
+Use one table per migration file.
+
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
 Always fix issues in the layer where the root cause exists. Backend issues must be resolved in the backend, not hidden or worked around in the frontend. Core business logic, validations, rules, calculations, permissions, and data integrity enforcement must be implemented and enforced in the backend as the single source of truth. The frontend should focus on presentation, user interaction, and user experience, and may only duplicate validations for immediate feedback—not as the authoritative enforcement point.

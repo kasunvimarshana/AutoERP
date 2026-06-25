@@ -8,6 +8,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\User\Console\Commands\UserCreateCommand;
+use Modules\User\Console\Commands\SyncPlatformPermissionCatalogCommand;
 use Modules\User\Contracts\AuthenticatedUserProviderInterface;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\User\Http\Middleware\RequirePlatformPermissionMiddleware;
@@ -140,6 +141,7 @@ final class UserServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 UserCreateCommand::class,
+                SyncPlatformPermissionCatalogCommand::class,
             ]);
         }
     }

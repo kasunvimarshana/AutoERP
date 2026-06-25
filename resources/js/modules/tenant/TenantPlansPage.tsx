@@ -39,6 +39,7 @@ type LifecycleRequest = { action: 'activate' | 'deactivate'; plan: TenantPlan } 
 export default function TenantPlansPage() {
     const auth = useAuth();
     const canManage = hasPermission(auth, PLATFORM_PERMISSION.plansManage);
+    const canAudit = hasPermission(auth, PLATFORM_PERMISSION.auditView);
     const [searchParams, setSearchParams] = useSearchParams();
     const search = searchParams.get('search') ?? '';
     const status = searchParams.get('status') ?? '';
@@ -183,7 +184,7 @@ export default function TenantPlansPage() {
                 </Panel>
             </div>
 
-            <TenantPlanRevisionHistory plan={historyPlan} onClose={() => setHistoryPlan(null)} />
+            <TenantPlanRevisionHistory plan={historyPlan} canAudit={canAudit} onClose={() => setHistoryPlan(null)} />
             <ConfirmDialog
                 open={lifecycleRequest !== null}
                 title={lifecycleRequest?.action === 'activate' ? 'Activate tenant plan' : 'Deactivate tenant plan'}

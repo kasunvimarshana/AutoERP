@@ -24,7 +24,7 @@ final class DnsTenantDomainOwnershipVerifier implements TenantDomainOwnershipVer
         } catch (Throwable $exception) {
             return TenantDomainVerificationResult::failed(
                 'dns_lookup_failed',
-                'DNS verification could not be completed: '.$exception->getMessage(),
+                'DNS verification could not be completed. The lookup will be retried automatically.',
             );
         } finally {
             restore_error_handler();

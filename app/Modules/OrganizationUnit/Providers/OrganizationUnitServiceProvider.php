@@ -24,6 +24,7 @@ use Modules\OrganizationUnit\Services\OrganizationUnitOwnershipChecker;
 use Modules\OrganizationUnit\Services\Rules\OrganizationUnitDomainService;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
 use Modules\OrganizationUnit\Services\Provisioning\TenantOrganizationProvisioner;
+use Modules\OrganizationUnit\Services\OrganizationUnits\OrganizationHierarchyService;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Modules\OrganizationUnit\Services\TenantLimits\OrganizationUnitLimitUsageContributor;
 
@@ -37,6 +38,7 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
         $this->app->singleton(OrganizationUnitDomainServiceInterface::class, OrganizationUnitDomainService::class);
         $this->app->singleton(OrganizationUnitOwnershipCheckerInterface::class, OrganizationUnitOwnershipChecker::class);
         $this->app->singleton(OrganizationUnitContext::class, OrganizationUnitContext::class);
+        $this->app->singleton(OrganizationHierarchyService::class);
         $this->app->singleton(TenantOrganizationProvisionerInterface::class, TenantOrganizationProvisioner::class);
         $this->app->singleton(OrganizationUnitTypeRepositoryInterface::class, fn (): OrganizationUnitTypeRepositoryInterface => new EloquentOrganizationUnitTypeRepository(new OrganizationUnitTypeModel));
         $this->app->singleton(OrganizationUnitRepositoryInterface::class, fn (): OrganizationUnitRepositoryInterface => new EloquentOrganizationUnitRepository(new OrganizationUnitModel));

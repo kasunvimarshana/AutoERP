@@ -6,9 +6,13 @@ import type { ConfigurationDefinition, ConfigurationEntry } from '../settingsTyp
 import { ConfigurationSettingsPanel } from './ConfigurationSettingsPanel';
 
 const apiMocks = vi.hoisted(() => ({
+    applyGlobalConfigurationImport: vi.fn(),
     createConfigurationEntry: vi.fn(),
+    exportGlobalConfiguration: vi.fn(),
+    getGlobalConfigurationImpact: vi.fn(),
     deleteConfigurationEntry: vi.fn(),
     listConfigurationDefinitions: vi.fn(),
+    previewGlobalConfigurationImport: vi.fn(),
     listConfigurationEntries: vi.fn(),
     updateConfigurationEntry: vi.fn(),
 }));
@@ -22,6 +26,8 @@ describe('ConfigurationSettingsPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         apiMocks.listConfigurationDefinitions.mockResolvedValue(definitions());
+        apiMocks.getGlobalConfigurationImpact.mockResolvedValue({ key: 'localization.timezone', tenant_count: 10, tenant_override_count: 2, inheriting_tenant_count: 8 });
+        apiMocks.exportGlobalConfiguration.mockResolvedValue({ schema_version: 1, scope: 'global', entries: [] });
         apiMocks.listConfigurationEntries.mockResolvedValue({
             data: entries(),
             meta: { current_page: 1, from: 1, last_page: 1, per_page: 25, to: 2, total: 2 },

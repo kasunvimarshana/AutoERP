@@ -12,12 +12,12 @@ final class TenantStorageCleanupJobModel extends TenantOwnedModel
 
     protected $fillable = [
         'tenant_id',
-        'storage_disk',
         'storage_path',
         'reason',
         'status',
         'attempts',
-        'last_error',
+        'last_error_code',
+        'last_error_message',
         'next_attempt_at',
         'claim_token',
         'claimed_at',

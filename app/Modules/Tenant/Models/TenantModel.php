@@ -15,9 +15,9 @@ final class TenantModel extends CoreModel
     protected $table = 'tenants';
 
     protected $fillable = [
-        'uuid', 'code', 'name', 'slug', 'logo_path', 'cross_org_transactions',
+        'uuid', 'code', 'name', 'slug', 'logo_path',
         'base_currency_id', 'status', 'status_reason',
-        'activated_at', 'suspended_at', 'archived_at', 'metadata',
+        'activated_at', 'suspended_at', 'archived_at',
         'row_version', 'created_by', 'updated_by',
     ];
 
@@ -25,11 +25,9 @@ final class TenantModel extends CoreModel
     {
         return array_merge(parent::casts(), [
             'base_currency_id' => 'integer',
-            'cross_org_transactions' => 'boolean',
             'activated_at' => 'datetime',
             'suspended_at' => 'datetime',
             'archived_at' => 'datetime',
-            'metadata' => 'array',
         ]);
     }
 

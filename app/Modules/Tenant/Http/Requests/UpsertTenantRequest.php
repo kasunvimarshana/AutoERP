@@ -27,16 +27,16 @@ final class UpsertTenantRequest extends FormRequest
             'code' => [...$required, 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'name' => [...$required, 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
-            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'remove_logo' => ['sometimes', 'boolean'],
-            'cross_org_transactions' => ['sometimes', 'boolean'],
+            'logo' => $creating
+                ? ['prohibited']
+                : ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.max((int) config('tenant.branding.max_logo_size_kb', 5120), 1)],
+            'remove_logo' => $creating ? ['prohibited'] : ['sometimes', 'boolean'],
             'base_currency_id' => [
                 'nullable',
                 'integer',
                 'min:1',
                 Rule::exists('currencies', 'id'),
             ],
-            'metadata' => ['nullable', 'array'],
         ];
     }
 }

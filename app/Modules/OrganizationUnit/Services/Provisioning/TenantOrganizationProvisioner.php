@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Services\Provisioning;
 
 use Illuminate\Support\Facades\DB;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
+use Modules\OrganizationUnit\Services\OrganizationUnits\OrganizationHierarchyService;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 
 final class TenantOrganizationProvisioner implements TenantOrganizationProvisionerInterface
 {
     private const ROOT_TYPE_NAME = 'Company';
+
+    public function __construct(private readonly OrganizationHierarchyService $hierarchy) {}
 
     public function provision(int $tenantId, string $tenantCode, string $tenantName): array
     {
@@ -29,43 +31,21 @@ final class TenantOrganizationProvisioner implements TenantOrganizationProvision
                 ],
             );
 
-            $root = OrganizationUnitModel::query()->firstOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'parent_id' => null,
-                    'code' => strtoupper(trim($tenantCode)),
-                ],
-                [
-                    'type_id' => (int) $type->getKey(),
-                    'name' => trim($tenantName),
-                    'path' => '/'.strtolower(trim($tenantCode)),
-                    'depth' => 0,
-                    'is_active' => true,
-                    'description' => 'Root organization unit created by tenant onboarding.',
-                    '_lft' => 1,
-                    '_rgt' => 2,
-                    'metadata' => ['system' => true, 'purpose' => 'tenant_root'],
-                    'row_version' => 1,
-                ],
+            $root = $this->hierarchy->createRoot(
+                tenantId: $tenantId,
+                typeId: (int) $type->getKey(),
+                code: $tenantCode,
+                name: $tenantName,
+                description: 'Protected root organization unit created by tenant onboarding.',
+                metadata: ['system' => true, 'purpose' => 'tenant_root'],
             );
-
-            if (! (bool) $root->getAttribute('is_active')) {
-                $root->forceFill([
-                    'is_active' => true,
-                    'row_version' => (int) $root->getAttribute('row_version') + 1,
-                ])->save();
-            }
 
             return ['organization_unit_id' => (int) $root->getKey()];
         }, 3);
     }
 
-    public function isReady(int $tenantId): bool
+    public function isReady(int $tenantId, bool $lockForUpdate = false): bool
     {
-        return OrganizationUnitModel::query()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('parent_id')
-            ->where('is_active', true)
-            ->exists();
+        return $this->hierarchy->rootIsReady($tenantId, $lockForUpdate);
     }
 }

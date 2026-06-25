@@ -20,17 +20,13 @@ final class AssignTenantSubscriptionRequest extends FormRequest
     {
         return [
             'expected_tenant_version' => ['required', 'integer', 'min:1'],
-            'tenant_plan_revision_id' => [
-                'required',
-                'integer',
-                'min:1',
-                Rule::exists('tenant_plan_revisions', 'id'),
-            ],
-            'status' => ['required', 'string', Rule::in(TenantSubscriptionStatus::assignable())],
+            'expected_subscription_version' => ['nullable', 'integer', 'min:1'],
+            'tenant_plan_revision_id' => ['required', 'integer', 'min:1', Rule::exists('tenant_plan_revisions', 'id')],
+            'contract_status' => ['required', 'string', Rule::in(TenantSubscriptionStatus::assignable())],
             'starts_at' => ['nullable', 'date'],
             'trial_ends_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date'],
-            'metadata' => ['nullable', 'array'],
+            'reason' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

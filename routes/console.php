@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('tenant:domains:revalidate')
-    ->hourly()
+    ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->onOneServer();
 

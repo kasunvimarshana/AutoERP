@@ -25,6 +25,8 @@ final class TenantDocumentResource extends JsonResource
             'mime_type',
             'size_bytes',
             'checksum_sha256',
+            'scan_engine',
+            'scanned_at',
             'row_version',
             'created_at',
             'updated_at',

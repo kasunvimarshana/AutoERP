@@ -10,7 +10,7 @@ use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\Tenant\Constants\PlatformPermission;
+use Modules\User\Constants\PlatformPermission;
 
 final class ConfigurationAuthorizationService
 {
@@ -52,6 +52,24 @@ final class ConfigurationAuthorizationService
             ? $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE)
                 && $this->allowsPlatformPermission(PlatformPermission::SECRETS_MANAGE)
             : $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_MANAGE_SENSITIVE);
+    }
+
+    public function canViewPlatformScope(string $scope): bool
+    {
+        return in_array($scope, ConfigurationScope::values(), true)
+            && $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
+    }
+
+    public function canManagePlatformScope(string $scope): bool
+    {
+        return in_array($scope, ConfigurationScope::values(), true)
+            && $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE);
+    }
+
+    public function canManagePlatformSensitive(): bool
+    {
+        return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE)
+            && $this->allowsPlatformPermission(PlatformPermission::SECRETS_MANAGE);
     }
 
     private function allowsPlatformPermission(string $permission): bool

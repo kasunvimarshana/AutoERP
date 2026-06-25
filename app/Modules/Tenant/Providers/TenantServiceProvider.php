@@ -7,6 +7,7 @@ namespace Modules\Tenant\Providers;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
@@ -29,6 +30,7 @@ use Modules\Tenant\Models\TenantDomainModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
+use Modules\Tenant\Models\TenantSubscriptionEventModel;
 use Modules\Tenant\Models\TenantSubscriptionModel;
 use Modules\Tenant\Models\TenantPrimaryDomainModel;
 use Modules\Tenant\Repositories\EloquentTenantDocumentRepository;
@@ -45,8 +47,15 @@ use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
+use Modules\Tenant\Services\Configuration\TenantConfigurationTargetPopulation;
+use Modules\Tenant\Services\Configuration\TenantConfigurationTargetValidator;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
+use Modules\Tenant\Services\Documents\Scanning\ClamAvTenantDocumentScanner;
+use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
+use Modules\Tenant\Services\Documents\Scanning\TrustedLocalTenantDocumentScanner;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
 use Modules\Tenant\Services\Subscriptions\TenantStorageLimitUsageContributor;
@@ -58,14 +67,34 @@ final class TenantServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/tenant.php', 'tenant');
+        $this->app->singleton(ConfigurationTargetValidatorInterface::class, TenantConfigurationTargetValidator::class);
+        $this->app->singleton(ConfigurationTargetPopulationInterface::class, TenantConfigurationTargetPopulation::class);
         $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
         $this->app->singleton(TenantValueNormalizerInterface::class, TenantValueNormalizer::class);
         $this->app->singleton(TenantDomainOwnershipVerifierInterface::class, DnsTenantDomainOwnershipVerifier::class);
+        $this->app->singleton(TenantDocumentScannerInterface::class, function (): TenantDocumentScannerInterface {
+            $driver = strtolower(trim((string) config('tenant.documents.scanner.driver', 'clamav')));
+
+            return match ($driver) {
+                'clamav' => new ClamAvTenantDocumentScanner(
+                    trim((string) config('tenant.documents.scanner.clamav.host', '127.0.0.1')),
+                    (int) config('tenant.documents.scanner.clamav.port', 3310),
+                    (float) config('tenant.documents.scanner.clamav.timeout_seconds', 10),
+                ),
+                'trusted_local' => new TrustedLocalTenantDocumentScanner(),
+                default => throw new LogicException(sprintf('Unsupported tenant document scanner [%s].', $driver)),
+            };
+        });
         $this->app->singleton(PlatformHostPolicy::class);
-        $this->app->singleton(TenantRepositoryInterface::class, fn (): TenantRepositoryInterface => new EloquentTenantRepository(new TenantModel));
-        $this->app->singleton(TenantPlanRepositoryInterface::class, fn (): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(new TenantPlanModel));
-        $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn (): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(new TenantPlanModel, new TenantPlanRevisionModel));
-        $this->app->scoped(TenantSubscriptionRepositoryInterface::class, fn (): TenantSubscriptionRepositoryInterface => new EloquentTenantSubscriptionRepository(new TenantSubscriptionModel, new TenantCurrentSubscriptionModel));
+        $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(new TenantModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->singleton(TenantPlanRepositoryInterface::class, fn ($app): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(new TenantPlanModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn ($app): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(new TenantPlanModel, new TenantPlanRevisionModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->scoped(TenantSubscriptionRepositoryInterface::class, fn ($app): TenantSubscriptionRepositoryInterface => new EloquentTenantSubscriptionRepository(
+            new TenantSubscriptionModel,
+            new TenantCurrentSubscriptionModel,
+            new TenantSubscriptionEventModel,
+            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+        ));
         $this->app->tag([TenantStorageLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->scoped(TenantSubscriptionReadinessService::class, fn ($app): TenantSubscriptionReadinessService => new TenantSubscriptionReadinessService(
             $app->make(TenantRepositoryInterface::class),
@@ -75,11 +104,12 @@ final class TenantServiceProvider extends ServiceProvider
             $app->make(TenantExecutionContextInterface::class),
             $app->tagged('tenant.limit_usage'),
         ));
-        $this->app->singleton(TenantDocumentRepositoryInterface::class, fn (): TenantDocumentRepositoryInterface => new EloquentTenantDocumentRepository(new TenantDocumentModel));
+        $this->app->singleton(TenantDocumentRepositoryInterface::class, fn ($app): TenantDocumentRepositoryInterface => new EloquentTenantDocumentRepository(new TenantDocumentModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
         $this->app->scoped(TenantDomainRepositoryInterface::class, fn ($app): TenantDomainRepositoryInterface => new EloquentTenantDomainRepository(
             new TenantDomainModel,
             new TenantPrimaryDomainModel,
             $app->make(TenantExecutionContextInterface::class),
+            $app->make(\Modules\Core\Contracts\ClockInterface::class),
         ));
     }
 
@@ -87,9 +117,12 @@ final class TenantServiceProvider extends ServiceProvider
     {
         $this->app->make(PermissionDefinitionRegistryInterface::class)
             ->register('tenant', TenantPermission::descriptions());
+        $this->app->make(ConfigurationDefinitionRegistryInterface::class)
+            ->register('Tenant', require __DIR__.'/../Config/configuration-definitions.php');
 
         $this->validateInfrastructureConfiguration();
         $this->validateDocumentDisk();
+        $this->validateDocumentScanner();
         $this->validateResolutionConfiguration();
         $router = $this->app->make(Router::class);
         $router->aliasMiddleware(
@@ -138,6 +171,27 @@ final class TenantServiceProvider extends ServiceProvider
             || (bool) ($configuration['serve'] ?? false)
         ) {
             throw new LogicException('Tenant documents require a non-public, non-served storage disk.');
+        }
+    }
+
+
+    private function validateDocumentScanner(): void
+    {
+        $driver = strtolower(trim((string) config('tenant.documents.scanner.driver', 'clamav')));
+        if (! in_array($driver, ['clamav', 'trusted_local'], true)) {
+            throw new LogicException(sprintf('Unsupported tenant document scanner [%s].', $driver));
+        }
+
+        if ($this->app->environment('production') && $driver !== 'clamav') {
+            throw new LogicException('Production tenant document uploads require the ClamAV scanner.');
+        }
+
+        if ($driver === 'clamav') {
+            $host = trim((string) config('tenant.documents.scanner.clamav.host', ''));
+            $port = (int) config('tenant.documents.scanner.clamav.port', 0);
+            if ($host === '' || $port < 1 || $port > 65535) {
+                throw new LogicException('ClamAV tenant document scanner connection is not configured.');
+            }
         }
     }
 
