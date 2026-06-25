@@ -13,21 +13,21 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class CurrentOrganizationUnitMiddleware
 {
+    private const MODE_CONFIGURED = 'configured';
+    private const MODE_REQUIRED = 'required';
+    private const MODE_OPTIONAL = 'optional';
+
     public function __construct(
         private readonly CurrentOrganizationUnitContextResolverInterface $resolver,
         private readonly ApiErrorResponseFactory $responses,
     ) {}
 
-    /**
-     * @param  Closure(Request): Response  $next
-     */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $mode = self::MODE_CONFIGURED): Response
     {
         try {
             $context = $this->resolver->resolve($request);
         } catch (CurrentOrganizationUnitContextResolutionException $exception) {
             report($exception);
-
             return $this->responses->forStatus(
                 Response::HTTP_UNPROCESSABLE_ENTITY,
                 'Organization unit context could not be resolved.',
@@ -35,20 +35,19 @@ final class CurrentOrganizationUnitMiddleware
         }
 
         if ($context === null) {
-            if ($this->required()) {
+            if ($this->isRequired($mode)) {
                 return $this->responses->forStatus(
                     Response::HTTP_BAD_REQUEST,
-                    'Unable to resolve organization unit context for the active request.',
+                    'Select an organization unit before performing this action.',
                 );
             }
-
             return $next($request);
         }
 
         if (! $this->resolver->hasAccess($request, $context)) {
             return $this->responses->forStatus(
                 Response::HTTP_FORBIDDEN,
-                'Authenticated user cannot access the resolved organization unit.',
+                'Authenticated user cannot access the selected organization unit.',
             );
         }
 
@@ -65,9 +64,14 @@ final class CurrentOrganizationUnitMiddleware
         return $next($request);
     }
 
-    private function required(): bool
+    private function isRequired(string $mode): bool
     {
-        return (bool) config('core.current_organization_unit.required', true);
+        return match ($mode) {
+            self::MODE_REQUIRED => true,
+            self::MODE_OPTIONAL => false,
+            self::MODE_CONFIGURED => (bool) config('core.current_organization_unit.required', false),
+            default => throw new \InvalidArgumentException('Unsupported organization-unit middleware mode.'),
+        };
     }
 
     private function configString(string $key, string $fallback): string

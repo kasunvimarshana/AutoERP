@@ -59,6 +59,7 @@ use Modules\User\Services\UserPermissionChecker;
 use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Services\TenantLimits\UserLimitUsageContributor;
+use Modules\User\Services\OrganizationUnit\UserOrganizationUnitLifecycleBlocker;
 
 final class UserServiceProvider extends ServiceProvider
 {
@@ -66,6 +67,7 @@ final class UserServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/user.php', 'user');
         $this->app->tag([UserLimitUsageContributor::class], 'tenant.limit_usage');
+        $this->app->tag([UserOrganizationUnitLifecycleBlocker::class], 'organization-unit.lifecycle_blocker');
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
         $this->app->singleton(PermissionDefinitionRegistryInterface::class, PermissionDefinitionRegistry::class);

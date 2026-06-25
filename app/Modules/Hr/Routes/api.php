@@ -12,7 +12,7 @@ use Modules\Hr\Http\Controllers\HrEmploymentTypeController;
 use Modules\Hr\Http\Controllers\HrLicenseController;
 use Modules\Hr\Http\Controllers\HrSkillController;
 
-$middleware = ['api', 'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'), (string) config('core.current_user.middleware_alias', 'current.user'), (string) config('core.current_tenant.middleware_alias', 'current.tenant'), (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit')];
+$middleware = ['api', 'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'), (string) config('core.current_user.middleware_alias', 'current.user'), (string) config('core.current_tenant.middleware_alias', 'current.tenant'), (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required'];
 
 Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(function (): void {
     Route::get('employees/lookup/{kind?}', [EmployeeController::class, 'lookup'])->whereIn('kind', ['active', 'available', 'service-available', 'by-skill', 'by-designation'])->name('employees.lookup');

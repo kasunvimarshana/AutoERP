@@ -18,6 +18,7 @@ return [
         'nullable' => false,
         'sensitive' => false,
         'runtime_mutable' => true,
+        'inherit_organization_hierarchy' => false,
     ],
     'auth.registration_approved_domains' => [
         'owner' => 'Auth',
@@ -30,5 +31,6 @@ return [
         'nullable' => false,
         'sensitive' => false,
         'runtime_mutable' => true,
+        'inherit_organization_hierarchy' => false,
     ],
 ];

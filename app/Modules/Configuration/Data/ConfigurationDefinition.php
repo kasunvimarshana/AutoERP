@@ -19,6 +19,7 @@ final readonly class ConfigurationDefinition
         public bool $nullable,
         public bool $sensitive,
         public bool $runtimeMutable,
+        public bool $inheritOrganizationHierarchy,
         public array $options = [],
         public ?string $minimum = null,
         public ?string $maximum = null,

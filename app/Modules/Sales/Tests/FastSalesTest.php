@@ -553,7 +553,7 @@ final class FastSalesTest extends TestCase
 
     private function organizationUnit(int $tenantId, string $code): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'row_version' => 1,
             'name' => $code,

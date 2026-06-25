@@ -10,7 +10,7 @@ $middleware = [
     'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'),
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
-    (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+    (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
 ];
 
 Route::prefix('api/v1/tax')->middleware($middleware)->name('api.v1.tax.')->group(function (): void {

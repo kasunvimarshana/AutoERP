@@ -5,21 +5,24 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class OrganizationUnitDocumentModel extends TenantOwnedModel
 {
-    protected $table = 'organization_unit_documents';
+    use SoftDeletes;
 
-    protected $guarded = ['id'];
+    protected $table = 'organization_unit_documents';
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'size' => 'integer',
+            'row_version' => 'integer',
+            'size_bytes' => 'integer',
+            'scanned_at' => 'datetime',
         ]);
     }
 

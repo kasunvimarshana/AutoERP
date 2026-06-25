@@ -7,6 +7,7 @@ namespace Modules\OrganizationUnit\Services\Provisioning;
 use Illuminate\Support\Facades\DB;
 use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
 use Modules\OrganizationUnit\Services\OrganizationUnits\OrganizationHierarchyService;
+use Modules\OrganizationUnit\Support\OrganizationUnitNameKey;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 
 final class TenantOrganizationProvisioner implements TenantOrganizationProvisionerInterface
@@ -18,47 +19,30 @@ final class TenantOrganizationProvisioner implements TenantOrganizationProvision
     public function provision(int $tenantId, string $tenantCode, string $tenantName): array
     {
         return DB::transaction(function () use ($tenantId, $tenantCode, $tenantName): array {
-            $type = OrganizationUnitTypeModel::withTrashed()
+            $type = OrganizationUnitTypeModel::query()
                 ->where('tenant_id', $tenantId)
-                ->where('name', self::ROOT_TYPE_NAME)
+                ->where('name_key', OrganizationUnitNameKey::from(self::ROOT_TYPE_NAME))
                 ->lockForUpdate()
                 ->first();
+
             if ($type instanceof OrganizationUnitTypeModel) {
-                $metadata = is_array($type->getAttribute('metadata'))
-                    ? $type->getAttribute('metadata')
-                    : [];
-                $attributes = [
-                    'level' => 0,
-                    'is_active' => true,
-                    'metadata' => [
-                        ...$metadata,
-                        'system' => true,
-                        'purpose' => 'tenant_root',
-                    ],
-                    'deleted_at' => null,
-                ];
-                $dirty = false;
-                foreach ($attributes as $attribute => $value) {
-                    if ($type->getAttribute($attribute) !== $value) {
-                        $dirty = true;
-                        break;
-                    }
-                }
-                if ($dirty) {
+                if ((int) $type->getAttribute('level') !== 0 || ! (bool) $type->getAttribute('is_active')) {
                     $type->forceFill([
-                        ...$attributes,
+                        'level' => 0,
+                        'is_active' => true,
                         'row_version' => max(1, (int) $type->getAttribute('row_version')) + 1,
                     ])->save();
                 }
             } else {
-                $type = OrganizationUnitTypeModel::query()->create([
+                $type = new OrganizationUnitTypeModel();
+                $type->forceFill([
                     'tenant_id' => $tenantId,
                     'name' => self::ROOT_TYPE_NAME,
+                    'name_key' => OrganizationUnitNameKey::from(self::ROOT_TYPE_NAME),
                     'level' => 0,
                     'is_active' => true,
-                    'metadata' => ['system' => true, 'purpose' => 'tenant_root'],
                     'row_version' => 1,
-                ]);
+                ])->save();
             }
 
             $root = $this->hierarchy->createRoot(
@@ -67,7 +51,6 @@ final class TenantOrganizationProvisioner implements TenantOrganizationProvision
                 code: $tenantCode,
                 name: $tenantName,
                 description: 'Protected root organization unit created by tenant onboarding.',
-                metadata: ['system' => true, 'purpose' => 'tenant_root'],
             );
 
             return ['organization_unit_id' => (int) $root->getKey()];

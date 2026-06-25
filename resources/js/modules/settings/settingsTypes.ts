@@ -22,12 +22,14 @@ export interface ConfigurationDefinition {
     label: string;
     description: string;
     owner: string;
+    version: number;
     value_type: ConfigurationValueType;
     allowed_scopes: ConfigurationScope[];
     default_value: unknown;
     nullable: boolean;
     sensitive: boolean;
     runtime_mutable: boolean;
+    inherit_organization_hierarchy: boolean;
     options: Array<string | number | boolean>;
     minimum: string | null;
     maximum: string | null;
@@ -73,6 +75,9 @@ export interface ConfigurationGlobalImpact {
     tenant_count: number;
     tenant_override_count: number;
     inheriting_tenant_count: number;
+    organization_unit_count: number;
+    organization_unit_override_count: number;
+    organization_unit_without_direct_override_count: number;
 }
 
 export interface ConfigurationEntry {
@@ -80,6 +85,7 @@ export interface ConfigurationEntry {
     label: string;
     description: string;
     owner: string;
+    version: number;
     value_type: ConfigurationValueType;
     scope: ConfigurationScope;
     value: unknown;

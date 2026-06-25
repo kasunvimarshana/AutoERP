@@ -439,8 +439,10 @@ export function ConfigurationSettingsPanel({
                                         message: (
                                             <div className="space-y-2">
                                                 <p>Apply <strong>{definition.label}</strong> as the global default?</p>
-                                                <p><strong>{impact.inheriting_tenant_count}</strong> of {impact.tenant_count} tenant(s) currently inherit this value. {impact.tenant_override_count} tenant(s) have an explicit tenant override and will not change at tenant scope.</p>
-                                                <p className="text-sm text-slate-600">Organization-unit overrides remain authoritative where configured.</p>
+                                                <p><strong>{impact.inheriting_tenant_count}</strong> of {impact.tenant_count} tenant(s) currently have no direct tenant override. {impact.tenant_override_count} tenant(s) have an explicit tenant value.</p>
+                                                {impact.organization_unit_count > 0 ? (
+                                                    <p><strong>{impact.organization_unit_override_count}</strong> of {impact.organization_unit_count} active organization unit(s) have a direct override. The other {impact.organization_unit_without_direct_override_count} resolve through their parent, tenant, or global chain.</p>
+                                                ) : null}
                                             </div>
                                         ),
                                         confirmLabel: editing === 'create' ? 'Add global default' : 'Replace global default',
@@ -577,6 +579,9 @@ function ConfigurationForm({
                         <MetadataBadge label={definition.owner} />
                         <MetadataBadge label={definition.runtime_mutable ? 'Runtime mutable' : 'Restart required'} tone={definition.runtime_mutable ? 'emerald' : 'slate'} />
                         {definition.sensitive ? <MetadataBadge label="Protected" tone="amber" /> : null}
+                        {scope === 'organization_unit' && definition.inherit_organization_hierarchy
+                            ? <MetadataBadge label="Inherits parent units" tone="blue" />
+                            : null}
                     </div>
                     <p className="mt-3">{definition.description}</p>
                     <p className="mt-1 text-xs">This override applies to {scopeLabel(scope)}.</p>
@@ -584,7 +589,12 @@ function ConfigurationForm({
                     {scope === 'global' ? (
                         <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">
                             {globalImpact.loading ? <p>Calculating tenant impact…</p> : globalImpact.error ? <p>Tenant impact could not be loaded. Saving remains blocked by the confirmation-time impact check.</p> : globalImpact.data ? (
-                                <p><strong>{globalImpact.data.inheriting_tenant_count}</strong> of {globalImpact.data.tenant_count} tenant(s) currently inherit this global value. {globalImpact.data.tenant_override_count} tenant(s) have an explicit tenant override.</p>
+                                <div className="space-y-1">
+                                    <p><strong>{globalImpact.data.inheriting_tenant_count}</strong> of {globalImpact.data.tenant_count} tenant(s) have no direct tenant override. {globalImpact.data.tenant_override_count} tenant(s) have an explicit tenant value.</p>
+                                    {globalImpact.data.organization_unit_count > 0 ? (
+                                        <p><strong>{globalImpact.data.organization_unit_override_count}</strong> of {globalImpact.data.organization_unit_count} active organization unit(s) have a direct override; {globalImpact.data.organization_unit_without_direct_override_count} continue through the parent/tenant/global inheritance chain.</p>
+                                    ) : null}
+                                </div>
                             ) : null}
                         </div>
                     ) : null}

@@ -11,5 +11,8 @@ final readonly class ConfigurationGlobalImpact
         public int $tenantCount,
         public int $tenantOverrideCount,
         public int $inheritingTenantCount,
+        public int $organizationUnitCount,
+        public int $organizationUnitOverrideCount,
+        public int $organizationUnitWithoutDirectOverrideCount,
     ) {}
 }

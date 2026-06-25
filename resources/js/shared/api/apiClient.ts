@@ -25,15 +25,12 @@ apiClient.interceptors.request.use((config) => {
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
         config.headers.delete('Content-Type');
     }
-    const { accessToken, tenantId, organizationUnitId } = getStoredApiContext();
+    const { accessToken, tenantId } = getStoredApiContext();
     if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
     }
     if (tenantId) {
         config.headers['X-Tenant-Id'] = String(tenantId);
-    }
-    if (organizationUnitId) {
-        config.headers['X-Organization-Unit-Id'] = String(organizationUnitId);
     }
     return config;
 });

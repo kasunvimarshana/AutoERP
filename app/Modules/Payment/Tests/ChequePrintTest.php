@@ -306,7 +306,7 @@ final class ChequePrintTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $code): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$code,
             'code' => $code,

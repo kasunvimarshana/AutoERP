@@ -82,6 +82,13 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
             ->count();
     }
 
+    public function countOrganizationUnitOverrides(string $key): int
+    {
+        return OrganizationUnitConfigurationValue::query()
+            ->where('key', strtolower(trim($key)))
+            ->count();
+    }
+
     public function create(
         ConfigurationScopeContext $context,
         array $attributes,

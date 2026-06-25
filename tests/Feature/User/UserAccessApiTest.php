@@ -389,7 +389,7 @@ final class UserAccessApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
@@ -473,7 +473,6 @@ final class UserAccessApiTest extends TestCase
     {
         return $this->withToken($context['token'])->withHeaders([
             'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
         ]);
     }
 }

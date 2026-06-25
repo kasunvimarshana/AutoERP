@@ -4,94 +4,88 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\OrganizationUnits;
 
-use DomainException;
+use Modules\Core\Exceptions\DomainException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
+use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
+use Modules\OrganizationUnit\Services\Lifecycle\OrganizationUnitLifecycleGuard;
 
 final class OrganizationHierarchyService
 {
-    private const MAX_PATH_LENGTH = 1024;
+    public function __construct(
+        private readonly OrganizationUnitModel $units,
+        private readonly OrganizationUnitTypeModel $types,
+        private readonly OrganizationUnitLifecycleGuard $lifecycle,
+        private readonly ClockInterface $clock,
+    ) {}
 
-    public function __construct(private readonly OrganizationUnitModel $units) {}
-
-    /** @param array<string, mixed>|null $metadata */
     public function createRoot(
         int $tenantId,
         int $typeId,
         string $code,
         string $name,
         ?string $description = null,
-        ?array $metadata = null,
     ): OrganizationUnitModel {
-        return DB::transaction(function () use ($tenantId, $typeId, $code, $name, $description, $metadata): OrganizationUnitModel {
+        return DB::transaction(function () use ($tenantId, $typeId, $code, $name, $description): OrganizationUnitModel {
+            $type = $this->lockAndValidateType($tenantId, $typeId, 0);
             $existing = $this->units->newQuery()
                 ->where('tenant_id', $tenantId)
                 ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
                 ->lockForUpdate()
                 ->first();
 
+            $normalizedName = $this->normalizeName($name);
+            $normalizedCode = $this->normalizeRequiredCode($code);
+            $path = '/'.$this->segment($normalizedCode, $normalizedName);
+            $this->assertPathLength($path);
+            $this->assertPathAvailable($tenantId, $path, $existing?->getKey());
+
             if ($existing instanceof OrganizationUnitModel) {
-                $normalizedName = trim($name);
-                $normalizedCode = $this->normalizeCode($code);
-                $newPath = '/'.$this->normalizeSegment($normalizedCode, $normalizedName);
+                if ((string) $existing->getAttribute('code') !== $normalizedCode) {
+                    throw OrganizationUnitException::conflict('The protected root organization-unit code is immutable.');
+                }
                 $oldPath = (string) $existing->getAttribute('path');
-
-                $this->assertPathAvailable($tenantId, $newPath, (int) $existing->getKey());
-
-                $changes = [
-                    'type_id' => $typeId,
+                $existing->forceFill([
+                    'type_id' => (int) $type->getKey(),
+                    'parent_id' => null,
                     'name' => $normalizedName,
                     'code' => $normalizedCode,
-                    'path' => $newPath,
+                    'path' => $path,
+                    'path_hash' => $this->pathHash($path),
                     'depth' => 0,
-                    'parent_id' => null,
                     'root_marker' => OrganizationUnitHierarchy::ROOT_MARKER,
                     'is_active' => true,
+                    'retired_at' => null,
                     'description' => $description,
-                    'metadata' => $metadata,
-                ];
+                    'row_version' => max(1, (int) $existing->getAttribute('row_version')) + 1,
+                ])->save();
 
-                $dirty = false;
-                foreach ($changes as $attribute => $value) {
-                    if ($existing->getAttribute($attribute) !== $value) {
-                        $dirty = true;
-                        break;
-                    }
-                }
-
-                if ($dirty) {
-                    $existing->forceFill([
-                        ...$changes,
-                        'row_version' => (int) $existing->getAttribute('row_version') + 1,
-                    ])->save();
-
-                    if ($oldPath !== $newPath) {
-                        $this->rebaseDescendants($tenantId, (int) $existing->getKey(), $oldPath, $newPath, 0);
-                    }
+                if ($oldPath !== $path) {
+                    $this->rebaseDescendants($tenantId, (int) $existing->getKey(), $oldPath, $path, 0);
                 }
 
                 return $existing->refresh();
             }
 
-            $segment = $this->normalizeSegment($code, $name);
-            $path = '/'.$segment;
-            $this->assertPathAvailable($tenantId, $path, null);
-
             $root = new OrganizationUnitModel();
             $root->forceFill([
                 'tenant_id' => $tenantId,
-                'type_id' => $typeId,
+                'type_id' => (int) $type->getKey(),
                 'parent_id' => null,
-                'name' => trim($name),
-                'code' => $this->normalizeCode($code),
+                'name' => $normalizedName,
+                'code' => $normalizedCode,
                 'path' => $path,
+                'path_hash' => $this->pathHash($path),
                 'depth' => 0,
                 'root_marker' => OrganizationUnitHierarchy::ROOT_MARKER,
                 'is_active' => true,
+                'retired_at' => null,
                 'description' => $description,
-                'metadata' => $metadata,
                 'row_version' => 1,
             ])->save();
 
@@ -103,36 +97,37 @@ final class OrganizationHierarchyService
     public function createUnit(int $tenantId, array $attributes): OrganizationUnitModel
     {
         return DB::transaction(function () use ($tenantId, $attributes): OrganizationUnitModel {
-            $parentId = isset($attributes['parent_id']) ? (int) $attributes['parent_id'] : null;
-            if ($parentId === null) {
-                throw new DomainException('A non-root organization unit must have a parent.');
+            $parentId = $this->positiveInt($attributes['parent_id'] ?? null);
+            $typeId = $this->positiveInt($attributes['type_id'] ?? null);
+            if ($parentId === null || $typeId === null) {
+                throw new DomainException('A parent and organization-unit type are required.');
             }
 
             $parent = $this->lockUnit($tenantId, $parentId);
-            if (! (bool) $parent->getAttribute('is_active')) {
-                throw new DomainException('An organization unit cannot be created under an inactive parent.');
-            }
+            $this->assertOperationalParent($parent);
+            $depth = (int) $parent->getAttribute('depth') + 1;
+            $type = $this->lockAndValidateType($tenantId, $typeId, $depth);
 
-            $name = trim((string) ($attributes['name'] ?? ''));
-            $code = $this->normalizeNullableCode($attributes['code'] ?? null);
-            $segment = $this->normalizeSegment($code, $name);
-            $path = $this->joinPath((string) $parent->getAttribute('path'), $segment);
+            $name = $this->normalizeName((string) ($attributes['name'] ?? ''));
+            $code = $this->normalizeRequiredCode((string) ($attributes['code'] ?? ''));
+            $path = $this->joinPath((string) $parent->getAttribute('path'), $this->segment($code, $name));
+            $this->assertPathLength($path);
             $this->assertPathAvailable($tenantId, $path, null);
 
             $unit = new OrganizationUnitModel();
             $unit->forceFill([
                 'tenant_id' => $tenantId,
-                'type_id' => $attributes['type_id'] ?? null,
+                'type_id' => (int) $type->getKey(),
                 'parent_id' => $parentId,
                 'name' => $name,
                 'code' => $code,
-                'image_path' => $attributes['image_path'] ?? null,
                 'path' => $path,
-                'depth' => (int) $parent->getAttribute('depth') + 1,
+                'path_hash' => $this->pathHash($path),
+                'depth' => $depth,
                 'root_marker' => null,
-                'is_active' => $attributes['is_active'] ?? true,
+                'is_active' => true,
+                'retired_at' => null,
                 'description' => $attributes['description'] ?? null,
-                'metadata' => $attributes['metadata'] ?? null,
                 'row_version' => 1,
             ])->save();
 
@@ -145,14 +140,13 @@ final class OrganizationHierarchyService
     {
         return DB::transaction(function () use ($tenantId, $unitId, $expectedVersion, $attributes): OrganizationUnitModel {
             $unit = $this->lockUnit($tenantId, $unitId);
-            if ((int) $unit->getAttribute('row_version') !== $expectedVersion) {
-                throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
-            }
+            $this->assertVersion($unit, $expectedVersion);
+            $this->assertNotRetired($unit);
 
             $isRoot = $unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER;
             $parentId = array_key_exists('parent_id', $attributes)
-                ? ($attributes['parent_id'] === null ? null : (int) $attributes['parent_id'])
-                : ($unit->getAttribute('parent_id') === null ? null : (int) $unit->getAttribute('parent_id'));
+                ? $this->positiveInt($attributes['parent_id'])
+                : $this->positiveInt($unit->getAttribute('parent_id'));
 
             if ($isRoot && $parentId !== null) {
                 throw new DomainException('The protected root organization unit cannot be moved.');
@@ -167,48 +161,45 @@ final class OrganizationHierarchyService
             $parent = null;
             if ($parentId !== null) {
                 $parent = $this->lockUnit($tenantId, $parentId);
-                $currentPath = (string) $unit->getAttribute('path');
+                $this->assertOperationalParent($parent);
+                $unitPath = (string) $unit->getAttribute('path');
                 $parentPath = (string) $parent->getAttribute('path');
-                if ($parentPath === $currentPath || str_starts_with($parentPath, $currentPath.'/')) {
+                if ($parentPath === $unitPath || str_starts_with($parentPath, $unitPath.'/')) {
                     throw new DomainException('Organization unit cannot be moved below one of its descendants.');
-                }
-                if (! (bool) $parent->getAttribute('is_active')) {
-                    throw new DomainException('Organization unit cannot be moved under an inactive parent.');
                 }
             }
 
-            $name = trim((string) ($attributes['name'] ?? $unit->getAttribute('name')));
-            $code = array_key_exists('code', $attributes)
-                ? $this->normalizeNullableCode($attributes['code'])
-                : $this->normalizeNullableCode($unit->getAttribute('code'));
-            $segment = $this->normalizeSegment($code, $name);
-            $newPath = $parent instanceof OrganizationUnitModel
-                ? $this->joinPath((string) $parent->getAttribute('path'), $segment)
-                : '/'.$segment;
-            $newDepth = $parent instanceof OrganizationUnitModel
-                ? (int) $parent->getAttribute('depth') + 1
-                : 0;
-            $oldPath = (string) $unit->getAttribute('path');
-            $oldDepth = (int) $unit->getAttribute('depth');
+            $depth = $parent instanceof OrganizationUnitModel ? (int) $parent->getAttribute('depth') + 1 : 0;
+            $typeId = $this->positiveInt($attributes['type_id'] ?? $unit->getAttribute('type_id'));
+            if ($typeId === null) {
+                throw new DomainException('Organization-unit type is required.');
+            }
+            $this->lockAndValidateType($tenantId, $typeId, $depth);
 
+            $name = $this->normalizeName((string) ($attributes['name'] ?? $unit->getAttribute('name')));
+            $code = $this->normalizeRequiredCode((string) ($attributes['code'] ?? $unit->getAttribute('code')));
+            $newPath = $parent instanceof OrganizationUnitModel
+                ? $this->joinPath((string) $parent->getAttribute('path'), $this->segment($code, $name))
+                : '/'.$this->segment($code, $name);
+            $this->assertPathLength($newPath);
             $this->assertPathAvailable($tenantId, $newPath, $unitId);
 
+            $oldPath = (string) $unit->getAttribute('path');
+            $oldDepth = (int) $unit->getAttribute('depth');
             $unit->forceFill([
-                'type_id' => $attributes['type_id'] ?? $unit->getAttribute('type_id'),
+                'type_id' => $typeId,
                 'parent_id' => $parentId,
                 'name' => $name,
                 'code' => $code,
-                'image_path' => array_key_exists('image_path', $attributes) ? $attributes['image_path'] : $unit->getAttribute('image_path'),
                 'path' => $newPath,
-                'depth' => $newDepth,
-                'is_active' => array_key_exists('is_active', $attributes) ? (bool) $attributes['is_active'] : (bool) $unit->getAttribute('is_active'),
+                'path_hash' => $this->pathHash($newPath),
+                'depth' => $depth,
                 'description' => array_key_exists('description', $attributes) ? $attributes['description'] : $unit->getAttribute('description'),
-                'metadata' => array_key_exists('metadata', $attributes) ? $attributes['metadata'] : $unit->getAttribute('metadata'),
                 'row_version' => $expectedVersion + 1,
             ])->save();
 
-            if ($oldPath !== $newPath || $oldDepth !== $newDepth) {
-                $this->rebaseDescendants($tenantId, $unitId, $oldPath, $newPath, $newDepth - $oldDepth);
+            if ($oldPath !== $newPath || $oldDepth !== $depth) {
+                $this->rebaseDescendants($tenantId, $unitId, $oldPath, $newPath, $depth - $oldDepth);
             }
 
             return $unit->refresh();
@@ -219,14 +210,33 @@ final class OrganizationHierarchyService
     {
         return DB::transaction(function () use ($tenantId, $unitId, $expectedVersion, $active): OrganizationUnitModel {
             $unit = $this->lockUnit($tenantId, $unitId);
-            if ((int) $unit->getAttribute('row_version') !== $expectedVersion) {
-                throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
+            $this->assertVersion($unit, $expectedVersion);
+            $this->assertNotRetired($unit);
+
+            if ($unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER && ! $active) {
+                throw OrganizationUnitException::lifecycleBlocked('The protected root organization unit cannot be deactivated.');
             }
-            if (! $active && $unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER) {
-                throw new DomainException('The protected root organization unit cannot be deactivated.');
-            }
-            if (! $active && $this->hasActiveDescendants($tenantId, (string) $unit->getAttribute('path'))) {
-                throw new DomainException('Deactivate child organization units before deactivating this unit.');
+
+            if ($active) {
+                $parentId = $this->positiveInt($unit->getAttribute('parent_id'));
+                if ($parentId !== null) {
+                    $this->assertOperationalParent($this->lockUnit($tenantId, $parentId));
+                }
+                $this->lockAndValidateType($tenantId, (int) $unit->getAttribute('type_id'), (int) $unit->getAttribute('depth'));
+            } else {
+                $activeDescendants = $this->units->newQuery()
+                    ->where('tenant_id', $tenantId)
+                    ->where('path', 'like', $this->escapeLike((string) $unit->getAttribute('path')).'/%')
+                    ->where('is_active', true)
+                    ->whereNull('retired_at')
+                    ->select('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->count();
+                if ($activeDescendants > 0) {
+                    throw OrganizationUnitException::lifecycleBlocked('Deactivate all active child organization units first.');
+                }
+                $this->lifecycle->assertClear($tenantId, $unitId);
             }
 
             $unit->forceFill([
@@ -238,56 +248,91 @@ final class OrganizationHierarchyService
         }, 3);
     }
 
-    public function deleteUnit(int $tenantId, int $unitId, int $expectedVersion): void
+    public function retire(int $tenantId, int $unitId, int $expectedVersion): OrganizationUnitModel
     {
-        DB::transaction(function () use ($tenantId, $unitId, $expectedVersion): void {
+        return DB::transaction(function () use ($tenantId, $unitId, $expectedVersion): OrganizationUnitModel {
             $unit = $this->lockUnit($tenantId, $unitId);
-            if ((int) $unit->getAttribute('row_version') !== $expectedVersion) {
-                throw new DomainException('Organization unit changed since it was loaded. Refresh and try again.');
-            }
+            $this->assertVersion($unit, $expectedVersion);
+            $this->assertNotRetired($unit);
             if ($unit->getAttribute('root_marker') === OrganizationUnitHierarchy::ROOT_MARKER) {
-                throw new DomainException('The protected root organization unit cannot be deleted.');
+                throw OrganizationUnitException::lifecycleBlocked('The protected root organization unit cannot be retired.');
             }
-            if ($this->units->newQuery()->where('tenant_id', $tenantId)->where('parent_id', $unitId)->exists()) {
-                throw new DomainException('Move or delete child organization units before deleting this unit.');
+            if ((bool) $unit->getAttribute('is_active')) {
+                throw OrganizationUnitException::lifecycleBlocked('Deactivate the organization unit before retirement.');
             }
 
-            $unit->delete();
+            $childCount = $this->units->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('parent_id', $unitId)
+                ->whereNull('retired_at')
+                ->select('id')
+                ->lockForUpdate()
+                ->get()
+                ->count();
+            if ($childCount > 0) {
+                throw OrganizationUnitException::lifecycleBlocked('Retire or move all child organization units first.');
+            }
+
+            $this->lifecycle->assertClear($tenantId, $unitId);
+            $unit->forceFill([
+                'is_active' => false,
+                'retired_at' => $this->clock->now(),
+                'row_version' => $expectedVersion + 1,
+            ])->save();
+
+            return $unit->refresh();
         }, 3);
     }
 
-    public function rootIsReady(int $tenantId, int $organizationUnitId, bool $lockForUpdate = false): bool
+    /** @param array{object_key:string,mime_type:string,size_bytes:int}|null $logo */
+    public function replaceLogo(int $tenantId, int $unitId, int $expectedVersion, ?array $logo): OrganizationUnitModel
     {
-        return $this->rootQuery($tenantId, $lockForUpdate)
-            ->whereKey($organizationUnitId)
-            ->exists();
+        return DB::transaction(function () use ($tenantId, $unitId, $expectedVersion, $logo): OrganizationUnitModel {
+            $unit = $this->lockUnit($tenantId, $unitId);
+            $this->assertVersion($unit, $expectedVersion);
+            $this->assertNotRetired($unit);
+            $unit->forceFill([
+                'logo_object_key' => $logo['object_key'] ?? null,
+                'logo_mime_type' => $logo['mime_type'] ?? null,
+                'logo_size_bytes' => $logo['size_bytes'] ?? null,
+                'row_version' => $expectedVersion + 1,
+            ])->save();
+
+            return $unit->refresh();
+        }, 3);
     }
 
     public function protectedRootId(int $tenantId, bool $lockForUpdate = false): ?int
     {
-        $value = $this->rootQuery($tenantId, $lockForUpdate)->value('id');
-
-        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
-    }
-
-    private function rootQuery(int $tenantId, bool $lockForUpdate): \Illuminate\Database\Eloquent\Builder
-    {
         $query = $this->units->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
-            ->whereNull('parent_id')
-            ->where('depth', 0)
             ->where('is_active', true)
-            ->whereNotNull('type_id')
-            ->whereNotNull('path')
-            ->whereHas('type', static fn ($type) => $type
-                ->where('is_active', true)
-                ->whereNull('deleted_at'));
+            ->whereNull('retired_at');
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
 
-        return $query;
+        $id = $query->value('id');
+        return is_numeric($id) ? (int) $id : null;
+    }
+
+    public function rootIsReady(int $tenantId, int $organizationUnitId, bool $lockForUpdate = false): bool
+    {
+        $query = $this->units->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($organizationUnitId)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->whereNull('parent_id')
+            ->where('depth', 0)
+            ->where('is_active', true)
+            ->whereNull('retired_at');
+
+        if (! $lockForUpdate) {
+            return $query->exists();
+        }
+
+        return $query->select('id')->lockForUpdate()->first() !== null;
     }
 
     private function lockUnit(int $tenantId, int $unitId): OrganizationUnitModel
@@ -297,72 +342,138 @@ final class OrganizationHierarchyService
             ->whereKey($unitId)
             ->lockForUpdate()
             ->first();
-
         if (! $unit instanceof OrganizationUnitModel) {
-            throw new DomainException('Organization unit was not found in the current tenant.');
+            throw OrganizationUnitException::notFound('Organization unit was not found in the active tenant.');
         }
 
         return $unit;
     }
 
-    private function rebaseDescendants(
-        int $tenantId,
-        int $unitId,
-        string $oldPath,
-        string $newPath,
-        int $depthDelta,
-    ): void {
+    private function lockAndValidateType(int $tenantId, int $typeId, int $depth): OrganizationUnitTypeModel
+    {
+        $type = $this->types->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($typeId)
+            ->where('is_active', true)
+            ->lockForUpdate()
+            ->first();
+        if (! $type instanceof OrganizationUnitTypeModel) {
+            throw new DomainException('Select an active organization-unit type from the same tenant.');
+        }
+        if ((int) $type->getAttribute('level') !== $depth) {
+            throw new DomainException(sprintf(
+                'Organization-unit type [%s] is valid only at hierarchy level %d.',
+                (string) $type->getAttribute('name'),
+                (int) $type->getAttribute('level'),
+            ));
+        }
+
+        return $type;
+    }
+
+    private function assertOperationalParent(OrganizationUnitModel $parent): void
+    {
+        if (! (bool) $parent->getAttribute('is_active') || $parent->getAttribute('retired_at') !== null) {
+            throw new DomainException('The parent organization unit must be active and not retired.');
+        }
+    }
+
+    private function assertVersion(OrganizationUnitModel $unit, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $unit->getAttribute('row_version') !== $expectedVersion) {
+            throw OrganizationUnitException::versionConflict('Organization unit changed since it was loaded. Refresh and try again.');
+        }
+    }
+
+    private function assertNotRetired(OrganizationUnitModel $unit): void
+    {
+        if ($unit->getAttribute('retired_at') !== null) {
+            throw OrganizationUnitException::lifecycleBlocked('A retired organization unit is read-only.');
+        }
+    }
+
+    private function assertPathAvailable(int $tenantId, string $path, int|string|null $ignoreId): void
+    {
+        $query = $this->units->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('path_hash', $this->pathHash($path));
+        if ($ignoreId !== null) {
+            $query->whereKeyNot($ignoreId);
+        }
+        $existing = $query->lockForUpdate()->first(['id', 'path']);
+        if ($existing instanceof OrganizationUnitModel && (string) $existing->getAttribute('path') === $path) {
+            throw OrganizationUnitException::conflict('Organization-unit hierarchy path already exists.');
+        }
+        if ($existing instanceof OrganizationUnitModel) {
+            throw OrganizationUnitException::conflict('Organization-unit hierarchy path hash collision detected.');
+        }
+    }
+
+    private function rebaseDescendants(int $tenantId, int $unitId, string $oldPath, string $newPath, int $depthDelta): void
+    {
+        /** @var Collection<int, OrganizationUnitModel> $descendants */
         $descendants = $this->units->newQuery()
             ->where('tenant_id', $tenantId)
-            ->where('id', '!=', $unitId)
-            ->where('path', 'like', $oldPath.'/%')
+            ->whereKeyNot($unitId)
+            ->where('path', 'like', $this->escapeLike($oldPath).'/%')
             ->orderBy('depth')
             ->lockForUpdate()
             ->get();
 
+        /** @var array<int, int> $newDepthById */
+        $newDepthById = [];
         foreach ($descendants as $descendant) {
-            if (! $descendant instanceof OrganizationUnitModel) {
-                continue;
+            $newDepth = (int) $descendant->getAttribute('depth') + $depthDelta;
+            if ($newDepth < 1) {
+                throw new DomainException('A hierarchy move would place a descendant at an invalid depth.');
             }
+            $this->lockAndValidateType(
+                $tenantId,
+                (int) $descendant->getAttribute('type_id'),
+                $newDepth,
+            );
+            $newDepthById[(int) $descendant->getKey()] = $newDepth;
+        }
 
-            $path = (string) $descendant->getAttribute('path');
-            $rebasedPath = $newPath.substr($path, strlen($oldPath));
-            if (mb_strlen($rebasedPath) > self::MAX_PATH_LENGTH) {
-                throw new DomainException('Moving this organization unit would create an excessively long hierarchy path.');
-            }
-
+        foreach ($descendants as $descendant) {
+            $currentPath = (string) $descendant->getAttribute('path');
+            $rebasedPath = $newPath.substr($currentPath, strlen($oldPath));
+            $this->assertPathLength($rebasedPath);
+            $this->assertPathAvailable($tenantId, $rebasedPath, $descendant->getKey());
             $descendant->forceFill([
                 'path' => $rebasedPath,
-                'depth' => (int) $descendant->getAttribute('depth') + $depthDelta,
+                'path_hash' => $this->pathHash($rebasedPath),
+                'depth' => $newDepthById[(int) $descendant->getKey()],
                 'row_version' => (int) $descendant->getAttribute('row_version') + 1,
             ])->save();
         }
     }
 
-    private function hasActiveDescendants(int $tenantId, string $path): bool
+    private function normalizeName(string $name): string
     {
-        return $this->units->newQuery()
-            ->where('tenant_id', $tenantId)
-            ->where('path', 'like', $path.'/%')
-            ->where('is_active', true)
-            ->exists();
+        $name = trim($name);
+        if ($name === '') {
+            throw new DomainException('Organization-unit name is required.');
+        }
+        return $name;
     }
 
-    private function assertPathAvailable(int $tenantId, string $path, ?int $exceptId): void
+    private function normalizeRequiredCode(string $code): string
     {
-        $query = $this->units->newQuery()
-            ->where('tenant_id', $tenantId)
-            ->where('path', $path)
-            ->lockForUpdate();
-        if ($exceptId !== null) {
-            $query->where('id', '!=', $exceptId);
+        $code = Str::upper(trim($code));
+        if ($code === '' || preg_match('/^[A-Z0-9][A-Z0-9_-]{0,99}$/D', $code) !== 1) {
+            throw new DomainException('Organization-unit code must use letters, numbers, underscores, or hyphens.');
         }
-        if ($query->exists()) {
-            throw new DomainException('An organization unit with the same code or name already exists under this parent.');
+        return $code;
+    }
+
+    private function segment(string $code, string $name): string
+    {
+        $slug = Str::slug($code !== '' ? $code : $name);
+        if ($slug === '') {
+            throw new DomainException('Organization-unit hierarchy segment could not be derived.');
         }
-        if (mb_strlen($path) > self::MAX_PATH_LENGTH) {
-            throw new DomainException('Organization hierarchy path is too long.');
-        }
+        return $slug;
     }
 
     private function joinPath(string $parentPath, string $segment): string
@@ -370,34 +481,32 @@ final class OrganizationHierarchyService
         return rtrim($parentPath, '/').'/'.$segment;
     }
 
-    private function normalizeSegment(?string $code, string $name): string
+    private function assertPathLength(string $path): void
     {
-        $source = trim((string) $code) !== '' ? trim((string) $code) : trim($name);
-        $segment = Str::slug($source);
-        if ($segment === '') {
-            throw new DomainException('Organization unit code or name must contain at least one path-safe character.');
+        $maximum = max(
+            OrganizationUnitHierarchy::MINIMUM_PATH_LENGTH,
+            (int) config(
+                'organization-unit.hierarchy.maximum_path_length',
+                OrganizationUnitHierarchy::DEFAULT_MAXIMUM_PATH_LENGTH,
+            ),
+        );
+        if (mb_strlen($path) > $maximum) {
+            throw new DomainException('Organization-unit hierarchy path exceeds the configured maximum length.');
         }
-
-        return mb_substr($segment, 0, 100);
     }
 
-    private function normalizeCode(string $code): string
+    private function pathHash(string $path): string
     {
-        $normalized = $this->normalizeNullableCode($code);
-        if ($normalized === null) {
-            throw new DomainException('Root organization code is required.');
-        }
-
-        return $normalized;
+        return hash('sha256', $path);
     }
 
-    private function normalizeNullableCode(mixed $code): ?string
+    private function escapeLike(string $value): string
     {
-        if ($code === null) {
-            return null;
-        }
-        $normalized = strtoupper(trim((string) $code));
+        return addcslashes($value, '\\%_');
+    }
 
-        return $normalized === '' ? null : mb_substr($normalized, 0, 100);
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 }

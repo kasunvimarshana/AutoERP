@@ -56,7 +56,7 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         return $this->query()
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
-            ->where('default_marker', 'default')
+            ->where('default_marker', UserOrganizationUnitStatus::DEFAULT_MARKER)
             ->where('status', UserOrganizationUnitStatus::ACTIVE)
             ->orderBy('id')
             ->get()
@@ -71,7 +71,7 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         $model = $this->query()
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
-            ->where('default_marker', 'default')
+            ->where('default_marker', UserOrganizationUnitStatus::DEFAULT_MARKER)
             ->where('status', UserOrganizationUnitStatus::ACTIVE)
             ->first();
 
@@ -95,7 +95,7 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         $query = $this->query()
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
-            ->where('default_marker', 'default');
+            ->where('default_marker', UserOrganizationUnitStatus::DEFAULT_MARKER);
 
         if ($excludeId !== null) {
             $query->where('id', '!=', $excludeId);
@@ -104,6 +104,8 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         $query->update([
             'is_default' => false,
             'default_marker' => null,
+            'row_version' => \DB::raw('row_version + 1'),
+            'updated_at' => now(),
         ]);
     }
 
@@ -119,7 +121,8 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
             ->where('status', UserOrganizationUnitStatus::ACTIVE)
             ->update([
                 'is_default' => true,
-                'default_marker' => 'default',
+                'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER,
+                'row_version' => \DB::raw('row_version + 1'),
                 'updated_at' => now(),
             ]) === 1;
     }

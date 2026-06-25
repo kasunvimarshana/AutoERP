@@ -4,6 +4,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
 import type { NavigationMatch } from '@/app/navigation/navigationTypes';
 import { Breadcrumbs } from './Breadcrumbs';
+import { OrganizationUnitSwitcher } from './OrganizationUnitSwitcher';
 
 export function AppHeader({
     collapsed,
@@ -47,6 +48,8 @@ export function AppHeader({
             <div className="min-w-0 flex-1">
                 <Breadcrumbs match={match} />
             </div>
+
+            {mode === 'tenant' && <OrganizationUnitSwitcher />}
 
             <div className="hidden min-w-0 items-center gap-3 md:flex">
                 <div className="min-w-0 text-right">

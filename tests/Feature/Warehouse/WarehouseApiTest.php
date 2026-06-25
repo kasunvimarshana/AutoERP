@@ -335,6 +335,11 @@ final class WarehouseApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        $this->assignOrganizationUnit([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+        ], $organizationUnitId, true);
+
         DB::table('auth_providers')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
@@ -368,7 +373,7 @@ final class WarehouseApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
@@ -425,9 +430,16 @@ final class WarehouseApiTest extends TestCase
 
     private function withAuth(array $context, ?int $organizationUnitId = null): self
     {
+        $targetOrganizationUnitId = $organizationUnitId ?? $context['organization_unit_id'];
+        $this->withToken($context['token'])
+            ->withHeaders(['X-Tenant-Id' => (string) $context['tenant_id']])
+            ->postJson('/api/v1/auth/organization-unit/switch', [
+                'target_organization_unit_id' => $targetOrganizationUnitId,
+            ])
+            ->assertOk();
+
         return $this->withToken($context['token'])->withHeaders([
             'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) ($organizationUnitId ?? $context['organization_unit_id']),
         ]);
     }
 }

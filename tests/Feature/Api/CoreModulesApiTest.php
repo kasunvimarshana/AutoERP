@@ -265,7 +265,7 @@ final class CoreModulesApiTest extends TestCase
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

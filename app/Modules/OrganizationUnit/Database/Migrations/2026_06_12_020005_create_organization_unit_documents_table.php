@@ -10,29 +10,34 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('organization_unit_documents', function (Blueprint $table) {
+        Schema::create('organization_unit_documents', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->unsignedBigInteger('organization_unit_id');
 
-            // $table->string('uuid')->unique('organization_unit_documents_uuid_uk');
             $table->string('name');
-            $table->string('file_path');
-            $table->string('mime_type')->nullable();
-            $table->unsignedInteger('size')->nullable();
-            $table->string('type')->nullable();
+            $table->char('active_name_hash', 64)->nullable()->comment('Case-insensitive uniqueness key for active documents.');
+            $table->string('document_type')->nullable();
+            $table->string('object_key');
+            $table->string('original_filename');
+            $table->string('mime_type', 255);
+            $table->unsignedBigInteger('size_bytes');
+            $table->char('checksum_sha256', 64);
+            $table->string('scan_engine', 100);
+            $table->timestamp('scanned_at');
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->foreign(['organization_unit_id', 'tenant_id'], 'organization_unit_documents_org_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
-                ->cascadeOnDelete();
-            $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'organization_units_organization_unit_name_uk');
-
+                ->restrictOnDelete();
+            $table->unique(['tenant_id', 'organization_unit_id', 'active_name_hash'], 'organization_unit_documents_active_name_uk');
+            $table->unique(['tenant_id', 'object_key'], 'organization_unit_documents_object_key_uk');
             $table->unique(['id', 'tenant_id'], 'organization_unit_documents_id_tenant_uk');
+            $table->index(['tenant_id', 'organization_unit_id', 'document_type'], 'organization_unit_documents_type_idx');
         });
     }
 

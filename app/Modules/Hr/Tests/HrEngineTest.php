@@ -232,7 +232,7 @@ final class HrEngineTest extends TestCase
         $suffix = Str::upper(Str::random(8));
         $currencyId = (int) DB::table('currencies')->insertGetId(['row_version' => 1, 'code' => 'H'.substr($suffix, 0, 4), 'name' => "HR Currency {$suffix}", 'symbol' => 'H', 'decimal_places' => 2, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $tenantId = (int) DB::table('tenants')->insertGetId(['uuid' => (string) Str::uuid(), 'code' => "TEN-HR-{$suffix}", 'name' => "HR Tenant {$suffix}", 'slug' => 'hr-'.Str::lower($suffix), 'status' => 'active', 'base_currency_id' => $currencyId, 'created_at' => now(), 'updated_at' => now()]);
-        $organizationId = (int) DB::table('organization_units')->insertGetId(['tenant_id' => $tenantId, 'name' => "HR Org {$suffix}", 'code' => "ORG-{$suffix}", 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $organizationId = (int) \Tests\Support\OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => "HR Org {$suffix}", 'code' => "ORG-{$suffix}", 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
         return [$tenantId, $organizationId, $currencyId];
     }
 }

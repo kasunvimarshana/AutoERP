@@ -4,7 +4,7 @@ export const endpoints = {
     users: '/api/user/users',
     roles: '/api/user/roles',
     permissions: '/api/user/permissions',
-    organizationUnits: '/api/organization-unit/organization-units',
+    organizationUnits: '/api/v1/organization-units',
     configuration: '/api/v1/configuration',
     countries: '/api/v1/countries',
     languages: '/api/v1/languages',

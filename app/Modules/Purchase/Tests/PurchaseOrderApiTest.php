@@ -1053,7 +1053,7 @@ final class PurchaseOrderApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $suffix): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main '.$suffix,
             'code' => 'MAIN-'.$suffix,
@@ -1389,9 +1389,9 @@ final class PurchaseOrderApiTest extends TestCase
 
     private function withAuth(array $context): self
     {
-        return $this->withToken($context['token'])->withHeaders([
-            'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
-        ]);
+        return $this->withToken($context['token'])->withHeader(
+            'X-Tenant-Id',
+            (string) $context['tenant_id'],
+        );
     }
 }

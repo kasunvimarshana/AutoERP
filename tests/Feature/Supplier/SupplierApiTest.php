@@ -381,7 +381,6 @@ final class SupplierApiTest extends TestCase
     {
         return $this->withToken($context['token'])->withHeaders([
             'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
         ]);
     }
 
@@ -398,7 +397,7 @@ final class SupplierApiTest extends TestCase
             'row_version' => 1,
             'created_at' => $now,
             'updated_at' => $now]);
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main',
             'code' => 'MAIN',

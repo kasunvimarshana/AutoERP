@@ -26,7 +26,6 @@ describe('auth session storage', () => {
             accessToken: ' access-token ',
             sessionId: 10,
             tenantId: 20,
-            organizationUnitId: 30,
             authMode: 'tenant',
         });
 
@@ -34,12 +33,12 @@ describe('auth session storage', () => {
             accessToken: 'access-token',
             sessionId: 10,
             tenantId: 20,
-            organizationUnitId: 30,
             authMode: 'tenant',
             hasSession: true,
         });
         expect(window.localStorage.getItem('autoerp.access_token')).toBeNull();
         expect(window.localStorage.getItem('autoerp.refresh_token')).toBeNull();
+        expect(window.localStorage.getItem('autoerp.organization_unit_id')).toBeNull();
         expect(window.localStorage.getItem(AUTH_SESSION_MARKER_KEY)).not.toBeNull();
     });
 
@@ -48,13 +47,11 @@ describe('auth session storage', () => {
             accessToken: 'platform-token',
             sessionId: 11,
             tenantId: 22,
-            organizationUnitId: 33,
             authMode: 'platform',
         });
 
         expect(getStoredApiContext()).toMatchObject({
             tenantId: null,
-            organizationUnitId: null,
             authMode: 'platform',
         });
     });
@@ -67,8 +64,8 @@ describe('auth session storage', () => {
         expect(getStoredApiContext()).toMatchObject({
             sessionId: null,
             tenantId: null,
-            organizationUnitId: null,
         });
+        expect(getStoredApiContext()).not.toHaveProperty('organizationUnitId');
     });
 
     it('rotates only the in-memory access token during refresh', () => {
@@ -76,7 +73,6 @@ describe('auth session storage', () => {
             accessToken: 'old-token',
             sessionId: 10,
             tenantId: 20,
-            organizationUnitId: 30,
             authMode: 'tenant',
         });
 
@@ -92,7 +88,6 @@ describe('auth session storage', () => {
             accessToken: 'token',
             sessionId: 10,
             tenantId: 20,
-            organizationUnitId: 30,
             authMode: 'tenant',
         });
 
@@ -102,7 +97,6 @@ describe('auth session storage', () => {
             accessToken: null,
             sessionId: null,
             tenantId: null,
-            organizationUnitId: null,
             hasSession: false,
         });
         expect(listener).toHaveBeenCalledOnce();

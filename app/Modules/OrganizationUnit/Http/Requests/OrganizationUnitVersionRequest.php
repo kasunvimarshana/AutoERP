@@ -4,20 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class OrganizationUnitVersionRequest extends FormRequest
+final class OrganizationUnitVersionRequest extends TenantScopedRequest
 {
-    public function authorize(): bool
-    {
-        return auth()->check();
-    }
-
-    /** @return array<string, list<string>> */
     public function rules(): array
     {
-        return [
-            'expected_version' => ['required', 'integer', 'min:1'],
-        ];
+        return ['expected_version' => ['required', 'integer', 'min:1']];
     }
 }

@@ -9,6 +9,7 @@ use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\User\Constants\UserPermission;
 
 final class UserAccessResolver implements PlatformOperatorCheckerInterface, TenantUserAccessCheckerInterface, OrganizationUnitUserAccessCheckerInterface
@@ -67,10 +68,10 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
             })
             ->where('user_organization_units.user_id', $userId)
             ->where('user_organization_units.tenant_id', $tenantId)
-            ->where('user_organization_units.status', 'active')
-            ->where('user_organization_units.default_marker', 'default')
+            ->where('user_organization_units.status', UserOrganizationUnitStatus::ACTIVE)
+            ->where('user_organization_units.default_marker', UserOrganizationUnitStatus::DEFAULT_MARKER)
             ->where('organization_units.is_active', true)
-            ->whereNull('organization_units.deleted_at')
+            ->whereNull('organization_units.retired_at')
             ->orderBy('user_organization_units.id')
             ->pluck('user_organization_units.organization_unit_id')
             ->map(static fn (mixed $id): int => (int) $id)
@@ -78,10 +79,11 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
             ->all();
     }
 
-    public function canAccessOrganizationUnit(int $userId, int $tenantId, int $organizationUnitId): bool
+    /** @return list<int> */
+    public function accessibleOrganizationUnitIds(int $userId, int $tenantId): array
     {
-        if ($organizationUnitId < 1 || ! $this->isActiveTenantUser($userId, $tenantId)) {
-            return false;
+        if (! $this->isActiveTenantUser($userId, $tenantId)) {
+            return [];
         }
 
         return DB::table('user_organization_units')
@@ -91,11 +93,53 @@ final class UserAccessResolver implements PlatformOperatorCheckerInterface, Tena
             })
             ->where('user_organization_units.user_id', $userId)
             ->where('user_organization_units.tenant_id', $tenantId)
-            ->where('user_organization_units.organization_unit_id', $organizationUnitId)
-            ->where('user_organization_units.status', 'active')
+            ->where('user_organization_units.status', UserOrganizationUnitStatus::ACTIVE)
             ->where('organization_units.is_active', true)
-            ->whereNull('organization_units.deleted_at')
-            ->exists();
+            ->whereNull('organization_units.retired_at')
+            ->orderBy('organization_units.path')
+            ->pluck('user_organization_units.organization_unit_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    public function canAccessOrganizationUnit(
+        int $userId,
+        int $tenantId,
+        int $organizationUnitId,
+        bool $lockForUpdate = false,
+    ): bool {
+        if ($userId < 1 || $tenantId < 1 || $organizationUnitId < 1) {
+            return false;
+        }
+
+        $query = DB::table('user_organization_units')
+            ->join('users', function ($join): void {
+                $join->on('users.id', '=', 'user_organization_units.user_id')
+                    ->on('users.tenant_id', '=', 'user_organization_units.tenant_id');
+            })
+            ->join('organization_units', function ($join): void {
+                $join->on('organization_units.id', '=', 'user_organization_units.organization_unit_id')
+                    ->on('organization_units.tenant_id', '=', 'user_organization_units.tenant_id');
+            })
+            ->where('user_organization_units.user_id', $userId)
+            ->where('user_organization_units.tenant_id', $tenantId)
+            ->where('user_organization_units.organization_unit_id', $organizationUnitId)
+            ->where('user_organization_units.status', UserOrganizationUnitStatus::ACTIVE)
+            ->where('users.status', 'active')
+            ->where('users.is_platform_operator', false)
+            ->whereNull('users.deleted_at')
+            ->where('organization_units.is_active', true)
+            ->whereNull('organization_units.retired_at');
+
+        if (! $lockForUpdate) {
+            return $query->exists();
+        }
+
+        return $query
+            ->select('user_organization_units.id')
+            ->lockForUpdate()
+            ->first() !== null;
     }
 
     public function can(int $userId, int $tenantId, string $permission): bool

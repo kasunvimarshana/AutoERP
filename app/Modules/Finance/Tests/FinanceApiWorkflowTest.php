@@ -107,7 +107,7 @@ final class FinanceApiWorkflowTest extends TestCase
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Finance API Org',
             'code' => 'ORG-'.$suffix,

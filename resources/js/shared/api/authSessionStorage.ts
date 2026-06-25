@@ -4,7 +4,6 @@ export interface StoredApiContext {
     accessToken: string | null;
     sessionId: number | null;
     tenantId: number | null;
-    organizationUnitId: number | null;
     authMode: AuthMode;
     hasSession: boolean;
 }
@@ -13,7 +12,6 @@ export interface AuthSessionContext {
     accessToken: string;
     sessionId: number | null;
     tenantId: number | null;
-    organizationUnitId: number | null;
     authMode: AuthMode;
 }
 
@@ -22,7 +20,6 @@ export const AUTH_SESSION_INVALIDATED_EVENT = 'autoerp:auth-session-invalidated'
 
 const SESSION_KEY = 'autoerp.session_id';
 const TENANT_KEY = 'autoerp.tenant_id';
-const ORG_KEY = 'autoerp.organization_unit_id';
 const AUTH_MODE_KEY = 'autoerp.auth_mode';
 const LEGACY_AUTH_KEYS = [
     'autoerp.access_token',
@@ -33,6 +30,7 @@ const LEGACY_AUTH_KEYS = [
     'autoerp.roles',
     'autoerp.tenant',
     'autoerp.organization_unit',
+    'autoerp.organization_unit_id',
 ];
 
 let accessTokenInMemory: string | null = null;
@@ -42,7 +40,6 @@ export function getStoredApiContext(): StoredApiContext {
         accessToken: accessTokenInMemory,
         sessionId: storedPositiveInteger(SESSION_KEY),
         tenantId: storedPositiveInteger(TENANT_KEY),
-        organizationUnitId: storedPositiveInteger(ORG_KEY),
         authMode: storedAuthMode(),
         hasSession: window.localStorage.getItem(AUTH_SESSION_MARKER_KEY) !== null,
     };
@@ -61,7 +58,6 @@ export function commitAuthSession(context: AuthSessionContext): void {
     accessTokenInMemory = accessToken;
     setPositiveInteger(SESSION_KEY, context.sessionId);
     setPositiveInteger(TENANT_KEY, context.authMode === 'tenant' ? context.tenantId : null);
-    setPositiveInteger(ORG_KEY, context.authMode === 'tenant' ? context.organizationUnitId : null);
     window.localStorage.setItem(AUTH_MODE_KEY, context.authMode);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
     window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, createSessionMarker());
@@ -83,7 +79,6 @@ export function clearStoredAuthSession(): void {
     accessTokenInMemory = null;
     window.localStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem(TENANT_KEY);
-    window.localStorage.removeItem(ORG_KEY);
     window.localStorage.removeItem(AUTH_MODE_KEY);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
     window.localStorage.removeItem(AUTH_SESSION_MARKER_KEY);

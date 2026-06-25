@@ -10,19 +10,10 @@ use Modules\Core\DTOs\DataRecord;
 
 final class OrganizationUnitDocumentResource extends JsonResource
 {
-    /**
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
-        }
-
-        if (is_array($this->resource)) {
-            return $this->resource;
-        }
-
-        return [];
+        $values = $this->resource instanceof DataRecord ? $this->resource->toArray() : (is_array($this->resource) ? $this->resource : []);
+        unset($values['object_key'], $values['active_name_hash'], $values['deleted_at']);
+        return $values;
     }
 }

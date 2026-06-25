@@ -3,6 +3,7 @@ import { accessPermissions, protectedAccessRoles } from '@/modules/access/access
 import { auditPermissions } from '@/modules/audit/auditPermissions';
 import { customerPermissions } from '@/modules/customer/customerPermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
+import { organizationUnitPermissions } from '@/modules/organization-unit/organizationUnitPermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { referenceDataPermissions } from '@/modules/reference-data/referenceDataPermissions';
@@ -77,6 +78,7 @@ const rules: readonly EntitlementRule[] = [
     }),
     operational('/administration/audit-logs/:id', undefined, [auditPermissions.view]),
     operational('/administration/audit-logs', undefined, [auditPermissions.view]),
+    tenant('/administration/organization-units', undefined, [organizationUnitPermissions.view]),
     tenant('/administration/tenant', undefined, tenantWorkspacePermissions),
     tenant('/reference-data', undefined, [referenceDataPermissions.view]),
     tenant('/settings', undefined, [settingsPermissions.view]),

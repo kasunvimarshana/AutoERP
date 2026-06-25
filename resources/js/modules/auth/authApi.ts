@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection } from './authTypes';
+import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection, OrganizationUnitContextOptions, AuthOrganizationUnit } from './authTypes';
 
 const platformAuthEndpoint = '/api/v1/platform/auth';
 
@@ -76,6 +76,22 @@ export const authApi = {
     async logout(authMode: LoginPayload['auth_mode'], payload: { access_token?: string | null; session_id?: number | null } = {}): Promise<void> {
         const endpoint = authMode === 'platform' ? platformAuthEndpoint : endpoints.auth;
         await apiClient.post(`${endpoint}/logout`, payload);
+    },
+
+    async organizationUnitOptions(signal?: AbortSignal): Promise<OrganizationUnitContextOptions> {
+        const { data } = await apiClient.get<OrganizationUnitContextOptions>(
+            '/api/v1/organization-units/context/options',
+            { signal },
+        );
+        return data;
+    },
+
+    async switchOrganizationUnit(organizationUnitId: number): Promise<AuthOrganizationUnit> {
+        const { data } = await apiClient.post<{ data: AuthOrganizationUnit }>(
+            '/api/v1/auth/organization-unit/switch',
+            { target_organization_unit_id: organizationUnitId },
+        );
+        return data.data;
     },
 
     async me(authMode: LoginPayload['auth_mode'], signal?: AbortSignal): Promise<CurrentUserResponse> {

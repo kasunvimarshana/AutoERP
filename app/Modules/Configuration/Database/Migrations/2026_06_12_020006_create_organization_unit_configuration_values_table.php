@@ -28,7 +28,7 @@ return new class extends Migration
                 'organization_configuration_values_org_tenant_fk',
             )->references(['id', 'tenant_id'])
                 ->on('organization_units')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->unique(
                 ['tenant_id', 'organization_unit_id', 'key'],
                 'organization_configuration_values_scope_key_uk',

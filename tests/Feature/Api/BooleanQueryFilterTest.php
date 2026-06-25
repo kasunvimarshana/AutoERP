@@ -123,7 +123,7 @@ final class BooleanQueryFilterTest extends TestCase
     {
         $suffix ??= Str::upper(Str::random(8));
 
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

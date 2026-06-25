@@ -185,6 +185,12 @@ function assertCanonicalConfigurationKey(value: unknown): string {
 
 function validateDefinition(definition: ConfigurationDefinition): ConfigurationDefinition {
     assertCanonicalConfigurationKey(definition.key);
+    if (!Number.isSafeInteger(definition.version) || definition.version < 1) {
+        throw new Error(`Configuration contract mismatch: [${definition.key}] has an invalid definition version.`);
+    }
+    if (typeof definition.inherit_organization_hierarchy !== 'boolean') {
+        throw new Error(`Configuration contract mismatch: [${definition.key}] is missing its hierarchy-inheritance policy.`);
+    }
     return definition;
 }
 

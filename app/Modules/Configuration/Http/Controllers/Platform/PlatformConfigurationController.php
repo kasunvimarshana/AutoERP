@@ -97,6 +97,9 @@ final class PlatformConfigurationController extends Controller
             'tenant_count' => $impact->tenantCount,
             'tenant_override_count' => $impact->tenantOverrideCount,
             'inheriting_tenant_count' => $impact->inheritingTenantCount,
+            'organization_unit_count' => $impact->organizationUnitCount,
+            'organization_unit_override_count' => $impact->organizationUnitOverrideCount,
+            'organization_unit_without_direct_override_count' => $impact->organizationUnitWithoutDirectOverrideCount,
         ]]);
     }
 

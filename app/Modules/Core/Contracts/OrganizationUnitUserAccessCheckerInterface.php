@@ -9,5 +9,13 @@ interface OrganizationUnitUserAccessCheckerInterface
     /** @return list<int> */
     public function defaultOrganizationUnitIds(int $userId, int $tenantId): array;
 
-    public function canAccessOrganizationUnit(int $userId, int $tenantId, int $organizationUnitId): bool;
+    /** @return list<int> */
+    public function accessibleOrganizationUnitIds(int $userId, int $tenantId): array;
+
+    public function canAccessOrganizationUnit(
+        int $userId,
+        int $tenantId,
+        int $organizationUnitId,
+        bool $lockForUpdate = false,
+    ): bool;
 }

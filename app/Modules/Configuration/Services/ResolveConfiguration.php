@@ -12,6 +12,7 @@ use Modules\Configuration\Data\ConfigurationDefinition;
 use Modules\Configuration\Data\ConfigurationScopeContext;
 use Modules\Configuration\Data\ResolvedConfigurationValue;
 use Modules\Configuration\Data\StoredConfigurationValue;
+use Modules\OrganizationUnit\Contracts\OrganizationUnitHierarchyReaderInterface;
 use RuntimeException;
 
 final class ResolveConfiguration implements ConfigurationResolverInterface
@@ -25,6 +26,7 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
         private readonly ConfigurationScopeResolver $scopes,
         private readonly ConfigurationValueCodec $codec,
         private readonly ConfigurationValueValidator $validator,
+        private readonly OrganizationUnitHierarchyReaderInterface $organizationHierarchy,
     ) {}
 
     public function resolve(
@@ -38,51 +40,13 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
             $organizationUnitId !== null
             && in_array(ConfigurationScope::ORGANIZATION_UNIT, $definition->allowedScopes, true)
         ) {
-            $stored = $this->exact(
-                $this->scopes->explicit(
-                    ConfigurationScope::ORGANIZATION_UNIT,
-                    $tenantId,
-                    $organizationUnitId,
-                ),
-                $definition->key,
-            );
-
+            $stored = $this->organizationValue($definition, $tenantId, $organizationUnitId, true);
             if ($stored !== null) {
                 return $this->resolved($definition, $stored);
             }
         }
 
-        if (in_array(ConfigurationScope::TENANT, $definition->allowedScopes, true)) {
-            $stored = $this->exact(
-                $this->scopes->explicit(ConfigurationScope::TENANT, $tenantId, null),
-                $definition->key,
-            );
-
-            if ($stored !== null) {
-                return $this->resolved($definition, $stored);
-            }
-        }
-
-        if (in_array(ConfigurationScope::GLOBAL, $definition->allowedScopes, true)) {
-            $stored = $this->exact(
-                $this->scopes->explicit(ConfigurationScope::GLOBAL, null, null),
-                $definition->key,
-            );
-
-            if ($stored !== null) {
-                return $this->resolved($definition, $stored);
-            }
-        }
-
-        return new ResolvedConfigurationValue(
-            definition: $definition,
-            value: $this->validator->validate($definition, $definition->defaultValue),
-            sourceScope: 'default',
-            tenantId: null,
-            organizationUnitId: null,
-            rowVersion: null,
-            usesDefault: true,
-        );
+        return $this->resolveTenantGlobalOrDefault($definition, $tenantId);
     }
 
     public function value(
@@ -102,19 +66,26 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
         if (
             $context->scope === ConfigurationScope::ORGANIZATION_UNIT
             && $context->tenantId !== null
-            && in_array(ConfigurationScope::TENANT, $definition->allowedScopes, true)
+            && $context->organizationUnitId !== null
+            && $definition->inheritOrganizationHierarchy
         ) {
-            $stored = $this->exact(
-                $this->scopes->explicit(ConfigurationScope::TENANT, $context->tenantId, null),
-                $definition->key,
+            $stored = $this->organizationValue(
+                $definition,
+                $context->tenantId,
+                $context->organizationUnitId,
+                false,
             );
             if ($stored !== null) {
                 return $this->resolved($definition, $stored);
             }
         }
 
+        if ($context->scope === ConfigurationScope::ORGANIZATION_UNIT && $context->tenantId !== null) {
+            return $this->resolveTenantGlobalOrDefault($definition, $context->tenantId);
+        }
+
         if (
-            $context->scope !== ConfigurationScope::GLOBAL
+            $context->scope === ConfigurationScope::TENANT
             && in_array(ConfigurationScope::GLOBAL, $definition->allowedScopes, true)
         ) {
             $stored = $this->exact(
@@ -126,15 +97,7 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
             }
         }
 
-        return new ResolvedConfigurationValue(
-            definition: $definition,
-            value: $this->validator->validate($definition, $definition->defaultValue),
-            sourceScope: 'default',
-            tenantId: null,
-            organizationUnitId: null,
-            rowVersion: null,
-            usesDefault: true,
-        );
+        return $this->defaultValue($definition);
     }
 
     public function exact(
@@ -155,12 +118,85 @@ final class ResolveConfiguration implements ConfigurationResolverInterface
         unset($this->requestCache[$this->cacheKey($context, $key)]);
     }
 
+    private function organizationValue(
+        ConfigurationDefinition $definition,
+        int $tenantId,
+        int $organizationUnitId,
+        bool $includeCurrent,
+    ): ?StoredConfigurationValue {
+        $organizationUnitIds = $includeCurrent ? [$organizationUnitId] : [];
+
+        if ($definition->inheritOrganizationHierarchy) {
+            array_push(
+                $organizationUnitIds,
+                ...$this->organizationHierarchy->activeAncestorIds($tenantId, $organizationUnitId),
+            );
+        }
+
+        foreach ($organizationUnitIds as $candidateId) {
+            $stored = $this->exact(
+                $this->scopes->explicit(
+                    ConfigurationScope::ORGANIZATION_UNIT,
+                    $tenantId,
+                    $candidateId,
+                ),
+                $definition->key,
+            );
+            if ($stored !== null) {
+                return $stored;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveTenantGlobalOrDefault(
+        ConfigurationDefinition $definition,
+        int $tenantId,
+    ): ResolvedConfigurationValue {
+        if (in_array(ConfigurationScope::TENANT, $definition->allowedScopes, true)) {
+            $stored = $this->exact(
+                $this->scopes->explicit(ConfigurationScope::TENANT, $tenantId, null),
+                $definition->key,
+            );
+            if ($stored !== null) {
+                return $this->resolved($definition, $stored);
+            }
+        }
+
+        if (in_array(ConfigurationScope::GLOBAL, $definition->allowedScopes, true)) {
+            $stored = $this->exact(
+                $this->scopes->explicit(ConfigurationScope::GLOBAL, null, null),
+                $definition->key,
+            );
+            if ($stored !== null) {
+                return $this->resolved($definition, $stored);
+            }
+        }
+
+        return $this->defaultValue($definition);
+    }
+
+    private function defaultValue(ConfigurationDefinition $definition): ResolvedConfigurationValue
+    {
+        return new ResolvedConfigurationValue(
+            definition: $definition,
+            value: $this->validator->validate($definition, $definition->defaultValue),
+            sourceScope: 'default',
+            tenantId: null,
+            organizationUnitId: null,
+            rowVersion: null,
+            usesDefault: true,
+        );
+    }
+
     private function resolved(
         ConfigurationDefinition $definition,
         StoredConfigurationValue $stored,
     ): ResolvedConfigurationValue {
         if (
-            $stored->valueType !== $definition->valueType
+            $stored->definitionVersion !== $definition->version
+            || $stored->valueType !== $definition->valueType
             || $stored->sensitive !== $definition->sensitive
         ) {
             throw new RuntimeException(

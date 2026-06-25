@@ -41,6 +41,7 @@ interface AuthContextValue {
     login: (payload: LoginPayload) => Promise<void>;
     logout: () => Promise<void>;
     loadCurrentUser: (signal?: AbortSignal) => Promise<void>;
+    switchOrganizationUnit: (organizationUnitId: number) => Promise<void>;
 }
 
 interface SessionPayload {
@@ -100,15 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const commitSession = useCallback((session: SessionPayload) => {
         const tenantId = session.authMode === 'tenant' ? toPositiveInteger(session.tenant?.id) : null;
-        const organizationUnitId = session.authMode === 'tenant'
-            ? toPositiveInteger(session.organizationUnit?.id)
-            : null;
-
         commitAuthSession({
             accessToken: session.token,
             sessionId: session.sessionId,
             tenantId,
-            organizationUnitId,
             authMode: session.authMode,
         });
         setToken(session.token);
@@ -222,6 +218,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [clearAuthState, commitSession]);
 
+    const switchOrganizationUnit = useCallback(async (organizationUnitId: number) => {
+        if (!Number.isSafeInteger(organizationUnitId) || organizationUnitId < 1) {
+            throw new ApiError('Select a valid organization unit.', 422, 'INVALID_ORGANIZATION_UNIT', 'validation');
+        }
+
+        await authApi.switchOrganizationUnit(organizationUnitId);
+        await loadCurrentUser();
+    }, [loadCurrentUser]);
+
     const logout = useCallback(async () => {
         const current = getStoredApiContext();
         try {
@@ -288,6 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         loadCurrentUser,
+        switchOrganizationUnit,
     }), [
         authMode,
         bootstrapError,
@@ -302,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         permissions,
         permissionsLoaded,
         roles,
+        switchOrganizationUnit,
         tenant,
         token,
         user,

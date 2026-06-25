@@ -26,7 +26,15 @@ describe('ConfigurationSettingsPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         apiMocks.listConfigurationDefinitions.mockResolvedValue(definitions());
-        apiMocks.getGlobalConfigurationImpact.mockResolvedValue({ key: 'localization.timezone', tenant_count: 10, tenant_override_count: 2, inheriting_tenant_count: 8 });
+        apiMocks.getGlobalConfigurationImpact.mockResolvedValue({
+            key: 'localization.timezone',
+            tenant_count: 10,
+            tenant_override_count: 2,
+            inheriting_tenant_count: 8,
+            organization_unit_count: 25,
+            organization_unit_override_count: 4,
+            organization_unit_without_direct_override_count: 21,
+        });
         apiMocks.exportGlobalConfiguration.mockResolvedValue({ schema_version: 1, scope: 'global', entries: [] });
         apiMocks.listConfigurationEntries.mockResolvedValue({
             data: entries(),
@@ -105,12 +113,14 @@ function definition(key: string, label: string, sensitive = false): Configuratio
         label,
         description: `${label} description`,
         owner: key.split('.')[0],
+        version: 1,
         value_type: 'string',
         allowed_scopes: ['global'],
         default_value: '',
         nullable: false,
         sensitive,
         runtime_mutable: true,
+        inherit_organization_hierarchy: false,
         options: [],
         minimum: null,
         maximum: null,
@@ -131,6 +141,7 @@ function entry(key: string, label: string, sensitive: boolean, value: unknown): 
         label,
         description: `${label} description`,
         owner: key.split('.')[0],
+        version: 1,
         value_type: 'string',
         scope: 'global',
         value,

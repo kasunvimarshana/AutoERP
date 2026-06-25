@@ -72,6 +72,7 @@ use Modules\Auth\Services\Mfa\TotpService;
 use Modules\Auth\Services\Rules\AuthDomainService;
 use Modules\Auth\Services\ValidateTokenService;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
+use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
 use Modules\User\Models\UserModel;
@@ -83,11 +84,15 @@ use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\Auth\Services\PlatformSessionService;
 
+use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
+use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
 final class AuthServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/auth.php', 'module-auth');
+        $this->app->tag([AuthOrganizationUnitLifecycleBlocker::class], 'organization-unit.lifecycle_blocker');
+        $this->app->singleton(OrganizationUnitAuthScopeRevokerInterface::class, RevokeOrganizationUnitAuthScopeService::class);
 
         $this->app->singleton(AuthDomainServiceInterface::class, AuthDomainService::class);
         $this->app->singleton(RegistrationInvitationService::class);

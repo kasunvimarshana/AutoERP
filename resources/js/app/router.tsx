@@ -34,6 +34,7 @@ const PermissionCataloguePage = lazy(
     () => import("@/modules/access/PermissionCataloguePage"),
 );
 const SettingsPage = lazy(() => import("@/modules/settings/SettingsPage"));
+const OrganizationUnitManagementPage = lazy(() => import("@/modules/organization-unit/OrganizationUnitManagementPage"));
 const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceDataPage"));
 const TenantWorkspacePage = lazy(() => import("@/modules/tenant/TenantWorkspacePage"));
 const PlatformTenantsPage = lazy(() => import("@/modules/tenant/PlatformTenantsPage"));
@@ -524,6 +525,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/administration/access"
                             element={<AccessOverviewPage />}
+                        />
+                        <Route
+                            path="/administration/organization-units"
+                            element={<PermissionRoute permission="organization-units.view"><OrganizationUnitManagementPage /></PermissionRoute>}
                         />
                         <Route
                             path="/administration/audit-logs"

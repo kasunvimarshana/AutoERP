@@ -1,0 +1,123 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Support;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
+use Modules\OrganizationUnit\Support\OrganizationUnitNameKey;
+use RuntimeException;
+
+final class OrganizationUnitFixture
+{
+    /**
+     * Creates a schema-valid organization unit for integration tests.
+     *
+     * The first unit in a tenant becomes its protected root. Later units without
+     * an explicit parent are created below that root so tests cannot manufacture
+     * invalid parallel roots.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    public static function create(array $attributes): int
+    {
+        $tenantId = self::positiveInt($attributes['tenant_id'] ?? null, 'tenant_id');
+        $name = trim((string) ($attributes['name'] ?? ''));
+        $code = Str::upper(trim((string) ($attributes['code'] ?? '')));
+        if ($name === '' || preg_match('/^[A-Z0-9][A-Z0-9_-]{0,99}$/D', $code) !== 1) {
+            throw new RuntimeException('Organization-unit test fixture requires a valid name and canonical code.');
+        }
+
+        $existingRoot = DB::table('organization_units')
+            ->where('tenant_id', $tenantId)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->first(['id', 'path', 'depth']);
+
+        $requestedParentId = self::nullablePositiveInt($attributes['parent_id'] ?? null);
+        $parent = $requestedParentId !== null
+            ? DB::table('organization_units')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $requestedParentId)
+                ->first(['id', 'path', 'depth'])
+            : $existingRoot;
+
+        if ($requestedParentId !== null && $parent === null) {
+            throw new RuntimeException('Organization-unit test fixture parent does not belong to the tenant.');
+        }
+
+        $isRoot = $existingRoot === null && $parent === null;
+        $depth = $isRoot ? 0 : ((int) $parent->depth + 1);
+        $typeId = self::typeId($tenantId, $depth);
+        $segment = Str::slug($code);
+        if ($segment === '') {
+            throw new RuntimeException('Organization-unit test fixture path segment could not be generated.');
+        }
+        $path = $isRoot ? '/'.$segment : rtrim((string) $parent->path, '/').'/'.$segment;
+        $retiredAt = $isRoot ? null : ($attributes['retired_at'] ?? null);
+        $now = now();
+
+        return (int) DB::table('organization_units')->insertGetId([
+            'tenant_id' => $tenantId,
+            'type_id' => $typeId,
+            'parent_id' => $isRoot ? null : (int) $parent->id,
+            'name' => $name,
+            'code' => $code,
+            'path' => $path,
+            'path_hash' => hash('sha256', $path),
+            'depth' => $depth,
+            'root_marker' => $isRoot ? OrganizationUnitHierarchy::ROOT_MARKER : null,
+            'is_active' => $isRoot ? true : ($retiredAt === null && (bool) ($attributes['is_active'] ?? true)),
+            'retired_at' => $retiredAt,
+            'description' => $attributes['description'] ?? null,
+            'logo_object_key' => $attributes['logo_object_key'] ?? null,
+            'logo_mime_type' => $attributes['logo_mime_type'] ?? null,
+            'logo_size_bytes' => $attributes['logo_size_bytes'] ?? null,
+            'row_version' => max(1, (int) ($attributes['row_version'] ?? 1)),
+            'created_at' => $attributes['created_at'] ?? $now,
+            'updated_at' => $attributes['updated_at'] ?? $now,
+        ]);
+    }
+
+    private static function typeId(int $tenantId, int $depth): int
+    {
+        $name = 'Test hierarchy level '.$depth;
+        $nameKey = OrganizationUnitNameKey::from($name);
+        $existing = DB::table('organization_unit_types')
+            ->where('tenant_id', $tenantId)
+            ->where('name_key', $nameKey)
+            ->value('id');
+        if (is_numeric($existing)) {
+            return (int) $existing;
+        }
+
+        return (int) DB::table('organization_unit_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $name,
+            'name_key' => $nameKey,
+            'level' => $depth,
+            'is_active' => true,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private static function positiveInt(mixed $value, string $field): int
+    {
+        $resolved = self::nullablePositiveInt($value);
+        if ($resolved === null) {
+            throw new RuntimeException("Organization-unit test fixture requires {$field}.");
+        }
+
+        return $resolved;
+    }
+
+    private static function nullablePositiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function __construct() {}
+}

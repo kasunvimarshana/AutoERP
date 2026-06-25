@@ -185,6 +185,7 @@ describe('navigation access and matching', () => {
         const administration = tenantNavigationSections.find((section) => section.label === 'Administration');
         expect(administration?.items.map((item) => item.label)).toEqual([
             'Users & Access',
+            'Organization Units',
             'Tenant Administration',
             'Audit Logs',
             'Reference Data',

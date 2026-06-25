@@ -7,6 +7,7 @@ use Modules\Auth\Http\Controllers\AuthController;
 use Modules\Auth\Http\Controllers\PlatformAuthController;
 use Modules\Auth\Http\Controllers\PlatformMfaController;
 use Modules\Auth\Http\Controllers\PlatformSecurityController;
+use Modules\Auth\Http\Controllers\OrganizationUnitContextController;
 use Modules\User\Constants\PlatformPermission;
 use Modules\Auth\Http\Controllers\InitialAdministratorInvitationController;
 
@@ -56,6 +57,17 @@ $registerAuthRoutes = static function (string $prefix, string $namePrefix) use (
             [AuthController::class, 'requestVerificationChallenge'],
         )->name('verification.request');
         Route::post('verification/verify', [AuthController::class, 'verifyChallenge'])->name('verification.verify');
+
+        Route::post('organization-unit/switch', [OrganizationUnitContextController::class, 'switch'])
+            ->middleware([
+                'throttle:60,1',
+                $tokenValidationMiddleware,
+                'auth:'.$protectedGuard,
+                $currentUserMiddleware,
+                $currentTenantMiddleware,
+                $authContextMiddleware,
+            ])
+            ->name('organization-unit.switch');
 
         Route::middleware([
             'throttle:60,1',

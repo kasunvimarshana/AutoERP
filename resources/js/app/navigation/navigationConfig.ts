@@ -6,6 +6,7 @@ import {
     protectedAccessRoles,
 } from "@/modules/access/accessPermissions";
 import { itemPermissions } from "@/modules/item/itemPermissions";
+import { organizationUnitPermissions } from "@/modules/organization-unit/organizationUnitPermissions";
 import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
@@ -1037,6 +1038,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                     ...tenantAccess([]),
                     roles: [protectedAccessRoles.superAdmin],
                     permissions: accessControlPermissions,
+                },
+            },
+            {
+                id: "organization-units",
+                type: "link",
+                label: "Organization Units",
+                to: "/administration/organization-units",
+                icon: "list",
+                access: {
+                    requiresTenant: true,
+                    permissions: [organizationUnitPermissions.view],
                 },
             },
             {

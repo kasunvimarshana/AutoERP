@@ -12,6 +12,8 @@ interface UserRepositoryInterface extends RepositoryPortInterface
 {
     public function countByTenant(int $tenantId): int;
 
+    public function lockByIdForTenant(int|string $id, int $tenantId): ?DataRecord;
+
     public function findActivePlatformOperatorCredentials(string $email): ?DataRecord;
 
     public function findByTenantAndEmail(?int $tenantId, string $email, ?int $excludeId = null): ?DataRecord;

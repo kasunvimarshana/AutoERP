@@ -65,19 +65,6 @@ final class OrganizationUnitDomainService implements OrganizationUnitDomainServi
         return $normalized;
     }
 
-    public function normalizeMetadata(mixed $metadata): ?array
-    {
-        if ($metadata === null) {
-            return null;
-        }
-
-        if (is_array($metadata)) {
-            return $metadata;
-        }
-
-        throw new InvalidArgumentException('Metadata must be an array or null.');
-    }
-
     public function normalizeLevel(int $level): int
     {
         if ($level < 0) {

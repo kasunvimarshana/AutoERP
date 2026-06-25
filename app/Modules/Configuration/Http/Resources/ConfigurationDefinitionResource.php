@@ -27,6 +27,7 @@ final class ConfigurationDefinitionResource extends JsonResource
             'nullable' => $definition->nullable,
             'sensitive' => $definition->sensitive,
             'runtime_mutable' => $definition->runtimeMutable,
+            'inherit_organization_hierarchy' => $definition->inheritOrganizationHierarchy,
             'options' => $definition->options,
             'minimum' => $definition->minimum,
             'maximum' => $definition->maximum,

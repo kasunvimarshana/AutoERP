@@ -19,6 +19,7 @@ use Modules\Configuration\Services\ConfigurationValueValidator;
 use Modules\Configuration\Services\ResolveConfiguration;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\OrganizationUnit\Contracts\OrganizationUnitHierarchyReaderInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitOwnershipCheckerInterface;
 use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
 use PHPUnit\Framework\TestCase;
@@ -37,6 +38,19 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
         self::assertSame(ConfigurationScope::ORGANIZATION_UNIT, $resolved->sourceScope);
         self::assertSame(10, $resolved->tenantId);
         self::assertSame(20, $resolved->organizationUnitId);
+    }
+
+
+    public function test_nearest_parent_override_is_used_before_tenant_value(): void
+    {
+        $resolved = $this->resolver([
+            'organization_unit:15' => 'division',
+            ConfigurationScope::TENANT => 'tenant',
+        ], [15, 10])->resolve('test.setting', 10, 20);
+
+        self::assertSame('division', $resolved->value);
+        self::assertSame(ConfigurationScope::ORGANIZATION_UNIT, $resolved->sourceScope);
+        self::assertSame(15, $resolved->organizationUnitId);
     }
 
     public function test_tenant_override_wins_when_organization_override_is_absent(): void
@@ -73,14 +87,15 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
         self::assertTrue($resolved->usesDefault);
     }
 
-    /** @param array<string,string> $valuesByScope */
-    private function resolver(array $valuesByScope): ResolveConfiguration
+    /** @param array<string,string> $valuesByScope @param list<int> $ancestorIds */
+    private function resolver(array $valuesByScope, array $ancestorIds = []): ResolveConfiguration
     {
         $definition = new ConfigurationDefinition(
             key: 'test.setting',
             label: 'Test setting',
             description: 'Verifies configuration inheritance.',
             owner: 'Tests',
+            version: 1,
             valueType: ConfigurationValueType::STRING,
             allowedScopes: [
                 ConfigurationScope::ORGANIZATION_UNIT,
@@ -91,6 +106,7 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
             nullable: false,
             sensitive: false,
             runtimeMutable: true,
+            inheritOrganizationHierarchy: true,
         );
 
         $definitions = $this->createMock(ConfigurationDefinitionRegistryInterface::class);
@@ -99,7 +115,10 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
         $repository = $this->createMock(ConfigurationValueRepositoryInterface::class);
         $repository->method('findExact')->willReturnCallback(
             static function (ConfigurationScopeContext $context, string $key) use ($valuesByScope): ?StoredConfigurationValue {
-                $value = $valuesByScope[$context->scope] ?? null;
+                $contextKey = $context->scope === ConfigurationScope::ORGANIZATION_UNIT
+                    ? $context->scope.':'.($context->organizationUnitId ?? 'none')
+                    : $context->scope;
+                $value = $valuesByScope[$contextKey] ?? $valuesByScope[$context->scope] ?? null;
                 if ($value === null) {
                     return null;
                 }
@@ -135,6 +154,9 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
         $lookup = $this->createMock(ReferenceValueLookupInterface::class);
         $validator = new ConfigurationValueValidator($lookup);
 
-        return new ResolveConfiguration($definitions, $repository, $scopes, $codec, $validator);
+        $hierarchy = $this->createMock(OrganizationUnitHierarchyReaderInterface::class);
+        $hierarchy->method('activeAncestorIds')->willReturn($ancestorIds);
+
+        return new ResolveConfiguration($definitions, $repository, $scopes, $codec, $validator, $hierarchy);
     }
 }

@@ -11,6 +11,7 @@ use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
@@ -43,6 +44,7 @@ final class UserService extends AbstractUserCrudService
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
+        private readonly OrganizationUnitAuthScopeRevokerInterface $organizationUnitAuthScopes,
     ) {}
 
     public function list(array $filters): Result
@@ -128,6 +130,7 @@ final class UserService extends AbstractUserCrudService
                 $organizationUnitId = $this->resolveOrganizationUnitId(
                     $tenantId,
                     $this->toNullableInt($payload['default_organization_unit_id'] ?? null),
+                    true,
                 );
                 $roleIds = $this->validateRoleIds($tenantId, $payload['role_ids'] ?? []);
                 $organizationUnitIds = $this->validateOrganizationUnitIds(
@@ -174,13 +177,13 @@ final class UserService extends AbstractUserCrudService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($id, $payload): Result {
-                $existing = $this->users->findById($id);
-                if ($existing === null || ! $this->isInTenantScope($existing)) {
+                $tenantId = $this->resolveTenantId($this->toNullableInt($payload['tenant_id'] ?? null));
+                $existing = $this->users->lockByIdForTenant($id, $tenantId);
+                if ($existing === null) {
                     return $this->notFound('User not found.');
                 }
 
                 $targetId = (int) $existing->id();
-                $tenantId = (int) $existing->require('tenant_id');
 
                 if (
                     array_key_exists('row_version', $payload)
@@ -229,7 +232,7 @@ final class UserService extends AbstractUserCrudService
                 $organizationUnitId = array_key_exists('default_organization_unit_id', $payload)
                     ? $this->toNullableInt($payload['default_organization_unit_id'])
                     : $this->defaultOrganizationUnitId($tenantId, $targetId);
-                $organizationUnitId = $this->resolveOrganizationUnitId($tenantId, $organizationUnitId);
+                $organizationUnitId = $this->resolveOrganizationUnitId($tenantId, $organizationUnitId, true);
                 $roleIds = array_key_exists('role_ids', $payload)
                     ? $this->validateRoleIds($tenantId, $payload['role_ids'])
                     : null;
@@ -329,15 +332,16 @@ final class UserService extends AbstractUserCrudService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($id, $payload): Result {
-                $user = $this->users->findById($id);
-                if ($user === null || ! $this->isInTenantScope($user)) {
+                $tenantId = $this->resolveTenantId(null);
+                $user = $this->users->lockByIdForTenant($id, $tenantId);
+                if ($user === null) {
                     return $this->notFound('User not found.');
                 }
 
-                $tenantId = (int) $user->require('tenant_id');
                 $organizationUnitId = $this->resolveOrganizationUnitId(
                     $tenantId,
                     $this->toNullableInt($payload['organization_unit_id'] ?? null),
+                    true,
                 );
                 if ($organizationUnitId === null) {
                     return $this->failure(
@@ -367,11 +371,10 @@ final class UserService extends AbstractUserCrudService
                 $assignment = $this->userOrganizationUnits->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
-                    'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                     'user_id' => (int) $user->id(),
                     'status' => UserOrganizationUnitStatus::ACTIVE,
                     'is_default' => $isDefault,
-                    'default_marker' => $isDefault ? 'default' : null,
+                    'default_marker' => $isDefault ? UserOrganizationUnitStatus::DEFAULT_MARKER : null,
                     'row_version' => 1,
                 ]);
 
@@ -386,12 +389,12 @@ final class UserService extends AbstractUserCrudService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($id, $organizationUnitId): Result {
-                $user = $this->users->findById($id);
-                if ($user === null || ! $this->isInTenantScope($user)) {
+                $tenantId = $this->resolveTenantId(null);
+                $user = $this->users->lockByIdForTenant($id, $tenantId);
+                if ($user === null) {
                     return $this->notFound('User not found.');
                 }
 
-                $tenantId = (int) $user->require('tenant_id');
                 $orgId = $this->toNullableInt($organizationUnitId);
                 if ($orgId === null) {
                     return $this->failure(
@@ -410,6 +413,11 @@ final class UserService extends AbstractUserCrudService
                     $assignment->id(),
                     $tenantId,
                     (int) $user->id(),
+                );
+                $this->organizationUnitAuthScopes->revokeForUserOrganizationUnit(
+                    $tenantId,
+                    (int) $user->id(),
+                    $orgId,
                 );
 
                 if ($removedDefault) {
@@ -585,7 +593,6 @@ final class UserService extends AbstractUserCrudService
                 })
                 ->where('user_organization_units.tenant_id', $tenantId)
                 ->where('user_organization_units.user_id', $userId)
-                ->whereNull('organization_units.deleted_at')
                 ->orderByDesc('user_organization_units.is_default')
                 ->orderBy('organization_units.name')
                 ->get([
@@ -702,7 +709,7 @@ final class UserService extends AbstractUserCrudService
         }
 
         foreach ($organizationUnitIds as $organizationUnitId) {
-            $this->resolveOrganizationUnitId($tenantId, $organizationUnitId);
+            $this->resolveOrganizationUnitId($tenantId, $organizationUnitId, true);
         }
 
         return $organizationUnitIds;
@@ -794,6 +801,13 @@ final class UserService extends AbstractUserCrudService
                 ->where('user_id', $userId)
                 ->whereIn('organization_unit_id', $removeIds)
                 ->delete();
+            foreach ($removeIds as $removedOrganizationUnitId) {
+                $this->organizationUnitAuthScopes->revokeForUserOrganizationUnit(
+                    $tenantId,
+                    $userId,
+                    $removedOrganizationUnitId,
+                );
+            }
         }
 
         $defaultOrganizationUnitId ??= $organizationUnitIds[0] ?? null;
@@ -805,21 +819,36 @@ final class UserService extends AbstractUserCrudService
         }
 
         foreach ($organizationUnitIds as $organizationUnitId) {
-            DB::table('user_organization_units')->updateOrInsert(
-                [
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $organizationUnitId,
-                    'user_id' => $userId,
-                ],
-                [
-                    'status' => UserOrganizationUnitStatus::ACTIVE,
-                    'is_default' => $organizationUnitId === $defaultOrganizationUnitId,
-                    'default_marker' => $organizationUnitId === $defaultOrganizationUnitId ? 'default' : null,
-                    'row_version' => 1,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
+            $attributes = [
+                'status' => UserOrganizationUnitStatus::ACTIVE,
+                'is_default' => $organizationUnitId === $defaultOrganizationUnitId,
+                'default_marker' => $organizationUnitId === $defaultOrganizationUnitId
+                    ? UserOrganizationUnitStatus::DEFAULT_MARKER
+                    : null,
+                'updated_at' => now(),
+            ];
+            $existingId = $existingByOrganizationUnit[$organizationUnitId] ?? null;
+            if ($existingId !== null) {
+                DB::table('user_organization_units')
+                    ->where('tenant_id', $tenantId)
+                    ->where('user_id', $userId)
+                    ->whereKey($existingId)
+                    ->update([
+                        ...$attributes,
+                        'row_version' => DB::raw('row_version + 1'),
+                    ]);
+
+                continue;
+            }
+
+            DB::table('user_organization_units')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'user_id' => $userId,
+                ...$attributes,
+                'row_version' => 1,
+                'created_at' => now(),
+            ]);
         }
     }
 
@@ -991,21 +1020,29 @@ final class UserService extends AbstractUserCrudService
         return $resolvedTenantId;
     }
 
-    private function resolveOrganizationUnitId(int $tenantId, ?int $organizationUnitId): ?int
-    {
+    private function resolveOrganizationUnitId(
+        int $tenantId,
+        ?int $organizationUnitId,
+        bool $lockForUpdate = false,
+    ): ?int {
         $contextOrganizationUnitId = $this->currentOrganizationUnit->currentOrganizationUnitId();
         $resolvedOrganizationUnitId = $organizationUnitId ?? $contextOrganizationUnitId;
         if ($resolvedOrganizationUnitId === null) {
             return null;
         }
 
-        $record = $this->organizationUnits->findById($resolvedOrganizationUnitId);
+        $record = $lockForUpdate
+            ? $this->organizationUnits->lockActiveByTenantAndId($tenantId, $resolvedOrganizationUnitId)
+            : $this->organizationUnits->findById($resolvedOrganizationUnitId);
         if ($record === null) {
             throw new InvalidArgumentException('Organization unit not found.');
         }
 
         if ((int) $record->require('tenant_id') !== $tenantId) {
             throw new InvalidArgumentException('Organization unit must belong to same tenant as user.');
+        }
+        if (! (bool) $record->get('is_active', false) || $record->get('retired_at') !== null) {
+            throw new InvalidArgumentException('Organization unit must be active and available.');
         }
 
         return $resolvedOrganizationUnitId;

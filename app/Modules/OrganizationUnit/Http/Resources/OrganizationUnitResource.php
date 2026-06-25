@@ -10,19 +10,13 @@ use Modules\Core\DTOs\DataRecord;
 
 final class OrganizationUnitResource extends JsonResource
 {
-    /**
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
-        }
-
-        if (is_array($this->resource)) {
-            return $this->resource;
-        }
-
-        return [];
+        $values = $this->resource instanceof DataRecord ? $this->resource->toArray() : (is_array($this->resource) ? $this->resource : []);
+        unset($values['logo_object_key'], $values['path_hash']);
+        $values['lifecycle_status'] = ($values['retired_at'] ?? null) !== null
+            ? 'retired'
+            : ((bool) ($values['is_active'] ?? false) ? 'active' : 'inactive');
+        return $values;
     }
 }

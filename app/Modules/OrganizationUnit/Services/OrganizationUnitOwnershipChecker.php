@@ -14,7 +14,6 @@ final class OrganizationUnitOwnershipChecker implements OrganizationUnitOwnershi
         return OrganizationUnitModel::query()
             ->whereKey($organizationUnitId)
             ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
             ->exists();
     }
 
@@ -24,7 +23,7 @@ final class OrganizationUnitOwnershipChecker implements OrganizationUnitOwnershi
             ->whereKey($organizationUnitId)
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
-            ->whereNull('deleted_at')
+            ->whereNull('retired_at')
             ->exists();
     }
 }

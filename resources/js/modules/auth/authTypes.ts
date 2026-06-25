@@ -18,7 +18,15 @@ export interface AuthTenant {
 export interface AuthOrganizationUnit {
     id: number | string;
     name: string | null;
+    code?: string | null;
+    path?: string | null;
     timezone?: string | null;
+}
+
+export interface OrganizationUnitContextOptions {
+    data: AuthOrganizationUnit[];
+    default_organization_unit_ids: number[];
+    current_organization_unit_id: number | null;
 }
 
 export interface AuthSession {

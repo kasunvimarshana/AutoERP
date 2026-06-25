@@ -8,15 +8,13 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 
 final class ListOrganizationUnitDocumentRequest extends TenantScopedRequest
 {
-    public function authorize(): bool
-    {
-        return auth()->check();
-    }
-
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'document_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }
 }

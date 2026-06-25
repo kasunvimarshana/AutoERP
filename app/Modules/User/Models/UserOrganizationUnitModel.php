@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
+use Modules\User\Constants\UserOrganizationUnitStatus;
 
 final class UserOrganizationUnitModel extends TenantOwnedModel
 {
-    use HasImmutableTenantOwnership;
-
     protected static function booted(): void
     {
         static::saving(static function (self $model): void {
@@ -21,15 +19,15 @@ final class UserOrganizationUnitModel extends TenantOwnedModel
             $defaultMarker = $model->getAttribute('default_marker');
             $status = (string) $model->getAttribute('status');
 
-            if ($isDefault && $status !== 'active') {
+            if ($isDefault && $status !== UserOrganizationUnitStatus::ACTIVE) {
                 throw new \LogicException('Only an active organization-unit assignment can be the default.');
             }
 
-            if ($defaultMarker !== null && $defaultMarker !== 'default') {
+            if ($defaultMarker !== null && $defaultMarker !== UserOrganizationUnitStatus::DEFAULT_MARKER) {
                 throw new \LogicException('Organization-unit default marker is invalid.');
             }
 
-            if ($isDefault !== ($defaultMarker === 'default')) {
+            if ($isDefault !== ($defaultMarker === UserOrganizationUnitStatus::DEFAULT_MARKER)) {
                 throw new \LogicException('Organization-unit default flag and marker must remain consistent.');
             }
         });
@@ -40,7 +38,6 @@ final class UserOrganizationUnitModel extends TenantOwnedModel
     protected $fillable = [
         'tenant_id',
         'organization_unit_id',
-        'metadata',
         'user_id',
         'status',
         'is_default',

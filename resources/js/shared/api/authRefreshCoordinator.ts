@@ -71,9 +71,6 @@ async function performRefresh(): Promise<string> {
         const { data } = await refreshClient.post<RefreshResponse>(endpoint, undefined, {
             headers: {
                 ...(context.tenantId ? { 'X-Tenant-Id': String(context.tenantId) } : {}),
-                ...(context.organizationUnitId
-                    ? { 'X-Organization-Unit-Id': String(context.organizationUnitId) }
-                    : {}),
             },
         });
         const rawToken = typeof data.access_token === 'string' ? data.access_token : data.token;

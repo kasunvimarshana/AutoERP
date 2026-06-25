@@ -16,7 +16,7 @@ final class OrganizationUnitLimitUsageContributor implements TenantLimitUsageCon
         return [
             'max_organization_units' => $this->organizationUnits->newQuery()
                 ->where('tenant_id', $tenantId)
-                ->whereNull('deleted_at')
+                ->whereNull('retired_at')
                 ->count(),
         ];
     }

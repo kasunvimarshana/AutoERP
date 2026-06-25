@@ -52,6 +52,17 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         return $this->query()->where('tenant_id', $tenantId)->count();
     }
 
+    public function lockByIdForTenant(int|string $id, int $tenantId): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($id)
+            ->lockForUpdate()
+            ->first();
+
+        return $model instanceof Model ? $this->toRecord($model) : null;
+    }
+
     public function findByTenantAndEmail(?int $tenantId, string $email, ?int $excludeId = null): ?DataRecord
     {
         $query = $this->query()->where('email', strtolower(trim($email)));

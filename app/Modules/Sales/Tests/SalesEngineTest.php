@@ -904,7 +904,7 @@ final class SalesEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name): int
     {
-        return (int) DB::table('organization_units')->insertGetId([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'row_version' => 1,
             'name' => $name,

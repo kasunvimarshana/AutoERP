@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\OrganizationUnits;
 
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Constants\OrganizationUnitErrorCode;
+use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\OrganizationUnit\Repositories\OrganizationUnitTypeRepositoryInterface;
+use Modules\OrganizationUnit\Services\Audit\OrganizationUnitAuditService;
 use Modules\OrganizationUnit\Services\Contracts\OrganizationUnitDomainServiceInterface;
+use Modules\OrganizationUnit\Services\Storage\OrganizationUnitAssetStorageService;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\TenantEntitlementService;
@@ -23,22 +27,26 @@ final class OrganizationUnitService
 {
     public function __construct(
         private readonly OrganizationUnitRepositoryInterface $units,
-        private readonly OrganizationUnitTypeRepositoryInterface $types,
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantEntitlementService $entitlements,
         private readonly OrganizationUnitDomainServiceInterface $domain,
         private readonly OrganizationHierarchyService $hierarchy,
-        private readonly OrganizationUnitContext $organizationUnitContext,
-        private readonly TransactionManagerInterface $transactions,
-        private readonly ErrorNormalizerInterface $errorNormalizer,
+        private readonly OrganizationUnitContext $context,
+        private readonly OrganizationUnitAssetStorageService $assets,
+        private readonly OrganizationUnitAuditService $audit,
+        private readonly ErrorNormalizerInterface $errors,
     ) {}
 
-    public function listByTenant(int|string|null $tenantId = null): Result
+    /** @param array<string, mixed> $filters */
+    public function page(array $filters, int $perPage, int $page): Result
     {
         try {
-            $resolvedTenantId = $this->organizationUnitContext->resolveTenantId($this->toNullableInt($tenantId));
-
-            return Result::success($this->units->listByTenant($resolvedTenantId));
+            return Result::success($this->units->pageByTenant(
+                $this->context->requireTenantId(),
+                $filters,
+                $perPage,
+                $page,
+            ));
         } catch (Throwable $exception) {
             return $this->failure($exception, 'organization-unit.list');
         }
@@ -48,11 +56,9 @@ final class OrganizationUnitService
     {
         try {
             $record = $this->units->findById($id);
-            if ($record === null || ! $this->isRecordInTenantScope($record)) {
-                return $this->notFound();
-            }
-
-            return Result::success($record);
+            return $record !== null && (int) $record->get('tenant_id') === $this->context->requireTenantId()
+                ? Result::success($record)
+                : $this->notFound();
         } catch (Throwable $exception) {
             return $this->failure($exception, 'organization-unit.get', ['organization_unit_id' => (string) $id]);
         }
@@ -62,52 +68,30 @@ final class OrganizationUnitService
     public function create(array $payload): Result
     {
         try {
-            return $this->transactions->runInTransaction(function () use ($payload): Result {
-                $tenantId = $this->organizationUnitContext->resolveTenantId(
-                    $this->toNullableInt($payload['tenant_id'] ?? null),
-                );
+            $tenantId = $this->context->requireTenantId();
+            $unit = DB::transaction(function () use ($tenantId, $payload): OrganizationUnitModel {
                 if ($this->tenants->lockById($tenantId) === null) {
-                    return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_NOT_FOUND, 'Tenant not found.'));
+                    throw OrganizationUnitException::tenantNotFound();
                 }
 
-                $unitLimit = $this->entitlements->limit($tenantId, 'max_organization_units');
-                if ($unitLimit !== null && $this->units->countByTenant($tenantId) >= $unitLimit) {
-                    return Result::failure(new Error(
-                        OrganizationUnitErrorCode::PLAN_LIMIT_REACHED,
-                        'The tenant plan organization unit limit has been reached.',
-                    ));
+                $limit = $this->entitlements->limit($tenantId, 'max_organization_units');
+                if ($limit !== null && $this->units->countByTenant($tenantId) >= $limit) {
+                    throw OrganizationUnitException::planLimitReached();
                 }
 
-                $typeId = $this->validatedTypeId($tenantId, $payload['type_id'] ?? null);
-                $parentId = isset($payload['parent_id']) ? (int) $payload['parent_id'] : null;
-                if ($parentId === null) {
-                    return Result::failure(new Error(
-                        OrganizationUnitErrorCode::INVALID_VALUE,
-                        'Select a parent organization unit. The tenant root is provisioned by the platform workflow.',
-                    ));
-                }
-
-                $unit = $this->hierarchy->createUnit($tenantId, [
-                    'type_id' => $typeId,
-                    'parent_id' => $parentId,
+                $created = $this->hierarchy->createUnit($tenantId, [
+                    'type_id' => $this->requiredPositiveInt($payload['type_id'] ?? null, 'Organization-unit type'),
+                    'parent_id' => $this->requiredPositiveInt($payload['parent_id'] ?? null, 'Parent organization unit'),
                     'name' => $this->domain->normalizeName((string) ($payload['name'] ?? '')),
-                    'code' => $this->domain->normalizeOptionalText(
-                        isset($payload['code']) ? (string) $payload['code'] : null,
-                        100,
-                    ),
-                    'image_path' => $this->domain->normalizeOptionalText(
-                        isset($payload['image_path']) ? (string) $payload['image_path'] : null,
-                        2048,
-                    ),
-                    'is_active' => array_key_exists('is_active', $payload) ? (bool) $payload['is_active'] : true,
-                    'description' => $this->domain->normalizeOptionalText(
-                        isset($payload['description']) ? (string) $payload['description'] : null,
-                    ),
-                    'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
+                    'code' => $this->domain->normalizeKey((string) ($payload['code'] ?? '')),
+                    'description' => $this->domain->normalizeOptionalText($this->nullableString($payload['description'] ?? null)),
                 ]);
+                $this->audit->unit('created', $created, null, $created->attributesToArray());
 
-                return Result::success($this->record($unit));
-            });
+                return $created;
+            }, 3);
+
+            return Result::success($this->record($unit));
         } catch (Throwable $exception) {
             return $this->failure($exception, 'organization-unit.create');
         }
@@ -117,54 +101,32 @@ final class OrganizationUnitService
     public function update(int|string $id, array $payload): Result
     {
         try {
-            $existing = $this->units->findById($id);
-            if ($existing === null || ! $this->isRecordInTenantScope($existing)) {
+            $existing = $this->scopedRecord($id);
+            if ($existing === null) {
                 return $this->notFound();
             }
+            $before = $existing->toArray();
+            $unit = DB::transaction(function () use ($existing, $payload, $before): OrganizationUnitModel {
+                $updated = $this->hierarchy->updateUnit(
+                    (int) $existing->require('tenant_id'),
+                    (int) $existing->id(),
+                    $this->requiredVersion($payload),
+                    [
+                        'type_id' => $payload['type_id'] ?? $existing->get('type_id'),
+                        'parent_id' => $payload['parent_id'] ?? $existing->get('parent_id'),
+                        'name' => array_key_exists('name', $payload)
+                            ? $this->domain->normalizeName((string) $payload['name'])
+                            : $existing->require('name'),
+                        'code' => $existing->require('code'),
+                        'description' => array_key_exists('description', $payload)
+                            ? $this->domain->normalizeOptionalText($this->nullableString($payload['description']))
+                            : $existing->get('description'),
+                    ],
+                );
+                $this->audit->unit('updated', $updated, $before, $updated->attributesToArray());
 
-            $tenantId = (int) $existing->require('tenant_id');
-            $expectedVersion = (int) ($payload['expected_version'] ?? 0);
-            if ($expectedVersion < 1) {
-                return Result::failure(new Error(
-                    OrganizationUnitErrorCode::INVALID_VALUE,
-                    'The expected organization unit version is required.',
-                ));
-            }
-
-            $typeId = array_key_exists('type_id', $payload)
-                ? $this->validatedTypeId($tenantId, $payload['type_id'])
-                : $existing->get('type_id');
-
-            $unit = $this->hierarchy->updateUnit($tenantId, (int) $existing->id(), $expectedVersion, [
-                'type_id' => $typeId,
-                'parent_id' => array_key_exists('parent_id', $payload)
-                    ? ($payload['parent_id'] === null ? null : (int) $payload['parent_id'])
-                    : $existing->get('parent_id'),
-                'name' => $this->domain->normalizeName((string) ($payload['name'] ?? $existing->require('name'))),
-                'code' => array_key_exists('code', $payload)
-                    ? $this->domain->normalizeOptionalText(
-                        isset($payload['code']) ? (string) $payload['code'] : null,
-                        100,
-                    )
-                    : $existing->get('code'),
-                'image_path' => array_key_exists('image_path', $payload)
-                    ? $this->domain->normalizeOptionalText(
-                        isset($payload['image_path']) ? (string) $payload['image_path'] : null,
-                        2048,
-                    )
-                    : $existing->get('image_path'),
-                'is_active' => array_key_exists('is_active', $payload)
-                    ? (bool) $payload['is_active']
-                    : (bool) $existing->get('is_active', true),
-                'description' => array_key_exists('description', $payload)
-                    ? $this->domain->normalizeOptionalText(
-                        isset($payload['description']) ? (string) $payload['description'] : null,
-                    )
-                    : $existing->get('description'),
-                'metadata' => array_key_exists('metadata', $payload)
-                    ? $this->domain->normalizeMetadata($payload['metadata'])
-                    : $this->domain->normalizeMetadata($existing->get('metadata')),
-            ]);
+                return $updated;
+            }, 3);
 
             return Result::success($this->record($unit));
         } catch (Throwable $exception) {
@@ -174,71 +136,204 @@ final class OrganizationUnitService
 
     public function activate(int|string $id, int $expectedVersion): Result
     {
-        return $this->setActivationState($id, $expectedVersion, true);
+        return $this->setActive($id, $expectedVersion, true);
     }
 
     public function deactivate(int|string $id, int $expectedVersion): Result
     {
-        return $this->setActivationState($id, $expectedVersion, false);
+        return $this->setActive($id, $expectedVersion, false);
     }
 
-    public function delete(int|string $id, int $expectedVersion): Result
+    public function retire(int|string $id, int $expectedVersion): Result
     {
         try {
-            $existing = $this->units->findById($id);
-            if ($existing === null || ! $this->isRecordInTenantScope($existing)) {
+            $existing = $this->scopedRecord($id);
+            if ($existing === null) {
                 return $this->notFound();
             }
 
-            $this->hierarchy->deleteUnit((int) $existing->require('tenant_id'), (int) $existing->id(), $expectedVersion);
+            $before = $existing->toArray();
+            $retired = DB::transaction(function () use ($existing, $expectedVersion, $before): OrganizationUnitModel {
+                $updated = $this->hierarchy->retire(
+                    (int) $existing->require('tenant_id'),
+                    (int) $existing->id(),
+                    $expectedVersion,
+                );
+                $this->audit->unit('retired', $updated, $before, $updated->attributesToArray());
 
-            return Result::success(true);
+                return $updated;
+            }, 3);
+
+            return Result::success($this->record($retired));
         } catch (Throwable $exception) {
-            return $this->failure($exception, 'organization-unit.delete', ['organization_unit_id' => (string) $id]);
+            return $this->failure($exception, 'organization-unit.retire', ['organization_unit_id' => (string) $id]);
         }
     }
 
-    private function setActivationState(int|string $id, int $expectedVersion, bool $isActive): Result
+    public function replaceLogo(int|string $id, int $expectedVersion, string $temporaryPath): Result
     {
+        $stored = null;
+        $committed = false;
+
         try {
-            $existing = $this->units->findById($id);
-            if ($existing === null || ! $this->isRecordInTenantScope($existing)) {
+            $existing = $this->scopedRecord($id);
+            if ($existing === null) {
                 return $this->notFound();
             }
+            $tenantId = (int) $existing->require('tenant_id');
+            $unitId = (int) $existing->id();
+            $oldObjectKey = $this->nullableString($existing->get('logo_object_key'));
+            $stored = $this->assets->storeLogo($tenantId, $unitId, $temporaryPath);
 
-            $unit = $this->hierarchy->setActive(
-                (int) $existing->require('tenant_id'),
-                (int) $existing->id(),
+            $updated = DB::transaction(function () use (
+                $tenantId,
+                $unitId,
                 $expectedVersion,
-                $isActive,
-            );
+                $stored,
+                $oldObjectKey,
+            ): OrganizationUnitModel {
+                $unit = $this->hierarchy->replaceLogo(
+                    $tenantId,
+                    $unitId,
+                    $expectedVersion,
+                    $stored,
+                );
+                $this->assets->scheduleCleanup(
+                    $tenantId,
+                    $oldObjectKey,
+                    'organization-unit logo replacement',
+                );
+                $this->audit->unit('logo_replaced', $unit, null, [
+                    'id' => (int) $unit->getKey(),
+                    'logo_mime_type' => $unit->getAttribute('logo_mime_type'),
+                    'logo_size_bytes' => $unit->getAttribute('logo_size_bytes'),
+                    'row_version' => (int) $unit->getAttribute('row_version'),
+                ]);
 
-            return Result::success($this->record($unit));
+                return $unit;
+            }, 3);
+            $committed = true;
+            $this->assets->processCleanup($tenantId, $oldObjectKey);
+
+            return Result::success($this->record($updated));
         } catch (Throwable $exception) {
-            return $this->failure($exception, $isActive ? 'organization-unit.activate' : 'organization-unit.deactivate', [
+            if (! $committed && is_array($stored)) {
+                $this->assets->discardUnreferencedAsset(
+                    $this->context->requireTenantId(),
+                    $stored['object_key'] ?? null,
+                    'failed organization-unit logo update',
+                );
+            }
+
+            return $this->failure(
+                $exception,
+                'organization-unit.logo.replace',
+                ['organization_unit_id' => (string) $id],
+            );
+        }
+    }
+
+    public function removeLogo(int|string $id, int $expectedVersion): Result
+    {
+        try {
+            $existing = $this->scopedRecord($id);
+            if ($existing === null) {
+                return $this->notFound();
+            }
+            $tenantId = (int) $existing->require('tenant_id');
+            $unitId = (int) $existing->id();
+            $oldObjectKey = $this->nullableString($existing->get('logo_object_key'));
+
+            $updated = DB::transaction(function () use (
+                $tenantId,
+                $unitId,
+                $expectedVersion,
+                $oldObjectKey,
+            ): OrganizationUnitModel {
+                $unit = $this->hierarchy->replaceLogo(
+                    $tenantId,
+                    $unitId,
+                    $expectedVersion,
+                    null,
+                );
+                $this->assets->scheduleCleanup(
+                    $tenantId,
+                    $oldObjectKey,
+                    'organization-unit logo removal',
+                );
+                $this->audit->unit('logo_removed', $unit, null, [
+                    'id' => (int) $unit->getKey(),
+                    'logo_mime_type' => null,
+                    'logo_size_bytes' => null,
+                    'row_version' => (int) $unit->getAttribute('row_version'),
+                ]);
+
+                return $unit;
+            }, 3);
+            $this->assets->processCleanup($tenantId, $oldObjectKey);
+
+            return Result::success($this->record($updated));
+        } catch (Throwable $exception) {
+            return $this->failure(
+                $exception,
+                'organization-unit.logo.remove',
+                ['organization_unit_id' => (string) $id],
+            );
+        }
+    }
+
+    private function setActive(int|string $id, int $expectedVersion, bool $active): Result
+    {
+        try {
+            $existing = $this->scopedRecord($id);
+            if ($existing === null) {
+                return $this->notFound();
+            }
+            $before = $existing->toArray();
+            $updated = DB::transaction(function () use ($existing, $expectedVersion, $active, $before): OrganizationUnitModel {
+                $changed = $this->hierarchy->setActive(
+                    (int) $existing->require('tenant_id'),
+                    (int) $existing->id(),
+                    $expectedVersion,
+                    $active,
+                );
+                $this->audit->unit($active ? 'activated' : 'deactivated', $changed, $before, $changed->attributesToArray());
+
+                return $changed;
+            }, 3);
+
+            return Result::success($this->record($updated));
+        } catch (Throwable $exception) {
+            return $this->failure($exception, $active ? 'organization-unit.activate' : 'organization-unit.deactivate', [
                 'organization_unit_id' => (string) $id,
             ]);
         }
     }
 
-    private function validatedTypeId(int $tenantId, mixed $candidate): ?int
+    private function scopedRecord(int|string $id): ?DataRecord
     {
-        if ($candidate === null || $candidate === '') {
-            return null;
-        }
-
-        $typeId = (int) $candidate;
-        $type = $this->types->findById($typeId);
-        if ($type === null || (int) $type->require('tenant_id') !== $tenantId) {
-            throw new \DomainException('Organization unit type must belong to the current tenant.');
-        }
-
-        return $typeId;
+        $record = $this->units->findById($id);
+        return $record !== null && (int) $record->get('tenant_id') === $this->context->requireTenantId()
+            ? $record
+            : null;
     }
 
-    private function isRecordInTenantScope(DataRecord $record): bool
+    private function requiredVersion(array $payload): int
     {
-        return (int) $record->require('tenant_id') === $this->organizationUnitContext->requireTenantId();
+        return $this->requiredPositiveInt($payload['expected_version'] ?? null, 'Expected version');
+    }
+
+    private function requiredPositiveInt(mixed $value, string $label): int
+    {
+        if (! is_numeric($value) || (int) $value < 1) {
+            throw new InvalidArgumentException($label.' is required.');
+        }
+        return (int) $value;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return $value === null ? null : (string) $value;
     }
 
     private function notFound(): Result
@@ -246,29 +341,33 @@ final class OrganizationUnitService
         return Result::failure(new Error(OrganizationUnitErrorCode::NOT_FOUND, 'Organization unit not found.'));
     }
 
-    /** @param array<string, mixed> $context */
     private function failure(Throwable $exception, string $operation, array $context = []): Result
     {
-        return Result::failure($this->errorNormalizer->normalize(
+        if ($exception instanceof OrganizationUnitException) {
+            return Result::failure(new Error(
+                $exception->errorCode(),
+                $exception->getMessage(),
+                [...$exception->context(), 'operation' => $operation, ...$context],
+            ));
+        }
+
+        return Result::failure($this->errors->normalize(
             $exception,
             OrganizationUnitErrorCode::INVALID_VALUE,
             ['operation' => $operation, ...$context],
         ));
     }
 
-    private function record(OrganizationUnitModel $model): DataRecord
+    private function record(OrganizationUnitModel $unit): DataRecord
     {
-        return new DataRecord($model->attributesToArray());
-    }
+        $unit->load(['type:id,tenant_id,name,level,is_active', 'parent:id,tenant_id,name,code,path,depth,is_active,retired_at']);
+        $payload = $unit->attributesToArray();
+        $payload['type'] = $unit->type?->attributesToArray();
+        $payload['parent'] = $unit->parent?->attributesToArray();
+        $payload['has_logo'] = is_string($unit->getAttribute('logo_object_key'))
+            && trim((string) $unit->getAttribute('logo_object_key')) !== '';
+        unset($payload['logo_object_key'], $payload['path_hash']);
 
-    private function toNullableInt(mixed $value): ?int
-    {
-        if ($value === null || $value === '' || ! is_numeric($value)) {
-            return null;
-        }
-
-        $normalized = (int) $value;
-
-        return $normalized > 0 ? $normalized : null;
+        return new DataRecord($payload);
     }
 }

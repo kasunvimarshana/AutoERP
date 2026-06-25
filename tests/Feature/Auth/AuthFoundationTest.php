@@ -235,7 +235,6 @@ final class AuthFoundationTest extends TestCase
 
         $this->withHeaders([
             'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
         ])
             ->getJson('/api/v1/auth/me')
             ->assertUnauthorized()
@@ -259,7 +258,6 @@ final class AuthFoundationTest extends TestCase
         $this->withToken((string) $login->json('token'))
             ->withHeaders([
                 'X-Tenant-Id' => (string) $context['tenant_id'],
-                'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
             ])
             ->getJson('/api/v1/auth/me')
             ->assertUnauthorized();
@@ -359,7 +357,7 @@ final class AuthFoundationTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Head Office',
             'code' => 'HO',
@@ -443,7 +441,6 @@ final class AuthFoundationTest extends TestCase
     {
         return $this->withToken($token)->withHeaders([
             'X-Tenant-Id' => (string) $context['tenant_id'],
-            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
         ]);
     }
 }

@@ -619,7 +619,7 @@ final class VehicleEngineTest extends TestCase
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

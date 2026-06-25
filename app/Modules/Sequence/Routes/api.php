@@ -11,7 +11,7 @@ $currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias
 $currentOrganizationUnitMiddleware = (string) config(
     'core.current_organization_unit.middleware_alias',
     'current.organization-unit',
-);
+).':required';
 
 Route::prefix('api/sequence')
     ->middleware([

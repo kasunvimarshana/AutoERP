@@ -282,7 +282,7 @@ final class SupplierEngineTest extends TestCase
     public function test_same_tenant_cross_organization_category_assignment_is_rejected(): void
     {
         [$tenantId, $organizationUnitId] = $this->scopeContext();
-        $otherOrganizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $otherOrganizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Other Organization',
             'code' => 'ORG-OTHER-'.Str::upper(Str::random(4)),
@@ -390,7 +390,7 @@ final class SupplierEngineTest extends TestCase
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

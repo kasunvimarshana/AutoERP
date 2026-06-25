@@ -6,6 +6,7 @@ namespace Modules\Auth\Services;
 
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -23,6 +24,7 @@ final class GetCurrentAuthProfileService
         private readonly UserRepositoryInterface $users,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
+        private readonly OrganizationUnitUserAccessCheckerInterface $organizationUnitAccess,
         private readonly UserRoleRepositoryInterface $userRoles,
         private readonly UserPermissionRepositoryInterface $userPermissions,
         private readonly RolePermissionRepositoryInterface $rolePermissions,
@@ -62,10 +64,10 @@ final class GetCurrentAuthProfileService
             return $this->failure(AuthErrorCode::TENANT_MISMATCH, 'Authenticated user does not belong to this tenant.');
         }
 
-        if ($organizationUnitId !== null && ! $this->organizationUnitBelongsToTenant($tenantId, $organizationUnitId)) {
+        if ($organizationUnitId !== null && ! $this->organizationUnitAvailableToUser($userId, $tenantId, $organizationUnitId)) {
             return $this->failure(
                 AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
-                'Authenticated organization unit does not belong to this tenant.',
+                'Authenticated organization unit is inactive, retired, or not assigned to this user.',
             );
         }
 
@@ -165,16 +167,21 @@ final class GetCurrentAuthProfileService
         return [
             'id' => (int) $organizationUnit->id(),
             'name' => $this->nullableString($organizationUnit->get('name')),
+            'code' => $this->nullableString($organizationUnit->get('code')),
+            'path' => $this->nullableString($organizationUnit->get('path')),
             'timezone' => $tenantId === null ? null : $this->configuredTimezone($tenantId, $organizationUnitId),
         ];
     }
 
-    private function organizationUnitBelongsToTenant(int $tenantId, int $organizationUnitId): bool
+    private function organizationUnitAvailableToUser(int $userId, int $tenantId, int $organizationUnitId): bool
     {
         $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
 
         return $organizationUnit !== null
-            && (int) $organizationUnit->get('tenant_id', 0) === $tenantId;
+            && (int) $organizationUnit->get('tenant_id', 0) === $tenantId
+            && (bool) $organizationUnit->get('is_active', false)
+            && $organizationUnit->get('retired_at') === null
+            && $this->organizationUnitAccess->canAccessOrganizationUnit($userId, $tenantId, $organizationUnitId);
     }
 
     private function configuredTimezone(int $tenantId, ?int $organizationUnitId): string

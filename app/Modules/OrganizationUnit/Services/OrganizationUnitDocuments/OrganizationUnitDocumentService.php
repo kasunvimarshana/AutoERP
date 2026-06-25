@@ -4,180 +4,433 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\OrganizationUnitDocuments;
 
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\FileStorageServiceInterface;
-use Modules\Core\Contracts\UuidGeneratorInterface;
+use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Constants\OrganizationUnitErrorCode;
-use Modules\OrganizationUnit\Repositories\OrganizationUnitDocumentRepositoryInterface;
-use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
+use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
+use Modules\OrganizationUnit\Models\OrganizationUnitDocumentModel;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Services\Audit\OrganizationUnitAuditService;
 use Modules\OrganizationUnit\Services\Contracts\OrganizationUnitDomainServiceInterface;
-use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\OrganizationUnit\Services\Storage\OrganizationUnitAssetStorageService;
+use Modules\OrganizationUnit\Support\OrganizationUnitContext;
+use Modules\OrganizationUnit\Support\OrganizationUnitNameKey;
+use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
+use RuntimeException;
 use Throwable;
 
 final class OrganizationUnitDocumentService
 {
     public function __construct(
-        private readonly OrganizationUnitDocumentRepositoryInterface $documents,
-        private readonly OrganizationUnitRepositoryInterface $units,
-        private readonly TenantRepositoryInterface $tenants,
+        private readonly OrganizationUnitDocumentModel $documents,
+        private readonly OrganizationUnitModel $units,
         private readonly OrganizationUnitDomainServiceInterface $domain,
+        private readonly OrganizationUnitContext $context,
+        private readonly OrganizationUnitAssetStorageService $assets,
+        private readonly TenantStoragePathPolicy $paths,
         private readonly FileStorageServiceInterface $files,
-        private readonly UuidGeneratorInterface $uuid,
+        private readonly OrganizationUnitAuditService $audit,
+        private readonly ErrorNormalizerInterface $errors,
     ) {}
 
-    public function listByTenant(int|string $tenantId): Result
+    /** @param array<string, mixed> $filters */
+    public function page(int $organizationUnitId, array $filters, int $perPage, int $page): Result
     {
         try {
-            return Result::success($this->documents->listByTenant($this->domain->ensureTenantId($tenantId)));
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function get(int|string $id): Result
-    {
-        try {
-            $record = $this->documents->findById($id);
-            if ($record === null) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::NOT_FOUND, 'Organization unit document not found.'));
+            $tenantId = $this->context->requireTenantId();
+            $this->requireUnit($tenantId, $organizationUnitId, false);
+            $query = $this->documents->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('organization_unit_id', $organizationUnitId);
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where(function ($nested) use ($search): void {
+                    $nested->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('original_filename', 'like', '%'.$search.'%')
+                        ->orWhere('document_type', 'like', '%'.$search.'%');
+                });
+            }
+            $documentType = trim((string) ($filters['document_type'] ?? ''));
+            if ($documentType !== '') {
+                $query->where('document_type', $documentType);
             }
 
-            return Result::success($record);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function create(array $payload): Result
-    {
-        try {
-            $tenantId = $this->domain->ensureTenantId((int) ($payload['tenant_id'] ?? 0));
-            if ($this->tenants->findById($tenantId) === null) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_NOT_FOUND, 'Tenant not found.'));
-            }
-
-            $organizationUnitId = (int) ($payload['organization_unit_id'] ?? 0);
-            $unit = $this->units->findById($organizationUnitId);
-            if ($organizationUnitId < 1 || $unit === null || (int) $unit->require('tenant_id') !== $tenantId) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_MISMATCH, 'Organization unit must belong to same tenant.'));
-            }
-
-            $name = $this->domain->normalizeName((string) ($payload['name'] ?? ''));
-            if ($this->documents->findByTenantAndOrganizationUnitAndName($tenantId, $organizationUnitId, $name) !== null) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::CONFLICT, 'Document name already exists for organization unit.'));
-            }
-
-            $record = $this->documents->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'name' => $name,
-                'file_path' => $this->resolveFilePath($payload, $tenantId, $organizationUnitId),
-                'mime_type' => $this->domain->normalizeOptionalText(isset($payload['mime_type']) ? (string) $payload['mime_type'] : null, 255),
-                'size' => isset($payload['size']) ? (int) $payload['size'] : null,
-                'type' => $this->domain->normalizeOptionalText(isset($payload['type']) ? (string) $payload['type'] : null, 255),
-                'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
-                'row_version' => 1,
-            ]);
-
-            return Result::success($record);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function update(int|string $id, array $payload): Result
-    {
-        try {
-            $existing = $this->documents->findById($id);
-            if ($existing === null) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::NOT_FOUND, 'Organization unit document not found.'));
-            }
-
-            $tenantId = (int) $existing->require('tenant_id');
-            $organizationUnitId = (int) $existing->require('organization_unit_id');
-
-            if (array_key_exists('tenant_id', $payload) && (int) $payload['tenant_id'] !== $tenantId) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_MISMATCH, 'Document tenant cannot be changed.'));
-            }
-
-            if (array_key_exists('organization_unit_id', $payload)
-                && (int) $payload['organization_unit_id'] !== $organizationUnitId) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::TENANT_MISMATCH, 'Document organization unit cannot be changed.'));
-            }
-
-            $name = $this->domain->normalizeName((string) ($payload['name'] ?? $existing->require('name')));
-            $byName = $this->documents->findByTenantAndOrganizationUnitAndName($tenantId, $organizationUnitId, $name);
-            if ($byName !== null && (string) $byName->id() !== (string) $existing->id()) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::CONFLICT, 'Document name already exists for organization unit.'));
-            }
-
-            $filePath = array_key_exists('file_path', $payload) || array_key_exists('file_tmp_path', $payload)
-                ? $this->resolveFilePath($payload, $tenantId, $organizationUnitId)
-                : (string) $existing->require('file_path');
-
-            $record = $this->documents->update($id, [
-                'name' => $name,
-                'file_path' => $filePath,
-                'mime_type' => array_key_exists('mime_type', $payload)
-                    ? $this->domain->normalizeOptionalText(isset($payload['mime_type']) ? (string) $payload['mime_type'] : null, 255)
-                    : $existing->get('mime_type'),
-                'size' => array_key_exists('size', $payload)
-                    ? (isset($payload['size']) ? (int) $payload['size'] : null)
-                    : $existing->get('size'),
-                'type' => array_key_exists('type', $payload)
-                    ? $this->domain->normalizeOptionalText(isset($payload['type']) ? (string) $payload['type'] : null, 255)
-                    : $existing->get('type'),
-                'metadata' => array_key_exists('metadata', $payload)
-                    ? $this->domain->normalizeMetadata($payload['metadata'])
-                    : $this->domain->normalizeMetadata($existing->get('metadata')),
-                'row_version' => ((int) $existing->get('row_version', 1)) + 1,
-            ]);
-
-            return Result::success($record);
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    public function delete(int|string $id): Result
-    {
-        try {
-            if ($this->documents->findById($id) === null) {
-                return Result::failure(new Error(OrganizationUnitErrorCode::NOT_FOUND, 'Organization unit document not found.'));
-            }
-
-            return Result::success($this->documents->delete($id));
-        } catch (Throwable $exception) {
-            return Result::failure(new Error(OrganizationUnitErrorCode::INVALID_VALUE, $exception->getMessage()));
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function resolveFilePath(array $payload, int $tenantId, int $organizationUnitId): string
-    {
-        if (isset($payload['file_tmp_path'])) {
-            $tmpPath = (string) $payload['file_tmp_path'];
-            $originalName = isset($payload['file_original_name']) ? (string) $payload['file_original_name'] : 'document.bin';
-            $extension = strtolower(trim((string) pathinfo($originalName, PATHINFO_EXTENSION)));
-            $filename = sprintf(
-                '%s-%s-%s.%s',
-                $tenantId,
-                $organizationUnitId,
-                $this->uuid->generate(),
-                $extension === '' ? 'bin' : $extension,
+            $paginator = $query->orderByDesc('created_at')->paginate($perPage, ['*'], 'page', $page);
+            $items = array_map(
+                fn (OrganizationUnitDocumentModel $document): DataRecord => $this->record($document),
+                $paginator->items(),
             );
 
-            return $this->files->store($tmpPath, 'organization-units/documents', $filename);
+            return Result::success(new PagedResult(
+                $items,
+                $paginator->total(),
+                $paginator->currentPage(),
+                $paginator->perPage(),
+            ));
+        } catch (Throwable $exception) {
+            return $this->failure($exception, 'organization-unit-document.list');
+        }
+    }
+
+    public function get(int $organizationUnitId, int|string $id): Result
+    {
+        try {
+            $document = $this->findScoped($organizationUnitId, $id);
+
+            return $document instanceof OrganizationUnitDocumentModel
+                ? Result::success($this->record($document))
+                : Result::failure(new Error(
+                    OrganizationUnitErrorCode::NOT_FOUND,
+                    'Organization-unit document not found.',
+                ));
+        } catch (Throwable $exception) {
+            return $this->failure($exception, 'organization-unit-document.get');
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function create(int $organizationUnitId, array $payload): Result
+    {
+        $stored = null;
+        $committed = false;
+
+        try {
+            $tenantId = $this->context->requireTenantId();
+            $name = $this->domain->normalizeName((string) ($payload['name'] ?? ''));
+            $stored = $this->assets->storeDocument(
+                $tenantId,
+                $organizationUnitId,
+                (string) ($payload['file_tmp_path'] ?? ''),
+                (string) ($payload['file_original_name'] ?? 'document.bin'),
+            );
+
+            $document = DB::transaction(function () use (
+                $tenantId,
+                $organizationUnitId,
+                $payload,
+                $name,
+                $stored,
+            ): OrganizationUnitDocumentModel {
+                $this->requireUnit($tenantId, $organizationUnitId, true, true);
+                if ($this->nameExists($tenantId, $organizationUnitId, $name)) {
+                    throw OrganizationUnitException::conflict('Document name already exists for this organization unit.');
+                }
+
+                $document = new OrganizationUnitDocumentModel();
+                $document->forceFill([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'name' => $name,
+                    'active_name_hash' => OrganizationUnitNameKey::from($name),
+                    'document_type' => $this->domain->normalizeOptionalText(
+                        $this->nullableString($payload['document_type'] ?? null),
+                        100,
+                    ),
+                    ...$stored,
+                    'row_version' => 1,
+                ])->save();
+                $document->refresh();
+                $this->audit->document('created', $document, null, $document->attributesToArray());
+
+                return $document;
+            }, 3);
+            $committed = true;
+
+            return Result::success($this->record($document));
+        } catch (Throwable $exception) {
+            if (! $committed && is_array($stored)) {
+                $this->assets->discardUnreferencedAsset(
+                    $this->context->requireTenantId(),
+                    $stored['object_key'] ?? null,
+                    'failed organization-unit document create',
+                );
+            }
+
+            return $this->failure($exception, 'organization-unit-document.create');
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function update(int $organizationUnitId, int|string $id, array $payload): Result
+    {
+        $replacement = null;
+        $committed = false;
+        $oldObjectKey = null;
+
+        try {
+            $tenantId = $this->context->requireTenantId();
+            $expectedVersion = (int) ($payload['expected_version'] ?? 0);
+            if ($expectedVersion < 1) {
+                throw OrganizationUnitException::invalid('The current document version is required.');
+            }
+            if (isset($payload['file_tmp_path'])) {
+                $replacement = $this->assets->storeDocument(
+                    $tenantId,
+                    $organizationUnitId,
+                    (string) $payload['file_tmp_path'],
+                    (string) ($payload['file_original_name'] ?? 'document.bin'),
+                );
+            }
+
+            $document = DB::transaction(function () use (
+                $tenantId,
+                $organizationUnitId,
+                $id,
+                $payload,
+                $expectedVersion,
+                $replacement,
+                &$oldObjectKey,
+            ): OrganizationUnitDocumentModel {
+                $this->requireUnit($tenantId, $organizationUnitId, true, true);
+                $existing = $this->findScoped($organizationUnitId, $id, false, true);
+                if (! $existing instanceof OrganizationUnitDocumentModel) {
+                    throw OrganizationUnitException::notFound('Organization-unit document not found.');
+                }
+                $this->assertVersion($existing, $expectedVersion);
+                $before = $existing->attributesToArray();
+
+                $name = array_key_exists('name', $payload)
+                    ? $this->domain->normalizeName((string) $payload['name'])
+                    : (string) $existing->getAttribute('name');
+                if ($this->nameExists($tenantId, $organizationUnitId, $name, (int) $existing->getKey())) {
+                    throw OrganizationUnitException::conflict('Document name already exists for this organization unit.');
+                }
+
+                if ($replacement !== null) {
+                    $oldObjectKey = $this->nullableString($existing->getAttribute('object_key'));
+                }
+                $existing->forceFill([
+                    'name' => $name,
+                    'active_name_hash' => OrganizationUnitNameKey::from($name),
+                    'document_type' => array_key_exists('document_type', $payload)
+                        ? $this->domain->normalizeOptionalText(
+                            $this->nullableString($payload['document_type']),
+                            100,
+                        )
+                        : $existing->getAttribute('document_type'),
+                    ...($replacement ?? []),
+                    'row_version' => $expectedVersion + 1,
+                ])->save();
+
+                if ($replacement !== null) {
+                    $this->assets->scheduleCleanup(
+                        $tenantId,
+                        $oldObjectKey,
+                        'organization-unit document replacement',
+                    );
+                }
+                $existing->refresh();
+                $this->audit->document('updated', $existing, $before, $existing->attributesToArray());
+
+                return $existing;
+            }, 3);
+            $committed = true;
+            $this->assets->processCleanup($tenantId, $oldObjectKey);
+
+            return Result::success($this->record($document));
+        } catch (Throwable $exception) {
+            if (! $committed && is_array($replacement)) {
+                $this->assets->discardUnreferencedAsset(
+                    $this->context->requireTenantId(),
+                    $replacement['object_key'] ?? null,
+                    'failed organization-unit document update',
+                );
+            }
+
+            return $this->failure($exception, 'organization-unit-document.update');
+        }
+    }
+
+    public function delete(int $organizationUnitId, int|string $id, int $expectedVersion): Result
+    {
+        try {
+            if ($expectedVersion < 1) {
+                throw OrganizationUnitException::invalid('The current document version is required.');
+            }
+            $tenantId = $this->context->requireTenantId();
+            $objectKey = null;
+
+            DB::transaction(function () use (
+                $tenantId,
+                $organizationUnitId,
+                $id,
+                $expectedVersion,
+                &$objectKey,
+            ): void {
+                $existing = $this->findScoped($organizationUnitId, $id, false, true);
+                if (! $existing instanceof OrganizationUnitDocumentModel) {
+                    throw OrganizationUnitException::notFound('Organization-unit document not found.');
+                }
+                $this->assertVersion($existing, $expectedVersion);
+                $before = $existing->attributesToArray();
+                $objectKey = $this->nullableString($existing->getAttribute('object_key'));
+                $existing->forceFill([
+                    'active_name_hash' => null,
+                    'row_version' => $expectedVersion + 1,
+                    'deleted_at' => now(),
+                ])->save();
+                $this->assets->scheduleCleanup(
+                    $tenantId,
+                    $objectKey,
+                    'organization-unit document deletion',
+                );
+                $this->audit->document('deleted', $existing, $before, null);
+            }, 3);
+
+            $this->assets->processCleanup($tenantId, $objectKey);
+
+            return Result::success(true);
+        } catch (Throwable $exception) {
+            return $this->failure($exception, 'organization-unit-document.delete');
+        }
+    }
+
+    public function download(int $organizationUnitId, int|string $id): Result
+    {
+        try {
+            $tenantId = $this->context->requireTenantId();
+            $document = $this->findScoped($organizationUnitId, $id);
+            if (! $document instanceof OrganizationUnitDocumentModel) {
+                return Result::failure(new Error(
+                    OrganizationUnitErrorCode::NOT_FOUND,
+                    'Organization-unit document not found.',
+                ));
+            }
+            $path = $this->paths->resolveObjectKey(
+                $tenantId,
+                (string) $document->getAttribute('object_key'),
+            );
+            $stream = $this->files->readStream($path, $this->disk());
+            if (! is_resource($stream)) {
+                throw new RuntimeException('Stored organization-unit document could not be opened.');
+            }
+
+            return Result::success([
+                'record' => $this->record($document),
+                'stream' => $stream,
+            ]);
+        } catch (Throwable $exception) {
+            return $this->failure($exception, 'organization-unit-document.download');
+        }
+    }
+
+    private function requireUnit(
+        int $tenantId,
+        int $organizationUnitId,
+        bool $mustBeActive,
+        bool $lockForUpdate = false,
+    ): OrganizationUnitModel {
+        $query = $this->units->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($organizationUnitId);
+        if ($mustBeActive) {
+            $query->where('is_active', true)->whereNull('retired_at');
+        }
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
         }
 
-        $filePath = $this->domain->normalizeOptionalText(isset($payload['file_path']) ? (string) $payload['file_path'] : null, 2048);
-        if ($filePath === null) {
-            throw new \InvalidArgumentException('File path is required.');
+        $unit = $query->first();
+        if (! $unit instanceof OrganizationUnitModel) {
+            throw $mustBeActive
+                ? OrganizationUnitException::invalid('Select an active organization unit from the current tenant.')
+                : OrganizationUnitException::notFound('Organization unit was not found in the current tenant.');
         }
 
-        return $filePath;
+        return $unit;
+    }
+
+    private function findScoped(
+        int $organizationUnitId,
+        int|string $id,
+        bool $required = false,
+        bool $lockForUpdate = false,
+    ): ?OrganizationUnitDocumentModel {
+        $query = $this->documents->newQuery()
+            ->where('tenant_id', $this->context->requireTenantId())
+            ->where('organization_unit_id', $organizationUnitId)
+            ->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $document = $query->first();
+        if ($required && ! $document instanceof OrganizationUnitDocumentModel) {
+            throw OrganizationUnitException::notFound('Organization-unit document not found.');
+        }
+
+        return $document;
+    }
+
+    private function nameExists(
+        int $tenantId,
+        int $organizationUnitId,
+        string $name,
+        ?int $excludeId = null,
+    ): bool {
+        $query = $this->documents->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->where('active_name_hash', OrganizationUnitNameKey::from($name));
+        if ($excludeId !== null) {
+            $query->whereKeyNot($excludeId);
+        }
+
+        return $query->exists();
+    }
+
+    private function assertVersion(OrganizationUnitDocumentModel $document, int $expectedVersion): void
+    {
+        if ((int) $document->getAttribute('row_version') !== $expectedVersion) {
+            throw OrganizationUnitException::versionConflict('Document changed since it was loaded. Refresh and try again.');
+        }
+    }
+
+    private function record(OrganizationUnitDocumentModel $document): DataRecord
+    {
+        $payload = $document->attributesToArray();
+        unset($payload['object_key'], $payload['active_name_hash']);
+        $payload['download_available'] = true;
+
+        return new DataRecord($payload);
+    }
+
+    private function failure(Throwable $exception, string $operation): Result
+    {
+        if ($exception instanceof OrganizationUnitException) {
+            return Result::failure(new Error(
+                $exception->errorCode(),
+                $exception->getMessage(),
+                [...$exception->context(), 'operation' => $operation],
+            ));
+        }
+
+        return Result::failure($this->errors->normalize(
+            $exception,
+            OrganizationUnitErrorCode::INVALID_VALUE,
+            ['operation' => $operation],
+        ));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return $value === null ? null : trim((string) $value);
+    }
+
+    private function disk(): string
+    {
+        $disk = trim((string) config(
+            'organization-unit.storage.disk',
+            config('tenant.documents.disk', 'tenant_private'),
+        ));
+        if ($disk === '') {
+            throw new RuntimeException('Organization-unit private storage is not configured.');
+        }
+
+        return $disk;
     }
 }

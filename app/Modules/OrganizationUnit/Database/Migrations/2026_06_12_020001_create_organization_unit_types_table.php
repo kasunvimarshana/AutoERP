@@ -10,21 +10,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('organization_unit_types', function (Blueprint $table) {
+        Schema::create('organization_unit_types', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
-
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->string('name');
-            $table->unsignedInteger('level')->default(0);
+            $table->char('name_key', 64)->comment('Case-insensitive type-name uniqueness key.');
+            $table->unsignedInteger('level')->comment('Required hierarchy depth for this organization-unit type.');
             $table->boolean('is_active')->default(true);
-
             $table->timestamps();
-            $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'organization_unit_types_id_tenant_uk');
-            $table->unique(['tenant_id', 'name'], 'organization_unit_types_name_uk');
+            $table->unique(['tenant_id', 'name_key'], 'organization_unit_types_name_key_uk');
+            $table->index(['tenant_id', 'level', 'is_active'], 'organization_unit_types_level_active_idx');
         });
     }
 

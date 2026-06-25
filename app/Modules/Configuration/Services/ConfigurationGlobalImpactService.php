@@ -11,6 +11,7 @@ use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
 use Modules\Configuration\Contracts\ConfigurationValueRepositoryInterface;
 use Modules\Configuration\Data\ConfigurationGlobalImpact;
+use Modules\OrganizationUnit\Contracts\OrganizationUnitPopulationReaderInterface;
 
 final class ConfigurationGlobalImpactService
 {
@@ -18,6 +19,7 @@ final class ConfigurationGlobalImpactService
         private readonly ConfigurationDefinitionRegistryInterface $definitions,
         private readonly ConfigurationValueRepositoryInterface $values,
         private readonly ConfigurationTargetPopulationInterface $targets,
+        private readonly OrganizationUnitPopulationReaderInterface $organizationUnits,
         private readonly ConfigurationAuthorizationService $authorization,
     ) {}
 
@@ -35,13 +37,33 @@ final class ConfigurationGlobalImpactService
         }
 
         $tenantCount = $this->targets->tenantCount();
-        $overrideCount = min($tenantCount, $this->values->countTenantOverrides($definition->key));
+        $tenantOverrideCount = min($tenantCount, $this->values->countTenantOverrides($definition->key));
+        $supportsOrganizationUnits = in_array(
+            ConfigurationScope::ORGANIZATION_UNIT,
+            $definition->allowedScopes,
+            true,
+        );
+        $organizationUnitCount = $supportsOrganizationUnits
+            ? $this->organizationUnits->activeCount()
+            : 0;
+        $organizationUnitOverrideCount = $supportsOrganizationUnits
+            ? min(
+                $organizationUnitCount,
+                $this->values->countOrganizationUnitOverrides($definition->key),
+            )
+            : 0;
 
         return new ConfigurationGlobalImpact(
             key: $definition->key,
             tenantCount: $tenantCount,
-            tenantOverrideCount: $overrideCount,
-            inheritingTenantCount: max(0, $tenantCount - $overrideCount),
+            tenantOverrideCount: $tenantOverrideCount,
+            inheritingTenantCount: max(0, $tenantCount - $tenantOverrideCount),
+            organizationUnitCount: $organizationUnitCount,
+            organizationUnitOverrideCount: $organizationUnitOverrideCount,
+            organizationUnitWithoutDirectOverrideCount: max(
+                0,
+                $organizationUnitCount - $organizationUnitOverrideCount,
+            ),
         );
     }
 }

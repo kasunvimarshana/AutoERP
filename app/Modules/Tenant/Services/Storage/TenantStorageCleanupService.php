@@ -186,7 +186,7 @@ final class TenantStorageCleanupService
         $updated = $this->jobs->newQuery()
             ->whereKey($jobId)
             ->where('status', self::STATUS_PENDING)
-            ->where(function ($query): void {
+            ->where(function ($query) use ($now): void {
                 $query->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', $now);
             })
             ->update([

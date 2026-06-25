@@ -6,19 +6,18 @@ namespace Modules\OrganizationUnit\Repositories;
 
 use Modules\Core\Contracts\RepositoryPortInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Core\DTOs\PagedResult;
 
 interface OrganizationUnitRepositoryInterface extends RepositoryPortInterface
 {
     public function countByTenant(int $tenantId): int;
 
-    /**
-     * @return list<DataRecord>
-     */
-    public function listByTenant(int|string $tenantId): array;
+    public function pageByTenant(int $tenantId, array $criteria, int $perPage, int $page): PagedResult;
 
-    public function findByTenantAndName(int|string $tenantId, string $name): ?DataRecord;
+    /** @return list<DataRecord> */
+    public function listAccessibleByIds(int $tenantId, array $organizationUnitIds): array;
 
-    public function findByTenantAndCode(int|string $tenantId, string $code): ?DataRecord;
+    public function findByTenantAndCode(int $tenantId, string $code): ?DataRecord;
 
-    public function findByTenantAndPath(int|string $tenantId, string $path): ?DataRecord;
+    public function lockActiveByTenantAndId(int $tenantId, int $organizationUnitId): ?DataRecord;
 }

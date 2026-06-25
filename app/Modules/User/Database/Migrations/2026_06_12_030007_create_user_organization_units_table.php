@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\User\Constants\UserOrganizationUnitStatus;
 
 return new class extends Migration
 {
@@ -16,8 +17,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('user_id');
-            $table->json('metadata')->nullable();
-            $table->enum('status', ['active', 'inactive', 'revoked'])->default('active');
+            $table->enum('status', UserOrganizationUnitStatus::values())->default(UserOrganizationUnitStatus::ACTIVE);
             $table->boolean('is_default')->default(false);
             $table->string('default_marker', 16)->nullable();
             $table->timestamps();
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreign(['organization_unit_id', 'tenant_id'], 'user_org_units_org_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['user_id', 'tenant_id'], 'user_org_units_user_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')

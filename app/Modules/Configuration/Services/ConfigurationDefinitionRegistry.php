@@ -195,12 +195,21 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             );
         }
 
-        foreach (['sensitive', 'runtime_mutable'] as $requiredFlag) {
+        foreach (['sensitive', 'runtime_mutable', 'inherit_organization_hierarchy'] as $requiredFlag) {
             if (! array_key_exists($requiredFlag, $raw) || ! is_bool($raw[$requiredFlag])) {
                 throw new InvalidArgumentException(
                     "Configuration definition [{$key}] must explicitly declare boolean [{$requiredFlag}].",
                 );
             }
+        }
+
+        if (
+            $raw['inherit_organization_hierarchy']
+            && ! in_array(ConfigurationScope::ORGANIZATION_UNIT, $scopes, true)
+        ) {
+            throw new InvalidArgumentException(
+                "Configuration definition [{$key}] cannot inherit the organization hierarchy without organization-unit scope.",
+            );
         }
 
         return new ConfigurationDefinition(
@@ -215,6 +224,7 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             nullable: (bool) ($raw['nullable'] ?? false),
             sensitive: $raw['sensitive'],
             runtimeMutable: $raw['runtime_mutable'],
+            inheritOrganizationHierarchy: $raw['inherit_organization_hierarchy'],
             options: $options,
             minimum: $minimum,
             maximum: $maximum,

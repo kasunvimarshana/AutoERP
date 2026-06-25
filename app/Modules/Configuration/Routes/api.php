@@ -181,13 +181,14 @@ Route::prefix('api/v1/configuration')
             ->defaults('scope', ConfigurationScope::TENANT)
             ->name('definitions');
         Route::get('resolved/{key}', [ConfigurationController::class, 'resolved'])
+            ->middleware($currentOrganization.':optional')
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', ConfigurationScope::TENANT)
             ->name('resolved');
 
         $registerTenantScope('tenant', ConfigurationScope::TENANT);
 
-        Route::middleware($currentOrganization)->group(function () use ($registerTenantScope): void {
+        Route::middleware($currentOrganization.':required')->group(function () use ($registerTenantScope): void {
             $registerTenantScope('organization', ConfigurationScope::ORGANIZATION_UNIT);
         });
     });
