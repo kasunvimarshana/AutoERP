@@ -86,6 +86,12 @@ Merge later `Schema::table()` patch migrations into the original table-creation 
 
 Use one table per migration file.
 
+Read recent records in /docs/changes before starting. Make only the required changes. After completion, create a new change record. Never modify previous records.
+
+This project uses `/docs/changes` as its shared memory. Before starting any task, read the latest change records to understand recent work and avoid conflicts or duplicate changes. Implement only what is required for the task and keep changes minimal, without modifying unrelated or shared parts of the system. After finishing, add a new change record explaining what was changed and why. Never edit or delete existing records; they are an append-only history for future reference.
+
+This project uses /docs/changes as shared memory. Before working, read recent records to understand context. Make only necessary changes and avoid touching unrelated or shared files. After finishing, add a new change record. Never modify or delete existing records.
+
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
 Always fix issues in the layer where the root cause exists. Backend issues must be resolved in the backend, not hidden or worked around in the frontend. Core business logic, validations, rules, calculations, permissions, and data integrity enforcement must be implemented and enforced in the backend as the single source of truth. The frontend should focus on presentation, user interaction, and user experience, and may only duplicate validations for immediate feedback—not as the authoritative enforcement point.
@@ -101,6 +107,10 @@ Explicit error handling: Handle errors explicitly and predictably. Do not silent
 No dead code: Do not introduce unused code, unnecessary abstractions, speculative features, or placeholders for hypothetical future requirements.
 
 Verify before completion: Before considering a task complete, verify that the solution satisfies all requirements and does not introduce regressions.
+
+Before making changes, review the latest records in /docs/changes for context. Modify only the files necessary for the task and avoid unrelated changes. After completing the work, create a new record in /docs/changes describing what changed and why. Never edit or delete existing change records.
+
+This project uses `/docs/changes` as its shared memory. Before starting any task, read the latest records to understand context and avoid repeating or conflicting work. Make only the minimal necessary changes to complete the task and do not modify unrelated or shared parts of the system. After finishing, add a new change record explaining what was changed and why. Never edit or delete existing records, as they form an append-only history for future reference.
 
 Do not use hardcoded magic values. Store fixed values in appropriate abstractions such as enums, constants, configuration files, or environment variables based on their purpose. Use enums for predefined option sets, constants for shared immutable values, and configuration sources for environment-specific or frequently changing values. Always reference values through descriptive names rather than embedding raw literals in code.
 
