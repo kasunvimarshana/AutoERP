@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('taxes', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('code', 100);
             $table->string('name');
             $table->text('description')->nullable();
@@ -29,6 +29,12 @@ return new class extends Migration
             $table->unique(['tenant_id', 'code'], 'taxes_tenant_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'taxes_scope_idx');
             $table->index(['tax_type', 'active'], 'taxes_type_active_idx');
+
+            $table->unique(['id', 'tenant_id'], 'taxes_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'taxes_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
         });
     }
 

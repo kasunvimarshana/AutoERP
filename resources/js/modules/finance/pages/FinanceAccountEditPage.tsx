@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { AccountForm } from '../components/AccountForm';
 import { getAccount, getFinanceLookups, updateAccount, type AccountPayload, type FinanceLookups } from '../financeApi';
 
@@ -16,6 +17,7 @@ export default function FinanceAccountEditPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const formGuard = useMutationFormGuard(submitting);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -54,6 +56,7 @@ export default function FinanceAccountEditPage() {
         setError(null);
         try {
             const account = await updateAccount(accountId, form);
+            formGuard.markSaved();
             navigate(`/finance/accounts/${account.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -66,7 +69,7 @@ export default function FinanceAccountEditPage() {
         <ContentHeader title="Edit account" description="Update account classification and posting behavior." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <AccountForm value={form} onChange={setForm} lookups={lookups} error={error} accountId={accountId} />
+            <AccountForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} lookups={lookups} error={error} accountId={accountId} />
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button type="submit" loading={submitting}>Save account</Button>

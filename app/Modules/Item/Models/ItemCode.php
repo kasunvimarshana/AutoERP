@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Enums\ItemCodeType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class ItemCode extends CoreModel
+final class ItemCode extends TenantOwnedModel
 {
     protected $table = 'item_codes';
 

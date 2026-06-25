@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class InventoryValuationConsumption extends CoreModel
+final class InventoryValuationConsumption extends TenantOwnedModel
 {
     protected $table = 'inventory_valuation_consumptions';
 

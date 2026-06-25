@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryAllocation;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Sales\Enums\SalesOrderLineStatus;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class SalesOrderLine extends CoreModel
+final class SalesOrderLine extends TenantOwnedModel
 {
     protected $guarded = ['id'];
 

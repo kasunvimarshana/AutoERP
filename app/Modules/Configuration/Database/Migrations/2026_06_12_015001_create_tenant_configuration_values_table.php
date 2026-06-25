@@ -29,6 +29,8 @@ return new class extends Migration
                 ['tenant_id', 'updated_at'],
                 'tenant_configuration_values_tenant_updated_idx',
             );
+
+            $table->unique(['id', 'tenant_id'], 'tenant_configuration_values_id_tenant_uk');
         });
     }
 

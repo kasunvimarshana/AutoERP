@@ -4,6 +4,7 @@ import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLook
 import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
 import { VehicleLookupSelect } from "@/modules/vehicle/components/VehicleLookupSelect";
 import { useAuth } from "@/modules/auth/AuthProvider";
+import { hasPermission } from "@/modules/auth/accessControl";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DataTable, type DataColumn } from "@/shared/components/DataTable";
@@ -16,9 +17,12 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Textarea } from "@/shared/components/Textarea";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { formatDate } from "@/shared/utils/formatDate";
+import type { NamedResource } from "@/shared/types/common";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
+import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
 import {
     activateVehicleFinanceAgreement,
     createVehicleFinanceAgreement,
@@ -36,7 +40,6 @@ interface FinanceForm {
     agreement_date: string;
     starts_at: string;
     matures_at: string;
-    currency_id: string;
     principal_amount: string;
     initial_deposit_amount: string;
     residual_value: string;
@@ -50,10 +53,9 @@ interface FinanceForm {
 
 const emptyForm = (): FinanceForm => ({
     agreement_number: "",
-    agreement_date: new Date().toISOString().slice(0, 10),
+    agreement_date: businessDateInputValue(),
     starts_at: "",
     matures_at: "",
-    currency_id: "",
     principal_amount: "",
     initial_deposit_amount: "0",
     residual_value: "0",
@@ -70,6 +72,7 @@ export default function VehicleFinancePage() {
     const [form, setForm] = useState<FinanceForm>(emptyForm);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [selected, setSelected] = useState<VehicleFinanceAgreement | null>(
@@ -80,7 +83,8 @@ export default function VehicleFinancePage() {
         (signal) => listVehicleFinanceAgreements({ per_page: 50 }, signal),
         [],
     );
-    const canManage = auth.permissions.includes(
+    const canManage = hasPermission(
+        auth,
         vehicleRentalPermissions.financeAgreementsManage,
     );
 
@@ -94,13 +98,14 @@ export default function VehicleFinancePage() {
                 ...form,
                 supplier_id: supplier.id,
                 vehicle_id: vehicle.id,
-                currency_id: Number(form.currency_id),
+                currency_id: Number(currency?.id),
                 installment_count: Number(form.installment_count),
                 payment_term_days: Number(form.payment_term_days),
             });
             setForm(emptyForm());
             setSupplier(null);
             setVehicle(null);
+            setCurrency(null);
             result.reload();
         } catch (error) {
             setActionError(toApiError(error));
@@ -228,7 +233,7 @@ export default function VehicleFinancePage() {
                         Create payable
                     </Button>
                 ) : row.invoice_id ? (
-                    `Invoice #${row.invoice_id}`
+                    'Invoice number unavailable'
                 ) : null,
         },
     ];
@@ -298,18 +303,10 @@ export default function VehicleFinancePage() {
                                     })
                                 }
                             />
-                            <Input
-                                label="Currency ID"
-                                type="number"
-                                min="1"
+                            <RentalCurrencyLookupSelect
+                                value={currency}
+                                onChange={setCurrency}
                                 required
-                                value={form.currency_id}
-                                onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        currency_id: event.target.value,
-                                    })
-                                }
                             />
                             <Input
                                 label="Principal"
@@ -444,7 +441,7 @@ export default function VehicleFinancePage() {
                             <Button
                                 type="submit"
                                 loading={saving}
-                                disabled={!supplier || !vehicle}
+                                disabled={!supplier || !vehicle || !currency}
                             >
                                 Create finance agreement
                             </Button>

@@ -23,8 +23,8 @@ export default function RoleEditPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const initializedRoleId = useRef<number | null>(null);
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesUpdate);
-    const canAssignPermissions = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesAssignPermissions);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canAssignPermissions = hasAccessPermission(auth, accessPermissions.rolesAssignPermissions);
     const role = useApi((signal) => accessApi.getRole(String(id), signal), [id], Boolean(id));
     const permissions = useApi((signal) => accessApi.listPermissions({ per_page: 100 }, signal), []);
 

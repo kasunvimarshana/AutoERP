@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useEffectEvent, type RefObject } from 'react';
 
 const focusableSelector = [
     'a[href]',
@@ -12,10 +12,9 @@ const focusableSelector = [
 export function useDialogAccessibility(
     open: boolean,
     containerRef: RefObject<HTMLElement | null>,
-    onClose: () => void,
+    onRequestClose: () => void,
 ) {
-    const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
+    const requestClose = useEffectEvent(onRequestClose);
 
     useEffect(() => {
         if (!open) return;
@@ -38,7 +37,7 @@ export function useDialogAccessibility(
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                onCloseRef.current();
+                requestClose();
                 return;
             }
             if (event.key !== 'Tab') return;

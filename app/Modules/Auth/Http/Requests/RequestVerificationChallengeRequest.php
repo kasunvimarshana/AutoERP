@@ -19,11 +19,6 @@ final class RequestVerificationChallengeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'provider_id' => ['nullable', 'integer', 'min:1'],
-            'identity_id' => ['nullable', 'integer', 'min:1'],
-            'user_id' => ['nullable', 'integer', 'min:1'],
             'channel' => ['nullable', 'string', 'max:60'],
             'target' => ['required', 'string', 'max:320'],
             'challenge_type' => ['nullable', 'string', 'max:60'],

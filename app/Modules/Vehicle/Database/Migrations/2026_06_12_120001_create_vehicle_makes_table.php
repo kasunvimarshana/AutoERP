@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('vehicle_makes', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('code');
             $table->string('name');
             $table->text('description')->nullable();
@@ -23,6 +23,12 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'code'], 'vehicle_makes_tenant_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_makes_tenant_org_idx');
+
+            $table->unique(['id', 'tenant_id'], 'vehicle_makes_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_makes_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
         });
     }
 

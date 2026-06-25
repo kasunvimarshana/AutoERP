@@ -8,7 +8,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { auditApi } from './auditApi';
-import type { AuditListFilters, AuditLogSummary } from './auditTypes';
+import { AUDIT_EVENT_CATEGORIES, type AuditListFilters, type AuditLogSummary } from './auditTypes';
 
 const emptyFilters: AuditListFilters = { per_page: 25 };
 
@@ -34,12 +34,12 @@ export default function AuditLogListPage() {
         {
             key: 'actor',
             header: 'Actor',
-            render: (row) => <div><p>{row.actor.name ?? row.actor.id ?? '-'}</p><p className="text-xs text-slate-500">{row.actor.type}</p></div>,
+            render: (row) => <div><p>{row.actor.name ?? 'Unresolved actor'}</p><p className="text-xs text-slate-500">{row.actor.type}</p></div>,
         },
         {
             key: 'subject',
             header: 'Subject',
-            render: (row) => <div><p>{row.subject.reference ?? row.subject.id}</p><p className="text-xs text-slate-500">{row.subject.type}</p></div>,
+            render: (row) => <div><p>{row.subject.reference ?? 'Reference unavailable'}</p><p className="text-xs text-slate-500">{row.subject.type}</p></div>,
         },
         { key: 'organization', header: 'Organization Unit', render: (row) => row.organization_unit.name ?? '-' },
         { key: 'occurred_at', header: 'Occurred', render: (row) => formatDateTime(row.occurred_at) },
@@ -75,9 +75,7 @@ export default function AuditLogListPage() {
                     <Input label="Event name" value={draft.event_name ?? ''} onChange={(event) => setDraft({ ...draft, event_name: event.target.value })} placeholder="purchase.fast_purchase.completed" />
                     <Input label="Source module" value={draft.source_module ?? ''} onChange={(event) => setDraft({ ...draft, source_module: event.target.value })} placeholder="purchase" />
                     <Select label="Actor type" value={draft.actor_type ?? ''} options={actorOptions} placeholder="All actor types" onChange={(event) => setDraft({ ...draft, actor_type: event.target.value })} />
-                    <Input label="Actor ID" value={draft.actor_id ?? ''} onChange={(event) => setDraft({ ...draft, actor_id: event.target.value })} />
                     <Input label="Subject type" value={draft.subject_type ?? ''} onChange={(event) => setDraft({ ...draft, subject_type: event.target.value })} />
-                    <Input label="Subject ID" value={draft.subject_id ?? ''} onChange={(event) => setDraft({ ...draft, subject_id: event.target.value })} />
                     <Select label="Rows" value={String(draft.per_page ?? 25)} options={pageSizeOptions} onChange={(event) => setDraft({ ...draft, per_page: Number(event.target.value) })} />
                     <Input label="From date" type="date" value={draft.from_date ?? ''} onChange={(event) => setDraft({ ...draft, from_date: event.target.value })} />
                     <Input label="To date" type="date" value={draft.to_date ?? ''} onChange={(event) => setDraft({ ...draft, to_date: event.target.value })} />
@@ -114,6 +112,6 @@ function formatDateTime(value: string): string {
     return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
 }
 
-const categoryOptions = ['authentication', 'authorization', 'configuration', 'data', 'financial', 'inventory', 'workflow', 'system'].map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+const categoryOptions = AUDIT_EVENT_CATEGORIES.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 const actorOptions = ['user', 'system', 'integration', 'job'].map((value) => ({ value, label: value }));
 const pageSizeOptions = [25, 50, 100].map((value) => ({ value: String(value), label: String(value) }));

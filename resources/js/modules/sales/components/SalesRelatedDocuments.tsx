@@ -21,7 +21,7 @@ export function SalesRelatedDocuments({ documents }: { documents?: SalesRelatedD
                     {documents.map((document) => (
                         <div key={`${document.type}-${document.id}`} className="flex items-center justify-between gap-3 py-2 text-sm">
                             <Link className="font-medium text-sky-700 hover:underline" to={pathFor(document)}>
-                                {document.number || `${document.type.replaceAll('_', ' ')} #${document.id}`}
+                                {document.number || document.type.replaceAll('_', ' ')}
                             </Link>
                             <StatusBadge status={document.status ?? undefined} />
                         </div>

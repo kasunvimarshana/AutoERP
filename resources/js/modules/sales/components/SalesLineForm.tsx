@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { isNonNegativeDecimal, isPositiveDecimal } from '@/shared/utils/decimal';
@@ -35,6 +37,9 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 }) {
     const [draft, setDraft] = useState(line);
     const [context, setContext] = useState<SalesItemContext | null>(null);
+    const [contextLoading, setContextLoading] = useState(false);
+    const [contextError, setContextError] = useState<ApiError | null>(null);
+    const [contextReload, setContextReload] = useState(0);
     const [errors, setErrors] = useState<LineFormErrors>({});
     const formRef = useRef<HTMLFormElement>(null);
 
@@ -49,11 +54,19 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 
     useEffect(() => {
         if (!draft.item?.id) {
-            setContext(null);
+            queueMicrotask(() => {
+                setContext(null);
+                setContextError(null);
+                setContextLoading(false);
+            });
             return;
         }
 
         const controller = new AbortController();
+        queueMicrotask(() => {
+            setContextLoading(true);
+            setContextError(null);
+        });
         void getSalesItemContext(draft.item.id, {
             item_variant_id: draft.item_variant_id ?? undefined,
             currency_id: currencyId,
@@ -84,10 +97,17 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
                     };
                 });
             })
-            .catch(() => undefined);
+            .catch((requestError: unknown) => {
+                if (controller.signal.aborted) return;
+                setContext(null);
+                setContextError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setContextLoading(false);
+            });
 
         return () => controller.abort();
-    }, [config.taxMode, draft.item?.id, draft.item_variant_id, draft.uom?.id, currencyId, warehouseId, salesDate]);
+    }, [config.taxMode, draft.item?.id, draft.item_variant_id, draft.uom?.id, currencyId, warehouseId, salesDate, contextReload]);
 
     useEffect(() => {
         if (Object.keys(errors).length === 0) return;
@@ -97,15 +117,15 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 
     const variantOptions = context?.variants.map((variant) => ({
         value: variant.id,
-        label: [variant.code, variant.name].filter(Boolean).join(' - ') || `Variant #${variant.id}`,
+        label: [variant.code, variant.name].filter(Boolean).join(' - ') || 'Unnamed variant',
     })) ?? [];
     const uomOptions = context?.allowed_sales_uoms.map((row) => ({
         value: row.id,
-        label: [row.uom?.code, row.uom?.name].filter(Boolean).join(' - ') || `UOM #${row.id}`,
+        label: [row.uom?.code, row.uom?.name].filter(Boolean).join(' - ') || 'Unnamed unit of measure',
     })) ?? [];
     const taxGroupOptions = config.taxGroupOptions?.map((group) => ({
         value: group.id,
-        label: [group.code, group.name].filter(Boolean).join(' - ') || `Tax group #${group.id}`,
+        label: [group.code, group.name].filter(Boolean).join(' - ') || 'Unnamed tax group',
     })) ?? [];
 
     return (
@@ -116,6 +136,14 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
             if (Object.keys(nextErrors).length > 0) return;
             onSave(draft);
         }}>
+            {contextError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                    <ErrorAlert error={contextError} />
+                    <Button type="button" variant="secondary" onClick={() => setContextReload((current) => current + 1)}>
+                        Retry item defaults
+                    </Button>
+                </div>
+            )}
             <section className="space-y-4">
                 <div>
                     <h3 className="font-semibold text-slate-900">Basic Details</h3>
@@ -276,7 +304,7 @@ export function SalesLineForm({ line, mode, config, currencyId, warehouseId, sal
 
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
-                <Button type="submit">{mode === 'edit' ? 'Save line' : 'Add line'}</Button>
+                <Button type="submit" loading={contextLoading} disabled={Boolean(draft.item) && (!context || Boolean(contextError))}>{mode === 'edit' ? 'Save line' : 'Add line'}</Button>
             </div>
         </form>
     );

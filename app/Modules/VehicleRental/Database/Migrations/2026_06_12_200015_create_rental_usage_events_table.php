@@ -14,9 +14,9 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
-            $table->foreignId('usage_log_id')->constrained('rental_usage_logs')->cascadeOnDelete();
+            $table->foreignId('usage_log_id');
             $table->unsignedInteger('sequence');
             $table->string('event_type', 40);
             $table->dateTime('occurred_at')->nullable();
@@ -30,6 +30,25 @@ return new class extends Migration
 
             $table->unique(['usage_log_id', 'sequence'], 'rental_usage_events_sequence_uk');
             $table->index(['usage_log_id', 'event_type'], 'rental_usage_events_type_idx');
+
+            $table->unique(['id', 'tenant_id'], 'rental_usage_events_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_events_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['usage_log_id', 'tenant_id'], 'rental_usage_events_usage_log_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('rental_usage_logs')
+                ->cascadeOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'rental_usage_events_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'rental_usage_events_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

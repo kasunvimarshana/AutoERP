@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
@@ -17,7 +17,7 @@ use Modules\Tax\Models\TaxGroup;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class Item extends CoreModel
+final class Item extends TenantOwnedModel
 {
     use SoftDeletes;
 

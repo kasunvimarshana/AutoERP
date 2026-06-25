@@ -1,9 +1,78 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { certificationApi } from '../hrApi';
-import type { EmployeeCertificationPayload, HrCertification } from '../hrTypes';
+import type {
+    EmployeeCertificationAssignment,
+    EmployeeCertificationPayload,
+    HrCertification,
+} from '../hrTypes';
 import { EmployeeRelationTab } from './EmployeeRelationTab';
 import { HrCertificationSelect } from './HrCertificationSelect';
 import { useEmployeeRelationCrud } from './useEmployeeRelationCrud';
-export function EmployeeCertificationTab({ employeeId }: { employeeId: number }) { const crud = useEmployeeRelationCrud(employeeId, certificationApi); const [master, setMaster] = useState<HrCertification | null>(null); const [draft, setDraft] = useState<EmployeeCertificationPayload>({ certification_id: 0, certificate_number: '', issued_date: '', expiry_date: '', status: 'pending' }); useEffect(() => { const r = crud.editing; setMaster(r?.certification ?? null); setDraft(r ? { certification_id: r.certification_id, certificate_number: r.certificate_number, issued_date: r.issued_date, expiry_date: r.expiry_date, status: r.status } : { certification_id: 0, certificate_number: '', issued_date: '', expiry_date: '', status: 'pending' }); }, [crud.editing, crud.open]); return <EmployeeRelationTab title="Certification" fields={['certification', 'certificate_number', 'expiry_date', 'status']} result={crud} open={crud.open} editing={crud.editing} submitting={crud.submitting} actionError={crud.actionError} onCreate={crud.startCreate} onEdit={crud.startEdit} onDelete={crud.destroy} onClose={crud.close} onSubmit={() => void crud.submit({ ...draft, certification_id: master?.id ?? 0 })}><HrCertificationSelect value={master} onChange={setMaster} /><Input label="Certificate number" value={draft.certificate_number ?? ''} onChange={(e) => setDraft({ ...draft, certificate_number: e.target.value })} /><Input label="Issued date" type="date" value={draft.issued_date ?? ''} onChange={(e) => setDraft({ ...draft, issued_date: e.target.value })} /><Input label="Expiry date" type="date" value={draft.expiry_date ?? ''} onChange={(e) => setDraft({ ...draft, expiry_date: e.target.value })} /><Select label="Status" value={draft.status} options={['active', 'expired', 'revoked', 'pending'].map((v) => ({ value: v, label: v }))} onChange={(e) => setDraft({ ...draft, status: e.target.value })} /></EmployeeRelationTab>; }
+
+const certificationStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
+
+const emptyCertification: EmployeeCertificationPayload = {
+    certification_id: 0,
+    certificate_number: '',
+    issued_date: '',
+    expiry_date: '',
+    status: 'pending',
+};
+
+function certificationDraft(row: EmployeeCertificationAssignment): EmployeeCertificationPayload {
+    return {
+        certification_id: row.certification_id,
+        certificate_number: row.certificate_number,
+        issued_date: row.issued_date,
+        expiry_date: row.expiry_date,
+        status: row.status,
+    };
+}
+
+export function EmployeeCertificationTab({ employeeId }: { employeeId: number }) {
+    const crud = useEmployeeRelationCrud(employeeId, certificationApi);
+    const [master, setMaster] = useState<HrCertification | null>(null);
+    const [draft, setDraft] = useState<EmployeeCertificationPayload>(emptyCertification);
+
+    const startCreate = () => {
+        setMaster(null);
+        setDraft(emptyCertification);
+        crud.startCreate();
+    };
+
+    const startEdit = (row: EmployeeCertificationAssignment) => {
+        setMaster(row.certification ?? null);
+        setDraft(certificationDraft(row));
+        crud.startEdit(row);
+    };
+
+    return (
+        <EmployeeRelationTab
+            title="Certification"
+            fields={['certification', 'certificate_number', 'expiry_date', 'status']}
+            result={crud}
+            open={crud.open}
+            editing={crud.editing}
+            submitting={crud.submitting}
+            actionError={crud.actionError}
+            onCreate={startCreate}
+            onEdit={startEdit}
+            onDelete={crud.destroy}
+            onClose={crud.close}
+            onSubmit={() => void crud.submit({ ...draft, certification_id: master?.id ?? 0 })}
+        >
+            <HrCertificationSelect value={master} onChange={setMaster} />
+            <Input label="Certificate number" value={draft.certificate_number ?? ''} onChange={(event) => setDraft({ ...draft, certificate_number: event.target.value })} />
+            <Input label="Issued date" type="date" value={draft.issued_date ?? ''} onChange={(event) => setDraft({ ...draft, issued_date: event.target.value })} />
+            <Input label="Expiry date" type="date" value={draft.expiry_date ?? ''} onChange={(event) => setDraft({ ...draft, expiry_date: event.target.value })} />
+            <Select
+                label="Status"
+                value={draft.status}
+                options={certificationStatuses.map((value) => ({ value, label: value }))}
+                onChange={(event) => setDraft({ ...draft, status: event.target.value })}
+            />
+        </EmployeeRelationTab>
+    );
+}

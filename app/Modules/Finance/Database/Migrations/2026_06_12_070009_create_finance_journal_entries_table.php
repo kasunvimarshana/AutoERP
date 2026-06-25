@@ -13,12 +13,12 @@ return new class extends Migration
         Schema::create('finance_journal_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('journal_number', 100);
             $table->date('journal_date');
-            $table->foreignId('fiscal_year_id')->nullable()->constrained('finance_fiscal_years', 'id')->nullOnDelete();
-            $table->foreignId('fiscal_period_id')->nullable()->constrained('finance_fiscal_periods', 'id')->nullOnDelete();
-            $table->foreignId('posting_profile_id')->nullable()->constrained('finance_posting_profiles', 'id')->nullOnDelete();
+            $table->foreignId('fiscal_year_id')->nullable();
+            $table->foreignId('fiscal_period_id')->nullable();
+            $table->foreignId('posting_profile_id')->nullable();
             $table->string('source_module', 100)->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
@@ -36,7 +36,7 @@ return new class extends Migration
             $table->timestamp('posted_at')->nullable();
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->timestamp('reversed_at')->nullable();
-            $table->foreignId('reversal_of_id')->nullable()->constrained('finance_journal_entries', 'id')->nullOnDelete();
+            $table->foreignId('reversal_of_id')->nullable();
             $table->text('reversal_reason')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -50,6 +50,41 @@ return new class extends Migration
             );
             $table->index('journal_date', 'finance_journals_date_idx');
             $table->index('status', 'finance_journals_status_idx');
+
+            $table->unique(['id', 'tenant_id'], 'finance_journal_entries_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_entries_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_journal_entries_fiscal_year_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_fiscal_years')
+                ->restrictOnDelete();
+            $table->foreign(['fiscal_period_id', 'tenant_id'], 'finance_journal_entries_fiscal_period_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_fiscal_periods')
+                ->restrictOnDelete();
+            $table->foreign(['posting_profile_id', 'tenant_id'], 'finance_journal_entries_posting_profile_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_posting_profiles')
+                ->restrictOnDelete();
+            $table->foreign(['reversal_of_id', 'tenant_id'], 'finance_journal_entries_reversal_of_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_journal_entries')
+                ->restrictOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'finance_journal_entries_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['posted_by', 'tenant_id'], 'finance_journal_entries_posted_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['reversed_by', 'tenant_id'], 'finance_journal_entries_reversed_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

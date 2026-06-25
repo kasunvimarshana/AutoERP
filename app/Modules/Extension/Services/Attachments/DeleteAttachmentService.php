@@ -25,7 +25,12 @@ final class DeleteAttachmentService
 
             return Result::success(null);
         } catch (Throwable $exception) {
-            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(
+                ExtensionErrorCode::INVALID_VALUE,
+                'Unable to delete the attachment for the active tenant.',
+            ));
         }
     }
 }

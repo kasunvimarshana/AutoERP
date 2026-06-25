@@ -14,11 +14,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('from_uom_id')->constrained('unit_of_measures');
-            $table->foreignId('to_uom_id')->constrained('unit_of_measures');
+            $table->foreignId('from_uom_id');
+            $table->foreignId('to_uom_id');
             $table->decimal('conversion_factor', 20, 6);
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
@@ -35,6 +35,20 @@ return new class extends Migration
             $table->index('from_uom_id', 'uom_conversions_from_uom_idx');
             $table->index('to_uom_id', 'uom_conversions_to_uom_idx');
             $table->index(['tenant_id', 'is_active'], 'uom_conversions_active_idx');
+
+            $table->unique(['id', 'tenant_id'], 'uom_conversions_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'uom_conversions_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['from_uom_id', 'tenant_id'], 'uom_conversions_from_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
+            $table->foreign(['to_uom_id', 'tenant_id'], 'uom_conversions_to_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
         });
     }
 

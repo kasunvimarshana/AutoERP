@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Http\Support;
 
 use Illuminate\Http\JsonResponse;
+use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Results\Error;
 use Modules\Tenant\Constants\TenantErrorCode;
 
@@ -12,7 +13,15 @@ final class TenantApiResponder
 {
     public static function error(Error $error): JsonResponse
     {
-        return response()->json(['message' => $error->message, 'error' => ['code' => $error->code]], self::status($error->code));
+        $status = self::status($error->code);
+
+        return (new ApiErrorResponseFactory())->make(
+            code: $error->code,
+            message: $error->message,
+            status: $status,
+            type: self::type($status),
+            details: $error->context,
+        );
     }
 
     private static function status(string $code): int
@@ -23,6 +32,16 @@ final class TenantApiResponder
             TenantErrorCode::CONFLICT, TenantErrorCode::VERSION_CONFLICT => 409,
             TenantErrorCode::FILE_OPERATION_FAILED => 500,
             default => 422,
+        };
+    }
+
+    private static function type(int $status): string
+    {
+        return match ($status) {
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'domain',
+            default => $status >= 500 ? 'infrastructure' : 'http',
         };
     }
 

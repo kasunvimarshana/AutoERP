@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('hr_employee_documents', function (Blueprint $table): void {
             $table->id();
             $this->scope($table, 'hr_emp_documents');
-            $table->foreignId('employee_id')->constrained('hr_employees')->cascadeOnDelete();
+            $table->foreignId('employee_id');
             $table->string('document_type');
             $table->string('document_number')->nullable();
             $table->date('issued_date')->nullable();
@@ -25,6 +25,12 @@ return new class extends Migration
             $table->softDeletes();
             $table->index(['tenant_id', 'employee_id'], 'hr_employee_documents_scope_idx');
             $table->index('expiry_date');
+
+            $table->unique(['id', 'tenant_id'], 'hr_employee_documents_id_tenant_uk');
+            $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_documents_employee_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employees')
+                ->cascadeOnDelete();
         });
     }
 
@@ -41,9 +47,9 @@ return new class extends Migration
             ->on('tenants')
             ->cascadeOnDelete();
         $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign('organization_unit_id', $constraintPrefix.'_org_fk')
-            ->references('id')
+        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
+            ->references(['id', 'tenant_id'])
             ->on('organization_units')
-            ->nullOnDelete();
+            ->restrictOnDelete();
     }
 };

@@ -21,12 +21,15 @@ use Modules\Auth\Repositories\AuthIdentityRepositoryInterface;
 use Modules\Auth\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
 use Modules\Auth\Services\Contracts\AuthDomainServiceInterface;
+use Modules\Auth\Services\Registration\RegistrationInvitationService;
+use Modules\Auth\Services\Registration\RegistrationPolicyService;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Services\UserService;
 use Throwable;
 
@@ -43,6 +46,9 @@ final class AuthWorkflowService
         private readonly ErrorNormalizerInterface $errorNormalizer,
         private readonly TenantRepositoryInterface $tenants,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
+        private readonly UserOrganizationUnitRepositoryInterface $userOrganizationUnits,
+        private readonly RegistrationPolicyService $registrationPolicy,
+        private readonly RegistrationInvitationService $registrationInvitations,
     ) {}
 
     public function login(LoginData $data): Result
@@ -81,9 +87,18 @@ final class AuthWorkflowService
                     return $this->failure(AuthErrorCode::USER_INACTIVE, 'User account is inactive.');
                 }
 
+                $organizationUnitId = $this->resolveUserOrganizationUnitId(
+                    $data->tenantId,
+                    (int) $user['id'],
+                    $data->organizationUnitId,
+                );
+                if ($organizationUnitId instanceof Result) {
+                    return $organizationUnitId;
+                }
+
                 $session = $this->registry->sessionProvider()->create([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'provider_id' => $providerRecord['id'] ?? null,
                     'identity_id' => $identity['id'] ?? null,
                     'user_id' => $user['id'],
@@ -95,7 +110,7 @@ final class AuthWorkflowService
 
                 $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'provider_id' => $providerRecord['id'] ?? null,
                     'identity_id' => $identity['id'] ?? null,
                     'session_id' => $session['id'] ?? null,
@@ -111,6 +126,7 @@ final class AuthWorkflowService
                     isset($providerRecord['id']) ? (int) $providerRecord['id'] : null,
                     isset($identity['id']) ? (int) $identity['id'] : null,
                     (int) $user['id'],
+                    $organizationUnitId,
                 );
 
                 $this->clearRecentFailures($data);
@@ -120,9 +136,7 @@ final class AuthWorkflowService
                     'identity' => $identity,
                     'user' => $user,
                     'tenant' => $this->tenantSummary($data->tenantId),
-                    'organization_unit' => $this->organizationUnitSummary(
-                        $data->organizationUnitId ?? $this->toNullableInt($user['organization_unit_id'] ?? null),
-                    ),
+                    'organization_unit' => $this->organizationUnitSummary($organizationUnitId),
                     'session' => $session,
                     'tokens' => $tokenPair,
                 ]);
@@ -157,6 +171,21 @@ final class AuthWorkflowService
     {
         try {
             return $this->transactions->runInTransaction(function () use ($data): Result {
+                $authorization = $this->registrationPolicy->authorize($data);
+                if ($authorization->isFailure()) {
+                    return Result::failure($authorization->errorOrFail());
+                }
+
+                $invitation = $authorization->valueOrFail();
+                $organizationUnitId = $invitation instanceof \Modules\Core\DTOs\DataRecord
+                    && is_numeric($invitation->get('organization_unit_id'))
+                        ? (int) $invitation->get('organization_unit_id')
+                        : null;
+                $roleIds = $invitation instanceof \Modules\Core\DTOs\DataRecord
+                    && is_numeric($invitation->get('role_id'))
+                        ? [(int) $invitation->get('role_id')]
+                        : [];
+
                 $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
                 if ($provider === null) {
                     return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
@@ -169,7 +198,9 @@ final class AuthWorkflowService
 
                 $createdUser = $this->userService->create([
                     'tenant_id' => $data->tenantId,
-                    'organization_unit_id' => $data->organizationUnitId,
+                    'organization_unit_ids' => $organizationUnitId === null ? [] : [$organizationUnitId],
+                    'default_organization_unit_id' => $organizationUnitId,
+                    'role_ids' => $roleIds,
                     'first_name' => $data->firstName,
                     'last_name' => $data->lastName,
                     'email' => $data->email,
@@ -194,7 +225,7 @@ final class AuthWorkflowService
                     if ($existingIdentity === null) {
                         $identity = $this->identities->create([
                             'tenant_id' => $data->tenantId,
-                            'organization_unit_id' => $data->organizationUnitId,
+                            'organization_unit_id' => $organizationUnitId,
                             'provider_id' => (int) $providerRecord->id(),
                             'user_id' => (int) $userRecord['id'],
                             'provider_user_key' => strtolower($data->email),
@@ -205,6 +236,15 @@ final class AuthWorkflowService
                         ]);
 
                     }
+                }
+
+                if ($invitation instanceof \Modules\Core\DTOs\DataRecord) {
+                    $this->registrationInvitations->accept(
+                        (int) $data->tenantId,
+                        (int) $invitation->id(),
+                        (int) $userRecord['id'],
+                        (int) $invitation->require('row_version'),
+                    );
                 }
 
                 return Result::success($userRecord);
@@ -455,6 +495,53 @@ final class AuthWorkflowService
         return strtolower(trim((string) ($user['status'] ?? ''))) === 'active';
     }
 
+    private function resolveUserOrganizationUnitId(
+        int $tenantId,
+        int $userId,
+        ?int $requestedOrganizationUnitId,
+    ): int|Result|null {
+        if ($requestedOrganizationUnitId !== null) {
+            if (! $this->userOrganizationUnits->existsForTenantUserAndOrganizationUnit(
+                $tenantId,
+                $userId,
+                $requestedOrganizationUnitId,
+            ) || ! $this->isActiveOrganizationUnit($tenantId, $requestedOrganizationUnitId)) {
+                return $this->failure(
+                    AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                    'Organization unit is not available for this user.',
+                );
+            }
+
+            return $requestedOrganizationUnitId;
+        }
+
+        $assignment = $this->userOrganizationUnits->findDefaultForTenantAndUser($tenantId, $userId)
+            ?? $this->userOrganizationUnits->firstActiveForTenantAndUser($tenantId, $userId);
+        if ($assignment === null) {
+            return null;
+        }
+
+        $organizationUnitId = $this->toNullableInt($assignment->get('organization_unit_id'));
+        if ($organizationUnitId === null || ! $this->isActiveOrganizationUnit($tenantId, $organizationUnitId)) {
+            return $this->failure(
+                AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                'The user default organization unit is not active.',
+            );
+        }
+
+        return $organizationUnitId;
+    }
+
+    private function isActiveOrganizationUnit(int $tenantId, int $organizationUnitId): bool
+    {
+        $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+        if ($organizationUnit === null || (int) $organizationUnit->get('tenant_id', 0) !== $tenantId) {
+            return false;
+        }
+
+        return filter_var($organizationUnit->get('is_active', false), FILTER_VALIDATE_BOOL);
+    }
+
     private function tenantSummary(?int $tenantId): ?array
     {
         if ($tenantId === null) {
@@ -529,10 +616,11 @@ final class AuthWorkflowService
         ?int $providerId,
         ?int $identityId,
         ?int $userId,
+        ?int $effectiveOrganizationUnitId = null,
     ): void {
         $this->loginAttempts->create([
             'tenant_id' => $data->tenantId,
-            'organization_unit_id' => $data->organizationUnitId,
+            'organization_unit_id' => $effectiveOrganizationUnitId ?? $data->organizationUnitId,
             'provider_id' => $providerId,
             'identity_id' => $identityId,
             'user_id' => $userId,

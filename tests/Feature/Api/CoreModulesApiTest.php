@@ -311,7 +311,6 @@ final class CoreModulesApiTest extends TestCase
         $now = now();
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Item',
             'last_name' => 'Administrator',
             'email' => 'item-admin-'.Str::lower(Str::random(8)).'@example.test',

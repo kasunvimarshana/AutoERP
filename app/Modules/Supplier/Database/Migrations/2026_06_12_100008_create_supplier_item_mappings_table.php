@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('supplier_item_mappings', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('supplier_id');
+            $table->foreignId('item_id');
+            $table->foreignId('item_variant_id')->nullable();
             $table->string('supplier_item_code')->nullable();
             $table->string('supplier_item_name')->nullable();
-            $table->foreignId('default_purchase_uom_id')->nullable()->constrained('unit_of_measures')->nullOnDelete();
+            $table->foreignId('default_purchase_uom_id')->nullable();
             $table->decimal('minimum_order_quantity', 20, 6)->default('0.000000');
             $table->integer('lead_time_days')->nullable();
             $table->boolean('is_preferred')->default(false);
@@ -36,6 +36,28 @@ return new class extends Migration
                 ['supplier_id', 'item_id', 'item_variant_id'],
                 'supplier_item_mappings_supplier_item_variant_uk',
             );
+
+            $table->unique(['id', 'tenant_id'], 'supplier_item_mappings_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_item_mappings_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_item_mappings_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->cascadeOnDelete();
+            $table->foreign(['item_id', 'tenant_id'], 'supplier_item_mappings_item_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('items')
+                ->cascadeOnDelete();
+            $table->foreign(['item_variant_id', 'tenant_id'], 'supplier_item_mappings_item_variant_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('item_variants')
+                ->restrictOnDelete();
+            $table->foreign(['default_purchase_uom_id', 'tenant_id'], 'supplier_item_mappings_default_purchase_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
         });
     }
 

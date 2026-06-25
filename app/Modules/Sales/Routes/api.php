@@ -20,6 +20,7 @@ $middleware = [
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+    'tenant.feature:sales',
 ];
 
 Route::prefix('api/v1/sales')->middleware($middleware)->name('api.v1.sales.')->group(function (): void {

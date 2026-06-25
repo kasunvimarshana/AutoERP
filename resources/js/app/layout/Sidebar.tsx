@@ -15,6 +15,8 @@ export function Sidebar({
     user,
     tenant,
     organizationUnit,
+    homePath,
+    workspaceLabel,
     onCloseMobile,
     onExpandDesktop,
     onToggleModule,
@@ -28,6 +30,8 @@ export function Sidebar({
     user: AuthUser | null;
     tenant: AuthTenant | null;
     organizationUnit: AuthOrganizationUnit | null;
+    homePath: string;
+    workspaceLabel: string;
     onCloseMobile: () => void;
     onExpandDesktop: () => void;
     onToggleModule: (moduleId: string) => void;
@@ -55,7 +59,7 @@ export function Sidebar({
             >
                 <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 px-4">
                     <Link
-                        to="/dashboard"
+                        to={homePath}
                         onClick={onCloseMobile}
                         className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
                         title={collapsed ? 'AutoERP' : undefined}
@@ -65,7 +69,7 @@ export function Sidebar({
                         </span>
                         <span className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
                             <span className="block truncate text-lg font-bold tracking-tight">AUTO<span className="text-blue-400">ERP</span></span>
-                            <span className="block truncate text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Business workspace</span>
+                            <span className="block truncate text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">{workspaceLabel}</span>
                         </span>
                     </Link>
                     <button

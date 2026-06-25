@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { TestRouter } from '@/test/TestRouter';
 import VehicleMasterDataPage from './VehicleMasterDataPage';
 import type { VehicleMasterKind } from './VehicleMasterDataPage';
 
@@ -23,13 +23,18 @@ const apiMocks = vi.hoisted(() => ({
     updateVehicleType: vi.fn(),
 }));
 
-vi.mock('./vehicleApi', () => apiMocks);
+vi.mock('./vehicleApi', () => Object.fromEntries(
+    Object.entries(apiMocks).map(([name, mock]) => [
+        name,
+        (...args: unknown[]) => Reflect.apply(mock, undefined, args),
+    ]),
+));
 
 const toyota = { id: 1, code: 'TOYOTA', name: 'Toyota', description: 'Default make', is_active: true };
 
 describe('VehicleMasterDataPage', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        Object.values(apiMocks).forEach((mock) => mock.mockReset());
         apiMocks.listVehicleMakes.mockResolvedValue(collection([toyota]));
         apiMocks.listVehicleTypes.mockResolvedValue(collection([]));
         apiMocks.listVehicleCategories.mockResolvedValue(collection([]));
@@ -63,7 +68,7 @@ describe('VehicleMasterDataPage', () => {
             expect.any(AbortSignal),
         ));
 
-        await user.click(screen.getByRole('button', { name: 'Next' }));
+        await user.click(await screen.findByRole('button', { name: 'Go to page 2' }));
         await waitFor(() => expect(apiMocks.listVehicleMakes).toHaveBeenLastCalledWith(
             expect.objectContaining({ search: 'toy', is_active: true, page: 2 }),
             expect.any(AbortSignal),
@@ -80,14 +85,15 @@ describe('VehicleMasterDataPage', () => {
 
         await screen.findAllByText('Toyota');
         await user.click(screen.getByRole('button', { name: 'Add Make' }));
-        await user.type(screen.getByLabelText('Code *'), 'NISSAN');
-        await user.type(screen.getByLabelText('Name *'), 'Nissan');
+        fireEvent.change(screen.getByLabelText('Code *'), { target: { value: 'NISSAN' } });
+        fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Nissan' } });
         await user.click(screen.getByRole('button', { name: 'Create Make' }));
         await user.click(screen.getByRole('button', { name: /Create Make/ }));
 
         expect(apiMocks.createVehicleMake).toHaveBeenCalledOnce();
         resolveCreate?.(toyota);
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        await waitFor(() => expect(apiMocks.listVehicleMakes).toHaveBeenCalledTimes(2));
     });
 
     it('shows backend validation beside fields', async () => {
@@ -103,27 +109,28 @@ describe('VehicleMasterDataPage', () => {
 
         await screen.findAllByText('Toyota');
         await user.click(screen.getByRole('button', { name: 'Add Make' }));
-        await user.type(screen.getByLabelText('Code *'), 'TOYOTA');
-        await user.type(screen.getByLabelText('Name *'), 'Toyota');
+        fireEvent.change(screen.getByLabelText('Code *'), { target: { value: 'TOYOTA' } });
+        fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Toyota' } });
         await user.click(screen.getByRole('button', { name: 'Create Make' }));
 
+        await waitFor(() => expect(apiMocks.createVehicleMake).toHaveBeenCalledTimes(1));
         expect(await screen.findByText('Vehicle make code already exists for this tenant.')).toBeInTheDocument();
     });
 
     it('warns before discarding an unsaved form', async () => {
         const user = userEvent.setup();
-        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
         renderPage('makes');
 
         await screen.findAllByText('Toyota');
         await user.click(screen.getByRole('button', { name: 'Add Make' }));
-        await user.type(screen.getByLabelText('Code *'), 'NISSAN');
+        fireEvent.change(screen.getByLabelText('Code *'), { target: { value: 'NISSAN' } });
         await user.click(screen.getByRole('button', { name: 'Close modal' }));
 
-        expect(confirm).toHaveBeenCalledWith('You have unsaved changes. Leave this form and discard them?');
+        const discardDialog = screen.getByRole('dialog', { name: 'Discard unsaved changes?' });
+        expect(discardDialog).toBeInTheDocument();
+        await user.click(within(discardDialog).getByRole('button', { name: 'Cancel' }));
         expect(screen.getByRole('dialog', { name: 'Add Make' })).toBeInTheDocument();
 
-        confirm.mockRestore();
     });
 
     it('surfaces relationship validation for vehicle models', async () => {
@@ -139,24 +146,20 @@ describe('VehicleMasterDataPage', () => {
 
         expect(await screen.findByRole('heading', { name: 'Vehicle Models' })).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: 'Add Model' }));
-        await user.type(screen.getByLabelText('Code *'), 'COROLLA');
-        await user.type(screen.getByLabelText('Name *'), 'Corolla');
+        fireEvent.change(screen.getByLabelText('Code *'), { target: { value: 'COROLLA' } });
+        fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Corolla' } });
         await user.click(screen.getByRole('button', { name: 'Create Model' }));
 
-        expect(apiMocks.createVehicleModel).toHaveBeenCalledWith(expect.objectContaining({
-            code: 'COROLLA',
-            name: 'Corolla',
-            vehicle_make_id: null,
-        }));
-        expect(await screen.findByText('The vehicle make field is required.')).toBeInTheDocument();
+        expect(apiMocks.createVehicleModel).not.toHaveBeenCalled();
+        expect(await screen.findByText('Select a valid make from the list.')).toBeInTheDocument();
     });
 });
 
 function renderPage(kind: VehicleMasterKind) {
     return render(
-        <MemoryRouter>
+        <TestRouter>
             <VehicleMasterDataPage kind={kind} />
-        </MemoryRouter>,
+        </TestRouter>,
     );
 }
 

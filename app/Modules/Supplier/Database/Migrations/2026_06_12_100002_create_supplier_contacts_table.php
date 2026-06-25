@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('supplier_contacts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('supplier_id');
             $table->string('contact_name');
             $table->string('designation')->nullable();
             $table->string('department')->nullable();
@@ -31,6 +31,16 @@ return new class extends Migration
             $table->index('supplier_id', 'supplier_contacts_supplier_idx');
             $table->index('email', 'supplier_contacts_email_idx');
             $table->index('phone', 'supplier_contacts_phone_idx');
+
+            $table->unique(['id', 'tenant_id'], 'supplier_contacts_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_contacts_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_contacts_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->cascadeOnDelete();
         });
     }
 

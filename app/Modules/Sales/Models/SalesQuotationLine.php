@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class SalesQuotationLine extends CoreModel
+final class SalesQuotationLine extends TenantOwnedModel
 {
     protected $guarded = ['id'];
 

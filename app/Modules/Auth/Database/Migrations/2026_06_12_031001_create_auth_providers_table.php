@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('auth_providers', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->json('metadata')->nullable();
 
             $table->string('provider_key', 120)->comment('Stable provider key, e.g. internal, oidc-google');
             $table->string('name', 160);
@@ -30,6 +30,11 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['id', 'tenant_id'], 'auth_providers_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_providers_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
             $table->unique(['tenant_id', 'provider_key'], 'auth_providers_key_uk');
             $table->index(['tenant_id', 'status'], 'auth_providers_status_idx');
         });

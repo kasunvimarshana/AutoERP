@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { FormActions } from '@/shared/components/FormActions';
@@ -116,6 +117,11 @@ const pageCopy: Record<VehicleMasterKind, { title: string; description: string; 
 };
 
 export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKind }) {
+    return <VehicleMasterDataContent key={kind} kind={kind} />;
+}
+
+function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const config = pageCopy[kind];
     const api = masterApis[kind];
     const [search, setSearch] = useState('');
@@ -127,20 +133,10 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
     const [busyId, setBusyId] = useState<number | null>(null);
     const [editing, setEditing] = useState<VehicleMasterRow | null>(null);
     const [formOpen, setFormOpen] = useState(false);
-    const [formDirty, setFormDirty] = useState(false);
     const [formVersion, setFormVersion] = useState(0);
+    const [formDirty, setFormDirty] = useState(false);
+    const [formSubmitting, setFormSubmitting] = useState(false);
     const debouncedSearch = useDebounce(search);
-
-    useEffect(() => {
-        setSearch('');
-        setActive('');
-        setMakeFilter(null);
-        setPage(1);
-        setActionError(null);
-        setEditing(null);
-        setFormOpen(false);
-        setFormDirty(false);
-    }, [kind]);
 
     const result = useApi((signal) => api.list({
         search: debouncedSearch || undefined,
@@ -151,27 +147,39 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
     }, signal), [active, debouncedSearch, kind, makeFilter?.id, page, refreshKey], true, true);
 
     const openCreate = () => {
+        setFormDirty(false);
+        setFormSubmitting(false);
         setActionError(null);
         setEditing(null);
-        setFormDirty(false);
         setFormVersion((value) => value + 1);
         setFormOpen(true);
     };
 
     const openEdit = (row: VehicleMasterRow) => {
+        setFormDirty(false);
+        setFormSubmitting(false);
         setActionError(null);
         setEditing(row);
-        setFormDirty(false);
         setFormVersion((value) => value + 1);
         setFormOpen(true);
     };
 
     const closeForm = useCallback(() => {
-        if (formDirty && !window.confirm('You have unsaved changes. Leave this form and discard them?')) return;
+        setFormDirty(false);
+        setFormSubmitting(false);
         setFormOpen(false);
         setEditing(null);
-        setFormDirty(false);
-    }, [formDirty]);
+    }, []);
+
+    const requestFormClose = useCallback(async () => {
+        if (formSubmitting) return;
+        if (formDirty && !await confirm({
+            title: 'Discard unsaved changes?',
+            message: 'Leave this form and discard all unsaved changes?',
+            confirmLabel: 'Discard changes',
+        })) return;
+        closeForm();
+    }, [closeForm, confirm, formDirty, formSubmitting]);
 
     const saveForm = useCallback(async (payload: VehicleMasterPayload) => {
         if (editing) {
@@ -179,7 +187,6 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
         } else {
             await api.create(payload);
         }
-        setFormDirty(false);
         setFormOpen(false);
         setEditing(null);
         setRefreshKey((value) => value + 1);
@@ -255,16 +262,18 @@ export default function VehicleMasterDataPage({ kind }: { kind: VehicleMasterKin
                 </>
             )}
 
-            <Modal open={formOpen} title={editing ? `Edit ${singularLabel(kind)}` : config.addLabel} onClose={closeForm}>
+            <Modal open={formOpen} title={editing ? `Edit ${singularLabel(kind)}` : config.addLabel} onClose={() => void requestFormClose()}>
                 <VehicleMasterForm
                     key={`${kind}-${editing?.id ?? 'new'}-${formVersion}`}
                     kind={kind}
                     initial={editing}
-                    onCancel={closeForm}
+                    onCancel={requestFormClose}
                     onDirtyChange={setFormDirty}
+                    onSubmittingChange={setFormSubmitting}
                     onSubmit={saveForm}
                 />
             </Modal>
+            {confirmDialog}
         </>
     );
 }
@@ -315,40 +324,45 @@ function masterColumns(
     return columns;
 }
 
+interface VehicleMasterFormProps {
+    kind: VehicleMasterKind;
+    initial: VehicleMasterRow | null;
+    onCancel: () => void;
+    onDirtyChange: (dirty: boolean) => void;
+    onSubmittingChange: (submitting: boolean) => void;
+    onSubmit: (payload: VehicleMasterPayload) => Promise<void>;
+}
+
 function VehicleMasterForm({
     kind,
     initial,
     onCancel,
     onDirtyChange,
+    onSubmittingChange,
     onSubmit,
-}: {
-    kind: VehicleMasterKind;
-    initial: VehicleMasterRow | null;
-    onCancel: () => void;
-    onDirtyChange: (dirty: boolean) => void;
-    onSubmit: (payload: VehicleMasterPayload) => Promise<void>;
-}) {
+}: VehicleMasterFormProps) {
     const [form, setForm] = useState(() => formFromRow(initial));
     const [make, setMake] = useState<VehicleMake | null>(() => namedToMake(initial?.make));
     const [parent, setParent] = useState<VehicleCategory | null>(() => namedToCategory(initial?.parent));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const snapshot = JSON.stringify({ form, makeId: make?.id ?? null, parentId: parent?.id ?? null });
-    const initialSnapshot = useRef(snapshot);
-    const dirty = snapshot !== initialSnapshot.current;
-    const confirmDiscard = useUnsavedChanges(dirty && !submitting);
+    const [dirty, setDirty] = useState(false);
+    useUnsavedChanges(dirty && !submitting);
 
-    useEffect(() => {
-        onDirtyChange(dirty);
-    }, [dirty, onDirtyChange]);
+    const markDirty = useCallback(() => {
+        onDirtyChange(true);
+        setDirty(true);
+    }, [onDirtyChange]);
 
     const update = (key: keyof MasterFormState, value: string | boolean) => {
+        markDirty();
         setForm((current) => ({ ...current, [key]: value }));
     };
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (submitting) return;
+        onSubmittingChange(true);
         setSubmitting(true);
         setError(null);
         try {
@@ -356,22 +370,24 @@ function VehicleMasterForm({
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
+            onSubmittingChange(false);
             setSubmitting(false);
         }
     };
 
     return (
-        <form className="space-y-5" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit} onChangeCapture={markDirty}>
             <ErrorAlert error={error} />
             <div className="grid gap-4 md:grid-cols-2">
                 {kind === 'models' && (
                     <GenericLookupSelect<VehicleMake>
                         label="Make *"
                         value={make}
-                        onChange={setMake}
+                        onChange={(value) => { markDirty(); setMake(value); }}
                         search={searchVehicleMakes}
                         formatLabel={formatNamedResource}
                         error={fieldError(error, 'vehicle_make_id')}
+                        required
                         loadOnOpen
                         minSearchLength={0}
                     />
@@ -380,7 +396,7 @@ function VehicleMasterForm({
                     <GenericLookupSelect<VehicleCategory>
                         label="Parent Category"
                         value={parent}
-                        onChange={setParent}
+                        onChange={(value) => { markDirty(); setParent(value); }}
                         search={searchVehicleCategories}
                         formatLabel={formatNamedResource}
                         error={fieldError(error, 'parent_id')}
@@ -452,7 +468,7 @@ function VehicleMasterForm({
                 </div>
             </div>
             <FormActions>
-                <Button type="button" variant="secondary" onClick={() => confirmDiscard() && onCancel()}>Cancel</Button>
+                <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
                 <Button type="submit" loading={submitting}>{initial ? `Save ${singularLabel(kind)}` : `Create ${singularLabel(kind)}`}</Button>
             </FormActions>
         </form>

@@ -2,9 +2,9 @@
 declare(strict_types=1);
 namespace Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Enums\SkillProficiencyLevel;
-final class HrEmployeeSkillAssignment extends CoreModel
+final class HrEmployeeSkillAssignment extends TenantOwnedModel
 {
     protected $table = 'hr_employee_skill_assignments';
     protected $guarded = ['id'];

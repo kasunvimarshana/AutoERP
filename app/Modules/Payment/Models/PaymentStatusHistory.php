@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class PaymentStatusHistory extends CoreModel
+final class PaymentStatusHistory extends TenantOwnedModel
 {
     protected $table = 'payment_status_histories';
 

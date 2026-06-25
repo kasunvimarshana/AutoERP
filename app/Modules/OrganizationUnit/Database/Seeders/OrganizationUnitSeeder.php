@@ -8,12 +8,14 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Database\Seeders\Concerns\ResolvesSeedContext;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
+use Modules\OrganizationUnit\Services\OrganizationUnits\OrganizationHierarchyService;
 
 final class OrganizationUnitSeeder extends Seeder
 {
     use ResolvesSeedContext;
+
+    public function __construct(private readonly OrganizationHierarchyService $hierarchy) {}
 
     public function run(): void
     {
@@ -44,24 +46,18 @@ final class OrganizationUnitSeeder extends Seeder
             }
 
             $code = $this->defaultOrganizationUnitCode();
-            $unit = OrganizationUnitModel::query()->updateOrCreate(
-                ['tenant_id' => $tenant->getKey(), 'name' => 'Head Office'],
-                [
-                    'type_id' => $type?->getKey(),
-                    'parent_id' => null,
-                    'code' => $code,
-                    'depth' => 0,
-                    'is_active' => true,
-                    'description' => 'Default organization unit.',
-                    'row_version' => 1,
-                    'metadata' => json_encode(
-                        ['seed_source' => 'organization_unit_module'],
-                        JSON_THROW_ON_ERROR,
-                    ),
-                ],
-            );
+            if ($type === null) {
+                return;
+            }
 
-            $unit->forceFill(['path' => '/'.$unit->getKey().'/'])->save();
+            $this->hierarchy->createRoot(
+                tenantId: (int) $tenant->getKey(),
+                typeId: (int) $type->getKey(),
+                code: $code,
+                name: 'Head Office',
+                description: 'Default organization unit.',
+                metadata: ['seed_source' => 'organization_unit_module'],
+            );
         }, 3);
     }
 }

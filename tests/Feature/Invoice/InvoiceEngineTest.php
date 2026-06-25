@@ -403,6 +403,8 @@ final class InvoiceEngineTest extends TestCase
             'code' => $name,
             'depth' => 0,
             'is_active' => true,
+            '_lft' => 0,
+            '_rgt' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

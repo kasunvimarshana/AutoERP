@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Sales\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Models\Invoice;
 
-final class SalesInvoiceLink extends CoreModel
+final class SalesInvoiceLink extends TenantOwnedModel
 {
     protected $guarded = ['id'];
 

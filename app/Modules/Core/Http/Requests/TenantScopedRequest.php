@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 
 abstract class TenantScopedRequest extends QueryRequest
@@ -40,6 +43,18 @@ abstract class TenantScopedRequest extends QueryRequest
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
     }
 
+    protected function tenantExists(string $table, string $column = 'id'): Exists
+    {
+        return Rule::exists($table, $column)
+            ->where('tenant_id', $this->tenantId());
+    }
+
+    protected function tenantUnique(string $table, string $column = 'NULL'): Unique
+    {
+        return Rule::unique($table, $column)
+            ->where('tenant_id', $this->tenantId());
+    }
+
     public function page(): int
     {
         $value = $this->input('page', 1);
@@ -59,10 +74,9 @@ abstract class TenantScopedRequest extends QueryRequest
     {
         parent::prepareForValidation();
 
-        if (! $this->attributes->has($this->tenantIdAttribute())) {
-            return;
-        }
-
+        // Request payload is never an authority for tenant or organization scope.
+        // Missing middleware/context must fail validation instead of falling back
+        // to client-supplied identifiers.
         $tenantId = $this->attributes->get($this->tenantIdAttribute());
         $organizationUnitId = $this->attributes->get($this->organizationUnitIdAttribute());
 

@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('item_variants', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('item_id');
             $table->string('code', 80);
             $table->string('sku', 120)->nullable();
             $table->string('barcode', 120)->nullable();
@@ -26,6 +26,16 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'code'], 'item_variants_tenant_code_uk');
             $table->index('item_id', 'item_variants_item_idx');
+
+            $table->unique(['id', 'tenant_id'], 'item_variants_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'item_variants_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['item_id', 'tenant_id'], 'item_variants_item_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('items')
+                ->cascadeOnDelete();
         });
     }
 

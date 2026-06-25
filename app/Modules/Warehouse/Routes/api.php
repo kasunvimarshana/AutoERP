@@ -21,6 +21,7 @@ Route::prefix('api/v1')
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
+        'tenant.feature:warehouse',
     ])
     ->name('api.v1.')
     ->group(function (): void {

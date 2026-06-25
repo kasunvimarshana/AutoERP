@@ -7,12 +7,12 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\BatchStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 
-final class InventoryBatch extends CoreModel
+final class InventoryBatch extends TenantOwnedModel
 {
     use SoftDeletes;
 

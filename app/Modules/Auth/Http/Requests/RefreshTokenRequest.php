@@ -19,12 +19,10 @@ final class RefreshTokenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'refresh_token' => ['required', 'string', 'min:10'],
-            'scopes' => ['nullable', 'array'],
-            'scopes.*' => ['string', 'max:100'],
-            'access_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
-            'refresh_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
+            'refresh_token' => ['prohibited'],
+            'scopes' => ['prohibited'],
+            'access_token_ttl_seconds' => ['prohibited'],
+            'refresh_token_ttl_seconds' => ['prohibited'],
         ];
     }
 }

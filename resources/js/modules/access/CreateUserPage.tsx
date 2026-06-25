@@ -21,9 +21,9 @@ export default function CreateUserPage() {
     const [form, setForm] = useState<UserFormState>(() => emptyUserForm());
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const canCreate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersCreate);
-    const canAssignRoles = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersAssignRoles);
-    const canManageOrganizationAccess = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersManageOrganizationAccess);
+    const canCreate = hasAccessPermission(auth, accessPermissions.usersCreate);
+    const canAssignRoles = hasAccessPermission(auth, accessPermissions.usersAssignRoles);
+    const canManageOrganizationAccess = hasAccessPermission(auth, accessPermissions.usersManageOrganizationAccess);
     const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(emptyUserForm()), [form]);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
     const roles = useApi((signal) => accessApi.listRoles({ per_page: 100 }, signal), []);

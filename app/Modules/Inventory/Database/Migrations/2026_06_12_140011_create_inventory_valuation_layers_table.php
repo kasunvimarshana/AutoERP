@@ -13,18 +13,18 @@ return new class extends Migration
         Schema::create('inventory_valuation_layers', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
-            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('item_id');
+            $table->foreignId('base_uom_id')->nullable();
+            $table->foreignId('item_variant_id')->nullable();
+            $table->foreignId('warehouse_id');
+            $table->foreignId('warehouse_location_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('source_line_type')->nullable();
             $table->unsignedBigInteger('source_line_id')->nullable();
-            $table->foreignId('movement_id')->nullable()->constrained('inventory_movements')->restrictOnDelete();
+            $table->foreignId('movement_id')->nullable();
             $table->string('valuation_method', 40);
             $table->decimal('original_quantity', 20, 6);
             $table->decimal('remaining_quantity', 20, 6);
@@ -41,6 +41,40 @@ return new class extends Migration
             $table->index(['source_line_type', 'source_line_id'], 'inventory_valuation_layers_source_line_idx');
             $table->index('movement_id', 'inventory_valuation_layers_movement_idx');
             $table->index('status', 'inventory_valuation_layers_status_idx');
+
+            $table->unique(['id', 'tenant_id'], 'inventory_valuation_layers_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_valuation_layers_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['item_id', 'tenant_id'], 'inventory_valuation_layers_item_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('items')
+                ->restrictOnDelete();
+            $table->foreign(['base_uom_id', 'tenant_id'], 'inventory_valuation_layers_base_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
+            $table->foreign(['item_variant_id', 'tenant_id'], 'inventory_valuation_layers_item_variant_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('item_variants')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_id', 'tenant_id'], 'inventory_valuation_layers_warehouse_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouses')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_location_id', 'tenant_id'], 'inventory_valuation_layers_warehouse_location_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouse_locations')
+                ->restrictOnDelete();
+            $table->foreign(['batch_id', 'tenant_id'], 'inventory_valuation_layers_batch_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batches')
+                ->restrictOnDelete();
+            $table->foreign(['movement_id', 'tenant_id'], 'inventory_valuation_layers_movement_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_movements')
+                ->restrictOnDelete();
         });
     }
 

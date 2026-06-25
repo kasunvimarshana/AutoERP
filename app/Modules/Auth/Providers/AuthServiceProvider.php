@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Auth\Console\Commands\AuthClientCreateCommand;
+use Modules\Auth\Constants\AuthTokenScope;
 use Modules\Auth\Contracts\Providers\AuthProviderRegistryInterface;
 use Modules\Auth\Contracts\Providers\IdentityProviderInterface;
 use Modules\Auth\Contracts\Providers\SessionProviderInterface;
@@ -21,6 +22,7 @@ use Modules\Auth\Http\Middleware\AuthContextMiddleware;
 use Modules\Auth\Http\Middleware\AuthenticateMiddleware;
 use Modules\Auth\Http\Middleware\SSOContextMiddleware;
 use Modules\Auth\Http\Middleware\TokenValidationMiddleware;
+use Modules\Auth\Http\Middleware\RequireRecentPlatformAuthenticationMiddleware;
 use Modules\Auth\Listeners\RevokeTenantAccessOnStatusChange;
 use Modules\Auth\Models\AuthAccessTokenModel;
 use Modules\Auth\Models\AuthAuthorizationCodeModel;
@@ -59,11 +61,21 @@ use Modules\Auth\Services\DatabaseSsoProvider;
 use Modules\Auth\Services\DatabaseTokenProvider;
 use Modules\Auth\Services\DatabaseVerificationProvider;
 use Modules\Auth\Services\InternalAuthenticationProvider;
+use Modules\Auth\Services\Mfa\PlatformMfaService;
+use Modules\Auth\Services\Mfa\TotpService;
 use Modules\Auth\Services\Rules\AuthDomainService;
 use Modules\Auth\Services\ValidateTokenService;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
 use Modules\User\Models\UserModel;
+use Modules\Auth\Models\AuthRegistrationInvitationModel;
+use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
+use Modules\Auth\Services\Registration\RegistrationInvitationService;
+use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
+use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
+use Modules\Auth\Services\PlatformSessionService;
 
 final class AuthServiceProvider extends ServiceProvider
 {
@@ -72,6 +84,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/auth.php', 'module-auth');
 
         $this->app->singleton(AuthDomainServiceInterface::class, AuthDomainService::class);
+        $this->app->singleton(RegistrationInvitationService::class);
+        $this->app->singleton(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
+        $this->app->singleton(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
 
         $this->app->singleton(
             AuthProviderRepositoryInterface::class,
@@ -131,12 +146,17 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(SsoProviderInterface::class, DatabaseSsoProvider::class);
         $this->app->singleton(VerificationProviderInterface::class, DatabaseVerificationProvider::class);
         $this->app->singleton(IdentityProviderInterface::class, DatabaseIdentityProvider::class);
+        $this->app->singleton(TotpService::class);
+        $this->app->scoped(PlatformMfaService::class);
         $this->app->singleton(AuthProviderRegistryInterface::class, AuthProviderRegistry::class);
         $this->app->singleton(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
     }
 
     public function boot(): void
     {
+        $this->app->make(ConfigurationDefinitionRegistryInterface::class)
+            ->register('Auth', require __DIR__.'/../Config/configuration-definitions.php');
+
         $router = $this->app->make(Router::class);
         $router->aliasMiddleware(
             (string) config('module-auth.middleware.authenticate_alias', 'auth.module.authenticate'),
@@ -154,34 +174,69 @@ final class AuthServiceProvider extends ServiceProvider
             (string) config('module-auth.middleware.sso_context_alias', 'auth.module.sso-context'),
             SSOContextMiddleware::class,
         );
+        $router->aliasMiddleware(
+            (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
+            RequireRecentPlatformAuthenticationMiddleware::class,
+        );
 
         Auth::viaRequest(
             (string) config('module-auth.token_guard_driver', 'module-auth-token'),
             function (Request $request): ?UserModel {
-                $plainAccessToken = $request->bearerToken();
-                if (! is_string($plainAccessToken) || trim($plainAccessToken) === '') {
-                    return null;
-                }
-
-                $tenantId = $request->headers->get((string) config('tenant.resolution.selection_headers.id', 'X-Tenant-Id'));
-                $validation = $this->app->make(ValidateTokenService::class)->validateToken(
-                    $plainAccessToken,
-                    is_numeric($tenantId) ? (int) $tenantId : null,
-                );
-
-                if ($validation->isFailure()) {
-                    return null;
-                }
-
-                $payload = $validation->valueOrFail();
+                $payload = $this->validatedBearerPayload($request);
                 $userId = $payload['user_id'] ?? null;
-                if (! is_numeric($userId)) {
+                $tenantId = $payload['tenant_id'] ?? null;
+                if (
+                    ($payload['token_scope'] ?? null) !== AuthTokenScope::TENANT
+                    || ! is_numeric($userId)
+                    || ! is_numeric($tenantId)
+                ) {
+                    return null;
+                }
+
+                $user = $this->app->make(TenantExecutionContextInterface::class)
+                    ->runForTenant((int) $tenantId, static fn (): ?UserModel => UserModel::query()
+                        ->whereKey((int) $userId)
+                        ->where('status', 'active')
+                        ->where('is_platform_operator', false)
+                        ->first());
+                if (! $user instanceof UserModel) {
                     return null;
                 }
 
                 $request->attributes->set('auth_access_token', $payload);
 
-                return UserModel::query()->find((int) $userId);
+                return $user;
+            },
+        );
+
+        Auth::viaRequest(
+            (string) config('module-auth.platform_token_guard_driver', 'module-platform-token'),
+            function (Request $request): ?UserModel {
+                $payload = $this->validatedBearerPayload($request);
+                $userId = $payload['user_id'] ?? null;
+                if (
+                    ($payload['token_scope'] ?? null) !== AuthTokenScope::PLATFORM
+                    || ! is_numeric($userId)
+                    || ($payload['tenant_id'] ?? null) !== null
+                ) {
+                    return null;
+                }
+
+                $user = $this->app->make(TenantExecutionContextInterface::class)
+                    ->runAsControlPlane(fn (): ?UserModel => UserModel::query()
+                        ->whereKey((int) $userId)
+                        ->whereNull('tenant_id')
+                        ->where('status', 'active')
+                        ->where('is_platform_operator', true)
+                        ->whereNotNull('platform_login_email')
+                        ->first());
+                if (! $user instanceof UserModel) {
+                    return null;
+                }
+
+                $request->attributes->set('auth_access_token', $payload);
+
+                return $user;
             },
         );
 
@@ -200,5 +255,19 @@ final class AuthServiceProvider extends ServiceProvider
                 __DIR__.'/../Config/auth.php' => config_path('module-auth.php'),
             ], 'auth-config');
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function validatedBearerPayload(Request $request): array
+    {
+        $plainAccessToken = $request->bearerToken();
+        if (! is_string($plainAccessToken) || trim($plainAccessToken) === '') {
+            return [];
+        }
+
+        $validation = $this->app->make(ValidateTokenService::class)
+            ->validateToken($plainAccessToken);
+
+        return $validation->isSuccess() ? $validation->valueOrFail() : [];
     }
 }

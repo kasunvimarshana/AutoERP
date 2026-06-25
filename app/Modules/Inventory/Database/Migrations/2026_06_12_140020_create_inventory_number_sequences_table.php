@@ -21,6 +21,8 @@ return new class extends Migration
                 ['tenant_id', 'sequence_key'],
                 'inventory_number_sequences_tenant_key_uk',
             );
+
+            $table->unique(['id', 'tenant_id'], 'inventory_number_sequences_id_tenant_uk');
         });
     }
 

@@ -8,6 +8,7 @@ export class ApiError extends Error {
         public readonly code: string | null = null,
         public readonly type: string | null = null,
         public readonly fields: Record<string, string[]> = {},
+        public readonly details: Record<string, unknown> = {},
     ) {
         super(message);
         this.name = 'ApiError';
@@ -27,7 +28,8 @@ export function toApiError(error: unknown): ApiError {
 
     const payload = error.response?.data;
     const status = error.response?.status ?? null;
-    const fields = payload?.errors ?? payload?.error?.details?.fields ?? {};
+    const details = payload?.error?.details ?? {};
+    const fields = payload?.errors ?? details.fields ?? {};
     const fallback = status === 422
         ? 'Please correct the highlighted fields and try again.'
         : status === 401
@@ -48,7 +50,13 @@ export function toApiError(error: unknown): ApiError {
         payload?.error?.code ?? error.code ?? null,
         payload?.error?.type ?? (status === null ? networkErrorType(error) : null),
         fields,
+        details,
     );
+}
+
+export function errorDetail<T>(error: ApiError | null, key: string): T | null {
+    if (!error || !(key in error.details)) return null;
+    return error.details[key] as T;
 }
 
 export function fieldError(error: ApiError | null, field: string): string | undefined {

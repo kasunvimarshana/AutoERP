@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('vehicles', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('vehicle_number');
             $table->string('code')->nullable();
-            $table->foreignId('vehicle_make_id')->nullable()->constrained('vehicle_makes')->nullOnDelete();
-            $table->foreignId('vehicle_model_id')->nullable()->constrained('vehicle_models')->nullOnDelete();
-            $table->foreignId('vehicle_type_id')->nullable()->constrained('vehicle_types')->nullOnDelete();
-            $table->foreignId('vehicle_category_id')->nullable()->constrained('vehicle_categories')->nullOnDelete();
+            $table->foreignId('vehicle_make_id')->nullable();
+            $table->foreignId('vehicle_model_id')->nullable();
+            $table->foreignId('vehicle_type_id')->nullable();
+            $table->foreignId('vehicle_category_id')->nullable();
             $table->string('registration_number')->nullable();
             $table->string('chassis_number')->nullable();
             $table->string('engine_number')->nullable();
@@ -48,6 +48,33 @@ return new class extends Migration
             $table->unique(['tenant_id', 'vin_number'], 'vehicles_tenant_vin_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicles_tenant_org_idx');
             $table->index('status', 'vehicles_status_idx');
+
+            $table->unique(['id', 'tenant_id'], 'vehicles_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicles_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_make_id', 'tenant_id'], 'vehicles_vehicle_make_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_makes')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_model_id', 'tenant_id'], 'vehicles_vehicle_model_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_models')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_type_id', 'tenant_id'], 'vehicles_vehicle_type_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_types')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_category_id', 'tenant_id'], 'vehicles_vehicle_category_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_categories')
+                ->restrictOnDelete();
+
+            $table->foreign(['approved_by', 'tenant_id'], 'vehicles_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

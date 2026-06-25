@@ -27,10 +27,6 @@ final class UserContextResolutionMiddleware
             $this->configString('tenant_id_attribute', 'current_user_record_tenant_id'),
             (int) $record->get('tenant_id'),
         );
-        $request->attributes->set(
-            $this->configString('organization_unit_id_attribute', 'current_user_record_organization_unit_id'),
-            $record->get('organization_unit_id') !== null ? (int) $record->get('organization_unit_id') : null,
-        );
 
         return $next($request);
     }

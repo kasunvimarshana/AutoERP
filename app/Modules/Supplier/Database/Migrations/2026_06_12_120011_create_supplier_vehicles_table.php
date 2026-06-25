@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('supplier_vehicles', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->restrictOnDelete();
-            $table->foreignId('supplier_id')->constrained('suppliers')->restrictOnDelete();
-            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('supplier_id');
+            $table->foreignId('vehicle_id');
             $table->string('relationship_type')->nullable();
             $table->timestamp('started_at');
             $table->timestamp('ended_at')->nullable();
@@ -31,6 +31,20 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'supplier_id'], 'supplier_vehicles_scope_supplier_idx');
             $table->index(['vehicle_id', 'is_current'], 'supplier_vehicles_current_idx');
             $table->index(['started_at', 'ended_at'], 'supplier_vehicles_dates_idx');
+
+            $table->unique(['id', 'tenant_id'], 'supplier_vehicles_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_vehicles_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_vehicles_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_id', 'tenant_id'], 'supplier_vehicles_vehicle_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicles')
+                ->restrictOnDelete();
         });
 
     }

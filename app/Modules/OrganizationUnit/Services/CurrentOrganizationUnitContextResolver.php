@@ -9,11 +9,11 @@ use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextResolverInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\DTOs\CurrentOrganizationUnitContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentOrganizationUnitContextResolutionException;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
-use Modules\User\Repositories\UserTenantRepositoryInterface;
 
 final class CurrentOrganizationUnitContextResolver implements CurrentOrganizationUnitContextResolverInterface
 {
@@ -21,7 +21,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
-        private readonly UserTenantRepositoryInterface $userTenants,
+        private readonly OrganizationUnitUserAccessCheckerInterface $userAccess,
     ) {}
 
     public function resolve(Request $request): ?CurrentOrganizationUnitContext
@@ -31,7 +31,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             return null;
         }
 
-        $applicationId = $this->resolveApplicationId($request);
+        $applicationId = $this->resolveApplicationId();
 
         $explicit = $this->resolveExplicitOrganizationUnit($request, $tenantId, $applicationId);
         if ($explicit !== null) {
@@ -43,19 +43,14 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             return null;
         }
 
-        $defaultMemberships = $this->userTenants->listDefaultsForTenantAndUser($tenantId, $userId);
-        if (count($defaultMemberships) > 1) {
+        $defaultOrganizationUnitIds = $this->userAccess->defaultOrganizationUnitIds($userId, $tenantId);
+        if (count($defaultOrganizationUnitIds) > 1) {
             throw new CurrentOrganizationUnitContextResolutionException(
-                'Multiple default organization memberships exist for the active tenant and user.',
+                'Multiple default organization unit assignments exist for the active tenant and user.',
             );
         }
 
-        $defaultMembership = $defaultMemberships[0] ?? null;
-        if (! $defaultMembership instanceof DataRecord) {
-            return null;
-        }
-
-        $organizationUnitId = $this->toNullableInt($defaultMembership->get('organization_unit_id'));
+        $organizationUnitId = $defaultOrganizationUnitIds[0] ?? null;
         if ($organizationUnitId === null) {
             return null;
         }
@@ -86,9 +81,9 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             return false;
         }
 
-        return $this->userTenants->existsForTenantUserAndOrganizationUnit(
-            $context->tenantId(),
+        return $this->userAccess->canAccessOrganizationUnit(
             $userId,
+            $context->tenantId(),
             $context->organizationUnitId(),
         );
     }
@@ -246,22 +241,8 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
         return $this->toNullableInt($user->getAuthIdentifier());
     }
 
-    private function resolveApplicationId(Request $request): ?string
+    private function resolveApplicationId(): ?string
     {
-        foreach ($this->configArray('application_input_keys', ['application_id', 'app_id', 'client_id']) as $key) {
-            $value = $request->input($key);
-            if (is_scalar($value) && trim((string) $value) !== '') {
-                return trim((string) $value);
-            }
-        }
-
-        foreach ($this->configArray('application_header_keys', ['X-Application-Id', 'X-App-Id', 'X-Client-Id']) as $key) {
-            $value = $request->headers->get($key);
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
-            }
-        }
-
         return $this->currentTenant->currentApplicationId()
             ?? $this->currentUser->currentApplicationId();
     }

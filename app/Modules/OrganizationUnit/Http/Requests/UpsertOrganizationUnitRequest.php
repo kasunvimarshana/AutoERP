@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertOrganizationUnitRequest extends FormRequest
+final class UpsertOrganizationUnitRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -15,18 +15,19 @@ final class UpsertOrganizationUnitRequest extends FormRequest
 
     public function rules(): array
     {
-        $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
+        $creating = $this->isMethod('post');
 
         return [
-            'tenant_id' => $this->isMethod('post') ? ['required', 'integer', 'min:1'] : ['sometimes', 'integer', 'min:1'],
+            'tenant_id' => ['sometimes', 'integer', 'min:1'],
+            'expected_version' => $creating ? ['prohibited'] : ['required', 'integer', 'min:1'],
             'type_id' => ['nullable', 'integer', 'min:1'],
-            'parent_id' => ['nullable', 'integer', 'min:1'],
-            'name' => array_merge($required, ['string', 'max:255']),
-            'code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
-            'image_path' => ['nullable', 'string', 'max:2048'],
+            'parent_id' => $creating ? ['required', 'integer', 'min:1'] : ['sometimes', 'nullable', 'integer', 'min:1'],
+            'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
+            'code' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'image_path' => ['sometimes', 'nullable', 'string', 'max:2048'],
             'is_active' => ['sometimes', 'boolean'],
-            'description' => ['nullable', 'string'],
-            'metadata' => ['nullable', 'array'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'metadata' => ['sometimes', 'nullable', 'array'],
         ];
     }
 }

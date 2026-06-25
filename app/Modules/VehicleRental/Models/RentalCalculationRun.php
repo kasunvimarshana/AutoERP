@@ -7,12 +7,12 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalDocumentStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalCalculationRun extends CoreModel
+final class RentalCalculationRun extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_calculation_runs';

@@ -14,13 +14,13 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('agreement_number', 100);
             $table->string('agreement_kind', 30);
-            $table->foreignId('reservation_id')->nullable()->constrained('rental_reservations')->nullOnDelete();
-            $table->foreignId('customer_id')->nullable()->constrained('customers')->restrictOnDelete();
-            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('reservation_id')->nullable();
+            $table->foreignId('customer_id')->nullable();
+            $table->foreignId('supplier_id')->nullable();
             $table->date('agreement_date');
             $table->dateTime('executed_at')->nullable();
             $table->dateTime('starts_at');
@@ -51,6 +51,37 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'agreement_kind', 'status'], 'rental_agreements_scope_kind_status_idx');
             $table->index(['customer_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_customer_period_idx');
             $table->index(['supplier_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_supplier_period_idx');
+
+            $table->unique(['id', 'tenant_id'], 'rental_agreements_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreements_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['reservation_id', 'tenant_id'], 'rental_agreements_reservation_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('rental_reservations')
+                ->restrictOnDelete();
+            $table->foreign(['customer_id', 'tenant_id'], 'rental_agreements_customer_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('customers')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'rental_agreements_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->restrictOnDelete();
+
+            $table->foreign(['approved_by', 'tenant_id'], 'rental_agreements_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['created_by', 'tenant_id'], 'rental_agreements_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'rental_agreements_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

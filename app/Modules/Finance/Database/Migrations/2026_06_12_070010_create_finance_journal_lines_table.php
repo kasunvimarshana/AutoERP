@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('finance_journal_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->foreignId('journal_entry_id')->constrained('finance_journal_entries', 'id')->restrictOnDelete();
-            $table->foreignId('account_id')->constrained('finance_accounts', 'id');
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('journal_entry_id');
+            $table->foreignId('account_id');
             $table->text('description')->nullable();
             $table->decimal('debit', 20, 6)->default('0');
             $table->decimal('credit', 20, 6)->default('0');
-            $table->foreignId('dimension_id')->nullable()->constrained('finance_dimensions', 'id')->nullOnDelete();
+            $table->foreignId('dimension_id')->nullable();
             $table->string('source_line_type')->nullable();
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->unsignedInteger('line_number');
@@ -29,6 +29,24 @@ return new class extends Migration
             $table->index('account_id', 'finance_journal_lines_account_idx');
             $table->index('dimension_id', 'finance_journal_lines_dimension_idx');
             $table->index(['source_line_type', 'source_line_id'], 'finance_journal_lines_source_line_idx');
+
+            $table->unique(['id', 'tenant_id'], 'finance_journal_lines_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_lines_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['journal_entry_id', 'tenant_id'], 'finance_journal_lines_journal_entry_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_journal_entries')
+                ->restrictOnDelete();
+            $table->foreign(['account_id', 'tenant_id'], 'finance_journal_lines_account_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_accounts')
+                ->restrictOnDelete();
+            $table->foreign(['dimension_id', 'tenant_id'], 'finance_journal_lines_dimension_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_dimensions')
+                ->restrictOnDelete();
         });
     }
 

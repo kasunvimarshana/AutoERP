@@ -10,19 +10,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('organization_units', function (Blueprint $table) {
+        Schema::create('organization_units', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->json('metadata')->nullable();
 
-            $table->foreignId('type_id')->nullable()->constrained('organization_unit_types', 'id', 'organization_units_type_id_fk')->nullOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('organization_units', 'id', 'organization_units_parent_id_fk')->restrictOnDelete();
+            $table->unsignedBigInteger('type_id')->nullable();
+            $table->unsignedBigInteger('parent_id')->nullable();
             $table->string('name');
-            $table->string('code')->nullable();
+            $table->string('code', 100)->nullable();
             $table->string('image_path')->nullable();
-            $table->string('path')->nullable()->comment('materialized path for quick tree queries');
-            $table->unsignedInteger('depth')->default(0);
+            $table->string('path', 1024)->comment('Server-derived materialized path.');
+            $table->unsignedInteger('depth')->default(0)->comment('Server-derived hierarchy depth.');
+            $table->string('root_marker', 16)->nullable()->comment('Set to root only for the protected tenant root.');
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
 
@@ -30,10 +31,19 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'organization_units_id_tenant_uk');
-            $table->unique(['tenant_id', 'name'], 'organization_units_name_uk');
+            $table->foreign(['type_id', 'tenant_id'], 'organization_units_type_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_unit_types')
+                ->restrictOnDelete();
+            $table->foreign(['parent_id', 'tenant_id'], 'organization_units_parent_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->unique(['tenant_id', 'path'], 'organization_units_path_uk');
             $table->unique(['tenant_id', 'code'], 'organization_units_code_uk');
-            $table->index(['tenant_id', 'parent_id'], 'organization_units_parent_id_idx');
-            $table->index(['tenant_id', 'path'], 'organization_units_path_idx');
+            $table->unique(['tenant_id', 'root_marker'], 'organization_units_root_uk');
+            $table->index(['tenant_id', 'parent_id', 'is_active'], 'organization_units_parent_active_idx');
+            $table->index(['tenant_id', 'name'], 'organization_units_name_idx');
         });
     }
 

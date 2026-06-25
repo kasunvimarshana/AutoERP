@@ -1,4 +1,5 @@
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ReferenceDataPanel } from './components/ReferenceDataPanel';
 import { referenceDataPermissions } from './referenceDataPermissions';
@@ -13,7 +14,7 @@ export default function ReferenceDataPage() {
                 description="Manage stable currencies, countries, languages, and timezones used across the application."
             />
             <ReferenceDataPanel
-                canManage={auth.permissions.includes(referenceDataPermissions.manage)}
+                canManage={hasPermission(auth, referenceDataPermissions.manage)}
             />
         </>
     );

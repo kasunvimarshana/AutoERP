@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\HrEmployee;
 
-final class VehicleServiceInspection extends CoreModel
+final class VehicleServiceInspection extends TenantOwnedModel
 {
     protected $table = 'vehicle_service_inspections';
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -34,6 +35,7 @@ function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine | null 
 }
 
 export function GoodsReceiptForm() {
+    const { confirm, confirmDialog } = useConfirmDialog();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [purchaseOrder, setPurchaseOrderState] = useState<NamedResource | null>(null);
@@ -135,7 +137,7 @@ export function GoodsReceiptForm() {
     }, [cancelSourceRequest, setPurchaseOrder]);
 
     const processInitialSource = useCallback(async (command: InitialSourceCommand<'purchase_order'>) => {
-        await loadPurchaseOrderSource(command.sourceId, `Purchase Order #${command.sourceId}`);
+        await loadPurchaseOrderSource(command.sourceId, 'Selected purchase order');
     }, [loadPurchaseOrderSource]);
 
     useInitialSourceParam({
@@ -180,10 +182,12 @@ export function GoodsReceiptForm() {
             unit_price: decimalOr(line.source.unit_price),
         })),
     });
-    const changePurchaseOrder = (next: NamedResource | null) => {
-        if (purchaseOrder?.id && next?.id !== purchaseOrder.id && hasEnteredLines && !window.confirm('Changing the purchase order clears entered receipt quantities.')) {
-            return;
-        }
+    const changePurchaseOrder = async (next: NamedResource | null) => {
+        if (purchaseOrder?.id && next?.id !== purchaseOrder.id && hasEnteredLines && !await confirm({
+            title: 'Change purchase order?',
+            message: 'Changing the purchase order clears all entered receipt quantities.',
+            confirmLabel: 'Change purchase order',
+        })) return;
 
         if (!next?.id) {
             clearSource();
@@ -220,7 +224,7 @@ export function GoodsReceiptForm() {
             <ErrorAlert error={error} />
             <Panel title="Source">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <PurchaseOrderLookupSelect eligibility="receivable" value={purchaseOrder} onChange={changePurchaseOrder} excludeIds={excludedPurchaseOrderIds} error={errorFor('purchase_order_id')} />
+                    <PurchaseOrderLookupSelect eligibility="receivable" value={purchaseOrder} onChange={(value) => void changePurchaseOrder(value)} excludeIds={excludedPurchaseOrderIds} error={errorFor('purchase_order_id')} />
                     <Input label="Received date" type="date" value={receivedDate} error={errorFor('received_date')} onChange={(event) => setReceivedDate(event.target.value)} />
                     <WarehouseLocationLookupSelect warehouseId={sourceOrder?.warehouse?.id ?? sourceOrder?.warehouse_id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                 </div>
@@ -242,6 +246,7 @@ export function GoodsReceiptForm() {
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/goods-receipts')}>Cancel</Button>
                 <Button type="submit" loading={submitting} disabled={loadingLines}>Create GRN</Button>
             </div>
+            {confirmDialog}
         </form>
     );
 }

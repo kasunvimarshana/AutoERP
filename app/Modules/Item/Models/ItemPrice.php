@@ -6,13 +6,13 @@ namespace Modules\Item\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
-final class ItemPrice extends CoreModel
+final class ItemPrice extends TenantOwnedModel
 {
     protected $table = 'item_prices';
 

@@ -19,7 +19,6 @@ final class VerifyChallengeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
             'challenge_key' => ['required', 'string', 'max:120'],
             'challenge_secret' => ['required', 'string', 'min:1'],
         ];

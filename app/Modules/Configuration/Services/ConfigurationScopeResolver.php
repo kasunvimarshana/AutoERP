@@ -44,6 +44,7 @@ final class ConfigurationScopeResolver
         string $scope,
         ?int $tenantId,
         ?int $organizationUnitId,
+        bool $requireActiveOrganization = true,
     ): ConfigurationScopeContext {
         if ($scope === ConfigurationScope::GLOBAL) {
             return new ConfigurationScopeContext($scope, null, null);
@@ -61,10 +62,10 @@ final class ConfigurationScopeResolver
         ) {
             throw new InvalidArgumentException('A valid organization-unit ID is required.');
         }
-        if (! $this->organizationUnits->belongsToActiveTenant(
-            $organizationUnitId,
-            $tenantId,
-        )) {
+        $belongsToTenant = $requireActiveOrganization
+            ? $this->organizationUnits->belongsToActiveTenant($organizationUnitId, $tenantId)
+            : $this->organizationUnits->belongsToTenant($organizationUnitId, $tenantId);
+        if (! $belongsToTenant) {
             throw new InvalidArgumentException(
                 'The organization unit does not belong to the tenant.',
             );

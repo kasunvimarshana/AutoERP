@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class PurchaseAdjustmentAllocation extends CoreModel
+final class PurchaseAdjustmentAllocation extends TenantOwnedModel
 {
     protected $table = 'purchase_adjustment_allocations';
 

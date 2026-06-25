@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -38,6 +38,15 @@ const workflowOptions: Array<{ value: FastSalesWorkflowMode; label: string; hint
     { value: 'direct_sale', label: 'Direct service sale', hint: 'Invoice only for non-stock lines' },
     { value: 'direct_sale_paid', label: 'Direct service + receipt', hint: 'Invoice and receipt for non-stock lines' },
 ];
+
+
+function workflowNeedsWarehouse(mode: FastSalesWorkflowMode): boolean {
+    return ['order_only', 'delivery_only', 'credit_sale', 'cash_sale'].includes(mode);
+}
+
+function workflowRecordsReceipt(mode: FastSalesWorkflowMode): boolean {
+    return mode === 'cash_sale' || mode === 'direct_sale_paid';
+}
 
 function newIdempotencyKey() {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -80,12 +89,12 @@ export default function FastSalesPage() {
     const recordReceipt = workflowMode === 'cash_sale' || workflowMode === 'direct_sale_paid';
     const needsWarehouse = createOrderOnly || deliverItemsNow;
 
-    useEffect(() => {
-        if (!needsWarehouse) {
+    const changeWorkflowMode = (nextMode: FastSalesWorkflowMode) => {
+        if (!workflowNeedsWarehouse(nextMode)) {
             setWarehouse(null);
             setWarehouseLocation(null);
         }
-        if (!recordReceipt) {
+        if (!workflowRecordsReceipt(nextMode)) {
             setPaymentAmount('');
             setPaymentMethodId('');
             setPaymentAccountId('');
@@ -93,7 +102,10 @@ export default function FastSalesPage() {
             setInstrumentNumber('');
             setInstrumentDate('');
         }
-    }, [needsWarehouse, recordReceipt]);
+        setPreview(null);
+        setResult(null);
+        setWorkflowMode(nextMode);
+    };
 
     const dirty = Boolean(
         customer
@@ -209,7 +221,7 @@ export default function FastSalesPage() {
                                     key={option.value}
                                     type="button"
                                     className={`rounded-lg border px-4 py-3 text-left transition ${workflowMode === option.value ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
-                                    onClick={() => setWorkflowMode(option.value)}
+                                    onClick={() => changeWorkflowMode(option.value)}
                                 >
                                     <div className="text-sm font-semibold">{option.label}</div>
                                     <div className="mt-1 text-xs text-slate-500">{option.hint}</div>

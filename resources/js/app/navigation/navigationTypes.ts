@@ -1,3 +1,5 @@
+import type { TenantModuleCode } from '@/app/access/tenantModules';
+
 export type NavigationIconName =
     | 'dashboard'
     | 'supplier'
@@ -17,29 +19,15 @@ export type NavigationIconName =
     | 'role'
     | 'permission';
 
-export type NavigationModule =
-    | 'dashboard'
-    | 'supplier'
-    | 'customer'
-    | 'item'
-    | 'vehicle'
-    | 'user'
-    | 'warehouse'
-    | 'purchase'
-    | 'sales'
-    | 'vehicle-service'
-    | 'vehicle-rental'
-    | 'invoice'
-    | 'payment'
-    | 'voucher'
-    | 'configuration';
+export type NavigationModule = TenantModuleCode;
 
 export interface NavigationAccessRule {
     requiresTenant?: boolean;
+    requiresPlatformOperator?: boolean;
     requiresOrganizationUnit?: boolean;
-    modules?: NavigationModule[];
-    permissions?: string[];
-    roles?: string[];
+    modules?: readonly NavigationModule[];
+    permissions?: readonly string[];
+    roles?: readonly string[];
 }
 
 export interface NavigationLinkItem {
@@ -72,11 +60,13 @@ export interface NavigationSection {
 
 export interface NavigationAccessContext {
     tenantId: number | string | null;
+    isPlatformOperator: boolean;
     organizationUnitId?: number | string | null;
     roles: string[];
     permissions: string[];
-    permissionsLoaded?: boolean;
+    permissionsLoaded: boolean;
     enabledModules: string[] | null;
+    enabledModulesLoaded: boolean;
 }
 
 export interface NavigationMatch {

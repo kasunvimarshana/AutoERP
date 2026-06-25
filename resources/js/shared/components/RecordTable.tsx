@@ -10,11 +10,16 @@ function renderValue(value: unknown): string {
     return String(value);
 }
 
-export function RecordTable({ rows, fields }: { rows: Row[]; fields: string[] }) {
+export function RecordTable({ rows, fields, rowKey }: {
+    rows: Row[];
+    fields: string[];
+    rowKey: (row: Row, index: number) => string | number;
+}) {
     const columns: DataColumn<Row>[] = fields.map((field) => ({
         key: field,
         header: humanize(field),
         render: (row) => renderValue(row[field]),
     }));
-    return <DataTable rows={rows} columns={columns} rowKey={(row) => String(row.id ?? JSON.stringify(row))} />;
+
+    return <DataTable rows={rows} columns={columns} rowKey={rowKey} />;
 }

@@ -6,7 +6,7 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\ValuationLayerStatus;
 use Modules\Inventory\Enums\ValuationMethod;
 use Modules\Item\Models\Item;
@@ -15,7 +15,7 @@ use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class InventoryValuationLayer extends CoreModel
+final class InventoryValuationLayer extends TenantOwnedModel
 {
     protected $table = 'inventory_valuation_layers';
 

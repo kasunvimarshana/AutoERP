@@ -18,7 +18,7 @@ final class EloquentRolePermissionRepository extends EloquentRepository implemen
         parent::__construct($model);
     }
 
-    public function findByTenantRolePermission(?int $tenantId, int $roleId, int $permissionId, ?int $excludeId = null): ?DataRecord
+    public function findByTenantRolePermission(int $tenantId, int $roleId, int $permissionId, ?int $excludeId = null): ?DataRecord
     {
         $query = $this->query()
             ->where('role_id', $roleId)
@@ -35,7 +35,7 @@ final class EloquentRolePermissionRepository extends EloquentRepository implemen
         return $model instanceof Model ? $this->toRecord($model) : null;
     }
 
-    public function listPermissionNamesForTenantRoles(?int $tenantId, array $roleIds): array
+    public function listPermissionNamesForTenantRoles(int $tenantId, array $roleIds): array
     {
         $roleIds = array_values(array_unique(array_filter(
             array_map(static fn (mixed $roleId): int => (int) $roleId, $roleIds),
@@ -47,16 +47,15 @@ final class EloquentRolePermissionRepository extends EloquentRepository implemen
         }
 
         $query = DB::table('role_permissions')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->join('permissions', function ($join): void {
+                $join->on('permissions.id', '=', 'role_permissions.permission_id')
+                    ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
+            })
+            ->where('role_permissions.tenant_id', $tenantId)
             ->whereIn('role_permissions.role_id', $roleIds)
             ->whereNull('permissions.deleted_at')
             ->select('permissions.name');
 
-        if ($tenantId === null) {
-            $query->whereNull('role_permissions.tenant_id');
-        } else {
-            $query->where('role_permissions.tenant_id', $tenantId);
-        }
 
         return $query
             ->orderBy('permissions.name')
@@ -67,14 +66,8 @@ final class EloquentRolePermissionRepository extends EloquentRepository implemen
             ->all();
     }
 
-    private function applyTenantScope(Builder $query, ?int $tenantId): void
+    private function applyTenantScope(Builder $query, int $tenantId): void
     {
-        if ($tenantId === null) {
-            $query->whereNull('tenant_id');
-
-            return;
-        }
-
         $query->where('tenant_id', $tenantId);
     }
 }

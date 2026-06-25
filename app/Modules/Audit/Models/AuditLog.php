@@ -17,6 +17,7 @@ final class AuditLog extends CoreModel
         'event_uuid',
         'producer_key',
         'producer_fingerprint',
+        'scope_type',
         'tenant_id',
         'tenant_name',
         'organization_unit_id',

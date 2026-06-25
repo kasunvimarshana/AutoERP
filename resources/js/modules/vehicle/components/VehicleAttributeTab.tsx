@@ -3,6 +3,7 @@ import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
@@ -17,7 +18,8 @@ const emptyPayload: VehicleAttributePayload = { attribute_key: '', attribute_val
 
 export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
     const auth = useAuth();
-    const canManage = hasVehiclePermission(auth.permissions, vehiclePermissions.manageAttributes);
+    const { confirm, confirmDialog } = useConfirmDialog();
+    const canManage = hasVehiclePermission(auth, vehiclePermissions.manageAttributes);
     const [rows, setRows] = useState<VehicleAttribute[]>([]);
     const [form, setForm] = useState<VehicleAttributePayload>(emptyPayload);
     const [editing, setEditing] = useState<number | null>(null);
@@ -49,7 +51,7 @@ export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
     }, [vehicleId]);
 
     useEffect(() => {
-        void load();
+        void Promise.resolve().then(() => load());
         return () => controllerRef.current?.abort();
     }, [load]);
 
@@ -72,7 +74,7 @@ export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
 
     const destroy = async (row: VehicleAttribute) => {
         if (deletingId !== null || !canManage) return;
-        if (!window.confirm('Delete this vehicle attribute?')) return;
+        if (!await confirm({ title: 'Delete vehicle attribute', message: 'This vehicle attribute will be permanently deleted.', confirmLabel: 'Delete' })) return;
         setDeletingId(row.id);
         setError(null);
         try {
@@ -114,6 +116,7 @@ export function VehicleAttributeTab({ vehicleId }: { vehicleId: number }) {
                     { key: 'actions', header: '', render: (row) => canManage ? <div className="flex justify-end gap-2"><Button variant="ghost" disabled={submitting || deletingId !== null} onClick={() => { setEditing(row.id); setForm({ attribute_key: row.attribute_key, attribute_value: row.attribute_value ?? '', data_type: row.data_type, sort_order: row.sort_order }); }}>Edit</Button><Button variant="danger" loading={deletingId === row.id} disabled={submitting || (deletingId !== null && deletingId !== row.id)} onClick={() => void destroy(row)}>Delete</Button></div> : null },
                 ]}
             />
+            {confirmDialog}
         </div>
     );
 }

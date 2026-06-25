@@ -27,30 +27,16 @@ final class UpsertTenantRequest extends FormRequest
             'code' => [...$required, 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'name' => [...$required, 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
-            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'cross_org_transactions' => ['sometimes', 'boolean'],
-            'tenant_plan_id' => [
-                'nullable',
-                'integer',
-                'min:1',
-                Rule::exists('tenant_plans', 'id')->where('is_active', true),
-            ],
+            'logo' => $creating
+                ? ['prohibited']
+                : ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.max((int) config('tenant.branding.max_logo_size_kb', 5120), 1)],
+            'remove_logo' => $creating ? ['prohibited'] : ['sometimes', 'boolean'],
             'base_currency_id' => [
                 'nullable',
                 'integer',
                 'min:1',
-                Rule::exists('currencies', 'id')->where('is_active', true),
+                Rule::exists('currencies', 'id'),
             ],
-            'trial_ends_at' => ['nullable', 'date'],
-            'subscription_ends_at' => ['nullable', 'date'],
-            'organization_unit' => $creating ? ['required', 'array'] : ['prohibited'],
-            'organization_unit.name' => $creating ? ['required', 'string', 'max:255'] : ['prohibited'],
-            'organization_unit.code' => $creating
-                ? ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/']
-                : ['prohibited'],
-            'organization_unit.description' => $creating
-                ? ['nullable', 'string', 'max:2000']
-                : ['prohibited'],
         ];
     }
 }

@@ -7,9 +7,9 @@ namespace Modules\Supplier\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class SupplierBankAccount extends CoreModel
+final class SupplierBankAccount extends TenantOwnedModel
 {
     use SoftDeletes;
 

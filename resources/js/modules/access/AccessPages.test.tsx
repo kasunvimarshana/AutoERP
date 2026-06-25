@@ -1,14 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CreateUserPage from './CreateUserPage';
 import PermissionCataloguePage from './PermissionCataloguePage';
 import UserDetailPage from './UserDetailPage';
 import UserListPage from './UserListPage';
 import { accessPermissions } from './accessPermissions';
-
 const apiMocks = vi.hoisted(() => ({
     activateUser: vi.fn(),
     createUser: vi.fn(),
@@ -19,16 +19,13 @@ const apiMocks = vi.hoisted(() => ({
     listRoles: vi.fn(),
     listUsers: vi.fn(),
 }));
-
 const authState = vi.hoisted(() => ({
     permissions: [] as string[],
     roles: [] as string[],
 }));
-
 vi.mock('./accessApi', () => ({
     accessApi: apiMocks,
 }));
-
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
         user: { id: 1, name: 'Admin User', email: 'admin@example.test' },
@@ -37,6 +34,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
         organizationUnit: { id: 1, name: 'Head Office' },
         roles: authState.roles,
         permissions: authState.permissions,
+        permissionsLoaded: true,
         enabledModules: ['user'],
         isAuthenticated: true,
         isLoading: false,
@@ -45,7 +43,6 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
         loadCurrentUser: vi.fn(),
     }),
 }));
-
 describe('Access pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -71,10 +68,8 @@ describe('Access pages', () => {
             },
         ]));
     });
-
     it('renders create user as a separate sectioned page without tabs', async () => {
         renderPage(<CreateUserPage />, ['/access/users/create']);
-
         expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument();
         expect(await screen.findByText('Basic')).toBeInTheDocument();
         expect(screen.getByText('Access')).toBeInTheDocument();
@@ -82,14 +77,11 @@ describe('Access pages', () => {
         expect(screen.getByLabelText('Temporary password')).toBeInTheDocument();
         expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     });
-
     it('uses server-side user filters without sending organization_unit_id as context', async () => {
         const user = userEvent.setup();
         renderPage(<UserListPage />, ['/access/users']);
-
         expect(await screen.findAllByText('Ada User')).not.toHaveLength(0);
         await user.selectOptions(screen.getByLabelText('Organization Unit'), '2');
-
         await waitFor(() => {
             expect(apiMocks.listUsers).toHaveBeenLastCalledWith(
                 expect.objectContaining({ organization_unit_filter_id: 2 }),
@@ -101,10 +93,8 @@ describe('Access pages', () => {
             expect.any(AbortSignal),
         );
     });
-
     it('renders user detail read-only', async () => {
         renderPage(<RoutePage page={<UserDetailPage />} path="/access/users/:id" />, ['/access/users/7']);
-
         expect(await screen.findByRole('heading', { name: 'Ada User' })).toBeInTheDocument();
         expect(screen.getByText('Roles & Permissions')).toBeInTheDocument();
         expect(screen.getByText('Organization Access')).toBeInTheDocument();
@@ -112,17 +102,14 @@ describe('Access pages', () => {
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
-
     it('renders permissions as a read-only catalogue', async () => {
         renderPage(<PermissionCataloguePage />, ['/access/permissions']);
-
         expect(screen.getByRole('heading', { name: 'Permissions' })).toBeInTheDocument();
         expect(await screen.findAllByText(accessPermissions.usersView)).not.toHaveLength(0);
         expect(screen.getAllByText('System Defined')).not.toHaveLength(0);
         expect(screen.queryByRole('button', { name: /add|edit|delete/i })).not.toBeInTheDocument();
     });
 });
-
 function RoutePage({ page, path }: { page: ReactElement; path: string }) {
     return (
         <Routes>
@@ -130,15 +117,13 @@ function RoutePage({ page, path }: { page: ReactElement; path: string }) {
         </Routes>
     );
 }
-
 function renderPage(page: ReactElement, initialEntries: string[]) {
     return render(
-        <MemoryRouter initialEntries={initialEntries}>
+        <TestRouter initialEntries={initialEntries}>
             {page}
-        </MemoryRouter>,
+        </TestRouter>,
     );
 }
-
 function accessUser() {
     return {
         id: 7,
@@ -156,7 +141,6 @@ function accessUser() {
         last_login_at: '2026-06-17T10:00:00.000000Z',
     };
 }
-
 function collection<T>(data: T[]) {
     return {
         data,

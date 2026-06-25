@@ -10,6 +10,7 @@ use Modules\Configuration\Data\ConfigurationRevisionView;
 
 final class ConfigurationRevisionResource extends JsonResource
 {
+    /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
         /** @var ConfigurationRevisionView $revision */
@@ -17,17 +18,24 @@ final class ConfigurationRevisionResource extends JsonResource
 
         return [
             'id' => $revision->id,
+            'operation' => $revision->operation,
             'scope' => $revision->scope,
+            'tenant_id' => $revision->tenantId,
+            'organization_unit_id' => $revision->organizationUnitId,
             'key' => $revision->key,
-            'action' => $revision->action,
-            'value_type' => $revision->valueType,
+            'value' => $revision->sensitive ? null : $revision->value,
+            'display_value' => $revision->sensitive
+                ? ($revision->configured ? 'Configured (protected)' : 'Not configured')
+                : null,
+            'configured' => $revision->configured,
             'sensitive' => $revision->sensitive,
-            'before_exists' => $revision->beforeExists,
-            'before_value' => $revision->sensitive ? null : $revision->beforeValue,
-            'after_exists' => $revision->afterExists,
-            'after_value' => $revision->sensitive ? null : $revision->afterValue,
-            'entry_row_version' => $revision->entryRowVersion,
-            'changed_by_name' => $revision->changedByName ?? 'System',
+            'resulting_row_version' => $revision->resultingRowVersion,
+            'source_revision_id' => $revision->sourceRevisionId,
+            'actor' => $revision->actorUserId === null ? null : [
+                'id' => $revision->actorUserId,
+                'name' => $revision->actorName,
+            ],
+            'reason' => $revision->reason,
             'created_at' => $revision->createdAt->format(DATE_ATOM),
         ];
     }

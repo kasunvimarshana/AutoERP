@@ -6,12 +6,12 @@ namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Tenant\Models\TenantModel;
 
-final class PaymentAllocation extends CoreModel
+final class PaymentAllocation extends TenantOwnedModel
 {
     protected $table = 'payment_allocations';
 

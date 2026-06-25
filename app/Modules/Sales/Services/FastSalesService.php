@@ -11,6 +11,7 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Core\Enums\IdempotencyStatus;
 use Modules\Core\Services\DecimalMath;
 use Modules\Core\Services\IdempotencyService;
 use Modules\Customer\Models\Customer;
@@ -165,13 +166,13 @@ final class FastSalesService
                 $resolved['current_user_id'],
             );
 
-            if ((string) $idempotency->status === 'completed' && is_array($idempotency->result)) {
+            if ($idempotency->status === IdempotencyStatus::Completed && is_array($idempotency->result)) {
                 return $idempotency->result;
             }
-            if (! $idempotency->wasRecentlyCreated && (string) $idempotency->status === 'in_progress') {
+            if (! $idempotency->wasRecentlyCreated && $idempotency->status === IdempotencyStatus::InProgress) {
                 throw new InvalidArgumentException('Fast sales request is already in progress for this idempotency key.');
             }
-            if ((string) $idempotency->status !== 'in_progress') {
+            if ($idempotency->status !== IdempotencyStatus::InProgress) {
                 throw new InvalidArgumentException('Fast sales idempotency record is not executable.');
             }
 
@@ -1397,6 +1398,7 @@ final class FastSalesService
         }
 
         $model = DB::table('unit_of_measures')
+            ->where('tenant_id', (int) $line['item']->tenant_id)
             ->where('id', $uomId)
             ->first(['id', 'code', 'name', 'symbol']);
         if ($model === null) {

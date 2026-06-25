@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\OrganizationUnit\Http\Requests\AssignUserToOrganizationUnitRequest;
 use Modules\OrganizationUnit\Http\Requests\ListOrganizationUnitRequest;
+use Modules\OrganizationUnit\Http\Requests\OrganizationUnitVersionRequest;
 use Modules\OrganizationUnit\Http\Requests\UpsertOrganizationUnitRequest;
 use Modules\OrganizationUnit\Http\Resources\OrganizationUnitResource;
 use Modules\OrganizationUnit\Services\OrganizationUnits as OrganizationUnitUseCases;
@@ -34,7 +35,7 @@ final class OrganizationUnitController extends Controller
 
     public function index(ListOrganizationUnitRequest $request): JsonResponse
     {
-        $result = $this->units->listByTenant((int) $request->validated('tenant_id'));
+        $result = $this->units->listByTenant($request->validated('tenant_id'));
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
@@ -76,9 +77,9 @@ final class OrganizationUnitController extends Controller
         return new OrganizationUnitResource($result->valueOrFail());
     }
 
-    public function activate(int|string $organizationUnit): JsonResponse|OrganizationUnitResource
+    public function activate(OrganizationUnitVersionRequest $request, int|string $organizationUnit): JsonResponse|OrganizationUnitResource
     {
-        $result = $this->units->activate($organizationUnit);
+        $result = $this->units->activate($organizationUnit, (int) $request->validated('expected_version'));
         if ($result->isFailure()) {
             $status = $result->errorOrFail()->code === 'ORGANIZATION_UNIT_NOT_FOUND' ? 404 : 422;
 
@@ -88,9 +89,9 @@ final class OrganizationUnitController extends Controller
         return new OrganizationUnitResource($result->valueOrFail());
     }
 
-    public function deactivate(int|string $organizationUnit): JsonResponse|OrganizationUnitResource
+    public function deactivate(OrganizationUnitVersionRequest $request, int|string $organizationUnit): JsonResponse|OrganizationUnitResource
     {
-        $result = $this->units->deactivate($organizationUnit);
+        $result = $this->units->deactivate($organizationUnit, (int) $request->validated('expected_version'));
         if ($result->isFailure()) {
             $status = $result->errorOrFail()->code === 'ORGANIZATION_UNIT_NOT_FOUND' ? 404 : 422;
 
@@ -114,9 +115,9 @@ final class OrganizationUnitController extends Controller
         return response()->json(['data' => $result->valueOrFail()], 201);
     }
 
-    public function destroy(int|string $organizationUnit): JsonResponse
+    public function destroy(OrganizationUnitVersionRequest $request, int|string $organizationUnit): JsonResponse
     {
-        $result = $this->units->delete($organizationUnit);
+        $result = $this->units->delete($organizationUnit, (int) $request->validated('expected_version'));
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
         }

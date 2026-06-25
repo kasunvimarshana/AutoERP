@@ -7,13 +7,13 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Supplier\Models\Supplier;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalUsageContext extends CoreModel
+final class RentalUsageContext extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_usage_contexts';

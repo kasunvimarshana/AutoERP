@@ -12,7 +12,7 @@ import type { VehicleDocument } from '../vehicleTypes';
 
 export function VehicleDocumentsView({ vehicleId }: { vehicleId: number }) {
     const auth = useAuth();
-    const canDownload = hasVehiclePermission(auth.permissions, vehiclePermissions.downloadDocuments);
+    const canDownload = hasVehiclePermission(auth, vehiclePermissions.downloadDocuments);
     const [rows, setRows] = useState<VehicleDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [fileAction, setFileAction] = useState<string | null>(null);
@@ -20,7 +20,9 @@ export function VehicleDocumentsView({ vehicleId }: { vehicleId: number }) {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         listVehicleDocuments(vehicleId, { per_page: 50 }, controller.signal)
             .then((response) => {
                 if (!controller.signal.aborted) {

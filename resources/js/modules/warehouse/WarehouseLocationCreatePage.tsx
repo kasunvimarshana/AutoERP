@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { WarehouseLocationForm } from './components/WarehouseLocationForm';
 import { createWarehouseLocation, getDefaultWarehouse } from './warehouseApi';
@@ -26,28 +27,42 @@ const initialForm: WarehouseLocationPayload = {
 
 export default function WarehouseLocationCreatePage() {
     const auth = useAuth();
-    const canCreate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsCreate);
-    const canManageDefault = hasWarehousePermission(auth.permissions, warehousePermissions.locationsManageDefaults);
+    const canCreate = hasWarehousePermission(auth, warehousePermissions.locationsCreate);
+    const canManageDefault = hasWarehousePermission(auth, warehousePermissions.locationsManageDefaults);
     const navigate = useNavigate();
     const [form, setForm] = useState<WarehouseLocationPayload>(initialForm);
     const [warehouse, setWarehouse] = useState<WarehouseSummary | null>(null);
     const [parent, setParent] = useState<WarehouseLocationSummary | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
+    const [defaultWarehouseError, setDefaultWarehouseError] = useState<ApiError | null>(null);
+    const [defaultWarehouseLoading, setDefaultWarehouseLoading] = useState(true);
+    const [defaultWarehouseReload, setDefaultWarehouseReload] = useState(0);
+    const formGuard = useMutationFormGuard(saving);
     const warehouseTouched = useRef(false);
 
     useEffect(() => {
         const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setDefaultWarehouseLoading(true);
+            setDefaultWarehouseError(null);
+        });
         void getDefaultWarehouse(controller.signal)
             .then((defaultWarehouse) => {
-                if (controller.signal.aborted || warehouseTouched.current || form.warehouse_id || !defaultWarehouse) return;
+                if (controller.signal.aborted || warehouseTouched.current || !defaultWarehouse) return;
                 setWarehouse(defaultWarehouse);
                 setForm((current) => current.warehouse_id ? current : { ...current, warehouse_id: Number(defaultWarehouse.id) });
             })
-            .catch(() => undefined);
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setDefaultWarehouseError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setDefaultWarehouseLoading(false);
+            });
 
         return () => controller.abort();
-    }, [form.warehouse_id]);
+    }, [defaultWarehouseReload]);
 
     async function save() {
         setSaving(true);
@@ -55,6 +70,7 @@ export default function WarehouseLocationCreatePage() {
         try {
             const payload = canManageDefault ? form : { ...form, is_default: false };
             const created = await createWarehouseLocation(payload);
+            formGuard.markSaved();
             navigate(`/warehouse-locations/${created.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -68,24 +84,31 @@ export default function WarehouseLocationCreatePage() {
             <ContentHeader title="Create Warehouse Location" description="Add a location under a selected warehouse." />
             {!canCreate && <CapabilityNotice>You do not have permission to create warehouse locations.</CapabilityNotice>}
             <ErrorAlert error={error} />
+            {defaultWarehouseError && (
+                <div className="mb-4 space-y-3">
+                    <ErrorAlert error={defaultWarehouseError} title="Default warehouse unavailable" />
+                    <Button type="button" variant="secondary" onClick={() => setDefaultWarehouseReload((current) => current + 1)}>Retry default warehouse</Button>
+                </div>
+            )}
             {canCreate && (
                 <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
                     <WarehouseLocationForm
                         value={form}
-                        onChange={setForm}
+                        onChange={(next) => { formGuard.markDirty(); setForm(next); }}
                         warehouse={warehouse}
                         onWarehouseChange={(next) => {
                             warehouseTouched.current = true;
+                            formGuard.markDirty();
                             setWarehouse(next);
                         }}
                         parent={parent}
-                        onParentChange={setParent}
+                        onParentChange={(next) => { formGuard.markDirty(); setParent(next); }}
                         error={error}
                         canManageDefault={canManageDefault}
                     />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => navigate('/warehouse-locations')}>Cancel</Button>
-                        <Button type="submit" loading={saving}>Create Location</Button>
+                        <Button type="submit" loading={saving || defaultWarehouseLoading}>Create Location</Button>
                     </div>
                 </form>
             )}

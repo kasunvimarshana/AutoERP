@@ -7,12 +7,12 @@ namespace Modules\Finance\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceJournalLine extends CoreModel
+final class FinanceJournalLine extends TenantOwnedModel
 {
     protected $table = 'finance_journal_lines';
 

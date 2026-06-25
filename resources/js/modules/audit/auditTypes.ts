@@ -1,5 +1,18 @@
+export const AUDIT_EVENT_CATEGORIES = [
+    'authentication',
+    'authorization',
+    'administration',
+    'configuration',
+    'data',
+    'financial',
+    'inventory',
+    'security',
+    'workflow',
+    'system',
+] as const;
+
 export type AuditActorType = 'user' | 'system' | 'integration' | 'job';
-export type AuditEventCategory = 'authentication' | 'authorization' | 'configuration' | 'data' | 'financial' | 'inventory' | 'workflow' | 'system';
+export type AuditEventCategory = (typeof AUDIT_EVENT_CATEGORIES)[number];
 
 export interface AuditActor {
     type: AuditActorType;
@@ -26,6 +39,7 @@ export interface AuditLogSummary {
     source_module: string;
     actor: AuditActor;
     subject: AuditSubject;
+    tenant: AuditNamedScope;
     organization_unit: AuditNamedScope;
     tags: string[];
     occurred_at: string;

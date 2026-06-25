@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use InvalidArgumentException;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -23,7 +23,7 @@ use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Tenant\Models\TenantModel;
 
-final class Payment extends CoreModel
+final class Payment extends TenantOwnedModel
 {
     use SoftDeletes;
 

@@ -28,8 +28,11 @@ export default function ReportPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError(null);
+        });
         runReport(key, params, controller.signal)
             .then((data) => {
                 if (!controller.signal.aborted) setResult(data);

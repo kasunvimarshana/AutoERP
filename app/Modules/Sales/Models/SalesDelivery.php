@@ -7,13 +7,13 @@ namespace Modules\Sales\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Sales\Enums\SalesDeliveryStatus;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
-final class SalesDelivery extends CoreModel
+final class SalesDelivery extends TenantOwnedModel
 {
     use SoftDeletes;
 

@@ -19,7 +19,6 @@ final class ValidateTokenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
             'access_token' => ['required', 'string', 'min:10'],
         ];
     }

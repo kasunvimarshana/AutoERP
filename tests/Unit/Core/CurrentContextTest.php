@@ -21,10 +21,8 @@ final class CurrentContextTest extends TestCase
             10,
             'AUTOERP',
             '2bdccf93-b5aa-4c59-b71c-bff3aa1e0eb1',
-            'tenant-10',
             'example.test',
             'active',
-            true,
             null,
             'request_host',
         );
@@ -52,6 +50,6 @@ final class CurrentContextTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        new CurrentUserContext($user, 100, 'auth-api', 'users', null);
+        new CurrentUserContext($user, 100, 'auth-api', 'users', null, []);
     }
 }

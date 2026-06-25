@@ -1,235 +1,247 @@
-import { useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
-import { toApiError, type ApiError } from "@/shared/api/apiError";
-import { Button, LinkButton } from "@/shared/components/Button";
-import { ContentHeader } from "@/shared/components/ContentHeader";
-import { DataTable, type DataColumn } from "@/shared/components/DataTable";
-import { ErrorAlert } from "@/shared/components/ErrorAlert";
-import { Input } from "@/shared/components/Input";
-import { LoadingState } from "@/shared/components/LoadingState";
-import { Pagination } from "@/shared/components/Pagination";
-import { Panel } from "@/shared/components/Panel";
-import { Select } from "@/shared/components/Select";
-import { StatusBadge } from "@/shared/components/StatusBadge";
-import { useApi } from "@/shared/hooks/useApi";
-import { readableRelation } from "@/shared/utils/object";
-import { RentalPage } from "../components/RentalPage";
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { getVehicle } from '@/modules/vehicle/vehicleApi';
+import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
+import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { Button, LinkButton } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
+import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { Pagination } from '@/shared/components/Pagination';
+import { Panel } from '@/shared/components/Panel';
+import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { useApi } from '@/shared/hooks/useApi';
+import type { NamedResource } from '@/shared/types/common';
+import { readableRelation } from '@/shared/utils/object';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
+import {
+    RentalAgreementLookupSelect,
+    RentalAllocationLookupSelect,
+    RentalFinanceAgreementLookupSelect,
+} from '../components/RentalLookups';
+import { RentalPage } from '../components/RentalPage';
 import {
     createRentalAllocation,
+    getRentalAgreement,
     listRentalAllocations,
-} from "../vehicleRentalApi";
-import type { RentalAllocation } from "../vehicleRentalTypes";
+} from '../vehicleRentalApi';
+import type { RentalAllocation } from '../vehicleRentalTypes';
+
+interface AllocationForm {
+    vehicleSourceType: string;
+    allocatedFrom: string;
+    allocatedTo: string;
+    startOdometer: string;
+}
+
+const emptyForm = (): AllocationForm => ({
+    vehicleSourceType: 'company_owned',
+    allocatedFrom: '',
+    allocatedTo: '',
+    startOdometer: '0',
+});
 
 export default function RentalAllocationPage() {
     const [params] = useSearchParams();
-    const agreementParam = params.get("agreement_id") ?? "";
-    const [agreementId, setAgreementId] = useState(agreementParam);
+    const initialAgreementId = parsePositiveInteger(params.get('agreement_id'));
+    const initialVehicleId = parsePositiveInteger(params.get('vehicle_id'));
+    const [agreement, setAgreement] = useState<NamedResource | null>(null);
+    const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
+    const [sourceAllocation, setSourceAllocation] = useState<NamedResource | null>(null);
+    const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
+    const [form, setForm] = useState<AllocationForm>(emptyForm);
     const [page, setPage] = useState(1);
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({
-        vehicle_id: "",
-        vehicle_source_type: "company_owned",
-        source_allocation_id: "",
-        vehicle_finance_agreement_id: "",
-        allocated_from: "",
-        allocated_to: "",
-        start_odometer: "0",
-    });
+
+    useEffect(() => {
+        if (!initialAgreementId && !initialVehicleId) return;
+
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
+
+        void Promise.all([
+            initialAgreementId
+                ? getRentalAgreement(initialAgreementId, controller.signal).then((resource) => {
+                    setAgreement({
+                        id: resource.id,
+                        code: resource.agreement_number,
+                        name: [
+                            resource.agreement_number,
+                            resource.customer?.name ?? resource.supplier?.name,
+                        ].filter(Boolean).join(' - '),
+                    });
+                })
+                : Promise.resolve(),
+            initialVehicleId
+                ? getVehicle(initialVehicleId, controller.signal).then(setVehicle)
+                : Promise.resolve(),
+        ]).catch((requestError: unknown) => {
+            if (!controller.signal.aborted) setError(toApiError(requestError));
+        });
+
+        return () => controller.abort();
+    }, [initialAgreementId, initialVehicleId]);
+
     const result = useApi(
-        (signal) =>
-            listRentalAllocations(
-                { agreement_id: agreementId || undefined, page, per_page: 25 },
-                signal,
-            ),
-        [agreementId, page, refresh],
+        (signal) => listRentalAllocations(
+            { agreement_id: agreement?.id, page, per_page: 25 },
+            signal,
+        ),
+        [agreement?.id, page, refresh],
     );
-    const submit = async (e: FormEvent) => {
-        e.preventDefault();
+
+    const changeSourceType = (vehicleSourceType: string) => {
+        setForm((current) => ({ ...current, vehicleSourceType }));
+        setSourceAllocation(null);
+        setFinanceAgreement(null);
+    };
+
+    const submit = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!agreement || !vehicle) return;
+
         setSaving(true);
         setError(null);
         try {
-            await createRentalAllocation(Number(agreementId), {
-                ...form,
-                vehicle_id: Number(form.vehicle_id),
-                source_allocation_id: form.source_allocation_id
-                    ? Number(form.source_allocation_id)
+            await createRentalAllocation(agreement.id, {
+                vehicle_id: vehicle.id,
+                vehicle_source_type: form.vehicleSourceType,
+                source_allocation_id: form.vehicleSourceType === 'owner_supplied'
+                    ? sourceAllocation?.id ?? null
                     : null,
-                vehicle_finance_agreement_id: form.vehicle_finance_agreement_id
-                    ? Number(form.vehicle_finance_agreement_id)
+                vehicle_finance_agreement_id: form.vehicleSourceType === 'financed'
+                    ? financeAgreement?.id ?? null
                     : null,
-                start_odometer: form.start_odometer,
+                allocated_from: form.allocatedFrom,
+                allocated_to: form.allocatedTo || null,
+                start_odometer: form.startOdometer,
             });
-            setRefresh((v) => v + 1);
-        } catch (err) {
-            setError(toApiError(err));
+            setVehicle(null);
+            setSourceAllocation(null);
+            setFinanceAgreement(null);
+            setForm(emptyForm());
+            setPage(1);
+            setRefresh((value) => value + 1);
+        } catch (requestError: unknown) {
+            setError(toApiError(requestError));
         } finally {
             setSaving(false);
         }
     };
+
     const columns: DataColumn<RentalAllocation>[] = [
+        { key: 'number', header: 'Allocation', render: (row) => row.allocation_number },
+        { key: 'agreement', header: 'Agreement', render: (row) => readableRelation(row.agreement) },
+        { key: 'vehicle', header: 'Vehicle', render: (row) => readableRelation(row.vehicle) },
         {
-            key: "number",
-            header: "Allocation",
-            render: (r) => r.allocation_number,
+            key: 'source',
+            header: 'Source',
+            render: (row) => row.vehicle_source_type.replaceAll('_', ' '),
         },
         {
-            key: "agreement",
-            header: "Agreement",
-            render: (r) => readableRelation(r.agreement),
+            key: 'period',
+            header: 'Period',
+            render: (row) => `${row.allocated_from.slice(0, 10)} – ${row.allocated_to?.slice(0, 10) ?? 'open'}`,
         },
+        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         {
-            key: "vehicle",
-            header: "Vehicle",
-            render: (r) => readableRelation(r.vehicle),
-        },
-        {
-            key: "source",
-            header: "Source",
-            render: (r) => r.vehicle_source_type.replaceAll("_", " "),
-        },
-        {
-            key: "period",
-            header: "Period",
-            render: (r) =>
-                `${r.allocated_from.slice(0, 10)} – ${r.allocated_to?.slice(0, 10) ?? "open"}`,
-        },
-        {
-            key: "status",
-            header: "Status",
-            render: (r) => <StatusBadge status={r.status} />,
-        },
-        {
-            key: "actions",
-            header: "",
-            render: (r) => (
-                <LinkButton
-                    variant="secondary"
-                    to={`/vehicle-rental/allocations/${r.id}`}
-                >
+            key: 'actions',
+            header: '',
+            render: (row) => (
+                <LinkButton variant="secondary" to={`/vehicle-rental/allocations/${row.id}`}>
                     View
                 </LinkButton>
             ),
         },
     ];
+
+    const sourceSelectionValid = form.vehicleSourceType === 'owner_supplied'
+        ? sourceAllocation !== null
+        : form.vehicleSourceType === 'financed'
+            ? financeAgreement !== null
+            : true;
+
     return (
         <RentalPage>
             <ContentHeader
                 title="Vehicle allocations"
-                description="Effective-dated vehicle and driver assignment with owner-source and finance traceability."
+                description="Assign a vehicle through guided agreement, vehicle and ownership controls. Internal database identifiers are never entered manually."
             />
             <ErrorAlert error={error ?? result.error} />
             <Panel title="Create allocation">
                 <form onSubmit={submit}>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <Input
-                            label="Agreement ID"
-                            type="number"
-                            min="1"
+                        <RentalAgreementLookupSelect
+                            value={agreement}
+                            onChange={(value) => {
+                                setAgreement(value);
+                                setPage(1);
+                            }}
                             required
-                            value={agreementId}
-                            onChange={(e) => setAgreementId(e.target.value)}
                         />
-                        <Input
-                            label="Vehicle ID"
-                            type="number"
-                            min="1"
-                            required
-                            value={form.vehicle_id}
-                            onChange={(e) =>
-                                setForm({ ...form, vehicle_id: e.target.value })
-                            }
-                        />
+                        <VehicleLookupSelect value={vehicle} onChange={setVehicle} required />
                         <Select
                             label="Vehicle source"
-                            value={form.vehicle_source_type}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    vehicle_source_type: e.target.value,
-                                })
-                            }
+                            value={form.vehicleSourceType}
+                            onChange={(event) => changeSourceType(event.target.value)}
                             options={[
-                                {
-                                    value: "company_owned",
-                                    label: "Company owned",
-                                },
-                                {
-                                    value: "owner_supplied",
-                                    label: "Owner supplied",
-                                },
-                                { value: "financed", label: "Financed" },
+                                { value: 'company_owned', label: 'Company owned' },
+                                { value: 'owner_supplied', label: 'Owner supplied' },
+                                { value: 'financed', label: 'Financed' },
                             ]}
                         />
-                        {form.vehicle_source_type === "owner_supplied" && (
-                            <Input
-                                label="Owner source allocation ID"
-                                type="number"
-                                min="1"
-                                value={form.source_allocation_id}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        source_allocation_id: e.target.value,
-                                    })
-                                }
+                        {form.vehicleSourceType === 'owner_supplied' && (
+                            <RentalAllocationLookupSelect
+                                value={sourceAllocation}
+                                onChange={setSourceAllocation}
+                                required
+                                excludeId={null}
                             />
-                        )}{" "}
-                        {form.vehicle_source_type === "financed" && (
-                            <Input
-                                label="Finance agreement ID"
-                                type="number"
-                                min="1"
-                                value={form.vehicle_finance_agreement_id}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        vehicle_finance_agreement_id:
-                                            e.target.value,
-                                    })
-                                }
+                        )}
+                        {form.vehicleSourceType === 'financed' && (
+                            <RentalFinanceAgreementLookupSelect
+                                value={financeAgreement}
+                                onChange={setFinanceAgreement}
+                                required
                             />
                         )}
                         <Input
                             label="From"
                             type="datetime-local"
                             required
-                            value={form.allocated_from}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    allocated_from: e.target.value,
-                                })
-                            }
+                            value={form.allocatedFrom}
+                            onChange={(event) => setForm({ ...form, allocatedFrom: event.target.value })}
                         />
                         <Input
                             label="To"
                             type="datetime-local"
-                            value={form.allocated_to}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    allocated_to: e.target.value,
-                                })
-                            }
+                            value={form.allocatedTo}
+                            onChange={(event) => setForm({ ...form, allocatedTo: event.target.value })}
                         />
                         <Input
                             label="Start odometer"
                             type="number"
                             min="0"
                             step="0.000001"
-                            value={form.start_odometer}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    start_odometer: e.target.value,
-                                })
-                            }
+                            required
+                            value={form.startOdometer}
+                            onChange={(event) => setForm({ ...form, startOdometer: event.target.value })}
                         />
                     </div>
                     <div className="mt-4 flex justify-end">
-                        <Button type="submit" loading={saving}>
+                        <Button
+                            type="submit"
+                            loading={saving}
+                            disabled={!agreement || !vehicle || !form.allocatedFrom || !sourceSelectionValid}
+                        >
                             Create allocation
                         </Button>
                     </div>
@@ -242,7 +254,7 @@ export default function RentalAllocationPage() {
                     <DataTable
                         rows={result.data?.data ?? []}
                         columns={columns}
-                        rowKey={(r) => r.id}
+                        rowKey={(row) => row.id}
                     />
                 )}
                 <Pagination meta={result.data?.meta} onPageChange={setPage} />

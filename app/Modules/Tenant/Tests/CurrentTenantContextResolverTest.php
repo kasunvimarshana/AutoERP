@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Tests;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
+use Modules\Core\DTOs\CurrentUserContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
-use Modules\Core\Support\SystemClock;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
-use Modules\Tenant\Services\TenantSubscriptionWindowPolicy;
-use Modules\User\Repositories\UserTenantRepositoryInterface;
+use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
+use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Tests\TestCase;
 
 final class CurrentTenantContextResolverTest extends TestCase
@@ -49,13 +52,13 @@ final class CurrentTenantContextResolverTest extends TestCase
             'domain' => 'tenant.example.test',
         ]));
 
-        $memberships = $this->createMock(UserTenantRepositoryInterface::class);
-        $memberships->expects(self::once())
-            ->method('existsForTenantAndUser')
-            ->with(10, 7)
+        $userAccess = $this->createMock(TenantUserAccessCheckerInterface::class);
+        $userAccess->expects(self::once())
+            ->method('isActiveTenantUser')
+            ->with(7, 10)
             ->willReturn(true);
 
-        $resolver = $this->resolver($tenants, $domains, $memberships, 7);
+        $resolver = $this->resolver($tenants, $domains, $userAccess, 7, 10);
         $request = Request::create('https://platform.example.test/api/v1/orders');
         $request->headers->set('X-Tenant-Id', '10');
 
@@ -94,8 +97,12 @@ final class CurrentTenantContextResolverTest extends TestCase
             'name' => 'AutoERP',
             'slug' => 'autoerp',
             'status' => 'active',
-            'trial_ends_at' => null,
-            'subscription_ends_at' => null,
+            'current_subscription' => [
+                'status' => 'active',
+                'starts_at' => '2020-01-01 00:00:00',
+                'ends_at' => null,
+                'trial_ends_at' => null,
+            ],
         ]);
         $tenants = $this->createMock(TenantRepositoryInterface::class);
         $tenants->expects(self::once())->method('findByCode')->with('AUTOERP')->willReturn($tenant);
@@ -145,19 +152,42 @@ final class CurrentTenantContextResolverTest extends TestCase
     private function resolver(
         ?TenantRepositoryInterface $tenants = null,
         ?TenantDomainRepositoryInterface $domains = null,
-        ?UserTenantRepositoryInterface $memberships = null,
+        ?TenantUserAccessCheckerInterface $userAccess = null,
         ?int $userId = null,
+        ?int $tokenTenantId = null,
     ): CurrentTenantContextResolver {
         $currentUser = $this->createMock(CurrentUserContextAccessorInterface::class);
         $currentUser->method('currentApplicationId')->willReturn('web');
         $currentUser->method('currentUserId')->willReturn($userId);
+        $currentUser->method('current')->willReturn(
+            $userId === null || $tokenTenantId === null
+                ? null
+                : $this->currentUserContext($userId, $tokenTenantId),
+        );
 
         return new CurrentTenantContextResolver(
             $currentUser,
             $tenants ?? $this->createMock(TenantRepositoryInterface::class),
             $domains ?? $this->createMock(TenantDomainRepositoryInterface::class),
-            $memberships ?? $this->createMock(UserTenantRepositoryInterface::class),
-            new TenantSubscriptionWindowPolicy(new SystemClock()),
+            $userAccess ?? $this->createMock(TenantUserAccessCheckerInterface::class),
+            new SystemClock(),
+            new PlatformHostPolicy($this->app),
+            new TenantExecutionContext(),
+        );
+    }
+
+    private function currentUserContext(int $userId, int $tenantId): CurrentUserContext
+    {
+        $user = $this->createMock(Authenticatable::class);
+        $user->method('getAuthIdentifier')->willReturn($userId);
+
+        return new CurrentUserContext(
+            $user,
+            $userId,
+            'auth-api',
+            'internal',
+            'web',
+            ['tenant_id' => $tenantId],
         );
     }
 
@@ -170,8 +200,12 @@ final class CurrentTenantContextResolverTest extends TestCase
             'name' => 'Tenant 10',
             'slug' => 'tenant-10',
             'status' => 'active',
-            'trial_ends_at' => null,
-            'subscription_ends_at' => null,
+            'current_subscription' => [
+                'status' => 'active',
+                'starts_at' => '2020-01-01 00:00:00',
+                'ends_at' => null,
+                'trial_ends_at' => null,
+            ],
         ]);
     }
 }

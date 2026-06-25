@@ -23,6 +23,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['id', 'tenant_id'], 'organization_unit_types_id_tenant_uk');
             $table->unique(['tenant_id', 'name'], 'organization_unit_types_name_uk');
         });
     }

@@ -14,8 +14,8 @@ final class UpsertSupplierTaxProfileRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'supplier_id' => ['required', 'integer', 'min:1', 'exists:suppliers,id'],
-            'tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
+            'supplier_id' => ['required', 'integer', 'min:1', $this->tenantExists('suppliers', 'id')],
+            'tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
             'registration_number' => ['nullable', 'string', 'max:255'],
             'exemption_status' => ['required', Rule::in(config('tax.exemption_statuses', []))],
             'active' => ['nullable', 'boolean'],

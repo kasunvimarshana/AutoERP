@@ -12,7 +12,10 @@ import { Input } from "@/shared/components/Input";
 import { Panel } from "@/shared/components/Panel";
 import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
+import type { NamedResource } from "@/shared/types/common";
+import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
 import { RentalPage } from "../components/RentalPage";
+import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
 import { createRentalAgreement } from "../vehicleRentalApi";
 
 const componentDefaults = [
@@ -29,6 +32,7 @@ export default function RentalAgreementCreatePage() {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [form, setForm] = useState({
         agreement_kind: "customer_rental",
         agreement_date: "",
@@ -41,7 +45,6 @@ export default function RentalAgreementCreatePage() {
         proration_rule: "exact_day_count",
         billing_timezone: "Asia/Colombo",
         payment_term_days: "30",
-        currency_id: "",
         included_km: "0",
         excess_km_method: "period",
         deposit_amount: "0",
@@ -52,6 +55,8 @@ export default function RentalAgreementCreatePage() {
     );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const formGuard = useMutationFormGuard(saving);
+    const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
     const partyValid = useMemo(
         () =>
             form.agreement_kind === "customer_rental"
@@ -74,7 +79,7 @@ export default function RentalAgreementCreatePage() {
                     form.agreement_kind === "owner_supply"
                         ? supplier?.id
                         : null,
-                currency_id: Number(form.currency_id),
+                currency_id: Number(currency?.id),
                 payment_term_days: Number(form.payment_term_days),
                 rate_version: {
                     effective_from: form.starts_at,
@@ -84,7 +89,7 @@ export default function RentalAgreementCreatePage() {
                     proration_rule: form.proration_rule,
                     excess_km_method: form.excess_km_method,
                     included_km: form.included_km,
-                    currency_id: Number(form.currency_id),
+                    currency_id: Number(currency?.id),
                     components: componentDefaults
                         .filter(
                             ([code]) =>
@@ -106,11 +111,12 @@ export default function RentalAgreementCreatePage() {
                     Number(form.deposit_amount) > 0
                         ? {
                               required_amount: form.deposit_amount,
-                              currency_id: Number(form.currency_id),
+                              currency_id: Number(currency?.id),
                               is_refundable: true,
                           }
                         : undefined,
             });
+            formGuard.markSaved();
             navigate(`/vehicle-rental/agreements/${row.id}`);
         } catch (e) {
             setError(toApiError(e));
@@ -132,7 +138,7 @@ export default function RentalAgreementCreatePage() {
                             label="Agreement kind"
                             value={form.agreement_kind}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     agreement_kind: e.target.value,
                                 })
@@ -151,12 +157,12 @@ export default function RentalAgreementCreatePage() {
                         {form.agreement_kind === "customer_rental" ? (
                             <CustomerLookupSelect
                                 value={customer}
-                                onChange={setCustomer}
+                                onChange={(next) => { formGuard.markDirty(); setCustomer(next); }}
                             />
                         ) : (
                             <SupplierLookupSelect
                                 value={supplier}
-                                onChange={setSupplier}
+                                onChange={(next) => { formGuard.markDirty(); setSupplier(next); }}
                             />
                         )}
                         <Input
@@ -165,7 +171,7 @@ export default function RentalAgreementCreatePage() {
                             required
                             value={form.agreement_date}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     agreement_date: e.target.value,
                                 })
@@ -177,7 +183,7 @@ export default function RentalAgreementCreatePage() {
                             required
                             value={form.starts_at}
                             onChange={(e) =>
-                                setForm({ ...form, starts_at: e.target.value })
+                                updateForm({ ...form, starts_at: e.target.value })
                             }
                         />
                         <Input
@@ -186,14 +192,14 @@ export default function RentalAgreementCreatePage() {
                             required
                             value={form.ends_at}
                             onChange={(e) =>
-                                setForm({ ...form, ends_at: e.target.value })
+                                updateForm({ ...form, ends_at: e.target.value })
                             }
                         />
                         <Select
                             label="Rental mode"
                             value={form.rental_mode}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     rental_mode: e.target.value,
                                 })
@@ -211,7 +217,7 @@ export default function RentalAgreementCreatePage() {
                             label="Billing cycle"
                             value={form.billing_cycle}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     billing_cycle: e.target.value,
                                 })
@@ -231,7 +237,7 @@ export default function RentalAgreementCreatePage() {
                             label="Billing basis"
                             value={form.billing_basis}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     billing_basis: e.target.value,
                                 })
@@ -247,18 +253,10 @@ export default function RentalAgreementCreatePage() {
                                 label: value.replaceAll("_", " "),
                             }))}
                         />
-                        <Input
-                            label="Currency ID"
-                            type="number"
-                            min="1"
+                        <RentalCurrencyLookupSelect
+                            value={currency}
+                            onChange={(next) => { formGuard.markDirty(); setCurrency(next); }}
                             required
-                            value={form.currency_id}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    currency_id: e.target.value,
-                                })
-                            }
                         />
                         <Input
                             label="Payment term days"
@@ -266,7 +264,7 @@ export default function RentalAgreementCreatePage() {
                             min="0"
                             value={form.payment_term_days}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     payment_term_days: e.target.value,
                                 })
@@ -279,7 +277,7 @@ export default function RentalAgreementCreatePage() {
                             step="0.000001"
                             value={form.included_km}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     included_km: e.target.value,
                                 })
@@ -289,7 +287,7 @@ export default function RentalAgreementCreatePage() {
                             label="Excess KM method"
                             value={form.excess_km_method}
                             onChange={(e) =>
-                                setForm({
+                                updateForm({
                                     ...form,
                                     excess_km_method: e.target.value,
                                 })
@@ -311,7 +309,7 @@ export default function RentalAgreementCreatePage() {
                                 step="0.000001"
                                 value={form.deposit_amount}
                                 onChange={(e) =>
-                                    setForm({
+                                    updateForm({
                                         ...form,
                                         deposit_amount: e.target.value,
                                     })
@@ -324,7 +322,7 @@ export default function RentalAgreementCreatePage() {
                             label="Remarks"
                             value={form.remarks}
                             onChange={(e) =>
-                                setForm({ ...form, remarks: e.target.value })
+                                updateForm({ ...form, remarks: e.target.value })
                             }
                         />
                     </div>
@@ -339,12 +337,13 @@ export default function RentalAgreementCreatePage() {
                                 min="0"
                                 step="0.000001"
                                 value={rates[code]}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    formGuard.markDirty();
                                     setRates({
                                         ...rates,
                                         [code]: e.target.value,
-                                    })
-                                }
+                                    });
+                                }}
                             />
                         ))}
                     </div>
@@ -353,7 +352,7 @@ export default function RentalAgreementCreatePage() {
                     <Button
                         type="submit"
                         loading={saving}
-                        disabled={!partyValid}
+                        disabled={!partyValid || !currency}
                     >
                         Create agreement
                     </Button>

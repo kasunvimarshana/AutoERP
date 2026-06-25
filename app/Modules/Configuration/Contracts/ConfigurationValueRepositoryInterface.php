@@ -12,7 +12,11 @@ interface ConfigurationValueRepositoryInterface
 {
     public function findExact(ConfigurationScopeContext $context, string $key): ?StoredConfigurationValue;
     /** @return LengthAwarePaginator<int, StoredConfigurationValue> */
-    public function paginate(ConfigurationScopeContext $context, ?string $prefix, int $page, int $perPage): LengthAwarePaginator;
+    /** @param list<string> $keys */
+    public function paginate(ConfigurationScopeContext $context, array $keys, int $page, int $perPage): LengthAwarePaginator;
+    /** @return list<string> */
+    public function keys(ConfigurationScopeContext $context): array;
+    public function countTenantOverrides(string $key): int;
     /** @param array<string, mixed> $attributes */
     public function create(ConfigurationScopeContext $context, array $attributes): StoredConfigurationValue;
     /** @param array<string, mixed> $attributes */

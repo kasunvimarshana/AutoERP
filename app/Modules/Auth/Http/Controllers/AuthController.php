@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Modules\Auth\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Auth\Constants\AuthErrorCode;
+use Modules\Auth\Constants\AuthTokenScope;
+use Modules\Auth\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\DTOs\AuthorizeClientData;
 use Modules\Auth\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\DTOs\LinkExternalIdentityData;
@@ -41,6 +44,7 @@ use Modules\Auth\Services\LinkExternalIdentityService;
 use Modules\Auth\Services\ListSessionsService;
 use Modules\Auth\Services\LoginService;
 use Modules\Auth\Services\LogoutService;
+use Modules\Auth\Services\TenantRefreshTokenCookie;
 use Modules\Auth\Services\RefreshTokenService;
 use Modules\Auth\Services\RegisterService;
 use Modules\Auth\Services\RequestVerificationChallengeService;
@@ -52,6 +56,7 @@ use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
@@ -69,6 +74,8 @@ final class AuthController extends Controller
         private readonly LinkExternalIdentityService $linkExternalIdentityService,
         private readonly UnlinkExternalIdentityService $unlinkExternalIdentityService,
         private readonly RefreshTokenService $refreshTokenService,
+        private readonly TenantRefreshTokenCookie $refreshTokenCookie,
+        private readonly TokenProviderInterface $tokens,
         private readonly RevokeSessionService $revokeSessionService,
         private readonly ListSessionsService $listSessionsService,
         private readonly ValidateTokenService $validateTokenService,
@@ -83,6 +90,7 @@ final class AuthController extends Controller
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentTenantContextResolverInterface $tenantResolver,
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
+        private readonly TenantExecutionContextInterface $tenantExecution,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse|AuthPayloadResource
@@ -92,14 +100,25 @@ final class AuthController extends Controller
             return $this->respond($payload);
         }
 
-        $result = $this->loginService->login(LoginData::fromArray($payload));
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->loginService->login(LoginData::fromArray($payload)),
+        );
 
-        return $this->respond($result);
+        return $this->respondWithRefreshCookie($result);
     }
 
     public function register(RegisterRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->registerService->register(RegistrationData::fromArray($request->validated()));
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated(), true);
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->registerService->register(RegistrationData::fromArray($payload)),
+        );
 
         return $this->respond($result, 201);
     }
@@ -133,9 +152,36 @@ final class AuthController extends Controller
 
     public function refreshToken(RefreshTokenRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($request->validated()));
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken === null) {
+            return $this->errorResponses->make(
+                AuthErrorCode::TOKEN_INVALID,
+                'Refresh session is not available.',
+                401,
+                'authentication',
+            );
+        }
 
-        return $this->respond($result);
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+        $payload['refresh_token'] = $refreshToken;
+        $payload['token_scope'] = AuthTokenScope::TENANT;
+        $payload['scopes'] = [];
+        $payload['access_token_ttl_seconds'] = (int) config('module-auth.access_token_ttl_seconds');
+        $payload['refresh_token_ttl_seconds'] = (int) config('module-auth.refresh_token_ttl_seconds');
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->refreshTokenService->refreshToken(TokenRefreshData::fromArray($payload)),
+        );
+
+        $response = $this->respondWithRefreshCookie($result);
+
+        return $result->isFailure() && $response instanceof JsonResponse
+            ? $this->refreshTokenCookie->forget($response)
+            : $response;
     }
 
     public function logout(LogoutRequest $request): JsonResponse|AuthPayloadResource
@@ -152,7 +198,16 @@ final class AuthController extends Controller
             LogoutData::fromArray($payload),
         );
 
-        return $this->respond($result);
+        $refreshToken = $this->refreshTokenCookie->read($request);
+        if ($refreshToken !== null) {
+            $this->tokens->revokeRefreshToken($refreshToken, $this->currentTenant->currentTenantId());
+        }
+
+        $response = $this->respond($result);
+
+        return $response instanceof JsonResponse
+            ? $this->refreshTokenCookie->forget($response)
+            : $response;
     }
 
     public function revokeSession(RevokeSessionRequest $request, int|string $session): JsonResponse|AuthPayloadResource
@@ -179,10 +234,17 @@ final class AuthController extends Controller
 
     public function validateToken(ValidateTokenRequest $request): JsonResponse|AuthPayloadResource
     {
-        $validated = $request->validated();
-        $result = $this->validateTokenService->validateToken(
-            (string) $validated['access_token'],
-            isset($validated['tenant_id']) ? (int) $validated['tenant_id'] : null,
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->validateTokenService->validateToken(
+                (string) $payload['access_token'],
+                (int) $payload['tenant_id'],
+            ),
         );
 
         return $this->respond($result);
@@ -191,16 +253,32 @@ final class AuthController extends Controller
     public function requestVerificationChallenge(
         RequestVerificationChallengeRequest $request,
     ): JsonResponse|AuthPayloadResource {
-        $result = $this->requestVerificationService
-            ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($request->validated()));
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->requestVerificationService
+                ->requestVerificationChallenge(VerificationChallengeRequestData::fromArray($payload)),
+        );
 
         return $this->respond($result, 201);
     }
 
     public function verifyChallenge(VerifyChallengeRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->verifyChallengeService
-            ->verifyChallenge(VerificationChallengeVerifyData::fromArray($request->validated()));
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->verifyChallengeService
+                ->verifyChallenge(VerificationChallengeVerifyData::fromArray($payload)),
+        );
 
         return $this->respond($result);
     }
@@ -217,8 +295,16 @@ final class AuthController extends Controller
     public function exchangeAuthorizationCode(
         ExchangeAuthorizationCodeRequest $request,
     ): JsonResponse|AuthPayloadResource {
-        $result = $this->exchangeAuthorizationCodeService->exchangeAuthorizationCode(
-            ExchangeAuthorizationCodeData::fromArray($request->validated()),
+        $payload = $this->resolveTenantScopedPublicPayload($request, $request->validated());
+        if ($payload instanceof Result) {
+            return $this->respond($payload);
+        }
+
+        $result = $this->tenantExecution->runForTenant(
+            (int) $payload['tenant_id'],
+            fn (): Result => $this->exchangeAuthorizationCodeService->exchangeAuthorizationCode(
+                ExchangeAuthorizationCodeData::fromArray($payload),
+            ),
         );
 
         return $this->respond($result, 201);
@@ -276,6 +362,24 @@ final class AuthController extends Controller
         }
 
         return $payload;
+    }
+
+    private function respondWithRefreshCookie(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource
+    {
+        if ($result->isFailure()) {
+            return $this->respond($result, $successStatus);
+        }
+
+        $payload = $result->valueOrFail();
+        $response = response()->json(
+            (new AuthPayloadResource($payload))->resolve(request()),
+            $successStatus,
+        );
+        $refreshToken = $this->refreshTokenCookie->extract($payload);
+
+        return $refreshToken === null
+            ? $response
+            : $this->refreshTokenCookie->attach($response, $refreshToken);
     }
 
     private function respond(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource
@@ -384,7 +488,10 @@ final class AuthController extends Controller
     {
         $organizationUnitId = $this->toNullableInt($requestedOrganizationUnitId);
         if ($organizationUnitId !== null) {
-            $organizationUnit = $this->organizationUnits->findById($organizationUnitId);
+            $organizationUnit = $this->tenantExecution->runForTenant(
+                $tenantId,
+                fn (): ?DataRecord => $this->organizationUnits->findById($organizationUnitId),
+            );
             if (! $organizationUnit instanceof DataRecord
                 || $this->toNullableInt($organizationUnit->get('tenant_id')) !== $tenantId
             ) {
@@ -397,19 +504,56 @@ final class AuthController extends Controller
             return $organizationUnitId;
         }
 
-        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
-            if ($this->truthy($organizationUnit->get('is_default'))) {
-                return (int) $organizationUnit->id();
-            }
-        }
-
-        foreach ($this->organizationUnits->listByTenant($tenantId) as $organizationUnit) {
-            if ($this->truthy($organizationUnit->get('is_active'))) {
-                return (int) $organizationUnit->id();
-            }
-        }
-
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|Result
+     */
+    private function resolveTenantScopedPublicPayload(
+        Request $request,
+        array $payload,
+        bool $resolveOrganizationUnit = false,
+    ): array|Result {
+        unset($payload['tenant_id']);
+
+        try {
+            $tenantContext = $this->tenantResolver->resolve($request);
+        } catch (CurrentTenantContextResolutionException $exception) {
+            return $this->tenantResolutionFailure(
+                app()->environment(['local', 'testing']) ? $exception->getMessage() : null,
+            );
+        }
+
+        if ($tenantContext === null) {
+            return $this->tenantResolutionFailure();
+        }
+
+        $tenantId = $tenantContext->tenantId();
+        $payload['tenant_id'] = $tenantId;
+
+        if (! $resolveOrganizationUnit) {
+            unset($payload['organization_unit_id']);
+
+            return $payload;
+        }
+
+        $organizationUnitId = $this->resolveLoginOrganizationUnitId(
+            $payload['organization_unit_id'] ?? null,
+            $tenantId,
+        );
+        if ($organizationUnitId instanceof Result) {
+            return $organizationUnitId;
+        }
+
+        if ($organizationUnitId === null) {
+            unset($payload['organization_unit_id']);
+        } else {
+            $payload['organization_unit_id'] = $organizationUnitId;
+        }
+
+        return $payload;
     }
 
     private function tenantResolutionFailure(?string $diagnostic = null): Result
@@ -433,20 +577,4 @@ final class AuthController extends Controller
         return $normalized > 0 ? $normalized : null;
     }
 
-    private function truthy(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value === 1;
-        }
-
-        if (is_string($value)) {
-            return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
-        }
-
-        return false;
-    }
 }

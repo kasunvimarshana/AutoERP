@@ -13,14 +13,14 @@ return new class extends Migration
         Schema::create('invoice_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->foreignId('invoice_id')->constrained('invoices', 'id')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('invoice_id');
             $table->unsignedInteger('line_number');
             $table->unsignedBigInteger('item_id')->nullable();
             $table->text('description');
             $table->enum('line_type', ['item', 'service', 'labour', 'charge', 'discount', 'tax', 'rounding', 'manual'])->default('item');
             $table->decimal('quantity', 20, 6)->default('0');
-            $table->foreignId('uom_id')->nullable()->constrained('unit_of_measures', 'id')->nullOnDelete();
+            $table->foreignId('uom_id')->nullable();
             $table->decimal('unit_price', 20, 6)->default('0');
             $table->decimal('discount_amount', 20, 6)->default('0');
             $table->decimal('tax_amount', 20, 6)->default('0');
@@ -34,6 +34,20 @@ return new class extends Migration
             $table->index('invoice_id', 'invoice_lines_invoice_idx');
             $table->index('item_id', 'invoice_lines_item_idx');
             $table->index(['source_line_type', 'source_line_id'], 'invoice_lines_source_line_idx');
+
+            $table->unique(['id', 'tenant_id'], 'invoice_lines_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_lines_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['invoice_id', 'tenant_id'], 'invoice_lines_invoice_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('invoices')
+                ->cascadeOnDelete();
+            $table->foreign(['uom_id', 'tenant_id'], 'invoice_lines_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
         });
     }
 

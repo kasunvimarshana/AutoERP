@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Audit\Database\Seeders\AuditSeeder;
 use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Configuration\Database\Seeders\ConfigurationSeeder;
@@ -19,8 +20,8 @@ use Modules\ReferenceData\Database\Seeders\ReferenceDataSeeder;
 use Modules\Sales\Database\Seeders\SalesSeeder;
 use Modules\Sequence\Database\Seeders\SequenceSeeder;
 use Modules\Supplier\Database\Seeders\SupplierSeeder;
-use Modules\Tenant\Database\Seeders\TenantBootstrapFinalizerSeeder;
 use Modules\Tenant\Database\Seeders\TenantDomainSeeder;
+use Modules\Tenant\Database\Seeders\TenantReferenceAssignmentSeeder;
 use Modules\Tenant\Database\Seeders\TenantSeeder;
 use Modules\UOM\Database\Seeders\UomSeeder;
 use Modules\User\Database\Seeders\SuperAdminPermissionSeeder;
@@ -39,32 +40,34 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
-            TenantSeeder::class,
-            TenantDomainSeeder::class,
-            OrganizationUnitSeeder::class,
-            UserSeeder::class,
-            AuthSeeder::class,
-            ReferenceDataSeeder::class,
-            TenantBootstrapFinalizerSeeder::class,
-            ConfigurationSeeder::class,
-            SequenceSeeder::class,
-            UomSeeder::class,
-            WarehouseSeeder::class,
-            FinanceSeeder::class,
-            PaymentSeeder::class,
-            ItemSeeder::class,
-            SupplierSeeder::class,
-            PurchaseSeeder::class,
-            CustomerSeeder::class,
-            SalesSeeder::class,
-            VehicleSeeder::class,
-            CustomerVehicleSeeder::class,
-            VehicleRentalSeeder::class,
-            HrSeeder::class,
-            ReportingSeeder::class,
-            AuditSeeder::class,
-            SuperAdminPermissionSeeder::class,
-        ]);
+        app(TenantExecutionContextInterface::class)->runAsControlPlane(function (): void {
+            $this->call([
+                TenantSeeder::class,
+                TenantDomainSeeder::class,
+                OrganizationUnitSeeder::class,
+                UserSeeder::class,
+                AuthSeeder::class,
+                ReferenceDataSeeder::class,
+                TenantReferenceAssignmentSeeder::class,
+                ConfigurationSeeder::class,
+                SequenceSeeder::class,
+                UomSeeder::class,
+                WarehouseSeeder::class,
+                FinanceSeeder::class,
+                PaymentSeeder::class,
+                ItemSeeder::class,
+                SupplierSeeder::class,
+                PurchaseSeeder::class,
+                CustomerSeeder::class,
+                SalesSeeder::class,
+                VehicleSeeder::class,
+                CustomerVehicleSeeder::class,
+                VehicleRentalSeeder::class,
+                HrSeeder::class,
+                ReportingSeeder::class,
+                AuditSeeder::class,
+                SuperAdminPermissionSeeder::class,
+            ]);
+        });
     }
 }

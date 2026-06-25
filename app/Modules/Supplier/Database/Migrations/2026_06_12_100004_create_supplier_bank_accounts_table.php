@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('supplier_bank_accounts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('supplier_id');
             $table->string('bank_name');
             $table->string('branch_name')->nullable();
             $table->string('account_name');
@@ -32,6 +32,16 @@ return new class extends Migration
             $table->index('supplier_id', 'supplier_bank_accounts_supplier_idx');
             $table->index('account_number', 'supplier_bank_accounts_number_idx');
             $table->unique(['supplier_id', 'account_number'], 'supplier_bank_accounts_supplier_number_uk');
+
+            $table->unique(['id', 'tenant_id'], 'supplier_bank_accounts_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_bank_accounts_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['supplier_id', 'tenant_id'], 'supplier_bank_accounts_supplier_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('suppliers')
+                ->cascadeOnDelete();
         });
     }
 

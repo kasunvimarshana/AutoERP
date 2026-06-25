@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toApiError, type ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -37,20 +37,6 @@ export default function PostingProfilePage() {
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
 
-    useEffect(() => {
-        if (!selected) return;
-        setForm({
-            code: selected.code,
-            name: selected.name,
-            description: typeof selected.description === 'string' ? selected.description : null,
-            is_active: Boolean(selected.is_active),
-            rules: (selected.rules ?? []).map((rule) => ({
-                line_key: rule.line_key,
-                account_id: rule.account?.id ? Number(rule.account.id) : Number(rule.account_id ?? 0) || null,
-                description: typeof rule.description === 'string' ? rule.description : null,
-            })),
-        });
-    }, [selected]);
 
     async function save() {
         setSaving(true);
@@ -74,6 +60,17 @@ export default function PostingProfilePage() {
 
     function edit(profile: PostingProfile) {
         setSelected(profile);
+        setForm({
+            code: profile.code,
+            name: profile.name,
+            description: typeof profile.description === 'string' ? profile.description : null,
+            is_active: Boolean(profile.is_active),
+            rules: (profile.rules ?? []).map((rule) => ({
+                line_key: rule.line_key,
+                account_id: rule.account?.id ? Number(rule.account.id) : Number(rule.account_id ?? 0) || null,
+                description: typeof rule.description === 'string' ? rule.description : null,
+            })),
+        });
         setError(null);
     }
 

@@ -5,6 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -19,7 +20,8 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 
 export default function ItemCategoryListPage() {
     const auth = useAuth();
-    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageCategories);
+    const { confirm, confirmDialog } = useConfirmDialog();
+    const canManage = hasItemPermission(auth, itemPermissions.manageCategories);
     const [search, setSearch] = useState('');
     const [active, setActive] = useState('');
     const [page, setPage] = useState(1);
@@ -50,6 +52,7 @@ export default function ItemCategoryListPage() {
         <ErrorAlert error={actionError ?? result.error} />
         {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item categories found." />}
         <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {confirmDialog}
     </>;
 
     async function toggle(row: ItemCategory) {
@@ -70,7 +73,7 @@ export default function ItemCategoryListPage() {
     }
 
     async function remove(row: ItemCategory) {
-        if (!window.confirm(`Delete category ${row.code}?`)) return;
+        if (!await confirm({ title: 'Delete category', message: `Delete category “${row.name}” (${row.code})? This cannot be undone.`, confirmLabel: 'Delete category' })) return;
         setActionError(null);
         try {
             await deleteItemCategory(Number(row.id));

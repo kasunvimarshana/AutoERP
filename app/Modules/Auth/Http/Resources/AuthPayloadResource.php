@@ -16,6 +16,7 @@ final class AuthPayloadResource extends JsonResource
     private const SENSITIVE_KEYS = [
         'token_hash',
         'refresh_hash',
+        'refresh_token',
         'challenge_hash',
         'code_hash',
         'client_secret_hash',
@@ -55,7 +56,6 @@ final class AuthPayloadResource extends JsonResource
 
             return [
                 'token' => $payload['tokens']['access_token'] ?? null,
-                'refresh_token' => $payload['tokens']['refresh_token'] ?? null,
                 'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
                 'user' => $this->userSummary($userPayload),
                 'tenant' => $this->relationSummary($payload['tenant'] ?? null),
@@ -63,6 +63,7 @@ final class AuthPayloadResource extends JsonResource
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
                 'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
+                'is_platform_operator' => (bool) ($payload['is_platform_operator'] ?? $userPayload['is_platform_operator'] ?? false),
                 'session_id' => $payload['session']['id'] ?? null,
             ];
         }
@@ -77,6 +78,7 @@ final class AuthPayloadResource extends JsonResource
                 'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
                 'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
                 'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
+                'is_platform_operator' => (bool) ($payload['is_platform_operator'] ?? $userPayload['is_platform_operator'] ?? false),
             ];
         }
 
@@ -101,6 +103,7 @@ final class AuthPayloadResource extends JsonResource
             'email' => isset($user['email']) ? (string) $user['email'] : null,
             'roles' => $this->stringList($user['roles'] ?? []),
             'permissions' => $this->stringList($user['permissions'] ?? []),
+            'is_platform_operator' => (bool) ($user['is_platform_operator'] ?? false),
         ];
     }
 

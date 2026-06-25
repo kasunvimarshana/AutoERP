@@ -14,7 +14,6 @@ use Modules\ReferenceData\Models\CountryModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\ReferenceData\Models\LanguageModel;
 use Modules\ReferenceData\Models\TimezoneModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class ReferenceDataSeeder extends Seeder
 {
@@ -24,7 +23,6 @@ final class ReferenceDataSeeder extends Seeder
     {
         $this->seedCatalogues();
         $this->seedPermissions();
-        $this->assignDefaultCurrency();
     }
 
     private function seedCatalogues(): void
@@ -110,7 +108,10 @@ final class ReferenceDataSeeder extends Seeder
                         || $existing->description !== $description
                         || $existing->deleted_at !== null
                     ) {
-                        DB::table('permissions')->where('id', $existing->id)->update([
+                        DB::table('permissions')
+                            ->where('tenant_id', (int) $tenantId)
+                            ->where('id', $existing->id)
+                            ->update([
                             ...$values,
                             'row_version' => max(1, (int) $existing->row_version) + 1,
                             'updated_at' => now(),
@@ -119,26 +120,6 @@ final class ReferenceDataSeeder extends Seeder
                 }
             }
         }, 3);
-    }
-
-    private function assignDefaultCurrency(): void
-    {
-        if (! Schema::hasTable('tenants') || ! Schema::hasColumn('tenants', 'base_currency_id')) {
-            return;
-        }
-
-        $currency = $this->defaultCurrency();
-        if ($currency === null) {
-            return;
-        }
-
-        TenantModel::query()
-            ->whereNull('base_currency_id')
-            ->update([
-                'base_currency_id' => $currency->getKey(),
-                'row_version' => DB::raw('row_version + 1'),
-                'updated_at' => now(),
-            ]);
     }
 
     private function ensureActive(Model $model): void

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_account_types', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->string('code', 100);
             $table->string('name');
             $table->enum('normal_balance', ['debit', 'credit']);
@@ -23,6 +23,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'code'], 'finance_account_types_tenant_code_uk');
+
+            $table->unique(['id', 'tenant_id'], 'finance_account_types_id_tenant_uk');
         });
     }
 

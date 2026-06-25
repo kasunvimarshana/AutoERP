@@ -1,13 +1,13 @@
 import { StrictMode, type ReactElement } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NamedResource } from '@/shared/types/common';
 import GoodsReceiptCreatePage from './pages/GoodsReceiptCreatePage';
 import PurchaseInvoiceCreatePage from './pages/PurchaseInvoiceCreatePage';
 import PurchaseReturnCreatePage from './pages/PurchaseReturnCreatePage';
 import type { GoodsReceipt, GoodsReceiptLine, PurchaseOrder, PurchaseOrderLine, ReturnableLine } from './purchaseTypes';
-
 const purchaseApiMocks = vi.hoisted(() => ({
     createGoodsReceipt: vi.fn(),
     createPurchaseInvoice: vi.fn(),
@@ -20,7 +20,6 @@ const purchaseApiMocks = vi.hoisted(() => ({
     getReturnableGoodsReceiptLines: vi.fn(),
     previewPurchaseInvoice: vi.fn(),
 }));
-
 vi.mock('./purchaseApi', () => purchaseApiMocks);
 vi.mock('./components/PurchaseLookups', () => ({
     SupplierLookupSelect: ({ value, onChange }: LookupMockProps) => (
@@ -59,17 +58,15 @@ vi.mock('./components/PurchaseLookups', () => ({
         </button>
     ),
 }));
-
 interface LookupMockProps {
     value: NamedResource | null;
     onChange: (value: NamedResource | null) => void;
     excludeIds?: Array<number | string>;
 }
-
 describe('Purchase source create flows', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        vi.mocked(window.confirm).mockReturnValue(true);
         purchaseApiMocks.getGoodsReceipt.mockResolvedValue(goodsReceipt(77));
         purchaseApiMocks.getInvoiceableGoodsReceiptLines.mockResolvedValue([goodsReceiptLine(501), goodsReceiptLine(501)]);
         purchaseApiMocks.getInvoiceablePurchaseOrderLines.mockResolvedValue([purchaseOrderLine(401)]);
@@ -77,10 +74,8 @@ describe('Purchase source create flows', () => {
         purchaseApiMocks.getReceivablePurchaseOrderLines.mockResolvedValue([purchaseOrderLine(401), purchaseOrderLine(401)]);
         purchaseApiMocks.getReturnableGoodsReceiptLines.mockResolvedValue([returnableLine(601), returnableLine(601)]);
     });
-
     it('loads an invoice query GRN once in StrictMode and deduplicates source lines', async () => {
         renderInvoice('/purchase/invoices/create?goods_receipt_id=77&tab=details', true);
-
         await waitFor(() => expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(1));
         expect(purchaseApiMocks.getInvoiceableGoodsReceiptLines).toHaveBeenCalledTimes(1);
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(1));
@@ -89,19 +84,16 @@ describe('Purchase source create flows', () => {
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=details');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('goods_receipt_id');
     });
-
     it('prevents rapid duplicate invoice source adds and allows intentional remove and re-add', async () => {
         const receipt = deferred<GoodsReceipt>();
         const lines = deferred<GoodsReceiptLine[]>();
         purchaseApiMocks.getGoodsReceipt.mockReturnValueOnce(receipt.promise);
         purchaseApiMocks.getInvoiceableGoodsReceiptLines.mockReturnValueOnce(lines.promise);
         renderInvoice('/purchase/invoices/create');
-
         fireEvent.click(screen.getByRole('button', { name: 'Select GRN 77' }));
         const addButton = screen.getByRole('button', { name: 'Add source' });
         fireEvent.click(addButton);
         fireEvent.click(addButton);
-
         expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(1);
         await act(async () => {
             receipt.resolve(goodsReceipt(77));
@@ -109,165 +101,130 @@ describe('Purchase source create flows', () => {
             await receipt.promise;
             await lines.promise;
         });
-
         expect(await screen.findByText('Widget')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
         await waitFor(() => expect(screen.queryByText('Widget')).not.toBeInTheDocument());
-
         purchaseApiMocks.getGoodsReceipt.mockResolvedValueOnce(goodsReceipt(77));
         purchaseApiMocks.getInvoiceableGoodsReceiptLines.mockResolvedValueOnce([goodsReceiptLine(501)]);
         fireEvent.click(screen.getByRole('button', { name: 'Select GRN 77' }));
         fireEvent.click(screen.getByRole('button', { name: 'Add source' }));
-
         expect(await screen.findByText('Widget')).toBeInTheDocument();
         expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(2);
         expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
     });
-
     it('does not restore a removed invoice query source and ignores stale source responses after supplier change', async () => {
         renderInvoice('/purchase/invoices/create?goods_receipt_id=77');
-
         expect(await screen.findByText('Widget')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
         await waitFor(() => expect(screen.queryByText('Widget')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(1);
-
         const receipt = deferred<GoodsReceipt>();
         const lines = deferred<GoodsReceiptLine[]>();
         purchaseApiMocks.getGoodsReceipt.mockReturnValueOnce(receipt.promise);
         purchaseApiMocks.getInvoiceableGoodsReceiptLines.mockReturnValueOnce(lines.promise);
-
         fireEvent.click(screen.getByRole('button', { name: 'Select GRN 77' }));
         fireEvent.click(screen.getByRole('button', { name: 'Add source' }));
         fireEvent.click(screen.getByRole('button', { name: 'Supplier A' }));
-
         await act(async () => {
             receipt.resolve(goodsReceipt(77));
             lines.resolve([goodsReceiptLine(501)]);
             await receipt.promise;
             await lines.promise;
         });
-
         expect(screen.queryByText('Widget')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Supplier B' })).toBeInTheDocument();
     });
-
     it('leaves invoice state untouched when source loading fails', async () => {
         purchaseApiMocks.getInvoiceableGoodsReceiptLines.mockRejectedValueOnce(new Error('No invoiceable lines'));
         renderInvoice('/purchase/invoices/create');
-
         fireEvent.click(screen.getByRole('button', { name: 'Select GRN 77' }));
         fireEvent.click(screen.getByRole('button', { name: 'Add source' }));
-
         expect(await screen.findByText('No invoiceable lines')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
         expect(screen.queryByText('Widget')).not.toBeInTheDocument();
     });
-
     it('loads a GRN query PO once, deduplicates lines, and does not reselect after clear', async () => {
         renderGoodsReceipt('/purchase/goods-receipts/create?purchase_order_id=31&tab=source', true);
-
         await waitFor(() => expect(purchaseApiMocks.getPurchaseOrder).toHaveBeenCalledTimes(1));
         expect(screen.getByTestId('po-eligibility')).toHaveTextContent('receivable');
         expect(await screen.findByText('PO-31 - Supplier A')).toBeInTheDocument();
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=source');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('purchase_order_id');
-
         fireEvent.click(screen.getByRole('button', { name: 'Clear PO' }));
         await waitFor(() => expect(screen.queryByText('PO-31 - Supplier A')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getPurchaseOrder).toHaveBeenCalledTimes(1);
     });
-
     it('ignores stale GRN PO line responses after the source changes', async () => {
         const order31 = deferred<PurchaseOrder>();
         const lines31 = deferred<PurchaseOrderLine[]>();
         purchaseApiMocks.getPurchaseOrder.mockImplementation((id: number) => id === 31 ? order31.promise : Promise.resolve(purchaseOrder(32)));
         purchaseApiMocks.getReceivablePurchaseOrderLines.mockImplementation((id: number) => id === 31 ? lines31.promise : Promise.resolve([purchaseOrderLine(402, 'Gadget')]));
-
         renderGoodsReceipt('/purchase/goods-receipts/create?purchase_order_id=31');
         fireEvent.click(screen.getByRole('button', { name: 'Select PO 32' }));
-
         expect(await screen.findByText('PO-32 - Supplier A')).toBeInTheDocument();
         expect(screen.getAllByText('Gadget')).toHaveLength(2);
-
         await act(async () => {
             order31.resolve(purchaseOrder(31));
             lines31.resolve([purchaseOrderLine(401, 'Widget')]);
             await order31.promise;
             await lines31.promise;
         });
-
         expect(screen.queryByText('PO-31 - Supplier A')).not.toBeInTheDocument();
         expect(screen.queryByText('Widget')).not.toBeInTheDocument();
     });
-
     it('loads a Return query GRN once, deduplicates lines, and does not reselect after clear', async () => {
         renderReturn('/purchase/returns/create?goods_receipt_id=77', true);
-
         await waitFor(() => expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(1));
         expect(screen.getByTestId('grn-eligibility')).toHaveTextContent('returnable');
         expect(await screen.findByText('GRN-77')).toBeInTheDocument();
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
-
         fireEvent.click(screen.getByRole('button', { name: 'Clear GRN' }));
         await waitFor(() => expect(screen.queryByText('GRN-77')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getGoodsReceipt).toHaveBeenCalledTimes(1);
     });
-
     it('ignores stale Return GRN responses after the source changes', async () => {
         const receipt77 = deferred<GoodsReceipt>();
         const lines77 = deferred<ReturnableLine[]>();
         purchaseApiMocks.getGoodsReceipt.mockImplementation((id: number) => id === 77 ? receipt77.promise : Promise.resolve(goodsReceipt(78)));
         purchaseApiMocks.getReturnableGoodsReceiptLines.mockImplementation((id: number) => id === 77 ? lines77.promise : Promise.resolve([returnableLine(602, 'Gadget')]));
-
         renderReturn('/purchase/returns/create?goods_receipt_id=77');
         fireEvent.click(screen.getByRole('button', { name: 'Select GRN 78' }));
-
         expect(await screen.findByText('GRN-78')).toBeInTheDocument();
         expect(screen.getAllByText('Gadget')).toHaveLength(2);
-
         await act(async () => {
             receipt77.resolve(goodsReceipt(77));
             lines77.resolve([returnableLine(601, 'Widget')]);
             await receipt77.promise;
             await lines77.promise;
         });
-
         expect(screen.queryByText('GRN-77')).not.toBeInTheDocument();
         expect(screen.queryByText('Widget')).not.toBeInTheDocument();
     });
 });
-
 function renderInvoice(initialEntry: string, strict = false) {
     renderWithRoute(initialEntry, '/purchase/invoices/create', <PurchaseInvoiceCreatePage />, strict);
 }
-
 function renderGoodsReceipt(initialEntry: string, strict = false) {
     renderWithRoute(initialEntry, '/purchase/goods-receipts/create', <GoodsReceiptCreatePage />, strict);
 }
-
 function renderReturn(initialEntry: string, strict = false) {
     renderWithRoute(initialEntry, '/purchase/returns/create', <PurchaseReturnCreatePage />, strict);
 }
-
 function renderWithRoute(initialEntry: string, path: string, element: ReactElement, strict: boolean) {
     const route = (
-        <MemoryRouter initialEntries={[initialEntry]}>
+        <TestRouter initialEntries={[initialEntry]}>
             <Routes>
                 <Route path={path} element={<>{element}<LocationProbe /></>} />
             </Routes>
-        </MemoryRouter>
+        </TestRouter>
     );
-
     render(strict ? <StrictMode>{route}</StrictMode> : route);
 }
-
 function LocationProbe() {
     const location = useLocation();
     return <span data-testid="location-search">{location.search}</span>;
 }
-
 function purchaseOrder(id: number): PurchaseOrder {
     return {
         id,
@@ -292,7 +249,6 @@ function purchaseOrder(id: number): PurchaseOrder {
         adjustments: [],
     };
 }
-
 function purchaseOrderLine(id: number, itemName = 'Widget'): PurchaseOrderLine {
     return {
         id,
@@ -310,7 +266,6 @@ function purchaseOrderLine(id: number, itemName = 'Widget'): PurchaseOrderLine {
         charge_amount: '0.000000',
     };
 }
-
 function goodsReceipt(id: number): GoodsReceipt {
     return {
         id,
@@ -330,7 +285,6 @@ function goodsReceipt(id: number): GoodsReceipt {
         adjustments: [],
     };
 }
-
 function goodsReceiptLine(id: number, itemName = 'Widget'): GoodsReceiptLine {
     return {
         id,
@@ -347,7 +301,6 @@ function goodsReceiptLine(id: number, itemName = 'Widget'): GoodsReceiptLine {
         unit_price: '10.000000',
     };
 }
-
 function returnableLine(id: number, itemName = 'Widget'): ReturnableLine {
     return {
         id,
@@ -359,7 +312,6 @@ function returnableLine(id: number, itemName = 'Widget'): ReturnableLine {
         unit_price: '10.000000',
     };
 }
-
 function deferred<T>() {
     let resolve!: (value: T) => void;
     let reject!: (reason?: unknown) => void;
@@ -367,6 +319,5 @@ function deferred<T>() {
         resolve = promiseResolve;
         reject = promiseReject;
     });
-
     return { promise, resolve, reject };
 }

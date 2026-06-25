@@ -19,8 +19,6 @@ return [
             'path_header_keys' => ['X-Organization-Unit-Path'],
             'name_input_keys' => ['organization_unit_name'],
             'name_header_keys' => ['X-Organization-Unit-Name'],
-            'application_input_keys' => ['application_id', 'app_id', 'client_id'],
-            'application_header_keys' => ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
         ],
     ],
 ];

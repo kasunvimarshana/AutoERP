@@ -13,14 +13,14 @@ return new class extends Migration
         Schema::create('inventory_stock_counts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('count_number', 80);
             $table->date('count_date');
             $table->string('count_type', 30)->default('stock_count');
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
+            $table->foreignId('warehouse_id');
+            $table->foreignId('warehouse_location_id')->nullable();
             $table->string('status', 30)->default('draft');
-            $table->foreignId('inventory_adjustment_id')->nullable()->constrained('inventory_adjustments')->restrictOnDelete();
+            $table->foreignId('inventory_adjustment_id')->nullable();
             $table->text('reason')->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -35,6 +35,37 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_counts_scope_idx');
             $table->index(['warehouse_id', 'warehouse_location_id'], 'inventory_stock_counts_wh_idx');
             $table->index('status', 'inventory_stock_counts_status_idx');
+
+            $table->unique(['id', 'tenant_id'], 'inventory_stock_counts_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_counts_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_id', 'tenant_id'], 'inventory_stock_counts_warehouse_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouses')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_location_id', 'tenant_id'], 'inventory_stock_counts_warehouse_location_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouse_locations')
+                ->restrictOnDelete();
+            $table->foreign(['inventory_adjustment_id', 'tenant_id'], 'inventory_stock_counts_inventory_adjustment_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_adjustments')
+                ->restrictOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'inventory_stock_counts_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'inventory_stock_counts_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['posted_by', 'tenant_id'], 'inventory_stock_counts_posted_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

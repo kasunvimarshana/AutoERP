@@ -6,8 +6,8 @@ namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\CoreModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 
 final class TenantModel extends CoreModel
@@ -15,40 +15,45 @@ final class TenantModel extends CoreModel
     protected $table = 'tenants';
 
     protected $fillable = [
-        'uuid', 'code', 'name', 'slug', 'logo_path', 'cross_org_transactions',
-        'tenant_plan_id', 'base_currency_id', 'status', 'status_reason',
-        'activated_at', 'suspended_at', 'archived_at', 'trial_ends_at',
-        'subscription_ends_at', 'metadata', 'row_version', 'created_by', 'updated_by',
+        'uuid', 'code', 'name', 'slug', 'logo_path',
+        'base_currency_id', 'status', 'status_reason',
+        'activated_at', 'suspended_at', 'archived_at',
+        'row_version', 'created_by', 'updated_by',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'tenant_plan_id' => 'integer',
             'base_currency_id' => 'integer',
-            'cross_org_transactions' => 'boolean',
             'activated_at' => 'datetime',
             'suspended_at' => 'datetime',
             'archived_at' => 'datetime',
-            'trial_ends_at' => 'datetime',
-            'subscription_ends_at' => 'datetime',
-            'metadata' => 'array',
         ]);
-    }
-
-    public function organizationUnits(): HasMany
-    {
-        return $this->hasMany(OrganizationUnitModel::class, 'tenant_id');
-    }
-
-    public function plan(): BelongsTo
-    {
-        return $this->belongsTo(TenantPlanModel::class, 'tenant_plan_id');
     }
 
     public function baseCurrency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'base_currency_id');
+    }
+
+    public function currentSubscription(): HasOne
+    {
+        return $this->hasOne(TenantCurrentSubscriptionModel::class, 'tenant_id');
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(TenantSubscriptionModel::class, 'tenant_id');
+    }
+
+    public function onboardingState(): HasOne
+    {
+        return $this->hasOne(TenantOnboardingStateModel::class, 'tenant_id');
+    }
+
+    public function primaryDomainAssignment(): HasOne
+    {
+        return $this->hasOne(TenantPrimaryDomainModel::class, 'tenant_id');
     }
 
     public function documents(): HasMany

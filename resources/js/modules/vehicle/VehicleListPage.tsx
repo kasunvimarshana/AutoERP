@@ -55,7 +55,9 @@ export default function VehicleListPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         listVehicles({
             search: debouncedSearch,
             status: status || undefined,

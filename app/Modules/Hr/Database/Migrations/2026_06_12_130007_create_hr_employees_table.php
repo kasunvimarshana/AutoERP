@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('hr_employees', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('employee_number');
             $table->string('code')->nullable();
             $table->string('first_name');
@@ -23,10 +23,10 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
             $table->string('mobile')->nullable();
-            $table->foreignId('department_id')->nullable()->constrained('hr_departments')->nullOnDelete();
-            $table->foreignId('designation_id')->nullable()->constrained('hr_designations')->nullOnDelete();
-            $table->foreignId('employment_type_id')->nullable()->constrained('hr_employment_types')->nullOnDelete();
-            $table->foreignId('reporting_manager_id')->nullable()->constrained('hr_employees')->nullOnDelete();
+            $table->foreignId('department_id')->nullable();
+            $table->foreignId('designation_id')->nullable();
+            $table->foreignId('employment_type_id')->nullable();
+            $table->foreignId('reporting_manager_id')->nullable();
             $table->date('joined_date')->nullable();
             $table->date('resigned_date')->nullable();
             $table->date('date_of_birth')->nullable();
@@ -49,6 +49,33 @@ return new class extends Migration
             $table->index('reporting_manager_id');
             $table->index('status');
             $table->index('availability_status');
+
+            $table->unique(['id', 'tenant_id'], 'hr_employees_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_employees_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['department_id', 'tenant_id'], 'hr_employees_department_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_departments')
+                ->restrictOnDelete();
+            $table->foreign(['designation_id', 'tenant_id'], 'hr_employees_designation_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_designations')
+                ->restrictOnDelete();
+            $table->foreign(['employment_type_id', 'tenant_id'], 'hr_employees_employment_type_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employment_types')
+                ->restrictOnDelete();
+            $table->foreign(['reporting_manager_id', 'tenant_id'], 'hr_employees_reporting_manager_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employees')
+                ->restrictOnDelete();
+
+            $table->foreign(['approved_by', 'tenant_id'], 'hr_employees_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

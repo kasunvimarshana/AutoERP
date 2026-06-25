@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class FinanceBankStatementLine extends CoreModel
+final class FinanceBankStatementLine extends TenantOwnedModel
 {
     protected $table = 'finance_bank_statement_lines';
 

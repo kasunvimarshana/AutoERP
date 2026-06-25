@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Tenant\Models;
+
+use Modules\Core\Models\TenantOwnedModel;
+
+final class TenantEventOutboxModel extends TenantOwnedModel
+{
+    protected $table = 'tenant_event_outbox';
+
+    protected $fillable = [
+        'event_uuid',
+        'tenant_id',
+        'event_type',
+        'payload',
+        'status',
+        'attempts',
+        'last_error_code',
+        'last_error_message',
+        'available_at',
+        'claim_token',
+        'claimed_at',
+        'published_at',
+        'dead_at',
+    ];
+
+    protected function casts(): array
+    {
+        return array_merge(parent::casts(), [
+            'tenant_id' => 'integer',
+            'payload' => 'array',
+            'attempts' => 'integer',
+            'available_at' => 'datetime',
+            'claimed_at' => 'datetime',
+            'published_at' => 'datetime',
+            'dead_at' => 'datetime',
+        ]);
+    }
+}

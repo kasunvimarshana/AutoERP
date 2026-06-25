@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { WarehouseLocationForm } from './components/WarehouseLocationForm';
@@ -15,8 +16,8 @@ import type { WarehouseLocation, WarehouseLocationPayload, WarehouseLocationSumm
 export default function WarehouseLocationEditPage() {
     const locationId = Number(useParams().id);
     const auth = useAuth();
-    const canUpdate = hasWarehousePermission(auth.permissions, warehousePermissions.locationsUpdate);
-    const canManageDefault = hasWarehousePermission(auth.permissions, warehousePermissions.locationsManageDefaults);
+    const canUpdate = hasWarehousePermission(auth, warehousePermissions.locationsUpdate);
+    const canManageDefault = hasWarehousePermission(auth, warehousePermissions.locationsManageDefaults);
     const navigate = useNavigate();
     const [location, setLocation] = useState<WarehouseLocation | null>(null);
     const [form, setForm] = useState<WarehouseLocationPayload | null>(null);
@@ -25,10 +26,13 @@ export default function WarehouseLocationEditPage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const formGuard = useMutationFormGuard(saving);
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         getWarehouseLocation(locationId, controller.signal)
             .then((record) => {
                 if (controller.signal.aborted) return;
@@ -50,6 +54,7 @@ export default function WarehouseLocationEditPage() {
         try {
             const payload = canManageDefault ? form : omitDefault(form);
             const updated = await updateWarehouseLocation(locationId, payload);
+            formGuard.markSaved();
             navigate(`/warehouse-locations/${updated.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -70,11 +75,11 @@ export default function WarehouseLocationEditPage() {
                 <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
                     <WarehouseLocationForm
                         value={form}
-                        onChange={setForm}
+                        onChange={(next) => { formGuard.markDirty(); setForm(next); }}
                         warehouse={warehouse}
-                        onWarehouseChange={setWarehouse}
+                        onWarehouseChange={(next) => { formGuard.markDirty(); setWarehouse(next); }}
                         parent={parent}
-                        onParentChange={setParent}
+                        onParentChange={(next) => { formGuard.markDirty(); setParent(next); }}
                         error={error}
                         currentLocationId={locationId}
                         lockWarehouse

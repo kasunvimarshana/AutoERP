@@ -8,34 +8,47 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
-use Modules\Tenant\Constants\TenantPermission;
 use Modules\Tenant\Http\Requests\ListTenantPlanRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantPlanRequest;
 use Modules\Tenant\Http\Resources\TenantPlanResource;
+use Modules\Tenant\Http\Resources\TenantPlanRevisionResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
+use Modules\Tenant\Services\Plans\ActivateTenantPlanService;
 use Modules\Tenant\Services\Plans\CreateTenantPlanService;
-use Modules\Tenant\Services\Plans\DeleteTenantPlanService;
+use Modules\Tenant\Services\Plans\DeactivateTenantPlanService;
 use Modules\Tenant\Services\Plans\GetTenantPlanService;
 use Modules\Tenant\Services\Plans\ListTenantPlansService;
+use Modules\Tenant\Services\Plans\ListTenantPlanRevisionsService;
 use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
-use Modules\Tenant\Services\TenantAuthorizationService;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantPlanController extends Controller
 {
     public function __construct(
-        private readonly TenantAuthorizationService $authorization,
         private readonly ListTenantPlansService $listPlans,
+        private readonly ListTenantPlanRevisionsService $listRevisions,
         private readonly GetTenantPlanService $getPlan,
         private readonly CreateTenantPlanService $createPlan,
         private readonly UpdateTenantPlanService $updatePlan,
-        private readonly DeleteTenantPlanService $deactivatePlan,
+        private readonly DeactivateTenantPlanService $deactivatePlan,
+        private readonly ActivateTenantPlanService $activatePlan,
+        private readonly TenantPlanSchema $schema,
     ) {}
+
+    public function capabilities(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'commercial_modules' => $this->schema->commercialModuleCatalogue(),
+                'always_on_modules' => TenantPlanSchema::ALWAYS_ON_MODULES,
+                'limits' => TenantPlanSchema::SUPPORTED_LIMITS,
+            ],
+        ]);
+    }
 
     public function index(ListTenantPlanRequest $request): JsonResponse
     {
-        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
-
         $result = $this->listPlans->execute($request->validated());
         if ($result->isFailure()) {
             return TenantApiResponder::error($result->errorOrFail());
@@ -52,15 +65,23 @@ final class TenantPlanController extends Controller
 
     public function show(int|string $tenantPlan): JsonResponse|TenantPlanResource
     {
-        $this->requirePermission(TenantPermission::PLATFORM_VIEW);
-
         return $this->planResponse($this->getPlan->execute($tenantPlan));
+    }
+
+    public function revisions(int|string $tenantPlan): JsonResponse
+    {
+        $result = $this->listRevisions->execute($tenantPlan);
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        return response()->json([
+            'data' => TenantPlanRevisionResource::collection($result->valueOrFail())->resolve(),
+        ]);
     }
 
     public function store(UpsertTenantPlanRequest $request): JsonResponse|TenantPlanResource
     {
-        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_PLANS);
-
         $result = $this->createPlan->execute($request->validated());
         if ($result->isFailure()) {
             return TenantApiResponder::error($result->errorOrFail());
@@ -75,8 +96,6 @@ final class TenantPlanController extends Controller
         UpsertTenantPlanRequest $request,
         int|string $tenantPlan,
     ): JsonResponse|TenantPlanResource {
-        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_PLANS);
-
         return $this->planResponse(
             $this->updatePlan->execute($tenantPlan, $request->validated()),
         );
@@ -86,9 +105,17 @@ final class TenantPlanController extends Controller
         TenantVersionRequest $request,
         int|string $tenantPlan,
     ): JsonResponse|TenantPlanResource {
-        $this->requirePermission(TenantPermission::PLATFORM_MANAGE_PLANS);
-
         return $this->planResponse($this->deactivatePlan->execute(
+            $tenantPlan,
+            (int) $request->validated('expected_version'),
+        ));
+    }
+
+    public function activate(
+        TenantVersionRequest $request,
+        int|string $tenantPlan,
+    ): JsonResponse|TenantPlanResource {
+        return $this->planResponse($this->activatePlan->execute(
             $tenantPlan,
             (int) $request->validated('expected_version'),
         ));
@@ -99,14 +126,5 @@ final class TenantPlanController extends Controller
         return $result->isFailure()
             ? TenantApiResponder::error($result->errorOrFail())
             : new TenantPlanResource($result->valueOrFail());
-    }
-
-    private function requirePermission(string $permission): void
-    {
-        abort_unless(
-            $this->authorization->allows($permission),
-            403,
-            'You are not authorized to perform this action.',
-        );
     }
 }

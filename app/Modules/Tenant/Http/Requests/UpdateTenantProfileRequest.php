@@ -20,8 +20,8 @@ final class UpdateTenantProfileRequest extends FormRequest
         return [
             'expected_version' => ['required', 'integer', 'min:1'],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'cross_org_transactions' => ['sometimes', 'boolean'],
+            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.max((int) config('tenant.branding.max_logo_size_kb', 5120), 1)],
+            'remove_logo' => ['sometimes', 'boolean'],
             'base_currency_id' => [
                 'sometimes',
                 'nullable',

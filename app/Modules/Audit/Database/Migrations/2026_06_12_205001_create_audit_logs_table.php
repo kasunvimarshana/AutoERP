@@ -18,8 +18,9 @@ return new class extends Migration
 
             // Deliberately no foreign keys: audit history must survive owner/user lifecycle changes.
             // Scope combinations are validated before append and human-readable snapshots are retained.
-            $table->unsignedBigInteger('tenant_id');
-            $table->string('tenant_name');
+            $table->string('scope_type', 20)->comment('tenant or platform');
+            $table->unsignedBigInteger('tenant_id')->nullable();
+            $table->string('tenant_name')->nullable();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
             $table->string('organization_unit_name')->nullable();
 
@@ -58,7 +59,7 @@ return new class extends Migration
             $table->timestamp('recorded_at')->useCurrent();
 
             $table->index(
-                ['tenant_id', 'organization_unit_id', 'occurred_at', 'id'],
+                ['scope_type', 'tenant_id', 'organization_unit_id', 'occurred_at', 'id'],
                 'audit_logs_scope_time_idx',
             );
             $table->index(

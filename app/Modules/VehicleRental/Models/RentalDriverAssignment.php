@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\VehicleRental\Enums\RentalDriverAssignmentStatus;
 use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 
-final class RentalDriverAssignment extends CoreModel
+final class RentalDriverAssignment extends TenantOwnedModel
 {
     use ScopesRentalContext;
     protected $table = 'rental_driver_assignments';

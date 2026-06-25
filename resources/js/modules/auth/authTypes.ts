@@ -1,9 +1,12 @@
+import type { AuthMode } from '@/shared/api/authSessionStorage';
+
 export interface AuthUser {
     id: number | string;
     name: string | null;
     email: string | null;
     roles?: string[];
     permissions?: string[];
+    is_platform_operator?: boolean;
 }
 
 export interface AuthTenant {
@@ -20,7 +23,6 @@ export interface AuthOrganizationUnit {
 
 export interface AuthSession {
     token: string;
-    refresh_token?: string | null;
     token_type: 'Bearer' | string;
     session_id?: number | null;
     user: AuthUser;
@@ -29,6 +31,7 @@ export interface AuthSession {
     roles?: string[];
     permissions?: string[];
     enabled_modules?: string[] | null;
+    is_platform_operator?: boolean;
 }
 
 export interface CurrentUserResponse {
@@ -38,12 +41,26 @@ export interface CurrentUserResponse {
     roles?: string[];
     permissions?: string[];
     enabled_modules?: string[] | null;
+    is_platform_operator?: boolean;
 }
 
 export interface LoginPayload {
+    auth_mode: AuthMode;
     login_identifier: string;
     password: string;
     tenant_code?: string | null;
     organization_unit_id?: number | null;
     device_name?: string | null;
+    totp_code?: string | null;
+    backup_code?: string | null;
+}
+
+export interface PlatformMfaEnrollment {
+    secret: string;
+    provisioning_uri: string;
+}
+
+export interface PlatformMfaConfirmation {
+    enabled: true;
+    backup_codes: string[];
 }

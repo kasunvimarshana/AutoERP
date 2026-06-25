@@ -58,11 +58,13 @@ final class FinanceHardeningTest extends TestCase
             'is_active' => true,
         ]);
         FinancePostingProfileRule::query()->create([
+            'tenant_id' => (int) $profile->tenant_id,
             'posting_profile_id' => $profile->getKey(),
             'line_key' => 'cash',
             'account_id' => $cash->getKey(),
         ]);
         FinancePostingProfileRule::query()->create([
+            'tenant_id' => (int) $profile->tenant_id,
             'posting_profile_id' => $profile->getKey(),
             'line_key' => 'capital',
             'account_id' => $capital->getKey(),

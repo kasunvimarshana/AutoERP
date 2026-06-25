@@ -1,10 +1,11 @@
 import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiCollection } from '@/shared/types/api';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
+import { TestRouter } from '@/test/TestRouter';
 import { PurchasePaymentCreateForm } from './PurchasePaymentCreateForm';
 
 const purchaseApiMocks = vi.hoisted(() => ({
@@ -69,9 +70,9 @@ describe('PurchasePaymentCreateForm', () => {
 
     it('auto-loads paginated outstanding invoices after selecting a supplier', async () => {
         render(
-            <MemoryRouter initialEntries={['/purchase/payments/create']}>
+            <TestRouter initialEntries={['/purchase/payments/create']}>
                 <PurchasePaymentCreateForm />
-            </MemoryRouter>,
+            </TestRouter>,
         );
 
         expect(screen.queryByRole('button', { name: /load outstanding invoices/i })).not.toBeInTheDocument();
@@ -90,9 +91,9 @@ describe('PurchasePaymentCreateForm', () => {
 
     it('previews a purchase payment without creating it', async () => {
         render(
-            <MemoryRouter initialEntries={['/purchase/payments/prepare']}>
+            <TestRouter initialEntries={['/purchase/payments/prepare']}>
                 <PurchasePaymentCreateForm mode="prepare" />
-            </MemoryRouter>,
+            </TestRouter>,
         );
 
         const user = userEvent.setup();
@@ -122,9 +123,9 @@ describe('PurchasePaymentCreateForm', () => {
     it('loads an initial invoice source once under StrictMode', async () => {
         render(
             <StrictMode>
-                <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+                <TestRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
                     <PurchasePaymentCreateForm />
-                </MemoryRouter>
+                </TestRouter>
             </StrictMode>,
         );
 
@@ -140,11 +141,11 @@ describe('PurchasePaymentCreateForm', () => {
             .mockResolvedValueOnce(invoice(43, 'SI-43', '200.000000'));
 
         render(
-            <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+            <TestRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
                 <Routes>
                     <Route path="/purchase/payments/create" element={<PaymentQueryHarness />} />
                 </Routes>
-            </MemoryRouter>,
+            </TestRouter>,
         );
 
         expect(await screen.findByText('Loaded supplier invoice SI-42.')).toBeInTheDocument();
@@ -161,11 +162,11 @@ describe('PurchasePaymentCreateForm', () => {
             .mockResolvedValueOnce(invoice(43, 'SI-43', '200.000000'));
 
         render(
-            <MemoryRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
+            <TestRouter initialEntries={['/purchase/payments/create?invoice_id=42']}>
                 <Routes>
                     <Route path="/purchase/payments/create" element={<PaymentQueryHarness />} />
                 </Routes>
-            </MemoryRouter>,
+            </TestRouter>,
         );
 
         await userEvent.click(screen.getByRole('button', { name: 'Load invoice 43' }));

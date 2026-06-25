@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('inventory_stock_balances', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('item_id')->constrained('items')->restrictOnDelete();
-            $table->foreignId('base_uom_id')->nullable()->constrained('unit_of_measures')->restrictOnDelete();
-            $table->foreignId('item_variant_id')->nullable()->constrained('item_variants')->restrictOnDelete();
-            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
-            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations')->restrictOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('inventory_batches')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('item_id');
+            $table->foreignId('base_uom_id')->nullable();
+            $table->foreignId('item_variant_id')->nullable();
+            $table->foreignId('warehouse_id');
+            $table->foreignId('warehouse_location_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
             $table->char('dimension_key', 64);
             $table->decimal('quantity_on_hand', 20, 6)->default('0.000000');
             $table->decimal('quantity_reserved', 20, 6)->default('0.000000');
@@ -41,6 +41,36 @@ return new class extends Migration
             $table->index('warehouse_id', 'inventory_stock_balances_warehouse_idx');
             $table->index('warehouse_location_id', 'inventory_stock_balances_location_idx');
             $table->index('batch_id', 'inventory_stock_balances_batch_idx');
+
+            $table->unique(['id', 'tenant_id'], 'inventory_stock_balances_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_balances_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['item_id', 'tenant_id'], 'inventory_stock_balances_item_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('items')
+                ->restrictOnDelete();
+            $table->foreign(['base_uom_id', 'tenant_id'], 'inventory_stock_balances_base_uom_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('unit_of_measures')
+                ->restrictOnDelete();
+            $table->foreign(['item_variant_id', 'tenant_id'], 'inventory_stock_balances_item_variant_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('item_variants')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_id', 'tenant_id'], 'inventory_stock_balances_warehouse_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouses')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_location_id', 'tenant_id'], 'inventory_stock_balances_warehouse_location_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouse_locations')
+                ->restrictOnDelete();
+            $table->foreign(['batch_id', 'tenant_id'], 'inventory_stock_balances_batch_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batches')
+                ->restrictOnDelete();
         });
     }
 

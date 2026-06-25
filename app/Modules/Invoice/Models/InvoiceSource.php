@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
-final class InvoiceSource extends CoreModel
+final class InvoiceSource extends TenantOwnedModel
 {
     protected $table = 'invoice_sources';
 

@@ -51,3 +51,42 @@ Route::prefix('api/user')
         Route::apiResource('user-documents', UserDocumentController::class);
         Route::apiResource('user-devices', UserDeviceController::class);
     });
+
+$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
+$platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
+$platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
+$platformStepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
+
+Route::prefix('api/v1/platform/operators')
+    ->middleware([
+        'api',
+        $platformHost,
+        'auth:'.$platformGuard,
+        $currentUserMiddleware,
+        $platformOperator,
+    ])
+    ->name('api.v1.platform.operators.')
+    ->group(function () use ($platformStepUp): void {
+        Route::get('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'index'])
+            ->middleware('platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_VIEW)
+            ->name('index');
+        Route::get('{operator}', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'show'])
+            ->whereNumber('operator')
+            ->middleware('platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_VIEW)
+            ->name('show');
+        Route::post('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'store'])
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('store');
+        Route::put('{operator}/permissions', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'permissions'])
+            ->whereNumber('operator')
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('permissions');
+        Route::patch('{operator}/activate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'activate'])
+            ->whereNumber('operator')
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('activate');
+        Route::patch('{operator}/deactivate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'deactivate'])
+            ->whereNumber('operator')
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('deactivate');
+    });

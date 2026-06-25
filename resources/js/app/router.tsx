@@ -1,16 +1,16 @@
-import { lazy, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy } from "react";
+import { Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
-import { PermissionRoute } from "@/modules/auth/PermissionRoute";
+import { PlatformLayout } from "./layout/PlatformLayout";
+import { PositiveIntegerRouteParamsBoundary } from "./routing/PositiveIntegerRouteParamsBoundary";
+import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "./routePaths";
 import { ProtectedRoute } from "@/modules/auth/ProtectedRoute";
-import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
-import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
-import { paymentPermissions } from "@/modules/payment/paymentPermissions";
-import { vehicleRentalPermissions } from "@/modules/vehicle-rental/vehicleRentalPermissions";
-import { auditPermissions } from "@/modules/audit/auditPermissions";
-import { settingsPermissions } from "@/modules/settings/settingsPermissions";
-import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
-import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
+import { TenantRoute } from "@/modules/auth/TenantRoute";
+import { TenantEntitlementRoute } from "@/modules/auth/TenantEntitlementRoute";
+import { AuthenticatedHomeRedirect } from "@/modules/auth/AuthenticatedHomeRedirect";
+import { PlatformOperatorRoute } from "@/modules/auth/PlatformOperatorRoute";
+import { PermissionRoute } from "@/modules/auth/PermissionRoute";
+import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -31,11 +31,15 @@ const PermissionCataloguePage = lazy(
     () => import("@/modules/access/PermissionCataloguePage"),
 );
 const SettingsPage = lazy(() => import("@/modules/settings/SettingsPage"));
-const PlatformDefaultsPage = lazy(() => import("@/modules/settings/PlatformDefaultsPage"));
 const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceDataPage"));
 const TenantWorkspacePage = lazy(() => import("@/modules/tenant/TenantWorkspacePage"));
 const PlatformTenantsPage = lazy(() => import("@/modules/tenant/PlatformTenantsPage"));
 const TenantPlansPage = lazy(() => import("@/modules/tenant/TenantPlansPage"));
+const PlatformOperatorsPage = lazy(() => import("@/modules/platform-administration/PlatformOperatorsPage"));
+const PlatformSecurityPage = lazy(() => import("@/modules/platform-administration/PlatformSecurityPage"));
+const PlatformAuditPage = lazy(() => import("@/modules/platform-administration/PlatformAuditPage"));
+const PlatformAuditDetailPage = lazy(() => import("@/modules/platform-administration/PlatformAuditDetailPage"));
+const PlatformHealthPage = lazy(() => import("@/modules/platform-administration/PlatformHealthPage"));
 const UomListPage = lazy(() => import("@/modules/uom/UomListPage"));
 const UomCreatePage = lazy(() => import("@/modules/uom/UomCreatePage"));
 const UomEditPage = lazy(() => import("@/modules/uom/UomEditPage"));
@@ -440,908 +444,720 @@ const RentalReportsPage = lazy(
 );
 const NotFoundPage = lazy(() => import("@/modules/not-found/NotFoundPage"));
 
-function requirePermission(permission: string, element: ReactNode) {
-    return <PermissionRoute permission={permission}>{element}</PermissionRoute>;
-}
 
-export function AppRouter() {
-    return (
-        <Routes>
+const appRouter = createBrowserRouter(
+    createRoutesFromElements(
+        <>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                    <Route
-                        index
-                        element={<Navigate to="/dashboard" replace />}
-                    />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/access/users" element={<UserListPage />} />
-                    <Route
-                        path="/access/users/create"
-                        element={<CreateUserPage />}
-                    />
-                    <Route
-                        path="/access/users/:id/edit"
-                        element={<UserEditPage />}
-                    />
-                    <Route
-                        path="/access/users/:id"
-                        element={<UserDetailPage />}
-                    />
-                    <Route path="/access/roles" element={<RoleListPage />} />
-                    <Route
-                        path="/access/roles/create"
-                        element={<RoleCreatePage />}
-                    />
-                    <Route
-                        path="/access/roles/:id/edit"
-                        element={<RoleEditPage />}
-                    />
-                    <Route
-                        path="/access/roles/:id"
-                        element={<RoleDetailPage />}
-                    />
-                    <Route
-                        path="/access/permissions"
-                        element={<PermissionCataloguePage />}
-                    />
-                    <Route
-                        path="/administration/access"
-                        element={<AccessOverviewPage />}
-                    />
-                    <Route
-                        path="/administration/audit-logs"
-                        element={requirePermission(auditPermissions.view, <AuditLogListPage />)}
-                    />
-                    <Route
-                        path="/administration/audit-logs/:id"
-                        element={requirePermission(auditPermissions.view, <AuditLogDetailPage />)}
-                    />
-                    <Route path="/settings" element={requirePermission(settingsPermissions.view, <SettingsPage />)} />
-                    <Route
-                        path="/administration/platform-defaults"
-                        element={requirePermission(settingsPermissions.platformDefaultsView, <PlatformDefaultsPage />)}
-                    />
-                    <Route
-                        path="/reference-data"
-                        element={requirePermission(referenceDataPermissions.view, <ReferenceDataPage />)}
-                    />
-                    <Route
-                        path="/administration/tenant"
-                        element={requirePermission(tenantPermissions.profileView, <TenantWorkspacePage />)}
-                    />
-                    <Route
-                        path="/administration/saas-tenants"
-                        element={requirePermission(tenantPermissions.platformView, <PlatformTenantsPage />)}
-                    />
-                    <Route
-                        path="/administration/tenant-plans"
-                        element={requirePermission(tenantPermissions.platformManagePlans, <TenantPlansPage />)}
-                    />
-                    <Route path="/uoms" element={<UomListPage />} />
-                    <Route path="/uoms/create" element={<UomCreatePage />} />
-                    <Route path="/uoms/:id/edit" element={<UomEditPage />} />
-                    <Route path="/uoms/:id" element={<UomDetailPage />} />
-                    <Route
-                        path="/uom-conversions"
-                        element={<UomConversionListPage />}
-                    />
-                    <Route
-                        path="/uom-conversions/create"
-                        element={<UomConversionForm />}
-                    />
-                    <Route
-                        path="/uom-conversions/:id/edit"
-                        element={<UomConversionForm />}
-                    />
-                    <Route path="/uom-convert" element={<UomConvertTool />} />
-                    <Route
-                        path="/suppliers"
-                        element={requirePermission(
-                            "suppliers.view",
-                            <SupplierListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/suppliers/create"
-                        element={requirePermission(
-                            "suppliers.create",
-                            <SupplierCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/suppliers/:id/edit"
-                        element={requirePermission(
-                            "suppliers.update",
-                            <SupplierEditPage />,
-                        )}
-                    />
-                    <Route
-                        path="/suppliers/:id"
-                        element={requirePermission(
-                            "suppliers.view",
-                            <SupplierDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/supplier-vehicles"
-                        element={requirePermission(
-                            "supplier-vehicles.view",
-                            <SupplierVehicleListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/supplier-vehicles/create"
-                        element={requirePermission(
-                            "supplier-vehicles.create",
-                            <SupplierVehicleFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/supplier-vehicles/:id/edit"
-                        element={requirePermission(
-                            "supplier-vehicles.update",
-                            <SupplierVehicleFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customers"
-                        element={requirePermission(
-                            "customers.view",
-                            <CustomerListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customers/create"
-                        element={requirePermission(
-                            "customers.create",
-                            <CustomerCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/customers/:id/edit"
-                        element={requirePermission(
-                            "customers.update",
-                            <CustomerEditPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customers/:id"
-                        element={requirePermission(
-                            "customers.view",
-                            <CustomerDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customer-vehicles"
-                        element={requirePermission(
-                            "customer-vehicles.view",
-                            <CustomerVehicleListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customer-vehicles/create"
-                        element={requirePermission(
-                            "customer-vehicles.create",
-                            <CustomerVehicleFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/customer-vehicles/:id/edit"
-                        element={requirePermission(
-                            "customer-vehicles.update",
-                            <CustomerVehicleFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicles/makes"
-                        element={<VehicleMasterDataPage kind="makes" />}
-                    />
-                    <Route
-                        path="/vehicles/types"
-                        element={<VehicleMasterDataPage kind="types" />}
-                    />
-                    <Route
-                        path="/vehicles/categories"
-                        element={<VehicleMasterDataPage kind="categories" />}
-                    />
-                    <Route
-                        path="/vehicles/models"
-                        element={<VehicleMasterDataPage kind="models" />}
-                    />
-                    <Route path="/vehicles" element={<VehicleListPage />} />
-                    <Route
-                        path="/vehicles/create"
-                        element={<VehicleCreatePage />}
-                    />
-                    <Route
-                        path="/vehicles/:id/edit"
-                        element={<VehicleEditPage />}
-                    />
-                    <Route
-                        path="/vehicles/:id"
-                        element={<VehicleDetailPage />}
-                    />
-                    <Route path="/items" element={<ItemListPage />} />
-                    <Route path="/items/create" element={<ItemCreatePage />} />
-                    <Route path="/items/:id/edit" element={<ItemEditPage />} />
-                    <Route path="/items/:id" element={<ItemDetailPage />} />
-                    <Route
-                        path="/item-categories"
-                        element={<ItemCategoryListPage />}
-                    />
-                    <Route
-                        path="/item-categories/create"
-                        element={<ItemCategoryCreatePage />}
-                    />
-                    <Route
-                        path="/item-categories/:id/edit"
-                        element={<ItemCategoryEditPage />}
-                    />
-                    <Route
-                        path="/item-categories/:id"
-                        element={<ItemCategoryDetailPage />}
-                    />
-                    <Route
-                        path="/item-brands"
-                        element={<ItemBrandListPage />}
-                    />
-                    <Route
-                        path="/item-brands/create"
-                        element={<ItemBrandCreatePage />}
-                    />
-                    <Route
-                        path="/item-brands/:id/edit"
-                        element={<ItemBrandEditPage />}
-                    />
-                    <Route
-                        path="/item-brands/:id"
-                        element={<ItemBrandDetailPage />}
-                    />
-                    <Route path="/inventory" element={<InventoryPage />} />
-                    <Route path="/warehouses" element={<WarehouseListPage />} />
-                    <Route
-                        path="/warehouses/create"
-                        element={<WarehouseCreatePage />}
-                    />
-                    <Route
-                        path="/warehouses/:id/edit"
-                        element={<WarehouseEditPage />}
-                    />
-                    <Route
-                        path="/warehouses/:id"
-                        element={<WarehouseDetailPage />}
-                    />
-                    <Route
-                        path="/warehouse-locations"
-                        element={<WarehouseLocationListPage />}
-                    />
-                    <Route
-                        path="/warehouse-locations/create"
-                        element={<WarehouseLocationCreatePage />}
-                    />
-                    <Route
-                        path="/warehouse-locations/:id/edit"
-                        element={<WarehouseLocationEditPage />}
-                    />
-                    <Route
-                        path="/warehouse-locations/:id"
-                        element={<WarehouseLocationDetailPage />}
-                    />
-                    <Route
-                        path="/purchase/fast-purchase"
-                        element={requirePermission(
-                            purchasePermissions.fastPurchasesView,
-                            <FastPurchasePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/orders"
-                        element={requirePermission(
-                            purchasePermissions.ordersView,
-                            <PurchaseOrderListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/orders/create"
-                        element={requirePermission(
-                            purchasePermissions.ordersCreate,
-                            <PurchaseOrderFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/orders/:id/edit"
-                        element={requirePermission(
-                            purchasePermissions.ordersUpdate,
-                            <PurchaseOrderFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/orders/:id"
-                        element={requirePermission(
-                            purchasePermissions.ordersView,
-                            <PurchaseOrderDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/goods-receipts"
-                        element={requirePermission(
-                            purchasePermissions.goodsReceiptsView,
-                            <GoodsReceiptListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/goods-receipts/create"
-                        element={requirePermission(
-                            purchasePermissions.goodsReceiptsCreate,
-                            <GoodsReceiptCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/goods-receipts/:id"
-                        element={requirePermission(
-                            purchasePermissions.goodsReceiptsView,
-                            <GoodsReceiptDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/returns"
-                        element={requirePermission(
-                            purchasePermissions.returnsView,
-                            <PurchaseReturnListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/returns/create"
-                        element={requirePermission(
-                            purchasePermissions.returnsCreate,
-                            <PurchaseReturnCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/returns/:id"
-                        element={requirePermission(
-                            purchasePermissions.returnsView,
-                            <PurchaseReturnDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/manual-supplier-returns/create"
-                        element={requirePermission(
-                            purchasePermissions.returnsCreateManual,
-                            <ManualSupplierReturnCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/invoices"
-                        element={requirePermission(
-                            purchasePermissions.supplierInvoicesView,
-                            <PurchaseInvoiceListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/invoices/create"
-                        element={requirePermission(
-                            purchasePermissions.supplierInvoicesCreate,
-                            <PurchaseInvoiceCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/payments"
-                        element={requirePermission(
-                            purchasePermissions.paymentsView,
-                            <PurchasePaymentWorkspacePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/payments/create"
-                        element={requirePermission(
-                            purchasePermissions.paymentsExecute,
-                            <PurchasePaymentCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/payments/prepare"
-                        element={requirePermission(
-                            purchasePermissions.paymentsExecute,
-                            <PurchasePaymentPreparePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/debit-notes"
-                        element={requirePermission(
-                            purchasePermissions.debitNotesView,
-                            <PurchaseDebitNoteListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/debit-notes/create"
-                        element={requirePermission(
-                            purchasePermissions.debitNotesCreate,
-                            <PurchaseDebitNoteCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/purchase/debit-notes/:id"
-                        element={requirePermission(
-                            purchasePermissions.debitNotesView,
-                            <PurchaseDebitNoteDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/sales/quotations"
-                        element={<SalesDocumentListPage kind="quotation" />}
-                    />
-                    <Route
-                        path="/sales/quotations/create"
-                        element={<SalesDocumentFormPage kind="quotation" />}
-                    />
-                    <Route
-                        path="/sales/quotations/:id/edit"
-                        element={<SalesDocumentFormPage kind="quotation" />}
-                    />
-                    <Route
-                        path="/sales/quotations/:id"
-                        element={<SalesDocumentDetailPage kind="quotation" />}
-                    />
-                    <Route
-                        path="/sales/fast-sales"
-                        element={<FastSalesPage />}
-                    />
-                    <Route
-                        path="/sales/orders"
-                        element={<SalesDocumentListPage kind="order" />}
-                    />
-                    <Route
-                        path="/sales/orders/create"
-                        element={<SalesDocumentFormPage kind="order" />}
-                    />
-                    <Route
-                        path="/sales/orders/:id/edit"
-                        element={<SalesDocumentFormPage kind="order" />}
-                    />
-                    <Route
-                        path="/sales/orders/:id"
-                        element={<SalesDocumentDetailPage kind="order" />}
-                    />
-                    <Route
-                        path="/sales/allocations"
-                        element={<SalesAllocationListPage />}
-                    />
-                    <Route
-                        path="/sales/allocations/create"
-                        element={<SalesAllocationCreatePage />}
-                    />
-                    <Route
-                        path="/sales/allocations/:id"
-                        element={<SalesAllocationDetailPage />}
-                    />
-                    <Route
-                        path="/sales/deliveries"
-                        element={<SalesDeliveryListPage />}
-                    />
-                    <Route
-                        path="/sales/deliveries/create"
-                        element={<SalesDeliveryCreatePage />}
-                    />
-                    <Route
-                        path="/sales/invoices/create"
-                        element={<SalesInvoiceCreatePage />}
-                    />
-                    <Route
-                        path="/sales/payments/prepare"
-                        element={<SalesPaymentPreparePage />}
-                    />
-                    <Route
-                        path="/sales/returns"
-                        element={<SalesReturnListPage />}
-                    />
-                    <Route
-                        path="/sales/returns/create"
-                        element={<SalesReturnCreatePage />}
-                    />
-                    <Route
-                        path="/sales/credit-notes"
-                        element={<SalesCreditNotePage />}
-                    />
-                    <Route path="/invoices" element={<InvoiceListPage />} />
-                    <Route
-                        path="/invoices/:id"
-                        element={<InvoiceDetailPage />}
-                    />
-                    <Route
-                        path="/payments"
-                        element={requirePermission(
-                            paymentPermissions.view,
-                            <PaymentListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/create"
-                        element={requirePermission(
-                            paymentPermissions.create,
-                            <PaymentEntryPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/methods"
-                        element={requirePermission(
-                            paymentPermissions.methodsView,
-                            <PaymentMethodListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/methods/create"
-                        element={requirePermission(
-                            paymentPermissions.methodsCreate,
-                            <PaymentMethodFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/methods/:id/edit"
-                        element={requirePermission(
-                            paymentPermissions.methodsUpdate,
-                            <PaymentMethodFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/cheque-templates"
-                        element={requirePermission(
-                            paymentPermissions.templatesView,
-                            <ChequeTemplateListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/cheque-templates/create"
-                        element={requirePermission(
-                            paymentPermissions.templatesCreate,
-                            <ChequeTemplateFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/cheque-templates/:id/edit"
-                        element={requirePermission(
-                            paymentPermissions.templatesUpdate,
-                            <ChequeTemplateFormPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/:paymentId/lines/:lineId/cheque-print"
-                        element={requirePermission(
-                            paymentPermissions.chequesPreview,
-                            <ChequePrintPreviewPage />,
-                        )}
-                    />
-                    <Route
-                        path="/payments/:id"
-                        element={requirePermission(
-                            paymentPermissions.view,
-                            <PaymentDetailPage />,
-                        )}
-                    />
-                    <Route path="/vouchers" element={<VoucherListPage />} />
-                    <Route
-                        path="/vouchers/:voucherType/:sourceId"
-                        element={<VoucherDetailPage />}
-                    />
-                    <Route
-                        path="/finance/accounts"
-                        element={<FinanceAccountsPage />}
-                    />
-                    <Route
-                        path="/finance/accounts/create"
-                        element={<FinanceAccountCreatePage />}
-                    />
-                    <Route
-                        path="/finance/accounts/:id/edit"
-                        element={<FinanceAccountEditPage />}
-                    />
-                    <Route
-                        path="/finance/accounts/:id"
-                        element={<FinanceAccountDetailPage />}
-                    />
-                    <Route
-                        path="/finance/journals"
-                        element={<FinanceJournalsPage />}
-                    />
-                    <Route
-                        path="/finance/journals/create"
-                        element={<FinanceJournalCreatePage />}
-                    />
-                    <Route
-                        path="/finance/journals/:id/edit"
-                        element={<FinanceJournalEditPage />}
-                    />
-                    <Route
-                        path="/finance/journals/:id"
-                        element={<FinanceJournalDetailPage />}
-                    />
-                    <Route
-                        path="/finance/ledger"
-                        element={<LedgerReportPage />}
-                    />
-                    <Route
-                        path="/finance/trial-balance"
-                        element={<TrialBalanceReportPage />}
-                    />
-                    <Route
-                        path="/finance/account-balances"
-                        element={<AccountBalanceReportPage />}
-                    />
-                    <Route
-                        path="/finance/posting-profiles"
-                        element={<PostingProfilePage />}
-                    />
-                    <Route
-                        path="/finance/fiscal-periods"
-                        element={<FiscalPeriodsPage />}
-                    />
-                    <Route
-                        path="/finance/reversals"
-                        element={<FinanceReversalsPage />}
-                    />
-                    <Route
-                        path="/finance/reports"
-                        element={<FinanceReportsPage />}
-                    />
-                    <Route
-                        path="/finance/bank-reconciliations"
-                        element={<BankReconciliationPage />}
-                    />
-                    <Route path="/finance/budgets" element={<BudgetPage />} />
-                    <Route path="/tax/taxes" element={<TaxListPage />} />
-                    <Route
-                        path="/tax/taxes/create"
-                        element={<TaxCreatePage />}
-                    />
-                    <Route
-                        path="/tax/taxes/:id/edit"
-                        element={<TaxEditPage />}
-                    />
-                    <Route path="/tax/groups" element={<TaxGroupPage />} />
-                    <Route
-                        path="/tax/customer-profiles"
-                        element={<CustomerTaxProfilePage />}
-                    />
-                    <Route
-                        path="/tax/supplier-profiles"
-                        element={<SupplierTaxProfilePage />}
-                    />
-                    <Route
-                        path="/tax/posting-profiles"
-                        element={<TaxPostingProfilePage />}
-                    />
-                    <Route path="/tax/reports" element={<TaxReportPages />} />
-                    <Route
-                        path="/reports"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <ReportListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/purchase/detailed"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <OperationalReportPage
-                                reportKey="purchase/detailed"
-                                kind="purchase"
-                            />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/vehicle-service/detailed"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <OperationalReportPage
-                                reportKey="vehicle-service/detailed"
-                                kind="vehicle-service"
-                            />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/vehicle-service/employee-incentives"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <OperationalReportPage
-                                reportKey="vehicle-service/employee-incentives"
-                                kind="employee-incentive"
-                            />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/vehicle-service/technician-work"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <TechnicianWorkReportPage />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/vehicle-service/employee-commissions"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <EmployeeCommissionReportPage />,
-                        )}
-                    />
-                    <Route
-                        path="/reports/:key"
-                        element={requirePermission(
-                            reportingPermissions.view,
-                            <ReportPage />,
-                        )}
-                    />
-                    <Route
-                        path="/hr/employees"
-                        element={<EmployeeListPage />}
-                    />
-                    <Route
-                        path="/hr/employees/create"
-                        element={<EmployeeCreatePage />}
-                    />
-                    <Route
-                        path="/hr/employees/:id/edit"
-                        element={<EmployeeEditPage />}
-                    />
-                    <Route
-                        path="/hr/employees/:id"
-                        element={<EmployeeDetailPage />}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs"
-                        element={<VehicleServiceJobListPage />}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs/create"
-                        element={<VehicleServiceJobCreatePage />}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs/:id/edit"
-                        element={<VehicleServiceJobEditPage />}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs/:id/invoice"
-                        element={<VehicleServiceInvoiceCreatePage />}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs/:id/payment"
-                        element={requirePermission(
-                            paymentPermissions.create,
-                            <VehicleServicePaymentPreparePage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-service/jobs/:id"
-                        element={<VehicleServiceJobDetailPage />}
-                    />
-                    <Route
-                        path="/vehicle-rental"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalDashboardPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/reservations"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalReservationListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/reservations/create"
-                        element={requirePermission(
-                            vehicleRentalPermissions.reservationsManage,
-                            <RentalReservationCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/reservations/:id"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalReservationDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/agreements"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalAgreementListPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/agreements/create"
-                        element={requirePermission(
-                            vehicleRentalPermissions.agreementsManage,
-                            <RentalAgreementCreatePage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/agreements/:id"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalAgreementDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/allocations"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalAllocationPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/allocations/:id"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalAllocationDetailPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/allocations/:id/replacement"
-                        element={requirePermission(
-                            vehicleRentalPermissions.replacementsManage,
-                            <RentalReplacementPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/custody"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalCustodyPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/running-chart"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalRunningChartPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/expenses"
-                        element={requirePermission(
-                            vehicleRentalPermissions.financialView,
-                            <RentalExpensePage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/billing"
-                        element={requirePermission(
-                            vehicleRentalPermissions.financialView,
-                            <RentalBillingPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/deposits"
-                        element={requirePermission(
-                            vehicleRentalPermissions.financialView,
-                            <RentalDepositPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/finance-agreements"
-                        element={requirePermission(
-                            vehicleRentalPermissions.financialView,
-                            <VehicleFinancePage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/availability"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <VehicleAvailabilityPage />,
-                        )}
-                    />
-                    <Route
-                        path="/vehicle-rental/reports"
-                        element={requirePermission(
-                            vehicleRentalPermissions.view,
-                            <RentalReportsPage />,
-                        )}
-                    />
-                    <Route path="*" element={<NotFoundPage />} />
+                <Route index element={<AuthenticatedHomeRedirect />} />
+                <Route element={<PlatformOperatorRoute />}>
+                    <Route element={<PlatformLayout />}>
+                        <Route path={PLATFORM_HOME_PATH} element={<PermissionRoute permission={PLATFORM_PERMISSION.tenantsView}><PlatformTenantsPage /></PermissionRoute>} />
+                        <Route path="/administration/tenant-plans" element={<PermissionRoute permission={PLATFORM_PERMISSION.plansView}><TenantPlansPage /></PermissionRoute>} />
+                        <Route
+                            path="/administration/platform-configuration"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.configurationView}><SettingsPage mode="platform" /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-operators"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.operatorsView}><PlatformOperatorsPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-security"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.sessionsView}><PlatformSecurityPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-audit"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.auditView}><PlatformAuditPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-audit/:id"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.auditView}><PlatformAuditDetailPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/administration/platform-health"
+                            element={<PermissionRoute permission={PLATFORM_PERMISSION.healthView}><PlatformHealthPage /></PermissionRoute>}
+                        />
+                    </Route>
+                </Route>
+                <Route element={<TenantRoute />}>
+                    <Route element={<AppLayout />}>
+                        <Route element={<TenantEntitlementRoute />}>
+                            <Route element={<PositiveIntegerRouteParamsBoundary />}>
+                        <Route path={DASHBOARD_PATH} element={<DashboardPage />} />
+                        <Route path="/access/users" element={<UserListPage />} />
+                        <Route
+                            path="/access/users/create"
+                            element={<CreateUserPage />}
+                        />
+                        <Route
+                            path="/access/users/:id/edit"
+                            element={<UserEditPage />}
+                        />
+                        <Route
+                            path="/access/users/:id"
+                            element={<UserDetailPage />}
+                        />
+                        <Route path="/access/roles" element={<RoleListPage />} />
+                        <Route
+                            path="/access/roles/create"
+                            element={<RoleCreatePage />}
+                        />
+                        <Route
+                            path="/access/roles/:id/edit"
+                            element={<RoleEditPage />}
+                        />
+                        <Route
+                            path="/access/roles/:id"
+                            element={<RoleDetailPage />}
+                        />
+                        <Route
+                            path="/access/permissions"
+                            element={<PermissionCataloguePage />}
+                        />
+                        <Route
+                            path="/administration/access"
+                            element={<AccessOverviewPage />}
+                        />
+                        <Route
+                            path="/administration/audit-logs"
+                            element={<AuditLogListPage />}
+                        />
+                        <Route
+                            path="/administration/audit-logs/:id"
+                            element={<AuditLogDetailPage />}
+                        />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route
+                            path="/reference-data"
+                            element={<ReferenceDataPage />}
+                        />
+                        <Route
+                            path="/administration/tenant"
+                            element={<TenantWorkspacePage />}
+                        />
+                        <Route path="/uoms" element={<UomListPage />} />
+                        <Route path="/uoms/create" element={<UomCreatePage />} />
+                        <Route path="/uoms/:id/edit" element={<UomEditPage />} />
+                        <Route path="/uoms/:id" element={<UomDetailPage />} />
+                        <Route
+                            path="/uom-conversions"
+                            element={<UomConversionListPage />}
+                        />
+                        <Route
+                            path="/uom-conversions/create"
+                            element={<UomConversionForm />}
+                        />
+                        <Route
+                            path="/uom-conversions/:id/edit"
+                            element={<UomConversionForm />}
+                        />
+                        <Route path="/uom-convert" element={<UomConvertTool />} />
+                        <Route
+                            path="/suppliers"
+                            element={<SupplierListPage />}
+                        />
+                        <Route
+                            path="/suppliers/create"
+                            element={<SupplierCreatePage />}
+                        />
+                        <Route
+                            path="/suppliers/:id/edit"
+                            element={<SupplierEditPage />}
+                        />
+                        <Route
+                            path="/suppliers/:id"
+                            element={<SupplierDetailPage />}
+                        />
+                        <Route
+                            path="/supplier-vehicles"
+                            element={<SupplierVehicleListPage />}
+                        />
+                        <Route
+                            path="/supplier-vehicles/create"
+                            element={<SupplierVehicleFormPage />}
+                        />
+                        <Route
+                            path="/supplier-vehicles/:id/edit"
+                            element={<SupplierVehicleFormPage />}
+                        />
+                        <Route
+                            path="/customers"
+                            element={<CustomerListPage />}
+                        />
+                        <Route
+                            path="/customers/create"
+                            element={<CustomerCreatePage />}
+                        />
+                        <Route
+                            path="/customers/:id/edit"
+                            element={<CustomerEditPage />}
+                        />
+                        <Route
+                            path="/customers/:id"
+                            element={<CustomerDetailPage />}
+                        />
+                        <Route
+                            path="/customer-vehicles"
+                            element={<CustomerVehicleListPage />}
+                        />
+                        <Route
+                            path="/customer-vehicles/create"
+                            element={<CustomerVehicleFormPage />}
+                        />
+                        <Route
+                            path="/customer-vehicles/:id/edit"
+                            element={<CustomerVehicleFormPage />}
+                        />
+                        <Route
+                            path="/vehicles/makes"
+                            element={<VehicleMasterDataPage kind="makes" />}
+                        />
+                        <Route
+                            path="/vehicles/types"
+                            element={<VehicleMasterDataPage kind="types" />}
+                        />
+                        <Route
+                            path="/vehicles/categories"
+                            element={<VehicleMasterDataPage kind="categories" />}
+                        />
+                        <Route
+                            path="/vehicles/models"
+                            element={<VehicleMasterDataPage kind="models" />}
+                        />
+                        <Route path="/vehicles" element={<VehicleListPage />} />
+                        <Route
+                            path="/vehicles/create"
+                            element={<VehicleCreatePage />}
+                        />
+                        <Route
+                            path="/vehicles/:id/edit"
+                            element={<VehicleEditPage />}
+                        />
+                        <Route
+                            path="/vehicles/:id"
+                            element={<VehicleDetailPage />}
+                        />
+                        <Route path="/items" element={<ItemListPage />} />
+                        <Route path="/items/create" element={<ItemCreatePage />} />
+                        <Route path="/items/:id/edit" element={<ItemEditPage />} />
+                        <Route path="/items/:id" element={<ItemDetailPage />} />
+                        <Route
+                            path="/item-categories"
+                            element={<ItemCategoryListPage />}
+                        />
+                        <Route
+                            path="/item-categories/create"
+                            element={<ItemCategoryCreatePage />}
+                        />
+                        <Route
+                            path="/item-categories/:id/edit"
+                            element={<ItemCategoryEditPage />}
+                        />
+                        <Route
+                            path="/item-categories/:id"
+                            element={<ItemCategoryDetailPage />}
+                        />
+                        <Route
+                            path="/item-brands"
+                            element={<ItemBrandListPage />}
+                        />
+                        <Route
+                            path="/item-brands/create"
+                            element={<ItemBrandCreatePage />}
+                        />
+                        <Route
+                            path="/item-brands/:id/edit"
+                            element={<ItemBrandEditPage />}
+                        />
+                        <Route
+                            path="/item-brands/:id"
+                            element={<ItemBrandDetailPage />}
+                        />
+                        <Route path="/inventory" element={<InventoryPage />} />
+                        <Route path="/warehouses" element={<WarehouseListPage />} />
+                        <Route
+                            path="/warehouses/create"
+                            element={<WarehouseCreatePage />}
+                        />
+                        <Route
+                            path="/warehouses/:id/edit"
+                            element={<WarehouseEditPage />}
+                        />
+                        <Route
+                            path="/warehouses/:id"
+                            element={<WarehouseDetailPage />}
+                        />
+                        <Route
+                            path="/warehouse-locations"
+                            element={<WarehouseLocationListPage />}
+                        />
+                        <Route
+                            path="/warehouse-locations/create"
+                            element={<WarehouseLocationCreatePage />}
+                        />
+                        <Route
+                            path="/warehouse-locations/:id/edit"
+                            element={<WarehouseLocationEditPage />}
+                        />
+                        <Route
+                            path="/warehouse-locations/:id"
+                            element={<WarehouseLocationDetailPage />}
+                        />
+                        <Route
+                            path="/purchase/fast-purchase"
+                            element={<FastPurchasePage />}
+                        />
+                        <Route
+                            path="/purchase/orders"
+                            element={<PurchaseOrderListPage />}
+                        />
+                        <Route
+                            path="/purchase/orders/create"
+                            element={<PurchaseOrderFormPage />}
+                        />
+                        <Route
+                            path="/purchase/orders/:id/edit"
+                            element={<PurchaseOrderFormPage />}
+                        />
+                        <Route
+                            path="/purchase/orders/:id"
+                            element={<PurchaseOrderDetailPage />}
+                        />
+                        <Route
+                            path="/purchase/goods-receipts"
+                            element={<GoodsReceiptListPage />}
+                        />
+                        <Route
+                            path="/purchase/goods-receipts/create"
+                            element={<GoodsReceiptCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/goods-receipts/:id"
+                            element={<GoodsReceiptDetailPage />}
+                        />
+                        <Route
+                            path="/purchase/returns"
+                            element={<PurchaseReturnListPage />}
+                        />
+                        <Route
+                            path="/purchase/returns/create"
+                            element={<PurchaseReturnCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/returns/:id"
+                            element={<PurchaseReturnDetailPage />}
+                        />
+                        <Route
+                            path="/purchase/manual-supplier-returns/create"
+                            element={<ManualSupplierReturnCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/invoices"
+                            element={<PurchaseInvoiceListPage />}
+                        />
+                        <Route
+                            path="/purchase/invoices/create"
+                            element={<PurchaseInvoiceCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/payments"
+                            element={<PurchasePaymentWorkspacePage />}
+                        />
+                        <Route
+                            path="/purchase/payments/create"
+                            element={<PurchasePaymentCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/payments/prepare"
+                            element={<PurchasePaymentPreparePage />}
+                        />
+                        <Route
+                            path="/purchase/debit-notes"
+                            element={<PurchaseDebitNoteListPage />}
+                        />
+                        <Route
+                            path="/purchase/debit-notes/create"
+                            element={<PurchaseDebitNoteCreatePage />}
+                        />
+                        <Route
+                            path="/purchase/debit-notes/:id"
+                            element={<PurchaseDebitNoteDetailPage />}
+                        />
+                        <Route
+                            path="/sales/quotations"
+                            element={<SalesDocumentListPage kind="quotation" />}
+                        />
+                        <Route
+                            path="/sales/quotations/create"
+                            element={<SalesDocumentFormPage kind="quotation" />}
+                        />
+                        <Route
+                            path="/sales/quotations/:id/edit"
+                            element={<SalesDocumentFormPage kind="quotation" />}
+                        />
+                        <Route
+                            path="/sales/quotations/:id"
+                            element={<SalesDocumentDetailPage kind="quotation" />}
+                        />
+                        <Route
+                            path="/sales/fast-sales"
+                            element={<FastSalesPage />}
+                        />
+                        <Route
+                            path="/sales/orders"
+                            element={<SalesDocumentListPage kind="order" />}
+                        />
+                        <Route
+                            path="/sales/orders/create"
+                            element={<SalesDocumentFormPage kind="order" />}
+                        />
+                        <Route
+                            path="/sales/orders/:id/edit"
+                            element={<SalesDocumentFormPage kind="order" />}
+                        />
+                        <Route
+                            path="/sales/orders/:id"
+                            element={<SalesDocumentDetailPage kind="order" />}
+                        />
+                        <Route
+                            path="/sales/allocations"
+                            element={<SalesAllocationListPage />}
+                        />
+                        <Route
+                            path="/sales/allocations/create"
+                            element={<SalesAllocationCreatePage />}
+                        />
+                        <Route
+                            path="/sales/allocations/:id"
+                            element={<SalesAllocationDetailPage />}
+                        />
+                        <Route
+                            path="/sales/deliveries"
+                            element={<SalesDeliveryListPage />}
+                        />
+                        <Route
+                            path="/sales/deliveries/create"
+                            element={<SalesDeliveryCreatePage />}
+                        />
+                        <Route
+                            path="/sales/invoices/create"
+                            element={<SalesInvoiceCreatePage />}
+                        />
+                        <Route
+                            path="/sales/payments/prepare"
+                            element={<SalesPaymentPreparePage />}
+                        />
+                        <Route
+                            path="/sales/returns"
+                            element={<SalesReturnListPage />}
+                        />
+                        <Route
+                            path="/sales/returns/create"
+                            element={<SalesReturnCreatePage />}
+                        />
+                        <Route
+                            path="/sales/credit-notes"
+                            element={<SalesCreditNotePage />}
+                        />
+                        <Route path="/invoices" element={<InvoiceListPage />} />
+                        <Route
+                            path="/invoices/:id"
+                            element={<InvoiceDetailPage />}
+                        />
+                        <Route
+                            path="/payments"
+                            element={<PaymentListPage />}
+                        />
+                        <Route
+                            path="/payments/create"
+                            element={<PaymentEntryPage />}
+                        />
+                        <Route
+                            path="/payments/methods"
+                            element={<PaymentMethodListPage />}
+                        />
+                        <Route
+                            path="/payments/methods/create"
+                            element={<PaymentMethodFormPage />}
+                        />
+                        <Route
+                            path="/payments/methods/:id/edit"
+                            element={<PaymentMethodFormPage />}
+                        />
+                        <Route
+                            path="/payments/cheque-templates"
+                            element={<ChequeTemplateListPage />}
+                        />
+                        <Route
+                            path="/payments/cheque-templates/create"
+                            element={<ChequeTemplateFormPage />}
+                        />
+                        <Route
+                            path="/payments/cheque-templates/:id/edit"
+                            element={<ChequeTemplateFormPage />}
+                        />
+                        <Route
+                            path="/payments/:paymentId/lines/:lineId/cheque-print"
+                            element={<ChequePrintPreviewPage />}
+                        />
+                        <Route
+                            path="/payments/:id"
+                            element={<PaymentDetailPage />}
+                        />
+                        <Route path="/vouchers" element={<VoucherListPage />} />
+                        <Route
+                            path="/vouchers/:voucherType/:sourceId"
+                            element={<VoucherDetailPage />}
+                        />
+                        <Route
+                            path="/finance/accounts"
+                            element={<FinanceAccountsPage />}
+                        />
+                        <Route
+                            path="/finance/accounts/create"
+                            element={<FinanceAccountCreatePage />}
+                        />
+                        <Route
+                            path="/finance/accounts/:id/edit"
+                            element={<FinanceAccountEditPage />}
+                        />
+                        <Route
+                            path="/finance/accounts/:id"
+                            element={<FinanceAccountDetailPage />}
+                        />
+                        <Route
+                            path="/finance/journals"
+                            element={<FinanceJournalsPage />}
+                        />
+                        <Route
+                            path="/finance/journals/create"
+                            element={<FinanceJournalCreatePage />}
+                        />
+                        <Route
+                            path="/finance/journals/:id/edit"
+                            element={<FinanceJournalEditPage />}
+                        />
+                        <Route
+                            path="/finance/journals/:id"
+                            element={<FinanceJournalDetailPage />}
+                        />
+                        <Route
+                            path="/finance/ledger"
+                            element={<LedgerReportPage />}
+                        />
+                        <Route
+                            path="/finance/trial-balance"
+                            element={<TrialBalanceReportPage />}
+                        />
+                        <Route
+                            path="/finance/account-balances"
+                            element={<AccountBalanceReportPage />}
+                        />
+                        <Route
+                            path="/finance/posting-profiles"
+                            element={<PostingProfilePage />}
+                        />
+                        <Route
+                            path="/finance/fiscal-periods"
+                            element={<FiscalPeriodsPage />}
+                        />
+                        <Route
+                            path="/finance/reversals"
+                            element={<FinanceReversalsPage />}
+                        />
+                        <Route
+                            path="/finance/reports"
+                            element={<FinanceReportsPage />}
+                        />
+                        <Route
+                            path="/finance/bank-reconciliations"
+                            element={<BankReconciliationPage />}
+                        />
+                        <Route path="/finance/budgets" element={<BudgetPage />} />
+                        <Route path="/tax/taxes" element={<TaxListPage />} />
+                        <Route
+                            path="/tax/taxes/create"
+                            element={<TaxCreatePage />}
+                        />
+                        <Route
+                            path="/tax/taxes/:id/edit"
+                            element={<TaxEditPage />}
+                        />
+                        <Route path="/tax/groups" element={<TaxGroupPage />} />
+                        <Route
+                            path="/tax/customer-profiles"
+                            element={<CustomerTaxProfilePage />}
+                        />
+                        <Route
+                            path="/tax/supplier-profiles"
+                            element={<SupplierTaxProfilePage />}
+                        />
+                        <Route
+                            path="/tax/posting-profiles"
+                            element={<TaxPostingProfilePage />}
+                        />
+                        <Route path="/tax/reports" element={<TaxReportPages />} />
+                        <Route
+                            path="/reports"
+                            element={<ReportListPage />}
+                        />
+                        <Route
+                            path="/reports/purchase/detailed"
+                            element={<OperationalReportPage
+                                    reportKey="purchase/detailed"
+                                    kind="purchase"
+                                />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/detailed"
+                            element={<OperationalReportPage
+                                    reportKey="vehicle-service/detailed"
+                                    kind="vehicle-service"
+                                />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/employee-incentives"
+                            element={<OperationalReportPage
+                                    reportKey="vehicle-service/employee-incentives"
+                                    kind="employee-incentive"
+                                />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/technician-work"
+                            element={<TechnicianWorkReportPage />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/employee-commissions"
+                            element={<EmployeeCommissionReportPage />}
+                        />
+                        <Route
+                            path="/reports/:key"
+                            element={<ReportPage />}
+                        />
+                        <Route
+                            path="/hr/employees"
+                            element={<EmployeeListPage />}
+                        />
+                        <Route
+                            path="/hr/employees/create"
+                            element={<EmployeeCreatePage />}
+                        />
+                        <Route
+                            path="/hr/employees/:id/edit"
+                            element={<EmployeeEditPage />}
+                        />
+                        <Route
+                            path="/hr/employees/:id"
+                            element={<EmployeeDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs"
+                            element={<VehicleServiceJobListPage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs/create"
+                            element={<VehicleServiceJobCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs/:id/edit"
+                            element={<VehicleServiceJobEditPage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs/:id/invoice"
+                            element={<VehicleServiceInvoiceCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs/:id/payment"
+                            element={<VehicleServicePaymentPreparePage />}
+                        />
+                        <Route
+                            path="/vehicle-service/jobs/:id"
+                            element={<VehicleServiceJobDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental"
+                            element={<RentalDashboardPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations"
+                            element={<RentalReservationListPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations/create"
+                            element={<RentalReservationCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations/:id"
+                            element={<RentalReservationDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements"
+                            element={<RentalAgreementListPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements/create"
+                            element={<RentalAgreementCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements/:id"
+                            element={<RentalAgreementDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations"
+                            element={<RentalAllocationPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations/:id"
+                            element={<RentalAllocationDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations/:id/replacement"
+                            element={<RentalReplacementPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/custody"
+                            element={<RentalCustodyPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/running-chart"
+                            element={<RentalRunningChartPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/expenses"
+                            element={<RentalExpensePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/billing"
+                            element={<RentalBillingPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/deposits"
+                            element={<RentalDepositPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/finance-agreements"
+                            element={<VehicleFinancePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/availability"
+                            element={<VehicleAvailabilityPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reports"
+                            element={<RentalReportsPage />}
+                        />
+                            </Route>
+                        </Route>
+                        <Route path="*" element={<NotFoundPage />} />
+                    </Route>
                 </Route>
             </Route>
-        </Routes>
-    );
+        </>,
+    ),
+);
+
+export function AppRouter() {
+    return <RouterProvider router={appRouter} />;
 }

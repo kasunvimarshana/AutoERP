@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('finance_ledger_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->foreignId('journal_entry_id')->constrained('finance_journal_entries', 'id')->restrictOnDelete();
-            $table->foreignId('journal_line_id')->constrained('finance_journal_lines', 'id')->restrictOnDelete();
-            $table->foreignId('account_id')->constrained('finance_accounts', 'id');
-            $table->foreignId('fiscal_year_id')->nullable()->constrained('finance_fiscal_years', 'id')->restrictOnDelete();
-            $table->foreignId('fiscal_period_id')->nullable()->constrained('finance_fiscal_periods', 'id')->restrictOnDelete();
-            $table->foreignId('dimension_id')->nullable()->constrained('finance_dimensions', 'id')->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('journal_entry_id');
+            $table->foreignId('journal_line_id');
+            $table->foreignId('account_id');
+            $table->foreignId('fiscal_year_id')->nullable();
+            $table->foreignId('fiscal_period_id')->nullable();
+            $table->foreignId('dimension_id')->nullable();
             $table->date('entry_date');
             $table->decimal('debit', 20, 6)->default('0');
             $table->decimal('credit', 20, 6)->default('0');
@@ -45,6 +45,36 @@ return new class extends Migration
                 ['tenant_id', 'source_module', 'source_type', 'source_id'],
                 'finance_ledger_tenant_source_trace_idx',
             );
+
+            $table->unique(['id', 'tenant_id'], 'finance_ledger_entries_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_ledger_entries_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['journal_entry_id', 'tenant_id'], 'finance_ledger_entries_journal_entry_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_journal_entries')
+                ->restrictOnDelete();
+            $table->foreign(['journal_line_id', 'tenant_id'], 'finance_ledger_entries_journal_line_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_journal_lines')
+                ->restrictOnDelete();
+            $table->foreign(['account_id', 'tenant_id'], 'finance_ledger_entries_account_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_accounts')
+                ->restrictOnDelete();
+            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_ledger_entries_fiscal_year_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_fiscal_years')
+                ->restrictOnDelete();
+            $table->foreign(['fiscal_period_id', 'tenant_id'], 'finance_ledger_entries_fiscal_period_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_fiscal_periods')
+                ->restrictOnDelete();
+            $table->foreign(['dimension_id', 'tenant_id'], 'finance_ledger_entries_dimension_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_dimensions')
+                ->restrictOnDelete();
         });
     }
 

@@ -21,9 +21,9 @@ export default function UserDetailPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [statusLoading, setStatusLoading] = useState(false);
     const user = useApi((signal) => accessApi.getUser(String(id), signal), [id], Boolean(id));
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersUpdate);
-    const canActivate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersActivate);
-    const canDeactivate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.usersDeactivate);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.usersUpdate);
+    const canActivate = hasAccessPermission(auth, accessPermissions.usersActivate);
+    const canDeactivate = hasAccessPermission(auth, accessPermissions.usersDeactivate);
 
     const changeStatus = async (record: AccessUser) => {
         setStatusLoading(true);

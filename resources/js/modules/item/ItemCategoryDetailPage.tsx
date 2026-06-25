@@ -14,7 +14,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 export default function ItemCategoryDetailPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
-    const canManage = hasItemPermission(auth.permissions, itemPermissions.manageCategories);
+    const canManage = hasItemPermission(auth, itemPermissions.manageCategories);
     const category = useApi((signal) => getItemCategory(id, signal), [id], Number.isFinite(id));
 
     if (category.loading) return <LoadingState />;

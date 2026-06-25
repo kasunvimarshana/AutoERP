@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('sales_header_adjustments', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('source_type');
             $table->unsignedBigInteger('source_id');
             $table->string('name');
@@ -35,6 +35,12 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'organization_unit_id'], 'sales_header_adjustments_scope_idx');
             $table->index(['source_type', 'source_id'], 'sales_header_adjustments_source_idx');
+
+            $table->unique(['id', 'tenant_id'], 'sales_header_adjustments_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_header_adjustments_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
         });
     }
 

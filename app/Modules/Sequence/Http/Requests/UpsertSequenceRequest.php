@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertSequenceRequest extends FormRequest
+final class UpsertSequenceRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -22,7 +22,7 @@ final class UpsertSequenceRequest extends FormRequest
 
         return [
             'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units', 'id')],
             'document_type' => array_merge($required, ['string', 'max:255']),
             'prefix' => ['nullable', 'string', 'max:255'],
             'suffix' => ['nullable', 'string', 'max:255'],

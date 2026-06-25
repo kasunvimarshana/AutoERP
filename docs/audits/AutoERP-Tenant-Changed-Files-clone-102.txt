@@ -1,0 +1,179 @@
+AutoERP Tenant foundation changed-file manifest — clone-102
+
+ M .env.example
+ M app/Modules/Audit/Providers/AuditServiceProvider.php
+ M app/Modules/Auth/Config/auth.php
+ M app/Modules/Auth/Constants/AuthErrorCode.php
+ M app/Modules/Auth/DTOs/RegistrationData.php
+ M app/Modules/Auth/Http/Controllers/AuthController.php
+ M app/Modules/Auth/Http/Controllers/PlatformAuthController.php
+ M app/Modules/Auth/Http/Requests/PlatformLoginRequest.php
+ M app/Modules/Auth/Http/Requests/RegisterRequest.php
+ M app/Modules/Auth/Providers/AuthServiceProvider.php
+ M app/Modules/Auth/Routes/api.php
+ M app/Modules/Auth/Services/AuthWorkflowService.php
+ M app/Modules/Auth/Services/GetCurrentAuthProfileService.php
+ M app/Modules/Auth/Services/PlatformLoginService.php
+ M app/Modules/Auth/Services/RefreshTokenCookie.php
+ M app/Modules/Configuration/Config/configuration.php
+ M app/Modules/Configuration/Contracts/ConfigurationDefinitionRegistryInterface.php
+ M app/Modules/Configuration/Providers/ConfigurationServiceProvider.php
+ M app/Modules/Configuration/Routes/api.php
+ M app/Modules/Configuration/Services/ConfigurationAuthorizationService.php
+ M app/Modules/Configuration/Services/ConfigurationDefinitionRegistry.php
+ M app/Modules/Configuration/Tests/ConfigurationAuthorizationServiceTest.php
+ M app/Modules/Customer/Providers/CustomerServiceProvider.php
+ M app/Modules/Inventory/Providers/InventoryServiceProvider.php
+ M app/Modules/Item/Providers/ItemServiceProvider.php
+ M app/Modules/OrganizationUnit/Providers/OrganizationUnitServiceProvider.php
+ M app/Modules/Payment/Providers/PaymentServiceProvider.php
+ M app/Modules/Purchase/Providers/PurchaseServiceProvider.php
+ M app/Modules/ReferenceData/Database/Seeders/ReferenceDataSeeder.php
+ M app/Modules/ReferenceData/Providers/ReferenceDataServiceProvider.php
+ M app/Modules/Reporting/Providers/ReportingServiceProvider.php
+ M app/Modules/Reporting/Services/ReportBrandingResolver.php
+ M app/Modules/Sales/Providers/SalesServiceProvider.php
+ M app/Modules/Supplier/Providers/SupplierServiceProvider.php
+ M app/Modules/Tenant/Config/tenant.php
+ M app/Modules/Tenant/Console/Commands/TenantActivateCommand.php
+ M app/Modules/Tenant/Console/Commands/TenantCreateCommand.php
+ M app/Modules/Tenant/Console/Commands/TenantDeactivateCommand.php
+ M app/Modules/Tenant/Console/Commands/TenantPublishEventsCommand.php
+ M app/Modules/Tenant/Console/Commands/TenantStorageCleanupCommand.php
+ M app/Modules/Tenant/Console/Commands/TenantSuspendCommand.php
+ M app/Modules/Tenant/Database/Migrations/2026_06_12_010001_create_tenant_plans_table.php
+ M app/Modules/Tenant/Database/Migrations/2026_06_12_010002_create_tenants_table.php
+ M app/Modules/Tenant/Database/Migrations/2026_06_12_010006_create_tenant_domains_table.php
+ D app/Modules/Tenant/Database/Migrations/2026_06_12_010007_create_tenant_storage_cleanup_jobs_table.php
+ D app/Modules/Tenant/Database/Migrations/2026_06_12_010008_create_tenant_event_outbox_table.php
+ D app/Modules/Tenant/Database/Seeders/TenantBootstrapFinalizerSeeder.php
+ M app/Modules/Tenant/Database/Seeders/TenantDomainSeeder.php
+ M app/Modules/Tenant/Database/Seeders/TenantSeeder.php
+ M app/Modules/Tenant/Http/Middleware/RequirePlatformOperatorMiddleware.php
+ M app/Modules/Tenant/Http/Requests/UpsertTenantPlanRequest.php
+ M app/Modules/Tenant/Http/Requests/UpsertTenantRequest.php
+ M app/Modules/Tenant/Http/Resources/TenantPlanResource.php
+ M app/Modules/Tenant/Http/Resources/TenantResource.php
+ M app/Modules/Tenant/Http/Support/TenantApiResponder.php
+ M app/Modules/Tenant/Models/TenantDocumentModel.php
+ M app/Modules/Tenant/Models/TenantDomainModel.php
+ M app/Modules/Tenant/Models/TenantEventOutboxModel.php
+ M app/Modules/Tenant/Models/TenantModel.php
+ M app/Modules/Tenant/Models/TenantPlanModel.php
+ M app/Modules/Tenant/Models/TenantStorageCleanupJobModel.php
+ M app/Modules/Tenant/Providers/TenantServiceProvider.php
+ M app/Modules/Tenant/Repositories/EloquentTenantDomainRepository.php
+ M app/Modules/Tenant/Repositories/EloquentTenantPlanRepository.php
+ M app/Modules/Tenant/Repositories/EloquentTenantRepository.php
+ M app/Modules/Tenant/Repositories/TenantDomainRepositoryInterface.php
+ M app/Modules/Tenant/Repositories/TenantRepositoryInterface.php
+ M app/Modules/Tenant/Routes/api.php
+ M app/Modules/Tenant/Services/CreateTenantService.php
+ M app/Modules/Tenant/Services/CurrentTenantContextResolver.php
+ M app/Modules/Tenant/Services/Documents/TenantDocumentService.php
+ M app/Modules/Tenant/Services/Domains/RevalidateTenantDomainsService.php
+ M app/Modules/Tenant/Services/Domains/TenantDomainService.php
+ M app/Modules/Tenant/Services/Events/TenantEventOutboxService.php
+ M app/Modules/Tenant/Services/ExpireTenantsService.php
+ M app/Modules/Tenant/Services/Plans/CreateTenantPlanService.php
+ M app/Modules/Tenant/Services/Plans/DeleteTenantPlanService.php
+ M app/Modules/Tenant/Services/Plans/TenantPlanSchema.php
+ M app/Modules/Tenant/Services/Plans/UpdateTenantPlanService.php
+ M app/Modules/Tenant/Services/Storage/TenantStorageCleanupService.php
+ M app/Modules/Tenant/Services/TenantEntitlementService.php
+ M app/Modules/Tenant/Services/TenantLifecycleService.php
+ M app/Modules/Tenant/Services/TenantReferenceValidator.php
+ M app/Modules/Tenant/Services/UpdateTenantService.php
+ M app/Modules/Tenant/Tests/CurrentTenantContextResolverTest.php
+ M app/Modules/User/Config/user.php
+ M app/Modules/User/Database/Seeders/UserSeeder.php
+ M app/Modules/User/Http/Requests/UpsertUserRequest.php
+ M app/Modules/User/Providers/UserServiceProvider.php
+ M app/Modules/User/Services/RoleService.php
+ M app/Modules/User/Services/UserAccessResolver.php
+ M app/Modules/User/Services/UserService.php
+ M app/Modules/VehicleRental/Providers/VehicleRentalServiceProvider.php
+ M app/Modules/Warehouse/Providers/WarehouseServiceProvider.php
+ M database/seeders/DatabaseSeeder.php
+ M resources/js/app/navigation/navigationConfig.ts
+ M resources/js/app/router.tsx
+ M resources/js/modules/auth/LoginPage.tsx
+ M resources/js/modules/auth/authApi.ts
+ M resources/js/modules/auth/authTypes.ts
+ M resources/js/modules/tenant/PlatformTenantsPage.tsx
+ M resources/js/modules/tenant/TenantPlansPage.tsx
+ M resources/js/modules/tenant/components/PlatformTenantForm.tsx
+ M resources/js/modules/tenant/components/TenantPlanLookupSelect.tsx
+ M resources/js/modules/tenant/tenantApi.ts
+ M resources/js/modules/tenant/tenantTypes.ts
+ M routes/console.php
+?? app/Modules/Auth/Config/configuration-definitions.php
+?? app/Modules/Auth/Constants/PlatformMfaStatus.php
+?? app/Modules/Auth/Database/Migrations/2026_06_12_031010_create_auth_registration_invitations_table.php
+?? app/Modules/Auth/Database/Migrations/2026_06_12_031011_create_auth_platform_mfa_methods_table.php
+?? app/Modules/Auth/Http/Controllers/PlatformMfaController.php
+?? app/Modules/Auth/Http/Middleware/RequireRecentPlatformAuthenticationMiddleware.php
+?? app/Modules/Auth/Http/Requests/ConfirmPlatformMfaEnrollmentRequest.php
+?? app/Modules/Auth/Http/Requests/PlatformMfaEnrollmentRequest.php
+?? app/Modules/Auth/Models/AuthPlatformMfaMethodModel.php
+?? app/Modules/Auth/Models/AuthRegistrationInvitationModel.php
+?? app/Modules/Auth/Services/Mfa/
+?? app/Modules/Auth/Services/PlatformRefreshTokenCookie.php
+?? app/Modules/Auth/Services/Provisioning/
+?? app/Modules/Auth/Services/Registration/
+?? app/Modules/Auth/Services/TenantRefreshTokenCookie.php
+?? app/Modules/Core/Contracts/PermissionDefinitionRegistryInterface.php
+?? app/Modules/Core/Contracts/PlatformPermissionCheckerInterface.php
+?? app/Modules/OrganizationUnit/Services/Provisioning/
+?? app/Modules/OrganizationUnit/Services/TenantLimits/
+?? app/Modules/Tenant/Console/Commands/TenantRetryDeadEventsCommand.php
+?? app/Modules/Tenant/Constants/PlatformPermission.php
+?? app/Modules/Tenant/Constants/TenantDatabaseStrategy.php
+?? app/Modules/Tenant/Constants/TenantOnboardingStatus.php
+?? app/Modules/Tenant/Constants/TenantSubscriptionStatus.php
+?? app/Modules/Tenant/Database/Migrations/2026_06_12_010007_create_tenant_primary_domains_table.php
+?? app/Modules/Tenant/Database/Migrations/2026_06_12_010008_create_tenant_storage_cleanup_jobs_table.php
+?? app/Modules/Tenant/Database/Migrations/2026_06_12_010009_create_tenant_event_outbox_table.php
+?? app/Modules/Tenant/Database/Migrations/2026_06_12_031012_create_tenant_onboarding_states_table.php
+?? app/Modules/Tenant/Database/Seeders/TenantReferenceAssignmentSeeder.php
+?? app/Modules/Tenant/Http/Controllers/PlatformTenantDomainController.php
+?? app/Modules/Tenant/Http/Controllers/TenantOnboardingController.php
+?? app/Modules/Tenant/Http/Controllers/TenantSubscriptionController.php
+?? app/Modules/Tenant/Http/Middleware/RequireCentralHostMiddleware.php
+?? app/Modules/Tenant/Http/Requests/AssignTenantSubscriptionRequest.php
+?? app/Modules/Tenant/Http/Requests/ProvisionTenantRequest.php
+?? app/Modules/Tenant/Http/Resources/TenantSubscriptionResource.php
+?? app/Modules/Tenant/Models/TenantCurrentSubscriptionModel.php
+?? app/Modules/Tenant/Models/TenantOnboardingStateModel.php
+?? app/Modules/Tenant/Models/TenantPlanRevisionModel.php
+?? app/Modules/Tenant/Models/TenantPrimaryDomainModel.php
+?? app/Modules/Tenant/Models/TenantSubscriptionModel.php
+?? app/Modules/Tenant/Queue/
+?? app/Modules/Tenant/Repositories/EloquentTenantPlanRevisionRepository.php
+?? app/Modules/Tenant/Repositories/EloquentTenantSubscriptionRepository.php
+?? app/Modules/Tenant/Repositories/TenantPlanRevisionRepositoryInterface.php
+?? app/Modules/Tenant/Repositories/TenantSubscriptionRepositoryInterface.php
+?? app/Modules/Tenant/Services/Contracts/TenantAccessProvisionerInterface.php
+?? app/Modules/Tenant/Services/Contracts/TenantAuthenticationProvisionerInterface.php
+?? app/Modules/Tenant/Services/Contracts/TenantLimitUsageContributorInterface.php
+?? app/Modules/Tenant/Services/Contracts/TenantOrganizationProvisionerInterface.php
+?? app/Modules/Tenant/Services/Hosts/
+?? app/Modules/Tenant/Services/Onboarding/
+?? app/Modules/Tenant/Services/Subscriptions/
+?? app/Modules/Tenant/Tests/PlatformHostPolicyTest.php
+?? app/Modules/Tenant/Tests/TenantDatabaseStrategyTest.php
+?? app/Modules/Tenant/Tests/TenantJobContextTest.php
+?? app/Modules/Tenant/Tests/TenantPlanSchemaTest.php
+?? app/Modules/User/Database/Migrations/2026_06_12_030010_create_platform_permissions_table.php
+?? app/Modules/User/Http/Middleware/RequirePlatformPermissionMiddleware.php
+?? app/Modules/User/Models/PlatformOperatorPermissionModel.php
+?? app/Modules/User/Models/PlatformPermissionModel.php
+?? app/Modules/User/Services/PermissionDefinitionRegistry.php
+?? app/Modules/User/Services/PlatformPermissionChecker.php
+?? app/Modules/User/Services/Provisioning/
+?? app/Modules/User/Services/TenantLimits/
+?? app/Modules/Warehouse/Services/TenantLimits/
+?? resources/js/app/access/platformPermissions.ts
+?? resources/js/modules/tenant/components/PlatformTenantDomainsPanel.tsx
+?? resources/js/modules/tenant/components/PlatformTenantOnboardingPanel.tsx
+?? resources/js/modules/tenant/components/PlatformTenantSubscriptionPanel.tsx

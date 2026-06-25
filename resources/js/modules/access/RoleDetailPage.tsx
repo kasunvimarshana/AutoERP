@@ -5,6 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -18,15 +19,16 @@ export default function RoleDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const auth = useAuth();
+    const { confirm, confirmDialog } = useConfirmDialog();
     const [search, setSearch] = useState('');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [deleting, setDeleting] = useState(false);
     const role = useApi((signal) => accessApi.getRole(String(id), signal), [id], Boolean(id));
-    const canUpdate = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesUpdate);
-    const canDelete = hasAccessPermission(auth.permissions, auth.roles, accessPermissions.rolesDelete);
+    const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canDelete = hasAccessPermission(auth, accessPermissions.rolesDelete);
 
     const deleteRole = async (record: AccessRole) => {
-        if (!window.confirm(`Delete role "${record.name}"?`)) return;
+        if (!await confirm({ title: 'Delete role', message: `Delete the role “${record.name}”? This cannot be undone.`, confirmLabel: 'Delete role' })) return;
         setDeleting(true);
         setActionError(null);
         try {
@@ -82,6 +84,7 @@ export default function RoleDetailPage() {
                     </Panel>
                 </div>
             )}
+            {confirmDialog}
         </>
     );
 }

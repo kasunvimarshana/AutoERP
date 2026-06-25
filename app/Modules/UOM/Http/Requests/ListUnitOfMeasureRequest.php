@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Http\Requests;
 
-use Modules\Core\Http\Requests\QueryRequest;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class ListUnitOfMeasureRequest extends QueryRequest
+final class ListUnitOfMeasureRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
@@ -20,7 +20,7 @@ final class ListUnitOfMeasureRequest extends QueryRequest
     {
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units', 'id')],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('uom.pagination.max_per_page', 200)],
             'code' => ['nullable', 'string', 'max:50'],

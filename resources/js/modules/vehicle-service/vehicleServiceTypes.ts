@@ -332,10 +332,18 @@ export interface VehicleServiceStatusHistory {
     changed_at: string;
 }
 
+export interface VehicleServiceDocumentOptions {
+    document_types: string[];
+    mime_types: string[];
+    max_size_bytes: number;
+}
+
 export interface VehicleServiceDocument {
     id: number;
     document_type: string;
-    file_path?: string | null;
+    original_filename: string;
+    mime_type: string;
+    size_bytes: number;
     description?: string | null;
     uploaded_by?: number | null;
     created_at?: string | null;

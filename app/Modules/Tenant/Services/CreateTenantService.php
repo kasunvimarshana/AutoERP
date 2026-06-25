@@ -4,44 +4,45 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
-use DateTimeImmutable;
+use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
+use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
+use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantDomainServiceInterface;
-use Modules\Tenant\Services\Contracts\TenantOrganizationUnitGatewayInterface;
+use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 use Throwable;
 
 final class CreateTenantService
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantDomainServiceInterface $rules,
-        private readonly TenantOrganizationUnitGatewayInterface $organizationUnits,
+        private readonly TenantValueNormalizerInterface $rules,
+        private readonly TenantReferenceValidator $references,
         private readonly SlugGeneratorInterface $slugger,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly FileStorageServiceInterface $files,
-        private readonly TransactionManagerInterface $transactions,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
+        private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
+        private readonly TenantExecutionContextInterface $executionContext,
+        private readonly TenantOnboardingStateModel $onboardingStates,
     ) {}
 
     /** @param array<string, mixed> $payload */
     public function execute(array $payload): Result
     {
-        $logoPath = null;
-
         try {
             $code = $this->rules->normalizeCode((string) ($payload['code'] ?? ''));
             $name = $this->rules->normalizeName((string) ($payload['name'] ?? ''));
@@ -50,88 +51,69 @@ final class CreateTenantService
                 $name,
                 $code,
             ));
+
             if ($this->tenants->findByCode($code) !== null) {
-                return Result::failure(new Error(
-                    TenantErrorCode::DUPLICATE_CODE,
-                    'Tenant code already exists.',
-                ));
+                return Result::failure(new Error(TenantErrorCode::DUPLICATE_CODE, 'Tenant code already exists.'));
+            }
+            if ($this->tenants->findBySlug($slug) !== null) {
+                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Tenant slug already exists.'));
             }
 
-            $organizationUnit = $payload['organization_unit'] ?? null;
-            if (! is_array($organizationUnit)) {
-                return Result::failure(new Error(
-                    TenantErrorCode::INVALID_VALUE,
-                    'Root organization unit details are required.',
-                ));
-            }
+            $baseCurrencyId = $this->positiveInt($payload['base_currency_id'] ?? null);
+            $this->references->assertActiveCurrency($baseCurrencyId);
 
-            if (isset($payload['logo_tmp_path'])) {
-                $logoPath = $this->storeLogo(
-                    (string) $payload['logo_tmp_path'],
-                    (string) ($payload['logo_original_name'] ?? 'logo.bin'),
-                    $slug,
-                );
-            }
-
+            /** @var DataRecord $record */
             $record = $this->transactions->runInTransaction(function () use (
-                $payload,
                 $code,
                 $name,
                 $slug,
-                $logoPath,
-                $organizationUnit,
-            ) {
-                $tenant = $this->tenants->create([
+                $baseCurrencyId,
+            ): DataRecord {
+                $record = $this->tenants->create([
                     'uuid' => $this->uuid->generate(),
                     'code' => $code,
                     'name' => $name,
                     'slug' => $slug,
-                    'logo_path' => $logoPath,
-                    'cross_org_transactions' => (bool) ($payload['cross_org_transactions'] ?? false),
-                    'tenant_plan_id' => $this->positiveInt($payload['tenant_plan_id'] ?? null),
-                    'base_currency_id' => $this->positiveInt($payload['base_currency_id'] ?? null),
+                    'logo_path' => null,
+                    'base_currency_id' => $baseCurrencyId,
                     'status' => TenantStatus::DRAFT,
-                    'trial_ends_at' => $this->dateTime($payload['trial_ends_at'] ?? null),
-                    'subscription_ends_at' => $this->dateTime($payload['subscription_ends_at'] ?? null),
-                    'metadata' => $this->rules->normalizeMetadata($payload['metadata'] ?? null),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),
                     'updated_by' => $this->currentUser->currentUserId(),
                 ]);
 
-                $root = $this->organizationUnits->provisionRoot(
-                    (int) $tenant->id(),
-                    $organizationUnit,
-                );
+                $tenantId = (int) $record->id();
+                $this->executionContext->runForTenant($tenantId, function () use ($tenantId): void {
+                    $this->onboardingStates->newQuery()->create([
+                        'tenant_id' => $tenantId,
+                        'status' => TenantOnboardingStatus::PENDING,
+                        'row_version' => 1,
+                        'created_by' => $this->currentUser->currentUserId(),
+                        'updated_by' => $this->currentUser->currentUserId(),
+                    ]);
+                });
 
-                $this->audit->record(new AuditEventData(
+                $this->audit->recordPlatform(new AuditEventData(
                     eventName: 'tenant.created',
-                    eventCategory: 'administration',
+                    eventCategory: AuditEventCategory::ADMINISTRATION,
                     sourceModule: 'tenant',
                     subjectType: 'tenant',
-                    subjectId: (string) $tenant->id(),
+                    subjectId: (string) $record->id(),
                     subjectReference: $code,
                     changes: ['new' => [
                         'code' => $code,
                         'name' => $name,
                         'status' => TenantStatus::DRAFT,
-                        'root_organization_unit' => [
-                            'name' => $root->get('name'),
-                            'code' => $root->get('code'),
-                        ],
+                        'base_currency_id' => $baseCurrencyId,
                     ]],
-                    tags: ['tenant', 'platform', 'onboarding'],
-                ));
+                    tags: ['tenant', 'platform'],
+                ), $tenantId);
 
-                return $tenant;
+                return $record;
             });
 
-            return Result::success($record);
+            return Result::success($this->tenants->findById($record->id()) ?? $record);
         } catch (Throwable $exception) {
-            if ($logoPath !== null && $this->files->exists($logoPath)) {
-                $this->files->delete($logoPath);
-            }
-
             return Result::failure($this->errors->normalize(
                 $exception,
                 TenantErrorCode::INVALID_VALUE,
@@ -140,26 +122,8 @@ final class CreateTenantService
         }
     }
 
-    private function storeLogo(string $tmpPath, string $originalName, string $slug): string
-    {
-        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) ?: 'bin';
-
-        return $this->files->store(
-            $tmpPath,
-            'tenants/logos',
-            sprintf('%s-%s.%s', $slug, $this->uuid->generate(), $extension),
-        );
-    }
-
     private function positiveInt(mixed $value): ?int
     {
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
-    }
-
-    private function dateTime(mixed $value): ?string
-    {
-        $value = is_scalar($value) ? trim((string) $value) : '';
-
-        return $value === '' ? null : (new DateTimeImmutable($value))->format('Y-m-d H:i:s');
     }
 }

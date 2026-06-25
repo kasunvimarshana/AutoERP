@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { TabPanel, Tabs, type TabItem } from '@/shared/components/Tabs';
 import { TenantDocumentsPanel } from './components/TenantDocumentsPanel';
@@ -11,13 +12,10 @@ type TenantTab = 'profile' | 'domains' | 'documents';
 
 export default function TenantWorkspacePage() {
     const auth = useAuth();
-    const availableTabs = useMemo<TabItem<TenantTab>[]>(() => {
-        const tabs: TabItem<TenantTab>[] = [];
-        if (auth.permissions.includes(tenantPermissions.profileView)) tabs.push({ id: 'profile', label: 'Profile' });
-        if (auth.permissions.includes(tenantPermissions.domainsView)) tabs.push({ id: 'domains', label: 'Verified domains' });
-        if (auth.permissions.includes(tenantPermissions.documentsView)) tabs.push({ id: 'documents', label: 'Private documents' });
-        return tabs;
-    }, [auth.permissions]);
+    const availableTabs: TabItem<TenantTab>[] = [];
+    if (hasPermission(auth, tenantPermissions.profileView)) availableTabs.push({ id: 'profile', label: 'Profile' });
+    if (hasPermission(auth, tenantPermissions.domainsView)) availableTabs.push({ id: 'domains', label: 'Verified domains' });
+    if (hasPermission(auth, tenantPermissions.documentsView)) availableTabs.push({ id: 'documents', label: 'Private documents' });
     const [selectedTab, setSelectedTab] = useState<TenantTab>('profile');
     const activeTab = availableTabs.some((tab) => tab.id === selectedTab) ? selectedTab : availableTabs[0]?.id ?? 'profile';
 
@@ -30,13 +28,15 @@ export default function TenantWorkspacePage() {
             <div className="space-y-5">
                 <Tabs id="tenant-workspace" tabs={availableTabs} active={activeTab} onChange={setSelectedTab} />
                 <TabPanel tabsId="tenant-workspace" tabId="profile" active={activeTab}>
-                    <TenantProfilePanel canManage={auth.permissions.includes(tenantPermissions.profileManage)} />
+                    <TenantProfilePanel
+                        canManage={hasPermission(auth, tenantPermissions.profileManage)}
+                    />
                 </TabPanel>
                 <TabPanel tabsId="tenant-workspace" tabId="domains" active={activeTab}>
-                    <TenantDomainsPanel canManage={auth.permissions.includes(tenantPermissions.domainsManage)} />
+                    <TenantDomainsPanel canManage={hasPermission(auth, tenantPermissions.domainsManage)} />
                 </TabPanel>
                 <TabPanel tabsId="tenant-workspace" tabId="documents" active={activeTab}>
-                    <TenantDocumentsPanel canManage={auth.permissions.includes(tenantPermissions.documentsManage)} />
+                    <TenantDocumentsPanel canManage={hasPermission(auth, tenantPermissions.documentsManage)} />
                 </TabPanel>
             </div>
         </>

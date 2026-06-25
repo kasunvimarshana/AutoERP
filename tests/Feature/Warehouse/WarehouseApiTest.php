@@ -305,7 +305,6 @@ final class WarehouseApiTest extends TestCase
         $email = (string) ($overrides['email'] ?? Str::lower($code).'@example.test');
         $userId = (int) DB::table('users')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'first_name' => 'Warehouse',
             'last_name' => 'Tester',
             'email' => $email,
@@ -385,13 +384,14 @@ final class WarehouseApiTest extends TestCase
 
     private function assignOrganizationUnit(array $context, int $organizationUnitId, bool $isDefault = false): void
     {
-        DB::table('user_tenants')->updateOrInsert([
+        DB::table('user_organization_units')->updateOrInsert([
             'tenant_id' => $context['tenant_id'],
             'organization_unit_id' => $organizationUnitId,
             'user_id' => $context['user_id'],
         ], [
-            'role_id' => $context['role_id'] ?? null,
+            'status' => 'active',
             'is_default' => $isDefault,
+            'default_marker' => $isDefault ? 'default' : null,
             'row_version' => 1,
             'created_at' => now(),
             'updated_at' => now(),

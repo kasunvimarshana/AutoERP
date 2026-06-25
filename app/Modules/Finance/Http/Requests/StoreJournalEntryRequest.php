@@ -23,7 +23,7 @@ final class StoreJournalEntryRequest extends TenantScopedRequest
             'journal_number' => ['nullable', 'string', 'max:100'],
             'fiscal_year_id' => ['nullable', 'integer', 'min:1'],
             'fiscal_period_id' => ['nullable', 'integer', 'min:1'],
-            'posting_profile_id' => ['nullable', 'integer', 'min:1', 'exists:finance_posting_profiles,id'],
+            'posting_profile_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('finance_posting_profiles', 'id')],
             'source_module' => ['nullable', 'string', 'max:100', 'required_with:source_type'],
             'source_type' => ['nullable', 'string', 'max:150', 'required_with:source_id'],
             'source_id' => ['nullable', 'integer', 'min:1', 'required_with:source_type'],
@@ -38,7 +38,7 @@ final class StoreJournalEntryRequest extends TenantScopedRequest
             'lines.*.debit' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.credit' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.description' => ['nullable', 'string'],
-            'lines.*.dimension_id' => ['nullable', 'integer', 'min:1', 'exists:finance_dimensions,id'],
+            'lines.*.dimension_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('finance_dimensions', 'id')],
             'lines.*.source_line_type' => ['nullable', 'string', 'max:150'],
             'lines.*.source_line_id' => ['nullable', 'integer', 'min:1'],
         ];

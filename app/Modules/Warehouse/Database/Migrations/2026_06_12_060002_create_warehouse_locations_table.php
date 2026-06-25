@@ -14,11 +14,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('warehouse_id')->constrained('warehouses', 'id', 'warehouse_locations_warehouse_id_fk')->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')->nullOnDelete();
+            $table->foreignId('warehouse_id');
+            $table->foreignId('parent_id')->nullable();
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('path')->nullable();
@@ -38,6 +38,20 @@ return new class extends Migration
             $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_parent_idx');
             $table->index(['warehouse_id', 'is_default'], 'warehouse_locations_default_idx');
             $table->index(['warehouse_id', 'path'], 'warehouse_locations_path_idx');
+
+            $table->unique(['id', 'tenant_id'], 'warehouse_locations_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'warehouse_locations_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['warehouse_id', 'tenant_id'], 'warehouse_locations_warehouse_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouses')
+                ->cascadeOnDelete();
+            $table->foreign(['parent_id', 'tenant_id'], 'warehouse_locations_parent_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('warehouse_locations')
+                ->restrictOnDelete();
         });
     }
 

@@ -11,6 +11,7 @@ $middleware = [
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+    'tenant.feature:finance',
 ];
 
 Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.')->group(function (): void {

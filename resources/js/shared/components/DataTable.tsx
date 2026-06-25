@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export interface DataColumn<T> {
@@ -12,7 +12,7 @@ export interface DataColumn<T> {
 export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref }: {
     rows: T[];
     columns: DataColumn<T>[];
-    rowKey: (row: T) => string | number;
+    rowKey: (row: T, index: number) => string | number;
     emptyMessage?: string;
     mobileSummary?: (row: T) => ReactNode;
     mobileDetails?: (row: T) => ReactNode;
@@ -21,10 +21,12 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     rowHref?: (row: T) => string;
 }) {
     const navigate = useNavigate();
-    const openRow = (event: MouseEvent, row: T) => {
+    const openRow = (event: MouseEvent | KeyboardEvent, row: T) => {
         if (!rowHref || event.defaultPrevented) return;
         const target = event.target;
         if (target instanceof Element && target.closest('a, button, input, select, textarea, summary')) return;
+        if ('key' in event && event.key !== 'Enter' && event.key !== ' ') return;
+        if ('key' in event) event.preventDefault();
         navigate(rowHref(row));
     };
 
@@ -40,8 +42,15 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-3 p-3 md:hidden">
-                {rows.map((row) => (
-                    <article key={rowKey(row)} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowHref ? 'cursor-pointer' : ''}`} onClick={(event) => openRow(event, row)}>
+                {rows.map((row, index) => (
+                    <article
+                        key={rowKey(row, index)}
+                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500' : ''}`}
+                        tabIndex={rowHref ? 0 : undefined}
+                        role={rowHref ? 'link' : undefined}
+                        onClick={(event) => openRow(event, row)}
+                        onKeyDown={(event) => openRow(event, row)}
+                    >
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 font-semibold text-slate-900">{mobileSummary ? mobileSummary(row) : columns[0]?.render(row)}</div>
                             {rowBadge?.(row)}
@@ -64,8 +73,14 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                         <tr>{columns.map((column) => <th key={column.key} className={`px-4 py-3 font-semibold ${column.className ?? ''}`}>{column.header}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {rows.map((row) => (
-                            <tr key={rowKey(row)} className={`transition-colors hover:bg-blue-50/40 ${rowHref ? 'cursor-pointer' : ''}`} onClick={(event) => openRow(event, row)}>
+                        {rows.map((row, index) => (
+                            <tr
+                                key={rowKey(row, index)}
+                                className={`transition-colors hover:bg-blue-50/40 ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500' : ''}`}
+                                tabIndex={rowHref ? 0 : undefined}
+                                onClick={(event) => openRow(event, row)}
+                                onKeyDown={(event) => openRow(event, row)}
+                            >
                                 {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 ${column.className ?? ''}`}>{column.render(row)}</td>)}
                             </tr>
                         ))}

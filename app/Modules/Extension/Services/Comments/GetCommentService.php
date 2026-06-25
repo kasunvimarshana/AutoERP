@@ -25,7 +25,12 @@ final class GetCommentService
 
             return Result::success($record);
         } catch (Throwable $exception) {
-            return Result::failure(new Error(ExtensionErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(
+                ExtensionErrorCode::INVALID_VALUE,
+                'Unable to retrieve the comment for the active tenant.',
+            ));
         }
     }
 }

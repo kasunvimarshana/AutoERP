@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('payment_number', 100);
             $table->enum('payment_type', [
                 'supplier_payment',
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('reference_number')->nullable();
             $table->string('cheque_number', 100)->nullable();
             $table->date('cheque_date')->nullable();
-            $table->foreignId('bank_account_id')->nullable()->constrained('finance_accounts', 'id')->nullOnDelete();
+            $table->foreignId('bank_account_id')->nullable();
             $table->string('payee_name')->nullable();
             $table->text('amount_in_words')->nullable();
             $table->enum('status', [
@@ -60,13 +60,13 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('unapplied_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');
-            $table->foreignId('finance_journal_entry_id')->nullable()->constrained('finance_journal_entries', 'id')->nullOnDelete();
+            $table->foreignId('finance_journal_entry_id')->nullable();
             $table->string('posting_correlation_key', 160)->nullable();
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->timestamp('reversed_at')->nullable();
             $table->text('reversal_reason')->nullable();
-            $table->foreignId('reversal_payment_id')->nullable()->constrained('payments', 'id')->nullOnDelete();
-            $table->foreignId('original_payment_id')->nullable()->constrained('payments', 'id')->nullOnDelete();
+            $table->foreignId('reversal_payment_id')->nullable();
+            $table->foreignId('original_payment_id')->nullable();
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -90,6 +90,45 @@ return new class extends Migration
             $table->unique('posting_correlation_key', 'payments_posting_correlation_uk');
             $table->index('finance_journal_entry_id', 'payments_finance_journal_idx');
             $table->index('original_payment_id', 'payments_original_payment_idx');
+
+            $table->unique(['id', 'tenant_id'], 'payments_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'payments_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['bank_account_id', 'tenant_id'], 'payments_bank_account_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_accounts')
+                ->restrictOnDelete();
+            $table->foreign(['finance_journal_entry_id', 'tenant_id'], 'payments_finance_journal_entry_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('finance_journal_entries')
+                ->restrictOnDelete();
+            $table->foreign(['reversal_payment_id', 'tenant_id'], 'payments_reversal_payment_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('payments')
+                ->restrictOnDelete();
+            $table->foreign(['original_payment_id', 'tenant_id'], 'payments_original_payment_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('payments')
+                ->restrictOnDelete();
+
+            $table->foreign(['reversed_by', 'tenant_id'], 'payments_reversed_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['created_by', 'tenant_id'], 'payments_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'payments_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['voided_by', 'tenant_id'], 'payments_voided_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

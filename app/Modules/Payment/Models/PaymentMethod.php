@@ -7,13 +7,13 @@ namespace Modules\Payment\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentMethodDirection;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Tenant\Models\TenantModel;
 
-final class PaymentMethod extends CoreModel
+final class PaymentMethod extends TenantOwnedModel
 {
     use SoftDeletes;
 
@@ -42,9 +42,13 @@ final class PaymentMethod extends CoreModel
             if (trim((string) $method->scope_key) === '') {
                 $tenantId = $method->tenant_id === null ? null : (int) $method->tenant_id;
                 $organizationUnitId = $method->organization_unit_id === null ? null : (int) $method->organization_unit_id;
-                $method->scope_key = $tenantId === null
-                    ? 'global'
-                    : ($organizationUnitId === null ? 'tenant:'.$tenantId : 'org:'.$tenantId.':'.$organizationUnitId);
+                if ($tenantId === null) {
+                    throw new \LogicException('Payment methods must belong to a tenant.');
+                }
+
+                $method->scope_key = $organizationUnitId === null
+                    ? 'tenant:'.$tenantId
+                    : 'org:'.$tenantId.':'.$organizationUnitId;
             }
         });
     }

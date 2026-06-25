@@ -3,9 +3,9 @@ declare(strict_types=1);
 namespace Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Enums\EmployeeRateType;
-final class HrEmployeeRate extends CoreModel
+final class HrEmployeeRate extends TenantOwnedModel
 {
     protected $table = 'hr_employee_rates';
     protected $guarded = ['id'];

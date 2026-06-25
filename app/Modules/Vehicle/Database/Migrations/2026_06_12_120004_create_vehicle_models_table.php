@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('vehicle_models', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
-            $table->foreignId('vehicle_make_id')->constrained('vehicle_makes')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('vehicle_make_id');
             $table->string('code');
             $table->string('name');
             $table->unsignedSmallInteger('year_from')->nullable();
@@ -27,6 +27,16 @@ return new class extends Migration
             $table->unique(['tenant_id', 'vehicle_make_id', 'code'], 'vehicle_models_tenant_make_code_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_models_tenant_org_idx');
             $table->index('vehicle_make_id', 'vehicle_models_make_idx');
+
+            $table->unique(['id', 'tenant_id'], 'vehicle_models_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_models_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['vehicle_make_id', 'tenant_id'], 'vehicle_models_vehicle_make_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_makes')
+                ->cascadeOnDelete();
         });
     }
 

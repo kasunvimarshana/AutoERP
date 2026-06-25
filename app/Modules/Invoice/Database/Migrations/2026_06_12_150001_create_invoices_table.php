@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
             $table->string('invoice_number', 100);
             $table->enum('invoice_type', ['purchase', 'sales', 'service', 'rental', 'manual', 'credit', 'debit']);
             $table->enum('direction', ['inbound', 'outbound']);
@@ -45,6 +45,21 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'invoices_tenant_org_idx');
             $table->index(['invoice_type', 'direction', 'status'], 'invoices_type_direction_status_idx');
             $table->index(['party_type', 'party_id'], 'invoices_party_idx');
+
+            $table->unique(['id', 'tenant_id'], 'invoices_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'invoices_organization_unit_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+
+            $table->foreign(['created_by', 'tenant_id'], 'invoices_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'invoices_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

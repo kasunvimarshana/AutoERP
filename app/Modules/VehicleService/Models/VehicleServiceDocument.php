@@ -6,9 +6,9 @@ namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class VehicleServiceDocument extends CoreModel
+final class VehicleServiceDocument extends TenantOwnedModel
 {
     use SoftDeletes;
 
@@ -22,6 +22,7 @@ final class VehicleServiceDocument extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'vehicle_service_job_id' => 'integer',
+            'size_bytes' => 'integer',
             'uploaded_by' => 'integer',
         ]);
     }

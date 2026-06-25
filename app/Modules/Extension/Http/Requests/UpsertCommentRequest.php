@@ -4,36 +4,43 @@ declare(strict_types=1);
 
 namespace Modules\Extension\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertCommentRequest extends FormRequest
+final class UpsertCommentRequest extends TenantScopedRequest
 {
-    public function authorize(): bool
-    {
-        return auth()->check();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
+        $entityTypes = $this->allowedEntityTypes();
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'row_version' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units')],
             'metadata' => ['nullable', 'array'],
-            'commentable_type' => array_merge($required, ['string', 'max:255']),
-            'commentable_id' => array_merge($required, ['integer', 'min:1']),
+            'commentable_type' => [...$required, 'string', Rule::in($entityTypes)],
+            'commentable_id' => [...$required, 'integer', 'min:1'],
             'source_module' => ['nullable', 'string', 'max:100'],
-            'source_type' => ['nullable', 'string', 'max:100'],
-            'source_id' => ['nullable', 'integer', 'min:1'],
+            'source_type' => ['nullable', 'required_with:source_id', 'string', Rule::in($entityTypes)],
+            'source_id' => ['nullable', 'required_with:source_type', 'integer', 'min:1'],
             'source_reference' => ['nullable', 'string', 'max:255'],
             'source_context' => ['nullable', 'array'],
-            'body' => array_merge($required, ['string']),
-            'author_id' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
+            'body' => [...$required, 'string'],
+            'author_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('users')],
         ];
+    }
+
+    private function tenantExists(string $table): mixed
+    {
+        return Rule::exists($table, 'id')->where(
+            fn ($query) => $query->where('tenant_id', $this->tenantId()),
+        );
+    }
+
+    /** @return list<string> */
+    private function allowedEntityTypes(): array
+    {
+        return array_map('strval', array_keys((array) config('extension.entity_types', [])));
     }
 }

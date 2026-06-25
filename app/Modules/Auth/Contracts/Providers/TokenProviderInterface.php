@@ -26,5 +26,7 @@ interface TokenProviderInterface
 
     public function revokeAccessToken(string $plainAccessToken, ?int $tenantId = null): bool;
 
+    public function revokeRefreshToken(string $plainRefreshToken, ?int $tenantId = null): bool;
+
     public function revokeSessionTokens(int $sessionId, ?int $tenantId = null): void;
 }

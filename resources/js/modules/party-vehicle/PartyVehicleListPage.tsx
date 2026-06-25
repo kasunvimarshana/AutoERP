@@ -16,6 +16,7 @@ import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { ApiCollection, ListParams } from '@/shared/types/api';
 import type { PartyVehicleRelationship } from '@/shared/types/partyVehicle';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 
 interface LookupProps<T> { value: T | null; onChange: (value: T | null) => void }
 export function PartyVehicleListPage<P extends { id: number }, V extends { id: number }>({ partyKey, title, createPath, editPath, permissions, PartyLookup, VehicleLookup, list, setCurrent, clearCurrent, end }: {
@@ -25,7 +26,7 @@ export function PartyVehicleListPage<P extends { id: number }, V extends { id: n
     list: (params: ListParams, signal?: AbortSignal) => Promise<ApiCollection<PartyVehicleRelationship>>;
     setCurrent: (id: number) => Promise<PartyVehicleRelationship>; clearCurrent: (id: number) => Promise<PartyVehicleRelationship>; end: (id: number) => Promise<PartyVehicleRelationship>;
 }) {
-    const auth = useAuth(); const can = (permission: string) => auth.permissions.includes(permission);
+    const auth = useAuth(); const can = (permission: string) => hasPermission(auth, permission);
     const [search,setSearch]=useState(''); const [party,setParty]=useState<P|null>(null); const [vehicle,setVehicle]=useState<V|null>(null); const [current,setCurrentFilter]=useState(''); const [status,setStatus]=useState(''); const [sort,setSort]=useState('started_at'); const [direction,setDirection]=useState('desc'); const [page,setPage]=useState(1); const [actionError,setActionError]=useState<ApiError|null>(null); const [busy,setBusy]=useState<number|null>(null); const debounced=useDebounce(search); const {confirm,confirmDialog}=useConfirmDialog();
     const result=useApi((signal)=>list({search:debounced,[`${partyKey}_id`]:party?.id,vehicle_id:vehicle?.id,is_current:current===''?undefined:current==='true',status:status||undefined,sort,direction,page,per_page:25},signal),[debounced,party?.id,vehicle?.id,current,status,sort,direction,page]);
     const mutate=async(row:PartyVehicleRelationship,action:'set'|'clear'|'end')=>{const labels={set:'set this relationship as current',clear:'clear the current relationship',end:'end this relationship'};if(!await confirm({title:`Confirm ${action}`,message:`Are you sure you want to ${labels[action]}?`,confirmLabel:action==='end'?'End relationship':'Confirm',danger:action!=='set'}))return;setBusy(row.id);setActionError(null);try{if(action==='set')await setCurrent(row.id);else if(action==='clear')await clearCurrent(row.id);else await end(row.id);result.reload();}catch(error){setActionError(toApiError(error));}finally{setBusy(null);}};

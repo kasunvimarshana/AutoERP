@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { EmployeeSummary } from "@/modules/hr/hrTypes";
 import { useAuth } from "@/modules/auth/AuthProvider";
+import { hasPermission } from "@/modules/auth/accessControl";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DataTable, type DataColumn } from "@/shared/components/DataTable";
@@ -14,8 +15,10 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Textarea } from "@/shared/components/Textarea";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
+import { parsePositiveInteger } from "@/shared/utils/routeParams";
 import { RentalDriverLookupSelect } from "../components/RentalDriverLookupSelect";
 import { RentalPage } from "../components/RentalPage";
 import {
@@ -47,7 +50,7 @@ interface UsageForm {
 }
 
 const emptyForm = (): UsageForm => ({
-    usage_date: new Date().toISOString().slice(0, 10),
+    usage_date: businessDateInputValue(),
     started_at: "",
     ended_at: "",
     start_odometer: "",
@@ -68,7 +71,7 @@ const emptyForm = (): UsageForm => ({
 export default function RentalRunningChartPage() {
     const auth = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const allocationId = Number(searchParams.get("allocation_id") ?? 0);
+    const allocationId = parsePositiveInteger(searchParams.get("allocation_id"));
     const [form, setForm] = useState<UsageForm>(emptyForm);
     const [driver, setDriver] = useState<EmployeeSummary | null>(null);
     const [saving, setSaving] = useState(false);
@@ -83,13 +86,13 @@ export default function RentalRunningChartPage() {
         (signal) =>
             listRentalUsageLogs(
                 {
-                    vehicle_allocation_id: allocationId || undefined,
+                    vehicle_allocation_id: allocationId ?? undefined,
                     per_page: 50,
                 },
                 signal,
             ),
         [allocationId],
-        allocationId > 0,
+        allocationId !== null,
     );
 
     const allocationOptions = useMemo(
@@ -100,16 +103,12 @@ export default function RentalRunningChartPage() {
             })),
         [allocations.data],
     );
-    const canRecord = auth.permissions.includes(
-        vehicleRentalPermissions.usageRecord,
-    );
-    const canApprove = auth.permissions.includes(
-        vehicleRentalPermissions.usageApprove,
-    );
+    const canRecord = hasPermission(auth, vehicleRentalPermissions.usageRecord);
+    const canApprove = hasPermission(auth, vehicleRentalPermissions.usageApprove);
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!allocationId) return;
+        if (allocationId === null) return;
         setSaving(true);
         setActionError(null);
         try {
@@ -228,7 +227,7 @@ export default function RentalRunningChartPage() {
             <Panel title="Context">
                 <Select
                     label="Active allocation"
-                    value={allocationId ? String(allocationId) : ""}
+                    value={allocationId !== null ? String(allocationId) : ""}
                     onChange={(event) =>
                         setSearchParams(
                             event.target.value
@@ -239,7 +238,7 @@ export default function RentalRunningChartPage() {
                     options={allocationOptions}
                 />
             </Panel>
-            {canRecord && allocationId > 0 && (
+            {canRecord && allocationId !== null && (
                 <form onSubmit={save} className="mt-5 space-y-5">
                     <Panel title="New usage entry">
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

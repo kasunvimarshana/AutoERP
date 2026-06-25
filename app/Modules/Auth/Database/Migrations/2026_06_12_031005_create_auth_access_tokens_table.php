@@ -13,19 +13,21 @@ return new class extends Migration
         Schema::create('auth_access_tokens', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('organization_unit_id')->nullable();
+            $table->json('metadata')->nullable();
 
-            $table->foreignId('provider_id')->nullable()->constrained('auth_providers', 'id')->nullOnDelete();
-            $table->foreignId('client_id')->nullable()->constrained('auth_clients', 'id')->nullOnDelete();
-            $table->foreignId('identity_id')->nullable()->constrained('auth_identities', 'id')->nullOnDelete();
-            $table->foreignId('session_id')->nullable()->constrained('auth_sessions', 'id')->nullOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained('users', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('provider_id')->nullable();
+            $table->unsignedBigInteger('client_id')->nullable();
+            $table->unsignedBigInteger('identity_id')->nullable();
+            $table->unsignedBigInteger('session_id')->nullable();
+            $table->unsignedBigInteger('platform_session_id')->nullable();
+            $table->foreignId('user_id')->constrained('users', 'id')->cascadeOnDelete();
             $table->string('token_key', 120)->comment('Public token identifier (jti-like)');
             $table->string('token_hash')->comment('Hashed token secret');
             $table->json('scopes')->nullable();
             $table->string('grant_type', 80)->nullable();
+            $table->string('token_scope', 24);
             $table->string('status', 40)->default('active');
             $table->timestamp('issued_at');
             $table->timestamp('expires_at')->nullable();
@@ -34,7 +36,38 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'token_key'], 'auth_access_tokens_key_uk');
+            $table->unique(['id', 'tenant_id'], 'auth_access_tokens_id_tenant_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_access_tokens_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['provider_id', 'tenant_id'], 'auth_access_tokens_provider_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_providers')
+                ->cascadeOnDelete();
+            $table->foreign(['client_id', 'tenant_id'], 'auth_access_tokens_client_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_clients')
+                ->cascadeOnDelete();
+            $table->foreign(['identity_id', 'tenant_id'], 'auth_access_tokens_identity_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_identities')
+                ->cascadeOnDelete();
+            $table->foreign(['session_id', 'tenant_id'], 'auth_access_tokens_session_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('auth_sessions')
+                ->cascadeOnDelete();
+            $table->foreign('platform_session_id', 'auth_access_tokens_platform_session_fk')
+                ->references('id')
+                ->on('auth_platform_sessions')
+                ->cascadeOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'auth_access_tokens_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->cascadeOnDelete();
+            $table->unique('token_key', 'auth_access_tokens_key_uk');
+            $table->index(['token_scope', 'user_id', 'status'], 'auth_access_tokens_scope_user_idx');
+            $table->index(['platform_session_id', 'status'], 'auth_access_tokens_platform_session_idx');
             $table->index(['tenant_id', 'user_id', 'status'], 'auth_access_tokens_user_idx');
             $table->index(['tenant_id', 'session_id'], 'auth_access_tokens_session_idx');
         });
