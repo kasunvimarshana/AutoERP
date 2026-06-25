@@ -31,6 +31,7 @@ final class TenantDomainService
     public function __construct(
         private readonly TenantDomainRepositoryInterface $domains,
         private readonly TenantRules $rules,
+        private readonly TenantDomainReadinessPolicy $readinessPolicy,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
@@ -289,11 +290,7 @@ final class TenantDomainService
             if ($record === null) {
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant domain not found.'));
             }
-            if (
-                $record->get('status') !== TenantDomainStatus::ACTIVE
-                || $record->get('ownership_status') !== TenantDomainOwnershipStatus::VERIFIED
-                || $record->get('operational_status') !== TenantDomainOperationalStatus::READY
-            ) {
+            if (! $this->readinessPolicy->isReady($record)) {
                 return Result::failure(new Error(
                     TenantErrorCode::DOMAIN_NOT_VERIFIED,
                     'Only an ownership-verified, operationally ready domain can be primary.',

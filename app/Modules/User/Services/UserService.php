@@ -757,7 +757,6 @@ final class UserService extends AbstractUserCrudService
         foreach ($addIds as $roleId) {
             DB::table('user_roles')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->currentOrganizationUnit->currentOrganizationUnitId(),
                 'user_id' => $userId,
                 'role_id' => $roleId,
                 'row_version' => 1,

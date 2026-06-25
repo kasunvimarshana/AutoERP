@@ -25,6 +25,7 @@ use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use RuntimeException;
 use Throwable;
 
@@ -37,6 +38,7 @@ final class TenantSubscriptionLifecycleService
         private readonly TenantSubscriptionReadinessService $readiness,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly TenantActorSnapshotFactory $actorSnapshots,
         private readonly AuditRecorderInterface $audit,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
@@ -127,7 +129,7 @@ final class TenantSubscriptionLifecycleService
                         null,
                         TenantSubscriptionEventType::CANCELLED,
                         $reason,
-                        $this->currentUser->currentUserId(),
+                        $this->actorSnapshots->current(),
                         $this->clock->now(),
                     );
                     $this->recordAudit('cancelled', $tenant, $current, $updated, $reason);
@@ -200,6 +202,7 @@ final class TenantSubscriptionLifecycleService
                     }
 
                     $previousId = $current === null ? null : (int) $current->id();
+                    $actor = $this->actorSnapshots->current();
                     $subscription = $this->subscriptions->createRevision($tenantId, [
                         'operation' => $operation,
                         'tenant_plan_revision_id' => $resolved['plan_revision_id'],
@@ -211,12 +214,17 @@ final class TenantSubscriptionLifecycleService
                         'change_reason' => $reason,
                         'plan_name' => (string) ($planRevision->get('plan')['name'] ?? ''),
                         'plan_slug' => (string) ($planRevision->get('plan')['slug'] ?? ''),
+                        'plan_features_schema_version' => (int) $planRevision->get('features_schema_version', TenantPlanSchema::SCHEMA_VERSION),
                         'plan_features' => is_array($planRevision->get('features')) ? $planRevision->get('features') : [],
+                        'plan_limits_schema_version' => (int) $planRevision->get('limits_schema_version', TenantPlanSchema::SCHEMA_VERSION),
                         'plan_limits' => is_array($planRevision->get('limits')) ? $planRevision->get('limits') : [],
                         'price' => $planRevision->get('price', 0),
                         'currency_code' => (string) ($planRevision->get('currency')['code'] ?? ''),
                         'currency_symbol' => $planRevision->get('currency')['symbol'] ?? null,
                         'billing_interval' => (string) $planRevision->get('billing_interval'),
+                        'created_by_type' => $actor['type'],
+                        'created_by_name' => $actor['name'],
+                        'created_by_email' => $actor['email'],
                     ], $this->currentUser->currentUserId());
 
                     $assigned = $this->subscriptions->assignCurrent(
@@ -243,7 +251,7 @@ final class TenantSubscriptionLifecycleService
                         $previousId,
                         $eventType,
                         $reason,
-                        $this->currentUser->currentUserId(),
+                        $actor,
                         $this->clock->now(),
                     );
                     $this->recordAudit($eventType, $tenant, $current, $assigned, $reason);

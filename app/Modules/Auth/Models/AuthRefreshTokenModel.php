@@ -6,12 +6,10 @@ namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Auth\Models\Concerns\HasValidTokenScope;
-use Modules\Core\Models\CoreModel;
+use Modules\Core\Models\TenantOwnedModel;
 
-final class AuthRefreshTokenModel extends CoreModel
+final class AuthRefreshTokenModel extends TenantOwnedModel
 {
-    use HasValidTokenScope;
     use SoftDeletes;
 
     protected $table = 'auth_refresh_tokens';
@@ -26,14 +24,12 @@ final class AuthRefreshTokenModel extends CoreModel
         'client_id',
         'identity_id',
         'session_id',
-        'platform_session_id',
         'user_id',
         'refresh_key',
         'refresh_hash',
         'rotated',
         'rotated_at',
         'replaced_by_expires_at',
-        'token_scope',
         'status',
         'issued_at',
         'expires_at',

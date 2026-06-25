@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tenant_onboarding_states', function (Blueprint $table): void {
-            $table->foreignId('tenant_id')->primary()->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->primary()->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->enum('status', [
                 'pending',
@@ -29,7 +29,6 @@ return new class extends Migration
             $table->unsignedBigInteger('root_organization_unit_id')->nullable();
             $table->unsignedBigInteger('super_admin_role_id')->nullable();
             $table->unsignedBigInteger('invitation_id')->nullable();
-            $table->json('completed_steps')->nullable();
             $table->string('failed_step', 80)->nullable();
             $table->string('last_error_code', 100)->nullable();
             $table->string('last_error_message', 500)->nullable();

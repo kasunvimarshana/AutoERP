@@ -1,10 +1,45 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { AuthSession, CurrentUserResponse, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment } from './authTypes';
+import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection } from './authTypes';
 
 const platformAuthEndpoint = '/api/v1/platform/auth';
 
 export const authApi = {
+
+    async inspectInitialAdministratorInvitation(token: string, signal?: AbortSignal): Promise<InitialAdministratorInvitationInspection> {
+        const { data } = await apiClient.post<{ data: InitialAdministratorInvitationInspection }>(
+            '/api/v1/auth/initial-administrator/inspect',
+            { token },
+            { signal },
+        );
+        return data.data;
+    },
+
+    async acceptInitialAdministratorInvitation(payload: AcceptInitialAdministratorInvitationPayload): Promise<InitialAdministratorInvitationAcceptance> {
+        const { data } = await apiClient.post<{ data: InitialAdministratorInvitationAcceptance }>(
+            '/api/v1/auth/initial-administrator/accept',
+            payload,
+        );
+        return data.data;
+    },
+
+    async inspectPlatformOperatorInvitation(token: string, signal?: AbortSignal): Promise<PlatformOperatorInvitationInspection> {
+        const { data } = await apiClient.post<{ data: PlatformOperatorInvitationInspection }>(
+            '/api/v1/platform/operator-invitations/inspect',
+            { token },
+            { signal },
+        );
+        return data.data;
+    },
+
+    async acceptPlatformOperatorInvitation(payload: AcceptPlatformOperatorInvitationPayload): Promise<PlatformOperatorInvitationAcceptance> {
+        const { data } = await apiClient.post<{ data: PlatformOperatorInvitationAcceptance }>(
+            '/api/v1/platform/operator-invitations/accept',
+            payload,
+        );
+        return data.data;
+    },
+
     async login(payload: LoginPayload): Promise<AuthSession> {
         if (payload.auth_mode === 'platform') {
             const { data } = await apiClient.post<AuthSession>(`${platformAuthEndpoint}/login`, {

@@ -114,6 +114,7 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
                     tenantId: $context->tenantId,
                     organizationUnitId: $context->organizationUnitId,
                     key: $key,
+                    definitionVersion: 1,
                     storedValue: json_encode($value, JSON_THROW_ON_ERROR),
                     valueType: ConfigurationValueType::STRING,
                     sensitive: false,

@@ -20,7 +20,6 @@ use Modules\Tenant\Http\Support\TenantApiResponder;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionLifecycleService;
-use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 
 final class TenantSubscriptionController extends Controller
@@ -30,7 +29,6 @@ final class TenantSubscriptionController extends Controller
         private readonly TenantSubscriptionReadinessService $readiness,
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSubscriptionRepositoryInterface $subscriptions,
-        private readonly TenantSubscriptionPolicy $policy,
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
@@ -44,7 +42,7 @@ final class TenantSubscriptionController extends Controller
 
         return $subscription === null
             ? response()->json(['data' => null])
-            : new TenantSubscriptionResource($this->withEffectiveStatus($subscription));
+            : new TenantSubscriptionResource($subscription);
     }
 
     public function history(ListTenantSubscriptionHistoryRequest $request, int $tenant): JsonResponse
@@ -114,15 +112,7 @@ final class TenantSubscriptionController extends Controller
         $subscription = $result->valueOrFail();
         abort_unless($subscription instanceof DataRecord, 500, 'Unexpected tenant subscription response.');
 
-        return new TenantSubscriptionResource($this->withEffectiveStatus($subscription));
+        return new TenantSubscriptionResource($subscription);
     }
 
-    /** @return array<string, mixed> */
-    private function withEffectiveStatus(DataRecord $subscription): array
-    {
-        $values = $subscription->toArray();
-        $values['effective_status'] = $this->policy->statusAt($values);
-
-        return $values;
-    }
 }

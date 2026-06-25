@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class RoleModel extends TenantOwnedModel
@@ -23,7 +22,6 @@ final class RoleModel extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
         ]);
     }
 
@@ -32,10 +30,6 @@ final class RoleModel extends TenantOwnedModel
         return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
 
     public function permissions(): HasMany
     {

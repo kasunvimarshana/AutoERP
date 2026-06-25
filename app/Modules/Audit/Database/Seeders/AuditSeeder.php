@@ -26,14 +26,12 @@ final class AuditSeeder extends Seeder
                     ];
                     $existing = DB::table('permissions')->where($identity)->first([
                         'id',
-                        'organization_unit_id',
                         'module',
                         'description',
                         'row_version',
                         'deleted_at',
                     ]);
                     $catalogueValues = [
-                        'organization_unit_id' => null,
                         'module' => 'Audit',
                         'description' => $description,
                         'deleted_at' => null,
@@ -51,8 +49,7 @@ final class AuditSeeder extends Seeder
                         continue;
                     }
 
-                    $isCurrent = $existing->organization_unit_id === null
-                        && $existing->module === 'Audit'
+                    $isCurrent = $existing->module === 'Audit'
                         && $existing->description === $description
                         && $existing->deleted_at === null;
 

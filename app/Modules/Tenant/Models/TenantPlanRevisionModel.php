@@ -17,7 +17,7 @@ final class TenantPlanRevisionModel extends CoreModel
     protected $table = 'tenant_plan_revisions';
 
     protected $fillable = [
-        'tenant_plan_id', 'revision_number', 'features', 'limits', 'price',
+        'tenant_plan_id', 'revision_number', 'features_schema_version', 'features', 'limits_schema_version', 'limits', 'price',
         'currency_id', 'billing_interval', 'effective_at', 'change_note', 'created_by', 'created_at',
     ];
 
@@ -36,6 +36,8 @@ final class TenantPlanRevisionModel extends CoreModel
         return array_merge(parent::casts(), [
             'tenant_plan_id' => 'integer',
             'revision_number' => 'integer',
+            'features_schema_version' => 'integer',
+            'limits_schema_version' => 'integer',
             'features' => 'array',
             'limits' => 'array',
             'currency_id' => 'integer',

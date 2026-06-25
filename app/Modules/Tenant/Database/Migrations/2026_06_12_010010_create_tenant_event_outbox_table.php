@@ -23,6 +23,7 @@ return new class extends Migration
             $table->timestamp('available_at');
             $table->uuid('claim_token')->nullable();
             $table->timestamp('claimed_at')->nullable();
+            $table->timestamp('claim_lease_expires_at')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamp('dead_at')->nullable();
             $table->timestamps();

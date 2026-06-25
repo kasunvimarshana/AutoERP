@@ -15,6 +15,8 @@ final readonly class ConfigurationRevisionView
         public ?int $tenantId,
         public ?int $organizationUnitId,
         public string $key,
+        public int $definitionVersion,
+        public bool $definitionCompatible,
         public mixed $value,
         public bool $configured,
         public bool $sensitive,

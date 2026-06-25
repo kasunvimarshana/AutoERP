@@ -47,6 +47,19 @@ export const platformAdministrationApi = {
             reason,
         }).then((response) => response.data.data),
 
+    resendOperatorInvitation: (operator: PlatformOperator) =>
+        apiClient.post<ApiResource<PlatformOperator>>(`${PLATFORM_OPERATORS}/${operator.id}/invitation/resend`, {
+            expected_version: operator.row_version,
+        }).then((response) => response.data.data),
+
+    revokeOperatorInvitation: (operator: PlatformOperator, reason: string) =>
+        apiClient.delete<ApiResource<PlatformOperator>>(`${PLATFORM_OPERATORS}/${operator.id}/invitation`, {
+            data: {
+                expected_version: operator.row_version,
+                reason,
+            },
+        }).then((response) => response.data.data),
+
     listSessions: (params: { operator_id?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
         apiClient.get<PlatformSessionPage>(`${PLATFORM_AUTH}/sessions`, { params, signal }).then((response) => response.data),
 

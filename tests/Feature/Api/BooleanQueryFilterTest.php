@@ -149,7 +149,6 @@ final class BooleanQueryFilterTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'name' => 'Warehouse Filter Role',
             'guard_name' => 'web',
             'description' => 'Warehouse filter test role',
@@ -161,7 +160,6 @@ final class BooleanQueryFilterTest extends TestCase
         foreach (array_keys(WarehouseAuthorizationService::descriptions()) as $permissionName) {
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'name' => $permissionName,
                 'guard_name' => 'web',
                 'module' => 'Warehouse',
@@ -172,7 +170,6 @@ final class BooleanQueryFilterTest extends TestCase
             ]);
             DB::table('role_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,
@@ -183,7 +180,6 @@ final class BooleanQueryFilterTest extends TestCase
 
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'row_version' => 1,

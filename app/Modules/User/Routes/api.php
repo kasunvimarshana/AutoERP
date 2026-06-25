@@ -52,8 +52,20 @@ Route::prefix('api/user')
         Route::apiResource('user-devices', UserDeviceController::class);
     });
 
-$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
+
 $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
+
+Route::prefix('api/v1/platform/operator-invitations')
+    ->middleware(['api', $platformHost, 'throttle:10,1'])
+    ->name('api.v1.platform.operator-invitations.')
+    ->group(function (): void {
+        Route::post('inspect', [\Modules\User\Http\Controllers\Platform\PlatformOperatorInvitationController::class, 'inspect'])
+            ->name('inspect');
+        Route::post('accept', [\Modules\User\Http\Controllers\Platform\PlatformOperatorInvitationController::class, 'accept'])
+            ->name('accept');
+    });
+
+$platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
 $platformStepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
 
@@ -77,6 +89,14 @@ Route::prefix('api/v1/platform/operators')
         Route::post('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'store'])
             ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
             ->name('store');
+        Route::post('{operator}/invitation/resend', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'resendInvitation'])
+            ->whereNumber('operator')
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('invitation.resend');
+        Route::delete('{operator}/invitation', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'revokeInvitation'])
+            ->whereNumber('operator')
+            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])
+            ->name('invitation.revoke');
         Route::put('{operator}/permissions', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'permissions'])
             ->whereNumber('operator')
             ->middleware([$platformStepUp, 'platform.permission:'.\Modules\User\Constants\PlatformPermission::OPERATORS_MANAGE])

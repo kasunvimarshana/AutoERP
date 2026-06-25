@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Onboarding;
 
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantReadinessCheck;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
@@ -17,6 +16,7 @@ use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 
 final class TenantReadinessService
 {
@@ -30,6 +30,7 @@ final class TenantReadinessService
         private readonly TenantAuthenticationProvisionerInterface $authentication,
         private readonly TenantBaseCurrencyReadinessInterface $baseCurrencies,
         private readonly TenantSubscriptionPolicy $subscriptionPolicy,
+        private readonly TenantDomainReadinessPolicy $domainReadiness,
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
 
@@ -121,7 +122,7 @@ final class TenantReadinessService
                 TenantReadinessCheck::ACTIVE_PLAN => $plan !== null && (bool) ($plan['is_active'] ?? false),
                 TenantReadinessCheck::SUBSCRIPTION_VALID => $this->subscriptionPolicy->isUsable($subscriptionPayload),
                 TenantReadinessCheck::PRIMARY_DOMAIN_READY => $primaryDomain !== null
-                    && $primaryDomain->get('operational_status') === TenantDomainOperationalStatus::READY,
+                    && $this->domainReadiness->isReady($primaryDomain),
             ];
 
             $blockers = $this->blockers($checks);

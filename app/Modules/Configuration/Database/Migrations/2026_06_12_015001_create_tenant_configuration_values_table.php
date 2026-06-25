@@ -16,6 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->string('key', 191);
+            $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
             $table->enum('value_type', ConfigurationValueType::values());
             $table->boolean('is_sensitive')->default(false);

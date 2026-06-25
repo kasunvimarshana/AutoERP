@@ -17,6 +17,7 @@ use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
 use Modules\Tenant\Constants\TenantDomainStatus;
 use Modules\Tenant\Models\TenantDomainModel;
 use Modules\Tenant\Models\TenantPrimaryDomainModel;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use RuntimeException;
 
 final class EloquentTenantDomainRepository implements TenantDomainRepositoryInterface
@@ -28,6 +29,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
         private readonly TenantPrimaryDomainModel $primaryDomains,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
+        private readonly TenantDomainReadinessPolicy $readinessPolicy,
     ) {}
 
     public function pageByTenant(
@@ -103,13 +105,11 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             return null;
         }
 
-        $query = $this->domainQuery()
-            ->where('tenant_domains.tenant_id', $tenantId)
-            ->where('tenant_domains.id', (int) $assignment->getAttribute('tenant_domain_id'))
-            ->where('tenant_domains.status', TenantDomainStatus::ACTIVE)
-            ->where('tenant_domains.ownership_status', TenantDomainOwnershipStatus::VERIFIED)
-            ->where('tenant_domains.operational_status', TenantDomainOperationalStatus::READY)
-            ->whereNotNull('tenant_domains.verified_at');
+        $query = $this->readinessPolicy->applyReadyScope(
+            $this->domainQuery()
+                ->where('tenant_domains.tenant_id', $tenantId)
+                ->where('tenant_domains.id', (int) $assignment->getAttribute('tenant_domain_id')),
+        );
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
@@ -133,8 +133,21 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
         array $attributes,
     ): ?DataRecord {
         unset($attributes['tenant_id'], $attributes['id'], $attributes['is_primary']);
+        $current = $this->domains->newQuery()
+            ->whereKey($id)
+            ->where('tenant_id', $tenantId)
+            ->where('row_version', $expectedVersion)
+            ->first();
+        if (! $current instanceof TenantDomainModel) {
+            return null;
+        }
+
         $attributes['row_version'] = $expectedVersion + 1;
         $attributes['updated_at'] = $this->clock->now();
+        $this->readinessPolicy->assertValid([
+            ...$current->getAttributes(),
+            ...$attributes,
+        ]);
 
         $updated = $this->domains->newQuery()
             ->whereKey($id)
@@ -153,14 +166,11 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
     ): ?DataRecord {
         try {
             DB::transaction(function () use ($id, $tenantId, $expectedVersion, $updatedBy): void {
-                $target = $this->domains->newQuery()
+                $targetQuery = $this->domains->newQuery()
                     ->whereKey($id)
                     ->where('tenant_id', $tenantId)
-                    ->where('row_version', $expectedVersion)
-                    ->where('status', TenantDomainStatus::ACTIVE)
-                    ->where('ownership_status', TenantDomainOwnershipStatus::VERIFIED)
-                    ->where('operational_status', TenantDomainOperationalStatus::READY)
-                    ->whereNotNull('verified_at')
+                    ->where('row_version', $expectedVersion);
+                $target = $this->readinessPolicy->applyReadyScope($targetQuery, $this->domains->getTable())
                     ->lockForUpdate()
                     ->first();
 
@@ -251,6 +261,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             'verification_error_message' => $verified ? null : mb_substr(trim((string) $errorMessage), 0, 500),
             'revalidation_claim_token' => null,
             'revalidation_claimed_at' => null,
+            'revalidation_claim_lease_expires_at' => null,
             'row_version' => $expectedVersion + 1,
             'updated_at' => $attemptedAt,
         ];
@@ -276,21 +287,21 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
     public function claimDueForRevalidation(
         DateTimeInterface $dueAt,
         DateTimeInterface $claimedAt,
-        DateTimeInterface $staleBefore,
+        DateTimeInterface $leaseExpiresAt,
         string $claimToken,
         int $limit,
     ): array {
         return $this->executionContext->runAsControlPlane(function () use (
             $dueAt,
             $claimedAt,
-            $staleBefore,
+            $leaseExpiresAt,
             $claimToken,
             $limit,
         ): array {
             return DB::transaction(function () use (
                 $dueAt,
                 $claimedAt,
-                $staleBefore,
+                $leaseExpiresAt,
                 $claimToken,
                 $limit,
             ): array {
@@ -301,9 +312,9 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                     ->whereNotNull('verified_token_hash')
                     ->whereNotNull('revalidation_due_at')
                     ->where('revalidation_due_at', '<=', $dueAt)
-                    ->where(function (Builder $query) use ($staleBefore): void {
-                        $query->whereNull('revalidation_claimed_at')
-                            ->orWhere('revalidation_claimed_at', '<=', $staleBefore);
+                    ->where(function (Builder $query) use ($claimedAt): void {
+                        $query->whereNull('revalidation_claim_lease_expires_at')
+                            ->orWhere('revalidation_claim_lease_expires_at', '<=', $claimedAt);
                     })
                     ->orderBy('revalidation_due_at')
                     ->limit(max(1, min($limit, 500)))
@@ -318,6 +329,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                         ->update([
                             'revalidation_claim_token' => $claimToken,
                             'revalidation_claimed_at' => $claimedAt,
+                            'revalidation_claim_lease_expires_at' => $leaseExpiresAt,
                             'row_version' => $version + 1,
                             'updated_at' => $claimedAt,
                         ]);
@@ -337,21 +349,21 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
     public function claimDueForOperationalVerification(
         DateTimeInterface $dueAt,
         DateTimeInterface $claimedAt,
-        DateTimeInterface $staleBefore,
+        DateTimeInterface $leaseExpiresAt,
         string $claimToken,
         int $limit,
     ): array {
         return $this->executionContext->runAsControlPlane(function () use (
             $dueAt,
             $claimedAt,
-            $staleBefore,
+            $leaseExpiresAt,
             $claimToken,
             $limit,
         ): array {
             return DB::transaction(function () use (
                 $dueAt,
                 $claimedAt,
-                $staleBefore,
+                $leaseExpiresAt,
                 $claimToken,
                 $limit,
             ): array {
@@ -365,9 +377,9 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                     ->whereNotNull('operational_probe_token_hash')
                     ->whereNotNull('operational_retry_at')
                     ->where('operational_retry_at', '<=', $dueAt)
-                    ->where(function (Builder $query) use ($staleBefore): void {
-                        $query->whereNull('operational_claimed_at')
-                            ->orWhere('operational_claimed_at', '<=', $staleBefore);
+                    ->where(function (Builder $query) use ($claimedAt): void {
+                        $query->whereNull('operational_claim_lease_expires_at')
+                            ->orWhere('operational_claim_lease_expires_at', '<=', $claimedAt);
                     })
                     ->orderBy('operational_retry_at')
                     ->limit(max(1, min($limit, 500)))
@@ -380,9 +392,11 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                         ->whereKey($record->getKey())
                         ->where('row_version', $version)
                         ->update([
+                            'status' => TenantDomainStatus::PENDING,
                             'operational_status' => TenantDomainOperationalStatus::CHECKING,
                             'operational_claim_token' => $claimToken,
                             'operational_claimed_at' => $claimedAt,
+                            'operational_claim_lease_expires_at' => $leaseExpiresAt,
                             'row_version' => $version + 1,
                             'updated_at' => $claimedAt,
                         ]);
@@ -416,6 +430,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             ->update([
                 'revalidation_claim_token' => null,
                 'revalidation_claimed_at' => null,
+            'revalidation_claim_lease_expires_at' => null,
                 'verification_error_code' => mb_substr(trim((string) $errorCode), 0, 100),
                 'verification_error_message' => mb_substr(trim((string) $errorMessage), 0, 500),
                 'row_version' => $expectedVersion + 1,
@@ -475,11 +490,16 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                         'last_verification_attempt_at' => $attemptedAt,
                         'verification_failure_count' => DB::raw('verification_failure_count + 1'),
                         'ownership_status' => TenantDomainOwnershipStatus::FAILED,
-                        'operational_status' => TenantDomainOperationalStatus::FAILED,
+                        'verified_at' => null,
+                        'routing_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
+                        'tls_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
+                        'reachability_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
+                        'operational_status' => TenantDomainOperationalStatus::DISABLED,
                         'verification_error_code' => mb_substr(trim((string) $errorCode), 0, 100),
                         'verification_error_message' => mb_substr(trim((string) $errorMessage), 0, 500),
                         'revalidation_claim_token' => null,
                         'revalidation_claimed_at' => null,
+            'revalidation_claim_lease_expires_at' => null,
                         'row_version' => $expectedVersion + 1,
                         'updated_by' => $updatedBy,
                         'updated_at' => $attemptedAt,
@@ -491,13 +511,10 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
 
                 $fallback = null;
                 if ($wasPrimary) {
-                    $fallbackModel = $this->domains->newQuery()
+                    $fallbackQuery = $this->domains->newQuery()
                         ->where('tenant_id', $tenantId)
-                        ->where('id', '!=', $target->getKey())
-                        ->where('status', TenantDomainStatus::ACTIVE)
-                        ->where('ownership_status', TenantDomainOwnershipStatus::VERIFIED)
-                        ->where('operational_status', TenantDomainOperationalStatus::READY)
-                        ->whereNotNull('verified_at')
+                        ->where('id', '!=', $target->getKey());
+                    $fallbackModel = $this->readinessPolicy->applyReadyScope($fallbackQuery, $this->domains->getTable())
                         ->orderByDesc('last_verified_at')
                         ->orderBy('domain')
                         ->lockForUpdate()

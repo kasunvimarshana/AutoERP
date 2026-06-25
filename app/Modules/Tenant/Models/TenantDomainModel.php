@@ -7,9 +7,17 @@ namespace Modules\Tenant\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 
 final class TenantDomainModel extends TenantOwnedModel
 {
+    protected static function booted(): void
+    {
+        static::saving(static function (self $model): void {
+            (new TenantDomainReadinessPolicy())->assertValid($model->getAttributes());
+        });
+    }
+
     protected $table = 'tenant_domains';
 
     protected $fillable = [
@@ -43,8 +51,10 @@ final class TenantDomainModel extends TenantOwnedModel
         'operational_error_message',
         'operational_claim_token',
         'operational_claimed_at',
+        'operational_claim_lease_expires_at',
         'revalidation_claim_token',
         'revalidation_claimed_at',
+        'revalidation_claim_lease_expires_at',
         'row_version',
         'created_by',
         'updated_by',
@@ -75,7 +85,9 @@ final class TenantDomainModel extends TenantOwnedModel
             'operational_retry_at' => 'datetime',
             'tls_expires_at' => 'datetime',
             'operational_claimed_at' => 'datetime',
+            'operational_claim_lease_expires_at' => 'datetime',
             'revalidation_claimed_at' => 'datetime',
+            'revalidation_claim_lease_expires_at' => 'datetime',
         ]);
     }
 

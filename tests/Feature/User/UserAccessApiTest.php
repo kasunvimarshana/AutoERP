@@ -366,7 +366,6 @@ final class UserAccessApiTest extends TestCase
             $description = UserPermission::descriptions()[$name] ?? 'Test permission';
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'name' => $name,
                 'guard_name' => 'web',
                 'module' => 'Users',
@@ -422,7 +421,6 @@ final class UserAccessApiTest extends TestCase
     {
         return (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'name' => $name,
             'guard_name' => 'web',
             'description' => $name.' role',
@@ -436,7 +434,6 @@ final class UserAccessApiTest extends TestCase
     {
         DB::table('role_permissions')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'role_id' => $roleId,
             'permission_id' => $permissionId,
             'row_version' => 1,
@@ -449,7 +446,6 @@ final class UserAccessApiTest extends TestCase
     {
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'row_version' => 1,

@@ -44,7 +44,12 @@ return [
     'verification_ttl_seconds' => (int) env('AUTH_VERIFICATION_TTL', 600),
     'registration' => [
         'invitation_expiry_hours' => (int) env('AUTH_REGISTRATION_INVITATION_EXPIRY_HOURS', 72),
-        'invitation_url' => env('AUTH_REGISTRATION_INVITATION_URL', rtrim((string) env('APP_URL', ''), '/').'/register/invitation'),
+        'delivery_lease_seconds' => (int) env('AUTH_REGISTRATION_DELIVERY_LEASE_SECONDS', 300),
+        'delivery_stale_after_seconds' => (int) env('AUTH_REGISTRATION_DELIVERY_STALE_AFTER_SECONDS', 900),
+        'invitation_url' => env(
+            'AUTH_REGISTRATION_INVITATION_URL',
+            rtrim((string) env('PLATFORM_PUBLIC_URL', ''), '/').'/register/invitation',
+        ),
     ],
     'platform_mfa' => [
         'required' => filter_var(

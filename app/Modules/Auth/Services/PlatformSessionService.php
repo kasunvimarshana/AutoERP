@@ -12,10 +12,10 @@ use Illuminate\Support\Str;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\Auth\Models\AuthAccessTokenModel;
+use Modules\Auth\Models\AuthPlatformAccessTokenModel;
 use Modules\Auth\Models\AuthPlatformMfaMethodModel;
 use Modules\Auth\Models\AuthPlatformSessionModel;
-use Modules\Auth\Models\AuthRefreshTokenModel;
+use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -27,8 +27,8 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
 {
     public function __construct(
         private readonly AuthPlatformSessionModel $sessions,
-        private readonly AuthAccessTokenModel $accessTokens,
-        private readonly AuthRefreshTokenModel $refreshTokens,
+        private readonly AuthPlatformAccessTokenModel $accessTokens,
+        private readonly AuthPlatformRefreshTokenModel $refreshTokens,
         private readonly AuthPlatformMfaMethodModel $mfaMethods,
         private readonly UserModel $users,
         private readonly ClockInterface $clock,

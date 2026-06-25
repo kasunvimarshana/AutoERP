@@ -79,7 +79,9 @@ export function formatLimitLabel(key: keyof TenantPlanLimits | string): string {
     }[key] ?? humanize(key);
 }
 
-export function humanize(value: string): string {
+export function humanize(value: unknown): string {
+    if (typeof value !== 'string' || value.trim() === '') return 'Not available';
+
     return value
         .replaceAll('_', ' ')
         .replaceAll('-', ' ')

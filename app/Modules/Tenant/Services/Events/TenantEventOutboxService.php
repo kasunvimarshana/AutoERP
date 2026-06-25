@@ -91,6 +91,7 @@ final class TenantEventOutboxService
                     'available_at' => $this->clock->now(),
                     'claim_token' => null,
                     'claimed_at' => null,
+                    'claim_lease_expires_at' => null,
                     'dead_at' => null,
                     'updated_at' => $this->clock->now(),
                 ]);
@@ -151,6 +152,7 @@ final class TenantEventOutboxService
                         'published_at' => $this->clock->now(),
                         'claim_token' => null,
                         'claimed_at' => null,
+                        'claim_lease_expires_at' => null,
                         'last_error_code' => null,
                     'last_error_message' => null,
                         'updated_at' => $this->clock->now(),
@@ -176,6 +178,7 @@ final class TenantEventOutboxService
                         'available_at' => $dead ? $this->clock->now() : $this->clock->now()->modify("+{$delayMinutes} minutes"),
                         'claim_token' => null,
                         'claimed_at' => null,
+                        'claim_lease_expires_at' => null,
                         'dead_at' => $dead ? $this->clock->now() : null,
                         'updated_at' => $this->clock->now(),
                     ]);
@@ -198,15 +201,18 @@ final class TenantEventOutboxService
     private function claim(int $eventId): ?TenantEventOutboxModel
     {
         $token = $this->uuid->generate();
+        $timeout = max(60, (int) config('tenant.event_outbox.claim_timeout_seconds', 600));
+        $now = $this->clock->now();
         $updated = $this->outbox->newQuery()
             ->whereKey($eventId)
             ->where('status', self::STATUS_PENDING)
-            ->where('available_at', '<=', $this->clock->now())
+            ->where('available_at', '<=', $now)
             ->update([
                 'status' => self::STATUS_PROCESSING,
                 'claim_token' => $token,
-                'claimed_at' => $this->clock->now(),
-                'updated_at' => $this->clock->now(),
+                'claimed_at' => $now,
+                'claim_lease_expires_at' => $now->modify("+{$timeout} seconds"),
+                'updated_at' => $now,
             ]);
 
         if ($updated !== 1) {
@@ -221,19 +227,19 @@ final class TenantEventOutboxService
 
     private function recoverStaleClaims(): int
     {
-        $timeout = max(60, (int) config('tenant.event_outbox.claim_timeout_seconds', 600));
-        $threshold = $this->clock->now()->modify("-{$timeout} seconds");
+        $now = $this->clock->now();
 
         return $this->outbox->newQuery()
             ->where('status', self::STATUS_PROCESSING)
-            ->whereNotNull('claimed_at')
-            ->where('claimed_at', '<=', $threshold)
+            ->whereNotNull('claim_lease_expires_at')
+            ->where('claim_lease_expires_at', '<=', $now)
             ->update([
                 'status' => self::STATUS_PENDING,
                 'claim_token' => null,
                 'claimed_at' => null,
-                'available_at' => $this->clock->now(),
-                'updated_at' => $this->clock->now(),
+                'claim_lease_expires_at' => null,
+                'available_at' => $now,
+                'updated_at' => $now,
             ]);
     }
 

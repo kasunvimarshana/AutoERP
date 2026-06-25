@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Auth\Constants\RegistrationInvitationStatus;
 
 return new class extends Migration
 {
@@ -14,20 +15,19 @@ return new class extends Migration
             $table->id();
             $table->uuid('public_id')->unique('auth_registration_invites_public_uk');
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
             $table->unsignedBigInteger('role_id')->nullable();
             $table->string('email');
             $table->char('token_hash', 64)->unique('auth_registration_invites_token_uk');
             $table->text('delivery_token')->nullable();
             $table->string('purpose', 50)->default('user_registration');
-            $table->enum('status', ['pending', 'accepted', 'revoked', 'expired'])->default('pending');
-            $table->enum('delivery_status', ['pending', 'sent', 'failed', 'not_required'])->default('pending');
-            $table->unsignedInteger('delivery_attempt_count')->default(0);
-            $table->timestamp('delivery_requested_at')->nullable();
-            $table->timestamp('delivered_at')->nullable();
-            $table->string('delivery_error_code', 100)->nullable();
-            $table->string('delivery_error_message', 500)->nullable();
+            $table->enum('status', [
+                RegistrationInvitationStatus::PENDING,
+                RegistrationInvitationStatus::ACCEPTED,
+                RegistrationInvitationStatus::REVOKED,
+                RegistrationInvitationStatus::EXPIRED,
+            ])->default(RegistrationInvitationStatus::PENDING);
             $table->timestamp('expires_at');
             $table->timestamp('accepted_at')->nullable();
             $table->unsignedBigInteger('accepted_by_user_id')->nullable();
@@ -53,10 +53,6 @@ return new class extends Migration
             $table->index(
                 ['tenant_id', 'email', 'status', 'expires_at'],
                 'auth_registration_invites_lookup_idx',
-            );
-            $table->index(
-                ['delivery_status', 'delivery_requested_at'],
-                'auth_registration_invites_delivery_idx',
             );
         });
     }

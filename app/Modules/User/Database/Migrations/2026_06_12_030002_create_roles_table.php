@@ -16,7 +16,6 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('name');
@@ -27,10 +26,6 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'roles_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'roles_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
             $table->unique(['tenant_id', 'name', 'guard_name'], 'roles_name_guard_uk');
         });
     }

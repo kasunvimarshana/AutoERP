@@ -22,6 +22,7 @@ final class TenantEventOutboxModel extends TenantOwnedModel
         'available_at',
         'claim_token',
         'claimed_at',
+        'claim_lease_expires_at',
         'published_at',
         'dead_at',
     ];
@@ -34,6 +35,7 @@ final class TenantEventOutboxModel extends TenantOwnedModel
             'attempts' => 'integer',
             'available_at' => 'datetime',
             'claimed_at' => 'datetime',
+            'claim_lease_expires_at' => 'datetime',
             'published_at' => 'datetime',
             'dead_at' => 'datetime',
         ]);

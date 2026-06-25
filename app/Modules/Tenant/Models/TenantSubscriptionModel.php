@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionRevisionState;
 
 final class TenantSubscriptionModel extends TenantOwnedModel
 {
@@ -29,18 +30,26 @@ final class TenantSubscriptionModel extends TenantOwnedModel
         'change_reason',
         'plan_name',
         'plan_slug',
+        'plan_features_schema_version',
         'plan_features',
+        'plan_limits_schema_version',
         'plan_limits',
         'price',
         'currency_code',
         'currency_symbol',
         'billing_interval',
         'created_by',
+        'created_by_type',
+        'created_by_name',
+        'created_by_email',
         'created_at',
     ];
 
     protected static function booted(): void
     {
+        static::creating(static function (self $subscription): void {
+            TenantSubscriptionRevisionState::assertValid($subscription->getAttributes());
+        });
         static::updating(static function (): never {
             throw new LogicException('Tenant subscription revisions are immutable. Create a new revision instead.');
         });
@@ -59,9 +68,11 @@ final class TenantSubscriptionModel extends TenantOwnedModel
             'starts_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'ends_at' => 'datetime',
+            'plan_features_schema_version' => 'integer',
             'plan_features' => 'array',
+            'plan_limits_schema_version' => 'integer',
             'plan_limits' => 'array',
-            'price' => 'decimal:4',
+            'price' => 'decimal:6',
         ]);
     }
 

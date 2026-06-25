@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use DateTimeImmutable;
 use Illuminate\Http\Request;
-use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
@@ -15,12 +13,12 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
-use Modules\Tenant\Constants\TenantDomainOperationalStatus;
-use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
-use Modules\Tenant\Constants\TenantDomainStatus;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Exceptions\TenantSubscriptionDataException;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 
 final class CurrentTenantContextResolver implements CurrentTenantContextResolverInterface
@@ -30,7 +28,8 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantDomainRepositoryInterface $domains,
         private readonly TenantUserAccessCheckerInterface $userAccess,
-        private readonly ClockInterface $clock,
+        private readonly TenantDomainReadinessPolicy $domainReadiness,
+        private readonly TenantSubscriptionPolicy $subscriptionPolicy,
         private readonly PlatformHostPolicy $hosts,
         private readonly TenantExecutionContextInterface $executionContext,
     ) {}
@@ -89,13 +88,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return null;
         }
         $domain = $this->domains->findByDomainFromControlPlane($host);
-        if (
-            $domain === null
-            || $domain->get('status') !== TenantDomainStatus::ACTIVE
-            || $domain->get('ownership_status') !== TenantDomainOwnershipStatus::VERIFIED
-            || $domain->get('operational_status') !== TenantDomainOperationalStatus::READY
-            || $domain->get('verified_at') === null
-        ) {
+        if ($domain === null || ! $this->domainReadiness->isReady($domain)) {
             return null;
         }
         $tenantId = $this->positiveInt($domain->get('tenant_id'));
@@ -164,7 +157,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         if (! TenantStatus::allowsRuntimeAccess($status)) {
             throw new CurrentTenantContextResolutionException('The selected tenant is not active.');
         }
-        $this->assertCurrentSubscription($tenant->get('current_subscription'), $this->clock->now());
+        $this->assertCurrentSubscription($tenant->get('current_subscription'));
         if ($domain === null) {
             $primary = $this->domains->findPrimaryByTenant($tenantId);
             $domain = $primary === null ? null : (string) $primary->get('domain');
@@ -172,42 +165,27 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return new CurrentTenantContext($tenant, $tenantId, $code, $uuid, $domain, $status, $applicationId, $source);
     }
 
-    private function assertCurrentSubscription(mixed $value, DateTimeImmutable $now): void
+    private function assertCurrentSubscription(mixed $value): void
     {
         if (! is_array($value)) {
             throw new CurrentTenantContextResolutionException('The selected tenant has no current subscription.');
         }
 
-        $status = strtolower(trim((string) ($value['status'] ?? '')));
-        $startsAt = $this->dateTime($value['starts_at'] ?? null);
-        if ($startsAt === null || $startsAt > $now) {
+        try {
+            $status = $this->subscriptionPolicy->statusAt($value);
+        } catch (TenantSubscriptionDataException) {
+            throw new CurrentTenantContextResolutionException(
+                'The selected tenant subscription contains invalid persisted data.',
+            );
+        }
+
+        if ($status === TenantSubscriptionPolicy::SCHEDULED) {
             throw new CurrentTenantContextResolutionException('The selected tenant subscription is not active yet.');
         }
-
-        if ($status === 'trial') {
-            $trialEndsAt = $this->dateTime($value['trial_ends_at'] ?? null);
-            if ($trialEndsAt === null || $trialEndsAt <= $now) {
-                throw new CurrentTenantContextResolutionException('The selected tenant trial has expired.');
-            }
-
-            return;
-        }
-
-        if ($status !== 'active') {
+        if ($status !== \Modules\Tenant\Constants\TenantSubscriptionStatus::TRIAL
+            && $status !== \Modules\Tenant\Constants\TenantSubscriptionStatus::ACTIVE) {
             throw new CurrentTenantContextResolutionException('The selected tenant subscription is not active.');
         }
-
-        $endsAt = $this->dateTime($value['ends_at'] ?? null);
-        if ($endsAt !== null && $endsAt <= $now) {
-            throw new CurrentTenantContextResolutionException('The selected tenant subscription has expired.');
-        }
-    }
-
-    private function dateTime(mixed $value): ?DateTimeImmutable
-    {
-        return $value === null || trim((string) $value) === ''
-            ? null
-            : new DateTimeImmutable((string) $value);
     }
 
     private function findTenantById(int $tenantId): ?DataRecord

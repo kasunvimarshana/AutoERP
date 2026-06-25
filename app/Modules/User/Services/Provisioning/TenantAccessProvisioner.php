@@ -35,7 +35,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                     ->first();
                 if ($permission instanceof PermissionModel) {
                     $permission->forceFill([
-                        'organization_unit_id' => null,
                         'module' => $definition['module'],
                         'description' => $definition['description'],
                         'metadata' => [self::SYSTEM_DEFINED => true],
@@ -45,7 +44,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 } else {
                     $permission = PermissionModel::query()->create([
                         'tenant_id' => $tenantId,
-                        'organization_unit_id' => null,
                         'name' => $name,
                         'guard_name' => self::GUARD_NAME,
                         'module' => $definition['module'],
@@ -84,7 +82,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 ->first();
             if ($role instanceof RoleModel) {
                 $role->forceFill([
-                    'organization_unit_id' => null,
                     'description' => 'Protected tenant super administrator role.',
                     'metadata' => [self::SYSTEM_DEFINED => true, 'protected' => true],
                     'deleted_at' => null,
@@ -93,7 +90,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             } else {
                 $role = RoleModel::query()->create([
                     'tenant_id' => $tenantId,
-                    'organization_unit_id' => null,
                     'name' => UserPermission::SUPER_ADMIN_ROLE,
                     'guard_name' => self::GUARD_NAME,
                     'description' => 'Protected tenant super administrator role.',
@@ -121,7 +117,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             foreach (array_values(array_diff($permissionIds, $assignedIds)) as $permissionId) {
                 $rows[] = [
                     'tenant_id' => $tenantId,
-                    'organization_unit_id' => null,
                     'role_id' => $roleId,
                     'permission_id' => $permissionId,
                     'metadata' => json_encode([self::SYSTEM_DEFINED => true], JSON_THROW_ON_ERROR),
@@ -244,10 +239,6 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->where('role_id', $superAdminRoleId)
-            ->where(function ($query) use ($rootOrganizationUnitId): void {
-                $query->whereNull('organization_unit_id')
-                    ->orWhere('organization_unit_id', $rootOrganizationUnitId);
-            })
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
 

@@ -8,6 +8,7 @@ use Modules\Configuration\Constants\ConfigurationValueType;
 return [
     'inventory.valuation_method' => [
         'owner' => 'Inventory',
+        'version' => 1,
         'label' => 'Default valuation method',
         'description' => 'Fallback inventory valuation method when the item, category, and warehouse do not override it.',
         'type' => ConfigurationValueType::STRING,
@@ -20,6 +21,7 @@ return [
     ],
     'inventory.allocation_method' => [
         'owner' => 'Inventory',
+        'version' => 1,
         'label' => 'Default allocation method',
         'description' => 'Fallback stock allocation method when the item, category, and warehouse do not override it.',
         'type' => ConfigurationValueType::STRING,

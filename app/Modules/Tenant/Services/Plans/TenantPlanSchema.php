@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
 {
+    public const SCHEMA_VERSION = 1;
     /**
      * Foundation capabilities are required for every tenant workspace and are
      * never toggled by commercial subscriptions.

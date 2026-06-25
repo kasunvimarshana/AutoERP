@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Models;
 
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Tenant\Services\Onboarding\TenantOnboardingStepPolicy;
 
 final class TenantOnboardingStepModel extends TenantOwnedModel
 {
@@ -23,6 +24,13 @@ final class TenantOnboardingStepModel extends TenantOwnedModel
         'error_message',
         'correlation_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(static function (self $step): void {
+            TenantOnboardingStepPolicy::assertValid($step->getAttributes());
+        });
+    }
 
     protected function casts(): array
     {

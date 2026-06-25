@@ -12,12 +12,15 @@ return new class extends Migration
     {
         Schema::create('tenant_subscription_events', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('tenant_subscription_id');
             $table->unsignedBigInteger('previous_subscription_id')->nullable();
             $table->enum('event_type', ['assigned', 'renewed', 'extended', 'corrected', 'cancelled', 'expired']);
             $table->string('reason', 500)->nullable();
             $table->unsignedBigInteger('actor_id')->nullable()->index('tenant_subscription_events_actor_idx');
+            $table->string('actor_type', 40)->default('system');
+            $table->string('actor_name')->nullable();
+            $table->string('actor_email')->nullable();
             $table->timestamp('occurred_at');
 
             $table->foreign(

@@ -8,6 +8,7 @@ use Modules\Configuration\Constants\ConfigurationValueType;
 return [
     'auth.registration_mode' => [
         'owner' => 'Auth',
+        'version' => 1,
         'label' => 'User registration policy',
         'description' => 'Controls whether users may self-register, require invitations, or must use approved email domains.',
         'type' => ConfigurationValueType::STRING,
@@ -20,6 +21,7 @@ return [
     ],
     'auth.registration_approved_domains' => [
         'owner' => 'Auth',
+        'version' => 1,
         'label' => 'Approved registration email domains',
         'description' => 'Email domains allowed when the registration policy is set to approved domains.',
         'type' => ConfigurationValueType::JSON,

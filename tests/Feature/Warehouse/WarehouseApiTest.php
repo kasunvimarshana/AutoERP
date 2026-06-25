@@ -316,7 +316,6 @@ final class WarehouseApiTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'name' => 'Warehouse Test Role',
             'guard_name' => 'web',
             'description' => 'Warehouse test role',
@@ -330,7 +329,6 @@ final class WarehouseApiTest extends TestCase
 
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'row_version' => 1,
@@ -406,7 +404,6 @@ final class WarehouseApiTest extends TestCase
         foreach ($permissions as $name) {
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'name' => $name,
                 'guard_name' => 'web',
                 'module' => 'Warehouse',
@@ -417,7 +414,6 @@ final class WarehouseApiTest extends TestCase
             ]);
             DB::table('role_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,

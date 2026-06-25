@@ -13,5 +13,5 @@ interface AuthRefreshTokenRepositoryInterface extends RepositoryPortInterface
 
     public function rotateIfActive(int $id, int $rowVersion): bool;
 
-    public function revokeBySessionId(int $sessionId, ?int $tenantId = null): void;
+    public function revokeBySessionId(int $sessionId, int $tenantId): void;
 }

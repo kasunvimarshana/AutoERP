@@ -26,17 +26,13 @@ final class EloquentAuthAccessTokenRepository extends EloquentRepository impleme
         return $model === null ? null : $this->toRecord($model);
     }
 
-    public function revokeBySessionId(int $sessionId, ?int $tenantId = null): void
+    public function revokeBySessionId(int $sessionId, int $tenantId): void
     {
         $query = $this->query()
             ->where('session_id', $sessionId)
             ->whereNull('revoked_at');
 
-        if ($tenantId === null) {
-            $query->whereNull('tenant_id');
-        } else {
-            $query->where('tenant_id', $tenantId);
-        }
+        $query->where('tenant_id', $tenantId);
 
         $query->update([
             'status' => 'revoked',

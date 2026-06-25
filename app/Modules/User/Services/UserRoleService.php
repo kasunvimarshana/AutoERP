@@ -50,7 +50,6 @@ final class UserRoleService extends AbstractUserCrudService
 
             return $this->success($this->userRoles->create([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? null),
                 'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                 'user_id' => $userId,
                 'role_id' => $roleId,
@@ -79,7 +78,6 @@ final class UserRoleService extends AbstractUserCrudService
 
             return $this->success($this->userRoles->update($id, [
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? $existing->get('organization_unit_id')),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->domain->normalizeMetadata($payload['metadata'])
                     : $existing->get('metadata'),

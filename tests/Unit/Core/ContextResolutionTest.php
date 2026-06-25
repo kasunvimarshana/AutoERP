@@ -21,6 +21,10 @@ use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
+use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Tests\TestCase;
 
 final class ContextResolutionTest extends TestCase
@@ -34,7 +38,7 @@ final class ContextResolutionTest extends TestCase
 
         $tenantDomains = $this->createMock(TenantDomainRepositoryInterface::class);
         $tenantDomains->expects(self::once())
-            ->method('findByDomain')
+            ->method('findByDomainFromControlPlane')
             ->with('unknown.test')
             ->willReturn(null);
 
@@ -43,7 +47,10 @@ final class ContextResolutionTest extends TestCase
             $this->createMock(TenantRepositoryInterface::class),
             $tenantDomains,
             $this->createMock(TenantUserAccessCheckerInterface::class),
-            new SystemClock(),
+            new TenantDomainReadinessPolicy(),
+            new TenantSubscriptionPolicy(new SystemClock()),
+            new PlatformHostPolicy($this->app),
+            new TenantExecutionContext(),
         );
 
         $request = Request::create('https://unknown.test/api/v1/test', 'GET');
@@ -71,7 +78,10 @@ final class ContextResolutionTest extends TestCase
             $this->createMock(TenantRepositoryInterface::class),
             $this->createMock(TenantDomainRepositoryInterface::class),
             $userAccess,
-            new SystemClock(),
+            new TenantDomainReadinessPolicy(),
+            new TenantSubscriptionPolicy(new SystemClock()),
+            new PlatformHostPolicy($this->app),
+            new TenantExecutionContext(),
         );
 
         $context = new CurrentTenantContext(

@@ -8,11 +8,14 @@ use DateTimeImmutable;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantSubscriptionStatus;
+use Modules\Tenant\Exceptions\TenantSubscriptionDataException;
+use Throwable;
 
 final class TenantSubscriptionPolicy
 {
     public const MISSING = 'missing';
     public const SCHEDULED = 'scheduled';
+    public const INVALID = 'invalid';
 
     public function __construct(private readonly ClockInterface $clock) {}
 
@@ -44,14 +47,14 @@ final class TenantSubscriptionPolicy
         }
 
         $at ??= $this->clock->now();
-        $startsAt = $this->dateTime($subscription['starts_at'] ?? null);
+        $startsAt = $this->dateTime('starts_at', $subscription['starts_at'] ?? null);
         if ($startsAt === null || $startsAt > $at) {
             return self::SCHEDULED;
         }
 
         $contractStatus = strtolower(trim((string) ($subscription['contract_status'] ?? '')));
         if ($contractStatus === TenantSubscriptionStatus::TRIAL) {
-            $trialEndsAt = $this->dateTime($subscription['trial_ends_at'] ?? null);
+            $trialEndsAt = $this->dateTime('trial_ends_at', $subscription['trial_ends_at'] ?? null);
 
             return $trialEndsAt !== null && $trialEndsAt > $at
                 ? TenantSubscriptionStatus::TRIAL
@@ -61,17 +64,24 @@ final class TenantSubscriptionPolicy
             return TenantSubscriptionStatus::EXPIRED;
         }
 
-        $endsAt = $this->dateTime($subscription['ends_at'] ?? null);
+        $endsAt = $this->dateTime('ends_at', $subscription['ends_at'] ?? null);
 
         return $endsAt === null || $endsAt > $at
             ? TenantSubscriptionStatus::ACTIVE
             : TenantSubscriptionStatus::EXPIRED;
     }
 
-    private function dateTime(mixed $value): ?DateTimeImmutable
+    private function dateTime(string $field, mixed $value): ?DateTimeImmutable
     {
         $value = is_scalar($value) ? trim((string) $value) : '';
+        if ($value === '') {
+            return null;
+        }
 
-        return $value === '' ? null : new DateTimeImmutable($value);
+        try {
+            return new DateTimeImmutable($value);
+        } catch (Throwable) {
+            throw TenantSubscriptionDataException::invalidDateTime($field, $value);
+        }
     }
 }

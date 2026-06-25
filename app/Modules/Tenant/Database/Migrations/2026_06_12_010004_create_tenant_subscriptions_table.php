@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tenant_subscriptions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedInteger('revision_number');
             $table->enum('operation', ['assign', 'renew', 'extend', 'correct']);
             $table->foreignId('tenant_plan_revision_id')->constrained('tenant_plan_revisions', 'id')->restrictOnDelete();
@@ -26,14 +26,19 @@ return new class extends Migration
             // Immutable commercial snapshots preserve the contract even when plan identity changes later.
             $table->string('plan_name');
             $table->string('plan_slug', 100);
+            $table->unsignedInteger('plan_features_schema_version');
             $table->json('plan_features');
+            $table->unsignedInteger('plan_limits_schema_version');
             $table->json('plan_limits');
-            $table->decimal('price', 18, 4)->default(0);
+            $table->decimal('price', 20, 6)->default('0.000000');
             $table->string('currency_code', 3);
             $table->string('currency_symbol', 20)->nullable();
             $table->enum('billing_interval', ['month', 'quarter', 'year']);
 
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_subscriptions_created_by_idx');
+            $table->string('created_by_type', 40)->default('system');
+            $table->string('created_by_name')->nullable();
+            $table->string('created_by_email')->nullable();
             $table->timestamp('created_at');
 
             $table->unique(['tenant_id', 'revision_number'], 'tenant_subscriptions_tenant_revision_uk');

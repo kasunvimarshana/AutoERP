@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->string('name');
             $table->string('document_type', 100)->nullable();
-            $table->string('storage_path');
+            $table->string('object_key');
             $table->string('original_filename');
             $table->string('mime_type', 255);
             $table->unsignedBigInteger('size_bytes');
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'name'], 'tenant_documents_tenant_name_uk');
-            $table->unique('storage_path', 'tenant_documents_storage_path_uk');
+            $table->unique(['tenant_id', 'object_key'], 'tenant_documents_tenant_object_uk');
             $table->index(['tenant_id', 'document_type', 'name'], 'tenant_documents_tenant_type_name_idx');
             $table->unique(['id', 'tenant_id'], 'tenant_documents_id_tenant_uk');
         });

@@ -145,9 +145,11 @@ final class UpdateTenantPlanService
     private function revisionAttributes(array $payload, DataRecord $latest): array
     {
         return [
+            'features_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'features' => array_key_exists('features', $payload)
                 ? $this->schema->normalizeFeatures($payload['features'])
                 : $this->schema->normalizeFeatures($latest->get('features')),
+            'limits_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'limits' => array_key_exists('limits', $payload)
                 ? $this->schema->normalizeLimits($payload['limits'])
                 : $this->schema->normalizeLimits($latest->get('limits')),

@@ -12,6 +12,7 @@ final readonly class ConfigurationDefinition
         public string $label,
         public string $description,
         public string $owner,
+        public int $version,
         public string $valueType,
         public array $allowedScopes,
         public mixed $defaultValue,
@@ -19,8 +20,8 @@ final readonly class ConfigurationDefinition
         public bool $sensitive,
         public bool $runtimeMutable,
         public array $options = [],
-        public ?float $minimum = null,
-        public ?float $maximum = null,
+        public ?string $minimum = null,
+        public ?string $maximum = null,
         public ?string $lookup = null,
     ) {}
 }

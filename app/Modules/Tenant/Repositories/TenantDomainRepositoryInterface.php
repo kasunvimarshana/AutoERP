@@ -65,7 +65,7 @@ interface TenantDomainRepositoryInterface
     public function claimDueForRevalidation(
         DateTimeInterface $dueAt,
         DateTimeInterface $claimedAt,
-        DateTimeInterface $staleBefore,
+        DateTimeInterface $leaseExpiresAt,
         string $claimToken,
         int $limit,
     ): array;
@@ -75,7 +75,7 @@ interface TenantDomainRepositoryInterface
     public function claimDueForOperationalVerification(
         DateTimeInterface $dueAt,
         DateTimeInterface $claimedAt,
-        DateTimeInterface $staleBefore,
+        DateTimeInterface $leaseExpiresAt,
         string $claimToken,
         int $limit,
     ): array;

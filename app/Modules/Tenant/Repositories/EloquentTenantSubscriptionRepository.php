@@ -14,6 +14,7 @@ use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Models\TenantCurrentSubscriptionModel;
 use Modules\Tenant\Models\TenantSubscriptionEventModel;
 use Modules\Tenant\Models\TenantSubscriptionModel;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
 use RuntimeException;
 
 final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRepositoryInterface
@@ -23,6 +24,7 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
         private readonly TenantCurrentSubscriptionModel $current,
         private readonly TenantSubscriptionEventModel $events,
         private readonly ClockInterface $clock,
+        private readonly TenantSubscriptionPresenter $presenter,
     ) {}
 
     public function findCurrentByTenant(int $tenantId, bool $lockForUpdate = false): ?DataRecord
@@ -211,7 +213,7 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
         ?int $previousSubscriptionId,
         string $eventType,
         ?string $reason,
-        ?int $actorId,
+        array $actor,
         DateTimeInterface $occurredAt,
     ): void {
         $this->events->newQuery()->create([
@@ -220,7 +222,10 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
             'previous_subscription_id' => $previousSubscriptionId,
             'event_type' => $eventType,
             'reason' => $reason,
-            'actor_id' => $actorId,
+            'actor_id' => $actor['id'],
+            'actor_type' => $actor['type'],
+            'actor_name' => $actor['name'],
+            'actor_email' => $actor['email'],
             'occurred_at' => $occurredAt,
         ]);
     }
@@ -259,6 +264,6 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
             $payload['assigned_by'] = $pointer->getAttribute('assigned_by');
         }
 
-        return new DataRecord($payload);
+        return new DataRecord($this->presenter->present($payload));
     }
 }

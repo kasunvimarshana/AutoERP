@@ -170,13 +170,20 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             );
         }
 
-        $minimum = is_numeric($raw['minimum'] ?? null)
-            ? (float) $raw['minimum']
-            : null;
-        $maximum = is_numeric($raw['maximum'] ?? null)
-            ? (float) $raw['maximum']
-            : null;
-        if ($minimum !== null && $maximum !== null && $minimum > $maximum) {
+        $version = $raw['version'] ?? null;
+        if (! is_int($version) || $version < 1) {
+            throw new InvalidArgumentException(
+                "Configuration definition [{$key}] requires a positive integer version.",
+            );
+        }
+
+        $minimum = $this->decimalBoundary($raw['minimum'] ?? null, $key, 'minimum');
+        $maximum = $this->decimalBoundary($raw['maximum'] ?? null, $key, 'maximum');
+        if (
+            $minimum !== null
+            && $maximum !== null
+            && $this->values->compareNumericBoundaries($minimum, $maximum) > 0
+        ) {
             throw new InvalidArgumentException(
                 "Configuration definition [{$key}] minimum cannot exceed its maximum.",
             );
@@ -195,6 +202,7 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             label: $label,
             description: $description,
             owner: $owner,
+            version: $version,
             valueType: $type,
             allowedScopes: $scopes,
             defaultValue: $raw['default'] ?? null,
@@ -206,6 +214,28 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
             maximum: $maximum,
             lookup: $lookup,
         );
+    }
+
+
+    private function decimalBoundary(mixed $value, string $key, string $name): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (! is_int($value) && ! is_string($value)) {
+            throw new InvalidArgumentException(
+                "Configuration definition [{$key}] {$name} must be a plain integer or decimal string.",
+            );
+        }
+
+        $normalized = trim((string) $value);
+        if (preg_match('/^-?\d+(?:\.\d+)?$/D', $normalized) !== 1) {
+            throw new InvalidArgumentException(
+                "Configuration definition [{$key}] {$name} must be a plain decimal without scientific notation.",
+            );
+        }
+
+        return $normalized;
     }
 
     private function validateDefinitionValues(ConfigurationDefinition $definition): void

@@ -6,6 +6,7 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -117,6 +118,16 @@ final class UserModel extends Authenticatable
     public function platformPermissionAssignments(): HasMany
     {
         return $this->hasMany(PlatformOperatorPermissionModel::class, 'user_id');
+    }
+
+    public function platformOperatorInvitations(): HasMany
+    {
+        return $this->hasMany(PlatformOperatorInvitationModel::class, 'user_id');
+    }
+
+    public function latestPlatformOperatorInvitation(): HasOne
+    {
+        return $this->hasOne(PlatformOperatorInvitationModel::class, 'user_id')->latestOfMany();
     }
 
     public function documents(): HasMany

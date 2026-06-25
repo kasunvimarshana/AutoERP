@@ -4,6 +4,7 @@ import {
     normalizeHostname,
     readinessLabel,
     readinessStepId,
+    humanize,
 } from './tenantPresentation';
 
 describe('tenant presentation rules', () => {
@@ -16,6 +17,12 @@ describe('tenant presentation rules', () => {
         'rejects invalid hostname input %s',
         (value) => expect(hostnameError(value)).not.toBeNull(),
     );
+
+    it('uses a safe fallback for missing enum values', () => {
+        expect(humanize(undefined)).toBe('Not available');
+        expect(humanize(null)).toBe('Not available');
+        expect(humanize('awaiting_domain')).toBe('Awaiting Domain');
+    });
 
     it('maps readiness failures to meaningful setup steps', () => {
         expect(readinessLabel('verified_primary_domain')).toBe('Verified primary domain');

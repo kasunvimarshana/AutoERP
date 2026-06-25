@@ -15,7 +15,7 @@ final class TenantDocumentModel extends TenantOwnedModel
         'tenant_id',
         'name',
         'document_type',
-        'storage_path',
+        'object_key',
         'original_filename',
         'mime_type',
         'size_bytes',

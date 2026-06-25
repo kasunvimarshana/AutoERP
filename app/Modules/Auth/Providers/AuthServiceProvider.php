@@ -30,6 +30,8 @@ use Modules\Auth\Models\AuthClientModel;
 use Modules\Auth\Models\AuthIdentityModel;
 use Modules\Auth\Models\AuthLoginAttemptModel;
 use Modules\Auth\Models\AuthProviderModel;
+use Modules\Auth\Models\AuthPlatformAccessTokenModel;
+use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
 use Modules\Auth\Models\AuthRefreshTokenModel;
 use Modules\Auth\Models\AuthSessionModel;
 use Modules\Auth\Models\AuthVerificationChallengeModel;
@@ -40,6 +42,8 @@ use Modules\Auth\Repositories\AuthClientRepositoryInterface;
 use Modules\Auth\Repositories\AuthIdentityRepositoryInterface;
 use Modules\Auth\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
+use Modules\Auth\Repositories\AuthPlatformAccessTokenRepositoryInterface;
+use Modules\Auth\Repositories\AuthPlatformRefreshTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthRefreshTokenRepositoryInterface;
 use Modules\Auth\Repositories\AuthSessionRepositoryInterface;
 use Modules\Auth\Repositories\AuthVerificationChallengeRepositoryInterface;
@@ -49,6 +53,8 @@ use Modules\Auth\Repositories\EloquentAuthClientRepository;
 use Modules\Auth\Repositories\EloquentAuthIdentityRepository;
 use Modules\Auth\Repositories\EloquentAuthLoginAttemptRepository;
 use Modules\Auth\Repositories\EloquentAuthProviderRepository;
+use Modules\Auth\Repositories\EloquentAuthPlatformAccessTokenRepository;
+use Modules\Auth\Repositories\EloquentAuthPlatformRefreshTokenRepository;
 use Modules\Auth\Repositories\EloquentAuthRefreshTokenRepository;
 use Modules\Auth\Repositories\EloquentAuthSessionRepository;
 use Modules\Auth\Repositories\EloquentAuthVerificationChallengeRepository;
@@ -114,6 +120,18 @@ final class AuthServiceProvider extends ServiceProvider
             AuthRefreshTokenRepositoryInterface::class,
             fn (): AuthRefreshTokenRepositoryInterface => new EloquentAuthRefreshTokenRepository(
                 new AuthRefreshTokenModel,
+            ),
+        );
+        $this->app->singleton(
+            AuthPlatformAccessTokenRepositoryInterface::class,
+            fn (): AuthPlatformAccessTokenRepositoryInterface => new EloquentAuthPlatformAccessTokenRepository(
+                new AuthPlatformAccessTokenModel,
+            ),
+        );
+        $this->app->singleton(
+            AuthPlatformRefreshTokenRepositoryInterface::class,
+            fn (): AuthPlatformRefreshTokenRepositoryInterface => new EloquentAuthPlatformRefreshTokenRepository(
+                new AuthPlatformRefreshTokenModel,
             ),
         );
         $this->app->singleton(

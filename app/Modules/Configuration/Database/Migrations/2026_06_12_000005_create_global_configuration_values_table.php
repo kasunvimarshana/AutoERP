@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->string('key', 191)->unique('global_configuration_values_key_uk');
+            $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
             $table->enum('value_type', ConfigurationValueType::values());
             $table->boolean('is_sensitive')->default(false);

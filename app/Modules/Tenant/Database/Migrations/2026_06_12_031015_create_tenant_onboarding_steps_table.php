@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tenant_onboarding_steps', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->string('step', 80);
             $table->string('owner_module', 80);
             $table->enum('status', ['pending', 'running', 'completed', 'failed'])->default('pending');

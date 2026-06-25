@@ -11,5 +11,5 @@ interface AuthAccessTokenRepositoryInterface extends RepositoryPortInterface
 {
     public function findActiveByTokenKey(string $tokenKey): ?DataRecord;
 
-    public function revokeBySessionId(int $sessionId, ?int $tenantId = null): void;
+    public function revokeBySessionId(int $sessionId, int $tenantId): void;
 }

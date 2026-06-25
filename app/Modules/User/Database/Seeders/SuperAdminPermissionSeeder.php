@@ -44,7 +44,6 @@ final class SuperAdminPermissionSeeder extends Seeder
                             'permission_id' => $permissionId,
                         ],
                         [
-                            'organization_unit_id' => null,
                             'row_version' => 1,
                             'metadata' => json_encode(['seed_source' => 'super_admin_permission_seeder'], JSON_THROW_ON_ERROR),
                             'updated_at' => now(),

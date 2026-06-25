@@ -76,7 +76,6 @@ final class RoleService extends AbstractUserCrudService
                 $permissionIds = $this->validatePermissionIds($tenantId, $payload['permission_ids'] ?? []);
                 $created = $this->roles->create([
                     'tenant_id' => $tenantId,
-                    'organization_unit_id' => null,
                     'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                     'name' => $name,
                     'guard_name' => $guardName,
@@ -140,7 +139,6 @@ final class RoleService extends AbstractUserCrudService
 
                 $updated = $this->roles->update($id, [
                     'tenant_id' => $tenantId,
-                    'organization_unit_id' => null,
                     'metadata' => array_key_exists('metadata', $payload)
                         ? $this->domain->normalizeMetadata($payload['metadata'])
                         : $existing->get('metadata'),
@@ -333,7 +331,6 @@ final class RoleService extends AbstractUserCrudService
         foreach ($addIds as $permissionId) {
             DB::table('role_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,

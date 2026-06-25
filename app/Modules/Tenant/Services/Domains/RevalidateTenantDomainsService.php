@@ -52,7 +52,7 @@ final class RevalidateTenantDomainsService
         $domains = $this->domains->claimDueForRevalidation(
             dueAt: $now,
             claimedAt: $now,
-            staleBefore: $now->modify("-{$claimTimeout} minutes"),
+            leaseExpiresAt: $now->modify("+{$claimTimeout} minutes"),
             claimToken: $claimToken,
             limit: $batchSize,
         );
@@ -101,7 +101,7 @@ final class RevalidateTenantDomainsService
         $operationalDomains = $this->domains->claimDueForOperationalVerification(
             dueAt: $now,
             claimedAt: $now,
-            staleBefore: $now->modify("-{$claimTimeout} minutes"),
+            leaseExpiresAt: $now->modify("+{$claimTimeout} minutes"),
             claimToken: $operationalClaimToken,
             limit: $batchSize,
         );

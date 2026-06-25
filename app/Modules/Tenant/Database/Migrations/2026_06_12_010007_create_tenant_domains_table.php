@@ -42,8 +42,10 @@ return new class extends Migration
             $table->string('operational_error_message', 500)->nullable();
             $table->uuid('operational_claim_token')->nullable();
             $table->timestamp('operational_claimed_at')->nullable();
+            $table->timestamp('operational_claim_lease_expires_at')->nullable();
             $table->uuid('revalidation_claim_token')->nullable();
             $table->timestamp('revalidation_claimed_at')->nullable();
+            $table->timestamp('revalidation_claim_lease_expires_at')->nullable();
             $table->unsignedBigInteger('verified_by')->nullable()->index('tenant_domains_verified_by_idx');
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_domains_created_by_idx');
             $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_domains_updated_by_idx');

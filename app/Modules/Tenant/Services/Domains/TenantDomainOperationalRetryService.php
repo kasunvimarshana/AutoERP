@@ -67,7 +67,8 @@ final class TenantDomainOperationalRetryService
                         'operational_error_message' => null,
                         'operational_retry_at' => null,
                         'operational_claim_token' => null,
-                        'operational_claimed_at' => $this->clock->now(),
+                        'operational_claimed_at' => null,
+                        'operational_claim_lease_expires_at' => null,
                     ],
                 ),
             );

@@ -1268,7 +1268,6 @@ final class PurchaseOrderApiTest extends TestCase
 
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'name' => 'Purchase Test Role',
             'guard_name' => 'web',
             'description' => 'Purchase test role',
@@ -1280,7 +1279,6 @@ final class PurchaseOrderApiTest extends TestCase
         foreach ($this->seedPurchasePermissions($tenantId, $permissions ?? array_keys(PurchaseAuthorizationService::descriptions())) as $permissionId) {
             DB::table('role_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,
@@ -1291,7 +1289,6 @@ final class PurchaseOrderApiTest extends TestCase
 
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'row_version' => 1,
@@ -1335,7 +1332,6 @@ final class PurchaseOrderApiTest extends TestCase
         if ($permissionId < 1) {
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $context['tenant_id'],
-                'organization_unit_id' => null,
                 'name' => $permission,
                 'guard_name' => 'web',
                 'module' => 'Purchase',
@@ -1355,7 +1351,6 @@ final class PurchaseOrderApiTest extends TestCase
         if (! $exists) {
             DB::table('role_permissions')->insert([
                 'tenant_id' => $context['tenant_id'],
-                'organization_unit_id' => null,
                 'role_id' => $context['role_id'],
                 'permission_id' => $permissionId,
                 'row_version' => 1,
@@ -1379,7 +1374,6 @@ final class PurchaseOrderApiTest extends TestCase
             $supplierDescription = SupplierAuthorizationService::descriptions()[$name] ?? null;
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'name' => $name,
                 'guard_name' => 'web',
                 'module' => $supplierDescription === null ? 'Purchase' : 'Supplier',

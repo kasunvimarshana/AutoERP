@@ -9,10 +9,10 @@ use Modules\Core\Models\CoreModel;
 final class GlobalConfigurationValue extends CoreModel
 {
     protected $table = 'global_configuration_values';
-    protected $fillable = ['key', 'value', 'value_type', 'is_sensitive'];
+    protected $fillable = ['key', 'definition_version', 'value', 'value_type', 'is_sensitive'];
 
     protected function casts(): array
     {
-        return ['row_version' => 'integer', 'is_sensitive' => 'boolean'];
+        return ['row_version' => 'integer', 'definition_version' => 'integer', 'is_sensitive' => 'boolean'];
     }
 }

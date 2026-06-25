@@ -48,13 +48,13 @@ final class TenantStorageReconciliationService
 
         $rows = $this->documents->newQuery()
             ->where('tenant_id', $tenantId)
-            ->get(['storage_path', 'size_bytes']);
+            ->get(['object_key', 'size_bytes']);
 
         foreach ($rows as $document) {
             try {
-                $path = $this->paths->canonicalize(
+                $path = $this->paths->resolveObjectKey(
                     $tenantId,
-                    (string) $document->getAttribute('storage_path'),
+                    (string) $document->getAttribute('object_key'),
                 );
                 $tracked[$path] = (int) $document->getAttribute('size_bytes');
             } catch (Throwable) {

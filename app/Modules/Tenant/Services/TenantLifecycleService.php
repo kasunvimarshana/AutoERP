@@ -38,6 +38,7 @@ final class TenantLifecycleService
         private readonly TenantOnboardingStateModel $onboardingStates,
         private readonly TenantLifecycleEventModel $lifecycleEvents,
         private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly TenantActorSnapshotFactory $actorSnapshots,
         private readonly AuditRecorderInterface $audit,
         private readonly TenantEventOutboxService $outbox,
         private readonly ClockInterface $clock,
@@ -57,7 +58,7 @@ final class TenantLifecycleService
         }
 
         $current = (string) $tenant->require('status');
-        if (! $this->transitionAllowed($current, $targetStatus)) {
+        if (! TenantLifecycleState::canTransition($current, $targetStatus)) {
             return $this->invalidTransition($current, $targetStatus);
         }
         if ($expectedVersion < 1 || (int) $tenant->require('row_version') !== $expectedVersion) {
@@ -96,7 +97,7 @@ final class TenantLifecycleService
             }
 
             $currentStatus = (string) $locked->require('status');
-            if (! $this->transitionAllowed($currentStatus, $targetStatus)) {
+            if (! TenantLifecycleState::canTransition($currentStatus, $targetStatus)) {
                 return [
                     'status' => self::OUTCOME_INVALID_TRANSITION,
                     'current_status' => $currentStatus,
@@ -121,6 +122,7 @@ final class TenantLifecycleService
             $attributes = [
                 'status' => $targetStatus,
                 'status_reason' => $normalizedReason,
+                'status_changed_at' => $now,
                 'activated_at' => $targetStatus === TenantStatus::ACTIVE
                     ? ($locked->get('activated_at') ?? $now)
                     : $locked->get('activated_at'),
@@ -147,6 +149,9 @@ final class TenantLifecycleService
                     if ($state instanceof TenantOnboardingStateModel) {
                         $state->forceFill([
                             'status' => TenantOnboardingStatus::COMPLETED,
+                            'operation_id' => null,
+                            'operation_started_at' => null,
+                            'operation_lease_expires_at' => null,
                             'completed_at' => $this->clock->now(),
                             'failed_step' => null,
                             'last_error_code' => null,
@@ -158,12 +163,16 @@ final class TenantLifecycleService
                 });
             }
 
+            $actor = $this->actorSnapshots->current();
             $this->lifecycleEvents->newQuery()->create([
                 'tenant_id' => $tenantId,
                 'previous_status' => $currentStatus,
                 'new_status' => $targetStatus,
                 'reason' => $normalizedReason,
-                'actor_id' => $this->currentUser->currentUserId(),
+                'actor_id' => $actor['id'],
+                'actor_type' => $actor['type'],
+                'actor_name' => $actor['name'],
+                'actor_email' => $actor['email'],
                 'occurred_at' => $now,
             ]);
 
@@ -209,18 +218,6 @@ final class TenantLifecycleService
             self::OUTCOME_READINESS_BLOCKED => $this->readinessFailure($outcome['readiness'] ?? []),
             default => throw new RuntimeException('Unknown tenant lifecycle transition outcome.'),
         };
-    }
-
-    private function transitionAllowed(string $from, string $to): bool
-    {
-        return in_array($to, match ($from) {
-            TenantStatus::DRAFT => [TenantStatus::ACTIVE, TenantStatus::ARCHIVED],
-            TenantStatus::ACTIVE => [TenantStatus::SUSPENDED, TenantStatus::INACTIVE],
-            TenantStatus::SUSPENDED => [TenantStatus::ACTIVE, TenantStatus::INACTIVE, TenantStatus::ARCHIVED],
-            TenantStatus::INACTIVE => [TenantStatus::ACTIVE, TenantStatus::ARCHIVED],
-            TenantStatus::ARCHIVED => [],
-            default => [],
-        }, true);
     }
 
     private function notFound(): Result

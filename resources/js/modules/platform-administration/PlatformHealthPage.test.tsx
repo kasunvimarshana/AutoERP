@@ -66,12 +66,21 @@ function healthOverview() {
         domains: { ownership: { verified: 1, pending: 0 }, operational: { ready: 0, failed: 1 } },
         subscriptions: { assigned: 1, expired: 0, cancelled: 0 },
         operations: { outbox: { pending: 0, dead: 0 }, storage_cleanup: { pending: 0, dead: 0 } },
+        infrastructure: {
+            ready: true,
+            mail: { ready: true, mailer: 'smtp', from_address_configured: true, external_transport: true },
+            queue: { ready: true, connection: 'database', requires_worker: true, pending_jobs: 0, failed_jobs: 0 },
+            administrator_invitation_url: { ready: true, origin: 'https://platform.example.test' },
+        },
+        invitation_delivery: { counts: { queued: 0, sending: 0, sent: 1, delivered: 0, bounced: 0, failed: 0, cancelled: 0 }, failed: 0, stale: 0 },
         storage: { tracked_document_bytes: 0, tracked_document_count: 0 },
         alerts: {
             onboarding_failures: 0,
             domain_failures: 1,
             dead_outbox_events: 0,
             dead_storage_cleanup_jobs: 0,
+            failed_invitation_deliveries: 0,
+            stale_invitation_deliveries: 0,
             requires_attention: true,
         },
         failures: {
@@ -89,6 +98,7 @@ function healthOverview() {
             }],
             outbox: [],
             storage_cleanup: [],
+            invitation_delivery: [],
         },
     };
 }

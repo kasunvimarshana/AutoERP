@@ -183,7 +183,7 @@ final class TenantDocumentService
                 if ($replacementFile !== null) {
                     $this->storageCleanup->schedule(
                         $tenantId,
-                        (string) $existing->require('storage_path'),
+                        $this->storagePaths->resolveObjectKey($tenantId, (string) $existing->require('object_key')),
                         'document replacement cleanup',
                     );
                 }
@@ -203,7 +203,7 @@ final class TenantDocumentService
             }
 
             if ($replacementFile !== null) {
-                $this->storageCleanup->processPath($tenantId, (string) $existing->require('storage_path'));
+                $this->storageCleanup->processPath($tenantId, $this->storagePaths->resolveObjectKey($tenantId, (string) $existing->require('object_key')));
             }
 
             return Result::success($updated);
@@ -239,7 +239,7 @@ final class TenantDocumentService
 
                 $this->storageCleanup->schedule(
                     $tenantId,
-                    (string) $record->require('storage_path'),
+                    $this->storagePaths->resolveObjectKey($tenantId, (string) $record->require('object_key')),
                     'document deletion cleanup',
                 );
                 $this->recordAudit('tenant.document.deleted', $record);
@@ -254,7 +254,7 @@ final class TenantDocumentService
                 ));
             }
 
-            $this->storageCleanup->processPath($tenantId, (string) $record->require('storage_path'));
+            $this->storageCleanup->processPath($tenantId, $this->storagePaths->resolveObjectKey($tenantId, (string) $record->require('object_key')));
 
             return Result::success(true);
         } catch (Throwable $exception) {
@@ -270,7 +270,7 @@ final class TenantDocumentService
                 return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant document not found.'));
             }
 
-            $path = $this->storagePaths->canonicalize($tenantId, (string) $record->require('storage_path'));
+            $path = $this->storagePaths->resolveObjectKey($tenantId, (string) $record->require('object_key'));
             $stream = $this->files->readStream($path, $this->disk());
             if (! is_resource($stream)) {
                 throw new RuntimeException('Stored tenant document could not be opened.');
@@ -284,7 +284,7 @@ final class TenantDocumentService
 
     /**
      * @param array<string, mixed> $payload
-     * @return array{storage_path:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string,scan_engine:string,scanned_at:\DateTimeInterface}
+     * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string,scan_engine:string,scanned_at:\DateTimeInterface}
      */
     private function storeUploadedFile(int $tenantId, array $payload): array
     {
@@ -328,10 +328,10 @@ final class TenantDocumentService
             $this->uuid->generate(),
             $this->disk(),
         );
-        $storedPath = $this->storagePaths->canonicalize($tenantId, $storedPath);
+        $objectKey = $this->storagePaths->objectKeyFromPath($tenantId, $storedPath);
 
         return [
-            'storage_path' => $storedPath,
+            'object_key' => $objectKey,
             'original_filename' => $originalFilename,
             'mime_type' => $mimeType,
             'size_bytes' => (int) $size,
@@ -391,7 +391,8 @@ final class TenantDocumentService
             return;
         }
 
-        $path = trim((string) ($file['storage_path'] ?? ''));
+        $objectKey = trim((string) ($file['object_key'] ?? ''));
+        $path = $objectKey === '' ? '' : $this->storagePaths->resolveObjectKey($tenantId, $objectKey);
         if ($path === '') {
             return;
         }

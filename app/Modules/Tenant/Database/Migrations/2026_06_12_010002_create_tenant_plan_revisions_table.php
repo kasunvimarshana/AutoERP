@@ -14,7 +14,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_plan_id')->constrained('tenant_plans', 'id')->restrictOnDelete();
             $table->unsignedInteger('revision_number');
+            $table->unsignedInteger('features_schema_version');
             $table->json('features');
+            $table->unsignedInteger('limits_schema_version');
             $table->json('limits');
             $table->decimal('price', 20, 6)->default('0.000000');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->restrictOnDelete();

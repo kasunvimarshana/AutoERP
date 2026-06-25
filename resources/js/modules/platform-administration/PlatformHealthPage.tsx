@@ -21,6 +21,7 @@ import { platformAdministrationApi } from './platformAdministrationApi';
 import { formatBytes, formatPlatformDateTime, humanizePlatformValue, platformAuditHref } from './platformAdministrationPresentation';
 import type {
     PlatformHealthOverview,
+    PlatformInvitationDeliveryFailure,
     PlatformOutboxFailure,
     PlatformStorageFailure,
     PlatformTenantHealthDetail,
@@ -119,8 +120,15 @@ export default function PlatformHealthPage() {
                             <Metric title="Dead storage cleanup" value={data.alerts.dead_storage_cleanup_jobs} supporting={`${data.operations.storage_cleanup.pending ?? 0} pending`} attention={data.alerts.dead_storage_cleanup_jobs > 0} />
                             <Metric title="Assigned subscriptions" value={data.subscriptions.assigned ?? 0} supporting={`${data.subscriptions.expired ?? 0} expired · ${data.subscriptions.cancelled ?? 0} cancelled`} />
                             <Metric title="Verified domains" value={data.domains.ownership.verified ?? 0} supporting={`${data.domains.ownership.pending ?? 0} pending ownership`} />
+                            <Metric
+                                title="Invitation delivery"
+                                value={data.alerts.failed_invitation_deliveries}
+                                supporting={`${data.alerts.stale_invitation_deliveries} stale · ${data.invitation_delivery.counts.sent ?? 0} sent`}
+                                attention={data.alerts.failed_invitation_deliveries > 0 || data.alerts.stale_invitation_deliveries > 0}
+                            />
                         </div>
 
+                        <InfrastructureHealth health={data.infrastructure} />
                         <FailurePanels overview={data} canRecover={canRecover} onRecover={(next) => { setAction(next); setReason(''); setError(null); }} />
                     </>
                 ) : null}
@@ -242,6 +250,21 @@ function FailurePanels({ overview, canRecover, onRecover }: {
                     )}
                 />
             </Panel>
+            <Panel title="Administrator invitation delivery failures">
+                <FailureList
+                    rows={overview.failures.invitation_delivery}
+                    empty="No failed administrator invitation deliveries."
+                    render={(failure: PlatformInvitationDeliveryFailure) => (
+                        <div>
+                            <FailureHeader tenantName={failure.tenant_name} tenantCode={failure.tenant_code} />
+                            <p className="mt-1 font-medium text-slate-900">{failure.email}</p>
+                            <p className="text-sm text-slate-700">Delivery attempt {failure.attempt_number} · {failure.processing_attempt_count} processing attempt(s)</p>
+                            <p className="mt-1 text-xs text-slate-500">{failure.error_message ?? failure.error_code ?? 'Safe failure details unavailable'} · failed {formatPlatformDateTime(failure.failed_at)}</p>
+                            <LinkButton className="mt-3 min-h-8 px-3 py-1 text-xs" variant="secondary" to={`${PLATFORM_HOME_PATH}?tenant=${failure.tenant_id}`}>Review onboarding</LinkButton>
+                        </div>
+                    )}
+                />
+            </Panel>
         </div>
     );
 }
@@ -264,7 +287,9 @@ function TenantHealth({ detail, canAudit }: { detail: PlatformTenantHealthDetail
                 <SmallMetric label="Subscription" value={detail.subscription ? `${detail.subscription.plan ?? 'Plan'} · ${detail.subscription.state}` : 'Not assigned'} />
                 <SmallMetric label="Domains" value={`${detail.domains.length} configured`} />
                 <SmallMetric label="Private documents" value={`${detail.storage.tracked_document_count} · ${formatBytes(detail.storage.tracked_document_bytes)}`} />
+                <SmallMetric label="Invitation delivery" value={`${detail.invitation_delivery.failed} failed · ${detail.invitation_delivery.stale} stale`} />
             </div>
+            <InfrastructureHealth health={detail.infrastructure} />
             <div className={`rounded-lg border p-4 ${detail.storage.reconciliation.healthy ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -360,6 +385,51 @@ function TenantHealth({ detail, canAudit }: { detail: PlatformTenantHealthDetail
             ) : null}
             <p className="text-xs text-slate-500">Health snapshot generated {formatPlatformDateTime(detail.generated_at)}.</p>
         </div>
+    );
+}
+
+
+function InfrastructureHealth({ health }: { health: PlatformHealthOverview['infrastructure'] }) {
+    const queueDetail = health.queue.pending_jobs === null
+        ? humanizePlatformValue(health.queue.connection ?? 'Not configured')
+        : `${humanizePlatformValue(health.queue.connection ?? 'Not configured')} · ${health.queue.pending_jobs} pending`;
+
+    return (
+        <Panel title="Operational infrastructure readiness">
+            <div className="grid gap-3 md:grid-cols-3">
+                <ReadinessItem
+                    title="Administrator email"
+                    ready={health.mail.ready}
+                    detail={health.mail.mailer ? `${humanizePlatformValue(health.mail.mailer)} transport` : 'Mail transport is not configured'}
+                    guidance={health.mail.ready ? 'External delivery transport and sender identity are configured.' : 'Configure an external mail transport and sender identity before provisioning administrators.'}
+                />
+                <ReadinessItem
+                    title="Queue processing"
+                    ready={health.queue.ready}
+                    detail={queueDetail}
+                    guidance={health.queue.ready ? `${health.queue.failed_jobs ?? 0} failed queued job(s).` : 'Use an asynchronous queue connection and run a supervised queue worker.'}
+                />
+                <ReadinessItem
+                    title="Invitation URL"
+                    ready={health.administrator_invitation_url.ready}
+                    detail={health.administrator_invitation_url.origin ?? 'Public platform origin is not configured'}
+                    guidance={health.administrator_invitation_url.ready ? 'Invitation links use the configured public Platform Administration origin.' : 'Configure a valid PLATFORM_PUBLIC_URL before sending invitations.'}
+                />
+            </div>
+        </Panel>
+    );
+}
+
+function ReadinessItem({ title, ready, detail, guidance }: { title: string; ready: boolean; detail: string; guidance: string }) {
+    return (
+        <article className={`rounded-lg border p-3 ${ready ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-950">{title}</p>
+                <StatusBadge status={ready ? 'ready' : 'not_ready'} />
+            </div>
+            <p className="mt-2 text-sm text-slate-700">{detail}</p>
+            <p className="mt-1 text-xs text-slate-600">{guidance}</p>
+        </article>
     );
 }
 

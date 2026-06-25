@@ -7,16 +7,22 @@ namespace Modules\Configuration\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Data\ConfigurationScopeContext;
 use Modules\Configuration\Data\StoredConfigurationValue;
 use Modules\Configuration\Models\ConfigurationValueRevision;
+use Modules\Configuration\Models\GlobalConfigurationValueRevision;
+use Modules\Configuration\Models\OrganizationUnitConfigurationValueRevision;
+use Modules\Configuration\Models\TenantConfigurationValueRevision;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 
 final class ConfigurationRevisionService
 {
     public function __construct(
-        private readonly ConfigurationValueRevision $revisions,
+        private readonly GlobalConfigurationValueRevision $globalRevisions,
+        private readonly TenantConfigurationValueRevision $tenantRevisions,
+        private readonly OrganizationUnitConfigurationValueRevision $organizationUnitRevisions,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly ClockInterface $clock,
     ) {}
@@ -26,16 +32,16 @@ final class ConfigurationRevisionService
         string $key,
         string $operation,
         ?StoredConfigurationValue $result,
+        int $definitionVersion,
         string $valueType,
         bool $sensitive,
         ?int $sourceRevisionId = null,
         ?string $reason = null,
     ): ConfigurationValueRevision {
-        return $this->revisions->newQuery()->create([
-            'scope' => $context->scope,
-            'tenant_id' => $context->tenantId,
-            'organization_unit_id' => $context->organizationUnitId,
+        $attributes = [
+            ...$this->scopeIdentity($context),
             'key' => strtolower(trim($key)),
+            'definition_version' => $definitionVersion,
             'operation' => $operation,
             'stored_value' => $result?->storedValue,
             'value_type' => $valueType,
@@ -45,7 +51,9 @@ final class ConfigurationRevisionService
             'actor_user_id' => $this->currentUser->currentUserId(),
             'reason' => $this->nullableReason($reason),
             'created_at' => $this->clock->now(),
-        ]);
+        ];
+
+        return $this->modelFor($context)->newQuery()->create($attributes);
     }
 
     /** @return LengthAwarePaginator<int, ConfigurationValueRevision> */
@@ -74,18 +82,37 @@ final class ConfigurationRevisionService
     /** @return Builder<ConfigurationValueRevision> */
     private function scopeQuery(ConfigurationScopeContext $context): Builder
     {
-        return $this->revisions->newQuery()
-            ->where('scope', $context->scope)
+        return $this->modelFor($context)->newQuery()
             ->when(
-                $context->tenantId === null,
-                fn (Builder $query): Builder => $query->whereNull('tenant_id'),
+                $context->tenantId !== null,
                 fn (Builder $query): Builder => $query->where('tenant_id', $context->tenantId),
             )
             ->when(
-                $context->organizationUnitId === null,
-                fn (Builder $query): Builder => $query->whereNull('organization_unit_id'),
+                $context->organizationUnitId !== null,
                 fn (Builder $query): Builder => $query->where('organization_unit_id', $context->organizationUnitId),
             );
+    }
+
+    private function modelFor(ConfigurationScopeContext $context): ConfigurationValueRevision
+    {
+        return match ($context->scope) {
+            ConfigurationScope::GLOBAL => $this->globalRevisions,
+            ConfigurationScope::TENANT => $this->tenantRevisions,
+            ConfigurationScope::ORGANIZATION_UNIT => $this->organizationUnitRevisions,
+        };
+    }
+
+    /** @return array<string, int> */
+    private function scopeIdentity(ConfigurationScopeContext $context): array
+    {
+        return match ($context->scope) {
+            ConfigurationScope::GLOBAL => [],
+            ConfigurationScope::TENANT => ['tenant_id' => (int) $context->tenantId],
+            ConfigurationScope::ORGANIZATION_UNIT => [
+                'tenant_id' => (int) $context->tenantId,
+                'organization_unit_id' => (int) $context->organizationUnitId,
+            ],
+        };
     }
 
     private function nullableReason(?string $reason): ?string

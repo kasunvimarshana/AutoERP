@@ -89,7 +89,7 @@ final class CustomerSeeder extends Seeder
         $guard = (string) config('auth.defaults.guard', 'web');
         foreach (DB::table('tenants')->pluck('id') as $tenantId) {
             foreach (CustomerAuthorizationService::descriptions() as $name => $description) {
-                DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['organization_unit_id' => null, 'module' => 'Customer', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['module' => 'Customer', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
             }
         }
     }

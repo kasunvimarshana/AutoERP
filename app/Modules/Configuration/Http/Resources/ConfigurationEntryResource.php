@@ -21,6 +21,7 @@ final class ConfigurationEntryResource extends JsonResource
             'label' => $entry->definition->label,
             'description' => $entry->definition->description,
             'owner' => $entry->definition->owner,
+            'definition_version' => $entry->definition->version,
             'value_type' => $entry->definition->valueType,
             'scope' => $entry->scope,
             'value' => $sensitive ? null : $entry->value,

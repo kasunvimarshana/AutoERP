@@ -85,7 +85,6 @@ final class VehicleSeeder extends Seeder
                 DB::table('permissions')->updateOrInsert(
                     ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
                     [
-                        'organization_unit_id' => null,
                         'module' => 'Vehicle',
                         'description' => $description,
                         'row_version' => 1,

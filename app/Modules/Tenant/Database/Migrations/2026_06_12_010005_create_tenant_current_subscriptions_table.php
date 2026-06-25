@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreign('tenant_id', 'tenant_current_subscriptions_tenant_fk')
                 ->references('id')
                 ->on('tenants')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(
                 ['tenant_subscription_id', 'tenant_id'],
                 'tenant_current_subscriptions_subscription_tenant_fk',

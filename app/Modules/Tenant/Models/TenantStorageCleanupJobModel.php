@@ -21,6 +21,7 @@ final class TenantStorageCleanupJobModel extends TenantOwnedModel
         'next_attempt_at',
         'claim_token',
         'claimed_at',
+        'claim_lease_expires_at',
         'completed_at',
     ];
 
@@ -31,6 +32,7 @@ final class TenantStorageCleanupJobModel extends TenantOwnedModel
             'attempts' => 'integer',
             'next_attempt_at' => 'datetime',
             'claimed_at' => 'datetime',
+            'claim_lease_expires_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);
     }

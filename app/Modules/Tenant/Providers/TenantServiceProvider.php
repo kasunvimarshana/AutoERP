@@ -53,6 +53,7 @@ use Modules\Tenant\Services\Configuration\TenantConfigurationTargetPopulation;
 use Modules\Tenant\Services\Configuration\TenantConfigurationTargetValidator;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Documents\Scanning\ClamAvTenantDocumentScanner;
 use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Modules\Tenant\Services\Documents\Scanning\TrustedLocalTenantDocumentScanner;
@@ -60,6 +61,7 @@ use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
 use Modules\Tenant\Services\Subscriptions\TenantStorageLimitUsageContributor;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class TenantServiceProvider extends ServiceProvider
@@ -86,7 +88,11 @@ final class TenantServiceProvider extends ServiceProvider
             };
         });
         $this->app->singleton(PlatformHostPolicy::class);
-        $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(new TenantModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(
+            new TenantModel,
+            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(TenantSubscriptionPresenter::class),
+        ));
         $this->app->singleton(TenantPlanRepositoryInterface::class, fn ($app): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(new TenantPlanModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
         $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn ($app): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(new TenantPlanModel, new TenantPlanRevisionModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
         $this->app->scoped(TenantSubscriptionRepositoryInterface::class, fn ($app): TenantSubscriptionRepositoryInterface => new EloquentTenantSubscriptionRepository(
@@ -94,6 +100,7 @@ final class TenantServiceProvider extends ServiceProvider
             new TenantCurrentSubscriptionModel,
             new TenantSubscriptionEventModel,
             $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(TenantSubscriptionPresenter::class),
         ));
         $this->app->tag([TenantStorageLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->scoped(TenantSubscriptionReadinessService::class, fn ($app): TenantSubscriptionReadinessService => new TenantSubscriptionReadinessService(
@@ -110,6 +117,7 @@ final class TenantServiceProvider extends ServiceProvider
             new TenantPrimaryDomainModel,
             $app->make(TenantExecutionContextInterface::class),
             $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(TenantDomainReadinessPolicy::class),
         ));
     }
 

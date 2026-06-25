@@ -21,7 +21,8 @@ final class AcceptInitialAdministratorInvitationRequest extends FormRequest
             'token' => ['required', 'string', 'size:64'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
-            'password' => ['required', 'string', 'max:255', PasswordPolicy::rule()],
+            'password' => ['required', 'string', 'max:255', 'confirmed', PasswordPolicy::rule()],
+            'password_confirmation' => ['required', 'string', 'max:255'],
         ];
     }
 }

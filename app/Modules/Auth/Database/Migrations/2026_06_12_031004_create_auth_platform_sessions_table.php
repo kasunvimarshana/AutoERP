@@ -25,6 +25,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
+            $table->unique(['id', 'user_id'], 'auth_platform_sessions_id_user_uk');
             $table->index(['user_id', 'status', 'last_activity_at'], 'auth_platform_sessions_user_status_idx');
         });
     }

@@ -461,7 +461,6 @@ final class SupplierApiTest extends TestCase
             ]);
             DB::table('user_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
                 'user_id' => $userId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,

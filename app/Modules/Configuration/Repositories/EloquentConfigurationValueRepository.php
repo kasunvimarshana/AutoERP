@@ -229,6 +229,7 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
                 ? (int) $model->getAttribute('organization_unit_id')
                 : null,
             key: (string) $model->getAttribute('key'),
+            definitionVersion: (int) $model->getAttribute('definition_version'),
             storedValue: $model->getAttribute('value') !== null
                 ? (string) $model->getAttribute('value')
                 : null,

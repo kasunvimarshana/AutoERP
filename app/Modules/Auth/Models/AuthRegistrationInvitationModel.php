@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Auth\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -22,12 +24,6 @@ final class AuthRegistrationInvitationModel extends TenantOwnedModel
         'delivery_token',
         'purpose',
         'status',
-        'delivery_status',
-        'delivery_attempt_count',
-        'delivery_requested_at',
-        'delivered_at',
-        'delivery_error_code',
-        'delivery_error_message',
         'expires_at',
         'accepted_at',
         'accepted_by_user_id',
@@ -47,14 +43,22 @@ final class AuthRegistrationInvitationModel extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'role_id' => 'integer',
             'accepted_by_user_id' => 'integer',
-            'delivery_attempt_count' => 'integer',
             'delivery_token' => 'encrypted',
-            'delivery_requested_at' => 'datetime',
-            'delivered_at' => 'datetime',
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
             'revoked_at' => 'datetime',
         ]);
+    }
+
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(AuthRegistrationInvitationDeliveryModel::class, 'invitation_id');
+    }
+
+    public function latestDelivery(): HasOne
+    {
+        return $this->hasOne(AuthRegistrationInvitationDeliveryModel::class, 'invitation_id')
+            ->latestOfMany('attempt_number');
     }
 
     public function tenant(): BelongsTo

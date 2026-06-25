@@ -26,7 +26,6 @@ final class UpsertUserRoleRequest extends TenantScopedRequest
 
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'user_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('users', 'id')]),
             'role_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('roles', 'id')]),

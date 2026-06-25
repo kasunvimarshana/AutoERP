@@ -46,7 +46,6 @@ final class UserSeeder extends Seeder
                     'guard_name' => $guardName,
                 ],
                 [
-                    'organization_unit_id' => null,
                     'description' => 'Full tenant administration.',
                     'row_version' => 1,
                     'metadata' => json_encode([
@@ -113,7 +112,6 @@ final class UserSeeder extends Seeder
                         'role_id' => $role->getKey(),
                     ],
                     [
-                        'organization_unit_id' => $organizationUnit->getKey(),
                         'row_version' => 1,
                         'metadata' => json_encode(['seed_source' => 'user_module'], JSON_THROW_ON_ERROR),
                     ],
@@ -137,7 +135,6 @@ final class UserSeeder extends Seeder
                         'guard_name' => $guardName,
                     ],
                     [
-                        'organization_unit_id' => null,
                         'module' => 'Users',
                         'description' => $description,
                         'row_version' => 1,

@@ -58,7 +58,7 @@ final class ConfigurationValueValidator
         if (is_int($normalized)) {
             if (
                 $definition->minimum !== null
-                && $normalized < $definition->minimum
+                && $this->compareNumericBoundaries((string) $normalized, $definition->minimum) < 0
             ) {
                 throw ValidationException::withMessages([
                     'value' => ["The value must be at least {$definition->minimum}."],
@@ -67,7 +67,7 @@ final class ConfigurationValueValidator
 
             if (
                 $definition->maximum !== null
-                && $normalized > $definition->maximum
+                && $this->compareNumericBoundaries((string) $normalized, $definition->maximum) > 0
             ) {
                 throw ValidationException::withMessages([
                     'value' => ["The value may not exceed {$definition->maximum}."],
@@ -76,12 +76,12 @@ final class ConfigurationValueValidator
         }
 
         if ($definition->valueType === ConfigurationValueType::DECIMAL && is_string($normalized)) {
-            if ($definition->minimum !== null && $this->compareDecimals($normalized, (string) $definition->minimum) < 0) {
+            if ($definition->minimum !== null && $this->compareNumericBoundaries($normalized, $definition->minimum) < 0) {
                 throw ValidationException::withMessages([
                     'value' => ["The value must be at least {$definition->minimum}."],
                 ]);
             }
-            if ($definition->maximum !== null && $this->compareDecimals($normalized, (string) $definition->maximum) > 0) {
+            if ($definition->maximum !== null && $this->compareNumericBoundaries($normalized, $definition->maximum) > 0) {
                 throw ValidationException::withMessages([
                     'value' => ["The value may not exceed {$definition->maximum}."],
                 ]);
@@ -191,7 +191,7 @@ final class ConfigurationValueValidator
         return $negative && $canonical !== '0' ? '-'.$canonical : $canonical;
     }
 
-    private function compareDecimals(string $left, string $right): int
+    public function compareNumericBoundaries(string $left, string $right): int
     {
         $left = $this->decimal($left);
         $right = $this->decimal($right);

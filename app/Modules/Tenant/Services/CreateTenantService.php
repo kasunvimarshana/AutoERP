@@ -77,6 +77,7 @@ final class CreateTenantService
                     'logo_path' => null,
                     'base_currency_id' => $baseCurrencyId,
                     'status' => TenantStatus::DRAFT,
+                    'status_changed_at' => now(),
                     'row_version' => 1,
                     'created_by' => $this->currentUser->currentUserId(),
                     'updated_by' => $this->currentUser->currentUserId(),

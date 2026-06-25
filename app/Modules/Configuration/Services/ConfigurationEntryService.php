@@ -329,6 +329,7 @@ final class ConfigurationEntryService
             try {
                 $created = $this->repository->create($context, [
                     'key' => $definition->key,
+                    'definition_version' => $definition->version,
                     'value' => $this->codec->encode($definition, $normalized),
                     'value_type' => $definition->valueType,
                     'is_sensitive' => $definition->sensitive,
@@ -349,6 +350,7 @@ final class ConfigurationEntryService
                 $definition->key,
                 ConfigurationRevisionOperation::CREATED,
                 $created,
+                $definition->version,
                 $definition->valueType,
                 $definition->sensitive,
             );
@@ -392,6 +394,7 @@ final class ConfigurationEntryService
 
             $updated = $this->repository->updateExpected($current, $expectedVersion, [
                 'value' => $this->codec->encode($definition, $normalized),
+                'definition_version' => $definition->version,
                 'value_type' => $definition->valueType,
                 'is_sensitive' => $definition->sensitive,
             ]);
@@ -400,6 +403,7 @@ final class ConfigurationEntryService
                 $definition->key,
                 ConfigurationRevisionOperation::UPDATED,
                 $updated,
+                $definition->version,
                 $definition->valueType,
                 $definition->sensitive,
             );
@@ -431,6 +435,7 @@ final class ConfigurationEntryService
                 $definition->key,
                 ConfigurationRevisionOperation::REMOVED,
                 null,
+                $definition->version,
                 $definition->valueType,
                 $definition->sensitive,
             );
@@ -483,7 +488,8 @@ final class ConfigurationEntryService
         ): ?StoredConfigurationValue {
             $target = $this->revisions->find($context, $revisionId, $definition->key);
             if (
-                (string) $target->getAttribute('value_type') !== $definition->valueType
+                (int) $target->getAttribute('definition_version') !== $definition->version
+                || (string) $target->getAttribute('value_type') !== $definition->valueType
                 || (bool) $target->getAttribute('is_sensitive') !== $definition->sensitive
             ) {
                 throw new ConflictHttpException('This historical value is incompatible with the current definition.');
@@ -513,6 +519,7 @@ final class ConfigurationEntryService
                     }
                     $result = $this->repository->create($context, [
                         'key' => $definition->key,
+                        'definition_version' => $definition->version,
                         'value' => $targetStoredValue,
                         'value_type' => $definition->valueType,
                         'is_sensitive' => $definition->sensitive,
@@ -523,6 +530,7 @@ final class ConfigurationEntryService
                     }
                     $result = $this->repository->updateExpected($current, $expectedVersion, [
                         'value' => $targetStoredValue,
+                        'definition_version' => $definition->version,
                         'value_type' => $definition->valueType,
                         'is_sensitive' => $definition->sensitive,
                     ]);
@@ -534,6 +542,7 @@ final class ConfigurationEntryService
                 $definition->key,
                 ConfigurationRevisionOperation::ROLLED_BACK,
                 $result,
+                $definition->version,
                 $definition->valueType,
                 $definition->sensitive,
                 (int) $target->getKey(),
@@ -620,11 +629,12 @@ final class ConfigurationEntryService
     {
         $definition = $this->definitions->get($stored->key);
         if (
-            $stored->valueType !== $definition->valueType
+            $stored->definitionVersion !== $definition->version
+            || $stored->valueType !== $definition->valueType
             || $stored->sensitive !== $definition->sensitive
         ) {
             throw new \RuntimeException(
-                "Stored configuration metadata for [{$definition->key}] does not match its definition.",
+                "Stored configuration metadata for [{$definition->key}] does not match definition version {$definition->version}.",
             );
         }
 
@@ -756,14 +766,22 @@ final class ConfigurationEntryService
             ? DateTimeImmutable::createFromInterface($createdAt)
             : new DateTimeImmutable((string) $createdAt);
 
+        $definitionCompatible = (int) $revision->getAttribute('definition_version') === $definition->version
+            && (string) $revision->getAttribute('value_type') === $definition->valueType
+            && (bool) $revision->getAttribute('is_sensitive') === $definition->sensitive;
+
         return new ConfigurationRevisionView(
             id: (int) $revision->getKey(),
             operation: (string) $revision->getAttribute('operation'),
-            scope: (string) $revision->getAttribute('scope'),
-            tenantId: is_numeric($revision->getAttribute('tenant_id')) ? (int) $revision->getAttribute('tenant_id') : null,
-            organizationUnitId: is_numeric($revision->getAttribute('organization_unit_id')) ? (int) $revision->getAttribute('organization_unit_id') : null,
+            scope: $revision->scopeName(),
+            tenantId: $revision->tenantId(),
+            organizationUnitId: $revision->organizationUnitId(),
             key: (string) $revision->getAttribute('key'),
-            value: $definition->sensitive || $storedValue === null ? null : $this->codec->decode($definition, $storedValue),
+            definitionVersion: (int) $revision->getAttribute('definition_version'),
+            definitionCompatible: $definitionCompatible,
+            value: $definition->sensitive || $storedValue === null || ! $definitionCompatible
+                ? null
+                : $this->codec->decode($definition, $storedValue),
             configured: $storedValue !== null,
             sensitive: $definition->sensitive,
             resultingRowVersion: is_numeric($revision->getAttribute('resulting_row_version')) ? (int) $revision->getAttribute('resulting_row_version') : null,

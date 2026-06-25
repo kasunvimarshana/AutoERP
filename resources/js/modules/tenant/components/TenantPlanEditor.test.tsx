@@ -9,6 +9,8 @@ function createPlan(): TenantPlan {
         id: 12,
         tenant_plan_id: 7,
         revision_number: 2,
+        features_schema_version: 1,
+        limits_schema_version: 1,
         features: { enabled_modules: ['inventory'] },
         limits: { max_users: 10 },
         price: '100.000000',

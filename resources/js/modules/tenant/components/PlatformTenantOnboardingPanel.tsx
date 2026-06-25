@@ -177,15 +177,15 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                             <p className="font-semibold text-slate-900">Initial administrator invitation</p>
                             <p className="mt-1 text-slate-600">{invitation.email}</p>
                         </div>
-                        <div className="flex gap-2"><StatusBadge status={invitation.status} /><StatusBadge status={invitation.delivery_status} /></div>
+                        <div className="flex gap-2"><StatusBadge status={invitation.status} />{invitation.delivery ? <StatusBadge status={invitation.delivery.status} /> : null}</div>
                     </div>
                     <dl className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-                        <div><dt className="font-medium text-slate-800">Delivery requested</dt><dd>{formatTenantDateTime(invitation.delivery_requested_at, 'Not requested')}</dd></div>
-                        <div><dt className="font-medium text-slate-800">Delivered</dt><dd>{formatTenantDateTime(invitation.delivered_at, 'Not confirmed')}</dd></div>
+                        <div><dt className="font-medium text-slate-800">Delivery requested</dt><dd>{formatTenantDateTime(invitation.delivery?.requested_at, 'Not requested')}</dd></div>
+                        <div><dt className="font-medium text-slate-800">Sent</dt><dd>{formatTenantDateTime(invitation.delivery?.sent_at, 'Not sent')}</dd></div>
                         <div><dt className="font-medium text-slate-800">Expires</dt><dd>{formatTenantDateTime(invitation.expires_at, 'No expiry recorded')}</dd></div>
-                        <div><dt className="font-medium text-slate-800">Delivery attempts</dt><dd>{invitation.delivery_attempt_count}</dd></div>
+                        <div><dt className="font-medium text-slate-800">Delivery attempts</dt><dd>{invitation.delivery?.attempt_number ?? 0}</dd></div>
                     </dl>
-                    {invitation.delivery_error_message ? <p className="rounded bg-rose-50 p-3 text-rose-800">{invitation.delivery_error_message}</p> : null}
+                    {invitation.delivery?.error_message ? <p className="rounded bg-rose-50 p-3 text-rose-800">{invitation.delivery.error_message}</p> : null}
                     {invitation.status === 'pending' && canProvision ? (
                         <div className="flex flex-wrap justify-end gap-2">
                             <Button variant="secondary" disabled={operationDisabled} onClick={resendInvitation}>Resend invitation</Button>

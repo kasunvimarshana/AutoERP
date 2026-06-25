@@ -96,7 +96,7 @@ final class TenantOnboardingProgressService
                 'updated_by' => $this->currentUser->currentUserId(),
             ])->save();
 
-            return $state->fresh() ?? $state;
+            return $state->fresh(['steps']) ?? $state;
         }, 3);
     }
 
@@ -159,18 +159,8 @@ final class TenantOnboardingProgressService
                 'error_message' => null,
             ])->save();
 
-            $completed = array_values(array_unique([
-                ...$this->completedSteps($state),
-                $step,
-            ]));
-            $completed = array_values(array_filter(
-                TenantOnboardingStep::ordered(),
-                static fn (string $candidate): bool => in_array($candidate, $completed, true),
-            ));
-
             $state->forceFill([
                 ...$stateAttributes,
-                'completed_steps' => $completed,
                 'operation_lease_expires_at' => $this->leaseExpiry($this->clock->now()),
                 'row_version' => (int) $state->getAttribute('row_version') + 1,
                 'updated_by' => $this->currentUser->currentUserId(),
@@ -195,7 +185,9 @@ final class TenantOnboardingProgressService
             $safeMessage,
         ): void {
             $state = $this->states->newQuery()->where('tenant_id', $tenantId)->lockForUpdate()->first();
-            if (! $state instanceof TenantOnboardingStateModel) {
+            if (! $state instanceof TenantOnboardingStateModel
+                || (string) $state->getAttribute('operation_id') !== $operationId
+            ) {
                 return;
             }
 
@@ -215,6 +207,7 @@ final class TenantOnboardingProgressService
             $state->forceFill([
                 'status' => TenantOnboardingStatus::FAILED,
                 'operation_id' => null,
+                'operation_started_at' => null,
                 'operation_lease_expires_at' => null,
                 'failed_step' => $step,
                 'last_error_code' => $errorCode,
@@ -233,6 +226,7 @@ final class TenantOnboardingProgressService
             $state->forceFill([
                 'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
                 'operation_id' => null,
+                'operation_started_at' => null,
                 'operation_lease_expires_at' => null,
                 'failed_step' => null,
                 'last_error_code' => null,
@@ -282,20 +276,10 @@ final class TenantOnboardingProgressService
                 'error_message' => null,
             ])->save();
 
-            $completed = array_values(array_unique([
-                ...$this->completedSteps($state),
-                TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
-            ]));
-            $completed = array_values(array_filter(
-                TenantOnboardingStep::ordered(),
-                static fn (string $candidate): bool => in_array($candidate, $completed, true),
-            ));
-
             $state->forceFill([
                 'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
                 'initial_admin_email' => strtolower(trim($email)),
                 'invitation_id' => (int) ($invitation['invitation_id'] ?? 0),
-                'completed_steps' => $completed,
                 'failed_step' => null,
                 'last_error_code' => null,
                 'last_error_message' => null,
@@ -336,15 +320,10 @@ final class TenantOnboardingProgressService
                     'updated_at' => $this->clock->now(),
                 ]);
 
-            $completed = array_values(array_filter(
-                $this->completedSteps($state),
-                static fn (string $step): bool => $step !== TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
-            ));
             $state->forceFill([
                 'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
                 'initial_admin_email' => null,
                 'invitation_id' => null,
-                'completed_steps' => $completed,
                 'failed_step' => null,
                 'last_error_code' => null,
                 'last_error_message' => null,
@@ -373,7 +352,6 @@ final class TenantOnboardingProgressService
                 'root_organization_unit_id',
                 'super_admin_role_id',
                 'invitation_id',
-                'completed_steps',
                 'failed_step',
                 'last_error_code',
                 'last_error_message',
@@ -382,6 +360,7 @@ final class TenantOnboardingProgressService
                 'completed_at',
                 'row_version',
             ]),
+            'completed_steps' => $this->completedSteps($state),
             'steps' => $state->steps->map(static fn (TenantOnboardingStepModel $step): array => $step->only([
                 'step',
                 'owner_module',
@@ -411,13 +390,36 @@ final class TenantOnboardingProgressService
     }
 
     /** @return list<string> */
+    public function completedStepNames(int $tenantId): array
+    {
+        return $this->steps->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('status', TenantOnboardingStepStatus::COMPLETED)
+            ->pluck('step')
+            ->map(static fn (mixed $step): string => (string) $step)
+            ->filter(static fn (string $step): bool => in_array($step, TenantOnboardingStep::ordered(), true))
+            ->sortBy(static fn (string $step): int => array_search($step, TenantOnboardingStep::ordered(), true))
+            ->values()
+            ->all();
+    }
+
+    /** @return list<string> */
     private function completedSteps(TenantOnboardingStateModel $state): array
     {
-        $value = $state->getAttribute('completed_steps');
+        if (! $state->relationLoaded('steps')) {
+            $state->load('steps');
+        }
 
-        return is_array($value)
-            ? array_values(array_filter($value, static fn (mixed $step): bool => is_string($step)))
-            : [];
+        $completed = $state->steps
+            ->filter(static fn (TenantOnboardingStepModel $step): bool => (string) $step->getAttribute('status') === TenantOnboardingStepStatus::COMPLETED)
+            ->pluck('step')
+            ->map(static fn (mixed $step): string => (string) $step)
+            ->all();
+
+        return array_values(array_filter(
+            TenantOnboardingStep::ordered(),
+            static fn (string $step): bool => in_array($step, $completed, true),
+        ));
     }
 
     private function leaseExpiry(\DateTimeImmutable $now): \DateTimeImmutable

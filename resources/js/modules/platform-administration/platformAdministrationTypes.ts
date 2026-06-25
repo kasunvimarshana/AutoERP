@@ -1,13 +1,23 @@
 import type { PaginationMeta } from '@/shared/types/pagination';
 import type { AuditListFilters, AuditListResponse, AuditLogDetail } from '@/modules/audit/auditTypes';
 
+export interface PlatformOperatorInvitationSummary {
+    status: 'pending' | 'accepted' | 'revoked' | 'expired';
+    delivery_status: 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled';
+    expires_at: string | null;
+    sent_at: string | null;
+    failed_at: string | null;
+    error_message: string | null;
+}
+
 export interface PlatformOperator {
     id: number;
     first_name: string;
     last_name: string | null;
     display_name: string;
     email: string;
-    status: 'active' | 'inactive';
+    status: 'invited' | 'active' | 'inactive';
+    invitation: PlatformOperatorInvitationSummary | null;
     permissions: string[];
     row_version: number;
     created_at: string;
@@ -24,8 +34,6 @@ export interface CreatePlatformOperatorPayload {
     first_name: string;
     last_name?: string | null;
     email: string;
-    password: string;
-    password_confirmation: string;
     permissions: string[];
 }
 
@@ -98,6 +106,41 @@ export interface PlatformStorageFailure extends PlatformHealthFailureBase {
     failed_at: string | null;
 }
 
+export interface PlatformInvitationDeliveryFailure extends PlatformHealthFailureBase {
+    public_id: string;
+    email: string;
+    attempt_number: number;
+    processing_attempt_count: number;
+    failed_at: string | null;
+}
+
+export interface PlatformInfrastructureHealth {
+    ready: boolean;
+    mail: {
+        ready: boolean;
+        mailer: string | null;
+        from_address_configured: boolean;
+        external_transport: boolean;
+    };
+    queue: {
+        ready: boolean;
+        connection: string | null;
+        requires_worker: boolean;
+        pending_jobs: number | null;
+        failed_jobs: number | null;
+    };
+    administrator_invitation_url: {
+        ready: boolean;
+        origin: string | null;
+    };
+}
+
+export interface PlatformInvitationDeliveryHealth {
+    counts: CountMap;
+    failed: number;
+    stale: number;
+}
+
 export interface PlatformHealthOverview {
     generated_at: string;
     release: {
@@ -111,12 +154,16 @@ export interface PlatformHealthOverview {
     domains: { ownership: CountMap; operational: CountMap };
     subscriptions: CountMap;
     operations: { outbox: CountMap; storage_cleanup: CountMap };
+    infrastructure: PlatformInfrastructureHealth;
+    invitation_delivery: PlatformInvitationDeliveryHealth;
     storage: { tracked_document_bytes: number; tracked_document_count: number };
     alerts: {
         onboarding_failures: number;
         domain_failures: number;
         dead_outbox_events: number;
         dead_storage_cleanup_jobs: number;
+        failed_invitation_deliveries: number;
+        stale_invitation_deliveries: number;
         requires_attention: boolean;
     };
     failures: {
@@ -124,6 +171,7 @@ export interface PlatformHealthOverview {
         domains: PlatformDomainFailure[];
         outbox: PlatformOutboxFailure[];
         storage_cleanup: PlatformStorageFailure[];
+        invitation_delivery: PlatformInvitationDeliveryFailure[];
     };
 }
 
@@ -178,6 +226,8 @@ export interface PlatformTenantHealthDetail {
         utilization_percent: Record<string, number | null>;
         blockers: Array<{ code: string; message: string; context: Record<string, unknown> }>;
     };
+    infrastructure: PlatformInfrastructureHealth;
+    invitation_delivery: PlatformInvitationDeliveryHealth;
     storage: {
         tracked_document_bytes: number;
         tracked_document_count: number;

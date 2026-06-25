@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreign('tenant_id', 'tenant_primary_domains_tenant_fk')
                 ->references('id')
                 ->on('tenants')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(
                 ['tenant_domain_id', 'tenant_id'],
                 'tenant_primary_domains_domain_tenant_fk',

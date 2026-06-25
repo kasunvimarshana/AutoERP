@@ -203,6 +203,64 @@ final class TenantIsolationArchitectureTest extends TestCase
         self::assertSame([], $violations, implode(PHP_EOL, $violations));
     }
 
+    public function test_raw_queries_against_tenant_tables_declare_an_explicit_tenant_boundary(): void
+    {
+        $tenantTables = [];
+        foreach ($this->tableMetadata() as $table => $metadata) {
+            if ($metadata['tenant_owned']) {
+                $tenantTables[$table] = true;
+            }
+        }
+
+        $root = dirname(__DIR__, 3).'/app/Modules';
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        );
+        $violations = [];
+
+        foreach ($iterator as $file) {
+            $path = str_replace('\\', '/', $file->getPathname());
+            if (
+                ! $file->isFile()
+                || $file->getExtension() !== 'php'
+                || str_contains($path, '/Database/Migrations/')
+                || str_contains($path, '/Database/Seeders/')
+                || str_contains($path, '/Tests/')
+            ) {
+                continue;
+            }
+
+            $source = (string) file_get_contents($file->getPathname());
+            foreach ($this->namedMethodSources($source) as $method) {
+                preg_match_all("/DB::table\(\s*'([^']+)'\s*\)/", $method['source'], $matches);
+                foreach ($matches[1] as $table) {
+                    if (! isset($tenantTables[$table])) {
+                        continue;
+                    }
+
+                    $hasTenantPredicate = preg_match(
+                        "/(?:where|whereColumn|whereIntegerInRaw)\([^;]{0,240}tenant_id/s",
+                        $method['source'],
+                    ) === 1;
+                    $usesOwnedScopeHelper = str_contains($method['source'], '$this->scoped(')
+                        || str_contains($method['source'], '$this->scopedJoin(');
+                    $isExplicitControlPlaneQuery = str_contains($method['source'], 'runAsControlPlane(');
+
+                    if (! $hasTenantPredicate && ! $usesOwnedScopeHelper && ! $isExplicitControlPlaneQuery) {
+                        $violations[] = sprintf(
+                            '%s::%s queries tenant table %s without a tenant predicate, owned scope helper, or explicit control-plane boundary',
+                            $path,
+                            $method['name'],
+                            $table,
+                        );
+                    }
+                }
+            }
+        }
+
+        self::assertSame([], array_values(array_unique($violations)), implode(PHP_EOL, $violations));
+    }
+
     public function test_application_code_has_no_global_scope_escape_hatch(): void
     {
         $root = dirname(__DIR__, 3).'/app/Modules';
@@ -267,6 +325,49 @@ final class TenantIsolationArchitectureTest extends TestCase
         self::assertStringNotContainsString('hasExplicitTenantEquality', $source);
         self::assertStringContainsString("whereRaw('1 = 0')", $source);
         self::assertStringContainsString('isControlPlane()', $source);
+    }
+
+    /** @return list<array{name:string,source:string}> */
+    private function namedMethodSources(string $source): array
+    {
+        preg_match_all(
+            '/(?:public|protected|private)\s+(?:static\s+)?function\s+([A-Za-z0-9_]+)\s*\([^)]*\)[^{]*\{/s',
+            $source,
+            $matches,
+            PREG_OFFSET_CAPTURE,
+        );
+        $methods = [];
+
+        foreach ($matches[0] as $index => $match) {
+            $methodStart = $match[1];
+            $braceStart = strpos($source, '{', $methodStart);
+            if ($braceStart === false) {
+                continue;
+            }
+
+            $depth = 0;
+            $length = strlen($source);
+            for ($offset = $braceStart; $offset < $length; $offset++) {
+                if ($source[$offset] === '{') {
+                    $depth++;
+                    continue;
+                }
+                if ($source[$offset] !== '}') {
+                    continue;
+                }
+
+                $depth--;
+                if ($depth === 0) {
+                    $methods[] = [
+                        'name' => $matches[1][$index][0],
+                        'source' => substr($source, $methodStart, $offset - $methodStart + 1),
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return $methods;
     }
 
     /** @return array<string,string> */

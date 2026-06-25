@@ -26,6 +26,7 @@ final class TenantResource extends JsonResource
             'base_currency_id',
             'status',
             'status_reason',
+            'status_changed_at',
             'activated_at',
             'suspended_at',
             'archived_at',

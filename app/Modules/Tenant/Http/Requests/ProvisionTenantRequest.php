@@ -18,7 +18,7 @@ final class ProvisionTenantRequest extends FormRequest
     {
         return [
             'expected_version' => ['required', 'integer', 'min:1'],
-            'initial_admin_email' => ['required', 'email:rfc,dns', 'max:255'],
+            'initial_admin_email' => ['required', 'email:rfc', 'max:255'],
         ];
     }
 }

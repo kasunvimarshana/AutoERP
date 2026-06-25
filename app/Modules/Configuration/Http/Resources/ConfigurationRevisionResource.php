@@ -23,6 +23,8 @@ final class ConfigurationRevisionResource extends JsonResource
             'tenant_id' => $revision->tenantId,
             'organization_unit_id' => $revision->organizationUnitId,
             'key' => $revision->key,
+            'definition_version' => $revision->definitionVersion,
+            'definition_compatible' => $revision->definitionCompatible,
             'value' => $revision->sensitive ? null : $revision->value,
             'display_value' => $revision->sensitive
                 ? ($revision->configured ? 'Configured (protected)' : 'Not configured')

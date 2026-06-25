@@ -33,6 +33,7 @@ final class TenantSeeder extends Seeder
                     'name' => trim((string) env('AUTOERP_TENANT_NAME', 'AutoERP')),
                     'slug' => Str::slug($code),
                     'status' => TenantStatus::DRAFT,
+                    'status_changed_at' => now(),
                     'status_reason' => 'Awaiting platform onboarding.',
                     'activated_at' => null,
                     'row_version' => 1,

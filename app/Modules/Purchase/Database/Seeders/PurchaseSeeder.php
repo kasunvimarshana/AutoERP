@@ -24,7 +24,6 @@ final class PurchaseSeeder extends Seeder
                 DB::table('permissions')->updateOrInsert(
                     ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
                     [
-                        'organization_unit_id' => null,
                         'module' => 'Purchase',
                         'description' => $description,
                         'row_version' => 1,

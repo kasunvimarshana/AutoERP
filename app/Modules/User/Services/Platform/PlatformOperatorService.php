@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
@@ -18,10 +19,12 @@ use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformPermission;
+use Modules\User\Constants\UserStatus;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Models\PlatformOperatorPermissionModel;
 use Modules\User\Models\PlatformPermissionModel;
 use Modules\User\Models\UserModel;
+use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class PlatformOperatorService
@@ -32,6 +35,7 @@ final class PlatformOperatorService
         private readonly PlatformOperatorPermissionModel $assignments,
         private readonly PlatformPermissionCatalogSynchronizer $catalogue,
         private readonly PlatformOperatorSessionRevokerInterface $sessions,
+        private readonly PlatformOperatorInvitationService $invitations,
         private readonly PasswordHasherInterface $passwords,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
@@ -96,15 +100,16 @@ final class PlatformOperatorService
                     'username' => null,
                     'first_name' => trim((string) ($payload['first_name'] ?? '')),
                     'last_name' => $this->nullableString($payload['last_name'] ?? null),
-                    'email_verified_at' => $this->clock->now(),
-                    'password' => $this->passwords->hash((string) ($payload['password'] ?? '')),
-                    'status' => 'active',
+                    'email_verified_at' => null,
+                    'password' => $this->passwords->hash(Str::random(72)),
+                    'status' => UserStatus::INVITED,
                     'is_platform_operator' => true,
                     'row_version' => 1,
                 ]);
                 $operator->save();
                 $this->syncPermissions($operator, $permissionNames);
-                $this->recordAudit('created', $operator, null, $this->snapshot($operator));
+                $this->invitations->issueForOperator($operator);
+                $this->recordAudit('invited', $operator, null, $this->snapshot($operator));
 
                 return $this->reload($operator);
             }, 3);
@@ -157,7 +162,7 @@ final class PlatformOperatorService
     {
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion, $status, $reason): UserModel {
             $status = strtolower(trim($status));
-            if (! in_array($status, ['active', 'inactive'], true)) {
+            if (! in_array($status, UserStatus::platformOperatorMutableValues(), true)) {
                 throw ValidationException::withMessages(['status' => ['Operator status must be active or inactive.']]);
             }
             $reason = trim($reason);
@@ -168,11 +173,16 @@ final class PlatformOperatorService
             return $this->database->transaction(function () use ($operatorId, $expectedVersion, $status, $reason): UserModel {
                 $operator = $this->find($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
+                if ((string) $operator->getAttribute('status') === UserStatus::INVITED) {
+                    throw new ConflictHttpException(
+                        'Invited operators must complete or revoke their invitation; they cannot be activated manually.',
+                    );
+                }
                 if ((string) $operator->getAttribute('status') === $status) {
                     return $operator;
                 }
 
-                if ($status !== 'active') {
+                if ($status !== UserStatus::ACTIVE) {
                     if ($this->currentUser->currentUserId() === $operatorId) {
                         throw new AuthorizationException('You cannot deactivate your own platform account.');
                     }
@@ -190,7 +200,7 @@ final class PlatformOperatorService
                     'updated_at' => $this->clock->now(),
                 ])->save();
                 $operator = $this->reload($operator);
-                if ($status !== 'active') {
+                if ($status !== UserStatus::ACTIVE) {
                     $this->sessions->revokeAllForOperator(
                         $operatorId,
                         'Platform operator deactivated: '.$reason,
@@ -224,7 +234,7 @@ final class PlatformOperatorService
             ->whereNull('tenant_id')
             ->where('is_platform_operator', true)
             ->whereNull('deleted_at')
-            ->with(['platformPermissionAssignments.permission']);
+            ->with(['platformPermissionAssignments.permission', 'latestPlatformOperatorInvitation']);
     }
 
     /** @param list<string> $permissionNames */
@@ -258,7 +268,7 @@ final class PlatformOperatorService
             ->whereHas('operator', fn (Builder $query) => $query
                 ->whereNull('tenant_id')
                 ->where('is_platform_operator', true)
-                ->where('status', 'active')
+                ->where('status', UserStatus::ACTIVE)
                 ->whereNull('deleted_at'))
             ->whereHas('permission', fn (Builder $query) => $query
                 ->where('name', PlatformPermission::OPERATORS_MANAGE)

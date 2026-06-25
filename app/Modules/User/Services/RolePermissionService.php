@@ -50,7 +50,6 @@ final class RolePermissionService extends AbstractUserCrudService
 
             return $this->success($this->rolePermissions->create([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? null),
                 'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
@@ -81,7 +80,6 @@ final class RolePermissionService extends AbstractUserCrudService
 
             return $this->success($this->rolePermissions->update($id, [
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? $existing->get('organization_unit_id')),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->domain->normalizeMetadata($payload['metadata'])
                     : $existing->get('metadata'),

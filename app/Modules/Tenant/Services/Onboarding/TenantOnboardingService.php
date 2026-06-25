@@ -81,7 +81,7 @@ final class TenantOnboardingService
                     &$currentStep,
                 ): array {
                     $state = $this->progress->begin($tenantId, $email, $operationId, $correlationId);
-                    $completed = $this->completedSteps($state->getAttribute('completed_steps'));
+                    $completed = $this->progress->completedStepNames($tenantId);
 
                     $organizationUnitId = $this->positiveInt($state->getAttribute('root_organization_unit_id'));
                     if (! in_array(TenantOnboardingStep::ROOT_ORGANIZATION, $completed, true) || $organizationUnitId === null) {
@@ -343,13 +343,6 @@ final class TenantOnboardingService
         }
     }
 
-    /** @return list<string> */
-    private function completedSteps(mixed $value): array
-    {
-        return is_array($value)
-            ? array_values(array_filter($value, static fn (mixed $step): bool => is_string($step)))
-            : [];
-    }
 
     private function positiveInt(mixed $value): ?int
     {

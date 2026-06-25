@@ -712,7 +712,6 @@ final class TechnicianWorkReportTest extends TestCase
 
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'created_at' => $now,

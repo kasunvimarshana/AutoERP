@@ -11,6 +11,7 @@ return [
         'operation_lease_minutes' => (int) env('TENANT_ONBOARDING_OPERATION_LEASE_MINUTES', 15),
     ],
     'platform' => [
+        'public_url' => env('PLATFORM_PUBLIC_URL'),
         'host_middleware_alias' => 'platform.host',
         'operator_middleware_alias' => 'platform.operator',
     ],

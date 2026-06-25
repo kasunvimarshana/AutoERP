@@ -15,6 +15,7 @@ use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Constants\TenantSubscriptionEventType;
+use Modules\Tenant\Models\TenantLifecycleEventModel;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Events\TenantEventOutboxService;
@@ -28,6 +29,8 @@ final class ExpireTenantsService
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSubscriptionRepositoryInterface $subscriptions,
+        private readonly TenantActorSnapshotFactory $actorSnapshots,
+        private readonly TenantLifecycleEventModel $lifecycleEvents,
         private readonly AuditRecorderInterface $audit,
         private readonly TenantEventOutboxService $outbox,
         private readonly ClockInterface $clock,
@@ -82,6 +85,7 @@ final class ExpireTenantsService
                                 [
                                     'status' => TenantStatus::INACTIVE,
                                     'status_reason' => self::EXPIRY_REASON,
+                                    'status_changed_at' => $now,
                                     'updated_by' => null,
                                 ],
                             );
@@ -96,7 +100,7 @@ final class ExpireTenantsService
                             null,
                             TenantSubscriptionEventType::EXPIRED,
                             self::EXPIRY_REASON,
-                            null,
+                            $this->actorSnapshots->system(),
                             $now,
                         );
                         $this->audit->recordSystem(new SystemAuditEventData(
@@ -127,6 +131,19 @@ final class ExpireTenantsService
                         ));
 
                         if ($previousTenantStatus === TenantStatus::ACTIVE) {
+                            $actor = $this->actorSnapshots->system();
+                            $this->lifecycleEvents->newQuery()->create([
+                                'tenant_id' => $tenantId,
+                                'previous_status' => TenantStatus::ACTIVE,
+                                'new_status' => TenantStatus::INACTIVE,
+                                'reason' => self::EXPIRY_REASON,
+                                'actor_id' => $actor['id'],
+                                'actor_type' => $actor['type'],
+                                'actor_name' => 'Tenant subscription expiry job',
+                                'actor_email' => null,
+                                'occurred_at' => $now,
+                            ]);
+
                             $this->outbox->enqueueStatusChanged(
                                 tenantId: $tenantId,
                                 previousStatus: TenantStatus::ACTIVE,

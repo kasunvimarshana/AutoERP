@@ -64,3 +64,43 @@ export interface PlatformMfaConfirmation {
     enabled: true;
     backup_codes: string[];
 }
+
+
+export interface InitialAdministratorInvitationInspection {
+    tenant_name: string;
+    email: string;
+    expires_at: string;
+}
+
+export interface AcceptInitialAdministratorInvitationPayload {
+    token: string;
+    first_name: string;
+    last_name: string | null;
+    password: string;
+    password_confirmation: string;
+}
+
+export interface InitialAdministratorInvitationAcceptance {
+    user_id: number;
+    tenant_id: number;
+    email: string;
+}
+
+export interface PlatformOperatorInvitationInspection {
+    operator_name: string;
+    email: string;
+    expires_at: string;
+    delivery_status: string;
+}
+
+export interface AcceptPlatformOperatorInvitationPayload {
+    token: string;
+    password: string;
+    password_confirmation: string;
+}
+
+export interface PlatformOperatorInvitationAcceptance {
+    operator_name: string;
+    email: string;
+    status: 'active';
+}

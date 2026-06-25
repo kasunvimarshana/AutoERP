@@ -6,7 +6,6 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class RolePermissionModel extends TenantOwnedModel
@@ -21,7 +20,6 @@ final class RolePermissionModel extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
             'role_id' => 'integer',
             'permission_id' => 'integer',
         ]);
@@ -32,10 +30,6 @@ final class RolePermissionModel extends TenantOwnedModel
         return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
 
     public function role(): BelongsTo
     {

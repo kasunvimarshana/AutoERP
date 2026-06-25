@@ -11,12 +11,14 @@ use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Tenant\Data\TenantDirectoryFilters;
 use Modules\Tenant\Models\TenantModel;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
 
 final class EloquentTenantRepository implements TenantRepositoryInterface
 {
     public function __construct(
         private readonly TenantModel $model,
         private readonly ClockInterface $clock,
+        private readonly TenantSubscriptionPresenter $subscriptionPresenter,
     ) {}
 
     public function findById(int|string $id): ?DataRecord
@@ -124,7 +126,8 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
             'currentSubscription.subscription.revision.plan:id,name,slug,is_active',
             'currentSubscription.subscription.revision.currency:id,code,name,symbol,is_active',
             'baseCurrency:id,code,name,symbol,is_active',
-            'onboardingState:tenant_id,status,operation_id,initial_admin_email,root_organization_unit_id,super_admin_role_id,invitation_id,completed_steps,failed_step,last_error_code,last_error_message,correlation_id,provisioned_at,completed_at,row_version',
+            'onboardingState:tenant_id,status,operation_id,initial_admin_email,root_organization_unit_id,super_admin_role_id,invitation_id,failed_step,last_error_code,last_error_message,correlation_id,provisioned_at,completed_at,row_version',
+            'onboardingState.steps:id,tenant_id,step,status,attempt_count,owner_module,started_at,completed_at,error_code,error_message,correlation_id',
             'primaryDomainAssignment:tenant_id,tenant_domain_id',
             'primaryDomainAssignment.domain:id,tenant_id,domain,status,ownership_status,routing_status,tls_status,reachability_status,operational_status,verified_at,last_operational_check_at,tls_expires_at',
         ]);
@@ -154,19 +157,22 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                     'id', 'code', 'name', 'symbol', 'is_active',
                 ]);
             }
+            $payload['current_subscription'] = $this->subscriptionPresenter->present(
+                $payload['current_subscription'],
+            );
         }
         $payload['base_currency'] = $model->relationLoaded('baseCurrency') && $model->baseCurrency !== null
             ? $model->baseCurrency->only(['id', 'code', 'name', 'symbol', 'is_active'])
             : null;
-        $payload['onboarding'] = $model->relationLoaded('onboardingState') && $model->onboardingState !== null
-            ? $model->onboardingState->only([
+        $payload['onboarding'] = null;
+        if ($model->relationLoaded('onboardingState') && $model->onboardingState !== null) {
+            $payload['onboarding'] = $model->onboardingState->only([
                 'status',
                 'initial_admin_email',
                 'operation_id',
                 'root_organization_unit_id',
                 'super_admin_role_id',
                 'invitation_id',
-                'completed_steps',
                 'failed_step',
                 'last_error_code',
                 'last_error_message',
@@ -174,8 +180,18 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                 'provisioned_at',
                 'completed_at',
                 'row_version',
-            ])
-            : null;
+            ]);
+            $payload['onboarding']['steps'] = $model->onboardingState->relationLoaded('steps')
+                ? $model->onboardingState->steps->toArray()
+                : [];
+            $payload['onboarding']['completed_steps'] = array_values(array_map(
+                static fn (array $step): string => (string) $step['step'],
+                array_filter(
+                    $payload['onboarding']['steps'],
+                    static fn (array $step): bool => ($step['status'] ?? null) === 'completed',
+                ),
+            ));
+        }
         $primaryDomain = $model->relationLoaded('primaryDomainAssignment')
             ? $model->primaryDomainAssignment?->domain
             : null;

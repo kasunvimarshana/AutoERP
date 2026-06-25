@@ -6,6 +6,7 @@ namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Tenant\Services\Onboarding\TenantOnboardingStatePolicy;
 
 final class TenantOnboardingStateModel extends TenantOwnedModel
 {
@@ -24,7 +25,6 @@ final class TenantOnboardingStateModel extends TenantOwnedModel
         'root_organization_unit_id',
         'super_admin_role_id',
         'invitation_id',
-        'completed_steps',
         'failed_step',
         'last_error_code',
         'last_error_message',
@@ -36,6 +36,13 @@ final class TenantOnboardingStateModel extends TenantOwnedModel
         'row_version',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(static function (self $state): void {
+            TenantOnboardingStatePolicy::assertValid($state->getAttributes());
+        });
+    }
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
@@ -43,7 +50,6 @@ final class TenantOnboardingStateModel extends TenantOwnedModel
             'root_organization_unit_id' => 'integer',
             'super_admin_role_id' => 'integer',
             'invitation_id' => 'integer',
-            'completed_steps' => 'array',
             'operation_started_at' => 'datetime',
             'operation_lease_expires_at' => 'datetime',
             'provisioned_at' => 'datetime',

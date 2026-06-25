@@ -654,7 +654,6 @@ final class ItemApiTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'name' => 'Item Test Role',
             'guard_name' => 'web',
             'description' => 'Item test role',
@@ -665,7 +664,6 @@ final class ItemApiTest extends TestCase
         foreach ($this->seedItemPermissions($tenantId, $permissions ?? array_keys(ItemAuthorizationService::descriptions())) as $permissionId) {
             DB::table('role_permissions')->insert([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
                 'row_version' => 1,
@@ -675,7 +673,6 @@ final class ItemApiTest extends TestCase
         }
         DB::table('user_roles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'user_id' => $userId,
             'role_id' => $roleId,
             'row_version' => 1,
@@ -717,7 +714,6 @@ final class ItemApiTest extends TestCase
         foreach ($names as $name) {
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
                 'name' => $name,
                 'guard_name' => 'web',
                 'module' => 'Item',

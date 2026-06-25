@@ -11,6 +11,7 @@ return [
             'label' => 'Workspace display name',
             'description' => 'Human-readable name shown in tenant-facing documents and screens.',
             'owner' => 'Configuration',
+            'version' => 1,
             'type' => ConfigurationValueType::STRING,
             'scopes' => [ConfigurationScope::GLOBAL, ConfigurationScope::TENANT],
             'default' => env('APP_NAME', 'AutoERP'),
@@ -22,6 +23,7 @@ return [
             'label' => 'Workspace timezone',
             'description' => 'IANA timezone used when presenting local dates and times to users.',
             'owner' => 'Configuration',
+            'version' => 1,
             'type' => ConfigurationValueType::STRING,
             'scopes' => [
                 ConfigurationScope::GLOBAL,

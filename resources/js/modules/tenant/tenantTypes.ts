@@ -3,7 +3,7 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 
 export type TenantStatus = 'draft' | 'active' | 'inactive' | 'suspended' | 'archived';
 export type TenantSubscriptionContractStatus = 'trial' | 'active';
-export type TenantSubscriptionEffectiveStatus = 'scheduled' | 'trial' | 'active' | 'expired';
+export type TenantSubscriptionEffectiveStatus = 'missing' | 'scheduled' | 'trial' | 'active' | 'cancelled' | 'expired' | 'invalid';
 export type TenantCurrentSubscriptionState = 'assigned' | 'cancelled' | 'expired';
 export type TenantSubscriptionOperation = 'assign' | 'renew' | 'extend' | 'correct';
 export type TenantOnboardingStatus =
@@ -49,7 +49,9 @@ export interface TenantPlanRevision {
     id: number;
     tenant_plan_id: number;
     revision_number: number;
+    features_schema_version: number;
     features: TenantPlanFeatures;
+    limits_schema_version: number;
     limits: TenantPlanLimits;
     price: string;
     currency_id: number | null;
@@ -79,7 +81,9 @@ export interface TenantSubscription {
     change_reason: string | null;
     plan_name: string;
     plan_slug: string;
+    plan_features_schema_version: number;
     plan_features: TenantPlanFeatures;
+    plan_limits_schema_version: number;
     plan_limits: TenantPlanLimits;
     price: string;
     currency_code: string | null;
@@ -125,17 +129,39 @@ export interface TenantOnboardingSummary {
     steps?: TenantOnboardingStep[];
 }
 
+export type InvitationDeliveryStatus =
+    | 'queued'
+    | 'sending'
+    | 'sent'
+    | 'delivered'
+    | 'bounced'
+    | 'failed'
+    | 'cancelled';
+
+export interface InitialAdministratorInvitationDelivery {
+    id: number;
+    public_id: string;
+    attempt_number: number;
+    status: InvitationDeliveryStatus;
+    processing_attempt_count: number;
+    requested_at: string | null;
+    sent_at: string | null;
+    delivered_at: string | null;
+    bounced_at: string | null;
+    failed_at: string | null;
+    cancelled_at: string | null;
+    provider: string | null;
+    provider_message_id: string | null;
+    error_code: string | null;
+    error_message: string | null;
+}
+
 export interface InitialAdministratorInvitation {
     id: number;
     public_id: string;
     email: string;
     status: 'pending' | 'accepted' | 'revoked' | 'expired';
-    delivery_status: 'pending' | 'sent' | 'failed' | 'not_required';
-    delivery_attempt_count: number;
-    delivery_requested_at: string | null;
-    delivered_at: string | null;
-    delivery_error_code: string | null;
-    delivery_error_message: string | null;
+    delivery: InitialAdministratorInvitationDelivery | null;
     expires_at: string | null;
     accepted_at: string | null;
     accepted_by_user_id: number | null;

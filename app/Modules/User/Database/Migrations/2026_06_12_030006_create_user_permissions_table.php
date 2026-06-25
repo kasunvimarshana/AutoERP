@@ -14,7 +14,6 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->unsignedBigInteger('user_id');
@@ -23,11 +22,6 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by')->nullable()->index('user_permissions_updated_by_idx');
 
             $table->timestamps();
-
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'up_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
             $table->foreign(['user_id', 'tenant_id'], 'up_user_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')

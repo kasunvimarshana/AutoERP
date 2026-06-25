@@ -14,6 +14,7 @@ final readonly class StoredConfigurationValue
         public ?int $tenantId,
         public ?int $organizationUnitId,
         public string $key,
+        public int $definitionVersion,
         public ?string $storedValue,
         public string $valueType,
         public bool $sensitive,

@@ -38,13 +38,14 @@ interface TenantSubscriptionRepositoryInterface
     /** @return list<DataRecord> */
     public function listExpiredCurrent(DateTimeInterface $now, int $limit): array;
 
+    /** @param array{id:?int,type:string,name:?string,email:?string} $actor */
     public function recordEvent(
         int $tenantId,
         int $subscriptionId,
         ?int $previousSubscriptionId,
         string $eventType,
         ?string $reason,
-        ?int $actorId,
+        array $actor,
         DateTimeInterface $occurredAt,
     ): void;
 }

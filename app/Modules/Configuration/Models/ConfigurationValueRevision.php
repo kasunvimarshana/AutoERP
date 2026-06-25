@@ -9,16 +9,24 @@ use LogicException;
 use Modules\Core\Models\CoreModel;
 use Modules\User\Models\UserModel;
 
-final class ConfigurationValueRevision extends CoreModel
+abstract class ConfigurationValueRevision extends CoreModel
 {
     public $timestamps = false;
 
-    protected $table = 'configuration_value_revisions';
-
     protected $fillable = [
-        'scope', 'tenant_id', 'organization_unit_id', 'key', 'operation', 'stored_value',
-        'value_type', 'is_sensitive', 'resulting_row_version', 'source_revision_id',
-        'actor_user_id', 'reason', 'created_at',
+        'tenant_id',
+        'organization_unit_id',
+        'key',
+        'definition_version',
+        'operation',
+        'stored_value',
+        'value_type',
+        'is_sensitive',
+        'resulting_row_version',
+        'source_revision_id',
+        'actor_user_id',
+        'reason',
+        'created_at',
     ];
 
     protected static function booted(): void
@@ -32,12 +40,29 @@ final class ConfigurationValueRevision extends CoreModel
         return [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'definition_version' => 'integer',
             'resulting_row_version' => 'integer',
             'source_revision_id' => 'integer',
             'actor_user_id' => 'integer',
             'is_sensitive' => 'boolean',
             'created_at' => 'immutable_datetime',
         ];
+    }
+
+    abstract public function scopeName(): string;
+
+    public function tenantId(): ?int
+    {
+        $value = $this->getAttribute('tenant_id');
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    public function organizationUnitId(): ?int
+    {
+        $value = $this->getAttribute('organization_unit_id');
+
+        return is_numeric($value) ? (int) $value : null;
     }
 
     public function actor(): BelongsTo
@@ -47,6 +72,6 @@ final class ConfigurationValueRevision extends CoreModel
 
     public function sourceRevision(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'source_revision_id');
+        return $this->belongsTo(static::class, 'source_revision_id');
     }
 }

@@ -108,7 +108,6 @@ final class WarehouseSeeder extends Seeder
                 DB::table('permissions')->updateOrInsert(
                     ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
                     [
-                        'organization_unit_id' => null,
                         'module' => 'Warehouse',
                         'description' => $description,
                         'row_version' => 1,

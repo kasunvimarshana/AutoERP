@@ -20,6 +20,7 @@ final class ConfigurationDefinitionResource extends JsonResource
             'label' => $definition->label,
             'description' => $definition->description,
             'owner' => $definition->owner,
+            'version' => $definition->version,
             'value_type' => $definition->valueType,
             'allowed_scopes' => $definition->allowedScopes,
             'default_value' => $definition->sensitive ? null : $definition->defaultValue,

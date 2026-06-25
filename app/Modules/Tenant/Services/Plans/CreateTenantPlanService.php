@@ -106,7 +106,9 @@ final class CreateTenantPlanService
             : $this->clock->now();
 
         return [
+            'features_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'features' => $this->schema->normalizeFeatures($payload['features'] ?? null),
+            'limits_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'limits' => $this->schema->normalizeLimits($payload['limits'] ?? null),
             'price' => $this->schema->normalizePrice($payload['price'] ?? null),
             'currency_id' => $this->positiveInt($payload['currency_id'] ?? null),

@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Platform;
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Auth\Constants\InvitationDeliveryStatus;
+use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
@@ -36,6 +40,7 @@ final class PlatformTenantHealthService
         private readonly TenantDomainModel $domains,
         private readonly TenantCurrentSubscriptionModel $subscriptions,
         private readonly TenantDocumentModel $documents,
+        private readonly AuthRegistrationInvitationDeliveryModel $invitationDeliveries,
         private readonly TenantStorageCleanupJobModel $cleanupJobs,
         private readonly TenantEventOutboxModel $outboxRows,
         private readonly TenantEventOutboxService $outbox,
@@ -60,6 +65,8 @@ final class PlatformTenantHealthService
                 })->count();
             $deadOutbox = $this->outboxRows->newQuery()->where('status', 'dead')->count();
             $deadCleanup = $this->cleanupJobs->newQuery()->where('status', 'dead')->count();
+            $invitationDelivery = $this->invitationDeliveryHealth();
+            $infrastructure = $this->infrastructureHealth();
 
             return [
                 'generated_at' => $this->clock->now()->format(DATE_ATOM),
@@ -84,6 +91,8 @@ final class PlatformTenantHealthService
                     'outbox' => $this->countsBy($this->outboxRows->newQuery(), 'status', ['pending', 'processing', 'published', 'dead']),
                     'storage_cleanup' => $this->countsBy($this->cleanupJobs->newQuery(), 'status', ['pending', 'processing', 'completed', 'dead']),
                 ],
+                'infrastructure' => $infrastructure,
+                'invitation_delivery' => $invitationDelivery,
                 'storage' => [
                     'tracked_document_bytes' => (int) $this->documents->newQuery()->sum('size_bytes'),
                     'tracked_document_count' => $this->documents->newQuery()->count(),
@@ -93,13 +102,24 @@ final class PlatformTenantHealthService
                     'domain_failures' => $domainFailures,
                     'dead_outbox_events' => $deadOutbox,
                     'dead_storage_cleanup_jobs' => $deadCleanup,
-                    'requires_attention' => ($onboardingFailures + $domainFailures + $deadOutbox + $deadCleanup) > 0,
+                    'failed_invitation_deliveries' => $invitationDelivery['failed'],
+                    'stale_invitation_deliveries' => $invitationDelivery['stale'],
+                    'requires_attention' => (
+                        $onboardingFailures
+                        + $domainFailures
+                        + $deadOutbox
+                        + $deadCleanup
+                        + $invitationDelivery['failed']
+                        + $invitationDelivery['stale']
+                    ) > 0
+                        || ! $infrastructure['ready'],
                 ],
                 'failures' => [
                     'onboarding' => $this->failedOnboarding(),
                     'domains' => $this->failedDomains(),
                     'outbox' => $this->deadOutboxEvents(),
                     'storage_cleanup' => $this->deadStorageCleanupJobs(),
+                    'invitation_delivery' => $this->failedInvitationDeliveries(),
                 ],
             ];
         });
@@ -135,6 +155,8 @@ final class PlatformTenantHealthService
                 ->where('tenant_id', $tenantId)
                 ->first();
             $capacity = $this->capacity($tenantId, $currentSubscription);
+            $infrastructure = $this->infrastructureHealth();
+            $invitationDelivery = $this->invitationDeliveryHealth($tenantId);
 
             return [
                 'generated_at' => $this->clock->now()->format(DATE_ATOM),
@@ -170,6 +192,8 @@ final class PlatformTenantHealthService
                     'ends_at' => $currentSubscription->subscription?->getAttribute('ends_at')?->toAtomString(),
                 ],
                 'capacity' => $capacity,
+                'infrastructure' => $infrastructure,
+                'invitation_delivery' => $invitationDelivery,
                 'storage' => [
                     'tracked_document_bytes' => (int) $this->documents->newQuery()->where('tenant_id', $tenantId)->sum('size_bytes'),
                     'tracked_document_count' => $this->documents->newQuery()->where('tenant_id', $tenantId)->count(),
@@ -239,6 +263,137 @@ final class PlatformTenantHealthService
             'utilization_percent' => $utilization,
             'blockers' => $assessment['blockers'],
         ];
+    }
+
+
+    /** @return array<string, mixed> */
+    private function infrastructureHealth(): array
+    {
+        $mailer = trim((string) config('mail.default', ''));
+        $fromAddress = trim((string) config('mail.from.address', ''));
+        $invitationUrl = trim((string) config('module-auth.registration.invitation_url', ''));
+        $queueConnection = trim((string) config('queue.default', ''));
+        $urlScheme = strtolower((string) parse_url($invitationUrl, PHP_URL_SCHEME));
+        $invitationUrlReady = filter_var($invitationUrl, FILTER_VALIDATE_URL) !== false
+            && in_array($urlScheme, ['http', 'https'], true);
+        $mailReady = $mailer !== ''
+            && ! in_array($mailer, ['log', 'array'], true)
+            && $fromAddress !== '';
+        $queueReady = $queueConnection !== '' && $queueConnection !== 'sync';
+
+        $pendingJobs = null;
+        $failedJobs = null;
+        if ($queueConnection === 'database' && Schema::hasTable('jobs')) {
+            $pendingJobs = DB::table('jobs')->count();
+        }
+        if (Schema::hasTable('failed_jobs')) {
+            $failedJobs = DB::table('failed_jobs')->count();
+        }
+
+        return [
+            'ready' => $mailReady && $queueReady && $invitationUrlReady,
+            'mail' => [
+                'ready' => $mailReady,
+                'mailer' => $mailer === '' ? null : $mailer,
+                'from_address_configured' => $fromAddress !== '',
+                'external_transport' => ! in_array($mailer, ['', 'log', 'array'], true),
+            ],
+            'queue' => [
+                'ready' => $queueReady,
+                'connection' => $queueConnection === '' ? null : $queueConnection,
+                'requires_worker' => $queueConnection !== 'sync',
+                'pending_jobs' => $pendingJobs,
+                'failed_jobs' => $failedJobs,
+            ],
+            'administrator_invitation_url' => [
+                'ready' => $invitationUrlReady,
+                'origin' => $invitationUrlReady
+                    ? parse_url($invitationUrl, PHP_URL_SCHEME).'://'.parse_url($invitationUrl, PHP_URL_HOST)
+                    : null,
+            ],
+        ];
+    }
+
+    /** @return array{counts:array<string,int>,failed:int,stale:int} */
+    private function invitationDeliveryHealth(?int $tenantId = null): array
+    {
+        $staleBefore = $this->clock->now()->modify(sprintf(
+            '-%d seconds',
+            max(60, (int) config('module-auth.registration.delivery_stale_after_seconds', 900)),
+        ));
+
+        $baseQuery = $this->invitationDeliveries->newQuery();
+        if ($tenantId !== null) {
+            $baseQuery->where('tenant_id', $tenantId);
+        }
+
+        $counts = $this->countsBy(
+            clone $baseQuery,
+            'status',
+            InvitationDeliveryStatus::values(),
+        );
+        $stale = (clone $baseQuery)
+            ->where(function ($query) use ($staleBefore): void {
+                $query->where(function ($queued) use ($staleBefore): void {
+                    $queued->where('status', InvitationDeliveryStatus::QUEUED)
+                        ->where('requested_at', '<=', $staleBefore);
+                })->orWhere(function ($sending): void {
+                    $sending->where('status', InvitationDeliveryStatus::SENDING)
+                        ->where('lease_expires_at', '<=', $this->clock->now());
+                });
+            })
+            ->count();
+
+        return [
+            'counts' => $counts,
+            'failed' => $counts[InvitationDeliveryStatus::FAILED] ?? 0,
+            'stale' => $stale,
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function failedInvitationDeliveries(): array
+    {
+        return $this->invitationDeliveries->newQuery()
+            ->join('auth_registration_invitations', function ($join): void {
+                $join->on(
+                    'auth_registration_invitations.id',
+                    '=',
+                    'auth_registration_invitation_deliveries.invitation_id',
+                )->on(
+                    'auth_registration_invitations.tenant_id',
+                    '=',
+                    'auth_registration_invitation_deliveries.tenant_id',
+                );
+            })
+            ->join('tenants', 'tenants.id', '=', 'auth_registration_invitation_deliveries.tenant_id')
+            ->where('auth_registration_invitation_deliveries.status', InvitationDeliveryStatus::FAILED)
+            ->orderByDesc('auth_registration_invitation_deliveries.failed_at')
+            ->limit(20)
+            ->get([
+                'auth_registration_invitation_deliveries.public_id',
+                'auth_registration_invitation_deliveries.tenant_id',
+                'auth_registration_invitation_deliveries.attempt_number',
+                'auth_registration_invitation_deliveries.processing_attempt_count',
+                'auth_registration_invitation_deliveries.error_code',
+                'auth_registration_invitation_deliveries.error_message',
+                'auth_registration_invitation_deliveries.failed_at',
+                'auth_registration_invitations.email',
+                'tenants.code as tenant_code',
+                'tenants.name as tenant_name',
+            ])
+            ->map(static fn ($row): array => [
+                'public_id' => (string) $row->public_id,
+                'tenant_id' => (int) $row->tenant_id,
+                'tenant_code' => (string) $row->tenant_code,
+                'tenant_name' => (string) $row->tenant_name,
+                'email' => (string) $row->email,
+                'attempt_number' => (int) $row->attempt_number,
+                'processing_attempt_count' => (int) $row->processing_attempt_count,
+                'error_code' => $row->error_code,
+                'error_message' => $row->error_message,
+                'failed_at' => $row->failed_at?->toAtomString(),
+            ])->all();
     }
 
     /** @return list<array<string, mixed>> */

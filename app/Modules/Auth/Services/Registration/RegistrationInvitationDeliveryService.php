@@ -6,119 +6,272 @@ namespace Modules\Auth\Services\Registration;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Modules\Auth\Constants\InvitationDeliveryStatus;
 use Modules\Auth\Constants\RegistrationInvitationStatus;
+use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
 use Modules\Auth\Notifications\InitialAdministratorInvitationNotification;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Throwable;
 
 final class RegistrationInvitationDeliveryService
 {
     private const DELIVERY_FAILURE_CODE = 'AUTH_INVITATION_DELIVERY_FAILED';
-    private const DELIVERY_FAILURE_MESSAGE = 'The invitation email could not be delivered. Retry the delivery after checking the mail service.';
+    private const DELIVERY_FAILURE_MESSAGE = 'The invitation email could not be sent. Check the mail transport and retry the delivery.';
+    private const MISSING_TOKEN_CODE = 'AUTH_INVITATION_DELIVERY_TOKEN_MISSING';
+    private const DEFAULT_LEASE_SECONDS = 300;
 
     public function __construct(
-        private readonly AuthRegistrationInvitationModel $invitations,
+        private readonly AuthRegistrationInvitationDeliveryModel $deliveries,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {}
 
-    public function deliver(int $tenantId, int $invitationId): void
+    public function deliver(int $tenantId, int $deliveryId): void
     {
+        $claim = null;
+
         try {
-            $payload = $this->executionContext->runForTenant(
+            $claim = $this->executionContext->runForTenant(
                 $tenantId,
-                fn (): ?array => DB::transaction(function () use ($invitationId): ?array {
-                    $invitation = $this->invitations->newQuery()
-                        ->with('tenant:id,name')
-                        ->whereKey($invitationId)
-                        ->where('status', RegistrationInvitationStatus::PENDING)
-                        ->where('expires_at', '>', $this->clock->now())
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $invitation instanceof AuthRegistrationInvitationModel) {
-                        return null;
-                    }
-
-                    $token = trim((string) $invitation->getAttribute('delivery_token'));
-                    if ($token === '') {
-                        return null;
-                    }
-
-                    $invitation->forceFill([
-                        'delivery_attempt_count' => (int) $invitation->getAttribute('delivery_attempt_count') + 1,
-                        'delivery_requested_at' => $this->clock->now(),
-                        'delivery_error_code' => null,
-                        'delivery_error_message' => null,
-                        'row_version' => (int) $invitation->getAttribute('row_version') + 1,
-                    ])->save();
-
-                    return [
-                        'email' => (string) $invitation->getAttribute('email'),
-                        'tenant_name' => (string) ($invitation->tenant?->getAttribute('name') ?? 'your organization'),
-                        'token' => $token,
-                        'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
-                    ];
-                }, 3),
+                fn (): ?array => $this->claim($tenantId, $deliveryId),
             );
 
-            if (! is_array($payload)) {
+            if (! is_array($claim)) {
                 return;
             }
 
-            $baseUrl = rtrim((string) config(
-                'module-auth.registration.invitation_url',
-                rtrim((string) config('app.url'), '/').'/register/invitation',
-            ), '#');
-            $registrationUrl = $baseUrl.'#token='.rawurlencode((string) $payload['token']);
+            if (! $this->executionContext->runForTenant(
+                $tenantId,
+                fn (): bool => $this->isClaimSendable($tenantId, $deliveryId, $claim),
+            )) {
+                return;
+            }
 
-            Notification::route('mail', (string) $payload['email'])->notify(
+            $registrationUrl = $this->registrationUrl((string) $claim['token']);
+            Notification::route('mail', (string) $claim['email'])->notify(
                 new InitialAdministratorInvitationNotification(
-                    (string) $payload['tenant_name'],
+                    (string) $claim['tenant_name'],
                     $registrationUrl,
-                    (string) $payload['expires_at'],
+                    (string) $claim['expires_at'],
                 ),
             );
 
-            $this->executionContext->runForTenant($tenantId, function () use ($invitationId): void {
-                $this->invitations->newQuery()
-                    ->whereKey($invitationId)
-                    ->where('status', RegistrationInvitationStatus::PENDING)
-                    ->update([
-                        'delivery_status' => InvitationDeliveryStatus::SENT,
-                        'delivered_at' => $this->clock->now(),
-                        'delivery_error_code' => null,
-                        'delivery_error_message' => null,
-                        'row_version' => DB::raw('row_version + 1'),
-                        'updated_at' => $this->clock->now(),
-                    ]);
-            });
+            $updated = $this->executionContext->runForTenant(
+                $tenantId,
+                fn (): int => $this->finalizeSent($tenantId, $deliveryId, $claim),
+            );
+
+            if ($updated !== 1) {
+                $this->logger->warning('Invitation email was handed to the mail transport after its delivery claim changed.', [
+                    'tenant_id' => $tenantId,
+                    'delivery_id' => $deliveryId,
+                    'invitation_id' => $claim['invitation_id'],
+                ]);
+            }
         } catch (Throwable $exception) {
             $this->logger->error('Initial administrator invitation delivery failed.', [
                 'tenant_id' => $tenantId,
-                'invitation_id' => $invitationId,
+                'delivery_id' => $deliveryId,
                 'exception' => $exception,
             ]);
 
-            $this->executionContext->runForTenant($tenantId, function () use ($invitationId): void {
-                $this->invitations->newQuery()
-                    ->whereKey($invitationId)
-                    ->where('status', RegistrationInvitationStatus::PENDING)
-                    ->update([
-                        'delivery_status' => InvitationDeliveryStatus::FAILED,
-                        'delivery_error_code' => self::DELIVERY_FAILURE_CODE,
-                        'delivery_error_message' => self::DELIVERY_FAILURE_MESSAGE,
-                        'row_version' => DB::raw('row_version + 1'),
-                        'updated_at' => $this->clock->now(),
-                    ]);
-            });
+            if (is_array($claim)) {
+                $this->executionContext->runForTenant(
+                    $tenantId,
+                    fn (): int => $this->finalizeFailed($tenantId, $deliveryId, $claim),
+                );
+            }
 
             throw $exception;
         }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function claim(int $tenantId, int $deliveryId): ?array
+    {
+        return DB::transaction(function () use ($tenantId, $deliveryId): ?array {
+            $delivery = $this->deliveries->newQuery()
+                ->with(['invitation.tenant:id,name'])
+                ->whereKey($deliveryId)
+                ->where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $delivery instanceof AuthRegistrationInvitationDeliveryModel) {
+                return null;
+            }
+
+            $status = (string) $delivery->getAttribute('status');
+            if (InvitationDeliveryStatus::isTerminal($status)) {
+                return null;
+            }
+
+            if (
+                $status === InvitationDeliveryStatus::SENDING
+                && $delivery->getAttribute('lease_expires_at')?->toImmutable() > $this->clock->now()
+            ) {
+                return null;
+            }
+
+            $invitation = $delivery->invitation;
+            if (! $invitation instanceof AuthRegistrationInvitationModel) {
+                $this->cancelInvalidDelivery($delivery, 'The invitation record is unavailable.');
+
+                return null;
+            }
+
+            if (
+                $invitation->getAttribute('status') !== RegistrationInvitationStatus::PENDING
+                || $invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now()
+            ) {
+                $this->cancelInvalidDelivery($delivery, 'The invitation is no longer pending or has expired.');
+
+                return null;
+            }
+
+            $token = trim((string) $invitation->getAttribute('delivery_token'));
+            if ($token === '') {
+                $delivery->forceFill([
+                    'status' => InvitationDeliveryStatus::FAILED,
+                    'failed_at' => $this->clock->now(),
+                    'error_code' => self::MISSING_TOKEN_CODE,
+                    'error_message' => 'The invitation delivery token is unavailable. Replace the invitation.',
+                    'claim_token' => null,
+                    'claimed_at' => null,
+                    'lease_expires_at' => null,
+                    'row_version' => (int) $delivery->getAttribute('row_version') + 1,
+                ])->save();
+
+                return null;
+            }
+
+            $claimToken = (string) Str::uuid();
+            $claimedAt = $this->clock->now();
+            $leaseSeconds = max(30, (int) config(
+                'module-auth.registration.delivery_lease_seconds',
+                self::DEFAULT_LEASE_SECONDS,
+            ));
+            $nextVersion = (int) $delivery->getAttribute('row_version') + 1;
+
+            $delivery->forceFill([
+                'status' => InvitationDeliveryStatus::SENDING,
+                'processing_attempt_count' => (int) $delivery->getAttribute('processing_attempt_count') + 1,
+                'claim_token' => $claimToken,
+                'claimed_at' => $claimedAt,
+                'lease_expires_at' => $claimedAt->modify(sprintf('+%d seconds', $leaseSeconds)),
+                'failed_at' => null,
+                'error_code' => null,
+                'error_message' => null,
+                'row_version' => $nextVersion,
+            ])->save();
+
+            return [
+                'claim_token' => $claimToken,
+                'row_version' => $nextVersion,
+                'invitation_id' => (int) $invitation->getKey(),
+                'email' => (string) $invitation->getAttribute('email'),
+                'tenant_name' => (string) ($invitation->tenant?->getAttribute('name') ?? 'your organization'),
+                'token' => $token,
+                'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
+            ];
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $claim */
+    private function isClaimSendable(int $tenantId, int $deliveryId, array $claim): bool
+    {
+        return $this->deliveries->newQuery()
+            ->whereKey($deliveryId)
+            ->where('tenant_id', $tenantId)
+            ->where('status', InvitationDeliveryStatus::SENDING)
+            ->where('claim_token', (string) $claim['claim_token'])
+            ->where('row_version', (int) $claim['row_version'])
+            ->whereHas('invitation', function ($query): void {
+                $query->where('status', RegistrationInvitationStatus::PENDING)
+                    ->where('expires_at', '>', $this->clock->now())
+                    ->whereNotNull('delivery_token');
+            })
+            ->exists();
+    }
+
+    /** @param array<string, mixed> $claim */
+    private function finalizeSent(int $tenantId, int $deliveryId, array $claim): int
+    {
+        return $this->deliveries->newQuery()
+            ->whereKey($deliveryId)
+            ->where('tenant_id', $tenantId)
+            ->where('status', InvitationDeliveryStatus::SENDING)
+            ->where('claim_token', (string) $claim['claim_token'])
+            ->where('row_version', (int) $claim['row_version'])
+            ->update([
+                'status' => InvitationDeliveryStatus::SENT,
+                'sent_at' => $this->clock->now(),
+                'provider' => (string) config('mail.default', 'unknown'),
+                'claim_token' => null,
+                'claimed_at' => null,
+                'lease_expires_at' => null,
+                'error_code' => null,
+                'error_message' => null,
+                'row_version' => (int) $claim['row_version'] + 1,
+                'updated_at' => $this->clock->now(),
+            ]);
+    }
+
+    /** @param array<string, mixed> $claim */
+    private function finalizeFailed(int $tenantId, int $deliveryId, array $claim): int
+    {
+        return $this->deliveries->newQuery()
+            ->whereKey($deliveryId)
+            ->where('tenant_id', $tenantId)
+            ->where('status', InvitationDeliveryStatus::SENDING)
+            ->where('claim_token', (string) $claim['claim_token'])
+            ->where('row_version', (int) $claim['row_version'])
+            ->update([
+                'status' => InvitationDeliveryStatus::FAILED,
+                'failed_at' => $this->clock->now(),
+                'claim_token' => null,
+                'claimed_at' => null,
+                'lease_expires_at' => null,
+                'error_code' => self::DELIVERY_FAILURE_CODE,
+                'error_message' => self::DELIVERY_FAILURE_MESSAGE,
+                'row_version' => (int) $claim['row_version'] + 1,
+                'updated_at' => $this->clock->now(),
+            ]);
+    }
+
+    private function cancelInvalidDelivery(
+        AuthRegistrationInvitationDeliveryModel $delivery,
+        string $message,
+    ): void {
+        $delivery->forceFill([
+            'status' => InvitationDeliveryStatus::CANCELLED,
+            'cancelled_at' => $this->clock->now(),
+            'claim_token' => null,
+            'claimed_at' => null,
+            'lease_expires_at' => null,
+            'error_code' => 'AUTH_INVITATION_CANCELLED',
+            'error_message' => $message,
+            'row_version' => (int) $delivery->getAttribute('row_version') + 1,
+        ])->save();
+    }
+
+    private function registrationUrl(string $token): string
+    {
+        $baseUrl = rtrim(trim((string) config('module-auth.registration.invitation_url', '')), '/#');
+        if (
+            $baseUrl === ''
+            || filter_var($baseUrl, FILTER_VALIDATE_URL) === false
+            || ! in_array(strtolower((string) parse_url($baseUrl, PHP_URL_SCHEME)), ['http', 'https'], true)
+        ) {
+            throw new RuntimeException('The platform administrator invitation URL is not configured correctly.');
+        }
+
+        return $baseUrl.'#token='.rawurlencode($token);
     }
 }

@@ -16,7 +16,9 @@ use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Core\Support\SystemClock;
 use Modules\Core\Support\TenantExecutionContext;
+use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Tests\TestCase;
 
 final class CurrentTenantContextResolverTest extends TestCase
@@ -98,7 +100,8 @@ final class CurrentTenantContextResolverTest extends TestCase
             'slug' => 'autoerp',
             'status' => 'active',
             'current_subscription' => [
-                'status' => 'active',
+                'contract_status' => 'active',
+                'current_state' => 'active',
                 'starts_at' => '2020-01-01 00:00:00',
                 'ends_at' => null,
                 'trial_ends_at' => null,
@@ -170,7 +173,8 @@ final class CurrentTenantContextResolverTest extends TestCase
             $tenants ?? $this->createMock(TenantRepositoryInterface::class),
             $domains ?? $this->createMock(TenantDomainRepositoryInterface::class),
             $userAccess ?? $this->createMock(TenantUserAccessCheckerInterface::class),
-            new SystemClock(),
+            new TenantDomainReadinessPolicy(),
+            new TenantSubscriptionPolicy(new SystemClock()),
             new PlatformHostPolicy($this->app),
             new TenantExecutionContext(),
         );
@@ -201,7 +205,8 @@ final class CurrentTenantContextResolverTest extends TestCase
             'slug' => 'tenant-10',
             'status' => 'active',
             'current_subscription' => [
-                'status' => 'active',
+                'contract_status' => 'active',
+                'current_state' => 'active',
                 'starts_at' => '2020-01-01 00:00:00',
                 'ends_at' => null,
                 'trial_ends_at' => null,

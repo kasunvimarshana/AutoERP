@@ -22,7 +22,6 @@ final class UpsertPermissionRequest extends TenantScopedRequest
 
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'name' => array_merge($required, ['string', 'max:255']),
             'guard_name' => ['nullable', 'string', 'max:100'],

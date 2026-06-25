@@ -60,6 +60,7 @@ final class TenantStorageCleanupService
                     'next_attempt_at' => $this->clock->now(),
                     'claim_token' => null,
                     'claimed_at' => null,
+                    'claim_lease_expires_at' => null,
                     'completed_at' => null,
                 ],
             );
@@ -128,6 +129,7 @@ final class TenantStorageCleanupService
                     'next_attempt_at' => $this->clock->now(),
                     'claim_token' => null,
                     'claimed_at' => null,
+                    'claim_lease_expires_at' => null,
                     'completed_at' => null,
                     'updated_at' => $this->clock->now(),
                 ]);
@@ -179,17 +181,20 @@ final class TenantStorageCleanupService
     private function claim(int $jobId): ?TenantStorageCleanupJobModel
     {
         $token = (string) Str::uuid();
+        $timeout = max(60, (int) config('tenant.storage_cleanup.claim_timeout_seconds', 900));
+        $now = $this->clock->now();
         $updated = $this->jobs->newQuery()
             ->whereKey($jobId)
             ->where('status', self::STATUS_PENDING)
             ->where(function ($query): void {
-                $query->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', $this->clock->now());
+                $query->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', $now);
             })
             ->update([
                 'status' => self::STATUS_PROCESSING,
                 'claim_token' => $token,
-                'claimed_at' => $this->clock->now(),
-                'updated_at' => $this->clock->now(),
+                'claimed_at' => $now,
+                'claim_lease_expires_at' => $now->modify("+{$timeout} seconds"),
+                'updated_at' => $now,
             ]);
 
         if ($updated !== 1) {
@@ -225,6 +230,7 @@ final class TenantStorageCleanupService
                     'next_attempt_at' => null,
                     'claim_token' => null,
                     'claimed_at' => null,
+                    'claim_lease_expires_at' => null,
                     'updated_at' => $this->clock->now(),
                 ]);
 
@@ -247,6 +253,7 @@ final class TenantStorageCleanupService
                     'next_attempt_at' => $dead ? null : $this->clock->now()->modify("+{$delayMinutes} minutes"),
                     'claim_token' => null,
                     'claimed_at' => null,
+                    'claim_lease_expires_at' => null,
                     'updated_at' => $this->clock->now(),
                 ]);
 
@@ -265,19 +272,19 @@ final class TenantStorageCleanupService
 
     private function recoverStaleClaims(): int
     {
-        $timeout = max(60, (int) config('tenant.storage_cleanup.claim_timeout_seconds', 900));
-        $threshold = $this->clock->now()->modify("-{$timeout} seconds");
+        $now = $this->clock->now();
 
         return $this->jobs->newQuery()
             ->where('status', self::STATUS_PROCESSING)
-            ->whereNotNull('claimed_at')
-            ->where('claimed_at', '<=', $threshold)
+            ->whereNotNull('claim_lease_expires_at')
+            ->where('claim_lease_expires_at', '<=', $now)
             ->update([
                 'status' => self::STATUS_PENDING,
                 'claim_token' => null,
                 'claimed_at' => null,
-                'next_attempt_at' => $this->clock->now(),
-                'updated_at' => $this->clock->now(),
+                'claim_lease_expires_at' => null,
+                'next_attempt_at' => $now,
+                'updated_at' => $now,
             ]);
     }
 
