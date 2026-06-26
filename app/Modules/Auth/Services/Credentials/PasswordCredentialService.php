@@ -23,6 +23,11 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
         private TenantExecutionContextInterface $executionContext,
     ) {}
 
+    public function passwordRequirements(): array
+    {
+        return PasswordPolicy::requirements();
+    }
+
     public function setTenantUserPassword(int $tenantId, int $userId, string $plainPassword): void
     {
         PasswordPolicy::assert($plainPassword);

@@ -99,6 +99,12 @@ describe('PlatformOperatorInvitationPage', () => {
             email: 'operator@example.test',
             expires_at: '2026-06-26T10:00:00Z',
             delivery_status: 'sent',
+            password_policy: {
+                minimum_length: 12,
+                mixed_case: true,
+                numbers: true,
+                symbols: true,
+            },
         });
         mocks.acceptPlatformOperatorInvitation.mockResolvedValue({
             operator_name: 'Platform Operator',
@@ -128,6 +134,7 @@ describe('PlatformOperatorInvitationPage', () => {
             platformOperatorToken,
             expect.any(AbortSignal),
         );
+        expect(screen.getByText(/at least 12 characters, uppercase and lowercase letters, a number, a symbol/i)).toBeInTheDocument();
 
         await user.type(getPasswordInput('password'), 'AnotherStrongPassword!456');
         await user.type(getPasswordInput('password_confirmation'), 'AnotherStrongPassword!456');

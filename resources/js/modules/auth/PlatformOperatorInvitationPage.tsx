@@ -6,7 +6,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { authApi } from './authApi';
-import type { PlatformMfaEnrollment, PlatformOperatorInvitationInspection } from './authTypes';
+import type { PasswordPolicyRequirements, PlatformMfaEnrollment, PlatformOperatorInvitationInspection } from './authTypes';
 
 export default function PlatformOperatorInvitationPage() {
     const [token] = useState(() => readInvitationToken());
@@ -152,7 +152,8 @@ export default function PlatformOperatorInvitationPage() {
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                             error={fieldError(error, 'password')}
-                            hint="Use a strong password that you do not use on another service."
+                            minLength={invitation.password_policy.minimum_length}
+                            hint={passwordPolicyHint(invitation.password_policy)}
                             required
                         />
                         <Input
@@ -186,4 +187,13 @@ function readInvitationToken(): string | null {
 function formatDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString();
+}
+
+function passwordPolicyHint(policy: PasswordPolicyRequirements): string {
+    const requirements = [`at least ${policy.minimum_length} characters`];
+    if (policy.mixed_case) requirements.push('uppercase and lowercase letters');
+    if (policy.numbers) requirements.push('a number');
+    if (policy.symbols) requirements.push('a symbol');
+
+    return `Use ${requirements.join(', ')}. Choose a password you do not use on another service.`;
 }

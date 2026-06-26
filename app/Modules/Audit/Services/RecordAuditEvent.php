@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Audit\Data\SystemAuditEventData;
 use Modules\Audit\Exceptions\AuditWriteException;
 use Modules\Audit\Repositories\AuditLogWriterInterface;
@@ -97,6 +98,33 @@ final class RecordAuditEvent implements AuditRecorderInterface
             'actor_provider' => $this->nullableTrim($user->provider()),
             'application_id' => $this->nullableTrim($user->applicationId()),
             'impersonator_user_id' => $this->positiveInt($token['impersonator_user_id'] ?? null),
+            ...$this->requestContext->resolve(),
+        ]);
+    }
+
+    public function recordPlatformActor(
+        AuditEventData $event,
+        PlatformAuditActorData $actor,
+        ?int $targetTenantId = null,
+    ): void
+    {
+        $this->validator->validate($event);
+        $this->validator->validatePlatformActor($actor);
+        $scope = $this->ownership->validatePlatformTarget($targetTenantId);
+
+        $this->append($event, [
+            'scope_type' => 'platform',
+            'tenant_id' => $targetTenantId,
+            'tenant_name' => $scope['tenant_name'],
+            'organization_unit_id' => null,
+            'organization_unit_name' => null,
+            'actor_type' => trim($actor->actorType),
+            'actor_id' => trim($actor->actorId),
+            'actor_name' => trim($actor->actorName),
+            'actor_guard' => $this->nullableTrim($actor->actorGuard),
+            'actor_provider' => $this->nullableTrim($actor->actorProvider),
+            'application_id' => $this->nullableTrim($actor->applicationId),
+            'impersonator_user_id' => $actor->impersonatorUserId,
             ...$this->requestContext->resolve(),
         ]);
     }

@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Audit\Data\SystemAuditEventData;
 
 final class AuditEventValidator
@@ -41,6 +42,23 @@ final class AuditEventValidator
         }
     }
 
+    public function validatePlatformActor(PlatformAuditActorData $actor): void
+    {
+        if (! in_array($actor->actorType, AuditActorType::values(), true)) {
+            throw new InvalidArgumentException('Unsupported platform audit actor type.');
+        }
+
+        $this->required($actor->actorId, 'actor identifier', 100);
+        $this->required($actor->actorName, 'actor name', 255);
+        $this->optional($actor->actorGuard, 'actor guard', 64);
+        $this->optional($actor->actorProvider, 'actor provider', 100);
+        $this->optional($actor->applicationId, 'application identifier', 100);
+
+        if ($actor->impersonatorUserId !== null && $actor->impersonatorUserId < 1) {
+            throw new InvalidArgumentException('Impersonator user identifier must be positive.');
+        }
+    }
+
     public function validateSystem(SystemAuditEventData $event): void
     {
         $this->validate($event->event);
@@ -60,7 +78,6 @@ final class AuditEventValidator
         }
         $this->optional($event->applicationId, 'application identifier', 100);
     }
-
 
     private function identifier(string $value, string $field, int $maxLength, bool $allowDots = false): void
     {

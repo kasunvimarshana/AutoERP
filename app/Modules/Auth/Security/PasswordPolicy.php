@@ -15,6 +15,17 @@ final class PasswordPolicy
             ->mixedCase()->numbers()->symbols();
     }
 
+    /** @return array{minimum_length:int,mixed_case:true,numbers:true,symbols:true} */
+    public static function requirements(): array
+    {
+        return [
+            'minimum_length' => self::minimumLength(),
+            'mixed_case' => true,
+            'numbers' => true,
+            'symbols' => true,
+        ];
+    }
+
     public static function assert(string $password): void
     {
         if (mb_strlen($password) < self::minimumLength()

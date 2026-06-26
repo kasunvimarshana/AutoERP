@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Audit\Data\SystemAuditEventData;
 use Modules\Audit\Services\AuditEventValidator;
 use PHPUnit\Framework\TestCase;
@@ -56,6 +57,20 @@ final class AuditEventValidatorTest extends TestCase
         $this->expectExceptionMessage('Unsupported audit event category');
 
         (new AuditEventValidator())->validate($event);
+    }
+
+    public function test_platform_actor_snapshots_accept_a_pre_authentication_user(): void
+    {
+        $actor = new PlatformAuditActorData(
+            actorType: AuditActorType::USER,
+            actorId: '42',
+            actorName: 'Platform Administrator',
+            actorGuard: 'platform-invitation',
+        );
+
+        (new AuditEventValidator())->validatePlatformActor($actor);
+
+        self::assertTrue(true);
     }
 
     public function test_system_events_cannot_impersonate_a_user_actor(): void

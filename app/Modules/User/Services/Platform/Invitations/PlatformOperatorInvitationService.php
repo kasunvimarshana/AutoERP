@@ -8,9 +8,11 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -135,6 +137,7 @@ final class PlatformOperatorInvitationService
                 'email' => (string) $operator->getAttribute('email'),
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
                 'delivery_status' => $latestDelivery?->getAttribute('status'),
+                'password_policy' => $this->credentials->passwordRequirements(),
             ];
         });
     }
@@ -168,7 +171,7 @@ final class PlatformOperatorInvitationService
                     'updated_at' => $now,
                 ])->save();
                 $this->revokePendingInvitations((int) $operator->getKey(), 'Operator registration completed.', (int) $invitation->getKey());
-                $this->recordAudit('invitation_accepted', $operator);
+                $this->recordAcceptanceAudit($operator);
 
                 $email = (string) $operator->getAttribute('email');
                 $enrollment = $this->mfaEnrollment->issueForOperator((int) $operator->getKey(), $email);
@@ -282,6 +285,30 @@ final class PlatformOperatorInvitationService
                 'error_message' => $reason,
                 'updated_at' => $this->clock->now(),
             ]);
+    }
+
+    private function recordAcceptanceAudit(PlatformOperatorModel $operator): void
+    {
+        $name = trim((string) $operator->getAttribute('first_name').' '.(string) $operator->getAttribute('last_name'));
+        $email = (string) $operator->getAttribute('email');
+
+        $this->audit->recordPlatformActor(
+            new AuditEventData(
+                eventName: 'platform.operator.invitation_accepted',
+                eventCategory: AuditEventCategory::SECURITY,
+                sourceModule: 'user',
+                subjectType: 'platform_operator',
+                subjectId: (string) $operator->getKey(),
+                subjectReference: $email,
+                tags: ['platform', 'operator', 'invitation'],
+            ),
+            new PlatformAuditActorData(
+                actorType: AuditActorType::USER,
+                actorId: (string) $operator->getKey(),
+                actorName: $name !== '' ? $name : $email,
+                actorGuard: 'platform-invitation',
+            ),
+        );
     }
 
     private function recordAudit(string $action, PlatformOperatorModel $operator, ?string $reason = null): void

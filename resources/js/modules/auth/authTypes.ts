@@ -92,11 +92,19 @@ export interface InitialAdministratorInvitationAcceptance {
     email: string;
 }
 
+export interface PasswordPolicyRequirements {
+    minimum_length: number;
+    mixed_case: boolean;
+    numbers: boolean;
+    symbols: boolean;
+}
+
 export interface PlatformOperatorInvitationInspection {
     operator_name: string;
     email: string;
     expires_at: string;
     delivery_status: string;
+    password_policy: PasswordPolicyRequirements;
 }
 
 export interface AcceptPlatformOperatorInvitationPayload {

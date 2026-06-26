@@ -1,5 +1,8 @@
 <?php
 
+// Prevent secrets passed to service methods from appearing in exception stack traces.
+ini_set('zend.exception_ignore_args', '1');
+
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
