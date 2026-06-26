@@ -116,7 +116,11 @@ export function PlatformTenantActivationPanel({ tenant, canActivate, disabled = 
                         </Button>
                     </div>
                 </div>
-            ) : null}
+            ) : (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    You have read-only access. Tenant activation requires the tenant lifecycle permission.
+                </p>
+            )}
             {confirmDialog}
         </section>
     );

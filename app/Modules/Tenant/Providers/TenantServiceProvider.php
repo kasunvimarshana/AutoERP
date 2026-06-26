@@ -108,15 +108,26 @@ final class TenantServiceProvider extends ServiceProvider
             new TenantModel,
             $app->make(\Modules\Core\Contracts\ClockInterface::class),
             $app->make(TenantSubscriptionPresenter::class),
+            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
         ));
-        $this->app->singleton(TenantPlanRepositoryInterface::class, fn ($app): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(new TenantPlanModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
-        $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn ($app): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(new TenantPlanModel, new TenantPlanRevisionModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->singleton(TenantPlanRepositoryInterface::class, fn ($app): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(
+            new TenantPlanModel,
+            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+        ));
+        $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn ($app): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(
+            new TenantPlanModel,
+            new TenantPlanRevisionModel,
+            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+        ));
         $this->app->scoped(TenantSubscriptionRepositoryInterface::class, fn ($app): TenantSubscriptionRepositoryInterface => new EloquentTenantSubscriptionRepository(
             new TenantSubscriptionModel,
             new TenantCurrentSubscriptionModel,
             new TenantSubscriptionEventModel,
             $app->make(\Modules\Core\Contracts\ClockInterface::class),
             $app->make(TenantSubscriptionPresenter::class),
+            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
         ));
         $this->app->tag([TenantStorageLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->scoped(TenantSubscriptionReadinessService::class, fn ($app): TenantSubscriptionReadinessService => new TenantSubscriptionReadinessService(

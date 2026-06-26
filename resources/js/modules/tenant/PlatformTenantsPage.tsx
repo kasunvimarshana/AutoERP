@@ -24,20 +24,24 @@ import { PlatformTenantDomainsPanel } from './components/PlatformTenantDomainsPa
 import { PlatformTenantForm } from './components/PlatformTenantForm';
 import { PlatformTenantOnboardingPanel } from './components/PlatformTenantOnboardingPanel';
 import { PlatformTenantSubscriptionPanel } from './components/PlatformTenantSubscriptionPanel';
+import { TenantDirectoryCard } from './components/TenantDirectoryCard';
+import { TenantIdentitySummary } from './components/TenantIdentitySummary';
+import {
+    BlockedTenantSetupStep,
+    resolveTenantSetupStep,
+    TenantSetupNavigation,
+    tenantFoundationProvisioned,
+} from './components/TenantSetupNavigation';
 import { TenantPlanLookupSelect } from './components/TenantPlanLookupSelect';
 import {
     changeTenantStatus,
     createPlatformTenant,
     getPlatformTenant,
-    getTenantPlan,
+    getSubscriptionPlan,
     listPlatformTenants,
     updatePlatformTenant,
 } from './tenantApi';
-import {
-    focusTenantStep,
-    formatTenantDateTime,
-    humanize,
-} from './tenantPresentation';
+import { humanize } from './tenantPresentation';
 import type { TenantRecord } from './tenantTypes';
 import { platformAuditHref } from '@/modules/platform-administration/platformAdministrationPresentation';
 
@@ -48,6 +52,7 @@ const TENANT_STATUSES = ['draft', 'active', 'inactive', 'suspended', 'archived']
 const ONBOARDING_STATUSES = ['pending', 'provisioning', 'awaiting_administrator', 'awaiting_domain', 'ready', 'completed', 'failed'] as const;
 const DOMAIN_OPERATIONAL_STATUSES = ['pending', 'checking', 'ready', 'failed', 'disabled'] as const;
 const SUBSCRIPTION_STATES = ['assigned', 'cancelled', 'expired'] as const;
+const SUBSCRIPTION_EFFECTIVE_STATUSES = ['scheduled', 'trial', 'active', 'expired', 'cancelled'] as const;
 const EXPIRY_WINDOWS = [7, 14, 30, 60, 90] as const;
 
 const ACTION_LABELS: Record<LifecycleAction, string> = {
@@ -73,6 +78,9 @@ export default function PlatformTenantsPage() {
     const onboardingStatus = searchParams.get('onboarding_status') ?? '';
     const domainOperationalStatus = searchParams.get('domain_operational_status') ?? '';
     const subscriptionState = searchParams.get('subscription_state') ?? '';
+    const subscriptionEffectiveStatus = searchParams.get('subscription_effective_status') ?? '';
+    const activeStep = resolveTenantSetupStep(searchParams.get('step'));
+    const subscriptionAction = searchParams.get('subscription_action') === 'assign' ? 'assign' : null;
     const planId = positiveInteger(searchParams.get('plan_id'));
     const expiresWithinDays = positiveInteger(searchParams.get('expires_within_days'));
     const debouncedSearch = useDebounce(search);
@@ -95,17 +103,18 @@ export default function PlatformTenantsPage() {
             onboarding_status: onboardingStatus || undefined,
             domain_operational_status: domainOperationalStatus || undefined,
             subscription_state: subscriptionState || undefined,
+            subscription_effective_status: subscriptionEffectiveStatus || undefined,
             plan_id: planId ?? undefined,
             expires_within_days: expiresWithinDays ?? undefined,
         }, signal),
-        [page, debouncedSearch, status, onboardingStatus, domainOperationalStatus, subscriptionState, planId, expiresWithinDays],
+        [page, debouncedSearch, status, onboardingStatus, domainOperationalStatus, subscriptionState, subscriptionEffectiveStatus, planId, expiresWithinDays],
         true,
         false,
     );
     const selectedPlan = useApi(
-        (signal) => getTenantPlan(planId ?? 0, signal),
+        (signal) => getSubscriptionPlan(planId ?? 0, signal),
         [planId],
-        planId !== null,
+        planId !== null && canManageSubscriptions,
         false,
     );
     const currencies = useApi((signal) => listActiveReferenceRecords('currencies', signal), [], true, false);
@@ -257,11 +266,18 @@ export default function PlatformTenantsPage() {
                             placeholder="All domain states"
                         />
                         <Select
-                            label="Subscription state"
+                            label="Assignment state"
                             value={subscriptionState}
                             onChange={(event) => updateQuery({ subscription_state: event.target.value, page: null })}
                             options={SUBSCRIPTION_STATES.map((value) => ({ value, label: humanize(value) }))}
-                            placeholder="All subscription states"
+                            placeholder="All assignment states"
+                        />
+                        <Select
+                            label="Effective subscription status"
+                            value={subscriptionEffectiveStatus}
+                            onChange={(event) => updateQuery({ subscription_effective_status: event.target.value, page: null })}
+                            options={SUBSCRIPTION_EFFECTIVE_STATUSES.map((value) => ({ value, label: humanize(value) }))}
+                            placeholder="All effective statuses"
                         />
                         <Select
                             label="Subscription expiry"
@@ -270,22 +286,25 @@ export default function PlatformTenantsPage() {
                             options={EXPIRY_WINDOWS.map((days) => ({ value: String(days), label: `Within ${days} days` }))}
                             placeholder="Any expiry date"
                         />
-                        <TenantPlanLookupSelect
-                            label="Current plan"
-                            value={selectedPlan.data ?? null}
-                            onChange={(plan) => updateQuery({ plan_id: plan ? String(plan.id) : null, page: null })}
-                            error={selectedPlan.error?.message}
-                        />
+                        {canManageSubscriptions ? (
+                            <TenantPlanLookupSelect
+                                label="Assigned plan"
+                                value={selectedPlan.data ?? null}
+                                onChange={(plan) => updateQuery({ plan_id: plan ? String(plan.id) : null, page: null })}
+                                error={selectedPlan.error?.message}
+                            />
+                        ) : null}
                         <div className="flex items-end">
                             <Button
                                 variant="ghost"
-                                disabled={!search && !status && !onboardingStatus && !domainOperationalStatus && !subscriptionState && planId === null && expiresWithinDays === null}
+                                disabled={!search && !status && !onboardingStatus && !domainOperationalStatus && !subscriptionState && !subscriptionEffectiveStatus && planId === null && expiresWithinDays === null}
                                 onClick={() => updateQuery({
                                     search: null,
                                     status: null,
                                     onboarding_status: null,
                                     domain_operational_status: null,
                                     subscription_state: null,
+                                    subscription_effective_status: null,
                                     plan_id: null,
                                     expires_within_days: null,
                                     page: null,
@@ -319,37 +338,79 @@ export default function PlatformTenantsPage() {
                                 <div className="flex flex-wrap gap-2">
                                     <Button variant="ghost" onClick={() => updateQuery({ tenant: null })}>Close details</Button>
                                     {canAudit ? <LinkButton variant="secondary" to={platformAuditHref({ tenant_id: selected.id, subject_type: 'tenant', subject_id: selected.id })}>View audit history</LinkButton> : null}
-                                    {canUpdate && selected.status !== 'archived' ? <Button variant="secondary" disabled={allMutationsDisabled} onClick={() => { setFormMode('edit'); setFormError(null); focusTenantStep('tenant-identity-step'); }}>Edit identity</Button> : null}
+                                    {canUpdate && selected.status !== 'archived' ? <Button variant="secondary" disabled={allMutationsDisabled} onClick={() => { setFormMode('edit'); setFormError(null); updateQuery({ step: 'identity' }); }}>Edit identity</Button> : null}
                                 </div>
                             </div>
-                            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                                {SETUP_STEPS.map((step) => <Button key={step.id} variant="ghost" onClick={() => focusTenantStep(step.id)}>{step.label}</Button>)}
-                            </div>
+                            <TenantSetupNavigation
+                                tenant={selected}
+                                activeStep={activeStep}
+                                onSelect={(step) => updateQuery({ step })}
+                            />
                         </Panel>
 
-                        <Panel>
-                            <section id="tenant-identity-step" className="scroll-mt-24 space-y-4" aria-labelledby="tenant-identity-title">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
-                                    <h3 id="tenant-identity-title" className="mt-1 font-semibold text-slate-900">Tenant identity and accounting base</h3>
-                                    <p className="mt-1 text-sm text-slate-500">Confirm stable identifiers and base currency before provisioning the tenant foundation.</p>
-                                </div>
-                                <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                                    <Detail label="Tenant code" value={selected.code} />
-                                    <Detail label="URL slug" value={selected.slug} />
-                                    <Detail label="Base currency" value={selected.base_currency ? `${selected.base_currency.code} — ${selected.base_currency.name}` : 'Required before activation'} warning={!selected.base_currency} />
-                                    <Detail label="Tenant logo" value={selected.has_logo ? 'Configured' : 'Not configured'} />
-                                    <Detail label="Last updated" value={formatTenantDateTime(selected.updated_at)} />
-                                </dl>
-                            </section>
-                        </Panel>
+                        {activeStep === 'identity' ? (
+                            <Panel>
+                                <TenantIdentitySummary tenant={selected} />
+                            </Panel>
+                        ) : null}
 
-                        <Panel><PlatformTenantOnboardingPanel key={`onboarding-${selected.id}-${selected.onboarding?.row_version ?? 0}`} tenant={selected} canProvision={canOnboard} disabled={allMutationsDisabled} onTenantChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantDomainsPanel key={`domains-${selected.id}`} tenant={selected} canManage={canManageDomains} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantSubscriptionPanel key={`subscription-${selected.id}-${selected.current_subscription?.row_version ?? 0}`} tenant={selected} canManage={canManageSubscriptions} canAudit={canAudit} disabled={allMutationsDisabled} onChanged={refreshSelected} /></Panel>
-                        <Panel><PlatformTenantActivationPanel key={`activation-${selected.id}`} tenant={selected} canActivate={canLifecycle} disabled={allMutationsDisabled} onChanged={(updated) => { selectedTenant.setData(updated); tenants.reload(); }} /></Panel>
+                        {activeStep === 'foundation' ? (
+                            <Panel>
+                                {selected.base_currency ? (
+                                    <PlatformTenantOnboardingPanel
+                                        key={`onboarding-${selected.id}-${selected.onboarding?.row_version ?? 0}`}
+                                        tenant={selected}
+                                        canProvision={canOnboard}
+                                        disabled={allMutationsDisabled}
+                                        onTenantChanged={refreshSelected}
+                                    />
+                                ) : <BlockedTenantSetupStep message="Select the tenant base currency in Step 1 before provisioning the foundation." />}
+                            </Panel>
+                        ) : null}
 
-                        {canLifecycle && selected.status !== 'archived' ? (
+                        {activeStep === 'domain' ? (
+                            <Panel>
+                                {tenantFoundationProvisioned(selected) ? (
+                                    <PlatformTenantDomainsPanel
+                                        key={`domains-${selected.id}`}
+                                        tenant={selected}
+                                        canManage={canManageDomains}
+                                        canAudit={canAudit}
+                                        disabled={allMutationsDisabled}
+                                        onChanged={refreshSelected}
+                                    />
+                                ) : <BlockedTenantSetupStep message="Provision the tenant foundation in Step 2 before configuring production domains." />}
+                            </Panel>
+                        ) : null}
+
+                        {activeStep === 'subscription' ? (
+                            <Panel>
+                                <PlatformTenantSubscriptionPanel
+                                    key={`subscription-${selected.id}-${selected.current_subscription?.row_version ?? 0}-${selectedPlan.data?.id ?? planId ?? 0}`}
+                                    tenant={selected}
+                                    canManage={canManageSubscriptions}
+                                    canAudit={canAudit}
+                                    initialPlan={selectedPlan.data}
+                                    initialAction={subscriptionAction}
+                                    disabled={allMutationsDisabled}
+                                    onChanged={refreshSelected}
+                                />
+                            </Panel>
+                        ) : null}
+
+                        {activeStep === 'readiness' ? (
+                            <Panel>
+                                <PlatformTenantActivationPanel
+                                    key={`activation-${selected.id}`}
+                                    tenant={selected}
+                                    canActivate={canLifecycle}
+                                    disabled={allMutationsDisabled}
+                                    onChanged={(updated) => { selectedTenant.setData(updated); tenants.reload(); }}
+                                />
+                            </Panel>
+                        ) : null}
+
+                        {activeStep === 'readiness' && canLifecycle && selected.status !== 'archived' ? (
                             <Panel title="Other lifecycle actions">
                                 <p className="mb-4 text-sm text-slate-500">Suspension, deactivation, and archival restrict access. Activation is intentionally available only in the final readiness step above.</p>
                                 <Textarea
@@ -383,44 +444,6 @@ export default function PlatformTenantsPage() {
             />
         </>
     );
-}
-
-const SETUP_STEPS = [
-    { id: 'tenant-identity-step', label: '1. Identity' },
-    { id: 'tenant-foundation-step', label: '2. Foundation' },
-    { id: 'tenant-domain-step', label: '3. Domain' },
-    { id: 'tenant-subscription-step', label: '4. Subscription' },
-    { id: 'tenant-activation-step', label: '5. Readiness' },
-] as const;
-
-function TenantDirectoryCard({ tenant, selected, onSelect }: { tenant: TenantRecord; selected: boolean; onSelect: () => void }) {
-    const onboarding = tenant.onboarding?.status ?? 'pending';
-    const subscription = tenant.current_subscription;
-    return (
-        <button
-            type="button"
-            onClick={onSelect}
-            aria-pressed={selected}
-            className="w-full rounded-lg border border-slate-200 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/30 aria-pressed:border-blue-500 aria-pressed:bg-blue-50"
-        >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p className="font-semibold text-slate-900">{tenant.name}</p>
-                    <p className="mt-1 text-sm text-slate-500">{tenant.code} · {tenant.primary_domain?.domain ?? 'Primary domain required'}</p>
-                </div>
-                <StatusBadge status={tenant.status} />
-            </div>
-            <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
-                <span>Foundation: <strong>{humanize(onboarding)}</strong></span>
-                <span>Plan: <strong>{subscription?.plan_name ?? subscription?.revision?.plan?.name ?? 'Not assigned'}</strong></span>
-                <span>Period: <strong>{subscription?.ends_at ? `Ends ${formatTenantDateTime(subscription.ends_at)}` : subscription ? humanize(subscription.effective_status) : 'Required'}</strong></span>
-            </div>
-        </button>
-    );
-}
-
-function Detail({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
-    return <div className={`rounded-lg p-3 ${warning ? 'bg-amber-50' : 'bg-slate-50'}`}><dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt><dd className={`mt-1 font-medium ${warning ? 'text-amber-800' : 'text-slate-900'}`}>{value}</dd></div>;
 }
 
 function lifecycleMessage(tenant: TenantRecord, action: LifecycleAction, reason: string) {

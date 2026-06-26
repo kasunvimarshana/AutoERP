@@ -9,6 +9,8 @@ use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
+use Modules\Tenant\Constants\TenantSubscriptionStatus;
 
 final class ListTenantRequest extends QueryRequest
 {
@@ -26,6 +28,13 @@ final class ListTenantRequest extends QueryRequest
             'onboarding_status' => ['nullable', 'string', 'in:'.implode(',', TenantOnboardingStatus::values())],
             'domain_operational_status' => ['nullable', 'string', 'in:'.implode(',', TenantDomainOperationalStatus::values())],
             'subscription_state' => ['nullable', 'string', 'in:'.implode(',', TenantCurrentSubscriptionState::values())],
+            'subscription_effective_status' => ['nullable', 'string', 'in:'.implode(',', [
+                TenantSubscriptionPolicy::SCHEDULED,
+                TenantSubscriptionStatus::TRIAL,
+                TenantSubscriptionStatus::ACTIVE,
+                TenantSubscriptionStatus::EXPIRED,
+                TenantSubscriptionStatus::CANCELLED,
+            ])],
             'plan_id' => ['nullable', 'integer', 'min:1', 'exists:tenant_plans,id'],
             'expires_within_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

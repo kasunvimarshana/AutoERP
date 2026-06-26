@@ -319,10 +319,26 @@ export function useAuth(): AuthContextValue {
     return context;
 }
 
-function isDefinitiveSessionFailure(error: ApiError): boolean {
+const DEFINITIVE_SESSION_ERROR_CODES = new Set([
+    'AUTH_TOKEN_INVALID',
+    'AUTH_TOKEN_REVOKED',
+    'AUTH_TOKEN_EXPIRED',
+    'AUTH_SESSION_MISSING',
+    'AUTH_SESSION_NOT_FOUND',
+    'AUTH_USER_INACTIVE',
+    'AUTH_TENANT_MISMATCH',
+    'TENANT_NOT_FOUND',
+    'PLATFORM_OPERATOR_REQUIRED',
+]);
+
+export function isDefinitiveSessionFailure(error: ApiError): boolean {
     return error.status === 401
-        || error.code === 'TOKEN_INVALID'
-        || error.code === 'TOKEN_REVOKED'
-        || error.code === 'AUTH_SESSION_MISSING';
+        || (error.code !== null && DEFINITIVE_SESSION_ERROR_CODES.has(error.code));
 }
 
+
+
+function toPositiveInteger(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}

@@ -61,12 +61,13 @@ export interface TenantPlanRevision {
     change_note: string;
     plan?: Pick<TenantPlan, 'id' | 'name' | 'slug' | 'is_active'> | null;
     total_subscription_count?: number;
+    assigned_subscription_count?: number;
     current_subscription_count?: number;
     historical_subscription_count?: number;
     created_at: string;
 }
 
-export interface TenantSubscription {
+export interface TenantSubscriptionRevision {
     id: number;
     tenant_id: number;
     revision_number: number;
@@ -89,15 +90,21 @@ export interface TenantSubscription {
     currency_code: string | null;
     currency_symbol: string | null;
     billing_interval: 'month' | 'quarter' | 'year';
-    current_state: TenantCurrentSubscriptionState | null;
+    revision?: TenantPlanRevision | null;
+    created_at: string;
+}
+
+export interface TenantCurrentSubscription extends TenantSubscriptionRevision {
+    current_state: TenantCurrentSubscriptionState;
     current_state_reason: string | null;
     current_state_changed_at: string | null;
     row_version: number;
     assigned_at: string | null;
     assigned_by: number | null;
-    revision?: TenantPlanRevision | null;
-    created_at: string;
 }
+
+/** @deprecated Use TenantCurrentSubscription for the current pointer and TenantSubscriptionRevision for history. */
+export type TenantSubscription = TenantCurrentSubscription;
 
 export interface TenantOnboardingStep {
     step: string;
@@ -185,7 +192,7 @@ export interface TenantRecord {
     archived_at: string | null;
     row_version: number;
     base_currency: NamedReference | null;
-    current_subscription: TenantSubscription | null;
+    current_subscription: TenantCurrentSubscription | null;
     onboarding: TenantOnboardingSummary | null;
     primary_domain: TenantDomain | null;
     created_at: string;
@@ -200,6 +207,7 @@ export interface TenantPlan {
     row_version: number;
     revisions_count: number;
     total_subscription_count: number;
+    assigned_subscription_count: number;
     current_subscription_count: number;
     historical_subscription_count: number;
     current_revision: TenantPlanRevision | null;
@@ -297,11 +305,6 @@ export interface TenantOnboardingReadiness {
         ready: boolean;
         mode: 'verified_domain' | 'local_fallback' | 'unavailable';
         message: string;
-    };
-    schema: {
-        compatible: boolean;
-        missing_tables: string[];
-        missing_columns: Record<string, string[]>;
     };
     infrastructure: {
         database: { strategy: string; tenant_specific_profiles_supported: boolean };

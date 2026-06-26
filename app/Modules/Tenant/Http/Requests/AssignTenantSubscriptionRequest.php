@@ -23,9 +23,18 @@ final class AssignTenantSubscriptionRequest extends FormRequest
             'expected_subscription_version' => ['nullable', 'integer', 'min:1'],
             'tenant_plan_revision_id' => ['required', 'integer', 'min:1', Rule::exists('tenant_plan_revisions', 'id')],
             'contract_status' => ['required', 'string', Rule::in(TenantSubscriptionStatus::assignable())],
-            'starts_at' => ['nullable', 'date'],
-            'trial_ends_at' => ['nullable', 'date'],
-            'ends_at' => ['nullable', 'date'],
+            'starts_at' => ['nullable', 'date', 'before_or_equal:now'],
+            'trial_ends_at' => [
+                Rule::requiredIf(fn (): bool => $this->input('contract_status') === TenantSubscriptionStatus::TRIAL),
+                Rule::prohibitedIf(fn (): bool => $this->input('contract_status') === TenantSubscriptionStatus::ACTIVE),
+                'nullable',
+                'date',
+            ],
+            'ends_at' => [
+                Rule::prohibitedIf(fn (): bool => $this->input('contract_status') === TenantSubscriptionStatus::TRIAL),
+                'nullable',
+                'date',
+            ],
             'reason' => ['nullable', 'string', 'max:500'],
         ];
     }

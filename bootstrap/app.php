@@ -25,6 +25,7 @@ use Modules\Core\Http\Middleware\CurrentOrganizationUnitMiddleware;
 use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\CurrentUserMiddleware;
 use Modules\Core\Http\Middleware\EnsureApiErrorResponseMiddleware;
+use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -68,6 +69,7 @@ return Application::configure(basePath: dirname(__DIR__))
             Authorize::class,
         ]);
 
+        $middleware->append(RequestCorrelationIdMiddleware::class);
         $middleware->append(EnsureApiErrorResponseMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -126,16 +128,27 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
+            $correlationId = $request->attributes->get(RequestCorrelationIdMiddleware::ATTRIBUTE);
+            $context = [
+                'correlation_id' => is_string($correlationId) ? $correlationId : null,
+                'method' => $request->method(),
+                'path' => $request->path(),
+                'exception' => $exception,
+            ];
+
             if ($exception instanceof HttpExceptionInterface) {
                 $status = $exception->getStatusCode();
                 $message = $status >= 500
                     ? 'Unexpected server error.'
                     : ($exception->getMessage() !== '' ? $exception->getMessage() : 'HTTP error.');
+                if ($status >= 500) {
+                    logger()->error('Unhandled API HTTP exception.', $context);
+                }
 
                 return $errorResponse($status, $message);
             }
 
-            report($exception);
+            logger()->error('Unhandled API exception.', $context);
 
             return $errorResponse(500, 'Unexpected server error.');
         });

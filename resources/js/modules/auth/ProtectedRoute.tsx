@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from './AuthProvider';
@@ -20,9 +20,15 @@ export function ProtectedRoute() {
                     <p className="mt-3 text-sm text-slate-600">
                         Your credentials were preserved because this may be a temporary network or service problem.
                     </p>
-                    <Button className="mt-5" onClick={() => void auth.loadCurrentUser()}>
-                        Retry
-                    </Button>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                        <Button onClick={() => void auth.loadCurrentUser()}>
+                            Retry
+                        </Button>
+                        <Button variant="secondary" onClick={() => void auth.logout()}>
+                            Sign out and clear session
+                        </Button>
+                        <LinkButton variant="ghost" to="/login">Return to login</LinkButton>
+                    </div>
                 </section>
             </main>
         );

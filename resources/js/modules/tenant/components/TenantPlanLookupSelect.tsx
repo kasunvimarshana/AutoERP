@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
-import { listTenantPlans } from '../tenantApi';
+import { listSubscriptionPlans } from '../tenantApi';
 import type { TenantPlan } from '../tenantTypes';
 
 interface TenantPlanLookupSelectProps {
@@ -18,11 +18,10 @@ export function TenantPlanLookupSelect({ value, onChange, disabled = false, erro
         perPage: number;
         signal: AbortSignal;
     }) => {
-        const result = await listTenantPlans({
+        const result = await listSubscriptionPlans({
             page,
             per_page: perPage,
             search: term || undefined,
-            is_active: true,
         }, signal);
 
         return { data: result.data, meta: result.meta };

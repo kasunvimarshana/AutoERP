@@ -21,6 +21,7 @@ final class ListTenantsService
             onboardingStatus: $this->nullableString($filters['onboarding_status'] ?? null),
             domainOperationalStatus: $this->nullableString($filters['domain_operational_status'] ?? null),
             subscriptionState: $this->nullableString($filters['subscription_state'] ?? null),
+            subscriptionEffectiveStatus: $this->nullableString($filters['subscription_effective_status'] ?? null),
             planId: $this->positiveInt($filters['plan_id'] ?? null),
             expiresWithinDays: $this->positiveInt($filters['expires_within_days'] ?? null),
             perPage: min(max((int) ($filters['per_page'] ?? 20), 1), 100),

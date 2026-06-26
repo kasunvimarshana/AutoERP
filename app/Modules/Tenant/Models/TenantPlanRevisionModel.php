@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\CoreModel;
 use LogicException;
-use Modules\ReferenceData\Models\CurrencyModel;
 
 final class TenantPlanRevisionModel extends CoreModel
 {
@@ -48,11 +47,6 @@ final class TenantPlanRevisionModel extends CoreModel
     public function plan(): BelongsTo
     {
         return $this->belongsTo(TenantPlanModel::class, 'tenant_plan_id');
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
     public function subscriptions(): HasMany

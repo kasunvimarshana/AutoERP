@@ -33,6 +33,7 @@ final class TenantPlanRevisionResource extends JsonResource
             'change_note',
             'plan',
             'total_subscription_count',
+            'assigned_subscription_count',
             'current_subscription_count',
             'historical_subscription_count',
             'created_at',

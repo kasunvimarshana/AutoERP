@@ -5,6 +5,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { CopyButton } from '@/shared/components/CopyButton';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { InlineFieldAction } from '@/shared/components/InlineFieldAction';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -82,7 +83,39 @@ export function PlatformTenantDomainsPanel({ tenant, canManage, canAudit, disabl
             <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 3</p><h3 id="tenant-domains-title" className="mt-1 font-semibold text-slate-900">Verify a primary tenant domain</h3><p className="mt-1 text-sm text-slate-500">DNS ownership, application routing, TLS, and reachability must all be ready before a public domain can become primary.</p><p className="mt-1 text-xs text-slate-500">Localhost and IP addresses are never stored as public tenant domains. Local/testing activation uses the explicitly configured tenant fallback shown in readiness.</p></div>
             <SuccessAlert message={success} onDismiss={() => setSuccess(null)} />
             <ErrorAlert error={domains.error} title="Unable to load tenant domains" /><ErrorAlert error={error} title="Domain action failed" />
-            {canManage && tenant.status !== 'archived' ? <div className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-[1fr_auto] md:items-end"><Input label="Tenant hostname" value={domainName} onChange={(event) => setDomainName(event.target.value)} placeholder="erp.example.com" hint="Hostname only. Protocols, ports, paths, queries, and fragments are rejected." error={validationError ?? undefined} disabled={mutationDisabled} /><Button disabled={mutationDisabled || normalizedDomain === '' || Boolean(validationError)} loading={busyId === 0} onClick={() => void createDomain()}>Add domain</Button></div> : null}
+            {canManage && tenant.status !== 'archived' ? (
+                <div className="rounded-lg border border-slate-200 p-4">
+                    <InlineFieldAction
+                        id="tenant-hostname"
+                        label="Tenant hostname"
+                        input={(
+                            <Input
+                                id="tenant-hostname"
+                                value={domainName}
+                                onChange={(event) => setDomainName(event.target.value)}
+                                placeholder="erp.example.com"
+                                error={validationError ?? undefined}
+                                disabled={mutationDisabled}
+                            />
+                        )}
+                        action={(
+                            <Button
+                                disabled={mutationDisabled || normalizedDomain === '' || Boolean(validationError)}
+                                loading={busyId === 0}
+                                onClick={() => void createDomain()}
+                            >
+                                Add domain
+                            </Button>
+                        )}
+                        hint="Hostname only. Protocols, ports, paths, queries, and fragments are rejected."
+                    />
+                </div>
+            ) : null}
+            {!canManage ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    You have read-only access. Domain changes require the tenant-domain management permission.
+                </p>
+            ) : null}
             {domains.loading && !domains.data ? <LoadingState label="Loading tenant domains..." /> : null}
             <div className="space-y-3">
                 {items.map((domain) => {

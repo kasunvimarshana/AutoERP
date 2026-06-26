@@ -20,7 +20,17 @@ describe('shared page states', () => {
             </TestRouter>,
         );
         expect(screen.getByText('No suppliers match these filters.')).toBeInTheDocument();
-        rerender(<ErrorAlert error={new ApiError('The network is unavailable.', null)} />);
+        rerender(<ErrorAlert error={new ApiError(
+            'The network is unavailable.',
+            500,
+            'UNEXPECTED_ERROR',
+            'infrastructure',
+            {},
+            { correlation_id: '01JSUPPORTREFERENCE', guidance: 'Retry after checking platform health.' },
+        )} />);
         expect(screen.getByRole('alert')).toHaveTextContent('The network is unavailable.');
+        expect(screen.getByRole('alert')).toHaveTextContent('Retry after checking platform health.');
+        expect(screen.getByRole('alert')).toHaveTextContent('01JSUPPORTREFERENCE');
+        expect(screen.getByRole('alert')).toHaveTextContent('UNEXPECTED_ERROR');
     });
 });

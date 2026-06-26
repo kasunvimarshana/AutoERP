@@ -15,6 +15,7 @@ use Modules\Tenant\Models\TenantCurrentSubscriptionModel;
 use Modules\Tenant\Models\TenantSubscriptionEventModel;
 use Modules\Tenant\Models\TenantSubscriptionModel;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use RuntimeException;
 
 final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRepositoryInterface
@@ -25,6 +26,7 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
         private readonly TenantSubscriptionEventModel $events,
         private readonly ClockInterface $clock,
         private readonly TenantSubscriptionPresenter $presenter,
+        private readonly CurrencyDirectoryInterface $currencies,
     ) {}
 
     public function findCurrentByTenant(int $tenantId, bool $lockForUpdate = false): ?DataRecord
@@ -234,7 +236,6 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
     {
         return $this->subscriptions->newQuery()->with([
             'revision.plan:id,name,slug,is_active',
-            'revision.currency:id,code,name,symbol,is_active',
             'tenant:id,code,name,status',
         ]);
     }
@@ -249,7 +250,9 @@ final class EloquentTenantSubscriptionRepository implements TenantSubscriptionRe
             : null;
         if (is_array($payload['revision'] ?? null)) {
             $payload['revision']['plan'] = $model->revision?->plan?->only(['id', 'name', 'slug', 'is_active']);
-            $payload['revision']['currency'] = $model->revision?->currency?->only(['id', 'code', 'name', 'symbol', 'is_active']);
+            $payload['revision']['currency'] = $this->currencies->find(
+                is_numeric($payload['revision']['currency_id'] ?? null) ? (int) $payload['revision']['currency_id'] : null,
+            );
         }
         $payload['tenant'] = $model->relationLoaded('tenant') && $model->tenant !== null
             ? $model->tenant->only(['id', 'code', 'name', 'status'])

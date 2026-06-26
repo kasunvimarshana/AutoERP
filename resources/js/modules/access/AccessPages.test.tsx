@@ -51,10 +51,11 @@ describe('Access pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         authState.roles = [];
-        authState.permissions = Object.values(accessPermissions).filter((permission) => ![
+        const excludedPermissions = new Set<string>([
             accessPermissions.userDocumentsManage,
             accessPermissions.userDevicesManage,
-        ].includes(permission));
+        ]);
+        authState.permissions = Object.values(accessPermissions).filter((permission) => !excludedPermissions.has(permission));
         apiMocks.listUsers.mockResolvedValue(collection([accessUser()]));
         apiMocks.getUser.mockResolvedValue(accessUser());
         apiMocks.listAllRoles.mockResolvedValue([{ id: 5, row_version: 1, name: 'Manager' }]);
@@ -92,7 +93,7 @@ describe('Access pages', () => {
         renderPage(<CreateUserPage />, ['/access/users/create']);
         expect(screen.getByRole('heading', { name: 'Invite User' })).toBeInTheDocument();
         expect(await screen.findByText('Invitation workflow')).toBeInTheDocument();
-        expect(screen.getByText('Role assignments')).toBeInTheDocument();
+        expect(screen.getByText('Initial roles')).toBeInTheDocument();
         expect(screen.getByText('Organization access')).toBeInTheDocument();
         expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument();
         expect(screen.queryByRole('tab')).not.toBeInTheDocument();
@@ -101,7 +102,7 @@ describe('Access pages', () => {
         const user = userEvent.setup();
         renderPage(<UserListPage />, ['/access/users']);
         expect(await screen.findAllByText('Ada User')).not.toHaveLength(0);
-        await user.selectOptions(screen.getByLabelText('Organization Unit'), '2');
+        await user.selectOptions(screen.getByLabelText('Organization unit'), '2');
         await waitFor(() => {
             expect(apiMocks.listUsers).toHaveBeenLastCalledWith(
                 expect.objectContaining({ organization_unit_filter_id: 2 }),

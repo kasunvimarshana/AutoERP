@@ -27,6 +27,7 @@ final class TenantPlanResource extends JsonResource
             'row_version',
             'revisions_count',
             'total_subscription_count',
+            'assigned_subscription_count',
             'current_subscription_count',
             'historical_subscription_count',
             'current_revision',

@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformMfaEnrollment, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection, OrganizationUnitContextOptions, AuthOrganizationUnit } from './authTypes';
+import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection, OrganizationUnitContextOptions, AuthOrganizationUnit } from './authTypes';
 
 const platformAuthEndpoint = '/api/v1/platform/auth';
 

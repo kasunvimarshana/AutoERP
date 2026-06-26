@@ -5,7 +5,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -18,6 +18,8 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { PLATFORM_HOME_PATH } from '@/app/routePaths';
+import { TenantPlanAssignmentsModal } from './components/TenantPlanAssignmentsModal';
 import { TenantPlanEditor } from './components/TenantPlanEditor';
 import { TenantPlanRevisionHistory } from './components/TenantPlanRevisionHistory';
 import {
@@ -40,6 +42,7 @@ export default function TenantPlansPage() {
     const auth = useAuth();
     const canManage = hasPermission(auth, PLATFORM_PERMISSION.plansManage);
     const canAudit = hasPermission(auth, PLATFORM_PERMISSION.auditView);
+    const canAssign = hasPermission(auth, PLATFORM_PERMISSION.tenantSubscriptionsManage);
     const [searchParams, setSearchParams] = useSearchParams();
     const search = searchParams.get('search') ?? '';
     const status = searchParams.get('status') ?? '';
@@ -60,6 +63,7 @@ export default function TenantPlansPage() {
     const [editor, setEditor] = useState<TenantPlan | 'create' | null>(null);
     const [editorRevision, setEditorRevision] = useState(0);
     const [historyPlan, setHistoryPlan] = useState<TenantPlan | null>(null);
+    const [assignmentPlan, setAssignmentPlan] = useState<TenantPlan | null>(null);
     const [lifecycleRequest, setLifecycleRequest] = useState<LifecycleRequest>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -149,6 +153,13 @@ export default function TenantPlansPage() {
                 ) : null}
 
                 <Panel title="Plan catalogue">
+                    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+                        <p className="font-semibold">How tenant allocation works</p>
+                        <p className="mt-1">Assigning a plan creates a tenant subscription. Tenant users and organization-unit access are managed inside that tenant. Platform operators remain global control-plane accounts.</p>
+                        {!canAssign ? (
+                            <p className="mt-2 font-medium">You have read-only plan access. Assigning plans requires the platform tenant-subscription management permission.</p>
+                        ) : null}
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input
                             label="Search plans"
@@ -172,9 +183,11 @@ export default function TenantPlansPage() {
                                 key={plan.id}
                                 plan={plan}
                                 canManage={canManage}
+                                canAssign={canAssign}
                                 disabled={saving}
                                 onRevise={() => { setEditor(plan); setError(null); setSuccess(null); }}
                                 onHistory={() => setHistoryPlan(plan)}
+                                onAssignments={() => setAssignmentPlan(plan)}
                                 onLifecycle={() => setLifecycleRequest({ action: plan.is_active ? 'deactivate' : 'activate', plan })}
                             />
                         ))}
@@ -185,6 +198,7 @@ export default function TenantPlansPage() {
             </div>
 
             <TenantPlanRevisionHistory plan={historyPlan} canAudit={canAudit} onClose={() => setHistoryPlan(null)} />
+            <TenantPlanAssignmentsModal key={assignmentPlan?.id ?? 'closed'} plan={assignmentPlan} onClose={() => setAssignmentPlan(null)} />
             <ConfirmDialog
                 open={lifecycleRequest !== null}
                 title={lifecycleRequest?.action === 'activate' ? 'Activate tenant plan' : 'Deactivate tenant plan'}
@@ -199,12 +213,14 @@ export default function TenantPlansPage() {
     );
 }
 
-function PlanCard({ plan, canManage, disabled, onRevise, onHistory, onLifecycle }: {
+function PlanCard({ plan, canManage, canAssign, disabled, onRevise, onHistory, onAssignments, onLifecycle }: {
     plan: TenantPlan;
     canManage: boolean;
+    canAssign: boolean;
     disabled: boolean;
     onRevise: () => void;
     onHistory: () => void;
+    onAssignments: () => void;
     onLifecycle: () => void;
 }) {
     const revision = plan.latest_revision;
@@ -218,24 +234,38 @@ function PlanCard({ plan, canManage, disabled, onRevise, onHistory, onLifecycle 
                     </div>
                     <p className="mt-1 text-sm text-slate-500">{plan.slug}</p>
                 </div>
-                {canManage ? (
-                    <div className="flex flex-wrap gap-2">
-                        <Button variant="secondary" disabled={disabled} onClick={onHistory}>Revision history</Button>
-                        <Button variant="secondary" disabled={disabled} onClick={onRevise}>Revise</Button>
-                        <Button variant={plan.is_active ? 'danger' : 'primary'} disabled={disabled} onClick={onLifecycle}>{plan.is_active ? 'Deactivate' : 'Activate'}</Button>
-                    </div>
-                ) : <Button variant="secondary" onClick={onHistory}>View revisions</Button>}
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" disabled={disabled} onClick={onHistory}>Revision history</Button>
+                    <Button variant="secondary" disabled={disabled} onClick={onAssignments}>View assigned tenants</Button>
+                    {canAssign && plan.is_active && revision ? (
+                        <LinkButton
+                            variant="primary"
+                            to={`${PLATFORM_HOME_PATH}?plan_id=${plan.id}&subscription_action=assign&step=subscription`}
+                        >
+                            Assign to tenant
+                        </LinkButton>
+                    ) : null}
+                    {canManage ? (
+                        <>
+                            <Button variant="secondary" disabled={disabled} onClick={onRevise}>Revise</Button>
+                            <Button variant={plan.is_active ? 'danger' : 'primary'} disabled={disabled} onClick={onLifecycle}>
+                                {plan.is_active ? 'Deactivate' : 'Activate'}
+                            </Button>
+                        </>
+                    ) : null}
+                </div>
             </div>
             {revision ? (
                 <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
                     <Metric label="Latest contract" value={`Revision ${revision.revision_number}`} />
                     <Metric label="Pricing" value={formatPlanMoney(revision)} />
                     <Metric label="Effective" value={formatTenantDateTime(revision.effective_at)} />
-                    <Metric label="Current tenants" value={String(plan.current_subscription_count)} />
+                    <Metric label="Effective tenants" value={String(plan.current_subscription_count)} />
                 </div>
             ) : <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">No plan revision exists. This plan cannot be assigned.</p>}
-            <div className="mt-3 grid gap-3 text-xs text-slate-600 sm:grid-cols-3">
+            <div className="mt-3 grid gap-3 text-xs text-slate-600 sm:grid-cols-4">
                 <span><strong>{plan.revisions_count}</strong> revision(s)</span>
+                <span><strong>{plan.assigned_subscription_count}</strong> assigned tenant pointer(s)</span>
                 <span><strong>{plan.historical_subscription_count}</strong> historical subscription(s)</span>
                 <span><strong>{revision?.features.enabled_modules.length ?? 0}</strong> enabled module(s)</span>
             </div>

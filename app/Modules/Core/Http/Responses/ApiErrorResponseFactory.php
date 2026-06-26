@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Responses;
 
 use Illuminate\Http\JsonResponse;
+use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -32,6 +33,11 @@ final class ApiErrorResponseFactory
             throw new InvalidArgumentException('API error status must be between 400 and 599.');
         }
 
+        $correlationId = $this->correlationId();
+        if ($correlationId !== null) {
+            $details['correlation_id'] = $correlationId;
+        }
+
         $payload = [
             'success' => false,
             'message' => $message,
@@ -47,7 +53,12 @@ final class ApiErrorResponseFactory
             $payload['errors'] = $details['fields'];
         }
 
-        return new JsonResponse($payload, $status);
+        $response = new JsonResponse($payload, $status);
+        if ($correlationId !== null) {
+            $response->headers->set(RequestCorrelationIdMiddleware::HEADER, $correlationId);
+        }
+
+        return $response;
     }
 
     /**
@@ -59,6 +70,17 @@ final class ApiErrorResponseFactory
         $type = $hasValidationFields ? 'validation' : $this->typeForStatus($status);
 
         return $this->make($this->codeForStatus($status, $type), $message, $status, $type, $details);
+    }
+
+    private function correlationId(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $value = request()->attributes->get(RequestCorrelationIdMiddleware::ATTRIBUTE);
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     private function typeForStatus(int $status): string

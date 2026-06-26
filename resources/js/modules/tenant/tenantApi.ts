@@ -19,6 +19,7 @@ import type {
     TenantPlanRevision,
     TenantRecord,
     TenantSubscription,
+    TenantSubscriptionRevision,
     TenantSubscriptionContractStatus,
     TenantSubscriptionReadiness,
 } from './tenantTypes';
@@ -31,6 +32,7 @@ export interface TenantListParams {
     onboarding_status?: string;
     domain_operational_status?: string;
     subscription_state?: string;
+    subscription_effective_status?: string;
     plan_id?: number;
     expires_within_days?: number;
 }
@@ -209,8 +211,8 @@ export async function listTenantSubscriptionHistory(
     tenantId: number,
     params: PageParams,
     signal?: AbortSignal,
-): Promise<{ data: TenantSubscription[]; meta: TenantPage['meta'] }> {
-    const response = await apiClient.get<ApiCollection<TenantSubscription>>(
+): Promise<{ data: TenantSubscriptionRevision[]; meta: TenantPage['meta'] }> {
+    const response = await apiClient.get<ApiCollection<TenantSubscriptionRevision>>(
         `/api/v1/platform/tenants/${tenantId}/subscription/history`,
         { params, signal },
     );
@@ -436,6 +438,40 @@ export async function downloadTenantDocument(document: TenantDocument): Promise<
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+
+export async function listSubscriptionPlans(
+    params: { page?: number; per_page?: number; search?: string },
+    signal?: AbortSignal,
+): Promise<TenantPlanPage> {
+    const response = await apiClient.get<ApiCollection<TenantPlan>>('/api/v1/platform/subscription-plans', { params, signal });
+    return pageFromResponse(response.data, 'Subscription plan');
+}
+
+export async function getSubscriptionPlan(planId: number, signal?: AbortSignal): Promise<TenantPlan> {
+    const response = await apiClient.get<ApiResource<TenantPlan>>(`/api/v1/platform/subscription-plans/${planId}`, { signal });
+    return response.data.data;
+}
+
+export async function listSubscriptionPlanRevisions(planId: number, signal?: AbortSignal): Promise<TenantPlanRevision[]> {
+    const response = await apiClient.get<ApiCollection<TenantPlanRevision>>(
+        `/api/v1/platform/subscription-plans/${planId}/revisions`,
+        { signal },
+    );
+    return response.data.data;
+}
+
+export async function listTenantPlanAssignments(
+    planId: number,
+    params: PageParams,
+    signal?: AbortSignal,
+): Promise<TenantPage> {
+    const response = await apiClient.get<ApiCollection<TenantRecord>>(
+        `/api/v1/platform/tenant-plans/${planId}/tenants`,
+        { params, signal },
+    );
+    return pageFromResponse(response.data, 'Assigned tenant');
 }
 
 export async function getTenantPlanCapabilities(signal?: AbortSignal): Promise<TenantPlanCapabilities> {

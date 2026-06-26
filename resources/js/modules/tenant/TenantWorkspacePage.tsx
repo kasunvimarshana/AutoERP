@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
+import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { TabPanel, Tabs, type TabItem } from '@/shared/components/Tabs';
 import { TenantDocumentsPanel } from './components/TenantDocumentsPanel';
@@ -18,6 +19,10 @@ export default function TenantWorkspacePage() {
     if (hasPermission(auth, tenantPermissions.documentsView)) availableTabs.push({ id: 'documents', label: 'Private documents' });
     const [selectedTab, setSelectedTab] = useState<TenantTab>('profile');
     const activeTab = availableTabs.some((tab) => tab.id === selectedTab) ? selectedTab : availableTabs[0]?.id ?? 'profile';
+
+    if (availableTabs.length === 0) {
+        return <AccessDeniedPage message="Your account has no tenant-administration capabilities. Ask an administrator to assign an appropriate tenant permission." />;
+    }
 
     return (
         <>

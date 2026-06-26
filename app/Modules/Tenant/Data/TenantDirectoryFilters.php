@@ -12,6 +12,7 @@ final readonly class TenantDirectoryFilters
         public ?string $onboardingStatus,
         public ?string $domainOperationalStatus,
         public ?string $subscriptionState,
+        public ?string $subscriptionEffectiveStatus,
         public ?int $planId,
         public ?int $expiresWithinDays,
         public int $perPage,

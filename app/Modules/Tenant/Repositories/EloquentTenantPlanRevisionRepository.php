@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
+use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 
 final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRepositoryInterface
 {
@@ -18,6 +20,7 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
         private readonly TenantPlanModel $plans,
         private readonly TenantPlanRevisionModel $revisions,
         private readonly ClockInterface $clock,
+        private readonly CurrencyDirectoryInterface $currencies,
     ) {}
 
     public function findById(int|string $id, bool $lockForUpdate = false): ?DataRecord
@@ -26,12 +29,6 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
             ->with([
                 'plan' => function ($query) use ($lockForUpdate): void {
                     $query->select(['id', 'name', 'slug', 'is_active']);
-                    if ($lockForUpdate) {
-                        $query->lockForUpdate();
-                    }
-                },
-                'currency' => function ($query) use ($lockForUpdate): void {
-                    $query->select(['id', 'code', 'name', 'symbol', 'is_active']);
                     if ($lockForUpdate) {
                         $query->lockForUpdate();
                     }
@@ -49,7 +46,7 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
     public function findLatestByPlan(int|string $planId): ?DataRecord
     {
         $model = $this->revisions->newQuery()
-            ->with(['plan:id,name,slug,is_active', 'currency:id,code,name,symbol,is_active'])
+            ->with(['plan:id,name,slug,is_active'])
             ->where('tenant_plan_id', $planId)
             ->orderByDesc('revision_number')
             ->first();
@@ -60,12 +57,29 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
     public function listByPlan(int|string $planId): array
     {
         return $this->revisions->newQuery()
-            ->with(['plan:id,name,slug,is_active', 'currency:id,code,name,symbol,is_active'])
+            ->with(['plan:id,name,slug,is_active'])
             ->withCount([
                 'subscriptions as total_subscription_count',
-                'subscriptions as current_subscription_count' => fn (Builder $query) => $query
+                'subscriptions as assigned_subscription_count' => fn (Builder $query) => $query
                     ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
                         ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
+                'subscriptions as current_subscription_count' => function (Builder $query): void {
+                    $now = $this->clock->now();
+                    $query->where('starts_at', '<=', $now)
+                        ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
+                            ->where('state', TenantCurrentSubscriptionState::ASSIGNED))
+                        ->where(function (Builder $effective) use ($now): void {
+                            $effective->where(function (Builder $trial) use ($now): void {
+                                $trial->where('contract_status', TenantSubscriptionStatus::TRIAL)
+                                    ->where('trial_ends_at', '>', $now);
+                            })->orWhere(function (Builder $active) use ($now): void {
+                                $active->where('contract_status', TenantSubscriptionStatus::ACTIVE)
+                                    ->where(function (Builder $end) use ($now): void {
+                                        $end->whereNull('ends_at')->orWhere('ends_at', '>', $now);
+                                    });
+                            });
+                        });
+                },
                 'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
                     ->whereDoesntHave('currentAssignment', fn (Builder $assignment) => $assignment
                         ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
@@ -105,9 +119,9 @@ final class EloquentTenantPlanRevisionRepository implements TenantPlanRevisionRe
         $payload['plan'] = $model->relationLoaded('plan') && $model->plan !== null
             ? $model->plan->only(['id', 'name', 'slug', 'is_active'])
             : null;
-        $payload['currency'] = $model->relationLoaded('currency') && $model->currency !== null
-            ? $model->currency->only(['id', 'code', 'name', 'symbol', 'is_active'])
-            : null;
+        $payload['currency'] = $this->currencies->find(
+            is_numeric($model->getAttribute('currency_id')) ? (int) $model->getAttribute('currency_id') : null,
+        );
 
         return new DataRecord($payload);
     }

@@ -42,7 +42,6 @@ const blocked: TenantOnboardingReadiness = {
         { code: 'SUBSCRIPTION_VALID', stage: 'subscription', owner: 'Tenant subscription', action: 'Assign a usable subscription.', message: 'Assign a subscription.' },
     ],
     routing: { ready: false, mode: 'unavailable', message: 'Tenant routing is unavailable.' },
-    schema: { compatible: true, missing_tables: [], missing_columns: {} },
     infrastructure: { database: { strategy: 'shared_schema', tenant_specific_profiles_supported: false }, storage: { strategy: 'shared_private_storage', isolation: 'tenant_object_key_prefix', disk: 'tenant_private', tenant_specific_profiles_supported: false }, mail: { strategy: 'platform_mailer', tenant_specific_profiles_supported: false }, configuration: { precedence: ['organization_unit', 'tenant', 'global', 'definition_default'], arbitrary_laravel_config_overrides_supported: false } },
 };
 

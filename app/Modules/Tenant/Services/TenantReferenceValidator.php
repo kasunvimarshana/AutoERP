@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use InvalidArgumentException;
-use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 
 final class TenantReferenceValidator
 {
-    public function __construct(private readonly CurrencyModel $currencies) {}
+    public function __construct(private readonly CurrencyDirectoryInterface $currencies) {}
 
     public function assertActiveCurrency(?int $currencyId): void
     {
@@ -17,7 +17,7 @@ final class TenantReferenceValidator
             return;
         }
 
-        if (! $this->currencies->newQuery()->whereKey($currencyId)->where('is_active', true)->exists()) {
+        if (! $this->currencies->isActive($currencyId)) {
             throw new InvalidArgumentException('The selected currency is not active.');
         }
     }

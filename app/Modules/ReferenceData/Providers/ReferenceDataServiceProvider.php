@@ -7,8 +7,8 @@ namespace Modules\ReferenceData\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
 use Modules\ReferenceData\Services\ReferenceValueLookup;
-use Modules\ReferenceData\Services\TenantBaseCurrencyReadiness;
-use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
+use Modules\ReferenceData\Services\EloquentCurrencyDirectory;
 use Modules\ReferenceData\Constants\ReferenceDataPermission;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
@@ -21,8 +21,8 @@ final class ReferenceDataServiceProvider extends ServiceProvider
             ReferenceValueLookup::class,
         );
         $this->app->singleton(
-            TenantBaseCurrencyReadinessInterface::class,
-            TenantBaseCurrencyReadiness::class,
+            CurrencyDirectoryInterface::class,
+            EloquentCurrencyDirectory::class,
         );
     }
 

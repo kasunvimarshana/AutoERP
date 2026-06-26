@@ -10,14 +10,17 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
+use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 
 final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterface
 {
     public function __construct(
         private readonly TenantPlanModel $model,
         private readonly ClockInterface $clock,
+        private readonly CurrencyDirectoryInterface $currencies,
     ) {}
 
     public function findById(int|string $id, bool $lockForUpdate = false): ?DataRecord
@@ -108,13 +111,30 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
     private function query(): Builder
     {
         return $this->model->newQuery()
-            ->with(['currentRevision.currency', 'latestRevision.currency'])
+            ->with(['currentRevision', 'latestRevision'])
             ->withCount([
                 'revisions',
                 'subscriptions as total_subscription_count',
-                'subscriptions as current_subscription_count' => fn (Builder $query) => $query
+                'subscriptions as assigned_subscription_count' => fn (Builder $query) => $query
                     ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
                         ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
+                'subscriptions as current_subscription_count' => function (Builder $query): void {
+                    $now = $this->clock->now();
+                    $query->where('starts_at', '<=', $now)
+                        ->whereHas('currentAssignment', fn (Builder $assignment) => $assignment
+                            ->where('state', TenantCurrentSubscriptionState::ASSIGNED))
+                        ->where(function (Builder $effective) use ($now): void {
+                            $effective->where(function (Builder $trial) use ($now): void {
+                                $trial->where('contract_status', TenantSubscriptionStatus::TRIAL)
+                                    ->where('trial_ends_at', '>', $now);
+                            })->orWhere(function (Builder $active) use ($now): void {
+                                $active->where('contract_status', TenantSubscriptionStatus::ACTIVE)
+                                    ->where(function (Builder $end) use ($now): void {
+                                        $end->whereNull('ends_at')->orWhere('ends_at', '>', $now);
+                                    });
+                            });
+                        });
+                },
                 'subscriptions as historical_subscription_count' => fn (Builder $query) => $query
                     ->whereDoesntHave('currentAssignment', fn (Builder $assignment) => $assignment
                         ->where('state', TenantCurrentSubscriptionState::ASSIGNED)),
@@ -134,6 +154,11 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
         return new DataRecord($payload);
     }
 
+    private function positiveInt(mixed $value): ?int
+    {
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
     /** @return array<string, mixed>|null */
     private function revisionPayload(?TenantPlanRevisionModel $revision): ?array
     {
@@ -143,7 +168,7 @@ final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterfac
 
         return [
             ...$revision->attributesToArray(),
-            'currency' => $revision->currency?->only(['id', 'code', 'name', 'symbol', 'is_active']),
+            'currency' => $this->currencies->find($this->positiveInt($revision->getAttribute('currency_id'))),
         ];
     }
 }

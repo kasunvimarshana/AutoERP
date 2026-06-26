@@ -9,9 +9,11 @@ use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
 use Modules\Tenant\Http\Requests\ListTenantPlanRequest;
+use Modules\Tenant\Http\Requests\ListTenantPlanAssignmentRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantPlanRequest;
 use Modules\Tenant\Http\Resources\TenantPlanResource;
+use Modules\Tenant\Http\Resources\TenantResource;
 use Modules\Tenant\Http\Resources\TenantPlanRevisionResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
 use Modules\Tenant\Services\Plans\ActivateTenantPlanService;
@@ -19,6 +21,7 @@ use Modules\Tenant\Services\Plans\CreateTenantPlanService;
 use Modules\Tenant\Services\Plans\DeactivateTenantPlanService;
 use Modules\Tenant\Services\Plans\GetTenantPlanService;
 use Modules\Tenant\Services\Plans\ListTenantPlansService;
+use Modules\Tenant\Services\Plans\ListTenantPlanAssignmentsService;
 use Modules\Tenant\Services\Plans\ListTenantPlanRevisionsService;
 use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
@@ -27,6 +30,7 @@ final class TenantPlanController extends Controller
 {
     public function __construct(
         private readonly ListTenantPlansService $listPlans,
+        private readonly ListTenantPlanAssignmentsService $listAssignments,
         private readonly ListTenantPlanRevisionsService $listRevisions,
         private readonly GetTenantPlanService $getPlan,
         private readonly CreateTenantPlanService $createPlan,
@@ -66,6 +70,22 @@ final class TenantPlanController extends Controller
     public function show(int|string $tenantPlan): JsonResponse|TenantPlanResource
     {
         return $this->planResponse($this->getPlan->execute($tenantPlan));
+    }
+
+    public function assignments(ListTenantPlanAssignmentRequest $request, int $tenantPlan): JsonResponse
+    {
+        $result = $this->listAssignments->execute($tenantPlan, $request->validated());
+        if ($result->isFailure()) {
+            return TenantApiResponder::error($result->errorOrFail());
+        }
+
+        $page = $result->valueOrFail();
+        abort_unless($page instanceof PagedResult, 500, 'Unexpected tenant plan assignment response.');
+
+        return response()->json([
+            'data' => TenantResource::collection($page->items)->resolve(),
+            'meta' => $page->paginationMeta(),
+        ]);
     }
 
     public function revisions(int|string $tenantPlan): JsonResponse

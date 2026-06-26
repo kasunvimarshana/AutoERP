@@ -30,6 +30,7 @@ function createPlan(): TenantPlan {
         row_version: 4,
         revisions_count: 2,
         total_subscription_count: 3,
+        assigned_subscription_count: 1,
         current_subscription_count: 1,
         historical_subscription_count: 2,
         current_revision: revision,

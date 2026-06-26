@@ -42,10 +42,6 @@ final class DeactivateTenantPlanService
                 if (! (bool) $existing->get('is_active')) {
                     return ['status' => 'success', 'record' => $existing];
                 }
-                if ($this->plans->hasCurrentAssignments($id)) {
-                    return ['status' => 'assigned'];
-                }
-
                 $updated = $this->plans->updateWithVersion($id, $expectedVersion, [
                     'is_active' => false,
                     'updated_by' => $this->currentUser->currentUserId(),
@@ -74,10 +70,6 @@ final class DeactivateTenantPlanService
             return match ($outcome['status']) {
                 'success' => Result::success($outcome['record']),
                 'not_found' => Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant plan not found.')),
-                'assigned' => Result::failure(new Error(
-                    TenantErrorCode::CONFLICT,
-                    'This plan has active tenant assignments. Move or cancel those subscriptions before deactivating it.',
-                )),
                 default => Result::failure(new Error(
                     TenantErrorCode::VERSION_CONFLICT,
                     'Tenant plan changed since it was loaded. Refresh and try again.',

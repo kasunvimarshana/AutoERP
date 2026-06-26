@@ -3,6 +3,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { InlineFieldAction } from '@/shared/components/InlineFieldAction';
 import { Modal } from '@/shared/components/Modal';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
@@ -151,23 +152,37 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
             ) : null}
 
             {canRun ? (
-                <div className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-[1fr_auto] md:items-end">
-                    <Input
+                <div className="rounded-lg border border-slate-200 p-4">
+                    <InlineFieldAction
+                        id="initial-administrator-email"
                         label="Initial administrator email"
-                        type="email"
-                        autoComplete="email"
-                        value={state?.initial_admin_email ?? emailInput}
-                        onChange={(event) => setEmailInput(event.target.value)}
-                        disabled={operationDisabled || Boolean(state?.initial_admin_email)}
+                        input={(
+                            <Input
+                                id="initial-administrator-email"
+                                type="email"
+                                autoComplete="email"
+                                value={state?.initial_admin_email ?? emailInput}
+                                onChange={(event) => setEmailInput(event.target.value)}
+                                disabled={operationDisabled || Boolean(state?.initial_admin_email)}
+                                required
+                            />
+                        )}
+                        action={(
+                            <Button loading={saving} disabled={operationDisabled || emailInput.trim() === ''} onClick={provision}>
+                                {provisionButtonLabel(state?.status)}
+                            </Button>
+                        )}
                         hint={state?.initial_admin_email
                             ? 'This address belongs to the current invitation. Use Replace or Revoke to recover safely.'
                             : 'The invitation is delivered by email. Raw invitation tokens are never shown in Platform Administration.'}
-                        required
                     />
-                    <Button loading={saving} disabled={operationDisabled || emailInput.trim() === ''} onClick={provision}>
-                        {provisionButtonLabel(state?.status)}
-                    </Button>
                 </div>
+            ) : null}
+
+            {!canProvision ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    You have read-only access. Foundation provisioning requires the tenant onboarding permission.
+                </p>
             ) : null}
 
             {invitation ? (

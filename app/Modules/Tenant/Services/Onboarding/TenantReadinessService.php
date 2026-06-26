@@ -14,10 +14,9 @@ use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
-use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Modules\Tenant\Services\Domains\TenantRoutingReadinessPolicy;
-use Modules\Tenant\Services\Platform\TenantSchemaCompatibilityService;
 use Modules\Tenant\Services\Platform\TenantInfrastructureCapabilityService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Psr\Log\LoggerInterface;
@@ -33,10 +32,9 @@ final class TenantReadinessService
         private readonly TenantOrganizationProvisionerInterface $organizations,
         private readonly TenantAccessProvisionerInterface $access,
         private readonly TenantAuthenticationProvisionerInterface $authentication,
-        private readonly TenantBaseCurrencyReadinessInterface $baseCurrencies,
+        private readonly CurrencyDirectoryInterface $baseCurrencies,
         private readonly TenantSubscriptionPolicy $subscriptionPolicy,
         private readonly TenantRoutingReadinessPolicy $routingReadiness,
-        private readonly TenantSchemaCompatibilityService $schemaCompatibility,
         private readonly TenantInfrastructureCapabilityService $infrastructureCapabilities,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly LoggerInterface $logger,
@@ -50,7 +48,6 @@ final class TenantReadinessService
      *   checks:array<string,bool>,
      *   blockers:list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>,
      *   routing:array{ready:bool,mode:string,message:string},
-     *   schema:array{compatible:bool,missing_tables:list<string>,missing_columns:array<string,list<string>>},
      *   infrastructure:array<string,mixed>
      * }
      */
@@ -63,16 +60,10 @@ final class TenantReadinessService
             return $this->missingTenant($tenantId);
         }
 
-        $schema = $this->schemaCompatibility->inspect();
-        if (! $schema['compatible']) {
-            return $this->schemaBlocked($tenantId, $schema);
-        }
-
         return $this->executionContext->runForTenant($tenantId, function () use (
             $tenant,
             $tenantId,
             $lockForUpdate,
-            $schema,
         ): array {
             $stateQuery = $this->states->newQuery()->where('tenant_id', $tenantId);
             if ($lockForUpdate) {
@@ -156,7 +147,6 @@ final class TenantReadinessService
             }
 
             $checks = [
-                TenantReadinessCheck::SCHEMA_COMPATIBLE => true,
                 TenantReadinessCheck::ROOT_ORGANIZATION => $rootReady,
                 TenantReadinessCheck::PERMISSION_CATALOGUE => $catalogueReady,
                 TenantReadinessCheck::SUPER_ADMIN_ACCESS => $superAdminReady,
@@ -182,7 +172,6 @@ final class TenantReadinessService
                 'checks' => $checks,
                 'blockers' => $blockers,
                 'routing' => $routing,
-                'schema' => $schema,
                 'infrastructure' => $this->infrastructureCapabilities->inspect(),
             ];
         });
@@ -253,7 +242,6 @@ final class TenantReadinessService
     private function stage(string $check): string
     {
         return match ($check) {
-            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'deployment',
             TenantReadinessCheck::ROOT_ORGANIZATION,
             TenantReadinessCheck::PERMISSION_CATALOGUE,
             TenantReadinessCheck::SUPER_ADMIN_ACCESS,
@@ -271,7 +259,6 @@ final class TenantReadinessService
     private function owner(string $check): string
     {
         return match ($check) {
-            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'Platform deployment',
             TenantReadinessCheck::ROOT_ORGANIZATION => 'Organization Unit',
             TenantReadinessCheck::PERMISSION_CATALOGUE,
             TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'User access',
@@ -289,7 +276,6 @@ final class TenantReadinessService
     private function action(string $check): string
     {
         return match ($check) {
-            TenantReadinessCheck::SCHEMA_COMPATIBLE => 'Apply the reviewed migrations and deploy matching application assets.',
             TenantReadinessCheck::ROOT_ORGANIZATION => 'Repair and recheck tenant foundation provisioning.',
             TenantReadinessCheck::PERMISSION_CATALOGUE => 'Synchronize the tenant permission catalogue.',
             TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'Repair the fully granted Super Admin role.',
@@ -324,36 +310,6 @@ final class TenantReadinessService
                 'mode' => TenantRoutingReadinessPolicy::MODE_UNAVAILABLE,
                 'message' => 'Tenant routing cannot be evaluated.',
             ],
-            'schema' => $this->schemaCompatibility->inspect(),
-            'infrastructure' => $this->infrastructureCapabilities->inspect(),
-        ];
-    }
-
-    /**
-     * @param array{compatible:bool,missing_tables:list<string>,missing_columns:array<string,list<string>>} $schema
-     * @return array<string, mixed>
-     */
-    private function schemaBlocked(int $tenantId, array $schema): array
-    {
-        return [
-            'ready' => false,
-            'tenant_id' => $tenantId,
-            'onboarding_status' => TenantOnboardingStatus::PENDING,
-            'checks' => [TenantReadinessCheck::SCHEMA_COMPATIBLE => false],
-            'blockers' => [[
-                'code' => 'SCHEMA_INCOMPATIBLE',
-                'stage' => 'deployment',
-                'owner' => 'Platform deployment',
-                'action' => 'Apply the reviewed migrations and deploy matching backend and frontend assets.',
-                'message' => TenantReadinessCheck::messages()[TenantReadinessCheck::SCHEMA_COMPATIBLE],
-                'context' => $schema,
-            ]],
-            'routing' => [
-                'ready' => false,
-                'mode' => TenantRoutingReadinessPolicy::MODE_UNAVAILABLE,
-                'message' => 'Tenant routing is not evaluated until the schema is compatible.',
-            ],
-            'schema' => $schema,
             'infrastructure' => $this->infrastructureCapabilities->inspect(),
         ];
     }

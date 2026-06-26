@@ -22,12 +22,10 @@ use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Constants\TenantSubscriptionEventType;
 use Modules\Tenant\Constants\TenantSubscriptionOperation;
-use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
-use Modules\Tenant\Services\Platform\TenantSchemaCompatibilityService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
@@ -46,7 +44,8 @@ final class TenantSubscriptionLifecycleService
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errors,
         private readonly ClockInterface $clock,
-        private readonly TenantSchemaCompatibilityService $schemaCompatibility,
+        private readonly TenantSubscriptionCommandInput $commandInput,
+        private readonly TenantSubscriptionMutationPolicy $mutationPolicy,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -77,10 +76,6 @@ final class TenantSubscriptionLifecycleService
     /** @param array<string, mixed> $payload */
     public function cancel(int $tenantId, array $payload): Result
     {
-        if (($schemaFailure = $this->schemaFailure()) !== null) {
-            return $schemaFailure;
-        }
-
         try {
             $expectedTenantVersion = $this->positiveInt($payload['expected_tenant_version'] ?? null);
             $expectedPointerVersion = $this->positiveInt($payload['expected_subscription_version'] ?? null);
@@ -105,6 +100,7 @@ final class TenantSubscriptionLifecycleService
                     if ($tenant === null || (int) $tenant->require('row_version') !== $expectedTenantVersion) {
                         return null;
                     }
+                    $this->mutationPolicy->assertTenantCanMutate($tenant);
 
                     $current = $this->subscriptions->findCurrentByTenant($tenantId, true);
                     if (
@@ -158,10 +154,6 @@ final class TenantSubscriptionLifecycleService
     /** @param array<string, mixed> $payload */
     private function createRevision(string $operation, int $tenantId, array $payload): Result
     {
-        if (($schemaFailure = $this->schemaFailure()) !== null) {
-            return $schemaFailure;
-        }
-
         try {
             $expectedTenantVersion = $this->positiveInt($payload['expected_tenant_version'] ?? null);
             $expectedPointerVersion = $this->positiveInt($payload['expected_subscription_version'] ?? null);
@@ -187,13 +179,14 @@ final class TenantSubscriptionLifecycleService
                     if ($tenant === null || (int) $tenant->require('row_version') !== $expectedTenantVersion) {
                         return ['conflict' => true];
                     }
+                    $this->mutationPolicy->assertTenantCanMutate($tenant);
 
                     $current = $this->subscriptions->findCurrentByTenant($tenantId, true);
-                    if (! $this->operationAllowed($operation, $current, $expectedPointerVersion)) {
+                    if (! $this->mutationPolicy->operationAllowed($operation, $current, $expectedPointerVersion)) {
                         return ['conflict' => true];
                     }
 
-                    $resolved = $this->resolveRevisionInput($operation, $payload, $current);
+                    $resolved = $this->commandInput->resolve($operation, $payload, $current);
                     $planRevision = $this->planRevisions->findById($resolved['plan_revision_id'], true);
                     if ($planRevision === null) {
                         throw new InvalidArgumentException('The selected tenant plan revision does not exist.');
@@ -290,125 +283,6 @@ final class TenantSubscriptionLifecycleService
         }
     }
 
-    private function operationAllowed(string $operation, ?DataRecord $current, ?int $expectedPointerVersion): bool
-    {
-        if ($operation === TenantSubscriptionOperation::ASSIGN) {
-            return $current === null
-                ? $expectedPointerVersion === null
-                : $expectedPointerVersion === (int) $current->get('row_version', 0)
-                    && in_array($current->get('current_state'), [
-                        TenantCurrentSubscriptionState::CANCELLED,
-                        TenantCurrentSubscriptionState::EXPIRED,
-                    ], true);
-        }
-
-        return $current !== null
-            && $expectedPointerVersion !== null
-            && $expectedPointerVersion === (int) $current->get('row_version', 0)
-            && $current->get('current_state') === TenantCurrentSubscriptionState::ASSIGNED;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return array{plan_revision_id:int,contract_status:string,period:array{starts_at:string,trial_ends_at:?string,ends_at:?string}}
-     */
-    private function resolveRevisionInput(string $operation, array $payload, ?DataRecord $current): array
-    {
-        if ($operation === TenantSubscriptionOperation::EXTEND) {
-            if ($current === null) {
-                throw new InvalidArgumentException('A current subscription is required before it can be extended.');
-            }
-            $newEnd = $this->dateTime($payload['ends_at'] ?? null);
-            $currentEnd = $this->dateTime($current->get('ends_at'));
-            if ($newEnd === null || ($currentEnd !== null && $newEnd <= $currentEnd)) {
-                throw new InvalidArgumentException('The extended end date must be later than the current end date.');
-            }
-
-            return [
-                'plan_revision_id' => (int) $current->require('tenant_plan_revision_id'),
-                'contract_status' => (string) $current->require('contract_status'),
-                'period' => [
-                    'starts_at' => $this->dateTime($current->require('starts_at'))?->format('Y-m-d H:i:s')
-                        ?? throw new InvalidArgumentException('Current subscription start date is invalid.'),
-                    'trial_ends_at' => $this->dateTime($current->get('trial_ends_at'))?->format('Y-m-d H:i:s'),
-                    'ends_at' => $newEnd->format('Y-m-d H:i:s'),
-                ],
-            ];
-        }
-
-        $planRevisionId = $this->positiveInt($payload['tenant_plan_revision_id'] ?? null);
-        if ($planRevisionId === null) {
-            throw new InvalidArgumentException('Select a tenant plan revision.');
-        }
-        $contractStatus = strtolower(trim((string) ($payload['contract_status'] ?? '')));
-        if (! in_array($contractStatus, TenantSubscriptionStatus::assignable(), true)) {
-            throw new InvalidArgumentException('Subscription contract status must be trial or active.');
-        }
-
-        $defaultStart = null;
-        if ($operation === TenantSubscriptionOperation::RENEW) {
-            if ($current === null) {
-                throw new InvalidArgumentException('A current subscription is required before it can be renewed.');
-            }
-            $defaultStart = $this->dateTime($current->get('ends_at'))
-                ?? $this->dateTime($current->get('trial_ends_at'));
-            if ($defaultStart === null) {
-                throw new InvalidArgumentException('An open-ended subscription cannot be renewed; correct or cancel it first.');
-            }
-        }
-
-        return [
-            'plan_revision_id' => $planRevisionId,
-            'contract_status' => $contractStatus,
-            'period' => $this->period($payload, $contractStatus, $defaultStart, $operation),
-        ];
-    }
-
-    /** @param array<string, mixed> $payload @return array{starts_at:string,trial_ends_at:?string,ends_at:?string} */
-    private function period(
-        array $payload,
-        string $contractStatus,
-        ?DateTimeImmutable $defaultStart,
-        string $operation,
-    ): array
-    {
-        $startsAt = $this->dateTime($payload['starts_at'] ?? null) ?? $defaultStart ?? $this->clock->now();
-        if (
-            $operation === TenantSubscriptionOperation::RENEW
-            && $defaultStart !== null
-            && $startsAt < $defaultStart
-        ) {
-            throw new InvalidArgumentException(
-                'A renewal cannot begin before the current subscription period ends.',
-            );
-        }
-
-        $trialEndsAt = $this->dateTime($payload['trial_ends_at'] ?? null);
-        $endsAt = $this->dateTime($payload['ends_at'] ?? null);
-
-        if ($contractStatus === TenantSubscriptionStatus::TRIAL && $trialEndsAt === null) {
-            throw new InvalidArgumentException('A trial end date is required for a trial subscription.');
-        }
-        if ($contractStatus === TenantSubscriptionStatus::ACTIVE) {
-            $trialEndsAt = null;
-        }
-        if ($trialEndsAt !== null && $trialEndsAt <= $startsAt) {
-            throw new InvalidArgumentException('Trial end date must be later than the subscription start date.');
-        }
-        if ($endsAt !== null && $endsAt <= $startsAt) {
-            throw new InvalidArgumentException('Subscription end date must be later than the subscription start date.');
-        }
-        if ($trialEndsAt !== null && $endsAt !== null && $endsAt < $trialEndsAt) {
-            throw new InvalidArgumentException('Subscription end date cannot be earlier than the trial end date.');
-        }
-
-        return [
-            'starts_at' => $startsAt->format('Y-m-d H:i:s'),
-            'trial_ends_at' => $trialEndsAt?->format('Y-m-d H:i:s'),
-            'ends_at' => $endsAt?->format('Y-m-d H:i:s'),
-        ];
-    }
-
     private function assertPlanRevisionAvailable(DataRecord $revision, string $startsAt): void
     {
         $plan = is_array($revision->get('plan')) ? $revision->get('plan') : [];
@@ -497,20 +371,6 @@ final class TenantSubscriptionLifecycleService
         $value = is_scalar($value) ? trim((string) $value) : '';
 
         return $value === '' ? null : mb_substr($value, 0, 500);
-    }
-
-    private function schemaFailure(): ?Result
-    {
-        $schema = $this->schemaCompatibility->inspect();
-        if ($schema['compatible']) {
-            return null;
-        }
-
-        return Result::failure(new Error(
-            TenantErrorCode::SCHEMA_INCOMPATIBLE,
-            'The deployed database schema is not compatible with tenant subscription management.',
-            $schema,
-        ));
     }
 
     private function failure(Throwable $exception, string $operation, int $tenantId): Result

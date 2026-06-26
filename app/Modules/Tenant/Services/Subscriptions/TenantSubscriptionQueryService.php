@@ -11,7 +11,6 @@ use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
-use Modules\Tenant\Services\Platform\TenantSchemaCompatibilityService;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -21,7 +20,6 @@ final class TenantSubscriptionQueryService
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSubscriptionRepositoryInterface $subscriptions,
         private readonly TenantExecutionContextInterface $executionContext,
-        private readonly TenantSchemaCompatibilityService $schema,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -43,15 +41,6 @@ final class TenantSubscriptionQueryService
     {
         if ($this->tenants->findById($tenantId) === null) {
             return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
-        }
-
-        $schema = $this->schema->inspect();
-        if (! $schema['compatible']) {
-            return Result::failure(new Error(
-                TenantErrorCode::SCHEMA_INCOMPATIBLE,
-                'The deployed database schema is not compatible with tenant subscription management.',
-                $schema,
-            ));
         }
 
         try {

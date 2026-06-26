@@ -12,6 +12,7 @@ import { PlatformOperatorRoute } from "@/modules/auth/PlatformOperatorRoute";
 import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 import { RouteErrorPage } from "./errors/RouteErrorPage";
+import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const InitialAdministratorInvitationPage = lazy(() => import("@/modules/auth/InitialAdministratorInvitationPage"));
@@ -545,7 +546,15 @@ const appRouter = createBrowserRouter(
                         />
                         <Route
                             path="/administration/tenant"
-                            element={<TenantWorkspacePage />}
+                            element={(
+                                <PermissionRoute anyOf={[
+                                    tenantPermissions.profileView,
+                                    tenantPermissions.domainsView,
+                                    tenantPermissions.documentsView,
+                                ]}>
+                                    <TenantWorkspacePage />
+                                </PermissionRoute>
+                            )}
                         />
                         <Route path="/uoms" element={<UomListPage />} />
                         <Route path="/uoms/create" element={<UomCreatePage />} />
