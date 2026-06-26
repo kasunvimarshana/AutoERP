@@ -20,12 +20,15 @@ use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Exceptions\DomainException;
 use Modules\Core\Http\Middleware\CurrentOrganizationUnitMiddleware;
 use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\CurrentUserMiddleware;
 use Modules\Core\Http\Middleware\EnsureApiErrorResponseMiddleware;
 use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
+use Modules\Core\Http\Middleware\ResolveCurrentTenantMiddleware;
+use Modules\Core\Http\Middleware\RequireCurrentTenantAccessMiddleware;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -47,6 +50,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             (string) env('CORE_CURRENT_USER_MIDDLEWARE_ALIAS', 'current.user') => CurrentUserMiddleware::class,
             (string) env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant') => CurrentTenantMiddleware::class,
+            (string) env('CORE_RESOLVE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'resolve.current-tenant') => ResolveCurrentTenantMiddleware::class,
+            (string) env('CORE_REQUIRE_CURRENT_TENANT_ACCESS_MIDDLEWARE_ALIAS', 'require.current-tenant-access') => RequireCurrentTenantAccessMiddleware::class,
             (string) env('CORE_CURRENT_ORGANIZATION_UNIT_MIDDLEWARE_ALIAS', 'current.organization-unit') => CurrentOrganizationUnitMiddleware::class,
         ]);
 
@@ -63,6 +68,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequestsWithRedis::class,
             AuthenticatesRequests::class,
             CurrentUserMiddleware::class,
+            ResolveCurrentTenantMiddleware::class,
+            RequireCurrentTenantAccessMiddleware::class,
             CurrentTenantMiddleware::class,
             CurrentOrganizationUnitMiddleware::class,
             SubstituteBindings::class,
@@ -107,14 +114,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 : null;
         });
 
-        $exceptions->render(function (InvalidArgumentException $exception, Request $request) use ($errorResponse) {
+        $exceptions->render(function (ConfigurationException $exception, Request $request) {
             if (! ($request->is('api/*') || $request->expectsJson())) {
                 return null;
             }
 
             report($exception);
 
-            return $errorResponse(422, 'The request contains an invalid value.');
+            return app(ApiErrorResponseFactory::class)->make(
+                'SERVICE_CONFIGURATION_INVALID',
+                'The authentication service is not configured correctly.',
+                503,
+                'infrastructure',
+            );
         });
 
         $exceptions->render(function (HttpResponseException $exception, Request $request) {

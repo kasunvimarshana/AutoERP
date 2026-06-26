@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Services\Security;
 
 use InvalidArgumentException;
+use Modules\Core\Exceptions\ConfigurationException;
 
 final readonly class OpaqueTokenCodec
 {
@@ -23,8 +24,8 @@ final readonly class OpaqueTokenCodec
         $applicationKey = $this->decodeApplicationKey(trim($applicationKey));
 
         if (strlen($applicationKey) < self::MINIMUM_APPLICATION_KEY_BYTES) {
-            throw new InvalidArgumentException(
-                'Application key is too short for Auth token derivation.',
+            throw new ConfigurationException(
+                'Application key is missing or too short for Auth token derivation.',
             );
         }
 

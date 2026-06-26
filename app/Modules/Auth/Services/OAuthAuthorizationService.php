@@ -30,7 +30,7 @@ final readonly class OAuthAuthorizationService
         private OpaqueTokenCodec $codec,
         private PasswordHasherInterface $passwords,
         private AuthSecurityConfig $config,
-        private TokenService $tokens,
+        private TenantTokenService $tokens,
     ) {}
 
     /**
@@ -161,7 +161,7 @@ final readonly class OAuthAuthorizationService
                     'row_version' => (int) $code->getAttribute('row_version') + 1,
                 ])->save();
 
-                return $this->tokens->issueTenantSessionTokens(
+                return $this->tokens->issueSessionTokens(
                     (int) $code->getAttribute('tenant_id'),
                     (int) $session->getKey(),
                     (int) $session->getAttribute('user_id'),

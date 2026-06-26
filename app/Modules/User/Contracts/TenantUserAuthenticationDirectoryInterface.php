@@ -12,6 +12,15 @@ interface TenantUserAuthenticationDirectoryInterface
     /** @return array{id:int,tenant_id:int,first_name:string,last_name:?string,email:string,username:?string,status:string,credentials_ready:bool}|null */
     public function findActiveTenantById(int $tenantId, int $userId): ?array;
 
+    /**
+     * Resolve and lock the organization-unit membership used for a new login session.
+     */
+    public function resolveLoginOrganizationUnit(
+        int $tenantId,
+        int $userId,
+        ?int $requestedOrganizationUnitId,
+    ): ?int;
+
     /** @return list<int> */
     public function defaultOrganizationUnitIds(int $tenantId, int $userId): array;
 

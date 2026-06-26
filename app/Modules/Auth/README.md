@@ -28,7 +28,24 @@ Platform-operator credential + MFA -> platform session
 -> platform access/refresh token family
 ```
 
-A token prefix selects the realm-specific validator. A tenant token cannot authenticate a platform route, and a platform token cannot authenticate a tenant route.
+A token prefix selects the realm-specific validator. A tenant token cannot authenticate a platform route, and a platform token cannot authenticate a tenant route. Tenant and platform login services, profile builders, and user directories are resolved independently; a platform-only dependency failure cannot block tenant login and vice versa.
+
+## Login transaction boundary
+
+A successful login is one atomic application outcome:
+
+```text
+credential verification
+  -> locked organization access / MFA verification
+  -> session and token issuance
+  -> complete profile and permission readiness
+  -> successful login-attempt audit
+  -> commit
+```
+
+If any persistence or profile-readiness step fails, the transaction rolls back and no active session/token pair is retained. Expected authentication failures use the normalized `AuthFailure` response contract; infrastructure failures remain observable through the global correlation-ID error handler.
+
+Unauthenticated tenant login, refresh, and OAuth exchange use context-resolution middleware that validates the verified host without requiring an already authenticated user. Protected tenant routes additionally require token-to-tenant access matching.
 
 ## Session and token state machines
 
@@ -106,9 +123,15 @@ Generic token issuance, public token introspection, generic verification challen
 
 ## Operations
 
+`auth:readiness` verifies key material, database connectivity, required schema, cache read/write capability, critical container bindings, and both realm login/profile graphs before login traffic is enabled.
+
+`auth:incident {correlationId}` locates a support reference in local structured Laravel logs without exposing server logs through a browser endpoint.
+
 `auth:purge-expired` removes expired authorization codes, tokens, sessions, login-attempt history, invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
 
-Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, MFA, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback.
+Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, MFA, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback. Route-level throttling provides a coarse IP boundary; the service-level account/account-IP throttle is the authoritative credential-abuse policy. Both depend on the cache probe covered by `auth:readiness`.
+
+Platform operators are invitation-first identities. `AUTOERP_PLATFORM_ADMIN_EMAIL` can seed an invitation when explicitly enabled; no administrator password is accepted from environment configuration. The recipient establishes the credential and MFA through the guided invitation flow.
 
 ## Verification expectations
 

@@ -1,12 +1,21 @@
+import { useState } from 'react';
 import type { ApiError } from '@/shared/api/apiError';
 
 export function ErrorAlert({ error, title = 'Request failed' }: { error: ApiError | null; title?: string }) {
+    const [copiedReference, setCopiedReference] = useState<string | null>(null);
     if (!error) return null;
+
     const fieldMessages = Object.entries(error.fields).flatMap(([field, messages]) =>
         messages.map((message) => `${field.replaceAll('.', ' ')}: ${message}`),
     );
     const correlationId = stringDetail(error.details.correlation_id);
     const guidance = stringDetail(error.details.guidance);
+
+    async function copyReference() {
+        if (!correlationId || typeof navigator.clipboard?.writeText !== 'function') return;
+        await navigator.clipboard.writeText(correlationId);
+        setCopiedReference(correlationId);
+    }
 
     return (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
@@ -19,9 +28,12 @@ export function ErrorAlert({ error, title = 'Request failed' }: { error: ApiErro
                 </ul>
             ) : null}
             {correlationId ? (
-                <p className="mt-3 text-xs text-rose-700">
-                    Support reference: <span className="font-mono">{correlationId}</span>
-                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-rose-700">
+                    <span>Support reference: <span className="font-mono">{correlationId}</span></span>
+                    <button type="button" className="font-semibold underline" onClick={() => void copyReference()}>
+                        {copiedReference === correlationId ? 'Copied' : 'Copy'}
+                    </button>
+                </div>
             ) : null}
             {error.code ? <p className="mt-1 text-xs text-rose-700">Error code: {error.code}</p> : null}
         </div>

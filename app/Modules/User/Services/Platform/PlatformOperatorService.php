@@ -15,6 +15,7 @@ use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\Core\Authorization\PlatformPermission;
@@ -33,6 +34,7 @@ final class PlatformOperatorService
         private readonly PlatformOperatorModel $operators,
         private readonly PlatformPermissionModel $permissions,
         private readonly PlatformOperatorPermissionModel $assignments,
+        private readonly PlatformPermissionCheckerInterface $access,
         private readonly PlatformPermissionCatalogSynchronizer $catalogue,
         private readonly PlatformOperatorSessionRevokerInterface $sessions,
         private readonly PlatformOperatorCredentialProvisionerInterface $credentials,
@@ -132,7 +134,7 @@ final class PlatformOperatorService
                 $this->assertVersion($operator, $expectedVersion);
                 $before = $this->snapshot($operator);
 
-                if ($this->hasPermission($operatorId, PlatformPermission::OPERATORS_MANAGE)
+                if ($this->access->allows($operatorId, PlatformPermission::OPERATORS_MANAGE)
                     && ! in_array(PlatformPermission::OPERATORS_MANAGE, $permissionNames, true)
                     && $this->isLastActiveManager($operatorId)
                 ) {
@@ -184,7 +186,7 @@ final class PlatformOperatorService
                     if ($this->currentUser->currentUserId() === $operatorId) {
                         throw new AuthorizationException('You cannot deactivate your own platform account.');
                     }
-                    if ($this->hasPermission($operatorId, PlatformPermission::OPERATORS_MANAGE)
+                    if ($this->access->allows($operatorId, PlatformPermission::OPERATORS_MANAGE)
                         && $this->isLastActiveManager($operatorId)
                     ) {
                         throw new ConflictHttpException('The last active platform manager cannot be deactivated.');
@@ -260,7 +262,7 @@ final class PlatformOperatorService
                         }
 
                         if (
-                            $this->hasPermission($operatorId, PlatformPermission::OPERATORS_MANAGE)
+                            $this->access->allows($operatorId, PlatformPermission::OPERATORS_MANAGE)
                             && (string) $operator->getAttribute('status') === PlatformOperatorStatus::ACTIVE
                             && $this->isLastActiveManager($operatorId)
                         ) {
@@ -340,13 +342,6 @@ final class PlatformOperatorService
             ->whereHas('permission', fn (Builder $query) => $query
                 ->where('name', PlatformPermission::OPERATORS_MANAGE)->where('is_active', true))
             ->exists();
-    }
-
-    private function hasPermission(int $operatorId, string $permission): bool
-    {
-        return $this->assignments->newQuery()->where('platform_operator_id', $operatorId)
-            ->whereHas('permission', fn (Builder $query) => $query
-                ->where('name', $permission)->where('is_active', true))->exists();
     }
 
     /** @param list<string> $permissions */

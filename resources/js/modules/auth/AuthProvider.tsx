@@ -16,7 +16,6 @@ import {
     clearStoredAuthSession,
     commitAuthSession,
     getStoredApiContext,
-    setTransientAccessToken,
 } from '@/shared/api/authSessionStorage';
 import type { AuthMode } from '@/shared/api/authSessionStorage';
 import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
@@ -174,39 +173,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const login = useCallback(async (payload: LoginPayload) => {
         setIsLoading(true);
         setBootstrapError(null);
-        let issuedToken: string | null = null;
-
         try {
             const session = await authApi.login({
                 ...payload,
                 device_name: payload.device_name ?? window.navigator.userAgent.slice(0, 160),
             });
-            issuedToken = session.token.trim();
+            const issuedToken = session.token.trim();
             if (issuedToken === '') {
                 throw new ApiError('Login response did not include an access token.', 502, 'INVALID_LOGIN_RESPONSE', 'infrastructure');
             }
 
-            setTransientAccessToken(issuedToken);
-            const current = await authApi.me(payload.auth_mode);
             commitSession({
                 token: issuedToken,
-                user: current.user,
-                tenant: current.tenant,
-                organizationUnit: current.organization_unit,
-                roles: current.roles ?? current.user.roles ?? [],
-                permissions: current.permissions ?? current.user.permissions ?? [],
-                enabledModules: current.enabled_modules ?? null,
-                isPlatformOperator: current.is_platform_operator ?? current.user.is_platform_operator ?? false,
+                user: session.user,
+                tenant: session.tenant,
+                organizationUnit: session.organization_unit,
+                roles: session.roles ?? session.user.roles ?? [],
+                permissions: session.permissions ?? session.user.permissions ?? [],
+                enabledModules: session.enabled_modules ?? null,
+                isPlatformOperator: session.is_platform_operator ?? session.user.is_platform_operator ?? false,
                 authMode: payload.auth_mode,
             });
         } catch (error: unknown) {
-            if (issuedToken) {
-                try {
-                    await authApi.logout(payload.auth_mode);
-                } catch {
-                    // The local transaction still rolls back; the access token expires server-side.
-                }
-            }
             clearAuthState();
             throw toApiError(error);
         } finally {
@@ -332,7 +320,7 @@ const DEFINITIVE_SESSION_ERROR_CODES = new Set([
 ]);
 
 export function isDefinitiveSessionFailure(error: ApiError): boolean {
-    return error.status === 401
+    return [401, 403, 404].includes(error.status ?? 0)
         || (error.code !== null && DEFINITIVE_SESSION_ERROR_CODES.has(error.code));
 }
 

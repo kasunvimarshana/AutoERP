@@ -11,21 +11,22 @@ use Modules\Auth\DTOs\ClientContext;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Http\Requests\PlatformLoginRequest;
 use Modules\Auth\Http\Requests\PlatformRefreshTokenRequest;
-use Modules\Auth\Http\Resources\AuthPayloadResource;
-use Modules\Auth\Services\AuthProfileService;
+use Modules\Auth\Http\Responses\AuthResponseFactory;
 use Modules\Auth\Services\PlatformAuthenticationService;
+use Modules\Auth\Services\PlatformAuthProfileBuilder;
 use Modules\Auth\Services\PlatformRefreshTokenCookie;
-use Modules\Auth\Services\TokenService;
+use Modules\Auth\Services\PlatformTokenService;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 
 final class PlatformAuthController extends Controller
 {
     public function __construct(
         private readonly PlatformAuthenticationService $authentication,
-        private readonly TokenService $tokens,
+        private readonly PlatformTokenService $tokens,
         private readonly PlatformRefreshTokenCookie $cookie,
-        private readonly AuthProfileService $profiles,
+        private readonly PlatformAuthProfileBuilder $profiles,
         private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly AuthResponseFactory $responses,
     ) {}
 
     public function login(PlatformLoginRequest $request): JsonResponse
@@ -44,9 +45,9 @@ final class PlatformAuthController extends Controller
                 ),
             );
 
-            return $this->respondWithRefreshCookie($this->completePlatformPayload($payload));
+            return $this->withRefreshCookie($payload);
         } catch (AuthFailure $failure) {
-            return $this->failure($failure);
+            return $this->responses->failure($failure);
         }
     }
 
@@ -54,7 +55,7 @@ final class PlatformAuthController extends Controller
     {
         $refreshToken = $this->cookie->read($request);
         if ($refreshToken === null) {
-            return $this->failure(new AuthFailure(
+            return $this->responses->failure(new AuthFailure(
                 AuthErrorCode::TOKEN_INVALID,
                 'Refresh session is not available.',
                 401,
@@ -62,41 +63,57 @@ final class PlatformAuthController extends Controller
         }
 
         try {
-            return $this->respondWithRefreshCookie($this->completePlatformPayload([
-                'tokens' => $this->tokens->refreshPlatform($refreshToken),
-            ]));
+            $tokens = $this->tokens->refresh($refreshToken);
+            $accessToken = $this->accessToken($tokens);
+            $payload = array_merge(
+                ['tokens' => $tokens],
+                $this->profiles->build($this->tokens->validateAccessToken($accessToken)),
+            );
+
+            return $this->withRefreshCookie($payload);
         } catch (AuthFailure $failure) {
-            return $this->cookie->forget($this->failure($failure));
+            return $this->cookie->forget($this->responses->failure($failure));
         }
     }
 
     public function me(): JsonResponse
     {
         try {
-            return $this->payloadResponse(
-                $this->profiles->platform($this->currentUser->requireCurrent()->tokenPayload()),
+            return $this->responses->payload(
+                $this->profiles->build($this->currentUser->requireCurrent()->tokenPayload()),
             );
         } catch (AuthFailure $failure) {
-            return $this->failure($failure);
+            return $this->responses->failure($failure);
         }
     }
 
     public function logout(): JsonResponse
     {
         $payload = $this->currentUser->requireCurrent()->tokenPayload();
-        $this->tokens->revokePlatformSession(
+        $this->tokens->revokeSession(
             (int) $payload['session_id'],
             (int) $payload['platform_operator_id'],
             'Platform operator signed out.',
         );
 
-        return $this->cookie->forget($this->noStore(response()->json(['success' => true])));
+        return $this->cookie->forget($this->responses->success());
     }
 
-    /** @param array<string,mixed> $payload @return array<string,mixed> */
-    private function completePlatformPayload(array $payload): array
+    /** @param array<string,mixed> $payload */
+    private function withRefreshCookie(array $payload): JsonResponse
     {
-        $accessToken = (string) ($payload['tokens']['access_token'] ?? '');
+        $response = $this->responses->payload($payload);
+        $refreshToken = $this->cookie->extract($payload);
+
+        return $refreshToken === null
+            ? $response
+            : $this->cookie->attach($response, $refreshToken, $this->cookie->extractExpiry($payload));
+    }
+
+    /** @param array<string,mixed> $tokens */
+    private function accessToken(array $tokens): string
+    {
+        $accessToken = trim((string) ($tokens['access_token'] ?? ''));
         if ($accessToken === '') {
             throw new AuthFailure(
                 AuthErrorCode::TOKEN_INVALID,
@@ -105,44 +122,6 @@ final class PlatformAuthController extends Controller
             );
         }
 
-        return array_merge($payload, $this->profiles->platform(
-            $this->tokens->validateAccessToken($accessToken),
-        ));
-    }
-
-    /** @param array<string,mixed> $payload */
-    private function respondWithRefreshCookie(array $payload): JsonResponse
-    {
-        $response = $this->payloadResponse($payload);
-        $refreshToken = $this->cookie->extract($payload);
-
-        return $refreshToken === null
-            ? $response
-            : $this->cookie->attach($response, $refreshToken, $this->cookie->extractExpiry($payload));
-    }
-
-    /** @param array<string,mixed> $payload */
-    private function payloadResponse(array $payload): JsonResponse
-    {
-        return $this->noStore(response()->json(
-            (new AuthPayloadResource($payload))->resolve(request()),
-        ));
-    }
-
-    private function failure(AuthFailure $failure): JsonResponse
-    {
-        return $this->noStore(response()->json([
-            'message' => $failure->getMessage(),
-            'code' => $failure->errorCode,
-            'details' => $failure->details,
-        ], $failure->httpStatus));
-    }
-
-    private function noStore(JsonResponse $response): JsonResponse
-    {
-        $response->headers->set('Cache-Control', 'no-store, private');
-        $response->headers->set('Pragma', 'no-cache');
-
-        return $response;
+        return $accessToken;
     }
 }

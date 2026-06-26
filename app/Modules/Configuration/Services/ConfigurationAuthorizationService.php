@@ -77,7 +77,7 @@ final class ConfigurationAuthorizationService
         $userId = $this->currentUser->currentUserId();
 
         return $userId !== null
-            && $this->platformPermissions->hasPermission($userId, $permission);
+            && $this->platformPermissions->allows($userId, $permission);
     }
 
     private function allowsTenantPermission(string $permission): bool

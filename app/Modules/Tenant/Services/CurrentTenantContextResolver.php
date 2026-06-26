@@ -47,6 +47,11 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
 
         $selectedContext = $this->fromSelectionHeaders($request, $applicationId);
+        if ($selectedContext !== null && $hostContext === null && ! app()->environment(['local', 'testing'])) {
+            throw new CurrentTenantContextResolutionException(
+                'Tenant selection headers are accepted only with a matching verified tenant host.',
+            );
+        }
         if ($hostContext !== null && $selectedContext !== null && $hostContext->tenantId() !== $selectedContext->tenantId()) {
             throw new CurrentTenantContextResolutionException('The requested host and selected tenant do not match.');
         }

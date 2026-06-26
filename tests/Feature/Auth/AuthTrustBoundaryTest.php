@@ -69,16 +69,42 @@ final class AuthTrustBoundaryTest extends TestCase
         }
     }
 
-    public function test_token_lifecycle_is_split_by_realm_and_the_facade_stays_small(): void
+
+    public function test_public_tenant_auth_resolves_workspace_without_requiring_a_preexisting_session(): void
     {
-        $facadePath = $this->root.'/app/Modules/Auth/Services/TokenService.php';
-        $facade = (string) file_get_contents($facadePath);
+        $routes = $this->source('app/Modules/Auth/Routes/api.php');
+
+        self::assertStringContainsString("'core.current_tenant.resolver_middleware_alias'", $routes);
+        self::assertStringContainsString("'core.current_tenant.access_middleware_alias'", $routes);
+        self::assertStringContainsString("->middleware(['api', $resolveCurrentTenant])", $routes);
+        self::assertStringContainsString('$requireCurrentTenantAccess,', $routes);
+    }
+
+    public function test_token_validation_router_is_small_and_token_lifecycle_is_realm_owned(): void
+    {
+        $routerPath = $this->root.'/app/Modules/Auth/Services/AccessTokenRouter.php';
+        $router = (string) file_get_contents($routerPath);
 
         self::assertFileExists($this->root.'/app/Modules/Auth/Services/TenantTokenService.php');
         self::assertFileExists($this->root.'/app/Modules/Auth/Services/PlatformTokenService.php');
-        self::assertStringContainsString('TenantTokenService', $facade);
-        self::assertStringContainsString('PlatformTokenService', $facade);
-        self::assertLessThanOrEqual(130, count(file($facadePath) ?: []));
+        self::assertStringContainsString('TenantTokenService', $router);
+        self::assertStringContainsString('PlatformTokenService', $router);
+        self::assertStringContainsString('function validate(', $router);
+        self::assertStringNotContainsString('issueSessionTokens', $router);
+        self::assertStringNotContainsString('function refresh(', $router);
+        self::assertLessThanOrEqual(80, count(file($routerPath) ?: []));
+    }
+
+    public function test_tenant_and_platform_authentication_directories_are_separate(): void
+    {
+        self::assertFileExists($this->root.'/app/Modules/User/Services/Authentication/TenantUserAuthenticationDirectory.php');
+        self::assertFileExists($this->root.'/app/Modules/User/Services/Authentication/PlatformOperatorAuthenticationDirectory.php');
+        self::assertFileDoesNotExist($this->root.'/app/Modules/User/Services/Authentication/AuthenticationDirectory.php');
+
+        $tenantDirectory = $this->source('app/Modules/User/Services/Authentication/TenantUserAuthenticationDirectory.php');
+        $platformDirectory = $this->source('app/Modules/User/Services/Authentication/PlatformOperatorAuthenticationDirectory.php');
+        self::assertStringNotContainsString('PlatformPermissionCheckerInterface', $tenantDirectory);
+        self::assertStringNotContainsString('TenantUserAuthenticationDirectoryInterface', $platformDirectory);
     }
 
     public function test_auth_does_not_restore_the_generic_data_record_repository_stack(): void

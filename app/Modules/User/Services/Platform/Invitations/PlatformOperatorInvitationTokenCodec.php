@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Services\Platform\Invitations;
 
-use InvalidArgumentException;
+use Modules\Core\Exceptions\ConfigurationException;
 
 final readonly class PlatformOperatorInvitationTokenCodec
 {
@@ -18,7 +18,7 @@ final readonly class PlatformOperatorInvitationTokenCodec
             $applicationKey = is_string($decoded) ? $decoded : '';
         }
         if (strlen($applicationKey) < 32) {
-            throw new InvalidArgumentException('Application key is too short for platform invitation token derivation.');
+            throw new ConfigurationException('Application key is too short for platform invitation token derivation.');
         }
 
         $this->digestKey = hash_hkdf(

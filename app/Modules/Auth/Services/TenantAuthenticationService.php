@@ -14,16 +14,16 @@ use Modules\Auth\Enums\ProviderStatus;
 use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Models\AuthIdentityModel;
-use Modules\Auth\Models\AuthLoginAttemptModel;
 use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Models\AuthSessionModel;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
+use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
-use Modules\Auth\Services\Security\LoginThrottle;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\TenantUserAuthenticationDirectoryInterface;
+use Throwable;
 
 final readonly class TenantAuthenticationService
 {
@@ -36,8 +36,10 @@ final readonly class TenantAuthenticationService
         private TenantAuthenticationDirectoryInterface $tenants,
         private TenantUserAuthenticationDirectoryInterface $users,
         private PasswordCredentialService $credentials,
-        private LoginThrottle $throttle,
-        private TokenService $tokens,
+        private AccountLoginThrottle $throttle,
+        private TenantTokenService $tokens,
+        private TenantAuthProfileBuilder $profiles,
+        private LoginAttemptRecorder $attempts,
         private AuthSecurityConfig $config,
     ) {}
 
@@ -50,13 +52,18 @@ final readonly class TenantAuthenticationService
         ClientContext $client,
     ): array {
         $identifier = mb_strtolower(trim($identifier));
-        $failure = $this->invalidCredentials();
         $userId = null;
 
         if ($identifier === '' || $this->throttle->isBlocked(self::REALM, $identifier, $client->ipAddress)) {
             $this->credentials->verifyDummy($password);
-            $this->recordAttempt($tenantId, null, $identifier, false, 'rate_limited', $client);
-            throw $failure;
+            $this->attempts->recordTenantFailureBestEffort(
+                $tenantId,
+                null,
+                $identifier,
+                AuthErrorCode::RATE_LIMITED,
+                $client,
+            );
+            throw $this->invalidCredentials();
         }
 
         $tenant = $this->tenants->findActive($tenantId);
@@ -77,36 +84,59 @@ final readonly class TenantAuthenticationService
                 $this->credentials->verifyDummy($password);
             }
             $this->throttle->recordFailure(self::REALM, $identifier, $client->ipAddress);
-            $this->recordAttempt($tenantId, $userId, $identifier, false, AuthErrorCode::INVALID_CREDENTIALS, $client);
-            throw $failure;
+            $this->attempts->recordTenantFailureBestEffort(
+                $tenantId,
+                $userId,
+                $identifier,
+                AuthErrorCode::INVALID_CREDENTIALS,
+                $client,
+            );
+            throw $this->invalidCredentials();
         }
-
-        $organizationUnitId = $this->resolveOrganizationUnit(
-            $tenantId,
-            (int) $user['id'],
-            $requestedOrganizationUnitId,
-        );
 
         try {
             $payload = $this->executionContext->runForTenant($tenantId, fn (): array => $this->database->transaction(
-                function () use ($tenantId, $user, $organizationUnitId, $client): array {
+                function () use ($tenantId, $user, $requestedOrganizationUnitId, $identifier, $client): array {
+                    $organizationUnitId = $this->users->resolveLoginOrganizationUnit(
+                        $tenantId,
+                        (int) $user['id'],
+                        $requestedOrganizationUnitId,
+                    );
+                    if ($organizationUnitId === null) {
+                        throw new AuthFailure(
+                            AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                            $requestedOrganizationUnitId === null
+                                ? 'A valid default organization unit is required.'
+                                : 'The selected organization unit is unavailable.',
+                            $requestedOrganizationUnitId === null ? 409 : 422,
+                            ['stage' => 'organization_access'],
+                        );
+                    }
+
                     $provider = AuthProviderModel::query()
+                        ->where('tenant_id', $tenantId)
                         ->where('provider_key', (string) config('module-auth.internal_provider_key', 'internal'))
                         ->where('status', ProviderStatus::ACTIVE->value)
                         ->lockForUpdate()
                         ->first();
                     if (! $provider instanceof AuthProviderModel) {
-                        throw new AuthFailure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Authentication is unavailable.', 503);
+                        throw new AuthFailure(
+                            AuthErrorCode::PROVIDER_NOT_FOUND,
+                            'Authentication is temporarily unavailable.',
+                            503,
+                            ['stage' => 'authentication_provider'],
+                        );
                     }
 
                     $identity = AuthIdentityModel::query()
+                        ->where('tenant_id', $tenantId)
                         ->where('provider_id', $provider->getKey())
                         ->where('user_id', (int) $user['id'])
                         ->where('status', IdentityStatus::ACTIVE->value)
                         ->lockForUpdate()
                         ->first();
                     if (! $identity instanceof AuthIdentityModel) {
-                        throw new AuthFailure(AuthErrorCode::INVALID_CREDENTIALS, 'The credentials are invalid.', 401);
+                        throw $this->invalidCredentials();
                     }
 
                     $now = $this->clock->now();
@@ -132,86 +162,72 @@ final readonly class TenantAuthenticationService
                         'row_version' => (int) $identity->getAttribute('row_version') + 1,
                     ])->save();
 
-                    return [
-                        'tokens' => $this->tokens->issueTenantSessionTokens(
-                            $tenantId,
-                            (int) $session->getKey(),
-                            (int) $user['id'],
-                            null,
-                            ['tenant'],
-                            GrantType::TENANT_PASSWORD,
-                        ),
+                    $tokens = $this->tokens->issueSessionTokens(
+                        $tenantId,
+                        (int) $session->getKey(),
+                        (int) $user['id'],
+                        null,
+                        ['tenant'],
+                        GrantType::TENANT_PASSWORD,
+                    );
+                    $profile = $this->profiles->build([
+                        'tenant_id' => $tenantId,
+                        'tenant_user_id' => (int) $user['id'],
+                        'organization_unit_id' => $organizationUnitId,
+                    ]);
+
+                    $this->attempts->recordTenant(
+                        $tenantId,
+                        (int) $user['id'],
+                        $identifier,
+                        true,
+                        null,
+                        $client,
+                    );
+
+                    return array_merge([
+                        'tokens' => $tokens,
                         'session' => [
                             'id' => (string) $session->getAttribute('public_id'),
                             'expires_at' => $session->getAttribute('expires_at')?->format(DATE_ATOM),
                         ],
-                    ];
+                    ], $profile);
                 },
                 3,
             ));
         } catch (AuthFailure $exception) {
             $this->throttle->recordFailure(self::REALM, $identifier, $client->ipAddress);
-            $this->recordAttempt($tenantId, $userId, $identifier, false, $exception->errorCode, $client);
+            $this->attempts->recordTenantFailureBestEffort(
+                $tenantId,
+                $userId,
+                $identifier,
+                $exception->errorCode,
+                $client,
+            );
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->attempts->recordTenantFailureBestEffort(
+                $tenantId,
+                $userId,
+                $identifier,
+                AuthErrorCode::INFRASTRUCTURE_FAILURE,
+                $client,
+            );
             throw $exception;
         }
 
         $this->throttle->clearSuccessful(self::REALM, $identifier, $client->ipAddress);
-        $this->recordAttempt($tenantId, (int) $user['id'], $identifier, true, null, $client);
 
         return $payload;
     }
 
-    private function resolveOrganizationUnit(int $tenantId, int $userId, ?int $requested): int
-    {
-        if ($requested !== null) {
-            if (! $this->users->canAccessOrganizationUnit($tenantId, $userId, $requested)) {
-                throw new AuthFailure(
-                    AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
-                    'The selected organization unit is unavailable.',
-                    422,
-                );
-            }
-            return $requested;
-        }
-
-        $defaults = $this->users->defaultOrganizationUnitIds($tenantId, $userId);
-        if (count($defaults) !== 1 || ! $this->users->canAccessOrganizationUnit($tenantId, $userId, $defaults[0])) {
-            throw new AuthFailure(
-                AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
-                'A valid default organization unit is required.',
-                409,
-            );
-        }
-
-        return $defaults[0];
-    }
-
-    private function recordAttempt(
-        int $tenantId,
-        ?int $userId,
-        string $identifier,
-        bool $successful,
-        ?string $failureCode,
-        ClientContext $client,
-    ): void {
-        try {
-            $this->executionContext->runForTenant($tenantId, fn () => AuthLoginAttemptModel::query()->create([
-                'tenant_id' => $tenantId,
-                'user_id' => $userId,
-                'login_identifier_hash' => hash_hmac('sha256', $identifier, (string) config('app.key')),
-                'was_successful' => $successful,
-                'failure_code' => $failureCode,
-                'ip_address' => $client->ipAddress,
-                'user_agent' => $client->userAgent,
-                'attempted_at' => $this->clock->now(),
-            ]));
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
-    }
-
     private function invalidCredentials(): AuthFailure
     {
-        return new AuthFailure(AuthErrorCode::INVALID_CREDENTIALS, 'The credentials are invalid.', 401);
+        return new AuthFailure(
+            AuthErrorCode::INVALID_CREDENTIALS,
+            'The credentials are invalid.',
+            401,
+            ['stage' => 'credentials'],
+        );
     }
 }

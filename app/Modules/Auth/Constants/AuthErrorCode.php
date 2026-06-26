@@ -8,6 +8,10 @@ final class AuthErrorCode
 {
     public const INVALID_CREDENTIALS = 'AUTH_INVALID_CREDENTIALS';
 
+    public const RATE_LIMITED = 'AUTH_RATE_LIMITED';
+
+    public const INFRASTRUCTURE_FAILURE = 'AUTH_INFRASTRUCTURE_FAILURE';
+
     public const PROVIDER_NOT_FOUND = 'AUTH_PROVIDER_NOT_FOUND';
 
     public const USER_INACTIVE = 'AUTH_USER_INACTIVE';

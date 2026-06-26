@@ -10,16 +10,16 @@ use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\DTOs\ClientContext;
 use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Exceptions\AuthFailure;
-use Modules\Auth\Models\AuthPlatformLoginAttemptModel;
 use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
 use Modules\Auth\Services\Mfa\PlatformMfaPolicy;
 use Modules\Auth\Services\Mfa\PlatformMfaService;
+use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
-use Modules\Auth\Services\Security\LoginThrottle;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
+use Throwable;
 
 final readonly class PlatformAuthenticationService
 {
@@ -33,8 +33,10 @@ final readonly class PlatformAuthenticationService
         private PasswordCredentialService $credentials,
         private PlatformMfaService $mfa,
         private PlatformMfaPolicy $mfaPolicy,
-        private LoginThrottle $throttle,
-        private TokenService $tokens,
+        private AccountLoginThrottle $throttle,
+        private PlatformTokenService $tokens,
+        private PlatformAuthProfileBuilder $profiles,
+        private LoginAttemptRecorder $attempts,
         private AuthSecurityConfig $config,
     ) {}
 
@@ -47,11 +49,15 @@ final readonly class PlatformAuthenticationService
         ClientContext $client,
     ): array {
         $email = mb_strtolower(trim($email));
-        $operator = null;
 
         if ($email === '' || $this->throttle->isBlocked(self::REALM, $email, $client->ipAddress)) {
             $this->credentials->verifyDummy($password);
-            $this->recordAttempt(null, $email, false, 'rate_limited', $client);
+            $this->attempts->recordPlatformFailureBestEffort(
+                null,
+                $email,
+                AuthErrorCode::RATE_LIMITED,
+                $client,
+            );
             throw $this->invalidCredentials();
         }
 
@@ -68,7 +74,12 @@ final readonly class PlatformAuthenticationService
                 $this->credentials->verifyDummy($password);
             }
             $this->throttle->recordFailure(self::REALM, $email, $client->ipAddress);
-            $this->recordAttempt($operator === null ? null : (int) $operator['id'], $email, false, AuthErrorCode::INVALID_CREDENTIALS, $client);
+            $this->attempts->recordPlatformFailureBestEffort(
+                $operator === null ? null : (int) $operator['id'],
+                $email,
+                AuthErrorCode::INVALID_CREDENTIALS,
+                $client,
+            );
             throw $this->invalidCredentials();
         }
 
@@ -76,84 +87,125 @@ final readonly class PlatformAuthenticationService
         $mfaVerifiedAt = null;
         if ($this->mfaPolicy->isEnabled()) {
             if (! $this->mfa->isActive($operatorId)) {
-                throw new AuthFailure(
+                $enrollment = $this->mfa->issueForOperator($operatorId, $email);
+                $failure = new AuthFailure(
                     AuthErrorCode::MFA_ENROLLMENT_REQUIRED,
                     'Multi-factor authentication enrollment is required.',
                     409,
+                    array_merge(['stage' => 'mfa_enrollment'], $enrollment ?? []),
                 );
+                $this->attempts->recordPlatformFailureBestEffort(
+                    $operatorId,
+                    $email,
+                    $failure->errorCode,
+                    $client,
+                );
+                throw $failure;
             }
 
             if ($this->mfaPolicy->shouldChallengeLogin(true)) {
                 if ($totpCode === null && $backupCode === null) {
-                    throw new AuthFailure(AuthErrorCode::MFA_REQUIRED, 'A multi-factor authentication code is required.', 401);
+                    $failure = new AuthFailure(
+                        AuthErrorCode::MFA_REQUIRED,
+                        'A multi-factor authentication code is required.',
+                        401,
+                        ['stage' => 'mfa_challenge'],
+                    );
+                    $this->attempts->recordPlatformFailureBestEffort(
+                        $operatorId,
+                        $email,
+                        $failure->errorCode,
+                        $client,
+                    );
+                    throw $failure;
                 }
                 if (! $this->mfa->verify($operatorId, $totpCode, $backupCode)) {
                     $this->throttle->recordFailure(self::REALM, $email, $client->ipAddress);
-                    $this->recordAttempt($operatorId, $email, false, AuthErrorCode::MFA_INVALID_CODE, $client);
-                    throw new AuthFailure(AuthErrorCode::MFA_INVALID_CODE, 'The multi-factor authentication code is invalid.', 401);
+                    $this->attempts->recordPlatformFailureBestEffort(
+                        $operatorId,
+                        $email,
+                        AuthErrorCode::MFA_INVALID_CODE,
+                        $client,
+                    );
+                    throw new AuthFailure(
+                        AuthErrorCode::MFA_INVALID_CODE,
+                        'The multi-factor authentication code is invalid.',
+                        401,
+                        ['stage' => 'mfa_challenge'],
+                    );
                 }
                 $mfaVerifiedAt = $this->clock->now();
             }
         }
 
-        $payload = $this->executionContext->runAsControlPlane(fn (): array => $this->database->transaction(
-            function () use ($operatorId, $mfaVerifiedAt, $client): array {
-                $now = $this->clock->now();
-                $session = AuthPlatformSessionModel::query()->create([
-                    'public_id' => (string) Str::uuid(),
-                    'platform_operator_id' => $operatorId,
-                    'status' => SessionStatus::ACTIVE->value,
-                    'ip_address' => $client->ipAddress,
-                    'user_agent' => $client->userAgent,
-                    'device_name' => $client->deviceName,
-                    'authenticated_at' => $now,
-                    'mfa_verified_at' => $mfaVerifiedAt,
-                    'last_activity_at' => $now,
-                    'expires_at' => $now->modify('+'.$this->config->platformSessionTtlSeconds.' seconds'),
-                    'row_version' => 1,
-                ]);
+        try {
+            $payload = $this->executionContext->runAsControlPlane(fn (): array => $this->database->transaction(
+                function () use ($operatorId, $mfaVerifiedAt, $email, $client): array {
+                    $now = $this->clock->now();
+                    $session = AuthPlatformSessionModel::query()->create([
+                        'public_id' => (string) Str::uuid(),
+                        'platform_operator_id' => $operatorId,
+                        'status' => SessionStatus::ACTIVE->value,
+                        'ip_address' => $client->ipAddress,
+                        'user_agent' => $client->userAgent,
+                        'device_name' => $client->deviceName,
+                        'authenticated_at' => $now,
+                        'mfa_verified_at' => $mfaVerifiedAt,
+                        'last_activity_at' => $now,
+                        'expires_at' => $now->modify('+'.$this->config->platformSessionTtlSeconds.' seconds'),
+                        'row_version' => 1,
+                    ]);
 
-                return [
-                    'tokens' => $this->tokens->issuePlatformSessionTokens((int) $session->getKey(), $operatorId),
-                    'session' => [
-                        'id' => (string) $session->getAttribute('public_id'),
-                        'expires_at' => $session->getAttribute('expires_at')?->format(DATE_ATOM),
-                    ],
-                ];
-            },
-            3,
-        ));
+                    $tokens = $this->tokens->issueSessionTokens((int) $session->getKey(), $operatorId);
+                    $profile = $this->profiles->build(['platform_operator_id' => $operatorId]);
+                    $this->attempts->recordPlatform(
+                        $operatorId,
+                        $email,
+                        true,
+                        null,
+                        $client,
+                    );
+
+                    return array_merge([
+                        'tokens' => $tokens,
+                        'session' => [
+                            'id' => (string) $session->getAttribute('public_id'),
+                            'expires_at' => $session->getAttribute('expires_at')?->format(DATE_ATOM),
+                        ],
+                    ], $profile);
+                },
+                3,
+            ));
+        } catch (AuthFailure $exception) {
+            $this->attempts->recordPlatformFailureBestEffort(
+                $operatorId,
+                $email,
+                $exception->errorCode,
+                $client,
+            );
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->attempts->recordPlatformFailureBestEffort(
+                $operatorId,
+                $email,
+                AuthErrorCode::INFRASTRUCTURE_FAILURE,
+                $client,
+            );
+            throw $exception;
+        }
 
         $this->throttle->clearSuccessful(self::REALM, $email, $client->ipAddress);
-        $this->recordAttempt($operatorId, $email, true, null, $client);
 
         return $payload;
     }
 
-    private function recordAttempt(
-        ?int $operatorId,
-        string $identifier,
-        bool $successful,
-        ?string $failureCode,
-        ClientContext $client,
-    ): void {
-        try {
-            $this->executionContext->runAsControlPlane(fn () => AuthPlatformLoginAttemptModel::query()->create([
-                'platform_operator_id' => $operatorId,
-                'login_identifier_hash' => hash_hmac('sha256', $identifier, (string) config('app.key')),
-                'was_successful' => $successful,
-                'failure_code' => $failureCode,
-                'ip_address' => $client->ipAddress,
-                'user_agent' => $client->userAgent,
-                'attempted_at' => $this->clock->now(),
-            ]));
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
-    }
-
     private function invalidCredentials(): AuthFailure
     {
-        return new AuthFailure(AuthErrorCode::INVALID_CREDENTIALS, 'The credentials are invalid.', 401);
+        return new AuthFailure(
+            AuthErrorCode::INVALID_CREDENTIALS,
+            'The credentials are invalid.',
+            401,
+            ['stage' => 'credentials'],
+        );
     }
 }

@@ -23,10 +23,14 @@ final class PlatformOperatorSeeder extends Seeder
         if (! $this->enabled()) {
             return;
         }
-        foreach (['platform_operators', 'platform_permissions', 'platform_operator_permissions'] as $table) {
-            if (! Schema::hasTable($table)) {
-                return;
-            }
+        if (! Schema::hasTable('platform_operators')) {
+            throw new RuntimeException('The platform_operators table must exist before platform operator seeding.');
+        }
+        if (! Schema::hasTable('platform_permissions')) {
+            throw new RuntimeException('The platform_permissions table must exist before platform operator seeding.');
+        }
+        if (! Schema::hasTable('platform_operator_permissions')) {
+            throw new RuntimeException('The platform_operator_permissions table must exist before platform operator seeding.');
         }
 
         $email = $this->requiredEmail();

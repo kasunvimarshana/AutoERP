@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services;
 
-use DateTimeInterface;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Str;
 use Modules\Auth\Constants\AuthErrorCode;
@@ -19,6 +18,7 @@ use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
 use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
+use Modules\Auth\Services\Security\TokenValueParser;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
@@ -32,6 +32,7 @@ final readonly class PlatformTokenService
         private ClockInterface $clock,
         private TenantExecutionContextInterface $executionContext,
         private PlatformOperatorAuthenticationDirectoryInterface $platformOperators,
+        private TokenValueParser $values,
     ) {}
 
     public function issueSessionTokens(int $sessionId, int $operatorId): array
@@ -64,7 +65,7 @@ final readonly class PlatformTokenService
     public function refresh(string $plainRefreshToken): array
     {
         $plainRefreshToken = trim($plainRefreshToken);
-        $key = $this->tokenKey($plainRefreshToken);
+        $key = $this->values->tokenKey($plainRefreshToken);
         $parsed = $this->codec->parse($plainRefreshToken, AuthTokenKeyPrefix::PLATFORM_REFRESH);
         if ($parsed === null) {
             throw $this->invalidToken();
@@ -91,7 +92,7 @@ final readonly class PlatformTokenService
                     );
                 }
 
-                if ($this->isExpired($refresh->getAttribute('expires_at'))) {
+                if ($this->values->isExpired($refresh->getAttribute('expires_at'))) {
                     $this->expirePlatformRefresh($refresh);
                     throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The refresh session has expired.', 401);
                 }
@@ -166,7 +167,7 @@ final readonly class PlatformTokenService
     public function validateAccessToken(string $plainToken): array
     {
         $plainToken = trim($plainToken);
-        $key = $this->tokenKey($plainToken);
+        $key = $this->values->tokenKey($plainToken);
         if (! str_starts_with($key, AuthTokenKeyPrefix::PLATFORM_ACCESS)) {
             throw $this->invalidToken();
         }
@@ -215,10 +216,10 @@ final readonly class PlatformTokenService
                 'application_id' => 'platform',
                 'scopes' => ['platform'],
                 'grant_type' => (string) $token->getAttribute('grant_type'),
-                'authenticated_at' => $this->atom($session->getAttribute('authenticated_at')),
-                'mfa_verified_at' => $this->atom($session->getAttribute('mfa_verified_at')),
-                'issued_at' => $this->atom($token->getAttribute('issued_at')),
-                'expires_at' => $this->atom($token->getAttribute('expires_at')),
+                'authenticated_at' => $this->values->atom($session->getAttribute('authenticated_at')),
+                'mfa_verified_at' => $this->values->atom($session->getAttribute('mfa_verified_at')),
+                'issued_at' => $this->values->atom($token->getAttribute('issued_at')),
+                'expires_at' => $this->values->atom($token->getAttribute('expires_at')),
             ];
         });
     }
@@ -233,12 +234,12 @@ final readonly class PlatformTokenService
         $now = $this->clock->now();
         $sessionExpiresAt = $session->getAttribute('expires_at');
         $accessExpiresAt = $now->modify('+'.$this->config->accessTokenTtlSeconds.' seconds');
-        if ($this->timestamp($sessionExpiresAt) < $accessExpiresAt->getTimestamp()) {
+        if ($this->values->timestamp($sessionExpiresAt) < $accessExpiresAt->getTimestamp()) {
             $accessExpiresAt = new \DateTimeImmutable($sessionExpiresAt->format(DATE_ATOM));
         }
 
         $refreshExpiresAt = $now->modify('+'.$this->config->refreshTokenTtlSeconds.' seconds');
-        if ($this->timestamp($sessionExpiresAt) < $refreshExpiresAt->getTimestamp()) {
+        if ($this->values->timestamp($sessionExpiresAt) < $refreshExpiresAt->getTimestamp()) {
             $refreshExpiresAt = new \DateTimeImmutable($sessionExpiresAt->format(DATE_ATOM));
         }
 
@@ -287,7 +288,7 @@ final readonly class PlatformTokenService
         if ($status !== TokenStatus::ACTIVE->value) {
             throw new AuthFailure(AuthErrorCode::TOKEN_REVOKED, 'The access token is no longer active.', 401);
         }
-        if ($this->isExpired($token->getAttribute('expires_at'))) {
+        if ($this->values->isExpired($token->getAttribute('expires_at'))) {
             throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The access token has expired.', 401);
         }
     }
@@ -297,7 +298,7 @@ final readonly class PlatformTokenService
         if ((string) $session->getAttribute('status') !== SessionStatus::ACTIVE->value) {
             throw $this->invalidSession();
         }
-        if ($this->isExpired($session->getAttribute('expires_at'))) {
+        if ($this->values->isExpired($session->getAttribute('expires_at'))) {
             throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The authentication session has expired.', 401);
         }
     }
@@ -388,7 +389,7 @@ final readonly class PlatformTokenService
 
     private function touchPlatformSession(AuthPlatformSessionModel $session): void
     {
-        $lastActivity = $this->timestamp($session->getAttribute('last_activity_at'));
+        $lastActivity = $this->values->timestamp($session->getAttribute('last_activity_at'));
         $now = $this->clock->now();
         if (($now->getTimestamp() - $lastActivity) < $this->config->activityTouchIntervalSeconds) {
             return;
@@ -404,45 +405,10 @@ final readonly class PlatformTokenService
             ]);
     }
 
-    private function tokenKey(string $plainToken): string
-    {
-        $parts = explode('.', trim($plainToken), 2);
-        if (count($parts) !== 2 || trim($parts[0]) === '' || trim($parts[1]) === '') {
-            throw $this->invalidToken();
-        }
 
-        return $parts[0];
-    }
 
-    private function isExpired(mixed $expiresAt): bool
-    {
-        return $expiresAt === null || $this->clock->now()->getTimestamp() >= $this->timestamp($expiresAt);
-    }
 
-    private function timestamp(mixed $value): int
-    {
-        if ($value instanceof DateTimeInterface) {
-            return $value->getTimestamp();
-        }
 
-        throw new AuthFailure(AuthErrorCode::TOKEN_INVALID, 'Authentication state is invalid.', 401);
-    }
-
-    private function atom(mixed $value): ?string
-    {
-        return $value instanceof DateTimeInterface ? $value->format(DATE_ATOM) : null;
-    }
-
-    private function positiveInt(mixed $value): ?int
-    {
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        $value = (int) $value;
-
-        return $value > 0 ? $value : null;
-    }
 
     private function runAsControlPlane(callable $callback): mixed
     {

@@ -20,7 +20,7 @@ final class PlatformAuditAuthorizationService
         $userId = $this->currentUser->currentUserId();
 
         return $userId !== null
-            && $this->permissions->hasPermission($userId, PlatformPermission::AUDIT_VIEW);
+            && $this->permissions->allows($userId, PlatformPermission::AUDIT_VIEW);
     }
 
     public function canViewSensitive(): bool
@@ -29,6 +29,6 @@ final class PlatformAuditAuthorizationService
 
         return $userId !== null
             && $this->canView()
-            && $this->permissions->hasPermission($userId, PlatformPermission::AUDIT_SENSITIVE_VIEW);
+            && $this->permissions->allows($userId, PlatformPermission::AUDIT_SENSITIVE_VIEW);
     }
 }

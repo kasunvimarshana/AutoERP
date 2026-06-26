@@ -68,7 +68,7 @@ async function performRefresh(): Promise<string> {
     try {
         const { data } = await refreshClient.post<RefreshResponse>(endpoint, undefined, {
             headers: {
-                ...(context.tenantId ? { 'X-Tenant-Id': String(context.tenantId) } : {}),
+                ...(context.authMode === 'tenant' && context.tenantId ? { 'X-Tenant-Id': String(context.tenantId) } : {}),
             },
         });
         const rawToken = typeof data.access_token === 'string' ? data.access_token : data.token;
@@ -207,6 +207,6 @@ function createCoordinatorId(): string {
 }
 
 function isTerminalRefreshFailure(error: ApiError): boolean {
-    return error.status === 401 || error.status === 403 || error.code === 'TOKEN_INVALID' || error.code === 'TOKEN_REVOKED';
+    return error.status === 401 || error.status === 403 || error.code === 'AUTH_TOKEN_INVALID' || error.code === 'AUTH_TOKEN_REVOKED';
 }
 

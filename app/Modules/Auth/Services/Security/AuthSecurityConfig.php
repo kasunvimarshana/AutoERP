@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services\Security;
 
-use LogicException;
+use Modules\Core\Exceptions\ConfigurationException;
 
 final readonly class AuthSecurityConfig
 {
@@ -33,18 +33,18 @@ final readonly class AuthSecurityConfig
     {
         $configuredScopes = config('module-auth.oauth.scopes', []);
         if (! is_array($configuredScopes)) {
-            throw new LogicException('Auth OAuth scopes must be configured as a list.');
+            throw new ConfigurationException('Auth OAuth scopes must be configured as a list.');
         }
 
         $oauthScopes = [];
         foreach ($configuredScopes as $scope) {
             if (! is_string($scope)) {
-                throw new LogicException('Every Auth OAuth scope must be a string.');
+                throw new ConfigurationException('Every Auth OAuth scope must be a string.');
             }
 
             $scope = trim($scope);
             if ($scope === '' || preg_match('/^[a-z0-9][a-z0-9._:-]{0,119}$/', $scope) !== 1) {
-                throw new LogicException('Auth OAuth scopes must use stable lowercase scope keys.');
+                throw new ConfigurationException('Auth OAuth scopes must use stable lowercase scope keys.');
             }
 
             $oauthScopes[] = $scope;
@@ -72,7 +72,7 @@ final readonly class AuthSecurityConfig
     private function assertValid(): void
     {
         if ($this->accessTokenTtlSeconds < 60 || $this->accessTokenTtlSeconds > 86400) {
-            throw new LogicException('Auth access-token TTL must be between 60 seconds and 24 hours.');
+            throw new ConfigurationException('Auth access-token TTL must be between 60 seconds and 24 hours.');
         }
 
         foreach ([
@@ -81,7 +81,7 @@ final readonly class AuthSecurityConfig
             'platform session' => $this->platformSessionTtlSeconds,
         ] as $name => $ttl) {
             if ($ttl < $this->accessTokenTtlSeconds || $ttl > 7776000) {
-                throw new LogicException(sprintf(
+                throw new ConfigurationException(sprintf(
                     'Auth %s TTL must be at least the access-token TTL and no more than 90 days.',
                     $name,
                 ));
@@ -89,11 +89,11 @@ final readonly class AuthSecurityConfig
         }
 
         if ($this->authorizationCodeTtlSeconds < 30 || $this->authorizationCodeTtlSeconds > 600) {
-            throw new LogicException('Auth authorization-code TTL must be between 30 and 600 seconds.');
+            throw new ConfigurationException('Auth authorization-code TTL must be between 30 and 600 seconds.');
         }
 
         if ($this->activityTouchIntervalSeconds < 30 || $this->activityTouchIntervalSeconds > 3600) {
-            throw new LogicException('Auth session activity interval must be between 30 and 3600 seconds.');
+            throw new ConfigurationException('Auth session activity interval must be between 30 and 3600 seconds.');
         }
 
         if (
@@ -101,23 +101,23 @@ final readonly class AuthSecurityConfig
             || $this->accountIpMaxAttempts < $this->accountMaxAttempts
             || $this->globalIpMaxAttempts < $this->accountIpMaxAttempts
         ) {
-            throw new LogicException('Auth login-rate limits are inconsistent.');
+            throw new ConfigurationException('Auth login-rate limits are inconsistent.');
         }
 
         if ($this->loginWindowSeconds < 60 || $this->loginWindowSeconds > 86400) {
-            throw new LogicException('Auth login-attempt window must be between one minute and one day.');
+            throw new ConfigurationException('Auth login-attempt window must be between one minute and one day.');
         }
 
         if ($this->mfaEnrollmentProofTtlSeconds < 60 || $this->mfaEnrollmentProofTtlSeconds > 1800) {
-            throw new LogicException('Auth MFA enrollment proof TTL must be between one and 30 minutes.');
+            throw new ConfigurationException('Auth MFA enrollment proof TTL must be between one and 30 minutes.');
         }
 
         if ($this->passwordMinimumLength < 12) {
-            throw new LogicException('Auth password minimum length cannot be below 12 characters.');
+            throw new ConfigurationException('Auth password minimum length cannot be below 12 characters.');
         }
 
         if ($this->oauthScopes === []) {
-            throw new LogicException('Auth OAuth scope catalogue cannot be empty.');
+            throw new ConfigurationException('Auth OAuth scope catalogue cannot be empty.');
         }
     }
 
@@ -132,13 +132,13 @@ final readonly class AuthSecurityConfig
             'platform MFA middleware alias' => config('module-auth.platform_mfa.middleware_alias'),
         ] as $name => $value) {
             if (! is_string($value) || trim($value) === '') {
-                throw new LogicException(sprintf('Auth %s must be a non-empty string.', $name));
+                throw new ConfigurationException(sprintf('Auth %s must be a non-empty string.', $name));
             }
         }
 
         $providerKey = (string) config('module-auth.internal_provider_key');
         if (preg_match('/^[a-z0-9][a-z0-9._-]{0,119}$/', $providerKey) !== 1) {
-            throw new LogicException('Auth internal provider key has an invalid format.');
+            throw new ConfigurationException('Auth internal provider key has an invalid format.');
         }
 
         foreach ([
@@ -158,7 +158,7 @@ final readonly class AuthSecurityConfig
 
         $issuer = trim((string) config('module-auth.platform_mfa.issuer'));
         if ($issuer === '' || mb_strlen($issuer) > 120) {
-            throw new LogicException('Auth platform MFA issuer must contain 1 to 120 characters.');
+            throw new ConfigurationException('Auth platform MFA issuer must contain 1 to 120 characters.');
         }
 
         self::assertIntegerRange(
@@ -180,14 +180,14 @@ final readonly class AuthSecurityConfig
             86400,
         );
         if ($staleSeconds < $leaseSeconds) {
-            throw new LogicException('Auth delivery stale threshold cannot be shorter than its lease.');
+            throw new ConfigurationException('Auth delivery stale threshold cannot be shorter than its lease.');
         }
         $invitationUrl = trim((string) config('module-auth.registration.invitation_url'));
         if (
             $invitationUrl === ''
             || (! str_starts_with($invitationUrl, '/') && filter_var($invitationUrl, FILTER_VALIDATE_URL) === false)
         ) {
-            throw new LogicException('Auth registration invitation URL is invalid.');
+            throw new ConfigurationException('Auth registration invitation URL is invalid.');
         }
 
         foreach ([
@@ -210,21 +210,21 @@ final readonly class AuthSecurityConfig
     {
         $cookieName = trim((string) config($key.'.name'));
         if ($cookieName === '' || preg_match('/[=;,\s]/', $cookieName) === 1) {
-            throw new LogicException(sprintf('Auth %s cookie name is invalid.', $name));
+            throw new ConfigurationException(sprintf('Auth %s cookie name is invalid.', $name));
         }
 
         $path = trim((string) config($key.'.path'));
         if (! str_starts_with($path, '/')) {
-            throw new LogicException(sprintf('Auth %s cookie path must be absolute.', $name));
+            throw new ConfigurationException(sprintf('Auth %s cookie path must be absolute.', $name));
         }
 
         $sameSite = strtolower(trim((string) config($key.'.same_site')));
         if (! in_array($sameSite, ['lax', 'strict', 'none'], true)) {
-            throw new LogicException(sprintf('Auth %s cookie SameSite value is invalid.', $name));
+            throw new ConfigurationException(sprintf('Auth %s cookie SameSite value is invalid.', $name));
         }
 
         if ($sameSite === 'none' && ! (bool) config($key.'.secure')) {
-            throw new LogicException(sprintf(
+            throw new ConfigurationException(sprintf(
                 'Auth %s cookie must be secure when SameSite=None.',
                 $name,
             ));
@@ -238,12 +238,12 @@ final readonly class AuthSecurityConfig
         int $maximum,
     ): int {
         if (! is_int($value) && ! ctype_digit((string) $value)) {
-            throw new LogicException(sprintf('Auth %s must be an integer.', $name));
+            throw new ConfigurationException(sprintf('Auth %s must be an integer.', $name));
         }
 
         $value = (int) $value;
         if ($value < $minimum || $value > $maximum) {
-            throw new LogicException(sprintf(
+            throw new ConfigurationException(sprintf(
                 'Auth %s must be between %d and %d.',
                 $name,
                 $minimum,

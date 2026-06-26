@@ -9,6 +9,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import type { AuthMode } from '@/shared/api/authSessionStorage';
 import { useAuth } from './AuthProvider';
 import { authApi } from './authApi';
+import { isCentralPlatformHost, workspaceLoginUrl } from './platformHost';
 import type { PlatformMfaEnrollment } from './authTypes';
 
 const MFA_ENROLLMENT_REQUIRED = 'AUTH_MFA_ENROLLMENT_REQUIRED';
@@ -21,6 +22,8 @@ export default function LoginPage() {
     const [authMode, setAuthMode] = useState<AuthMode>('tenant');
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [workspaceAddress, setWorkspaceAddress] = useState('');
+    const [workspaceAddressError, setWorkspaceAddressError] = useState<string | null>(null);
     const [totpCode, setTotpCode] = useState('');
     const [backupCode, setBackupCode] = useState('');
     const [useBackupCode, setUseBackupCode] = useState(false);
@@ -42,6 +45,7 @@ export default function LoginPage() {
         ? String(location.state.from)
         : null;
     const destination = authMode === 'platform' ? PLATFORM_HOME_PATH : requestedPath ?? DASHBOARD_PATH;
+    const tenantLoginRequiresWorkspace = authMode === 'tenant' && isCentralPlatformHost();
 
     function resetMfaState() {
         setMfaRequired(false);
@@ -51,6 +55,26 @@ export default function LoginPage() {
         setEnrollment(null);
         setEnrollmentCode('');
         setBackupCodes(null);
+    }
+
+    function changeAuthMode(mode: AuthMode) {
+        if (mode === authMode) return;
+        setAuthMode(mode);
+        setLoginIdentifier('');
+        setPassword('');
+        setWorkspaceAddressError(null);
+        resetMfaState();
+        setError(null);
+    }
+
+    function openWorkspace() {
+        const url = workspaceLoginUrl(workspaceAddress);
+        if (!url) {
+            setWorkspaceAddressError('Enter a valid verified workspace hostname, such as erp.example.com.');
+            return;
+        }
+
+        window.location.assign(url);
     }
 
     async function submitLogin() {
@@ -117,20 +141,31 @@ export default function LoginPage() {
                             key={mode}
                             type="button"
                             className={`rounded-md px-3 py-2 text-sm font-medium ${authMode === mode ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
-                            onClick={() => {
-                                setAuthMode(mode);
-                                resetMfaState();
-                                setError(null);
-                            }}
+                            onClick={() => changeAuthMode(mode)}
                         >
                             {mode === 'tenant' ? 'Tenant workspace' : 'Platform operator'}
                         </button>
                     ))}
                 </div>
 
-                <ErrorAlert error={error} title="Unable to sign in" />
+                <ErrorAlert error={error} title={loginErrorTitle(error)} />
 
-                {backupCodes ? (
+                {tenantLoginRequiresWorkspace ? (
+                    <div className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+                        <div>
+                            <p className="font-semibold">Open your verified tenant workspace</p>
+                            <p className="mt-1">Tenant credentials are accepted only from the organization’s verified workspace address. This platform address is reserved for platform operators.</p>
+                        </div>
+                        <Input
+                            label="Tenant workspace hostname"
+                            placeholder="erp.example.com"
+                            value={workspaceAddress}
+                            onChange={(event) => { setWorkspaceAddress(event.target.value); setWorkspaceAddressError(null); }}
+                            error={workspaceAddressError ?? undefined}
+                        />
+                        <Button type="button" className="w-full" onClick={openWorkspace}>Open tenant workspace</Button>
+                    </div>
+                ) : backupCodes ? (
                     <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
                         <p className="font-semibold">Save these one-time backup codes now</p>
                         <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
@@ -139,13 +174,11 @@ export default function LoginPage() {
                         <p className="mt-3">They will not be shown again. Store them separately from your password.</p>
                         <Button className="mt-3 w-full" onClick={() => setBackupCodes(null)}>I have stored the codes</Button>
                     </div>
-                ) : null}
-
-                {enrollment ? (
+                ) : enrollment ? (
                     <div className="space-y-4">
                         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
                             <p className="font-semibold">Set up multi-factor authentication</p>
-                            <p className="mt-2">Add this account to an authenticator app using the setup URI or secret, then enter the current six-digit code.</p>
+                            <p className="mt-2">Add this account to an authenticator app using the setup URI, then enter the current six-digit code.</p>
                             <p className="mt-3 break-all"><strong>Setup URI:</strong> <code className="text-xs">{enrollment.provisioning_uri}</code></p>
                         </div>
                         <Input
@@ -211,4 +244,15 @@ export default function LoginPage() {
             </section>
         </main>
     );
+}
+
+export function loginErrorTitle(error: ApiError | null): string {
+    if (!error) return 'Unable to sign in';
+    const stage = errorDetail<string>(error, 'stage');
+    if (stage === 'credentials') return 'Check your sign-in details';
+    if (stage === 'mfa_challenge' || stage === 'mfa_enrollment') return 'Complete account security';
+    if (stage === 'organization_access') return 'Organization access is not ready';
+    if (error.status !== null && error.status >= 500) return 'Authentication service unavailable';
+
+    return 'Unable to sign in';
 }

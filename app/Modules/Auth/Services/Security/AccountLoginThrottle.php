@@ -6,7 +6,10 @@ namespace Modules\Auth\Services\Security;
 
 use Illuminate\Cache\RateLimiter;
 
-final readonly class LoginThrottle
+/**
+ * Account-aware throttling. Route middleware owns the coarse IP-wide limit.
+ */
+final readonly class AccountLoginThrottle
 {
     public function __construct(
         private RateLimiter $limiter,
@@ -18,25 +21,24 @@ final readonly class LoginThrottle
         $keys = $this->keys($realm, $identifier, $ipAddress);
 
         return $this->limiter->tooManyAttempts($keys['account'], $this->config->accountMaxAttempts)
-            || $this->limiter->tooManyAttempts($keys['account_ip'], $this->config->accountIpMaxAttempts)
-            || $this->limiter->tooManyAttempts($keys['ip'], $this->config->globalIpMaxAttempts);
+            || $this->limiter->tooManyAttempts($keys['account_ip'], $this->config->accountIpMaxAttempts);
     }
 
     public function recordFailure(string $realm, string $identifier, string $ipAddress): void
     {
-        foreach ($this->keys($realm, $identifier, $ipAddress) as $key) {
-            $this->limiter->hit($key, $this->config->loginWindowSeconds);
-        }
+        $keys = $this->keys($realm, $identifier, $ipAddress);
+        $this->limiter->hit($keys['account'], $this->config->loginWindowSeconds);
+        $this->limiter->hit($keys['account_ip'], $this->config->loginWindowSeconds);
     }
 
     public function clearSuccessful(string $realm, string $identifier, string $ipAddress): void
     {
-        foreach ($this->keys($realm, $identifier, $ipAddress) as $key) {
-            $this->limiter->clear($key);
-        }
+        $keys = $this->keys($realm, $identifier, $ipAddress);
+        $this->limiter->clear($keys['account']);
+        $this->limiter->clear($keys['account_ip']);
     }
 
-    /** @return array{account:string,account_ip:string,ip:string} */
+    /** @return array{account:string,account_ip:string} */
     private function keys(string $realm, string $identifier, string $ipAddress): array
     {
         $realm = strtolower(trim($realm));
@@ -46,7 +48,6 @@ final readonly class LoginThrottle
         return [
             'account' => "auth:{$realm}:account:{$account}",
             'account_ip' => "auth:{$realm}:account-ip:{$account}:{$network}",
-            'ip' => "auth:{$realm}:ip:{$network}",
         ];
     }
 }

@@ -25,13 +25,17 @@ apiClient.interceptors.request.use((config) => {
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
         config.headers.delete('Content-Type');
     }
-    const { accessToken, tenantId } = getStoredApiContext();
-    if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
+
+    const context = getStoredApiContext();
+    if (context.accessToken) {
+        config.headers.Authorization = `Bearer ${context.accessToken}`;
     }
-    if (tenantId) {
-        config.headers['X-Tenant-Id'] = String(tenantId);
+    if (shouldAttachTenantHeader(config.url, context.authMode, context.tenantId)) {
+        config.headers['X-Tenant-Id'] = String(context.tenantId);
+    } else {
+        config.headers.delete('X-Tenant-Id');
     }
+
     return config;
 });
 
@@ -57,3 +61,33 @@ apiClient.interceptors.response.use(
         }
     },
 );
+
+export function shouldAttachTenantHeader(
+    url: string | undefined,
+    authMode: 'tenant' | 'platform',
+    tenantId: number | null,
+): boolean {
+    if (authMode !== 'tenant' || tenantId === null || !Number.isSafeInteger(tenantId) || tenantId < 1) {
+        return false;
+    }
+
+    const path = normalizedPath(url);
+    if (!path.startsWith('/api/v1/')) return false;
+    if (path.startsWith('/api/v1/platform/')) return false;
+
+    return ![
+        '/api/v1/auth/login',
+        '/api/v1/auth/refresh',
+        '/api/v1/auth/initial-administrator/',
+    ].some((prefix) => path === prefix || path.startsWith(prefix));
+}
+
+function normalizedPath(url: string | undefined): string {
+    if (!url) return '';
+
+    try {
+        return new URL(url, window.location.origin).pathname;
+    } catch {
+        return url.split('?')[0] ?? '';
+    }
+}

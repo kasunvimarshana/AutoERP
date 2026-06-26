@@ -20,6 +20,14 @@ return [
     ],
     'current_tenant' => [
         'middleware_alias' => env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant'),
+        'resolver_middleware_alias' => env(
+            'CORE_RESOLVE_CURRENT_TENANT_MIDDLEWARE_ALIAS',
+            'resolve.current-tenant',
+        ),
+        'access_middleware_alias' => env(
+            'CORE_REQUIRE_CURRENT_TENANT_ACCESS_MIDDLEWARE_ALIAS',
+            'require.current-tenant-access',
+        ),
         'required' => (bool) env('CORE_CURRENT_TENANT_REQUIRED', true),
         'request_attribute' => env('CORE_CURRENT_TENANT_REQUEST_ATTRIBUTE', 'current_tenant'),
         'id_attribute' => env('CORE_CURRENT_TENANT_ID_ATTRIBUTE', 'current_tenant_id'),

@@ -7,7 +7,6 @@ namespace Tests\Feature\Supplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Tests\TestCase;
@@ -395,8 +394,12 @@ final class SupplierApiTest extends TestCase
             'slug' => strtolower($code).'-tenant',
             'status' => 'active',
             'row_version' => 1,
+            'status_reason' => 'Integration test tenant.',
+            'status_changed_at' => $now,
+            'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
+        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main',
@@ -413,7 +416,7 @@ final class SupplierApiTest extends TestCase
             'first_name' => 'Supplier',
             'last_name' => 'Tester',
             'email' => $email,
-            'password' => app(PasswordHasherInterface::class)->hash('secret-password'),
+            'password' => 'secret-password',
             'status' => 'active',
             'row_version' => 1,
             'created_at' => $now,
@@ -430,20 +433,7 @@ final class SupplierApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        DB::table('auth_providers')->insert([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'provider_key' => 'internal',
-            'name' => 'Internal password login',
-            'guard_name' => 'auth-api',
-            'provider_name' => 'users',
-            'driver' => 'internal',
-            'status' => 'active',
-            'is_sso' => false,
-            'row_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $permissions = SupplierAuthorizationService::descriptions();
         $permissions[ItemAuthorizationService::CREATE] = 'Create items used by Supplier API fixtures.';
@@ -468,10 +458,9 @@ final class SupplierApiTest extends TestCase
             ]);
         }
 
-        $token = (string) $this->postJson('/api/v1/auth/login', [
-            'tenant_id' => $tenantId,
+        $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
-            'login_identifier' => $email,
+            'identifier' => $email,
             'password' => 'secret-password',
         ])->assertOk()->json('token');
 

@@ -16,7 +16,7 @@ final readonly class TenantSessionService
     public function __construct(
         private TenantExecutionContextInterface $executionContext,
         private ClockInterface $clock,
-        private TokenService $tokens,
+        private TenantTokenService $tokens,
     ) {}
 
     /** @return list<array<string,mixed>> */
@@ -50,7 +50,7 @@ final readonly class TenantSessionService
             throw new AuthFailure(AuthErrorCode::SESSION_NOT_FOUND, 'The session was not found.', 404);
         }
 
-        $this->tokens->revokeTenantSession($tenantId, $sessionId, $userId, $reason);
+        $this->tokens->revokeSession($tenantId, $sessionId, $userId, $reason);
     }
 
     /** @return array<string,mixed> */

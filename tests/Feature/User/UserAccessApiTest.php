@@ -320,8 +320,11 @@ final class UserAccessApiTest extends TestCase
         $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(), 'code' => $code, 'name' => $code.' Tenant',
             'slug' => strtolower($code).'-tenant', 'status' => 'active', 'row_version' => 1,
+            'status_reason' => 'Integration test tenant.', 'status_changed_at' => $now,
+            'activated_at' => $now,
             'created_at' => $now, 'updated_at' => $now,
         ]);
+        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Head Office', 'HO');
         $email = (string) ($overrides['email'] ?? strtolower($code).'@example.test');
         $userId = $this->createUser($tenantId, $email, ['first_name' => 'Admin']);
@@ -331,17 +334,11 @@ final class UserAccessApiTest extends TestCase
         }
         $this->assignRole($tenantId, $userId, $roleId);
         $this->assignOrganizationUnit($tenantId, $userId, $organizationUnitId, true);
-        DB::table('auth_providers')->insert([
-            'tenant_id' => $tenantId, 'organization_unit_id' => null, 'provider_key' => 'internal',
-            'name' => 'Internal authentication', 'guard_name' => UserGuard::TENANT_API,
-            'provider_name' => 'users', 'driver' => 'internal', 'status' => 'active',
-            'is_sso' => false, 'row_version' => 1, 'created_at' => $now, 'updated_at' => $now,
-        ]);
+        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
-        $token = (string) $this->postJson('/api/v1/auth/login', [
-            'tenant_id' => $tenantId,
+        $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
-            'login_identifier' => $email,
+            'identifier' => $email,
             'password' => 'secret-password',
         ])->assertOk()->json('token');
 

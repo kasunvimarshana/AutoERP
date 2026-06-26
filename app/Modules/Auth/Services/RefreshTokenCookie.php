@@ -8,7 +8,7 @@ use DateTimeImmutable;
 use DateTimeInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use LogicException;
+use Modules\Core\Exceptions\ConfigurationException;
 use Symfony\Component\HttpFoundation\Cookie;
 
 class RefreshTokenCookie
@@ -85,7 +85,7 @@ class RefreshTokenCookie
 
         return $name !== ''
             ? $name
-            : throw new LogicException('Refresh-token cookie name is not configured.');
+            : throw new ConfigurationException('Refresh-token cookie name is not configured.');
     }
 
     private function path(): string
@@ -94,7 +94,7 @@ class RefreshTokenCookie
 
         return str_starts_with($path, '/')
             ? $path
-            : throw new LogicException('Refresh-token cookie path must be absolute.');
+            : throw new ConfigurationException('Refresh-token cookie path must be absolute.');
     }
 
     private function domain(): ?string
@@ -114,7 +114,7 @@ class RefreshTokenCookie
     {
         $sameSite = strtolower((string) config($this->configurationKey.'.same_site', 'strict'));
         if (! in_array($sameSite, ['lax', 'strict', 'none'], true)) {
-            throw new LogicException('Refresh-token cookie SameSite configuration is invalid.');
+            throw new ConfigurationException('Refresh-token cookie SameSite configuration is invalid.');
         }
 
         return $sameSite;
@@ -130,13 +130,13 @@ class RefreshTokenCookie
             try {
                 return new DateTimeImmutable($expiresAt);
             } catch (\Throwable $exception) {
-                throw new LogicException(
+                throw new ConfigurationException(
                     'The issued refresh token has an invalid expiry timestamp.',
                     previous: $exception,
                 );
             }
         }
 
-        throw new LogicException('The issued refresh-token expiry is required for its cookie.');
+        throw new ConfigurationException('The issued refresh-token expiry is required for its cookie.');
     }
 }

@@ -86,7 +86,7 @@ final class ConfigurationAuthorizationServiceTest extends TestCase
                 && in_array($permission, $allowedTenantPermissions, true),
         );
         $platformPermissions = $this->createMock(PlatformPermissionCheckerInterface::class);
-        $platformPermissions->method('hasPermission')->willReturnCallback(
+        $platformPermissions->method('allows')->willReturnCallback(
             static fn (int $userId, string $permission): bool => $userId === 5
                 && in_array($permission, $allowedPlatformPermissions, true),
         );

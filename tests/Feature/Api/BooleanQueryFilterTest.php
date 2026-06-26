@@ -7,7 +7,6 @@ namespace Tests\Feature\Api;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
 use Tests\TestCase;
@@ -141,7 +140,7 @@ final class BooleanQueryFilterTest extends TestCase
             'first_name' => 'Warehouse',
             'last_name' => 'Filter',
             'email' => 'warehouse-filter-'.Str::lower($suffix).'@example.test',
-            'password' => app(PasswordHasherInterface::class)->hash('secret-password'),
+            'password' => 'secret-password',
             'status' => 'active',
             'row_version' => 1,
             'created_at' => $now,

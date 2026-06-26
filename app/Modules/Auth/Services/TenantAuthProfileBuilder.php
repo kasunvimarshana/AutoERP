@@ -8,20 +8,18 @@ use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
-use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
 use Modules\User\Contracts\TenantUserAuthenticationDirectoryInterface;
 
-final readonly class AuthProfileService
+final readonly class TenantAuthProfileBuilder
 {
     public function __construct(
         private TenantAuthenticationDirectoryInterface $tenants,
-        private TenantUserAuthenticationDirectoryInterface $tenantUsers,
-        private PlatformOperatorAuthenticationDirectoryInterface $operators,
+        private TenantUserAuthenticationDirectoryInterface $users,
         private OrganizationUnitDirectoryInterface $organizationUnits,
     ) {}
 
     /** @param array<string,mixed> $token @return array<string,mixed> */
-    public function tenant(array $token): array
+    public function build(array $token): array
     {
         $tenantId = $this->positiveInt($token['tenant_id'] ?? null);
         $userId = $this->positiveInt($token['tenant_user_id'] ?? null);
@@ -30,16 +28,16 @@ final readonly class AuthProfileService
             throw $this->unauthorized();
         }
 
-        $user = $this->tenantUsers->findActiveTenantById($tenantId, $userId);
+        $user = $this->users->findActiveTenantById($tenantId, $userId);
         $tenant = $this->tenants->findActive($tenantId);
         $organizationUnit = $this->organizationUnits->summaries($tenantId, [$organizationUnitId])[$organizationUnitId] ?? null;
         if ($user === null || $tenant === null || $organizationUnit === null
-            || ! $this->tenantUsers->canAccessOrganizationUnit($tenantId, $userId, $organizationUnitId)) {
+            || ! $this->users->canAccessOrganizationUnit($tenantId, $userId, $organizationUnitId)) {
             throw $this->unauthorized();
         }
 
-        $roles = $this->tenantUsers->roleNames($tenantId, $userId);
-        $permissions = $this->tenantUsers->permissionNames($tenantId, $userId);
+        $roles = $this->users->roleNames($tenantId, $userId);
+        $permissions = $this->users->permissionNames($tenantId, $userId);
 
         return [
             'user' => array_merge($user, ['roles' => $roles, 'permissions' => $permissions]),
@@ -52,42 +50,14 @@ final readonly class AuthProfileService
         ];
     }
 
-    /** @param array<string,mixed> $token @return array<string,mixed> */
-    public function platform(array $token): array
-    {
-        $operatorId = $this->positiveInt($token['platform_operator_id'] ?? null);
-        $operator = $operatorId === null ? null : $this->operators->findActivePlatformById($operatorId);
-        if ($operatorId === null || $operator === null) {
-            throw new AuthFailure(
-                AuthErrorCode::UNAUTHORIZED_ACCESS,
-                'Platform authentication is required.',
-                401,
-            );
-        }
-
-        $permissions = $this->operators->permissionNames($operatorId);
-
-        return [
-            'user' => array_merge($operator, [
-                'roles' => ['Platform Operator'],
-                'permissions' => $permissions,
-                'is_platform_operator' => true,
-            ]),
-            'tenant' => null,
-            'organization_unit' => null,
-            'roles' => ['Platform Operator'],
-            'permissions' => $permissions,
-            'enabled_modules' => null,
-            'is_platform_operator' => true,
-        ];
-    }
-
     private function positiveInt(mixed $value): ?int
     {
         if (! is_int($value) && ! ctype_digit((string) $value)) {
             return null;
         }
+
         $value = (int) $value;
+
         return $value > 0 ? $value : null;
     }
 

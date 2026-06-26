@@ -7,7 +7,6 @@ namespace Tests\Feature\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
 use Tests\TestCase;
 
@@ -299,8 +298,12 @@ final class WarehouseApiTest extends TestCase
             'slug' => Str::lower($code).'-tenant',
             'status' => 'active',
             'row_version' => 1,
+            'status_reason' => 'Integration test tenant.',
+            'status_changed_at' => $now,
+            'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
+        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Main', 'MAIN');
         $email = (string) ($overrides['email'] ?? Str::lower($code).'@example.test');
         $userId = (int) \Tests\Support\TenantUserFixture::create([
@@ -308,7 +311,7 @@ final class WarehouseApiTest extends TestCase
             'first_name' => 'Warehouse',
             'last_name' => 'Tester',
             'email' => $email,
-            'password' => app(PasswordHasherInterface::class)->hash('secret-password'),
+            'password' => 'secret-password',
             'status' => 'active',
             'row_version' => 1,
             'created_at' => $now,
@@ -340,25 +343,11 @@ final class WarehouseApiTest extends TestCase
             'user_id' => $userId,
         ], $organizationUnitId, true);
 
-        DB::table('auth_providers')->insert([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'provider_key' => 'internal',
-            'name' => 'Internal password login',
-            'guard_name' => 'auth-api',
-            'provider_name' => 'users',
-            'driver' => 'internal',
-            'status' => 'active',
-            'is_sso' => false,
-            'row_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
-        $token = (string) $this->postJson('/api/v1/auth/login', [
-            'tenant_id' => $tenantId,
+        $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
-            'login_identifier' => $email,
+            'identifier' => $email,
             'password' => 'secret-password',
         ])->assertOk()->json('token');
 

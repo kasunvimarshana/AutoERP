@@ -6,8 +6,5 @@ namespace Modules\Core\Contracts;
 
 interface PlatformPermissionCheckerInterface
 {
-    public function hasPermission(int $userId, string $permission): bool;
-
-    /** @return list<string> */
-    public function permissions(int $userId): array;
+    public function allows(int $operatorId, string $permission): bool;
 }

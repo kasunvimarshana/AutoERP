@@ -17,7 +17,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
     public function __construct(
         private TenantExecutionContextInterface $executionContext,
         private PlatformOperatorAuthenticationDirectoryInterface $operators,
-        private TokenService $tokens,
+        private PlatformTokenService $tokens,
         private ClockInterface $clock,
     ) {}
 
@@ -60,7 +60,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
 
     public function revokeCurrent(int $sessionId, int $operatorId, string $reason): void
     {
-        $this->tokens->revokePlatformSession($sessionId, $operatorId, $reason);
+        $this->tokens->revokeSession($sessionId, $operatorId, $reason);
     }
 
     /** @return array<string,mixed> */
@@ -71,7 +71,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
             if (! $session instanceof AuthPlatformSessionModel) {
                 throw (new ModelNotFoundException())->setModel(AuthPlatformSessionModel::class, [$publicId]);
             }
-            $this->tokens->revokePlatformSession(
+            $this->tokens->revokeSession(
                 (int) $session->getKey(),
                 (int) $session->getAttribute('platform_operator_id'),
                 $reason,
@@ -96,7 +96,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
                 ->map(static fn ($id): int => (int) $id)
                 ->all();
             foreach ($sessionIds as $sessionId) {
-                $this->tokens->revokePlatformSession($sessionId, $operatorId, $reason);
+                $this->tokens->revokeSession($sessionId, $operatorId, $reason);
             }
             return count($sessionIds);
         });

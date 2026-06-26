@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Modules\Auth\Console\Commands\AuthClientCreateCommand;
+use Modules\Auth\Console\Commands\AuthIncidentLookupCommand;
+use Modules\Auth\Console\Commands\AuthReadinessCommand;
 use Modules\Auth\Console\Commands\AuthRetentionPurgeCommand;
 use Modules\Auth\Enums\AuthScope;
 use Modules\Auth\Exceptions\AuthFailure;
@@ -23,15 +25,16 @@ use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
 use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
 use Modules\Auth\Services\PlatformSessionService;
+use Modules\Auth\Services\Readiness\AuthReadinessService;
 use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
 use Modules\Auth\Services\Registration\InvitationDeliveryHealthReader;
 use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
-use Modules\Auth\Services\Security\LoginThrottle;
+use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Auth\Services\PlatformTokenService;
 use Modules\Auth\Services\TenantTokenService;
-use Modules\Auth\Services\TokenService;
+use Modules\Auth\Services\AccessTokenRouter;
 use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Core\Contracts\AuthInvitationDeliveryHealthReaderInterface;
@@ -45,7 +48,6 @@ use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Contracts\TenantUserAccessRevokerInterface;
 use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
-use Throwable;
 
 final class AuthServiceProvider extends ServiceProvider
 {
@@ -62,8 +64,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->scoped(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
         $this->app->scoped(TenantTokenService::class);
         $this->app->scoped(PlatformTokenService::class);
-        $this->app->scoped(TokenService::class);
-        $this->app->scoped(LoginThrottle::class);
+        $this->app->scoped(AccessTokenRouter::class);
+        $this->app->scoped(AccountLoginThrottle::class);
+        $this->app->scoped(AuthReadinessService::class);
         $this->app->scoped(PlatformMfaService::class);
         $this->app->scoped(RegistrationInvitationService::class);
         $this->app->scoped(PasswordCredentialService::class);
@@ -100,7 +103,12 @@ final class AuthServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([AuthClientCreateCommand::class, AuthRetentionPurgeCommand::class]);
+            $this->commands([
+                AuthClientCreateCommand::class,
+                AuthIncidentLookupCommand::class,
+                AuthReadinessCommand::class,
+                AuthRetentionPurgeCommand::class,
+            ]);
             $this->publishes([
                 __DIR__.'/../Config/auth.php' => config_path('module-auth.php'),
             ], 'auth-config');
@@ -155,13 +163,10 @@ final class AuthServiceProvider extends ServiceProvider
         }
 
         try {
-            $payload = $this->app->make(TokenService::class)->validateAccessToken($plainToken);
+            $payload = $this->app->make(AccessTokenRouter::class)->validate($plainToken);
             $request->attributes->set('auth_access_token', $payload);
             return $payload;
         } catch (AuthFailure) {
-            return [];
-        } catch (Throwable $exception) {
-            report($exception);
             return [];
         }
     }
