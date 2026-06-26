@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'users_tenant_fk')->restrictOnDelete();
             $table->string('first_name');
             $table->string('last_name')->nullable();
             $table->string('username', 100)->nullable();
@@ -37,12 +37,12 @@ return new class extends Migration
             $table->unique(['id', 'tenant_id'], 'users_id_tenant_uk');
             $table->unique(['tenant_id', 'email'], 'users_tenant_email_uk');
             $table->unique(['tenant_id', 'username'], 'users_tenant_username_uk');
-            $table->index(['tenant_id', 'status', 'deleted_at'], 'users_tenant_status_idx');
-            $table->index(['tenant_id', 'email'], 'users_tenant_email_idx');
+            $table->index(['tenant_id', 'status', 'deleted_at'], 'users_tenant_status_ix');
+            $table->index(['tenant_id', 'email'], 'users_tenant_email_ix');
 
-            $table->index(['tenant_id', 'created_by_user_id'], 'users_created_by_idx');
-            $table->index(['tenant_id', 'updated_by_user_id'], 'users_updated_by_idx');
-            $table->index(['tenant_id', 'deleted_by_user_id'], 'users_deleted_by_idx');
+            $table->index(['tenant_id', 'created_by_user_id'], 'users_created_by_ix');
+            $table->index(['tenant_id', 'updated_by_user_id'], 'users_updated_by_ix');
+            $table->index(['tenant_id', 'deleted_by_user_id'], 'users_deleted_by_ix');
         });
     }
 

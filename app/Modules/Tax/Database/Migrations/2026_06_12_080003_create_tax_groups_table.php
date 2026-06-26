@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_groups', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_groups_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('code', 100);
             $table->string('name');
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'organization_unit_id', 'code'], 'tax_groups_scope_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'is_default'], 'tax_groups_default_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'is_default'], 'tax_groups_default_ix');
 
             $table->unique(['id', 'tenant_id'], 'tax_groups_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'tax_groups_organization_unit_id_tenant_fk')

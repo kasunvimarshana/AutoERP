@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_group_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_group_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('tax_group_id');
             $table->foreignId('tax_id');
             $table->unsignedInteger('sequence');

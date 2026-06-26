@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('cheque_print_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'cheque_print_logs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('payment_line_id')->nullable();
@@ -23,9 +23,9 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'cheque_print_logs_tenant_org_idx');
-            $table->index(['payment_id', 'printed_at'], 'cheque_print_logs_payment_date_idx');
-            $table->index(['payment_line_id', 'printed_at'], 'cheque_print_logs_line_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'cheque_print_logs_tenant_org_ix');
+            $table->index(['payment_id', 'printed_at'], 'cheque_print_logs_payment_date_ix');
+            $table->index(['payment_line_id', 'printed_at'], 'cheque_print_logs_line_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'cheque_print_logs_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'cheque_print_logs_organization_unit_id_tenant_fk')

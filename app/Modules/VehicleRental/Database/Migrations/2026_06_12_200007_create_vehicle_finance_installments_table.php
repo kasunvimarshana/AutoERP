@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('vehicle_finance_installments', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_finance_installments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('finance_agreement_id');
@@ -34,8 +34,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['finance_agreement_id', 'installment_number'], 'vehicle_finance_installments_number_uk');
-            $table->index(['due_date', 'status'], 'vehicle_finance_installments_due_status_idx');
-            $table->index(['invoice_id', 'status'], 'vehicle_finance_installments_invoice_status_idx');
+            $table->index(['due_date', 'status'], 'vehicle_finance_installments_due_status_ix');
+            $table->index(['invoice_id', 'status'], 'vehicle_finance_installments_invoice_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_finance_installments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_installments_organization_unit_id_tenant_fk')

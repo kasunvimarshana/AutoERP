@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('public_id')->unique('auth_registration_invites_public_uk');
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'auth_registration_invitations_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
             $table->unsignedBigInteger('role_id')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'auth_registration_invites_id_tenant_uk');
-            $table->index(['tenant_id', 'user_id', 'purpose', 'status'], 'auth_registration_invites_user_status_idx');
+            $table->index(['tenant_id', 'user_id', 'purpose', 'status'], 'auth_registration_invites_user_status_ix');
             $table->foreign(['user_id', 'tenant_id'], 'auth_reg_invites_target_user_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_reg_invites_org_tenant_fk')
@@ -42,7 +42,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])->on('roles')->restrictOnDelete();
             $table->foreign(['accepted_by_user_id', 'tenant_id'], 'auth_reg_invites_user_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            $table->index(['tenant_id', 'email', 'status', 'expires_at'], 'auth_registration_invites_lookup_idx');
+            $table->index(['tenant_id', 'email', 'status', 'expires_at'], 'auth_registration_invites_lookup_ix');
         });
     }
 

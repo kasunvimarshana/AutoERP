@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_number_sequences', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_number_sequences_tenant_fk')->restrictOnDelete();
             $table->string('sequence_key', 80);
             $table->unsignedBigInteger('last_number')->default(0);
             $table->timestamps();

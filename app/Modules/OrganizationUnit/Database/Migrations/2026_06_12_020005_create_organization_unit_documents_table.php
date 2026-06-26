@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('organization_unit_documents', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'organization_unit_documents_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id');
 
             $table->string('name');
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'organization_unit_id', 'active_name_hash'], 'organization_unit_documents_active_name_uk');
             $table->unique(['tenant_id', 'object_key'], 'organization_unit_documents_object_key_uk');
             $table->unique(['id', 'tenant_id'], 'organization_unit_documents_id_tenant_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'document_type'], 'organization_unit_documents_type_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'document_type'], 'organization_unit_documents_type_ix');
         });
     }
 

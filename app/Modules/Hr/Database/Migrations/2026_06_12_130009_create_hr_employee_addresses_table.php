@@ -25,7 +25,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();
-            $table->index(['tenant_id', 'employee_id'], 'hr_employee_addresses_scope_idx');
+            $table->index(['tenant_id', 'employee_id'], 'hr_employee_addresses_scope_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_addresses_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_addresses_employee_id_tenant_fk')

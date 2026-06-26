@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_movements', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_movements_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('movement_number', 80);
             $table->date('movement_date');
@@ -52,16 +52,16 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'movement_number'], 'inventory_movements_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_movements_tenant_org_idx');
-            $table->index('movement_date', 'inventory_movements_date_idx');
-            $table->index('item_id', 'inventory_movements_item_idx');
-            $table->index('warehouse_id', 'inventory_movements_warehouse_idx');
-            $table->index('warehouse_location_id', 'inventory_movements_location_idx');
-            $table->index('batch_id', 'inventory_movements_batch_idx');
-            $table->index('serial_number_id', 'inventory_movements_serial_idx');
-            $table->index(['source_type', 'source_id'], 'inventory_movements_source_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'inventory_movements_source_line_idx');
-            $table->index('status', 'inventory_movements_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_movements_tenant_org_ix');
+            $table->index('movement_date', 'inventory_movements_date_ix');
+            $table->index('item_id', 'inventory_movements_item_ix');
+            $table->index('warehouse_id', 'inventory_movements_warehouse_ix');
+            $table->index('warehouse_location_id', 'inventory_movements_location_ix');
+            $table->index('batch_id', 'inventory_movements_batch_ix');
+            $table->index('serial_number_id', 'inventory_movements_serial_ix');
+            $table->index(['source_type', 'source_id'], 'inventory_movements_source_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'inventory_movements_source_line_ix');
+            $table->index('status', 'inventory_movements_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_movements_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_movements_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoice_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id');
             $table->unsignedInteger('line_number');
@@ -31,9 +31,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index('invoice_id', 'invoice_lines_invoice_idx');
-            $table->index('item_id', 'invoice_lines_item_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'invoice_lines_source_line_idx');
+            $table->index('invoice_id', 'invoice_lines_invoice_ix');
+            $table->index('item_id', 'invoice_lines_item_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'invoice_lines_source_line_ix');
 
             $table->unique(['id', 'tenant_id'], 'invoice_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_lines_organization_unit_id_tenant_fk')

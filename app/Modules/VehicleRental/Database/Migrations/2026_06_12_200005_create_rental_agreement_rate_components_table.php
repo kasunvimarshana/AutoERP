@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_agreement_rate_components', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_agreement_rate_components_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('rate_version_id');
@@ -34,10 +34,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['rate_version_id', 'vehicle_category_id', 'component_code'], 'rental_rate_components_version_category_code_uk');
-            $table->index(['rate_version_id', 'calculation_order'], 'rental_rate_components_order_idx');
+            $table->index(['rate_version_id', 'calculation_order'], 'rental_rate_components_order_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_agreement_rate_components_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_rate_components_organization_un_d3b71abf_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_rate_components_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
@@ -45,11 +45,11 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('rental_agreement_rate_versions')
                 ->cascadeOnDelete();
-            $table->foreign(['vehicle_category_id', 'tenant_id'], 'rental_agreement_rate_components_vehicle_categor_bf6bd058_fk')
+            $table->foreign(['vehicle_category_id', 'tenant_id'], 'rental_agreement_rate_components_veh_cat_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_categories')
                 ->restrictOnDelete();
-            $table->foreign(['tax_group_override_id', 'tenant_id'], 'rental_agreement_rate_components_tax_group_overr_36be5cf0_fk')
+            $table->foreign(['tax_group_override_id', 'tenant_id'], 'rental_agreement_rate_components_tax_group_override_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('tax_groups')
                 ->restrictOnDelete();

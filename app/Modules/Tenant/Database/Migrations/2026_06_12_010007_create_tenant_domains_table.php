@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('tenant_domains', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_domains_tenant_fk')->restrictOnDelete();
             $table->string('domain', 253)->unique('tenant_domains_domain_uk');
             $table->enum('status', ['pending', 'active', 'disabled'])->default('pending');
             $table->enum('ownership_status', ['pending', 'checking', 'verified', 'failed', 'expired'])->default('pending');
@@ -46,21 +46,15 @@ return new class extends Migration
             $table->uuid('revalidation_claim_token')->nullable();
             $table->timestamp('revalidation_claimed_at')->nullable();
             $table->timestamp('revalidation_claim_lease_expires_at')->nullable();
-            $table->unsignedBigInteger('verified_by')->nullable()->index('tenant_domains_verified_by_idx');
-            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_domains_created_by_idx');
-            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_domains_updated_by_idx');
+            $table->unsignedBigInteger('verified_by')->nullable()->index('tenant_domains_verified_by_ix');
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_domains_created_by_ix');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_domains_updated_by_ix');
             $table->timestamps();
 
-            $table->index(['tenant_id', 'status'], 'tenant_domains_tenant_status_idx');
-            $table->index(['tenant_id', 'operational_status'], 'tenant_domains_tenant_operational_idx');
-            $table->index(
-                ['operational_status', 'operational_retry_at', 'operational_claimed_at'],
-                'tenant_domains_operational_retry_idx',
-            );
-            $table->index(
-                ['status', 'revalidation_due_at', 'revalidation_claimed_at'],
-                'tenant_domains_revalidation_idx',
-            );
+            $table->index(['tenant_id', 'status'], 'tenant_domains_tenant_status_ix');
+            $table->index(['tenant_id', 'operational_status'], 'tenant_domains_tenant_operational_ix');
+            $table->index(['operational_status', 'operational_retry_at', 'operational_claimed_at'], 'tenant_domains_operational_retry_ix', );
+            $table->index(['status', 'revalidation_due_at', 'revalidation_claimed_at'], 'tenant_domains_revalidation_ix', );
             $table->unique(['id', 'tenant_id'], 'tenant_domains_id_tenant_uk');
         });
     }

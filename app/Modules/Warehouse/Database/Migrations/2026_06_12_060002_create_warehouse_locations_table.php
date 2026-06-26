@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('warehouse_locations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'warehouse_locations_tenant_fk')->restrictOnDelete()->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
@@ -35,9 +35,9 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'warehouse_id', 'name'], 'warehouse_locations_warehouse_name_uk');
             $table->unique(['tenant_id', 'warehouse_id', 'code'], 'warehouse_locations_warehouse_code_uk');
-            $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_parent_idx');
-            $table->index(['warehouse_id', 'is_default'], 'warehouse_locations_default_idx');
-            $table->index(['warehouse_id', 'path'], 'warehouse_locations_path_idx');
+            $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_parent_ix');
+            $table->index(['warehouse_id', 'is_default'], 'warehouse_locations_default_ix');
+            $table->index(['warehouse_id', 'path'], 'warehouse_locations_path_ix');
 
             $table->unique(['id', 'tenant_id'], 'warehouse_locations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'warehouse_locations_organization_unit_id_tenant_fk')

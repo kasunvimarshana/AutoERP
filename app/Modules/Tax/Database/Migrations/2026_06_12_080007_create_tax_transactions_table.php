@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_transactions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_transactions_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('tax_id')->nullable();
             $table->foreignId('tax_document_snapshot_id')->nullable();
@@ -37,10 +37,10 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'transaction_date'], 'tax_transactions_scope_date_idx');
-            $table->index(['tax_type', 'tax_code', 'transaction_date'], 'tax_transactions_tax_date_idx');
-            $table->index(['party_type', 'party_id'], 'tax_transactions_party_idx');
-            $table->index(['source_type', 'source_id'], 'tax_transactions_source_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'transaction_date'], 'tax_transactions_scope_date_ix');
+            $table->index(['tax_type', 'tax_code', 'transaction_date'], 'tax_transactions_tax_date_ix');
+            $table->index(['party_type', 'party_id'], 'tax_transactions_party_ix');
+            $table->index(['source_type', 'source_id'], 'tax_transactions_source_ix');
 
             $table->unique(['id', 'tenant_id'], 'tax_transactions_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'tax_transactions_organization_unit_id_tenant_fk')

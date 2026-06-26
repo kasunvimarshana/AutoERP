@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_return_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_return_adjustment_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('purchase_return_id');
             $table->foreignId('purchase_header_adjustment_id');
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->decimal('remaining_amount', 20, 6);
             $table->timestamps();
 
-            $table->index('purchase_return_id', 'purchase_return_adjustment_allocations_return_idx');
-            $table->index('purchase_header_adjustment_id', 'purchase_return_adjustment_allocations_adjustment_idx');
+            $table->index('purchase_return_id', 'purchase_return_adjustment_allocations_return_ix');
+            $table->index('purchase_header_adjustment_id', 'purchase_return_adjustment_allocations_adjustment_ix');
             $table->unique(['purchase_return_id', 'purchase_header_adjustment_id'], 'purchase_return_adj_alloc_return_header_uk');
 
             $table->unique(['id', 'tenant_id'], 'purchase_return_adjustment_allocations_id_tenant_uk');

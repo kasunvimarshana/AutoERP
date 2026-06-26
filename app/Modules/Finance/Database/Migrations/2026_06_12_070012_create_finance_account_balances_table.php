@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_account_balances', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_account_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_id');
             $table->foreignId('fiscal_year_id')->nullable();

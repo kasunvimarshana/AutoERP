@@ -30,7 +30,7 @@ return new class extends Migration
                 ->references(['id', 'platform_operator_id'])->on('auth_platform_sessions')->restrictOnDelete();
             $table->unique('token_key', 'auth_plat_access_key_uk');
             $table->unique(['id', 'platform_session_id', 'platform_operator_id'], 'auth_plat_access_graph_uk');
-            $table->index(['platform_session_id', 'status', 'expires_at'], 'auth_plat_access_status_idx');
+            $table->index(['platform_session_id', 'status', 'expires_at'], 'auth_plat_access_status_ix');
         });
     }
 

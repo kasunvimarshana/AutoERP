@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_usage_logs', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_usage_logs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('usage_number', 100);
@@ -57,10 +57,10 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'usage_number'], 'rental_usage_logs_tenant_number_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_usage_logs_fingerprint_uk');
-            $table->index(['vehicle_allocation_id', 'usage_date', 'status'], 'rental_usage_logs_allocation_date_idx');
-            $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_vehicle_date_idx');
-            $table->index(['driver_id', 'usage_date', 'status'], 'rental_usage_logs_driver_date_idx');
-            $table->index(['vehicle_id', 'status', 'started_at', 'id'], 'rental_usage_logs_odometer_chain_idx');
+            $table->index(['vehicle_allocation_id', 'usage_date', 'status'], 'rental_usage_logs_allocation_date_ix');
+            $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_vehicle_date_ix');
+            $table->index(['driver_id', 'usage_date', 'status'], 'rental_usage_logs_driver_date_ix');
+            $table->index(['vehicle_id', 'status', 'started_at', 'id'], 'rental_usage_logs_odometer_chain_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_usage_logs_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_logs_organization_unit_id_tenant_fk')

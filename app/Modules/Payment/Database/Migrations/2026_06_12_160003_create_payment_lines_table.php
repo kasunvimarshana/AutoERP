@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('payment_method_id');
@@ -36,9 +36,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index('payment_id', 'payment_lines_payment_idx');
-            $table->index(['payment_method_id', 'status'], 'payment_lines_method_status_idx');
-            $table->index(['instrument_number', 'external_bank_name'], 'payment_lines_instrument_idx');
+            $table->index('payment_id', 'payment_lines_payment_ix');
+            $table->index(['payment_method_id', 'status'], 'payment_lines_method_status_ix');
+            $table->index(['instrument_number', 'external_bank_name'], 'payment_lines_instrument_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_lines_organization_unit_id_tenant_fk')

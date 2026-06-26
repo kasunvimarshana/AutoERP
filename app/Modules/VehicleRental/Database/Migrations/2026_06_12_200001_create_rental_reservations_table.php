@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_reservations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_reservations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('reservation_number', 100);
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('billing_cycle', 30);
             $table->dateTime('requested_start_at');
             $table->dateTime('requested_end_at');
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_reservations_currency_fk')->restrictOnDelete();
             $table->decimal('estimated_amount', 20, 6)->default('0.000000');
             $table->decimal('estimated_deposit_amount', 20, 6)->default('0.000000');
             $table->string('status', 30)->default('draft');
@@ -40,9 +40,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'reservation_number'], 'rental_reservations_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'rental_reservations_scope_status_idx');
-            $table->index(['customer_id', 'requested_start_at'], 'rental_reservations_customer_start_idx');
-            $table->index(['requested_vehicle_id', 'requested_start_at', 'requested_end_at'], 'rental_reservations_vehicle_period_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'rental_reservations_scope_status_ix');
+            $table->index(['customer_id', 'requested_start_at'], 'rental_reservations_customer_start_ix');
+            $table->index(['requested_vehicle_id', 'requested_start_at', 'requested_end_at'], 'rental_reservations_vehicle_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_reservations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_reservations_organization_unit_id_tenant_fk')

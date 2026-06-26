@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('warehouses', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'warehouses_tenant_fk')->restrictOnDelete()->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
@@ -29,8 +29,8 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'warehouses_scope_name_uk');
             $table->unique(['tenant_id', 'organization_unit_id', 'code'], 'warehouses_scope_code_uk');
-            $table->index(['tenant_id', 'is_active'], 'warehouses_active_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'is_default'], 'warehouses_scope_default_idx');
+            $table->index(['tenant_id', 'is_active'], 'warehouses_active_ix');
+            $table->index(['tenant_id', 'organization_unit_id', 'is_default'], 'warehouses_scope_default_ix');
 
             $table->unique(['id', 'tenant_id'], 'warehouses_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'warehouses_organization_unit_id_tenant_fk')

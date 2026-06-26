@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('platform_operator_permissions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('platform_operator_id')->constrained('platform_operators', 'id')->cascadeOnDelete();
-            $table->foreignId('platform_permission_id')->constrained('platform_permissions', 'id')->restrictOnDelete();
+            $table->foreignId('platform_operator_id')->constrained('platform_operators', 'id', indexName: 'platform_operator_permissions_operator_fk')->cascadeOnDelete();
+            $table->foreignId('platform_permission_id')->constrained('platform_permissions', 'id', indexName: 'platform_operator_permissions_plat_permission_fk')->restrictOnDelete();
             $table->unsignedBigInteger('granted_by_operator_id')->nullable();
             $table->timestamps();
 

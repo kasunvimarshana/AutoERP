@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_invoice_links', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_invoice_links_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id');
             $table->string('source_type');
@@ -24,9 +24,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['invoice_id', 'source_type', 'source_id'], 'purchase_invoice_links_invoice_source_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_invoice_links_tenant_org_idx');
-            $table->index(['source_type', 'source_id'], 'purchase_invoice_links_source_idx');
-            $table->index('status', 'purchase_invoice_links_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_invoice_links_tenant_org_ix');
+            $table->index(['source_type', 'source_id'], 'purchase_invoice_links_source_ix');
+            $table->index('status', 'purchase_invoice_links_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'purchase_invoice_links_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_invoice_links_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('allocation_number');
             $table->date('allocation_date');
@@ -29,8 +29,8 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'allocation_number'], 'sales_allocations_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'sales_allocations_scope_idx');
-            $table->index(['sales_order_id', 'status'], 'sales_allocations_order_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'sales_allocations_scope_ix');
+            $table->index(['sales_order_id', 'status'], 'sales_allocations_order_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'sales_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_allocations_organization_unit_id_tenant_fk')

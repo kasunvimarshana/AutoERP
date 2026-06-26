@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_employees', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'hr_employees_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('employee_number');
             $table->string('code')->nullable();
@@ -44,11 +44,11 @@ return new class extends Migration
             $table->softDeletes();
             $table->unique(['tenant_id', 'employee_number'], 'hr_employees_tenant_number_uk');
             $table->unique(['tenant_id', 'code'], 'hr_employees_tenant_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'hr_employees_tenant_org_idx');
-            $table->index(['department_id', 'designation_id', 'employment_type_id'], 'hr_employees_workforce_idx');
-            $table->index('reporting_manager_id');
-            $table->index('status');
-            $table->index('availability_status');
+            $table->index(['tenant_id', 'organization_unit_id'], 'hr_employees_tenant_org_ix');
+            $table->index(['department_id', 'designation_id', 'employment_type_id'], 'hr_employees_workforce_ix');
+            $table->index('reporting_manager_id', 'hr_employees_reporting_manager_ix');
+            $table->index('status', 'hr_employees_status_ix');
+            $table->index('availability_status', 'hr_employees_availability_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employees_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_employees_organization_unit_id_tenant_fk')

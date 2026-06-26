@@ -12,12 +12,12 @@ return new class extends Migration
     {
         Schema::create('tenant_subscription_events', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_subscription_events_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('tenant_subscription_id');
             $table->unsignedBigInteger('previous_subscription_id')->nullable();
             $table->enum('event_type', ['assigned', 'renewed', 'extended', 'corrected', 'cancelled', 'expired']);
             $table->string('reason', 500)->nullable();
-            $table->unsignedBigInteger('actor_id')->nullable()->index('tenant_subscription_events_actor_idx');
+            $table->unsignedBigInteger('actor_id')->nullable()->index('tenant_subscription_events_actor_ix');
             $table->string('actor_type', 40)->default('system');
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();
@@ -35,7 +35,7 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('tenant_subscriptions')
                 ->restrictOnDelete();
-            $table->index(['tenant_id', 'occurred_at'], 'tenant_subscription_events_tenant_time_idx');
+            $table->index(['tenant_id', 'occurred_at'], 'tenant_subscription_events_tenant_time_ix');
         });
     }
 

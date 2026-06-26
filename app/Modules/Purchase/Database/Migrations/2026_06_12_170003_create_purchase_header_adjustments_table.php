@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_header_adjustments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_header_adjustments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('source_type');
             $table->unsignedBigInteger('source_id');
@@ -40,19 +40,19 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_header_adjustments_tenant_org_idx');
-            $table->index(['source_type', 'source_id'], 'purchase_header_adjustments_source_idx');
-            $table->index('adjustment_type', 'purchase_header_adjustments_type_idx');
-            $table->index('finance_posting_profile_id', 'purchase_header_adjustments_profile_idx');
-            $table->index('finance_account_id', 'purchase_header_adjustments_account_idx');
-            $table->index('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_header_adjustments_tenant_org_ix');
+            $table->index(['source_type', 'source_id'], 'purchase_header_adjustments_source_ix');
+            $table->index('adjustment_type', 'purchase_header_adjustments_type_ix');
+            $table->index('finance_posting_profile_id', 'purchase_header_adjustments_profile_ix');
+            $table->index('finance_account_id', 'purchase_header_adjustments_account_ix');
+            $table->index('origin_purchase_header_adjustment_id', 'purchase_header_adjustments_origin_ix');
 
             $table->unique(['id', 'tenant_id'], 'purchase_header_adjustments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_header_adjustments_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['finance_posting_profile_id', 'tenant_id'], 'purchase_header_adjustments_finance_posting_prof_ba428243_fk')
+            $table->foreign(['finance_posting_profile_id', 'tenant_id'], 'purchase_header_adjustments_fin_posting_profile_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('finance_posting_profiles')
                 ->restrictOnDelete();

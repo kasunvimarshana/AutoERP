@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('items', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'items_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_category_id')->nullable();
             $table->foreignId('item_brand_id')->nullable();
@@ -40,10 +40,10 @@ return new class extends Migration
             $table->unique(['tenant_id', 'code'], 'items_tenant_code_uk');
             $table->unique(['tenant_id', 'sku'], 'items_tenant_sku_uk');
             $table->unique(['tenant_id', 'barcode'], 'items_tenant_barcode_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'items_tenant_org_idx');
-            $table->index('sku', 'items_sku_idx');
-            $table->index('barcode', 'items_barcode_idx');
-            $table->index('item_type', 'items_type_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'items_tenant_org_ix');
+            $table->index('sku', 'items_sku_ix');
+            $table->index('barcode', 'items_barcode_ix');
+            $table->index('item_type', 'items_type_ix');
 
             $table->unique(['id', 'tenant_id'], 'items_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'items_organization_unit_id_tenant_fk')

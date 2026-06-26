@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_unapplied_balances', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_unapplied_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id')->unique('payment_unapplied_balances_payment_uk');
             $table->string('balance_type', 50)->default('credit');
@@ -29,8 +29,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['party_type', 'party_id', 'status'], 'payment_unapplied_party_status_idx');
-            $table->index(['source_type', 'source_id'], 'payment_unapplied_source_idx');
+            $table->index(['party_type', 'party_id', 'status'], 'payment_unapplied_party_status_ix');
+            $table->index(['source_type', 'source_id'], 'payment_unapplied_source_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_unapplied_balances_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_unapplied_balances_organization_unit_id_tenant_fk')

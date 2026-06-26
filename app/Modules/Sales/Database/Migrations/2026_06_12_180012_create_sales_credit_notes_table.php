@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_credit_notes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_credit_notes_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->foreignId('sales_return_id')->nullable();
@@ -27,7 +27,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'credit_note_number'], 'sales_credit_notes_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'sales_credit_notes_scope_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'sales_credit_notes_scope_ix');
 
             $table->unique(['id', 'tenant_id'], 'sales_credit_notes_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_credit_notes_organization_unit_id_tenant_fk')

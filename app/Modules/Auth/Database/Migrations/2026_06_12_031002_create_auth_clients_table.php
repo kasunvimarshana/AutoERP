@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_clients', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_clients_tenant_fk')->restrictOnDelete();
             $table->string('client_key', 120);
             $table->string('client_name', 180);
             $table->string('client_secret_hash')->nullable();
@@ -29,7 +29,7 @@ return new class extends Migration
 
             $table->unique(['id', 'tenant_id'], 'auth_client_id_tenant_uk');
             $table->unique(['tenant_id', 'client_key'], 'auth_client_key_uk');
-            $table->index(['tenant_id', 'status', 'expires_at'], 'auth_client_status_idx');
+            $table->index(['tenant_id', 'status', 'expires_at'], 'auth_client_status_ix');
         });
     }
 

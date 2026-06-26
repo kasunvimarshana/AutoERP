@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_bank_statement_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('reconciliation_id');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_bank_statement_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('bank_account_id');
             $table->date('statement_date');
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamp('matched_at')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_stmt_scope_account_idx');
-            $table->index(['reconciliation_id', 'status'], 'finance_bank_stmt_recon_status_idx');
-            $table->index('matched_ledger_entry_id', 'finance_bank_stmt_ledger_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_stmt_scope_account_ix');
+            $table->index(['reconciliation_id', 'status'], 'finance_bank_stmt_recon_status_ix');
+            $table->index('matched_ledger_entry_id', 'finance_bank_stmt_ledger_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_bank_statement_lines_id_tenant_uk');
             $table->foreign(['reconciliation_id', 'tenant_id'], 'finance_bank_statement_lines_reconciliation_id_tenant_fk')
@@ -44,7 +44,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('finance_accounts')
                 ->restrictOnDelete();
-            $table->foreign(['matched_ledger_entry_id', 'tenant_id'], 'finance_bank_statement_lines_matched_ledger_entr_16443ecc_fk')
+            $table->foreign(['matched_ledger_entry_id', 'tenant_id'], 'finance_bank_statement_lines_matched_ledger_entry_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('finance_ledger_entries')
                 ->restrictOnDelete();

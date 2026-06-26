@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_allocation_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_allocation_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('sales_allocation_id');
             $table->foreignId('sales_order_line_id');
@@ -29,9 +29,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['sales_allocation_id', 'line_number'], 'sales_allocation_lines_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'sales_allocation_lines_scope_idx');
-            $table->index(['sales_order_line_id', 'status'], 'sales_allocation_lines_source_status_idx');
-            $table->index('inventory_allocation_id', 'sales_allocation_lines_inventory_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'sales_allocation_lines_scope_ix');
+            $table->index(['sales_order_line_id', 'status'], 'sales_allocation_lines_source_status_ix');
+            $table->index('inventory_allocation_id', 'sales_allocation_lines_inventory_ix');
 
             $table->unique(['id', 'tenant_id'], 'sales_allocation_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_allocation_lines_organization_unit_id_tenant_fk')

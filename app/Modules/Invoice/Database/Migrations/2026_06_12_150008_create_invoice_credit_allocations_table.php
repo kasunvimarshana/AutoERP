@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_credit_allocations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoice_credit_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('credit_source_type');
             $table->unsignedBigInteger('credit_source_id');
@@ -23,8 +23,8 @@ return new class extends Migration
             $table->decimal('remaining_invoice_balance', 20, 6)->default('0');
             $table->timestamps();
 
-            $table->index(['credit_source_type', 'credit_source_id'], 'invoice_credit_allocations_source_idx');
-            $table->index('invoice_id', 'invoice_credit_allocations_invoice_idx');
+            $table->index(['credit_source_type', 'credit_source_id'], 'invoice_credit_allocations_source_ix');
+            $table->index('invoice_id', 'invoice_credit_allocations_invoice_ix');
 
             $table->unique(['id', 'tenant_id'], 'invoice_credit_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_credit_allocations_organization_unit_id_tenant_fk')

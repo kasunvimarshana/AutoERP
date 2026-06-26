@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('public_id')->unique('auth_reg_invite_deliveries_public_uk');
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'auth_registration_invitation_deliveries_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('invitation_id');
             $table->unsignedInteger('attempt_number');
             $table->string('status', 30)->default('queued');
@@ -45,18 +45,9 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('auth_registration_invitations')
                 ->restrictOnDelete();
-            $table->index(
-                ['status', 'lease_expires_at', 'requested_at'],
-                'auth_reg_invite_deliveries_work_idx',
-            );
-            $table->index(
-                ['tenant_id', 'invitation_id', 'requested_at'],
-                'auth_reg_invite_deliveries_invitation_idx',
-            );
-            $table->index(
-                ['provider', 'provider_message_id'],
-                'auth_reg_invite_deliveries_provider_idx',
-            );
+            $table->index(['status', 'lease_expires_at', 'requested_at'], 'auth_reg_invite_deliveries_work_ix', );
+            $table->index(['tenant_id', 'invitation_id', 'requested_at'], 'auth_reg_invite_deliveries_invitation_ix', );
+            $table->index(['provider', 'provider_message_id'], 'auth_reg_invite_deliveries_provider_ix', );
         });
     }
 

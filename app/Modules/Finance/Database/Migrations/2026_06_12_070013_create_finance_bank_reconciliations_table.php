@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_bank_reconciliations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_bank_reconciliations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('bank_account_id');
             $table->string('statement_reference', 150);
@@ -32,8 +32,8 @@ return new class extends Migration
                 ['tenant_id', 'organization_unit_id', 'bank_account_id', 'statement_reference'],
                 'finance_bank_recon_scope_statement_uk',
             );
-            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_recon_scope_account_idx');
-            $table->index('status', 'finance_bank_recon_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'finance_bank_recon_scope_account_ix');
+            $table->index('status', 'finance_bank_recon_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_bank_reconciliations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_bank_reconciliations_organization_unit_id_tenant_fk')

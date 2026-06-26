@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_valuation_layers', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_valuation_layers_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('base_uom_id')->nullable();
@@ -34,13 +34,13 @@ return new class extends Migration
             $table->string('status', 30)->default('open');
             $table->timestamps();
 
-            $table->index('item_id', 'inventory_valuation_layers_item_idx');
-            $table->index('warehouse_id', 'inventory_valuation_layers_warehouse_idx');
-            $table->index('batch_id', 'inventory_valuation_layers_batch_idx');
-            $table->index(['source_type', 'source_id'], 'inventory_valuation_layers_source_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'inventory_valuation_layers_source_line_idx');
-            $table->index('movement_id', 'inventory_valuation_layers_movement_idx');
-            $table->index('status', 'inventory_valuation_layers_status_idx');
+            $table->index('item_id', 'inventory_valuation_layers_item_ix');
+            $table->index('warehouse_id', 'inventory_valuation_layers_warehouse_ix');
+            $table->index('batch_id', 'inventory_valuation_layers_batch_ix');
+            $table->index(['source_type', 'source_id'], 'inventory_valuation_layers_source_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'inventory_valuation_layers_source_line_ix');
+            $table->index('movement_id', 'inventory_valuation_layers_movement_ix');
+            $table->index('status', 'inventory_valuation_layers_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_valuation_layers_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_valuation_layers_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_balances', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoice_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id')->unique('invoice_balances_invoice_uk');
             $table->decimal('invoice_total', 20, 6)->default('0');

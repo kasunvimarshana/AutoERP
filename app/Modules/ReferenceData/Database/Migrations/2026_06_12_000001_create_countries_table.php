@@ -19,7 +19,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['is_active', 'name'], 'countries_active_name_idx');
+            $table->index(['is_active', 'name'], 'countries_active_name_ix');
         });
     }
 

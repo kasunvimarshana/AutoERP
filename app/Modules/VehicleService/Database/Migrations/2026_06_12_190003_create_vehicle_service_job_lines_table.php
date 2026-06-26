@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_service_job_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_job_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_service_job_id');
             $table->foreignId('parent_line_id')->nullable();
@@ -45,9 +45,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['vehicle_service_job_id', 'line_number'], 'vehicle_service_job_lines_job_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_job_lines_tenant_org_idx');
-            $table->index(['vehicle_service_job_id', 'line_source_type'], 'vehicle_service_job_lines_job_type_idx');
-            $table->index('parent_line_id', 'vehicle_service_job_lines_parent_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_job_lines_tenant_org_ix');
+            $table->index(['vehicle_service_job_id', 'line_source_type'], 'vehicle_service_job_lines_job_type_ix');
+            $table->index('parent_line_id', 'vehicle_service_job_lines_parent_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_job_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_job_lines_organization_unit_id_tenant_fk')

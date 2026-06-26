@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_reservations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_reservations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('reservation_number', 80);
             $table->date('reservation_date');
@@ -43,11 +43,11 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'reservation_number'], 'inventory_reservations_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_reservations_tenant_org_idx');
-            $table->index('item_id', 'inventory_reservations_item_idx');
-            $table->index('warehouse_id', 'inventory_reservations_warehouse_idx');
-            $table->index(['source_type', 'source_id'], 'inventory_reservations_source_idx');
-            $table->index('status', 'inventory_reservations_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_reservations_tenant_org_ix');
+            $table->index('item_id', 'inventory_reservations_item_ix');
+            $table->index('warehouse_id', 'inventory_reservations_warehouse_ix');
+            $table->index(['source_type', 'source_id'], 'inventory_reservations_source_ix');
+            $table->index('status', 'inventory_reservations_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_reservations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_reservations_organization_unit_id_tenant_fk')

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('permissions', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'permissions_tenant_fk')->restrictOnDelete();
             $table->string('name');
             $table->string('guard_name', 100);
             $table->string('module', 100);
@@ -23,7 +23,7 @@ return new class extends Migration
 
             $table->unique(['id', 'tenant_id'], 'permissions_id_tenant_uk');
             $table->unique(['tenant_id', 'name', 'guard_name'], 'permissions_name_guard_uk');
-            $table->index(['tenant_id', 'module', 'is_active'], 'permissions_module_active_idx');
+            $table->index(['tenant_id', 'module', 'is_active'], 'permissions_module_active_ix');
         });
     }
 

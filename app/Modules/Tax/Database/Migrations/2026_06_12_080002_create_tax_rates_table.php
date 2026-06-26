@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_rates', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_rates_tenant_fk')->restrictOnDelete();
             $table->foreignId('tax_id');
             $table->decimal('rate', 20, 6);
             $table->date('effective_from');
@@ -25,8 +25,8 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('taxes')
                 ->cascadeOnDelete();
-            $table->index(['tenant_id', 'tax_id', 'active', 'effective_from'], 'tax_rates_tax_active_from_idx');
-            $table->index(['effective_from', 'effective_to'], 'tax_rates_dates_idx');
+            $table->index(['tenant_id', 'tax_id', 'active', 'effective_from'], 'tax_rates_tax_active_from_ix');
+            $table->index(['effective_from', 'effective_to'], 'tax_rates_dates_ix');
         });
     }
 

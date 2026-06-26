@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('organization_units', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Optimistic concurrency version.');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'organization_units_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('type_id');
             $table->unsignedBigInteger('parent_id')->nullable();
 
@@ -48,8 +48,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'path_hash'], 'organization_units_path_hash_uk');
             $table->unique(['tenant_id', 'code'], 'organization_units_code_uk');
             $table->unique(['tenant_id', 'root_marker'], 'organization_units_root_uk');
-            $table->index(['tenant_id', 'parent_id', 'is_active', 'retired_at'], 'organization_units_parent_state_idx');
-            $table->index(['tenant_id', 'name'], 'organization_units_name_idx');
+            $table->index(['tenant_id', 'parent_id', 'is_active', 'retired_at'], 'organization_units_parent_state_ix');
+            $table->index(['tenant_id', 'name'], 'organization_units_name_ix');
         });
     }
 

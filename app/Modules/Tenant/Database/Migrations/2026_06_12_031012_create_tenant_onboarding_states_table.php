@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tenant_onboarding_states', function (Blueprint $table): void {
-            $table->foreignId('tenant_id')->primary()->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->primary('tenant_onboarding_states_tenant_pk')->constrained('tenants', 'id', indexName: 'tenant_onboarding_states_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->enum('status', [
                 'pending',
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('failed_step', 80)->nullable();
             $table->string('last_error_code', 100)->nullable();
             $table->string('last_error_message', 500)->nullable();
-            $table->uuid('correlation_id')->nullable()->index('tenant_onboarding_correlation_idx');
+            $table->uuid('correlation_id')->nullable()->index('tenant_onboarding_correlation_ix');
             $table->timestamp('provisioned_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -57,7 +57,7 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('auth_registration_invitations')
                 ->restrictOnDelete();
-            $table->index(['status', 'updated_at'], 'tenant_onboarding_status_idx');
+            $table->index(['status', 'updated_at'], 'tenant_onboarding_status_ix');
         });
 
     }

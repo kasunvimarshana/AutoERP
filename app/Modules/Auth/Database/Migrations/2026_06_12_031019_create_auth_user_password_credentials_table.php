@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_user_password_credentials', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_user_password_credentials_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('user_id');
             $table->string('password_hash');
             $table->string('status', 30);
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'user_id'], 'auth_user_credential_user_uk');
             $table->foreign(['user_id', 'tenant_id'], 'auth_user_credential_user_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            $table->index(['tenant_id', 'status'], 'auth_user_credential_status_idx');
+            $table->index(['tenant_id', 'status'], 'auth_user_credential_status_ix');
         });
     }
 

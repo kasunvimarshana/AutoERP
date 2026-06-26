@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_login_attempts', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_login_attempts_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('login_identifier_hash', 64);
             $table->boolean('was_successful');
@@ -24,8 +24,8 @@ return new class extends Migration
 
             $table->foreign(['user_id', 'tenant_id'], 'auth_login_user_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            $table->index(['tenant_id', 'login_identifier_hash', 'attempted_at'], 'auth_login_account_idx');
-            $table->index(['tenant_id', 'ip_address', 'attempted_at'], 'auth_login_ip_idx');
+            $table->index(['tenant_id', 'login_identifier_hash', 'attempted_at'], 'auth_login_account_ix');
+            $table->index(['tenant_id', 'ip_address', 'attempted_at'], 'auth_login_ip_ix');
         });
     }
 

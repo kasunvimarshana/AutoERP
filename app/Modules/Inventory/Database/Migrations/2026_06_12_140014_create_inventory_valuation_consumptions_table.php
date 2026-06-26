@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_valuation_consumptions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_valuation_consumptions_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('issue_movement_id');
             $table->foreignId('valuation_layer_id');
@@ -27,11 +27,11 @@ return new class extends Migration
                 ['issue_movement_id', 'valuation_layer_id'],
                 'inventory_valuation_consumptions_issue_layer_uk',
             );
-            $table->index('valuation_layer_id', 'inventory_valuation_consumptions_layer_idx');
-            $table->index('reversed_by_movement_id', 'inventory_valuation_consumptions_reversal_idx');
+            $table->index('valuation_layer_id', 'inventory_valuation_consumptions_layer_ix');
+            $table->index('reversed_by_movement_id', 'inventory_valuation_consumptions_reversal_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_valuation_consumptions_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_valuation_consumptions_organization_un_afa30040_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_valuation_consumptions_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
@@ -39,11 +39,11 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_movements')
                 ->restrictOnDelete();
-            $table->foreign(['valuation_layer_id', 'tenant_id'], 'inventory_valuation_consumptions_valuation_layer_0488911c_fk')
+            $table->foreign(['valuation_layer_id', 'tenant_id'], 'inventory_valuation_consumptions_valuation_layer_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_valuation_layers')
                 ->restrictOnDelete();
-            $table->foreign(['reversed_by_movement_id', 'tenant_id'], 'inventory_valuation_consumptions_reversed_by_mov_28eeb155_fk')
+            $table->foreign(['reversed_by_movement_id', 'tenant_id'], 'inventory_valuation_consumptions_reversed_by_movement_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_movements')
                 ->restrictOnDelete();

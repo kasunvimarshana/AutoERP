@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
-                ->constrained('tenants', 'id')
+                ->constrained('tenants', 'id', indexName: 'sequences_tenant_fk')
                 ->restrictOnDelete()
                 ->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')
@@ -29,9 +29,9 @@ return new class extends Migration
             $table->enum('period_type', ['yearly', 'monthly', 'infinite'])->default('yearly');
             $table->string('period_value')->nullable()->comment('e.g., 2025');
             $table->string('scope_key')->comment('Non-null organization/period scope used for portable uniqueness.');
-            $table->unsignedBigInteger('created_by')->nullable()->index('sequences_created_by_idx');
-            $table->unsignedBigInteger('updated_by')->nullable()->index('sequences_updated_by_idx');
-            $table->unsignedBigInteger('deleted_by')->nullable()->index('sequences_deleted_by_idx');
+            $table->unsignedBigInteger('created_by')->nullable()->index('sequences_created_by_ix');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('sequences_updated_by_ix');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('sequences_deleted_by_ix');
 
             $table->timestamps();
             $table->softDeletes();

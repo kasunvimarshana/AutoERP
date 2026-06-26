@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('finance_budget_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('budget_id');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_budget_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_id');
             $table->foreignId('fiscal_period_id')->nullable();
@@ -22,8 +22,8 @@ return new class extends Migration
             $table->decimal('amount', 20, 6)->default('0.000000');
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'account_id'], 'finance_budget_lines_scope_account_idx');
-            $table->index(['budget_id', 'fiscal_period_id'], 'finance_budget_lines_budget_period_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'account_id'], 'finance_budget_lines_scope_account_ix');
+            $table->index(['budget_id', 'fiscal_period_id'], 'finance_budget_lines_budget_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_budget_lines_id_tenant_uk');
             $table->foreign(['budget_id', 'tenant_id'], 'finance_budget_lines_budget_id_tenant_fk')

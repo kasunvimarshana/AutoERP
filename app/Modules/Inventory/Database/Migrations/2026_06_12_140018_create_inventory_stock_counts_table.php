@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_stock_counts', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_stock_counts_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('count_number', 80);
             $table->date('count_date');
@@ -32,9 +32,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'count_number'], 'inventory_stock_counts_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_counts_scope_idx');
-            $table->index(['warehouse_id', 'warehouse_location_id'], 'inventory_stock_counts_wh_idx');
-            $table->index('status', 'inventory_stock_counts_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_counts_scope_ix');
+            $table->index(['warehouse_id', 'warehouse_location_id'], 'inventory_stock_counts_wh_ix');
+            $table->index('status', 'inventory_stock_counts_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_stock_counts_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_counts_organization_unit_id_tenant_fk')

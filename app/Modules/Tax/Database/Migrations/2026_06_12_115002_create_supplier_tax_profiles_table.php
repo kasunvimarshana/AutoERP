@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('supplier_tax_profiles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'supplier_tax_profiles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('supplier_id');
             $table->foreignId('tax_group_id')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('supplier_id', 'supplier_tax_profiles_supplier_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'active'], 'supplier_tax_profiles_scope_active_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'active'], 'supplier_tax_profiles_scope_active_ix');
 
             $table->unique(['id', 'tenant_id'], 'supplier_tax_profiles_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_tax_profiles_organization_unit_id_tenant_fk')

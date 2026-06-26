@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tenant_onboarding_steps', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_onboarding_steps_tenant_fk')->restrictOnDelete();
             $table->string('step', 80);
             $table->string('owner_module', 80);
             $table->enum('status', ['pending', 'running', 'completed', 'failed'])->default('pending');
@@ -26,8 +26,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'step'], 'tenant_onboarding_steps_tenant_step_uk');
-            $table->index(['tenant_id', 'status'], 'tenant_onboarding_steps_status_idx');
-            $table->index('operation_id', 'tenant_onboarding_steps_operation_idx');
+            $table->index(['tenant_id', 'status'], 'tenant_onboarding_steps_status_ix');
+            $table->index('operation_id', 'tenant_onboarding_steps_operation_ix');
         });
     }
 

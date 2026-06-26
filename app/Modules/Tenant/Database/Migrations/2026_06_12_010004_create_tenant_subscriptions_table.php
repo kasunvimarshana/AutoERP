@@ -12,10 +12,10 @@ return new class extends Migration
     {
         Schema::create('tenant_subscriptions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_subscriptions_tenant_fk')->restrictOnDelete();
             $table->unsignedInteger('revision_number');
             $table->enum('operation', ['assign', 'renew', 'extend', 'correct']);
-            $table->foreignId('tenant_plan_revision_id')->constrained('tenant_plan_revisions', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_plan_revision_id')->constrained('tenant_plan_revisions', 'id', indexName: 'tenant_subscriptions_tenant_plan_rev_fk')->restrictOnDelete();
             $table->unsignedBigInteger('supersedes_subscription_id')->nullable();
             $table->enum('contract_status', ['trial', 'active']);
             $table->dateTime('starts_at');
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->string('currency_symbol', 20)->nullable();
             $table->enum('billing_interval', ['month', 'quarter', 'year']);
 
-            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_subscriptions_created_by_idx');
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_subscriptions_created_by_ix');
             $table->string('created_by_type', 40)->default('system');
             $table->string('created_by_name')->nullable();
             $table->string('created_by_email')->nullable();
@@ -43,7 +43,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'revision_number'], 'tenant_subscriptions_tenant_revision_uk');
             $table->unique(['id', 'tenant_id'], 'tenant_subscriptions_id_tenant_uk');
-            $table->index(['tenant_id', 'starts_at', 'ends_at'], 'tenant_subscriptions_tenant_period_idx');
+            $table->index(['tenant_id', 'starts_at', 'ends_at'], 'tenant_subscriptions_tenant_period_ix');
             $table->foreign(
                 ['supersedes_subscription_id', 'tenant_id'],
                 'tenant_subscriptions_supersedes_tenant_fk',

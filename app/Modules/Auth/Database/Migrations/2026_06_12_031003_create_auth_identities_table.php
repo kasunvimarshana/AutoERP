@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_identities', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_identities_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('provider_id');
             $table->unsignedBigInteger('user_id');
             $table->string('provider_user_key', 190);
@@ -30,7 +30,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->unique(['tenant_id', 'provider_id', 'provider_user_key'], 'auth_identity_subject_uk');
             $table->unique(['tenant_id', 'user_id', 'primary_marker'], 'auth_identity_primary_uk');
-            $table->index(['tenant_id', 'user_id', 'status'], 'auth_identity_user_idx');
+            $table->index(['tenant_id', 'user_id', 'status'], 'auth_identity_user_ix');
         });
     }
 

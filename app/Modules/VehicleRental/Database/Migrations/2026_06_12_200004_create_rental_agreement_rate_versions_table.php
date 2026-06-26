@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_agreement_rate_versions', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_agreement_rate_versions_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->unsignedInteger('weekday_included_minutes')->default(0);
             $table->unsignedInteger('saturday_included_minutes')->default(0);
             $table->unsignedInteger('holiday_included_minutes')->default(0);
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_agreement_rate_versions_currency_fk')->restrictOnDelete();
             $table->foreignId('tax_group_id')->nullable();
             $table->foreignId('withholding_tax_group_id')->nullable();
             $table->string('status', 30)->default('draft');
@@ -43,10 +43,10 @@ return new class extends Migration
 
             $table->unique(['agreement_id', 'version_number'], 'rental_rate_versions_agreement_version_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_rate_versions_fingerprint_uk');
-            $table->index(['agreement_id', 'effective_from', 'effective_to', 'status'], 'rental_rate_versions_period_idx');
+            $table->index(['agreement_id', 'effective_from', 'effective_to', 'status'], 'rental_rate_versions_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_agreement_rate_versions_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_rate_versions_organization_unit_da3c849c_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_rate_versions_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
@@ -58,7 +58,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('tax_groups')
                 ->restrictOnDelete();
-            $table->foreign(['withholding_tax_group_id', 'tenant_id'], 'rental_agreement_rate_versions_withholding_tax_g_f2afbd68_fk')
+            $table->foreign(['withholding_tax_group_id', 'tenant_id'], 'rental_agreement_rate_versions_withholding_tax_group_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('tax_groups')
                 ->restrictOnDelete();

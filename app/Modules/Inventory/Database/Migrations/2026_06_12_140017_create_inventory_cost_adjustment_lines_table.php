@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_cost_adjustment_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_cost_adjustment_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('inventory_cost_adjustment_id');
             $table->foreignId('valuation_layer_id');
@@ -25,11 +25,11 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamps();
 
-            $table->index('inventory_cost_adjustment_id', 'inventory_cost_adj_lines_header_idx');
-            $table->index('valuation_layer_id', 'inventory_cost_adj_lines_layer_idx');
+            $table->index('inventory_cost_adjustment_id', 'inventory_cost_adj_lines_header_ix');
+            $table->index('valuation_layer_id', 'inventory_cost_adj_lines_layer_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_cost_adjustment_lines_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_cost_adjustment_lines_organization_uni_d10a6a53_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_cost_adjustment_lines_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();

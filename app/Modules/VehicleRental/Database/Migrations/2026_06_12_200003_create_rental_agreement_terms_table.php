@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_agreement_terms', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_agreement_terms_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['agreement_id', 'sequence'], 'rental_agreement_terms_sequence_uk');
-            $table->index(['agreement_id', 'is_active'], 'rental_agreement_terms_active_idx');
+            $table->index(['agreement_id', 'is_active'], 'rental_agreement_terms_active_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_agreement_terms_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreement_terms_organization_unit_id_tenant_fk')

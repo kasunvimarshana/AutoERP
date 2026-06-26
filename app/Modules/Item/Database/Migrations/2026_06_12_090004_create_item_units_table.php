@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('item_units', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_units_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('uom_id');
@@ -22,9 +22,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'item_units_tenant_org_idx');
-            $table->index('item_id', 'item_units_item_idx');
-            $table->index('uom_id', 'item_units_uom_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'item_units_tenant_org_ix');
+            $table->index('item_id', 'item_units_item_ix');
+            $table->index('uom_id', 'item_units_uom_ix');
             $table->unique(['item_id', 'uom_id', 'unit_role'], 'item_units_item_uom_role_uk');
 
             $table->unique(['id', 'tenant_id'], 'item_units_id_tenant_uk');

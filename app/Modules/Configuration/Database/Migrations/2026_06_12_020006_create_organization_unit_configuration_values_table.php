@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('organization_unit_configuration_values', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'organization_unit_configuration_values_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id');
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
@@ -33,10 +33,7 @@ return new class extends Migration
                 ['tenant_id', 'organization_unit_id', 'key'],
                 'organization_configuration_values_scope_key_uk',
             );
-            $table->index(
-                ['tenant_id', 'organization_unit_id', 'updated_at'],
-                'organization_configuration_values_scope_updated_idx',
-            );
+            $table->index(['tenant_id', 'organization_unit_id', 'updated_at'], 'organization_configuration_values_scope_updated_ix', );
 
             $table->unique(['id', 'tenant_id'], 'organization_unit_configuration_values_id_tenant_uk');
         });

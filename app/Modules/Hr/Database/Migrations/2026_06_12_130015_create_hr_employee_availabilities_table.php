@@ -22,9 +22,9 @@ return new class extends Migration
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
             $table->timestamps();
-            $table->index(['tenant_id', 'employee_id', 'availability_status'], 'hr_employee_availability_lookup_idx');
-            $table->index(['source_type', 'source_id'], 'hr_employee_availability_source_idx');
-            $table->index(['starts_at', 'ends_at'], 'hr_employee_availability_dates_idx');
+            $table->index(['tenant_id', 'employee_id', 'availability_status'], 'hr_employee_availability_lookup_ix');
+            $table->index(['source_type', 'source_id'], 'hr_employee_availability_source_ix');
+            $table->index(['starts_at', 'ends_at'], 'hr_employee_availability_dates_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_availabilities_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_availabilities_employee_id_tenant_fk')

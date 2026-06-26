@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_journal_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_journal_entries_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('journal_number', 100);
             $table->date('journal_date');
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->decimal('total_debit', 20, 6)->default('0');
             $table->decimal('total_credit', 20, 6)->default('0');
-            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'finance_journal_entries_currency_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('posted_by')->nullable();
@@ -42,14 +42,11 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'journal_number'], 'finance_journals_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'finance_journals_tenant_org_idx');
-            $table->index(['source_type', 'source_id'], 'finance_journals_source_idx');
-            $table->index(
-                ['tenant_id', 'source_module', 'source_type', 'source_id'],
-                'finance_journals_tenant_source_idx',
-            );
-            $table->index('journal_date', 'finance_journals_date_idx');
-            $table->index('status', 'finance_journals_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'finance_journals_tenant_org_ix');
+            $table->index(['source_type', 'source_id'], 'finance_journals_source_ix');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_journals_tenant_source_ix', );
+            $table->index('journal_date', 'finance_journals_date_ix');
+            $table->index('status', 'finance_journals_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_journal_entries_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_entries_organization_unit_id_tenant_fk')

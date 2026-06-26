@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('changed_by')->nullable();
             $table->dateTime('changed_at');
             $table->timestamps();
-            $table->index(['tenant_id', 'employee_id', 'changed_at'], 'hr_employee_status_history_idx');
+            $table->index(['tenant_id', 'employee_id', 'changed_at'], 'hr_employee_status_history_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_status_histories_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_status_histories_employee_id_tenant_fk')

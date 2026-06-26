@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_stock_count_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_stock_count_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('inventory_stock_count_id');
             $table->foreignId('item_id');
@@ -33,17 +33,17 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->index('inventory_stock_count_id', 'inventory_stock_count_lines_count_idx');
-            $table->index('item_id', 'inventory_stock_count_lines_item_idx');
-            $table->index('batch_id', 'inventory_stock_count_lines_batch_idx');
-            $table->index('serial_number_id', 'inventory_stock_count_lines_serial_idx');
+            $table->index('inventory_stock_count_id', 'inventory_stock_count_lines_count_ix');
+            $table->index('item_id', 'inventory_stock_count_lines_item_ix');
+            $table->index('batch_id', 'inventory_stock_count_lines_batch_ix');
+            $table->index('serial_number_id', 'inventory_stock_count_lines_serial_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_stock_count_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_count_lines_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['inventory_stock_count_id', 'tenant_id'], 'inventory_stock_count_lines_inventory_stock_coun_2ce87e46_fk')
+            $table->foreign(['inventory_stock_count_id', 'tenant_id'], 'inventory_stock_count_lines_invty_stock_count_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_stock_counts')
                 ->restrictOnDelete();
@@ -71,7 +71,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_serial_numbers')
                 ->restrictOnDelete();
-            $table->foreign(['inventory_adjustment_line_id', 'tenant_id'], 'inventory_stock_count_lines_inventory_adjustment_d9c6216b_fk')
+            $table->foreign(['inventory_adjustment_line_id', 'tenant_id'], 'inventory_stock_count_lines_invty_adjustment_line_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_adjustment_lines')
                 ->restrictOnDelete();

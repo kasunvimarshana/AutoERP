@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('idempotency_records', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'idempotency_records_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('operation', 120);
             $table->string('reference_hash', 64);
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('scope_hash', 'idempotency_records_scope_hash_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'operation'], 'idempotency_records_scope_idx');
-            $table->index(['operation', 'reference_hash'], 'idempotency_records_reference_idx');
-            $table->index('status', 'idempotency_records_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'operation'], 'idempotency_records_scope_ix');
+            $table->index(['operation', 'reference_hash'], 'idempotency_records_reference_ix');
+            $table->index('status', 'idempotency_records_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'idempotency_records_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'idempotency_records_organization_unit_id_tenant_fk')

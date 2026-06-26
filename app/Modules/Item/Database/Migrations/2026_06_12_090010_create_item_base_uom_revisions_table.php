@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('item_base_uom_revisions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_base_uom_revisions_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('old_base_uom_id');
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamp('applied_at')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'item_base_uom_revisions_scope_idx');
-            $table->index(['item_id', 'effective_at'], 'item_base_uom_revisions_item_effective_idx');
-            $table->index('status', 'item_base_uom_revisions_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'item_base_uom_revisions_scope_ix');
+            $table->index(['item_id', 'effective_at'], 'item_base_uom_revisions_item_effective_ix');
+            $table->index('status', 'item_base_uom_revisions_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'item_base_uom_revisions_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'item_base_uom_revisions_organization_unit_id_tenant_fk')

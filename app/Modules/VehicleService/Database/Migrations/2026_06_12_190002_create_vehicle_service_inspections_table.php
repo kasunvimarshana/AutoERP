@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_service_inspections', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_inspections_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_service_job_id');
             $table->text('customer_complaint')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('vehicle_service_job_id', 'vehicle_service_inspections_job_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_inspections_tenant_org_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_inspections_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_inspections_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_inspections_organization_unit_id_tenant_fk')

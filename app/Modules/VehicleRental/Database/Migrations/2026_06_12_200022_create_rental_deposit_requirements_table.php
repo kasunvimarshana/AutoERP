@@ -13,12 +13,12 @@ return new class extends Migration
         Schema::create('rental_deposit_requirements', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_deposit_requirements_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
             $table->decimal('required_amount', 20, 6);
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_deposit_requirements_currency_fk')->restrictOnDelete();
             $table->date('due_date')->nullable();
             $table->boolean('is_refundable')->default(true);
             $table->decimal('received_amount', 20, 6)->default('0.000000');
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('agreement_id', 'rental_deposit_requirements_agreement_uk');
-            $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_idx');
+            $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_deposit_requirements_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_requirements_organization_unit_id_tenant_fk')

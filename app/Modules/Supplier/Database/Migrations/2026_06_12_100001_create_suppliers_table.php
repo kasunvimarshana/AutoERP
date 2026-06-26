@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'suppliers_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_number');
             $table->string('code');
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('mobile')->nullable();
             $table->string('website')->nullable();
-            $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('default_currency_id')->nullable()->constrained('currencies', indexName: 'suppliers_default_currency_fk')->nullOnDelete();
             $table->unsignedBigInteger('payment_term_id')->nullable();
             $table->string('tax_registration_number')->nullable();
             $table->string('vat_number')->nullable();
@@ -43,11 +43,11 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'supplier_number'], 'suppliers_tenant_number_uk');
             $table->unique(['tenant_id', 'code'], 'suppliers_tenant_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'suppliers_tenant_org_idx');
-            $table->index('supplier_type', 'suppliers_type_idx');
-            $table->index('status', 'suppliers_status_idx');
-            $table->index('email', 'suppliers_email_idx');
-            $table->index('phone', 'suppliers_phone_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'suppliers_tenant_org_ix');
+            $table->index('supplier_type', 'suppliers_type_ix');
+            $table->index('status', 'suppliers_status_ix');
+            $table->index('email', 'suppliers_email_ix');
+            $table->index('phone', 'suppliers_phone_ix');
 
             $table->unique(['id', 'tenant_id'], 'suppliers_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'suppliers_organization_unit_id_tenant_fk')

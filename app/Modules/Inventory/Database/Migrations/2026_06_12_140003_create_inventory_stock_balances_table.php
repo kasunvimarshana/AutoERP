@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_stock_balances', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_stock_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('base_uom_id')->nullable();
@@ -36,11 +36,11 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('dimension_key', 'inventory_stock_balances_dimension_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_balances_tenant_org_idx');
-            $table->index('item_id', 'inventory_stock_balances_item_idx');
-            $table->index('warehouse_id', 'inventory_stock_balances_warehouse_idx');
-            $table->index('warehouse_location_id', 'inventory_stock_balances_location_idx');
-            $table->index('batch_id', 'inventory_stock_balances_batch_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_stock_balances_tenant_org_ix');
+            $table->index('item_id', 'inventory_stock_balances_item_ix');
+            $table->index('warehouse_id', 'inventory_stock_balances_warehouse_ix');
+            $table->index('warehouse_location_id', 'inventory_stock_balances_location_ix');
+            $table->index('batch_id', 'inventory_stock_balances_batch_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_stock_balances_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_balances_organization_unit_id_tenant_fk')

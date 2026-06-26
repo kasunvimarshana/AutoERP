@@ -11,14 +11,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tenant_current_subscriptions', function (Blueprint $table): void {
-            $table->unsignedBigInteger('tenant_id')->primary();
+            $table->unsignedBigInteger('tenant_id')->primary('tenant_current_subscriptions_tenant_pk');
             $table->unsignedBigInteger('tenant_subscription_id')->unique('tenant_current_subscriptions_subscription_uk');
             $table->enum('state', ['assigned', 'cancelled', 'expired'])->default('assigned');
             $table->string('state_reason', 500)->nullable();
             $table->dateTime('state_changed_at');
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamp('assigned_at')->useCurrent();
-            $table->unsignedBigInteger('assigned_by')->nullable()->index('tenant_current_subscriptions_assigned_by_idx');
+            $table->unsignedBigInteger('assigned_by')->nullable()->index('tenant_current_subscriptions_assigned_by_ix');
             $table->timestamps();
 
             $table->foreign('tenant_id', 'tenant_current_subscriptions_tenant_fk')
@@ -31,7 +31,7 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('tenant_subscriptions')
                 ->restrictOnDelete();
-            $table->index(['state', 'state_changed_at'], 'tenant_current_subscriptions_state_idx');
+            $table->index(['state', 'state_changed_at'], 'tenant_current_subscriptions_state_ix');
         });
     }
 

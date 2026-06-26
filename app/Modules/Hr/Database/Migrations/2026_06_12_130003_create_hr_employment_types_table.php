@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_employment_types', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'hr_employment_types_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('code');
             $table->string('name');
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
             $table->unique(['tenant_id', 'code'], 'hr_employment_types_tenant_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'hr_employment_types_tenant_org_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'hr_employment_types_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employment_types_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_employment_types_organization_unit_id_tenant_fk')

@@ -13,13 +13,13 @@ return new class extends Migration
         Schema::create('rental_calculation_runs', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_calculation_runs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('billing_period_id');
             $table->unsignedInteger('run_version');
             $table->foreignId('supersedes_run_id')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_calculation_runs_currency_fk')->restrictOnDelete();
             $table->string('calculation_status', 30)->default('draft');
             $table->string('document_status', 30)->default('not_generated');
             $table->decimal('net_total', 20, 6)->default('0.000000');
@@ -42,7 +42,7 @@ return new class extends Migration
 
             $table->unique(['billing_period_id', 'run_version'], 'rental_calculation_runs_period_version_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_runs_fingerprint_uk');
-            $table->index(['billing_period_id', 'calculation_status'], 'rental_calculation_runs_period_status_idx');
+            $table->index(['billing_period_id', 'calculation_status'], 'rental_calculation_runs_period_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_calculation_runs_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_runs_organization_unit_id_tenant_fk')

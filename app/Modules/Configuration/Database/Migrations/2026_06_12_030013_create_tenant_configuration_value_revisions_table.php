@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('tenant_configuration_value_revisions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'tenant_configuration_value_revisions_tenant_fk')->restrictOnDelete();
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
             $table->enum('operation', ConfigurationRevisionOperation::values());
@@ -38,7 +38,7 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('tenant_configuration_value_revisions')
                 ->restrictOnDelete();
-            $table->index(['tenant_id', 'key', 'created_at'], 'tenant_configuration_revisions_key_created_idx');
+            $table->index(['tenant_id', 'key', 'created_at'], 'tenant_configuration_revisions_key_created_ix');
         });
     }
 

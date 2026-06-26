@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('user_organization_units', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'user_organization_units_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id');
             $table->unsignedBigInteger('user_id');
             $table->string('status', 30)->default(self::ACTIVE_STATUS);
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->unique(['id', 'tenant_id'], 'user_organization_units_id_tenant_uk');
             $table->unique(['tenant_id', 'user_id', 'organization_unit_id'], 'user_org_units_assignment_uk');
             $table->unique(['tenant_id', 'user_id', 'default_marker'], 'user_org_units_one_default_uk');
-            $table->index(['tenant_id', 'user_id', 'status'], 'user_org_units_access_idx');
+            $table->index(['tenant_id', 'user_id', 'status'], 'user_org_units_access_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'user_org_units_org_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['user_id', 'tenant_id'], 'user_org_units_user_tenant_fk')

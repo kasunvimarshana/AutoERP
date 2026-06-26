@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_platform_mfa_methods', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('platform_operator_id')->constrained('platform_operators')->restrictOnDelete();
+            $table->foreignId('platform_operator_id')->constrained('platform_operators', indexName: 'auth_platform_mfa_methods_operator_fk')->restrictOnDelete();
             $table->text('secret');
             $table->text('backup_code_hashes')->nullable();
             $table->string('status', 30);
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('platform_operator_id', 'auth_mfa_operator_uk');
-            $table->index(['status', 'enrollment_proof_expires_at'], 'auth_mfa_status_idx');
+            $table->index(['status', 'enrollment_proof_expires_at'], 'auth_mfa_status_ix');
         });
     }
 

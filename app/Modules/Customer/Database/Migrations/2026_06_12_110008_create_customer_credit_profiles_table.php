@@ -12,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('customer_credit_profiles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_credit_profiles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('customer_id')->unique();
+            $table->foreignId('customer_id')->unique('customer_credit_profiles_cust_uk');
             $table->decimal('credit_limit', 20, 6)->default('0.000000');
             $table->integer('credit_period_days')->nullable();
             $table->decimal('warning_threshold_percent', 20, 6)->default('80.000000');
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'customer_credit_profiles_tenant_org_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customer_credit_profiles_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'customer_credit_profiles_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_credit_profiles_organization_unit_id_tenant_fk')

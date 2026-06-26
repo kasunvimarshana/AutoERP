@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_allocations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('invoice_id');
@@ -29,8 +29,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_idx');
-            $table->index('invoice_id', 'payment_allocations_invoice_idx');
+            $table->index(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_ix');
+            $table->index('invoice_id', 'payment_allocations_invoice_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_allocations_organization_unit_id_tenant_fk')

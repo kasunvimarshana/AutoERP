@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('tenant_configuration_values', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'tenant_configuration_values_tenant_fk')->restrictOnDelete();
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
@@ -26,10 +26,7 @@ return new class extends Migration
                 ['tenant_id', 'key'],
                 'tenant_configuration_values_tenant_key_uk',
             );
-            $table->index(
-                ['tenant_id', 'updated_at'],
-                'tenant_configuration_values_tenant_updated_idx',
-            );
+            $table->index(['tenant_id', 'updated_at'], 'tenant_configuration_values_tenant_updated_ix', );
 
             $table->unique(['id', 'tenant_id'], 'tenant_configuration_values_id_tenant_uk');
         });

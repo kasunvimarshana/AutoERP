@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('user_documents', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'user_documents_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('user_id');
             $table->string('name');
             $table->string('active_name_key')->nullable();

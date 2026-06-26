@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_deposit_links', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_deposit_links_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('deposit_requirement_id');
@@ -31,9 +31,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'fingerprint'], 'rental_deposit_links_fingerprint_uk');
-            $table->index(['deposit_requirement_id', 'status', 'link_type'], 'rental_deposit_links_requirement_idx');
-            $table->index(['payment_id', 'status'], 'rental_deposit_links_payment_idx');
-            $table->index(['invoice_id', 'status'], 'rental_deposit_links_invoice_idx');
+            $table->index(['deposit_requirement_id', 'status', 'link_type'], 'rental_deposit_links_requirement_ix');
+            $table->index(['payment_id', 'status'], 'rental_deposit_links_payment_ix');
+            $table->index(['invoice_id', 'status'], 'rental_deposit_links_invoice_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_deposit_links_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_links_organization_unit_id_tenant_fk')

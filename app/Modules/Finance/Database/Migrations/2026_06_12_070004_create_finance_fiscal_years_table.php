@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_fiscal_years', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_fiscal_years_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('name');
             $table->date('start_date');

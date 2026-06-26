@@ -16,11 +16,11 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug', 100)->unique('tenant_plans_slug_uk');
             $table->boolean('is_active')->default(true);
-            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_plans_created_by_idx');
-            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_plans_updated_by_idx');
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_plans_created_by_ix');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_plans_updated_by_ix');
             $table->timestamps();
 
-            $table->index(['is_active', 'name'], 'tenant_plans_active_name_idx');
+            $table->index(['is_active', 'name'], 'tenant_plans_active_name_ix');
         });
     }
 

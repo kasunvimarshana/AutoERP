@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_journal_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_journal_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('journal_entry_id');
             $table->foreignId('account_id');
@@ -25,10 +25,10 @@ return new class extends Migration
             $table->unsignedInteger('line_number');
             $table->timestamps();
 
-            $table->index('journal_entry_id', 'finance_journal_lines_entry_idx');
-            $table->index('account_id', 'finance_journal_lines_account_idx');
-            $table->index('dimension_id', 'finance_journal_lines_dimension_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'finance_journal_lines_source_line_idx');
+            $table->index('journal_entry_id', 'finance_journal_lines_entry_ix');
+            $table->index('account_id', 'finance_journal_lines_account_ix');
+            $table->index('dimension_id', 'finance_journal_lines_dimension_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'finance_journal_lines_source_line_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_journal_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_lines_organization_unit_id_tenant_fk')

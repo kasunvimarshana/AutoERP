@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customer_documents', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_documents_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->string('document_type');
@@ -25,11 +25,11 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'customer_documents_tenant_org_idx');
-            $table->index('customer_id', 'customer_documents_customer_idx');
-            $table->index('document_type', 'customer_documents_type_idx');
-            $table->index('expiry_date', 'customer_documents_expiry_idx');
-            $table->index('status', 'customer_documents_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customer_documents_tenant_org_ix');
+            $table->index('customer_id', 'customer_documents_customer_ix');
+            $table->index('document_type', 'customer_documents_type_ix');
+            $table->index('expiry_date', 'customer_documents_expiry_ix');
+            $table->index('status', 'customer_documents_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'customer_documents_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_documents_organization_unit_id_tenant_fk')

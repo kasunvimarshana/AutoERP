@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_refunds', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_refunds_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('refund_payment_id')->nullable();
@@ -30,7 +30,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'refund_number'], 'payment_refunds_tenant_number_uk');
             $table->unique('refund_payment_id', 'payment_refunds_refund_payment_uk');
-            $table->index('payment_id', 'payment_refunds_payment_idx');
+            $table->index('payment_id', 'payment_refunds_payment_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_refunds_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_refunds_organization_unit_id_tenant_fk')

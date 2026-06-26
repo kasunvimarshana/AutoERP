@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_returns', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_returns_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('return_number');
             $table->date('return_date');
@@ -41,8 +41,8 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'return_number'], 'sales_returns_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'sales_returns_scope_idx');
-            $table->index(['customer_id', 'status'], 'sales_returns_customer_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'sales_returns_scope_ix');
+            $table->index(['customer_id', 'status'], 'sales_returns_customer_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'sales_returns_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_returns_organization_unit_id_tenant_fk')

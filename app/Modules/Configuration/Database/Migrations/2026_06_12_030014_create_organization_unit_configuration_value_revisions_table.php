@@ -56,10 +56,7 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->index(
-                ['tenant_id', 'organization_unit_id', 'key', 'created_at'],
-                'organization_unit_configuration_revisions_key_created_idx',
-            );
+            $table->index(['tenant_id', 'organization_unit_id', 'key', 'created_at'], 'organization_unit_configuration_revisions_key_created_ix', );
         });
     }
 

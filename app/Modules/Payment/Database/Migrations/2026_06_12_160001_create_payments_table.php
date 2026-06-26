@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('payment_number', 100);
             $table->enum('payment_type', [
@@ -34,7 +34,7 @@ return new class extends Migration
             $table->string('posting_status', 50)->default('not_posted');
             $table->string('instrument_status', 50)->nullable();
             $table->date('payment_date');
-            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'payments_currency_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->string('reference_number')->nullable();
             $table->string('cheque_number', 100)->nullable();
@@ -80,16 +80,16 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'payment_number'], 'payments_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'payments_tenant_org_idx');
-            $table->index(['payment_type', 'direction', 'status'], 'payments_type_direction_status_idx');
-            $table->index(['document_status', 'allocation_status', 'posting_status'], 'payments_status_dimensions_idx');
-            $table->index(['party_type', 'party_id'], 'payments_party_idx');
-            $table->index(['source_type', 'source_id'], 'payments_source_idx');
-            $table->index('cheque_number', 'payments_cheque_number_idx');
-            $table->index('payment_date', 'payments_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'payments_tenant_org_ix');
+            $table->index(['payment_type', 'direction', 'status'], 'payments_type_direction_status_ix');
+            $table->index(['document_status', 'allocation_status', 'posting_status'], 'payments_status_dimensions_ix');
+            $table->index(['party_type', 'party_id'], 'payments_party_ix');
+            $table->index(['source_type', 'source_id'], 'payments_source_ix');
+            $table->index('cheque_number', 'payments_cheque_number_ix');
+            $table->index('payment_date', 'payments_date_ix');
             $table->unique('posting_correlation_key', 'payments_posting_correlation_uk');
-            $table->index('finance_journal_entry_id', 'payments_finance_journal_idx');
-            $table->index('original_payment_id', 'payments_original_payment_idx');
+            $table->index('finance_journal_entry_id', 'payments_finance_journal_ix');
+            $table->index('original_payment_id', 'payments_original_payment_ix');
 
             $table->unique(['id', 'tenant_id'], 'payments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payments_organization_unit_id_tenant_fk')

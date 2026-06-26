@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('vehicle_finance_status_histories', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_finance_status_histories_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('finance_agreement_id')->nullable();
@@ -25,15 +25,15 @@ return new class extends Migration
             $table->dateTime('changed_at');
             $table->timestamps();
 
-            $table->index(['finance_agreement_id', 'changed_at'], 'vehicle_finance_history_agreement_idx');
-            $table->index(['installment_id', 'changed_at'], 'vehicle_finance_history_installment_idx');
+            $table->index(['finance_agreement_id', 'changed_at'], 'vehicle_finance_history_agreement_ix');
+            $table->index(['installment_id', 'changed_at'], 'vehicle_finance_history_installment_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_finance_status_histories_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_status_histories_organization_un_fa664031_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_status_histories_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['finance_agreement_id', 'tenant_id'], 'vehicle_finance_status_histories_finance_agreeme_f2d9f3fa_fk')
+            $table->foreign(['finance_agreement_id', 'tenant_id'], 'vehicle_finance_status_histories_fin_agreement_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_finance_agreements')
                 ->cascadeOnDelete();

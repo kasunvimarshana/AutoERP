@@ -23,8 +23,8 @@ return new class extends Migration
 
             $table->foreign('platform_operator_id', 'auth_plat_login_operator_fk')
                 ->references('id')->on('platform_operators')->restrictOnDelete();
-            $table->index(['login_identifier_hash', 'attempted_at'], 'auth_plat_login_account_idx');
-            $table->index(['ip_address', 'attempted_at'], 'auth_plat_login_ip_idx');
+            $table->index(['login_identifier_hash', 'attempted_at'], 'auth_plat_login_account_ix');
+            $table->index(['ip_address', 'attempted_at'], 'auth_plat_login_ip_ix');
         });
     }
 

@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_sensitive')->default(false);
             $table->unsignedBigInteger('resulting_row_version')->nullable();
             $table->foreignId('source_revision_id')->nullable()
-                ->constrained('global_configuration_value_revisions')
+                ->constrained('global_configuration_value_revisions', indexName: 'global_configuration_value_revisions_source_revision_fk')
                 ->restrictOnDelete();
             $table->enum('actor_type', ConfigurationActorType::values());
             $table->unsignedBigInteger('actor_id')->nullable();
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('reason', 1000)->nullable();
             $table->dateTime('created_at');
 
-            $table->index(['key', 'created_at'], 'global_configuration_revisions_key_created_idx');
+            $table->index(['key', 'created_at'], 'global_configuration_revisions_key_created_ix');
         });
     }
 

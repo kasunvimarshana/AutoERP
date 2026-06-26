@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_service_jobs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_jobs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('job_number', 100);
             $table->date('job_date');
@@ -42,9 +42,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'job_number'], 'vehicle_service_jobs_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_idx');
-            $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_idx');
-            $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_ix');
+            $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_ix');
+            $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_jobs_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_jobs_organization_unit_id_tenant_fk')

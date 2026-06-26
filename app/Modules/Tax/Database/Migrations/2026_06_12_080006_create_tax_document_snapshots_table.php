@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_document_snapshots', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_document_snapshots_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('source_module', 100)->nullable();
             $table->string('source_type', 100);
@@ -39,8 +39,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'source_type', 'source_id'], 'tax_snapshots_source_idx');
-            $table->index(['tax_code', 'source_date'], 'tax_snapshots_code_date_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'source_type', 'source_id'], 'tax_snapshots_source_ix');
+            $table->index(['tax_code', 'source_date'], 'tax_snapshots_code_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'tax_document_snapshots_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'tax_document_snapshots_organization_unit_id_tenant_fk')

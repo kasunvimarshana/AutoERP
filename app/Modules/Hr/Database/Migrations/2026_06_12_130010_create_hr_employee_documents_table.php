@@ -23,8 +23,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
-            $table->index(['tenant_id', 'employee_id'], 'hr_employee_documents_scope_idx');
-            $table->index('expiry_date');
+            $table->index(['tenant_id', 'employee_id'], 'hr_employee_documents_scope_ix');
+            $table->index('expiry_date', 'hr_employee_documents_expiry_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_documents_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_documents_employee_id_tenant_fk')

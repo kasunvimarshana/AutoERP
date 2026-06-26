@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('supplier_contacts', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'supplier_contacts_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('supplier_id');
             $table->string('contact_name');
@@ -27,10 +27,10 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'supplier_contacts_tenant_org_idx');
-            $table->index('supplier_id', 'supplier_contacts_supplier_idx');
-            $table->index('email', 'supplier_contacts_email_idx');
-            $table->index('phone', 'supplier_contacts_phone_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'supplier_contacts_tenant_org_ix');
+            $table->index('supplier_id', 'supplier_contacts_supplier_ix');
+            $table->index('email', 'supplier_contacts_email_ix');
+            $table->index('phone', 'supplier_contacts_phone_ix');
 
             $table->unique(['id', 'tenant_id'], 'supplier_contacts_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'supplier_contacts_organization_unit_id_tenant_fk')

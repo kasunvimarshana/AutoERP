@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_driver_assignments', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_driver_assignments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
@@ -29,9 +29,9 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
 
-            $table->index(['employee_id', 'assigned_from', 'assigned_to', 'status'], 'rental_driver_assignments_employee_period_idx');
-            $table->index(['vehicle_allocation_id', 'assigned_from', 'assigned_to'], 'rental_driver_assignments_allocation_period_idx');
-            $table->index(['agreement_id', 'status'], 'rental_driver_assignments_agreement_status_idx');
+            $table->index(['employee_id', 'assigned_from', 'assigned_to', 'status'], 'rental_driver_assignments_employee_period_ix');
+            $table->index(['vehicle_allocation_id', 'assigned_from', 'assigned_to'], 'rental_driver_assignments_allocation_period_ix');
+            $table->index(['agreement_id', 'status'], 'rental_driver_assignments_agreement_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_driver_assignments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_driver_assignments_organization_unit_id_tenant_fk')

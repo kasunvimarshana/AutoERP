@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('role_permissions', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'role_permissions_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('role_id');
             $table->unsignedBigInteger('permission_id');
             $table->unsignedBigInteger('created_by_user_id')->nullable();

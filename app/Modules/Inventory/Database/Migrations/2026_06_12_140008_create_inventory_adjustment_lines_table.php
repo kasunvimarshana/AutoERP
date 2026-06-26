@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_adjustment_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_adjustment_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('inventory_adjustment_id');
             $table->foreignId('item_id');
@@ -34,8 +34,8 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamps();
 
-            $table->index('inventory_adjustment_id', 'inventory_adjustment_lines_adjustment_idx');
-            $table->index('item_id', 'inventory_adjustment_lines_item_idx');
+            $table->index('inventory_adjustment_id', 'inventory_adjustment_lines_adjustment_ix');
+            $table->index('item_id', 'inventory_adjustment_lines_item_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_adjustment_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_adjustment_lines_organization_unit_id_tenant_fk')

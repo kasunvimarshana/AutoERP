@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoice_adjustments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoice_adjustments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id');
             $table->string('source_adjustment_type')->nullable();
@@ -40,9 +40,9 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamps();
 
-            $table->index('invoice_id', 'invoice_adjustments_invoice_idx');
-            $table->index(['source_adjustment_type', 'source_adjustment_id'], 'invoice_adjustments_source_adjustment_idx');
-            $table->index(['source_type', 'source_id'], 'invoice_adjustments_source_idx');
+            $table->index('invoice_id', 'invoice_adjustments_invoice_ix');
+            $table->index(['source_adjustment_type', 'source_adjustment_id'], 'invoice_adjustments_source_adjustment_ix');
+            $table->index(['source_type', 'source_id'], 'invoice_adjustments_source_ix');
 
             $table->unique(['id', 'tenant_id'], 'invoice_adjustments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'invoice_adjustments_organization_unit_id_tenant_fk')

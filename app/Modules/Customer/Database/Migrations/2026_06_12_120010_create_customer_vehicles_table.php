@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customer_vehicles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_vehicles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->foreignId('vehicle_id');
@@ -27,10 +27,10 @@ return new class extends Migration
 
             $table->unique(['vehicle_id', 'current_guard'], 'customer_vehicles_one_current_uk');
             $table->unique(['vehicle_id', 'customer_id', 'active_guard'], 'customer_vehicles_active_pair_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'vehicle_id'], 'customer_vehicles_scope_vehicle_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'customer_id'], 'customer_vehicles_scope_customer_idx');
-            $table->index(['vehicle_id', 'is_current'], 'customer_vehicles_current_idx');
-            $table->index(['started_at', 'ended_at'], 'customer_vehicles_dates_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'vehicle_id'], 'customer_vehicles_scope_vehicle_ix');
+            $table->index(['tenant_id', 'organization_unit_id', 'customer_id'], 'customer_vehicles_scope_customer_ix');
+            $table->index(['vehicle_id', 'is_current'], 'customer_vehicles_current_ix');
+            $table->index(['started_at', 'ended_at'], 'customer_vehicles_dates_ix');
 
             $table->unique(['id', 'tenant_id'], 'customer_vehicles_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_vehicles_organization_unit_id_tenant_fk')

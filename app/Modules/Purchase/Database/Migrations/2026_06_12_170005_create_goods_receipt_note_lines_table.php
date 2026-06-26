@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('goods_receipt_note_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'goods_receipt_note_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('goods_receipt_note_id');
             $table->foreignId('purchase_order_line_id')->nullable();
@@ -43,15 +43,15 @@ return new class extends Migration
             $table->string('status')->default('open');
             $table->timestamps();
 
-            $table->index('goods_receipt_note_id', 'goods_receipt_note_lines_grn_idx');
-            $table->index('purchase_order_line_id', 'goods_receipt_note_lines_po_line_idx');
-            $table->index('item_id', 'goods_receipt_note_lines_item_idx');
-            $table->index('inventory_movement_id', 'goods_receipt_note_lines_movement_idx');
-            $table->index('status', 'goods_receipt_note_lines_status_idx');
-            $table->index('tax_group_id', 'goods_receipt_note_lines_tax_group_idx');
-            $table->index(['goods_receipt_note_id', 'purchase_order_line_id'], 'goods_receipt_note_lines_grn_po_line_idx');
-            $table->index(['goods_receipt_note_id', 'status'], 'goods_receipt_note_lines_grn_status_idx');
-            $table->index(['goods_receipt_note_id', 'accepted_quantity', 'invoiced_quantity', 'returned_quantity'], 'goods_receipt_note_lines_balance_idx');
+            $table->index('goods_receipt_note_id', 'goods_receipt_note_lines_grn_ix');
+            $table->index('purchase_order_line_id', 'goods_receipt_note_lines_po_line_ix');
+            $table->index('item_id', 'goods_receipt_note_lines_item_ix');
+            $table->index('inventory_movement_id', 'goods_receipt_note_lines_movement_ix');
+            $table->index('status', 'goods_receipt_note_lines_status_ix');
+            $table->index('tax_group_id', 'goods_receipt_note_lines_tax_group_ix');
+            $table->index(['goods_receipt_note_id', 'purchase_order_line_id'], 'goods_receipt_note_lines_grn_po_line_ix');
+            $table->index(['goods_receipt_note_id', 'status'], 'goods_receipt_note_lines_grn_status_ix');
+            $table->index(['goods_receipt_note_id', 'accepted_quantity', 'invoiced_quantity', 'returned_quantity'], 'goods_receipt_note_lines_balance_ix');
 
             $table->unique(['id', 'tenant_id'], 'goods_receipt_note_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'goods_receipt_note_lines_organization_unit_id_tenant_fk')

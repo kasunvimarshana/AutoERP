@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_processed_integration_events', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_processed_integration_events_tenant_fk')->restrictOnDelete();
             $table->string('source_system', 100);
             $table->uuid('event_id');
             $table->string('event_type', 160);
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'source_system', 'event_id'], 'auth_event_idempotency_uk');
-            $table->index('processed_at', 'auth_event_processed_idx');
+            $table->index('processed_at', 'auth_event_processed_ix');
         });
     }
 

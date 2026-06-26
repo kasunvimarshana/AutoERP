@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_service_line_employees', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_line_employees_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_service_job_id');
             $table->foreignId('vehicle_service_job_line_id');
@@ -32,14 +32,14 @@ return new class extends Migration
                 ['vehicle_service_job_line_id', 'employee_id', 'role_type'],
                 'vehicle_service_line_employees_assignment_uk',
             );
-            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_line_employees_tenant_org_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_line_employees_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_line_employees_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_line_employees_organization_unit_6c5ed7af_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_line_employees_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_line_employees_vehicle_service_j_ad8bb866_fk')
+            $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_line_employees_veh_svc_job_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_service_jobs')
                 ->cascadeOnDelete();

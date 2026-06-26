@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_refresh_tokens', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_refresh_tokens_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('access_token_id');
             $table->unsignedBigInteger('parent_refresh_token_id')->nullable();
             $table->uuid('family_id');
@@ -42,8 +42,8 @@ return new class extends Migration
                 ->references(['id', 'tenant_id', 'user_id'])->on('auth_sessions')->restrictOnDelete();
             $table->foreign(['client_id', 'tenant_id'], 'auth_refresh_client_fk')
                 ->references(['id', 'tenant_id'])->on('auth_clients')->restrictOnDelete();
-            $table->index(['family_id', 'status'], 'auth_refresh_family_idx');
-            $table->index(['session_id', 'status', 'expires_at'], 'auth_refresh_session_idx');
+            $table->index(['family_id', 'status'], 'auth_refresh_family_ix');
+            $table->index(['session_id', 'status', 'expires_at'], 'auth_refresh_session_ix');
         });
     }
 

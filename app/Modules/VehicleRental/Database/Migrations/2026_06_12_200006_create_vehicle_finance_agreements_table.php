@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('vehicle_finance_agreements', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_finance_agreements_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('agreement_number', 100);
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->date('agreement_date');
             $table->dateTime('starts_at');
             $table->dateTime('matures_at');
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'vehicle_finance_agreements_currency_fk')->restrictOnDelete();
             $table->decimal('principal_amount', 20, 6)->default('0.000000');
             $table->decimal('initial_deposit_amount', 20, 6)->default('0.000000');
             $table->decimal('residual_value', 20, 6)->default('0.000000');
@@ -42,8 +42,8 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'agreement_number'], 'vehicle_finance_agreements_tenant_number_uk');
-            $table->index(['vehicle_id', 'status', 'starts_at', 'matures_at'], 'vehicle_finance_agreements_vehicle_period_idx');
-            $table->index(['supplier_id', 'status'], 'vehicle_finance_agreements_supplier_status_idx');
+            $table->index(['vehicle_id', 'status', 'starts_at', 'matures_at'], 'vehicle_finance_agreements_vehicle_period_ix');
+            $table->index(['supplier_id', 'status'], 'vehicle_finance_agreements_supplier_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_finance_agreements_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_finance_agreements_organization_unit_id_tenant_fk')

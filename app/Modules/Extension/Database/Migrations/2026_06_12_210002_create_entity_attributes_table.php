@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('entity_attributes', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'entity_attributes_tenant_fk')->restrictOnDelete()->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
@@ -24,7 +24,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'entity_type', 'entity_id', 'attribute_key'], 'entity_attributes_type_id_key_idx');
+            $table->unique(['tenant_id', 'entity_type', 'entity_id', 'attribute_key'], 'entity_attributes_type_id_key_uk');
 
             $table->unique(['id', 'tenant_id'], 'entity_attributes_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'entity_attributes_organization_unit_id_tenant_fk')

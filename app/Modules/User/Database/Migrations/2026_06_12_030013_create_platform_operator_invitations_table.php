@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('platform_operator_invitations', function (Blueprint $table): void {
             $table->id();
             $table->uuid('public_id')->unique('platform_operator_invitations_public_uk');
-            $table->foreignId('platform_operator_id')->constrained('platform_operators', 'id')->cascadeOnDelete();
+            $table->foreignId('platform_operator_id')->constrained('platform_operators', 'id', indexName: 'platform_operator_invitations_operator_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('created_by_operator_id')->nullable();
             $table->char('token_hash', 64)->unique('platform_operator_invitations_token_uk');
             $table->text('delivery_token')->nullable();
@@ -29,10 +29,7 @@ return new class extends Migration
 
             $table->foreign('created_by_operator_id', 'platform_operator_invitations_actor_fk')
                 ->references('id')->on('platform_operators')->restrictOnDelete();
-            $table->index(
-                ['platform_operator_id', 'status', 'expires_at'],
-                'platform_operator_invitations_operator_status_idx',
-            );
+            $table->index(['platform_operator_id', 'status', 'expires_at'], 'platform_operator_invitations_operator_status_ix', );
         });
     }
 

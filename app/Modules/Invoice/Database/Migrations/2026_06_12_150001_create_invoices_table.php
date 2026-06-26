@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoices_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('invoice_number', 100);
             $table->enum('invoice_type', ['purchase', 'sales', 'service', 'rental', 'manual', 'credit', 'debit']);
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id')->nullable();
             $table->date('invoice_date');
             $table->date('due_date')->nullable();
-            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'invoices_currency_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->enum('status', ['draft', 'approved', 'posted', 'partially_paid', 'paid', 'cancelled', 'void'])->default('draft');
             $table->decimal('subtotal', 20, 6)->default('0');
@@ -42,9 +42,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'invoice_number'], 'invoices_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'invoices_tenant_org_idx');
-            $table->index(['invoice_type', 'direction', 'status'], 'invoices_type_direction_status_idx');
-            $table->index(['party_type', 'party_id'], 'invoices_party_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'invoices_tenant_org_ix');
+            $table->index(['invoice_type', 'direction', 'status'], 'invoices_type_direction_status_ix');
+            $table->index(['party_type', 'party_id'], 'invoices_party_ix');
 
             $table->unique(['id', 'tenant_id'], 'invoices_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'invoices_organization_unit_id_tenant_fk')

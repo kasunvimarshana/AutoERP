@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('supplier_item_mappings', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'supplier_item_mappings_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('supplier_id');
             $table->foreignId('item_id');
@@ -27,11 +27,11 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'supplier_item_mappings_tenant_org_idx');
-            $table->index('supplier_id', 'supplier_item_mappings_supplier_idx');
-            $table->index('item_id', 'supplier_item_mappings_item_idx');
-            $table->index('item_variant_id', 'supplier_item_mappings_variant_idx');
-            $table->index('supplier_item_code', 'supplier_item_mappings_code_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'supplier_item_mappings_tenant_org_ix');
+            $table->index('supplier_id', 'supplier_item_mappings_supplier_ix');
+            $table->index('item_id', 'supplier_item_mappings_item_ix');
+            $table->index('item_variant_id', 'supplier_item_mappings_variant_ix');
+            $table->index('supplier_item_code', 'supplier_item_mappings_code_ix');
             $table->unique(
                 ['supplier_id', 'item_id', 'item_variant_id'],
                 'supplier_item_mappings_supplier_item_variant_uk',

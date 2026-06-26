@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_allocation_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_allocation_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('allocation_id');
             $table->foreignId('stock_balance_id');
@@ -25,11 +25,11 @@ return new class extends Migration
             $table->decimal('quantity_remaining', 20, 6);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_allocation_lines_scope_idx');
-            $table->index('allocation_id', 'inventory_allocation_lines_allocation_idx');
-            $table->index('stock_balance_id', 'inventory_allocation_lines_balance_idx');
-            $table->index('batch_id', 'inventory_allocation_lines_batch_idx');
-            $table->index('serial_number_id', 'inventory_allocation_lines_serial_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_allocation_lines_scope_ix');
+            $table->index('allocation_id', 'inventory_allocation_lines_allocation_ix');
+            $table->index('stock_balance_id', 'inventory_allocation_lines_balance_ix');
+            $table->index('batch_id', 'inventory_allocation_lines_batch_ix');
+            $table->index('serial_number_id', 'inventory_allocation_lines_serial_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_allocation_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_allocation_lines_organization_unit_id_tenant_fk')

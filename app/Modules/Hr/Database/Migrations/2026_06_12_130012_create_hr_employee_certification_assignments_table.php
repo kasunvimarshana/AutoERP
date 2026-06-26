@@ -21,14 +21,14 @@ return new class extends Migration
             $table->string('status')->default('pending');
             $table->timestamps();
             $table->unique(['employee_id', 'certification_id'], 'hr_employee_certifications_uk');
-            $table->index(['tenant_id', 'certification_id'], 'hr_employee_certifications_lookup_idx');
+            $table->index(['tenant_id', 'certification_id'], 'hr_employee_certifications_lookup_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_certification_assignments_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_certification_assignments_employee_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')
                 ->cascadeOnDelete();
-            $table->foreign(['certification_id', 'tenant_id'], 'hr_employee_certification_assignments_certificat_962915eb_fk')
+            $table->foreign(['certification_id', 'tenant_id'], 'hr_employee_certification_assignments_certification_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('hr_certifications')
                 ->cascadeOnDelete();

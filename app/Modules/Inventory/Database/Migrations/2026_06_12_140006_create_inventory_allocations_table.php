@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('allocation_number', 80);
             $table->date('allocation_date');
@@ -48,15 +48,15 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'allocation_number'], 'inventory_allocations_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_allocations_tenant_org_idx');
-            $table->index('reservation_id', 'inventory_allocations_reservation_idx');
-            $table->index('item_id', 'inventory_allocations_item_idx');
-            $table->index('warehouse_id', 'inventory_allocations_warehouse_idx');
-            $table->index('batch_id', 'inventory_allocations_batch_idx');
-            $table->index('serial_number_id', 'inventory_allocations_serial_idx');
-            $table->index(['source_type', 'source_id'], 'inventory_allocations_source_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'inventory_allocations_source_line_idx');
-            $table->index('status', 'inventory_allocations_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_allocations_tenant_org_ix');
+            $table->index('reservation_id', 'inventory_allocations_reservation_ix');
+            $table->index('item_id', 'inventory_allocations_item_ix');
+            $table->index('warehouse_id', 'inventory_allocations_warehouse_ix');
+            $table->index('batch_id', 'inventory_allocations_batch_ix');
+            $table->index('serial_number_id', 'inventory_allocations_serial_ix');
+            $table->index(['source_type', 'source_id'], 'inventory_allocations_source_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'inventory_allocations_source_line_ix');
+            $table->index('status', 'inventory_allocations_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_allocations_organization_unit_id_tenant_fk')

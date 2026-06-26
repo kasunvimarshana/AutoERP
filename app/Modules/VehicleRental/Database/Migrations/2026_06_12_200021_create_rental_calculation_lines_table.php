@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_calculation_lines', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_calculation_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('calculation_run_id');
@@ -47,8 +47,8 @@ return new class extends Migration
 
             $table->unique(['calculation_run_id', 'line_number'], 'rental_calculation_lines_run_line_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_lines_fingerprint_uk');
-            $table->index(['usage_context_id', 'component_code'], 'rental_calculation_lines_usage_component_idx');
-            $table->index(['source_type', 'source_id'], 'rental_calculation_lines_source_idx');
+            $table->index(['usage_context_id', 'component_code'], 'rental_calculation_lines_usage_component_ix');
+            $table->index(['source_type', 'source_id'], 'rental_calculation_lines_source_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_calculation_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_lines_organization_unit_id_tenant_fk')

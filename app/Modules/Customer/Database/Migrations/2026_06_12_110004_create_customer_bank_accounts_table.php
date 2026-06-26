@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customer_bank_accounts', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_bank_accounts_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->string('bank_name');
@@ -21,16 +21,16 @@ return new class extends Migration
             $table->string('account_number');
             $table->string('swift_code')->nullable();
             $table->string('iban')->nullable();
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', indexName: 'customer_bank_accounts_currency_fk')->nullOnDelete();
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'customer_bank_accounts_tenant_org_idx');
-            $table->index('customer_id', 'customer_bank_accounts_customer_idx');
-            $table->index('account_number', 'customer_bank_accounts_number_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customer_bank_accounts_tenant_org_ix');
+            $table->index('customer_id', 'customer_bank_accounts_customer_ix');
+            $table->index('account_number', 'customer_bank_accounts_number_ix');
             $table->unique(['customer_id', 'account_number'], 'customer_bank_accounts_customer_number_uk');
 
             $table->unique(['id', 'tenant_id'], 'customer_bank_accounts_id_tenant_uk');

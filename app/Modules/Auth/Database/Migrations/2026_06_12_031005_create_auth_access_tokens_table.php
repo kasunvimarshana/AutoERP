@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('auth_access_tokens', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'auth_access_tokens_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('session_id');
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('client_id')->nullable();
@@ -34,7 +34,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])->on('auth_clients')->restrictOnDelete();
             $table->unique('token_key', 'auth_access_key_uk');
             $table->unique(['id', 'tenant_id', 'session_id', 'user_id'], 'auth_access_graph_uk');
-            $table->index(['session_id', 'status', 'expires_at'], 'auth_access_session_idx');
+            $table->index(['session_id', 'status', 'expires_at'], 'auth_access_session_ix');
         });
     }
 

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('item_bundles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_bundles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('parent_item_id');
             $table->foreignId('child_item_id');
@@ -24,9 +24,9 @@ return new class extends Migration
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'item_bundles_tenant_org_idx');
-            $table->index('parent_item_id', 'item_bundles_parent_idx');
-            $table->index('child_item_id', 'item_bundles_child_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'item_bundles_tenant_org_ix');
+            $table->index('parent_item_id', 'item_bundles_parent_ix');
+            $table->index('child_item_id', 'item_bundles_child_ix');
 
             $table->unique(['id', 'tenant_id'], 'item_bundles_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'item_bundles_organization_unit_id_tenant_fk')

@@ -35,8 +35,8 @@ return new class extends Migration
             $table->foreign(['platform_session_id', 'platform_operator_id'], 'auth_plat_refresh_session_fk')
                 ->references(['id', 'platform_operator_id'])->on('auth_platform_sessions')->restrictOnDelete();
             $table->unique('refresh_key', 'auth_plat_refresh_key_uk');
-            $table->index(['family_id', 'status'], 'auth_plat_refresh_family_idx');
-            $table->index(['platform_session_id', 'status', 'expires_at'], 'auth_plat_refresh_status_idx');
+            $table->index(['family_id', 'status'], 'auth_plat_refresh_family_ix');
+            $table->index(['platform_session_id', 'status', 'expires_at'], 'auth_plat_refresh_status_ix');
         });
     }
 

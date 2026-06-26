@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('payment_status_histories', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_status_histories_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->string('from_status', 50)->nullable();
@@ -23,8 +23,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['payment_id', 'changed_at'], 'payment_status_histories_payment_date_idx');
-            $table->index(['tenant_id', 'organization_unit_id'], 'payment_status_histories_tenant_org_idx');
+            $table->index(['payment_id', 'changed_at'], 'payment_status_histories_payment_date_ix');
+            $table->index(['tenant_id', 'organization_unit_id'], 'payment_status_histories_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_status_histories_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_status_histories_organization_unit_id_tenant_fk')

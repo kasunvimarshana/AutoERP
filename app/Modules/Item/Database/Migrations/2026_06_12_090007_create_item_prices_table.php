@@ -12,12 +12,12 @@ return new class extends Migration
     {
         Schema::create('item_prices', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_prices_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('item_variant_id')->nullable();
             $table->string('price_type', 30);
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', indexName: 'item_prices_currency_fk')->nullOnDelete();
             $table->foreignId('uom_id')->nullable();
             $table->decimal('amount', 20, 6);
             $table->date('effective_from')->nullable();
@@ -25,10 +25,10 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'item_prices_tenant_org_idx');
-            $table->index('item_id', 'item_prices_item_idx');
-            $table->index('item_variant_id', 'item_prices_variant_idx');
-            $table->index('price_type', 'item_prices_type_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'item_prices_tenant_org_ix');
+            $table->index('item_id', 'item_prices_item_ix');
+            $table->index('item_variant_id', 'item_prices_variant_ix');
+            $table->index('price_type', 'item_prices_type_ix');
 
             $table->unique(['id', 'tenant_id'], 'item_prices_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'item_prices_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_return_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_return_adjustment_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('sales_return_id');
             $table->foreignId('sales_header_adjustment_id');
@@ -27,11 +27,11 @@ return new class extends Migration
             $table->unique(['sales_return_id', 'sales_header_adjustment_id'], 'sales_return_adjustments_uk');
 
             $table->unique(['id', 'tenant_id'], 'sales_return_adjustment_allocations_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_return_adjustment_allocations_organization_c6eb7e6c_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_return_adjustment_allocations_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['sales_return_id', 'tenant_id'], 'sales_return_adjustment_allocations_sales_return_6f15c87a_fk')
+            $table->foreign(['sales_return_id', 'tenant_id'], 'sales_return_adjustment_allocations_sales_return_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('sales_returns')
                 ->cascadeOnDelete();

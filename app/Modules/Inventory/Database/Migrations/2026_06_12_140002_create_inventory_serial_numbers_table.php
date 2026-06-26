@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_serial_numbers', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_serial_numbers_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('item_variant_id')->nullable();
@@ -28,13 +28,13 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'serial_number'], 'inventory_serials_tenant_serial_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_serials_tenant_org_idx');
-            $table->index('item_id', 'inventory_serials_item_idx');
-            $table->index('serial_number', 'inventory_serials_serial_idx');
-            $table->index('batch_id', 'inventory_serials_batch_idx');
-            $table->index('warehouse_id', 'inventory_serials_warehouse_idx');
-            $table->index('warehouse_location_id', 'inventory_serials_location_idx');
-            $table->index('status', 'inventory_serials_status_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_serials_tenant_org_ix');
+            $table->index('item_id', 'inventory_serials_item_ix');
+            $table->index('serial_number', 'inventory_serials_serial_ix');
+            $table->index('batch_id', 'inventory_serials_batch_ix');
+            $table->index('warehouse_id', 'inventory_serials_warehouse_ix');
+            $table->index('warehouse_location_id', 'inventory_serials_location_ix');
+            $table->index('status', 'inventory_serials_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_serial_numbers_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_serial_numbers_organization_unit_id_tenant_fk')

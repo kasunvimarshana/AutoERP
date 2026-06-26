@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('item_codes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_codes_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->foreignId('item_variant_id')->nullable();
@@ -23,11 +23,11 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'item_codes_tenant_org_idx');
-            $table->index('item_id', 'item_codes_item_idx');
-            $table->index('item_variant_id', 'item_codes_variant_idx');
-            $table->index(['code_type', 'code'], 'item_codes_type_code_idx');
-            $table->index(['party_type', 'party_id'], 'item_codes_party_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'item_codes_tenant_org_ix');
+            $table->index('item_id', 'item_codes_item_ix');
+            $table->index('item_variant_id', 'item_codes_variant_ix');
+            $table->index(['code_type', 'code'], 'item_codes_type_code_ix');
+            $table->index(['party_type', 'party_id'], 'item_codes_party_ix');
             $table->unique(['tenant_id', 'code_type', 'code'], 'item_codes_tenant_type_code_uk');
 
             $table->unique(['id', 'tenant_id'], 'item_codes_id_tenant_uk');

@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_usage_contexts', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_usage_contexts_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('usage_log_id');
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('rate_version_id');
             $table->foreignId('customer_id')->nullable();
             $table->foreignId('supplier_id')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_usage_contexts_currency_fk')->restrictOnDelete();
             $table->char('context_fingerprint', 64);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -31,7 +31,7 @@ return new class extends Migration
 
             $table->unique(['usage_log_id', 'financial_side', 'agreement_id'], 'rental_usage_contexts_log_side_agreement_uk');
             $table->unique(['tenant_id', 'context_fingerprint'], 'rental_usage_contexts_fingerprint_uk');
-            $table->index(['agreement_id', 'financial_side', 'usage_log_id'], 'rental_usage_contexts_agreement_side_idx');
+            $table->index(['agreement_id', 'financial_side', 'usage_log_id'], 'rental_usage_contexts_agreement_side_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_usage_contexts_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_contexts_organization_unit_id_tenant_fk')

@@ -27,7 +27,7 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by_operator_id')->nullable();
             $table->timestamps();
 
-            $table->index(['status', 'email'], 'platform_operators_status_email_idx');
+            $table->index(['status', 'email'], 'platform_operators_status_email_ix');
             $table->foreign('created_by_operator_id', 'platform_operators_created_by_fk')
                 ->references('id')->on('platform_operators')->restrictOnDelete();
             $table->foreign('updated_by_operator_id', 'platform_operators_updated_by_fk')

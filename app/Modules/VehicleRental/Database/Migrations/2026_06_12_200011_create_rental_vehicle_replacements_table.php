@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_vehicle_replacements', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_vehicle_replacements_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('replacement_number', 100);
@@ -36,7 +36,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'replacement_number'], 'rental_vehicle_replacements_tenant_number_uk');
             $table->unique('old_allocation_id', 'rental_vehicle_replacements_old_uk');
             $table->unique('new_allocation_id', 'rental_vehicle_replacements_new_uk');
-            $table->index(['agreement_id', 'replacement_at'], 'rental_vehicle_replacements_agreement_at_idx');
+            $table->index(['agreement_id', 'replacement_at'], 'rental_vehicle_replacements_agreement_at_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_vehicle_replacements_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_vehicle_replacements_organization_unit_id_tenant_fk')

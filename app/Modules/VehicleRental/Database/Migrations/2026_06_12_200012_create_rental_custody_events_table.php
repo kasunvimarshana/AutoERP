@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_custody_events', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_custody_events_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('event_number', 100);
@@ -44,9 +44,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'event_number'], 'rental_custody_events_tenant_number_uk');
-            $table->index(['vehicle_id', 'occurred_at'], 'rental_custody_events_vehicle_at_idx');
-            $table->index(['vehicle_allocation_id', 'event_type', 'occurred_at'], 'rental_custody_events_allocation_type_idx');
-            $table->index(['status', 'occurred_at'], 'rental_custody_events_status_at_idx');
+            $table->index(['vehicle_id', 'occurred_at'], 'rental_custody_events_vehicle_at_ix');
+            $table->index(['vehicle_allocation_id', 'event_type', 'occurred_at'], 'rental_custody_events_allocation_type_ix');
+            $table->index(['status', 'occurred_at'], 'rental_custody_events_status_at_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_custody_events_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_custody_events_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_adjustment_allocations', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_adjustment_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->unsignedBigInteger('purchase_header_adjustment_id');
             $table->unsignedBigInteger('target_purchase_header_adjustment_id')->nullable();
@@ -43,19 +43,19 @@ return new class extends Migration
             $table->json('provenance')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_adj_alloc_tenant_org_idx');
-            $table->index(['purchase_header_adjustment_id', 'stage'], 'purchase_adj_alloc_source_stage_idx');
-            $table->index('target_purchase_header_adjustment_id', 'purchase_adj_alloc_target_adj_idx');
-            $table->index(['target_type', 'target_id'], 'purchase_adj_alloc_target_idx');
-            $table->index(['target_line_type', 'target_line_id'], 'purchase_adj_alloc_target_line_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_adj_alloc_tenant_org_ix');
+            $table->index(['purchase_header_adjustment_id', 'stage'], 'purchase_adj_alloc_source_stage_ix');
+            $table->index('target_purchase_header_adjustment_id', 'purchase_adj_alloc_target_adj_ix');
+            $table->index(['target_type', 'target_id'], 'purchase_adj_alloc_target_ix');
+            $table->index(['target_line_type', 'target_line_id'], 'purchase_adj_alloc_target_line_ix');
             $table->unique('correlation_key', 'purchase_adj_alloc_correlation_uk');
             $table->unique(['reversal_of_id', 'entry_type'], 'purchase_adj_alloc_one_reversal_uk');
-            $table->index(['purchase_header_adjustment_id', 'entry_type', 'stage'], 'purchase_adj_alloc_effective_stage_idx');
-            $table->index(['target_type', 'target_id', 'entry_type'], 'purchase_adj_alloc_target_effective_idx');
-            $table->index(['event_type', 'entry_type'], 'purchase_adj_alloc_event_idx');
+            $table->index(['purchase_header_adjustment_id', 'entry_type', 'stage'], 'purchase_adj_alloc_effective_stage_ix');
+            $table->index(['target_type', 'target_id', 'entry_type'], 'purchase_adj_alloc_target_effective_ix');
+            $table->index(['event_type', 'entry_type'], 'purchase_adj_alloc_event_ix');
 
             $table->unique(['id', 'tenant_id'], 'purchase_adjustment_allocations_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_adjustment_allocations_organization_uni_ff2af3ee_fk')
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_adjustment_allocations_org_unit_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
             $table->unique(['employee_id', 'skill_id'], 'hr_employee_skills_uk');
-            $table->index(['tenant_id', 'skill_id'], 'hr_employee_skills_lookup_idx');
+            $table->index(['tenant_id', 'skill_id'], 'hr_employee_skills_lookup_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_skill_assignments_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_skill_assignments_employee_id_tenant_fk')

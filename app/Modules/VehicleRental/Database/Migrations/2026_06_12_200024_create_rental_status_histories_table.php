@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_status_histories', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_status_histories_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('entity_type', 80);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->dateTime('changed_at');
             $table->timestamps();
 
-            $table->index(['tenant_id', 'entity_type', 'entity_id', 'changed_at'], 'rental_status_histories_entity_idx');
+            $table->index(['tenant_id', 'entity_type', 'entity_id', 'changed_at'], 'rental_status_histories_entity_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_status_histories_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_status_histories_organization_unit_id_tenant_fk')

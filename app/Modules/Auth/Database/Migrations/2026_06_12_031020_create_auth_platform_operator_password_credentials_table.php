@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('platform_operator_id', 'auth_plat_credential_operator_uk');
-            $table->index('status', 'auth_plat_credential_status_idx');
+            $table->index('status', 'auth_plat_credential_status_ix');
         });
     }
 

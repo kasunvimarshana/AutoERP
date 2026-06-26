@@ -12,14 +12,14 @@ return new class extends Migration
     {
         Schema::create('customer_category_assignments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_category_assignments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->foreignId('customer_category_id');
             $table->timestamps();
 
             $table->unique(['customer_id', 'customer_category_id'], 'customer_category_assignments_pair_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'customer_category_assignments_tenant_org_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customer_category_assignments_tenant_org_ix');
 
             $table->unique(['id', 'tenant_id'], 'customer_category_assignments_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_category_assignments_organization_unit_id_tenant_fk')

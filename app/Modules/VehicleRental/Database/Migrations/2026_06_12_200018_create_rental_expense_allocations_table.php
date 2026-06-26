@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_expense_allocations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_expense_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('expense_id');
@@ -38,7 +38,7 @@ return new class extends Migration
 
             $table->unique(['expense_id', 'sequence'], 'rental_expense_allocations_sequence_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_expense_allocations_fingerprint_uk');
-            $table->index(['allocation_type', 'status'], 'rental_expense_allocations_type_status_idx');
+            $table->index(['allocation_type', 'status'], 'rental_expense_allocations_type_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_expense_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_expense_allocations_organization_unit_id_tenant_fk')
@@ -53,7 +53,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('rental_agreements')
                 ->restrictOnDelete();
-            $table->foreign(['target_vehicle_allocation_id', 'tenant_id'], 'rental_expense_allocations_target_vehicle_alloca_bb603e58_fk')
+            $table->foreign(['target_vehicle_allocation_id', 'tenant_id'], 'rental_expense_allocations_target_veh_alloc_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_vehicle_allocations')
                 ->restrictOnDelete();

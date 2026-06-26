@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_vehicle_allocations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_vehicle_allocations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('allocation_number', 100);
@@ -40,9 +40,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'allocation_number'], 'rental_vehicle_allocations_tenant_number_uk');
-            $table->index(['vehicle_id', 'allocated_from', 'allocated_to', 'status'], 'rental_vehicle_allocations_vehicle_period_idx');
-            $table->index(['agreement_id', 'status', 'allocated_from'], 'rental_vehicle_allocations_agreement_status_idx');
-            $table->index(['source_allocation_id', 'allocated_from', 'allocated_to'], 'rental_vehicle_allocations_source_period_idx');
+            $table->index(['vehicle_id', 'allocated_from', 'allocated_to', 'status'], 'rental_vehicle_allocations_vehicle_period_ix');
+            $table->index(['agreement_id', 'status', 'allocated_from'], 'rental_vehicle_allocations_agreement_status_ix');
+            $table->index(['source_allocation_id', 'allocated_from', 'allocated_to'], 'rental_vehicle_allocations_source_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_vehicle_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_vehicle_allocations_organization_unit_id_tenant_fk')
@@ -65,7 +65,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('rental_vehicle_allocations')
                 ->restrictOnDelete();
-            $table->foreign(['vehicle_finance_agreement_id', 'tenant_id'], 'rental_vehicle_allocations_vehicle_finance_agree_3a7f95a2_fk')
+            $table->foreign(['vehicle_finance_agreement_id', 'tenant_id'], 'rental_vehicle_allocations_veh_fin_agreement_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_finance_agreements')
                 ->restrictOnDelete();

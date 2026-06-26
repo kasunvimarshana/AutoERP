@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_transfer_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_transfer_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('inventory_transfer_id');
             $table->foreignId('item_id');
@@ -34,8 +34,8 @@ return new class extends Migration
             $table->foreignId('inbound_movement_id')->nullable();
             $table->timestamps();
 
-            $table->index('inventory_transfer_id', 'inventory_transfer_lines_transfer_idx');
-            $table->index('item_id', 'inventory_transfer_lines_item_idx');
+            $table->index('inventory_transfer_id', 'inventory_transfer_lines_transfer_ix');
+            $table->index('item_id', 'inventory_transfer_lines_item_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_transfer_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_transfer_lines_organization_unit_id_tenant_fk')

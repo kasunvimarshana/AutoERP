@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_usage_events', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_usage_events_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('usage_log_id');
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['usage_log_id', 'sequence'], 'rental_usage_events_sequence_uk');
-            $table->index(['usage_log_id', 'event_type'], 'rental_usage_events_type_idx');
+            $table->index(['usage_log_id', 'event_type'], 'rental_usage_events_type_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_usage_events_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_events_organization_unit_id_tenant_fk')

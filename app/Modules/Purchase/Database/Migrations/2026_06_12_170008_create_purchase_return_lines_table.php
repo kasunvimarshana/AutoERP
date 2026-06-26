@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_return_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_return_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('purchase_return_id');
             $table->unsignedInteger('line_number')->nullable();
@@ -37,10 +37,10 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamps();
 
-            $table->index('purchase_return_id', 'purchase_return_lines_return_idx');
-            $table->index('item_id', 'purchase_return_lines_item_idx');
-            $table->index(['source_line_type', 'source_line_id'], 'purchase_return_lines_source_line_idx');
-            $table->index('inventory_movement_id', 'purchase_return_lines_movement_idx');
+            $table->index('purchase_return_id', 'purchase_return_lines_return_ix');
+            $table->index('item_id', 'purchase_return_lines_item_ix');
+            $table->index(['source_line_type', 'source_line_id'], 'purchase_return_lines_source_line_ix');
+            $table->index('inventory_movement_id', 'purchase_return_lines_movement_ix');
             $table->unique(['purchase_return_id', 'line_number'], 'purchase_return_lines_return_line_number_uk');
             $table->unique(['purchase_return_id', 'client_line_key'], 'purchase_return_lines_return_client_key_uk');
             $table->unique(['purchase_return_id', 'source_line_type', 'source_line_id'], 'purchase_return_lines_return_source_uk');

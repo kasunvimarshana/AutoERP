@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('item_variants', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'item_variants_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_id');
             $table->string('code', 80);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'code'], 'item_variants_tenant_code_uk');
-            $table->index('item_id', 'item_variants_item_idx');
+            $table->index('item_id', 'item_variants_item_ix');
 
             $table->unique(['id', 'tenant_id'], 'item_variants_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'item_variants_organization_unit_id_tenant_fk')

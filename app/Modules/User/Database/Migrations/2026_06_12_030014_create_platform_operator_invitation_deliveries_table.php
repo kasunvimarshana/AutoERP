@@ -14,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('platform_operator_invitation_deliveries', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('invitation_id')->constrained('platform_operator_invitations', 'id')->cascadeOnDelete();
+            $table->foreignId('invitation_id')->constrained('platform_operator_invitations', 'id', indexName: 'platform_operator_invitation_deliveries_invite_fk')->cascadeOnDelete();
             $table->unsignedInteger('attempt_number');
             $table->string('status', 30)->default(self::QUEUED_STATUS);
             $table->uuid('claim_token')->nullable();
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['invitation_id', 'attempt_number'], 'platform_operator_invitation_delivery_attempt_uk');
-            $table->index(['status', 'lease_expires_at'], 'platform_operator_invitation_delivery_claim_idx');
+            $table->index(['status', 'lease_expires_at'], 'platform_operator_invitation_delivery_claim_ix');
         });
     }
 

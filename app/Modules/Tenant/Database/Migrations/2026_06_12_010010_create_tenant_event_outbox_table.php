@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('tenant_event_outbox', function (Blueprint $table): void {
             $table->id();
             $table->uuid('event_uuid')->unique('tenant_event_outbox_uuid_uk');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_event_outbox_tenant_fk')->restrictOnDelete();
             $table->string('event_type', 120);
             $table->json('payload');
             $table->enum('status', ['pending', 'processing', 'published', 'dead'])->default('pending');
@@ -28,9 +28,9 @@ return new class extends Migration
             $table->timestamp('dead_at')->nullable();
             $table->timestamps();
 
-            $table->index(['status', 'available_at'], 'tenant_event_outbox_due_idx');
-            $table->index(['status', 'claimed_at'], 'tenant_event_outbox_claim_idx');
-            $table->index(['tenant_id', 'event_type'], 'tenant_event_outbox_tenant_type_idx');
+            $table->index(['status', 'available_at'], 'tenant_event_outbox_due_ix');
+            $table->index(['status', 'claimed_at'], 'tenant_event_outbox_claim_ix');
+            $table->index(['tenant_id', 'event_type'], 'tenant_event_outbox_tenant_type_ix');
             $table->unique(['id', 'tenant_id'], 'tenant_event_outbox_id_tenant_uk');
         });
     }

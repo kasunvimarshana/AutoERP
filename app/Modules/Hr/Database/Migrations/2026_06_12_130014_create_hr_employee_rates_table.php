@@ -16,13 +16,13 @@ return new class extends Migration
             $table->foreignId('employee_id');
             $table->string('rate_type');
             $table->decimal('amount', 20, 6);
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', indexName: 'hr_employee_rates_currency_fk')->nullOnDelete();
             $table->date('effective_from')->nullable();
             $table->date('effective_to')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            $table->index(['tenant_id', 'employee_id', 'rate_type'], 'hr_employee_rates_lookup_idx');
-            $table->index(['effective_from', 'effective_to'], 'hr_employee_rates_dates_idx');
+            $table->index(['tenant_id', 'employee_id', 'rate_type'], 'hr_employee_rates_lookup_ix');
+            $table->index(['effective_from', 'effective_to'], 'hr_employee_rates_dates_ix');
 
             $table->unique(['id', 'tenant_id'], 'hr_employee_rates_id_tenant_uk');
             $table->foreign(['employee_id', 'tenant_id'], 'hr_employee_rates_employee_id_tenant_fk')

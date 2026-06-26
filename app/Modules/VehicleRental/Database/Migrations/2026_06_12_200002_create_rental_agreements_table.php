@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_agreements', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_agreements_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('agreement_number', 100);
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->string('proration_rule', 30)->default('exact_day_count');
             $table->string('billing_timezone', 60)->default('Asia/Colombo');
             $table->unsignedSmallInteger('payment_term_days')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_agreements_currency_fk')->restrictOnDelete();
             $table->string('status', 30)->default('draft');
             $table->text('termination_reason')->nullable();
             $table->text('remarks')->nullable();
@@ -48,9 +48,9 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'agreement_number'], 'rental_agreements_tenant_number_uk');
             $table->unique('reservation_id', 'rental_agreements_reservation_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'agreement_kind', 'status'], 'rental_agreements_scope_kind_status_idx');
-            $table->index(['customer_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_customer_period_idx');
-            $table->index(['supplier_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_supplier_period_idx');
+            $table->index(['tenant_id', 'organization_unit_id', 'agreement_kind', 'status'], 'rental_agreements_scope_kind_status_ix');
+            $table->index(['customer_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_customer_period_ix');
+            $table->index(['supplier_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_supplier_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_agreements_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreements_organization_unit_id_tenant_fk')

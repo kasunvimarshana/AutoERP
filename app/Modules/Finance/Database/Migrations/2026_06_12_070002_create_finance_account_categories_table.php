@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_account_categories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_account_categories_tenant_fk')->restrictOnDelete();
             $table->foreignId('account_type_id');
             $table->string('code', 100);
             $table->string('name');

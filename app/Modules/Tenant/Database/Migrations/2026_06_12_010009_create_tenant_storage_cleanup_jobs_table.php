@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tenant_storage_cleanup_jobs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_storage_cleanup_jobs_tenant_fk')->restrictOnDelete();
             $table->string('storage_path');
             $table->string('reason', 255);
             $table->enum('status', ['pending', 'processing', 'completed', 'dead'])->default('pending');
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'storage_path'], 'tenant_storage_cleanup_path_uk');
-            $table->index(['status', 'next_attempt_at'], 'tenant_storage_cleanup_due_idx');
-            $table->index(['status', 'claimed_at'], 'tenant_storage_cleanup_claim_idx');
-            $table->index(['tenant_id', 'status'], 'tenant_storage_cleanup_tenant_idx');
+            $table->index(['status', 'next_attempt_at'], 'tenant_storage_cleanup_due_ix');
+            $table->index(['status', 'claimed_at'], 'tenant_storage_cleanup_claim_ix');
+            $table->index(['tenant_id', 'status'], 'tenant_storage_cleanup_tenant_ix');
             $table->unique(['id', 'tenant_id'], 'tenant_storage_cleanup_jobs_id_tenant_uk');
         });
     }

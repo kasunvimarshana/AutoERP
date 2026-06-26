@@ -11,10 +11,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tenant_primary_domains', function (Blueprint $table): void {
-            $table->unsignedBigInteger('tenant_id')->primary();
+            $table->unsignedBigInteger('tenant_id')->primary('tenant_primary_domains_tenant_pk');
             $table->unsignedBigInteger('tenant_domain_id')->unique('tenant_primary_domains_domain_uk');
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_primary_domains_updated_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_primary_domains_updated_by_ix');
             $table->timestamps();
 
             $table->foreign('tenant_id', 'tenant_primary_domains_tenant_fk')

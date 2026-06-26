@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('inventory_stock_state_changes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'inventory_stock_state_changes_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('stock_balance_id')->nullable();
             $table->foreignId('item_id');
@@ -33,10 +33,10 @@ return new class extends Migration
             $table->timestamp('occurred_at')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_state_changes_scope_idx');
-            $table->index(['source_type', 'source_id'], 'inventory_state_changes_source_idx');
-            $table->index(['item_id', 'warehouse_id'], 'inventory_state_changes_item_wh_idx');
-            $table->index(['from_state', 'to_state'], 'inventory_state_changes_states_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'inventory_state_changes_scope_ix');
+            $table->index(['source_type', 'source_id'], 'inventory_state_changes_source_ix');
+            $table->index(['item_id', 'warehouse_id'], 'inventory_state_changes_item_wh_ix');
+            $table->index(['from_state', 'to_state'], 'inventory_state_changes_states_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_stock_state_changes_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'inventory_stock_state_changes_organization_unit_id_tenant_fk')
@@ -59,7 +59,7 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('warehouses')
                 ->restrictOnDelete();
-            $table->foreign(['warehouse_location_id', 'tenant_id'], 'inventory_stock_state_changes_warehouse_location_29e48847_fk')
+            $table->foreign(['warehouse_location_id', 'tenant_id'], 'inventory_stock_state_changes_wh_location_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('warehouse_locations')
                 ->restrictOnDelete();

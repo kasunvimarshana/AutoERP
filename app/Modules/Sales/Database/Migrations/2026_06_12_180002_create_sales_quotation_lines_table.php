@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('sales_quotation_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'sales_quotation_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('sales_quotation_id');
             $table->unsignedInteger('line_number');
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['sales_quotation_id', 'line_number'], 'sales_quotation_lines_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'sales_quotation_lines_scope_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'sales_quotation_lines_scope_ix');
 
             $table->unique(['id', 'tenant_id'], 'sales_quotation_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'sales_quotation_lines_organization_unit_id_tenant_fk')

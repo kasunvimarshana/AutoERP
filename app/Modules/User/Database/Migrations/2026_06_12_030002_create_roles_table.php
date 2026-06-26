@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('roles', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'roles_tenant_fk')->restrictOnDelete();
             $table->string('name');
             $table->string('active_name_key')->nullable();
             $table->string('guard_name', 100);

@@ -58,26 +58,11 @@ return new class extends Migration
             $table->dateTime('occurred_at');
             $table->timestamp('recorded_at')->useCurrent();
 
-            $table->index(
-                ['scope_type', 'tenant_id', 'organization_unit_id', 'occurred_at', 'id'],
-                'audit_logs_scope_time_idx',
-            );
-            $table->index(
-                ['tenant_id', 'event_name', 'occurred_at', 'id'],
-                'audit_logs_event_time_idx',
-            );
-            $table->index(
-                ['tenant_id', 'actor_type', 'actor_id', 'occurred_at', 'id'],
-                'audit_logs_actor_time_idx',
-            );
-            $table->index(
-                ['tenant_id', 'subject_type', 'subject_id', 'occurred_at', 'id'],
-                'audit_logs_subject_time_idx',
-            );
-            $table->index(
-                ['tenant_id', 'source_module', 'source_type', 'source_id', 'occurred_at'],
-                'audit_logs_source_time_idx',
-            );
+            $table->index(['scope_type', 'tenant_id', 'organization_unit_id', 'occurred_at', 'id'], 'audit_logs_scope_time_ix', );
+            $table->index(['tenant_id', 'event_name', 'occurred_at', 'id'], 'audit_logs_event_time_ix', );
+            $table->index(['tenant_id', 'actor_type', 'actor_id', 'occurred_at', 'id'], 'audit_logs_actor_time_ix', );
+            $table->index(['tenant_id', 'subject_type', 'subject_id', 'occurred_at', 'id'], 'audit_logs_subject_time_ix', );
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id', 'occurred_at'], 'audit_logs_source_time_ix', );
         });
     }
 

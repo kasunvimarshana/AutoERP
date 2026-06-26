@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('rental_expenses', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'rental_expenses_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->string('expense_number', 100);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('employee_id')->nullable();
             $table->string('expense_type', 30);
             $table->date('expense_date');
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_expenses_currency_fk')->restrictOnDelete();
             $table->decimal('net_amount', 20, 6);
             $table->foreignId('tax_group_id')->nullable();
             $table->decimal('tax_amount', 20, 6)->default('0.000000');
@@ -50,8 +50,8 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'expense_number'], 'rental_expenses_tenant_number_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_expenses_fingerprint_uk');
-            $table->index(['vehicle_id', 'expense_date', 'status'], 'rental_expenses_vehicle_date_idx');
-            $table->index(['agreement_id', 'expense_type', 'status'], 'rental_expenses_agreement_type_idx');
+            $table->index(['vehicle_id', 'expense_date', 'status'], 'rental_expenses_vehicle_date_ix');
+            $table->index(['agreement_id', 'expense_type', 'status'], 'rental_expenses_agreement_type_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_expenses_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_expenses_organization_unit_id_tenant_fk')

@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_debit_notes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_debit_notes_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
@@ -32,12 +32,12 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'debit_note_number'], 'purchase_debit_notes_tenant_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_debit_notes_tenant_org_idx');
-            $table->index(['supplier_type', 'supplier_id'], 'purchase_debit_notes_supplier_idx');
-            $table->index('purchase_return_id', 'purchase_debit_notes_return_idx');
-            $table->index('status', 'purchase_debit_notes_status_idx');
-            $table->index(['source_type', 'source_id'], 'purchase_debit_notes_source_idx');
-            $table->index(['status', 'allocated_amount', 'remaining_amount'], 'purchase_debit_notes_allocation_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'purchase_debit_notes_tenant_org_ix');
+            $table->index(['supplier_type', 'supplier_id'], 'purchase_debit_notes_supplier_ix');
+            $table->index('purchase_return_id', 'purchase_debit_notes_return_ix');
+            $table->index('status', 'purchase_debit_notes_status_ix');
+            $table->index(['source_type', 'source_id'], 'purchase_debit_notes_source_ix');
+            $table->index(['status', 'allocated_amount', 'remaining_amount'], 'purchase_debit_notes_allocation_ix');
 
             $table->unique(['id', 'tenant_id'], 'purchase_debit_notes_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_debit_notes_organization_unit_id_tenant_fk')

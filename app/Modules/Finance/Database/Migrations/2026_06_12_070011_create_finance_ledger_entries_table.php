@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('finance_ledger_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_ledger_entries_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('journal_entry_id');
             $table->foreignId('journal_line_id');
@@ -33,18 +33,12 @@ return new class extends Migration
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'finance_ledger_tenant_org_idx');
-            $table->index('account_id', 'finance_ledger_account_idx');
-            $table->index('entry_date', 'finance_ledger_date_idx');
-            $table->index(['source_type', 'source_id'], 'finance_ledger_source_idx');
-            $table->index(
-                ['tenant_id', 'organization_unit_id', 'fiscal_period_id'],
-                'finance_ledger_scope_period_idx',
-            );
-            $table->index(
-                ['tenant_id', 'source_module', 'source_type', 'source_id'],
-                'finance_ledger_tenant_source_trace_idx',
-            );
+            $table->index(['tenant_id', 'organization_unit_id'], 'finance_ledger_tenant_org_ix');
+            $table->index('account_id', 'finance_ledger_account_ix');
+            $table->index('entry_date', 'finance_ledger_date_ix');
+            $table->index(['source_type', 'source_id'], 'finance_ledger_source_ix');
+            $table->index(['tenant_id', 'organization_unit_id', 'fiscal_period_id'], 'finance_ledger_scope_period_ix', );
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix', );
 
             $table->unique(['id', 'tenant_id'], 'finance_ledger_entries_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_ledger_entries_organization_unit_id_tenant_fk')

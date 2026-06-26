@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_order_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'purchase_order_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('purchase_order_id');
             $table->unsignedInteger('line_number');
@@ -49,13 +49,13 @@ return new class extends Migration
             $table->string('status')->default('open');
             $table->timestamps();
 
-            $table->index('purchase_order_id', 'purchase_order_lines_order_idx');
-            $table->index('item_id', 'purchase_order_lines_item_idx');
-            $table->index('status', 'purchase_order_lines_status_idx');
-            $table->index('tax_group_id', 'purchase_order_lines_tax_group_idx');
+            $table->index('purchase_order_id', 'purchase_order_lines_order_ix');
+            $table->index('item_id', 'purchase_order_lines_item_ix');
+            $table->index('status', 'purchase_order_lines_status_ix');
+            $table->index('tax_group_id', 'purchase_order_lines_tax_group_ix');
             $table->unique(['purchase_order_id', 'line_number'], 'purchase_order_lines_order_line_number_uk');
-            $table->index(['purchase_order_id', 'status'], 'purchase_order_lines_order_status_idx');
-            $table->index(['purchase_order_id', 'received_quantity', 'invoiced_quantity', 'returned_quantity'], 'purchase_order_lines_balance_idx');
+            $table->index(['purchase_order_id', 'status'], 'purchase_order_lines_order_status_ix');
+            $table->index(['purchase_order_id', 'received_quantity', 'invoiced_quantity', 'returned_quantity'], 'purchase_order_lines_balance_ix');
 
             $table->unique(['id', 'tenant_id'], 'purchase_order_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'purchase_order_lines_organization_unit_id_tenant_fk')

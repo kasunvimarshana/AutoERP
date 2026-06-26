@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customers_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('customer_number');
             $table->string('code');
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('mobile')->nullable();
             $table->string('website')->nullable();
-            $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('default_currency_id')->nullable()->constrained('currencies', indexName: 'customers_default_currency_fk')->nullOnDelete();
             $table->unsignedBigInteger('payment_term_id')->nullable();
             $table->string('tax_registration_number')->nullable();
             $table->string('vat_number')->nullable();
@@ -47,11 +47,11 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'customer_number'], 'customers_tenant_number_uk');
             $table->unique(['tenant_id', 'code'], 'customers_tenant_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id'], 'customers_tenant_org_idx');
-            $table->index('customer_type', 'customers_type_idx');
-            $table->index('status', 'customers_status_idx');
-            $table->index('email', 'customers_email_idx');
-            $table->index('phone', 'customers_phone_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customers_tenant_org_ix');
+            $table->index('customer_type', 'customers_type_ix');
+            $table->index('status', 'customers_status_ix');
+            $table->index('email', 'customers_email_ix');
+            $table->index('phone', 'customers_phone_ix');
 
             $table->unique(['id', 'tenant_id'], 'customers_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customers_organization_unit_id_tenant_fk')

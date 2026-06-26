@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('customer_addresses', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_addresses_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id');
             $table->string('address_type');
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id'], 'customer_addresses_tenant_org_idx');
-            $table->index('customer_id', 'customer_addresses_customer_idx');
-            $table->index('address_type', 'customer_addresses_type_idx');
+            $table->index(['tenant_id', 'organization_unit_id'], 'customer_addresses_tenant_org_ix');
+            $table->index('customer_id', 'customer_addresses_customer_ix');
+            $table->index('address_type', 'customer_addresses_type_ix');
 
             $table->unique(['id', 'tenant_id'], 'customer_addresses_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'customer_addresses_organization_unit_id_tenant_fk')
