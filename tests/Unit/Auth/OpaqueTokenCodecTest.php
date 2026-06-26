@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Auth;
 
-use InvalidArgumentException;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
+use Modules\Core\Exceptions\ConfigurationException;
 use PHPUnit\Framework\TestCase;
 
 final class OpaqueTokenCodecTest extends TestCase
@@ -46,7 +46,7 @@ final class OpaqueTokenCodecTest extends TestCase
 
     public function test_short_application_keys_are_rejected(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ConfigurationException::class);
 
         new OpaqueTokenCodec('too-short');
     }

@@ -19,16 +19,11 @@ final class TenantCreateCommand extends Command
 
     protected $description = 'Create a draft tenant';
 
-    public function __construct(
-        private readonly CreateTenantService $service,
-        private readonly TenantExecutionContextInterface $executionContext,
-    ) {
-        parent::__construct();
-    }
-
-    public function handle(): int
-    {
-        $result = $this->executionContext->runAsControlPlane(fn () => $this->service->execute([
+    public function handle(
+        CreateTenantService $service,
+        TenantExecutionContextInterface $executionContext,
+    ): int {
+        $result = $executionContext->runAsControlPlane(fn () => $service->execute([
             'code' => (string) $this->argument('code'),
             'name' => (string) $this->argument('name'),
             'slug' => $this->option('slug'),

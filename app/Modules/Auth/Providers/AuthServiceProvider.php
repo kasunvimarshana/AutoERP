@@ -103,6 +103,8 @@ final class AuthServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
         if ($this->app->runningInConsole()) {
+            // Artisan constructs every registered command while bootstrapping. Runtime
+            // services therefore belong in handle() method injection, not constructors.
             $this->commands([
                 AuthClientCreateCommand::class,
                 AuthIncidentLookupCommand::class,

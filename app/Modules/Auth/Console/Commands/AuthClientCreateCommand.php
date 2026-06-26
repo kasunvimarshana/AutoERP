@@ -30,17 +30,12 @@ final class AuthClientCreateCommand extends Command
 
     protected $description = 'Create a tenant-owned OAuth client with exact redirects and server-owned security policy.';
 
-    public function __construct(
-        private readonly PasswordHasherInterface $passwords,
-        private readonly TenantExecutionContextInterface $executionContext,
-        private readonly ClockInterface $clock,
-        private readonly AuthSecurityConfig $config,
-    ) {
-        parent::__construct();
-    }
-
-    public function handle(): int
-    {
+    public function handle(
+        PasswordHasherInterface $passwords,
+        TenantExecutionContextInterface $executionContext,
+        ClockInterface $clock,
+        AuthSecurityConfig $config,
+    ): int {
         $tenantId = filter_var($this->argument('tenant_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($tenantId === false) {
             return $this->commandFailure('Tenant identifier must be a positive integer.');
@@ -53,7 +48,7 @@ final class AuthClientCreateCommand extends Command
         }
 
         $scopes = $this->csv((string) $this->option('scopes'));
-        if ($scopes === [] || array_diff($scopes, $this->config->oauthScopes) !== []) {
+        if ($scopes === [] || array_diff($scopes, $config->oauthScopes) !== []) {
             return $this->commandFailure('Scopes must be a non-empty subset of the registered Auth scope catalogue.');
         }
 
@@ -73,7 +68,7 @@ final class AuthClientCreateCommand extends Command
             }
         }
 
-        $expiresAt = $this->parseExpiry($this->option('expires-at'));
+        $expiresAt = $this->parseExpiry($this->option('expires-at'), $clock);
         if ($this->option('expires-at') !== null && $expiresAt === null) {
             return $this->commandFailure('expires-at must be a future ISO-8601 timestamp.');
         }
@@ -85,7 +80,7 @@ final class AuthClientCreateCommand extends Command
         }
 
         try {
-            $client = $this->executionContext->runForTenant((int) $tenantId, function () use (
+            $client = $executionContext->runForTenant((int) $tenantId, function () use (
                 $tenantId,
                 $clientKey,
                 $clientName,
@@ -95,19 +90,21 @@ final class AuthClientCreateCommand extends Command
                 $grants,
                 $redirectUris,
                 $expiresAt,
+                $passwords,
+                $clock,
             ): AuthClientModel {
                 return AuthClientModel::query()->create([
                     'tenant_id' => (int) $tenantId,
                     'client_key' => $clientKey,
                     'client_name' => $clientName,
-                    'client_secret_hash' => $plainSecret === null ? null : $this->passwords->hash($plainSecret),
+                    'client_secret_hash' => $plainSecret === null ? null : $passwords->hash($plainSecret),
                     'status' => ClientStatus::ACTIVE->value,
                     'allowed_grant_types' => $grants,
                     'allowed_scopes' => $scopes,
                     'redirect_uris' => $redirectUris,
                     'is_confidential' => $isConfidential,
                     'is_first_party' => (bool) $this->option('first-party'),
-                    'secret_rotated_at' => $plainSecret === null ? null : $this->clock->now(),
+                    'secret_rotated_at' => $plainSecret === null ? null : $clock->now(),
                     'expires_at' => $expiresAt,
                     'row_version' => 1,
                 ]);
@@ -153,14 +150,14 @@ final class AuthClientCreateCommand extends Command
         )));
     }
 
-    private function parseExpiry(mixed $value): ?DateTimeImmutable
+    private function parseExpiry(mixed $value, ClockInterface $clock): ?DateTimeImmutable
     {
         if ($value === null || trim((string) $value) === '') {
             return null;
         }
         try {
             $expiry = new DateTimeImmutable((string) $value);
-            return $expiry > $this->clock->now() ? $expiry : null;
+            return $expiry > $clock->now() ? $expiry : null;
         } catch (Throwable) {
             return null;
         }

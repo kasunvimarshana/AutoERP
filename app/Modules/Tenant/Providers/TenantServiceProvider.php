@@ -172,7 +172,19 @@ final class TenantServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         if ($this->app->runningInConsole()) {
-            $this->commands([TenantCreateCommand::class, TenantActivateCommand::class, TenantSuspendCommand::class, TenantDeactivateCommand::class, TenantDomainRevalidateCommand::class, TenantExpireCommand::class, TenantStorageCleanupCommand::class, TenantPublishEventsCommand::class, TenantRetryDeadEventsCommand::class]);
+            // Keep command constructors dependency-free so setup and recovery commands
+            // can boot before runtime services such as Auth cryptography are configured.
+            $this->commands([
+                TenantCreateCommand::class,
+                TenantActivateCommand::class,
+                TenantSuspendCommand::class,
+                TenantDeactivateCommand::class,
+                TenantDomainRevalidateCommand::class,
+                TenantExpireCommand::class,
+                TenantStorageCleanupCommand::class,
+                TenantPublishEventsCommand::class,
+                TenantRetryDeadEventsCommand::class,
+            ]);
         }
     }
 

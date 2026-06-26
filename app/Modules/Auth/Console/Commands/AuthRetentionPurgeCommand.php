@@ -12,14 +12,9 @@ final class AuthRetentionPurgeCommand extends Command
     protected $signature = 'auth:retention:purge';
     protected $description = 'Purge expired Auth operational records according to configured retention periods.';
 
-    public function __construct(private readonly AuthRetentionService $retention)
+    public function handle(AuthRetentionService $retention): int
     {
-        parent::__construct();
-    }
-
-    public function handle(): int
-    {
-        $counts = $this->retention->purge();
+        $counts = $retention->purge();
         foreach ($counts as $recordType => $count) {
             $this->line(sprintf('%s: %d', $recordType, $count));
         }

@@ -17,15 +17,10 @@ final class TenantActivateCommand extends Command
 
     protected $description = 'Activate a tenant through the validated lifecycle.';
 
-    public function __construct(
-        private readonly ActivateTenantService $service,
-        private readonly TenantExecutionContextInterface $executionContext,
-    ) {
-        parent::__construct();
-    }
-
-    public function handle(): int
-    {
+    public function handle(
+        ActivateTenantService $service,
+        TenantExecutionContextInterface $executionContext,
+    ): int {
         $reason = trim((string) $this->option('reason'));
         if ($reason === '') {
             $this->error('A lifecycle reason is required.');
@@ -33,8 +28,8 @@ final class TenantActivateCommand extends Command
             return self::FAILURE;
         }
 
-        $result = $this->executionContext->runAsControlPlane(
-            fn () => $this->service->execute(
+        $result = $executionContext->runAsControlPlane(
+            fn () => $service->execute(
                 (string) $this->argument('tenant'),
                 (int) $this->argument('expected-version'),
                 $reason,
