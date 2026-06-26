@@ -40,12 +40,9 @@ return new class extends Migration
             $table->index(['tenant_id', 'status', 'deleted_at'], 'users_tenant_status_idx');
             $table->index(['tenant_id', 'email'], 'users_tenant_email_idx');
 
-            foreach (['created_by_user_id', 'updated_by_user_id', 'deleted_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'users_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])
-                    ->on('users')
-                    ->restrictOnDelete();
-            }
+            $table->index(['tenant_id', 'created_by_user_id'], 'users_created_by_idx');
+            $table->index(['tenant_id', 'updated_by_user_id'], 'users_updated_by_idx');
+            $table->index(['tenant_id', 'deleted_by_user_id'], 'users_deleted_by_idx');
         });
     }
 
