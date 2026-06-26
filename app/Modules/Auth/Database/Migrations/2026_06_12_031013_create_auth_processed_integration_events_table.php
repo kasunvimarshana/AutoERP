@@ -12,13 +12,15 @@ return new class extends Migration
     {
         Schema::create('auth_processed_integration_events', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('event_uuid');
-            $table->string('consumer_name', 150);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->string('source_system', 100);
+            $table->uuid('event_id');
+            $table->string('event_type', 160);
             $table->timestamp('processed_at');
+            $table->timestamps();
 
-            $table->unique(['event_uuid', 'consumer_name'], 'auth_processed_events_event_consumer_uk');
-            $table->index(['tenant_id', 'processed_at'], 'auth_processed_events_tenant_processed_idx');
+            $table->unique(['tenant_id', 'source_system', 'event_id'], 'auth_event_idempotency_uk');
+            $table->index('processed_at', 'auth_event_processed_idx');
         });
     }
 

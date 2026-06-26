@@ -43,18 +43,18 @@ export const authApi = {
     async login(payload: LoginPayload): Promise<AuthSession> {
         if (payload.auth_mode === 'platform') {
             const { data } = await apiClient.post<AuthSession>(`${platformAuthEndpoint}/login`, {
-                email: payload.login_identifier,
+                email: payload.identifier,
                 password: payload.password,
                 totp_code: payload.totp_code || undefined,
                 backup_code: payload.backup_code || undefined,
+                device_name: payload.device_name || undefined,
             });
             return data;
         }
 
         const tenantPayload = {
-            login_identifier: payload.login_identifier,
+            identifier: payload.identifier,
             password: payload.password,
-            tenant_code: payload.tenant_code,
             organization_unit_id: payload.organization_unit_id,
             device_name: payload.device_name,
         };
@@ -63,19 +63,17 @@ export const authApi = {
     },
 
 
-    async startPlatformMfaEnrollment(email: string, password: string): Promise<PlatformMfaEnrollment> {
-        const { data } = await apiClient.post<PlatformMfaEnrollment>(`${platformAuthEndpoint}/mfa/enrollment`, { email, password });
+    async confirmPlatformMfaEnrollment(enrollmentProof: string, code: string): Promise<PlatformMfaConfirmation> {
+        const { data } = await apiClient.post<PlatformMfaConfirmation>(`${platformAuthEndpoint}/mfa/enrollment/confirm`, {
+            enrollment_proof: enrollmentProof,
+            code,
+        });
         return data;
     },
 
-    async confirmPlatformMfaEnrollment(email: string, password: string, code: string): Promise<PlatformMfaConfirmation> {
-        const { data } = await apiClient.post<PlatformMfaConfirmation>(`${platformAuthEndpoint}/mfa/enrollment/confirm`, { email, password, code });
-        return data;
-    },
-
-    async logout(authMode: LoginPayload['auth_mode'], payload: { access_token?: string | null; session_id?: number | null } = {}): Promise<void> {
+    async logout(authMode: LoginPayload['auth_mode']): Promise<void> {
         const endpoint = authMode === 'platform' ? platformAuthEndpoint : endpoints.auth;
-        await apiClient.post(`${endpoint}/logout`, payload);
+        await apiClient.post(`${endpoint}/logout`);
     },
 
     async organizationUnitOptions(signal?: AbortSignal): Promise<OrganizationUnitContextOptions> {

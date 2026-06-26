@@ -12,31 +12,17 @@ return new class extends Migration
     {
         Schema::create('auth_providers', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
-            $table->unsignedBigInteger('organization_unit_id')->nullable();
-            $table->json('metadata')->nullable();
-
-            $table->string('provider_key', 120)->comment('Stable provider key, e.g. internal, oidc-google');
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->string('provider_key', 120);
             $table->string('name', 160);
-            $table->string('guard_name', 100)->default('web');
-            $table->string('provider_name', 100)->default('users');
-            $table->string('driver', 120)->default('internal');
-            $table->string('status', 40)->default('active');
-            $table->boolean('is_sso')->default(false);
-            $table->json('config')->nullable();
-            $table->timestamp('last_synced_at')->nullable();
-
+            $table->string('driver', 80);
+            $table->string('status', 30);
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique(['id', 'tenant_id'], 'auth_providers_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_providers_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->unique(['tenant_id', 'provider_key'], 'auth_providers_key_uk');
-            $table->index(['tenant_id', 'status'], 'auth_providers_status_idx');
+            $table->unique(['id', 'tenant_id'], 'auth_provider_id_tenant_uk');
+            $table->unique(['tenant_id', 'provider_key'], 'auth_provider_key_uk');
+            $table->index(['tenant_id', 'status'], 'auth_provider_status_idx');
         });
     }
 

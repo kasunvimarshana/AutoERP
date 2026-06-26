@@ -8,8 +8,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\Auth\Constants\InvitationDeliveryStatus;
-use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
+use Modules\Core\Contracts\AuthInvitationDeliveryHealthReaderInterface;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
@@ -38,7 +37,7 @@ final class PlatformTenantHealthService
         private readonly TenantDomainModel $domains,
         private readonly TenantCurrentSubscriptionModel $subscriptions,
         private readonly TenantDocumentModel $documents,
-        private readonly AuthRegistrationInvitationDeliveryModel $invitationDeliveries,
+        private readonly AuthInvitationDeliveryHealthReaderInterface $invitationDeliveries,
         private readonly TenantStorageCleanupJobModel $cleanupJobs,
         private readonly TenantEventOutboxModel $outboxRows,
         private readonly TenantEventOutboxService $outbox,
@@ -278,83 +277,31 @@ final class PlatformTenantHealthService
     /** @return array{counts:array<string,int>,failed:int,stale:int} */
     private function invitationDeliveryHealth(?int $tenantId = null): array
     {
-        $staleBefore = $this->clock->now()->modify(sprintf(
-            '-%d seconds',
-            max(60, (int) config('module-auth.registration.delivery_stale_after_seconds', 900)),
-        ));
-
-        $baseQuery = $this->invitationDeliveries->newQuery();
-        if ($tenantId !== null) {
-            $baseQuery->where('tenant_id', $tenantId);
-        }
-
-        $counts = $this->countsBy(
-            clone $baseQuery,
-            'status',
-            InvitationDeliveryStatus::values(),
-        );
-        $stale = (clone $baseQuery)
-            ->where(function ($query) use ($staleBefore): void {
-                $query->where(function ($queued) use ($staleBefore): void {
-                    $queued->where('status', InvitationDeliveryStatus::QUEUED)
-                        ->where('requested_at', '<=', $staleBefore);
-                })->orWhere(function ($sending): void {
-                    $sending->where('status', InvitationDeliveryStatus::SENDING)
-                        ->where('lease_expires_at', '<=', $this->clock->now());
-                });
-            })
-            ->count();
-
-        return [
-            'counts' => $counts,
-            'failed' => $counts[InvitationDeliveryStatus::FAILED] ?? 0,
-            'stale' => $stale,
-        ];
+        return $this->invitationDeliveries->health($tenantId);
     }
 
     /** @return list<array<string, mixed>> */
     private function failedInvitationDeliveries(): array
     {
-        return $this->invitationDeliveries->newQuery()
-            ->join('auth_registration_invitations', function ($join): void {
-                $join->on(
-                    'auth_registration_invitations.id',
-                    '=',
-                    'auth_registration_invitation_deliveries.invitation_id',
-                )->on(
-                    'auth_registration_invitations.tenant_id',
-                    '=',
-                    'auth_registration_invitation_deliveries.tenant_id',
-                );
-            })
-            ->join('tenants', 'tenants.id', '=', 'auth_registration_invitation_deliveries.tenant_id')
-            ->where('auth_registration_invitation_deliveries.status', InvitationDeliveryStatus::FAILED)
-            ->orderByDesc('auth_registration_invitation_deliveries.failed_at')
-            ->limit(20)
-            ->get([
-                'auth_registration_invitation_deliveries.public_id',
-                'auth_registration_invitation_deliveries.tenant_id',
-                'auth_registration_invitation_deliveries.attempt_number',
-                'auth_registration_invitation_deliveries.processing_attempt_count',
-                'auth_registration_invitation_deliveries.error_code',
-                'auth_registration_invitation_deliveries.error_message',
-                'auth_registration_invitation_deliveries.failed_at',
-                'auth_registration_invitations.email',
-                'tenants.code as tenant_code',
-                'tenants.name as tenant_name',
-            ])
-            ->map(static fn ($row): array => [
-                'public_id' => (string) $row->public_id,
-                'tenant_id' => (int) $row->tenant_id,
-                'tenant_code' => (string) $row->tenant_code,
-                'tenant_name' => (string) $row->tenant_name,
-                'email' => (string) $row->email,
-                'attempt_number' => (int) $row->attempt_number,
-                'processing_attempt_count' => (int) $row->processing_attempt_count,
-                'error_code' => $row->error_code,
-                'error_message' => $row->error_message,
-                'failed_at' => $row->failed_at?->toAtomString(),
-            ])->all();
+        $failures = $this->invitationDeliveries->failed(20);
+        if ($failures === []) {
+            return [];
+        }
+
+        $tenants = $this->tenants->newQuery()
+            ->whereIn('id', array_values(array_unique(array_column($failures, 'tenant_id'))))
+            ->get(['id', 'code', 'name'])
+            ->keyBy('id');
+
+        return array_map(static function (array $failure) use ($tenants): array {
+            $tenant = $tenants->get($failure['tenant_id']);
+
+            return [
+                ...$failure,
+                'tenant_code' => $tenant === null ? null : (string) $tenant->getAttribute('code'),
+                'tenant_name' => $tenant === null ? null : (string) $tenant->getAttribute('name'),
+            ];
+        }, $failures);
     }
 
     /** @return list<array<string, mixed>> */

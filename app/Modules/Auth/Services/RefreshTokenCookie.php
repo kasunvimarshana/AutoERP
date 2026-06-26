@@ -4,39 +4,40 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\DTOs\DataRecord;
+use LogicException;
 use Symfony\Component\HttpFoundation\Cookie;
 
 class RefreshTokenCookie
 {
     public function __construct(private readonly string $configurationKey) {}
+
     public function read(Request $request): ?string
     {
         $value = $request->cookie($this->name());
-        if (! is_string($value)) {
-            return null;
-        }
 
-        $value = trim($value);
-
-        return $value !== '' ? $value : null;
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    public function attach(JsonResponse $response, string $refreshToken): JsonResponse
-    {
-        $cookie = Cookie::create($this->name())
-            ->withValue($refreshToken)
-            ->withExpires(now()->addSeconds($this->ttlSeconds()))
-            ->withPath($this->path())
-            ->withDomain($this->domain())
-            ->withSecure($this->secure())
-            ->withHttpOnly(true)
-            ->withRaw(false)
-            ->withSameSite($this->sameSite());
-
-        $response->headers->setCookie($cookie);
+    public function attach(
+        JsonResponse $response,
+        string $refreshToken,
+        mixed $expiresAt,
+    ): JsonResponse {
+        $response->headers->setCookie(
+            Cookie::create($this->name())
+                ->withValue($refreshToken)
+                ->withExpires($this->resolveExpiry($expiresAt))
+                ->withPath($this->path())
+                ->withDomain($this->domain())
+                ->withSecure($this->secure())
+                ->withHttpOnly(true)
+                ->withRaw(false)
+                ->withSameSite($this->sameSite()),
+        );
 
         return $response;
     }
@@ -57,38 +58,43 @@ class RefreshTokenCookie
 
     public function extract(mixed $payload): ?string
     {
-        if ($payload instanceof DataRecord) {
-            $payload = $payload->toArray();
-        }
         if (! is_array($payload)) {
             return null;
         }
 
-        $tokenPayload = isset($payload['tokens']) && is_array($payload['tokens'])
-            ? $payload['tokens']
-            : $payload;
-        $refreshToken = $tokenPayload['refresh_token'] ?? null;
-        if (! is_string($refreshToken)) {
+        $tokens = is_array($payload['tokens'] ?? null) ? $payload['tokens'] : $payload;
+        $value = $tokens['refresh_token'] ?? null;
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    public function extractExpiry(mixed $payload): mixed
+    {
+        if (! is_array($payload)) {
             return null;
         }
 
-        $refreshToken = trim($refreshToken);
+        $tokens = is_array($payload['tokens'] ?? null) ? $payload['tokens'] : $payload;
 
-        return $refreshToken !== '' ? $refreshToken : null;
+        return $tokens['refresh_token_expires_at'] ?? null;
     }
 
     private function name(): string
     {
         $name = trim((string) config($this->configurationKey.'.name', ''));
 
-        return $name !== '' ? $name : throw new \LogicException('Refresh-token cookie name is not configured.');
+        return $name !== ''
+            ? $name
+            : throw new LogicException('Refresh-token cookie name is not configured.');
     }
 
     private function path(): string
     {
         $path = trim((string) config($this->configurationKey.'.path', ''));
 
-        return str_starts_with($path, '/') ? $path : throw new \LogicException('Refresh-token cookie path must be absolute.');
+        return str_starts_with($path, '/')
+            ? $path
+            : throw new LogicException('Refresh-token cookie path must be absolute.');
     }
 
     private function domain(): ?string
@@ -100,22 +106,37 @@ class RefreshTokenCookie
 
     private function secure(): bool
     {
-        if ($this->sameSite() === 'none') {
-            return true;
-        }
-
-        return (bool) config($this->configurationKey.'.secure', app()->environment('production'));
+        return $this->sameSite() === 'none'
+            || (bool) config($this->configurationKey.'.secure', app()->environment('production'));
     }
 
     private function sameSite(): string
     {
         $sameSite = strtolower((string) config($this->configurationKey.'.same_site', 'strict'));
+        if (! in_array($sameSite, ['lax', 'strict', 'none'], true)) {
+            throw new LogicException('Refresh-token cookie SameSite configuration is invalid.');
+        }
 
-        return in_array($sameSite, ['lax', 'strict', 'none'], true) ? $sameSite : 'strict';
+        return $sameSite;
     }
 
-    private function ttlSeconds(): int
+    private function resolveExpiry(mixed $expiresAt): DateTimeInterface
     {
-        return max(1, (int) config('module-auth.refresh_token_ttl_seconds', 2592000));
+        if ($expiresAt instanceof DateTimeInterface) {
+            return $expiresAt;
+        }
+
+        if (is_string($expiresAt) && trim($expiresAt) !== '') {
+            try {
+                return new DateTimeImmutable($expiresAt);
+            } catch (\Throwable $exception) {
+                throw new LogicException(
+                    'The issued refresh token has an invalid expiry timestamp.',
+                    previous: $exception,
+                );
+            }
+        }
+
+        throw new LogicException('The issued refresh-token expiry is required for its cookie.');
     }
 }

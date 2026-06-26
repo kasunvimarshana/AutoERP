@@ -12,16 +12,16 @@ return new class extends Migration
     {
         Schema::create('auth_platform_operator_password_credentials', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('platform_operator_id')->constrained('platform_operators', 'id')->cascadeOnDelete();
+            $table->foreignId('platform_operator_id')->constrained('platform_operators')->restrictOnDelete();
             $table->string('password_hash');
-            $table->string('status', 30)->default('active');
+            $table->string('status', 30);
             $table->timestamp('changed_at');
             $table->timestamp('revoked_at')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
-            $table->unique('platform_operator_id', 'auth_platform_credentials_operator_uk');
-            $table->index('status', 'auth_platform_credentials_status_idx');
+            $table->unique('platform_operator_id', 'auth_plat_credential_operator_uk');
+            $table->index('status', 'auth_plat_credential_status_idx');
         });
     }
 

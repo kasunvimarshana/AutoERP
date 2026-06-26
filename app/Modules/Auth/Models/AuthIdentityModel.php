@@ -4,49 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\User\Models\UserModel;
 
 final class AuthIdentityModel extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'auth_identities';
-
     protected $fillable = [
-        'row_version',
-        'tenant_id',
-        'organization_unit_id',
-        'metadata',
-        'provider_id',
-        'user_id',
-        'provider_user_key',
-        'status',
-        'is_primary',
-        'last_authenticated_at',
-        'verified_at',
-        'claims',
+        'tenant_id', 'provider_id', 'user_id', 'provider_user_key', 'status',
+        'primary_marker', 'verified_at', 'last_authenticated_at', 'row_version',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'claims' => 'array',
-            'is_primary' => 'boolean',
-            'last_authenticated_at' => 'datetime',
-            'verified_at' => 'datetime',
+            'verified_at' => 'immutable_datetime', 'last_authenticated_at' => 'immutable_datetime',
         ]);
-    }
-
-    public function provider(): BelongsTo
-    {
-        return $this->belongsTo(AuthProviderModel::class, 'provider_id');
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'user_id');
     }
 }

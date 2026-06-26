@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\User\Models\PlatformOperatorModel;
+use Modules\Core\Models\CoreModel;
 
-final class AuthPlatformOperatorPasswordCredentialModel extends Model
+final class AuthPlatformOperatorPasswordCredentialModel extends CoreModel
 {
     protected $table = 'auth_platform_operator_password_credentials';
     protected $fillable = [
@@ -19,16 +17,9 @@ final class AuthPlatformOperatorPasswordCredentialModel extends Model
 
     protected function casts(): array
     {
-        return [
-            'platform_operator_id' => 'integer',
-            'row_version' => 'integer',
-            'changed_at' => 'datetime',
-            'revoked_at' => 'datetime',
-        ];
-    }
-
-    public function operator(): BelongsTo
-    {
-        return $this->belongsTo(PlatformOperatorModel::class, 'platform_operator_id');
+        return array_merge(parent::casts(), [
+            'platform_operator_id' => 'integer', 'changed_at' => 'immutable_datetime',
+            'revoked_at' => 'immutable_datetime',
+        ]);
     }
 }

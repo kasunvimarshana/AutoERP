@@ -13,9 +13,10 @@ use Modules\Auth\Constants\RegistrationInvitationStatus;
 use Modules\Auth\Jobs\DeliverRegistrationInvitation;
 use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
+use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\ClockInterface;
+use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Core\DTOs\DataRecord;
 use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
 use RuntimeException;
 
@@ -30,6 +31,8 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
         private readonly AuthRegistrationInvitationDeliveryModel $deliveries,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
+        private readonly OpaqueTokenCodec $tokens,
+        private readonly TenantAuthenticationDirectoryInterface $tenants,
     ) {}
 
     /** @return array{invitation_id:int,expires_at:string,delivery_status:string} */
@@ -60,7 +63,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                 'organization_unit_id' => null,
                 'role_id' => null,
                 'email' => $email,
-                'token_hash' => hash('sha256', $plainToken),
+                'token_hash' => $this->tokens->digestArbitrary($plainToken, 'registration-invitation'),
                 'delivery_token' => $plainToken,
                 'purpose' => RegistrationInvitationPurpose::USER_INVITATION,
                 'status' => RegistrationInvitationStatus::PENDING,
@@ -159,7 +162,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                 'organization_unit_id' => $organizationUnitId,
                 'role_id' => $roleId,
                 'email' => $email,
-                'token_hash' => hash('sha256', $plainToken),
+                'token_hash' => $this->tokens->digestArbitrary($plainToken, 'registration-invitation'),
                 'delivery_token' => $plainToken,
                 'purpose' => RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR,
                 'status' => RegistrationInvitationStatus::PENDING,
@@ -180,7 +183,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
         ];
     }
 
-    public function findValid(int $tenantId, string $email, ?string $plainToken): ?DataRecord
+    public function findValid(int $tenantId, string $email, ?string $plainToken): ?array
     {
         $plainToken = trim((string) $plainToken);
         if ($plainToken === '') {
@@ -190,14 +193,14 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
         $invitation = $this->invitations->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('email', strtolower(trim($email)))
-            ->where('token_hash', hash('sha256', $plainToken))
+            ->where('token_hash', $this->tokens->digestArbitrary($plainToken, 'registration-invitation'))
             ->where('status', RegistrationInvitationStatus::PENDING)
             ->where('expires_at', '>', $this->clock->now())
             ->lockForUpdate()
             ->first();
 
         return $invitation instanceof AuthRegistrationInvitationModel
-            ? new DataRecord($invitation->attributesToArray())
+            ? $invitation->attributesToArray()
             : null;
     }
 
@@ -211,8 +214,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
 
         return $this->executionContext->runAsControlPlane(function () use ($plainToken): ?array {
             $invitation = $this->invitations->newQuery()
-                ->with('tenant:id,name')
-                ->where('token_hash', hash('sha256', $plainToken))
+                ->where('token_hash', $this->tokens->digestArbitrary($plainToken, 'registration-invitation'))
                 ->where('purpose', RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR)
                 ->where('status', RegistrationInvitationStatus::PENDING)
                 ->where('expires_at', '>', $this->clock->now())
@@ -222,10 +224,16 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                 return null;
             }
 
+            $tenantId = (int) $invitation->getAttribute('tenant_id');
+            $tenant = $this->tenants->findActive($tenantId);
+            if ($tenant === null) {
+                return null;
+            }
+
             return [
-                'tenant_id' => (int) $invitation->getAttribute('tenant_id'),
+                'tenant_id' => $tenantId,
                 'email' => (string) $invitation->getAttribute('email'),
-                'tenant_name' => (string) ($invitation->tenant?->getAttribute('name') ?? 'Tenant'),
+                'tenant_name' => $tenant['name'],
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
             ];
         });
@@ -457,7 +465,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                 'organization_unit_id' => $organizationUnitId,
                 'role_id' => $roleId,
                 'email' => $email,
-                'token_hash' => hash('sha256', $plainToken),
+                'token_hash' => $this->tokens->digestArbitrary($plainToken, 'registration-invitation'),
                 'delivery_token' => $plainToken,
                 'purpose' => RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR,
                 'status' => RegistrationInvitationStatus::PENDING,
@@ -495,10 +503,9 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
             $updated = $this->invitations->newQuery()
                 ->whereIn('id', $ids)
                 ->where('status', RegistrationInvitationStatus::PENDING)
-                ->update([
+                ->increment('row_version', 1, [
                     'status' => RegistrationInvitationStatus::EXPIRED,
                     'delivery_token' => null,
-                    'row_version' => DB::raw('row_version + 1'),
                     'updated_at' => $this->clock->now(),
                 ]);
 
@@ -509,7 +516,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                     InvitationDeliveryStatus::SENDING,
                     InvitationDeliveryStatus::FAILED,
                 ])
-                ->update([
+                ->increment('row_version', 1, [
                     'status' => InvitationDeliveryStatus::CANCELLED,
                     'cancelled_at' => $this->clock->now(),
                     'claim_token' => null,
@@ -577,7 +584,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
                 InvitationDeliveryStatus::SENDING,
                 InvitationDeliveryStatus::FAILED,
             ])
-            ->update([
+            ->increment('row_version', 1, [
                 'status' => InvitationDeliveryStatus::CANCELLED,
                 'cancelled_at' => $this->clock->now(),
                 'claim_token' => null,

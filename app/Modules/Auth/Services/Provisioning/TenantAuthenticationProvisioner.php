@@ -5,60 +5,47 @@ declare(strict_types=1);
 namespace Modules\Auth\Services\Provisioning;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Auth\Enums\ProviderStatus;
 use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
-use Modules\User\Constants\UserGuard;
 
-final class TenantAuthenticationProvisioner implements TenantAuthenticationProvisionerInterface
+final readonly class TenantAuthenticationProvisioner implements TenantAuthenticationProvisionerInterface
 {
-    private const INTERNAL_PROVIDER_KEY = 'internal';
+    private const INTERNAL_PROVIDER_NAME = 'Internal authentication';
+    private const INTERNAL_PROVIDER_DRIVER = 'internal';
 
-    public function __construct(
-        private readonly RegistrationInvitationService $invitations,
-    ) {}
+    public function __construct(private RegistrationInvitationService $invitations) {}
 
     public function provisionProvider(int $tenantId): array
     {
+        if ($tenantId < 1) {
+            throw new \InvalidArgumentException('A valid tenant identifier is required.');
+        }
+
         return DB::transaction(function () use ($tenantId): array {
-            $provider = AuthProviderModel::withTrashed()
+            $providerKey = (string) config('module-auth.internal_provider_key', self::INTERNAL_PROVIDER_DRIVER);
+            $provider = AuthProviderModel::query()
                 ->where('tenant_id', $tenantId)
-                ->where('provider_key', self::INTERNAL_PROVIDER_KEY)
+                ->where('provider_key', $providerKey)
                 ->lockForUpdate()
                 ->first();
 
             $attributes = [
-                'organization_unit_id' => null,
-                'name' => 'Internal authentication',
-                'guard_name' => UserGuard::TENANT_API,
-                'provider_name' => 'users',
-                'driver' => self::INTERNAL_PROVIDER_KEY,
-                'status' => 'active',
-                'is_sso' => false,
-                'config' => null,
-                'metadata' => ['system_defined' => true],
-                'deleted_at' => null,
+                'tenant_id' => $tenantId,
+                'provider_key' => $providerKey,
+                'name' => self::INTERNAL_PROVIDER_NAME,
+                'driver' => self::INTERNAL_PROVIDER_DRIVER,
+                'status' => ProviderStatus::ACTIVE->value,
             ];
 
             if ($provider instanceof AuthProviderModel) {
-                $dirty = false;
-                foreach ($attributes as $attribute => $value) {
-                    if ($provider->getAttribute($attribute) !== $value) {
-                        $dirty = true;
-                        break;
-                    }
-                }
-
-                if ($dirty) {
-                    $provider->forceFill([
-                        ...$attributes,
-                        'row_version' => max(1, (int) $provider->getAttribute('row_version')) + 1,
-                    ])->save();
-                }
+                $provider->forceFill([
+                    ...$attributes,
+                    'row_version' => (int) $provider->getAttribute('row_version') + 1,
+                ])->save();
             } else {
                 $provider = AuthProviderModel::query()->create([
-                    'tenant_id' => $tenantId,
-                    'provider_key' => self::INTERNAL_PROVIDER_KEY,
                     ...$attributes,
                     'row_version' => 1,
                 ]);
@@ -84,13 +71,17 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
 
     public function providerIsReady(int $tenantId, bool $lockForUpdate = false): bool
     {
-        return AuthProviderModel::query()
+        $query = AuthProviderModel::query()
             ->where('tenant_id', $tenantId)
-            ->where('provider_key', self::INTERNAL_PROVIDER_KEY)
-            ->where('status', 'active')
-            ->whereNull('deleted_at')
-            ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
-            ->exists();
+            ->where('provider_key', (string) config('module-auth.internal_provider_key', self::INTERNAL_PROVIDER_DRIVER))
+            ->where('driver', self::INTERNAL_PROVIDER_DRIVER)
+            ->where('status', ProviderStatus::ACTIVE->value);
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
     }
 
     public function acceptedInitialAdministratorUserId(
@@ -125,8 +116,11 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
         return $this->invitations->initialAdministratorStatus($tenantId, $invitationId, $lockForUpdate);
     }
 
-    public function resendInitialAdministratorInvitation(int $tenantId, int $invitationId, int $expectedVersion): array
-    {
+    public function resendInitialAdministratorInvitation(
+        int $tenantId,
+        int $invitationId,
+        int $expectedVersion,
+    ): array {
         return $this->invitations->resendInitialAdministrator($tenantId, $invitationId, $expectedVersion);
     }
 
@@ -136,7 +130,12 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
         int $expectedVersion,
         string $reason,
     ): void {
-        $this->invitations->revokeInitialAdministrator($tenantId, $invitationId, $expectedVersion, $reason);
+        $this->invitations->revokeInitialAdministrator(
+            $tenantId,
+            $invitationId,
+            $expectedVersion,
+            $reason,
+        );
     }
 
     public function replaceInitialAdministratorInvitation(

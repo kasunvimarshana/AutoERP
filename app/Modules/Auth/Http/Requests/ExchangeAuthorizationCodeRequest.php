@@ -13,21 +13,18 @@ final class ExchangeAuthorizationCodeRequest extends FormRequest
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'authorization_code' => ['required', 'string', 'min:10'],
+            'authorization_code' => ['required', 'string', 'max:512'],
             'client_key' => ['required', 'string', 'max:120'],
-            'client_secret' => ['nullable', 'string', 'min:1'],
-            'redirect_uri' => ['nullable', 'url', 'max:2048'],
-            'code_verifier' => ['nullable', 'string', 'max:255'],
-            'scopes' => ['nullable', 'array'],
-            'scopes.*' => ['string', 'max:100'],
-            'access_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
-            'refresh_token_ttl_seconds' => ['nullable', 'integer', 'min:1'],
+            'client_secret' => ['nullable', 'string', 'max:1024'],
+            'redirect_uri' => ['required', 'url', 'max:2048'],
+            'code_verifier' => ['required', 'string', 'regex:/^[A-Za-z0-9._~-]{43,128}$/'],
+            'scopes' => ['prohibited'],
+            'user_id' => ['prohibited'],
+            'session_id' => ['prohibited'],
         ];
     }
 }

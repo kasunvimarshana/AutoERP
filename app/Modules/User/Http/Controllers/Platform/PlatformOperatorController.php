@@ -10,6 +10,7 @@ use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Http\Requests\Platform\ChangePlatformOperatorStatusRequest;
 use Modules\User\Http\Requests\Platform\CreatePlatformOperatorRequest;
 use Modules\User\Http\Requests\Platform\ListPlatformOperatorRequest;
+use Modules\User\Http\Requests\Platform\RecoverPlatformOperatorAccessRequest;
 use Modules\User\Http\Requests\Platform\ResendPlatformOperatorInvitationRequest;
 use Modules\User\Http\Requests\Platform\RevokePlatformOperatorInvitationRequest;
 use Modules\User\Http\Requests\Platform\UpdatePlatformOperatorPermissionsRequest;
@@ -87,6 +88,17 @@ final class PlatformOperatorController extends Controller
             $operator,
             (int) $request->validated('expected_version'),
             PlatformOperatorStatus::INACTIVE,
+            (string) $request->validated('reason'),
+        ));
+    }
+
+    public function recoverAccess(
+        RecoverPlatformOperatorAccessRequest $request,
+        int $operator,
+    ): PlatformOperatorResource {
+        return new PlatformOperatorResource($this->operators->recoverAccess(
+            $operator,
+            (int) $request->validated('expected_version'),
             (string) $request->validated('reason'),
         ));
     }

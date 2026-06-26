@@ -32,7 +32,6 @@ export interface OrganizationUnitContextOptions {
 export interface AuthSession {
     token: string;
     token_type: 'Bearer' | string;
-    session_id?: number | null;
     user: AuthUser;
     tenant: AuthTenant | null;
     organization_unit: AuthOrganizationUnit | null;
@@ -54,9 +53,8 @@ export interface CurrentUserResponse {
 
 export interface LoginPayload {
     auth_mode: AuthMode;
-    login_identifier: string;
+    identifier: string;
     password: string;
-    tenant_code?: string | null;
     organization_unit_id?: number | null;
     device_name?: string | null;
     totp_code?: string | null;
@@ -64,7 +62,7 @@ export interface LoginPayload {
 }
 
 export interface PlatformMfaEnrollment {
-    secret: string;
+    enrollment_proof: string;
     provisioning_uri: string;
 }
 
@@ -111,4 +109,5 @@ export interface PlatformOperatorInvitationAcceptance {
     operator_name: string;
     email: string;
     status: 'active';
+    mfa_enrollment?: PlatformMfaEnrollment;
 }

@@ -12,47 +12,36 @@ return new class extends Migration
     {
         Schema::create('auth_sessions', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->uuid('public_id');
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
-            $table->json('metadata')->nullable();
-
-            $table->unsignedBigInteger('provider_id')->nullable();
-            $table->unsignedBigInteger('identity_id')->nullable();
+            $table->unsignedBigInteger('provider_id');
+            $table->unsignedBigInteger('identity_id');
             $table->unsignedBigInteger('user_id');
-            $table->string('session_key', 120);
-            $table->string('status', 40)->default('active');
-            $table->string('ip_address', 45)->nullable();
+            $table->string('status', 30);
+            $table->string('ip_address', 45);
             $table->string('user_agent', 1024)->nullable();
             $table->string('device_name', 160)->nullable();
-            $table->timestamp('last_activity_at')->nullable();
+            $table->timestamp('authenticated_at');
+            $table->timestamp('last_activity_at');
+            $table->timestamp('expires_at');
             $table->timestamp('revoked_at')->nullable();
-            $table->timestamp('expires_at')->nullable();
-
+            $table->string('revocation_reason', 255)->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique(['id', 'tenant_id'], 'auth_sessions_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_sessions_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['provider_id', 'tenant_id'], 'auth_sessions_provider_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('auth_providers')
-                ->restrictOnDelete();
-            $table->foreign(['identity_id', 'tenant_id'], 'auth_sessions_identity_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('auth_identities')
-                ->restrictOnDelete();
-            $table->foreign(['user_id', 'tenant_id'], 'auth_sessions_user_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->cascadeOnDelete();
-            $table->unique(['tenant_id', 'session_key'], 'auth_sessions_key_uk');
-            $table->index(['tenant_id', 'user_id', 'status'], 'auth_sessions_user_status_idx');
+            $table->unique('public_id', 'auth_session_public_uk');
+            $table->unique(['id', 'tenant_id', 'user_id'], 'auth_session_graph_uk');
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_session_ou_fk')
+                ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
+            $table->foreign(['provider_id', 'tenant_id'], 'auth_session_provider_fk')
+                ->references(['id', 'tenant_id'])->on('auth_providers')->restrictOnDelete();
+            $table->foreign(['identity_id', 'tenant_id'], 'auth_session_identity_fk')
+                ->references(['id', 'tenant_id'])->on('auth_identities')->restrictOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'auth_session_user_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->index(['tenant_id', 'user_id', 'status', 'expires_at'], 'auth_session_user_idx');
         });
-
     }
 
     public function down(): void

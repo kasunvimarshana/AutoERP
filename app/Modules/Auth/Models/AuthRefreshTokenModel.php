@@ -4,52 +4,23 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
 
 final class AuthRefreshTokenModel extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'auth_refresh_tokens';
-
     protected $fillable = [
-        'row_version',
-        'tenant_id',
-        'organization_unit_id',
-        'metadata',
-        'access_token_id',
-        'provider_id',
-        'client_id',
-        'identity_id',
-        'session_id',
-        'user_id',
-        'refresh_key',
-        'refresh_hash',
-        'rotated',
-        'rotated_at',
-        'replaced_by_expires_at',
-        'status',
-        'issued_at',
-        'expires_at',
-        'revoked_at',
+        'tenant_id', 'access_token_id', 'parent_refresh_token_id', 'family_id', 'session_id',
+        'user_id', 'client_id', 'refresh_key', 'refresh_digest', 'status', 'issued_at',
+        'expires_at', 'rotated_at', 'revoked_at', 'revocation_reason', 'row_version',
     ];
+    protected $hidden = ['refresh_digest'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'rotated' => 'boolean',
-            'issued_at' => 'datetime',
-            'rotated_at' => 'datetime',
-            'expires_at' => 'datetime',
-            'revoked_at' => 'datetime',
-            'replaced_by_expires_at' => 'datetime',
+            'issued_at' => 'immutable_datetime', 'expires_at' => 'immutable_datetime',
+            'rotated_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime',
         ]);
-    }
-
-    public function accessToken(): BelongsTo
-    {
-        return $this->belongsTo(AuthAccessTokenModel::class, 'access_token_id');
     }
 }

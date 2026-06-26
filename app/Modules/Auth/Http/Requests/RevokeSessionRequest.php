@@ -8,18 +8,13 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 
 final class RevokeSessionRequest extends TenantScopedRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'user_id' => ['prohibited'],
+            'session_id' => ['prohibited'],
         ];
     }
 }

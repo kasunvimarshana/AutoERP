@@ -27,3 +27,8 @@ Schedule::command('tenant:events:publish')
     ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('auth:retention:purge')
+    ->dailyAt('02:30')
+    ->withoutOverlapping()
+    ->onOneServer();

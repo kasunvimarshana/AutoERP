@@ -101,4 +101,14 @@ Route::prefix('api/v1/platform/operators')
             ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('activate');
         Route::patch('{operator}/deactivate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'deactivate'])
             ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('deactivate');
+        Route::post(
+            '{operator}/security-recovery',
+            [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'recoverAccess'],
+        )
+            ->whereNumber('operator')
+            ->middleware([
+                $platformStepUp,
+                'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::MFA_MANAGE,
+            ])
+            ->name('security-recovery');
     });

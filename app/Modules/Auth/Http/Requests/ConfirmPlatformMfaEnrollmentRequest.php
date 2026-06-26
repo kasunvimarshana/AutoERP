@@ -17,9 +17,11 @@ final class ConfirmPlatformMfaEnrollmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email:rfc', 'max:320'],
-            'password' => ['required', 'string', 'max:1024'],
-            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
+            'enrollment_proof' => ['required', 'string', 'max:512'],
+            'code' => ['required', 'string', 'regex:/^\\d{6}$/'],
+            'email' => ['prohibited'],
+            'password' => ['prohibited'],
+            'operator_id' => ['prohibited'],
         ];
     }
 }

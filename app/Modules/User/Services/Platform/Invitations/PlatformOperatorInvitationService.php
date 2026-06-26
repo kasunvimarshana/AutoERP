@@ -7,7 +7,6 @@ namespace Modules\User\Services\Platform\Invitations;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
@@ -18,6 +17,7 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Jobs\DeliverPlatformOperatorInvitation;
 use Modules\User\Models\PlatformOperatorInvitationDeliveryModel;
@@ -32,6 +32,8 @@ final class PlatformOperatorInvitationService
         private readonly PlatformOperatorInvitationDeliveryModel $deliveries,
         private readonly PlatformOperatorModel $operators,
         private readonly PlatformOperatorCredentialProvisionerInterface $credentials,
+        private readonly PlatformMfaEnrollmentIssuerInterface $mfaEnrollment,
+        private readonly PlatformOperatorInvitationTokenCodec $tokens,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TenantExecutionContextInterface $executionContext,
@@ -44,12 +46,12 @@ final class PlatformOperatorInvitationService
         $this->assertInvitable($operator);
         $this->revokePendingInvitations((int) $operator->getKey(), 'Replaced by a new invitation.');
 
-        $token = Str::random(72);
+        $token = $this->tokens->issue();
         $invitation = $this->invitations->newQuery()->create([
             'public_id' => (string) Str::uuid(),
             'platform_operator_id' => (int) $operator->getKey(),
             'created_by_operator_id' => $this->currentUser->currentUserId(),
-            'token_hash' => hash('sha256', $token),
+            'token_hash' => $this->tokens->digest($token),
             'delivery_token' => $token,
             'status' => PlatformOperatorInvitationStatus::PENDING,
             'expires_at' => $this->clock->now()->modify(sprintf(
@@ -168,10 +170,14 @@ final class PlatformOperatorInvitationService
                 $this->revokePendingInvitations((int) $operator->getKey(), 'Operator registration completed.', (int) $invitation->getKey());
                 $this->recordAudit('invitation_accepted', $operator);
 
+                $email = (string) $operator->getAttribute('email');
+                $enrollment = $this->mfaEnrollment->issueForOperator((int) $operator->getKey(), $email);
+
                 return [
                     'operator_name' => trim((string) $operator->getAttribute('first_name').' '.(string) $operator->getAttribute('last_name')),
-                    'email' => (string) $operator->getAttribute('email'),
+                    'email' => $email,
                     'status' => PlatformOperatorStatus::ACTIVE,
+                    'mfa_enrollment' => $enrollment,
                 ];
             }, 3);
         });
@@ -184,7 +190,7 @@ final class PlatformOperatorInvitationService
             throw ValidationException::withMessages(['token' => ['A valid invitation token is required.']]);
         }
         $query = $this->invitations->newQuery()->with('operator')
-            ->where('token_hash', hash('sha256', $plainToken))
+            ->where('token_hash', $this->tokens->digest($plainToken))
             ->where('status', PlatformOperatorInvitationStatus::PENDING);
         if ($lock) {
             $query->lockForUpdate();
@@ -267,14 +273,13 @@ final class PlatformOperatorInvitationService
                 PlatformOperatorInvitationDeliveryStatus::QUEUED,
                 PlatformOperatorInvitationDeliveryStatus::SENDING,
                 PlatformOperatorInvitationDeliveryStatus::FAILED,
-            ])->update([
+            ])->increment('row_version', 1, [
                 'status' => PlatformOperatorInvitationDeliveryStatus::CANCELLED,
                 'claim_token' => null,
                 'claimed_at' => null,
                 'lease_expires_at' => null,
                 'error_code' => 'PLATFORM_OPERATOR_INVITATION_CANCELLED',
                 'error_message' => $reason,
-                'row_version' => DB::raw('row_version + 1'),
                 'updated_at' => $this->clock->now(),
             ]);
     }

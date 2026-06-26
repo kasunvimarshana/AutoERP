@@ -6,19 +6,21 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { authApi } from './authApi';
-import type { PlatformOperatorInvitationInspection } from './authTypes';
+import type { PlatformMfaEnrollment, PlatformOperatorInvitationInspection } from './authTypes';
 
 export default function PlatformOperatorInvitationPage() {
     const [token] = useState(() => readInvitationToken());
     const [invitation, setInvitation] = useState<PlatformOperatorInvitationInspection | null>(null);
     const [password, setPassword] = useState('');
     const [passwordConfirmation, setPasswordConfirmation] = useState('');
+    const [enrollment, setEnrollment] = useState<PlatformMfaEnrollment | null>(null);
+    const [enrollmentCode, setEnrollmentCode] = useState('');
+    const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
     const [error, setError] = useState<ApiError | null>(() => token
         ? null
         : new ApiError('This invitation link is incomplete. Ask a platform manager to send a new invitation.', 404));
     const [loading, setLoading] = useState(token !== null);
     const [submitting, setSubmitting] = useState(false);
-    const [completed, setCompleted] = useState(false);
 
     useEffect(() => {
         document.title = 'Platform operator registration - AutoERP';
@@ -33,18 +35,47 @@ export default function PlatformOperatorInvitationPage() {
         return () => controller.abort();
     }, [token]);
 
-    async function submit() {
+    async function activateAccount() {
         if (!token || !invitation) return;
         setError(null);
         setSubmitting(true);
         try {
-            await authApi.acceptPlatformOperatorInvitation({
+            const acceptance = await authApi.acceptPlatformOperatorInvitation({
                 token,
                 password,
                 password_confirmation: passwordConfirmation,
             });
             window.history.replaceState(null, '', '/register/platform-operator');
-            setCompleted(true);
+            if (!acceptance.mfa_enrollment) {
+                throw new ApiError(
+                    'The platform account was activated, but MFA enrollment could not be started. Contact a platform manager.',
+                    503,
+                    'AUTH_MFA_ENROLLMENT_UNAVAILABLE',
+                    'infrastructure',
+                );
+            }
+            setEnrollment(acceptance.mfa_enrollment);
+            setPassword('');
+            setPasswordConfirmation('');
+        } catch (nextError) {
+            setError(toApiError(nextError));
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    async function confirmMfa() {
+        if (!enrollment || enrollmentCode.length !== 6) return;
+        setError(null);
+        setSubmitting(true);
+        try {
+            const confirmation = await authApi.confirmPlatformMfaEnrollment(
+                enrollment.enrollment_proof,
+                enrollmentCode,
+            );
+            setBackupCodes(confirmation.backup_codes);
+            setEnrollment(null);
+            setEnrollmentCode('');
         } catch (nextError) {
             setError(toApiError(nextError));
         } finally {
@@ -60,21 +91,54 @@ export default function PlatformOperatorInvitationPage() {
                 <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">AutoERP platform</p>
                 <h1 className="mt-2 text-2xl font-bold text-slate-950">Complete platform operator registration</h1>
                 <p className="mt-2 text-sm text-slate-600">
-                    Choose your own password for the control plane. MFA enrollment is required when you first sign in.
+                    Create your password and secure the control-plane account with an authenticator before signing in.
                 </p>
 
                 <div className="mt-5">
-                    <ErrorAlert error={error} title="Unable to use this invitation" />
+                    <ErrorAlert error={error} title="Unable to complete registration" />
                     <SuccessAlert
-                        title="Platform operator account activated"
-                        message={completed ? 'Your password is set. Continue to platform sign-in and complete MFA enrollment.' : null}
+                        title="Platform operator security is ready"
+                        message={backupCodes ? 'Your password and MFA are configured. Store the backup codes before continuing.' : null}
                     />
                 </div>
 
-                {completed ? (
-                    <LinkButton className="mt-5 w-full" to="/login">Continue to platform sign in</LinkButton>
+                {backupCodes ? (
+                    <div className="mt-5 space-y-4">
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                            <p className="font-semibold">Save these one-time backup codes now</p>
+                            <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
+                                {backupCodes.map((code) => (
+                                    <code key={code} className="rounded bg-white p-2 text-center">{code}</code>
+                                ))}
+                            </div>
+                            <p className="mt-3">They will not be shown again. Store them separately from your password.</p>
+                        </div>
+                        <LinkButton className="w-full" to="/login">I stored the codes — continue to sign in</LinkButton>
+                    </div>
+                ) : enrollment ? (
+                    <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void confirmMfa(); }}>
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+                            <p className="font-semibold">Set up multi-factor authentication</p>
+                            <p className="mt-2">Add this account to an authenticator app, then enter the current six-digit code.</p>
+                            <p className="mt-3 break-all"><strong>Setup URI:</strong> <code className="text-xs">{enrollment.provisioning_uri}</code></p>
+                        </div>
+                        <Input
+                            label="Authenticator code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            pattern="[0-9]{6}"
+                            maxLength={6}
+                            value={enrollmentCode}
+                            onChange={(event) => setEnrollmentCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                            error={fieldError(error, 'code')}
+                            required
+                        />
+                        <Button type="submit" className="w-full" loading={submitting} disabled={enrollmentCode.length !== 6}>
+                            Enable MFA
+                        </Button>
+                    </form>
                 ) : invitation ? (
-                    <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+                    <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void activateAccount(); }}>
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                             <p><span className="font-semibold">Operator:</span> {invitation.operator_name}</p>
                             <p className="mt-1"><span className="font-semibold">Email:</span> {invitation.email}</p>
@@ -101,7 +165,7 @@ export default function PlatformOperatorInvitationPage() {
                             error={fieldError(error, 'password_confirmation')}
                             required
                         />
-                        <Button type="submit" className="w-full" loading={submitting}>Activate platform operator account</Button>
+                        <Button type="submit" className="w-full" loading={submitting}>Set password and continue to MFA</Button>
                     </form>
                 ) : (
                     <LinkButton className="mt-5 w-full" to="/login" variant="secondary">Return to sign in</LinkButton>

@@ -4,165 +4,122 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services\OrganizationUnit;
 
+use Illuminate\Database\DatabaseManager;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\Core\Exceptions\DomainException;
-use Illuminate\Support\Facades\DB;
-use Modules\Auth\Constants\AuthStatus;
-use Modules\Auth\Models\AuthAccessTokenModel;
-use Modules\Auth\Models\AuthRefreshTokenModel;
+use Modules\Auth\Constants\AuthErrorCode;
+use Modules\Auth\Enums\SessionStatus;
+use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Models\AuthSessionModel;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
-use Modules\Core\DTOs\DataRecord;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 
-final class SwitchOrganizationUnitService
+final readonly class SwitchOrganizationUnitService
 {
     public function __construct(
-        private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly CurrentTenantContextAccessorInterface $currentTenant,
-        private readonly OrganizationUnitUserAccessCheckerInterface $access,
-        private readonly OrganizationUnitDirectoryInterface $organizationUnits,
-        private readonly AuditRecorderInterface $audit,
+        private CurrentUserContextAccessorInterface $currentUser,
+        private CurrentTenantContextAccessorInterface $currentTenant,
+        private OrganizationUnitUserAccessCheckerInterface $access,
+        private OrganizationUnitDirectoryInterface $organizationUnits,
+        private TenantExecutionContextInterface $executionContext,
+        private DatabaseManager $database,
+        private ClockInterface $clock,
+        private AuditRecorderInterface $audit,
     ) {}
 
-    public function execute(int $targetOrganizationUnitId): DataRecord
+    /** @return array{id:int,code:string,name:string,path:string} */
+    public function execute(int $targetOrganizationUnitId): array
     {
         $user = $this->currentUser->requireCurrent();
         $tenantId = $this->currentTenant->requireCurrent()->tenantId();
-        $tokenPayload = $user->tokenPayload();
-        $accessTokenId = $this->positiveInt($tokenPayload['id'] ?? null);
-        $sessionId = $this->positiveInt($tokenPayload['session_id'] ?? null);
-        if ($accessTokenId === null) {
-            throw new DomainException('The authenticated access token cannot be updated. Sign in again.');
+        $sessionId = $this->positiveInt($user->tokenPayload()['session_id'] ?? null);
+        if ($sessionId === null) {
+            throw $this->invalidSession();
         }
 
-        return DB::transaction(function () use (
-            $tenantId,
-            $user,
-            $targetOrganizationUnitId,
-            $accessTokenId,
-            $sessionId,
-        ): DataRecord {
-            $this->organizationUnits->assertActive($tenantId, [$targetOrganizationUnitId], true);
-            if (! $this->access->canAccessOrganizationUnit(
-                $user->userId(),
-                $tenantId,
-                $targetOrganizationUnitId,
-                true,
-            )) {
-                throw new DomainException('You do not have an active assignment to the selected organization unit.');
-            }
+        return $this->executionContext->runForTenant($tenantId, fn (): array => $this->database->transaction(
+            function () use ($tenantId, $user, $targetOrganizationUnitId, $sessionId): array {
+                $this->organizationUnits->assertActive($tenantId, [$targetOrganizationUnitId], true);
+                if (! $this->access->canAccessOrganizationUnit(
+                    $user->userId(),
+                    $tenantId,
+                    $targetOrganizationUnitId,
+                    true,
+                )) {
+                    throw new AuthFailure(
+                        AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                        'You do not have an active assignment to the selected organization unit.',
+                        403,
+                    );
+                }
 
-            $token = AuthAccessTokenModel::query()
-                ->where('tenant_id', $tenantId)
-                ->where('user_id', $user->userId())
-                ->whereKey($accessTokenId)
-                ->where('status', AuthStatus::ACTIVE)
-                ->lockForUpdate()
-                ->first();
-            if (! $token instanceof AuthAccessTokenModel) {
-                throw new DomainException('The authenticated access token is no longer active. Sign in again.');
-            }
-
-            $previousOrganizationUnitId = $this->positiveInt($token->getAttribute('organization_unit_id'));
-
-            if ($sessionId !== null) {
-                AuthSessionModel::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('user_id', $user->userId())
+                $session = AuthSessionModel::query()
                     ->whereKey($sessionId)
-                    ->where('status', AuthStatus::ACTIVE)
+                    ->where('tenant_id', $tenantId)
+                    ->where('user_id', $user->userId())
                     ->lockForUpdate()
-                    ->get()
-                    ->each(function (AuthSessionModel $session) use ($targetOrganizationUnitId): void {
-                        $session->forceFill([
-                            'organization_unit_id' => $targetOrganizationUnitId,
-                            'row_version' => (int) $session->getAttribute('row_version') + 1,
-                        ])->save();
-                    });
+                    ->first();
+                if (! $session instanceof AuthSessionModel
+                    || (string) $session->getAttribute('status') !== SessionStatus::ACTIVE->value
+                    || $this->clock->now()->getTimestamp() >= $session->getAttribute('expires_at')->getTimestamp()) {
+                    throw $this->invalidSession();
+                }
 
-                AuthAccessTokenModel::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('user_id', $user->userId())
-                    ->where('session_id', $sessionId)
-                    ->where('status', AuthStatus::ACTIVE)
-                    ->lockForUpdate()
-                    ->get()
-                    ->each(function (AuthAccessTokenModel $activeToken) use ($targetOrganizationUnitId): void {
-                        $activeToken->forceFill([
-                            'organization_unit_id' => $targetOrganizationUnitId,
-                            'row_version' => (int) $activeToken->getAttribute('row_version') + 1,
-                        ])->save();
-                    });
-
-                AuthRefreshTokenModel::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('user_id', $user->userId())
-                    ->where('session_id', $sessionId)
-                    ->where('status', AuthStatus::ACTIVE)
-                    ->lockForUpdate()
-                    ->get()
-                    ->each(function (AuthRefreshTokenModel $refreshToken) use ($targetOrganizationUnitId): void {
-                        $refreshToken->forceFill([
-                            'organization_unit_id' => $targetOrganizationUnitId,
-                            'row_version' => (int) $refreshToken->getAttribute('row_version') + 1,
-                        ])->save();
-                    });
-            } else {
-                $token->forceFill([
-                    'organization_unit_id' => $targetOrganizationUnitId,
-                    'row_version' => (int) $token->getAttribute('row_version') + 1,
-                ])->save();
-                AuthRefreshTokenModel::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('user_id', $user->userId())
-                    ->where('access_token_id', $accessTokenId)
-                    ->where('status', AuthStatus::ACTIVE)
-                    ->update([
+                $previous = $this->positiveInt($session->getAttribute('organization_unit_id'));
+                if ($previous !== $targetOrganizationUnitId) {
+                    $session->forceFill([
                         'organization_unit_id' => $targetOrganizationUnitId,
-                        'row_version' => DB::raw('row_version + 1'),
-                        'updated_at' => now(),
-                    ]);
-            }
+                        'last_activity_at' => $this->clock->now(),
+                        'row_version' => (int) $session->getAttribute('row_version') + 1,
+                    ])->save();
 
-            $this->audit->record(new AuditEventData(
-                eventName: 'auth.organization_unit.switched',
-                eventCategory: AuditEventCategory::AUTHORIZATION,
-                sourceModule: 'auth',
-                subjectType: 'auth_session',
-                subjectId: (string) ($sessionId ?? $accessTokenId),
-                subjectReference: 'Organization-unit context switch',
-                changes: [
-                    'before' => ['organization_unit_id' => $previousOrganizationUnitId],
-                    'after' => ['organization_unit_id' => $targetOrganizationUnitId],
-                ],
-                metadata: [
-                    'user_id' => $user->userId(),
-                    'session_id' => $sessionId,
-                    'access_token_id' => $accessTokenId,
-                ],
-                tags: ['authentication', 'organization-unit', 'scope-switch'],
-            ));
+                    $this->audit->record(new AuditEventData(
+                        eventName: 'auth.organization_unit.switched',
+                        eventCategory: AuditEventCategory::AUTHORIZATION,
+                        sourceModule: 'auth',
+                        subjectType: 'auth_session',
+                        subjectId: (string) $session->getAttribute('public_id'),
+                        subjectReference: 'Organization-unit context switch',
+                        changes: [
+                            'before' => ['organization_unit_id' => $previous],
+                            'after' => ['organization_unit_id' => $targetOrganizationUnitId],
+                        ],
+                        metadata: ['user_id' => $user->userId()],
+                        tags: ['authentication', 'organization-unit', 'scope-switch'],
+                    ));
+                }
 
-            $unit = $this->organizationUnits->summaries($tenantId, [$targetOrganizationUnitId])[$targetOrganizationUnitId] ?? null;
-            if ($unit === null) {
-                throw new DomainException('The selected organization unit is no longer available.');
-            }
+                $unit = $this->organizationUnits->summaries($tenantId, [$targetOrganizationUnitId])[$targetOrganizationUnitId] ?? null;
+                if ($unit === null) {
+                    throw new AuthFailure(
+                        AuthErrorCode::ORGANIZATION_UNIT_RESOLUTION_FAILED,
+                        'The selected organization unit is unavailable.',
+                        409,
+                    );
+                }
 
-            return new DataRecord([
-                ...$unit,
-                'tenant_id' => $tenantId,
-                'is_active' => true,
-            ]);
-        }, 3);
+                return $unit;
+            },
+            3,
+        ));
     }
 
     private function positiveInt(mixed $value): ?int
     {
-        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+        if (! is_int($value) && ! ctype_digit((string) $value)) {
+            return null;
+        }
+        $value = (int) $value;
+        return $value > 0 ? $value : null;
+    }
+
+    private function invalidSession(): AuthFailure
+    {
+        return new AuthFailure(AuthErrorCode::SESSION_NOT_FOUND, 'The authentication session is unavailable.', 401);
     }
 }

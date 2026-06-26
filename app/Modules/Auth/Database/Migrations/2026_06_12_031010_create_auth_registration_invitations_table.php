@@ -35,7 +35,7 @@ return new class extends Migration
             $table->unique(['id', 'tenant_id'], 'auth_registration_invites_id_tenant_uk');
             $table->index(['tenant_id', 'user_id', 'purpose', 'status'], 'auth_registration_invites_user_status_idx');
             $table->foreign(['user_id', 'tenant_id'], 'auth_reg_invites_target_user_tenant_fk')
-                ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_reg_invites_org_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['role_id', 'tenant_id'], 'auth_reg_invites_role_tenant_fk')

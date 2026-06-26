@@ -7,153 +7,142 @@ namespace Modules\Auth\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Auth\Constants\AuthErrorCode;
-use Modules\Auth\Constants\AuthTokenScope;
-use Modules\Auth\DTOs\TokenRefreshData;
-use Modules\Auth\Contracts\Providers\TokenProviderInterface;
+use Modules\Auth\DTOs\ClientContext;
+use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Http\Requests\PlatformLoginRequest;
 use Modules\Auth\Http\Requests\PlatformRefreshTokenRequest;
 use Modules\Auth\Http\Resources\AuthPayloadResource;
-use Modules\Auth\Services\PlatformLoginService;
+use Modules\Auth\Services\AuthProfileService;
+use Modules\Auth\Services\PlatformAuthenticationService;
 use Modules\Auth\Services\PlatformRefreshTokenCookie;
-use Modules\Auth\Services\RefreshTokenService;
+use Modules\Auth\Services\TokenService;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Core\Http\Responses\ApiErrorResponseFactory;
-use Modules\Core\Results\Result;
 
 final class PlatformAuthController extends Controller
 {
     public function __construct(
-        private readonly PlatformLoginService $login,
-        private readonly RefreshTokenService $refreshTokens,
-        private readonly PlatformRefreshTokenCookie $refreshTokenCookie,
-        private readonly TokenProviderInterface $tokens,
+        private readonly PlatformAuthenticationService $authentication,
+        private readonly TokenService $tokens,
+        private readonly PlatformRefreshTokenCookie $cookie,
+        private readonly AuthProfileService $profiles,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly ApiErrorResponseFactory $errors,
-        private readonly TenantExecutionContextInterface $executionContext,
-        private readonly PlatformPermissionCheckerInterface $platformPermissions,
     ) {}
 
     public function login(PlatformLoginRequest $request): JsonResponse
     {
-        $result = $this->login->login(
-            (string) $request->validated('email'),
-            (string) $request->validated('password'),
-            (string) $request->ip(),
-            is_string($request->validated('totp_code')) ? $request->validated('totp_code') : null,
-            is_string($request->validated('backup_code')) ? $request->validated('backup_code') : null,
-            $request->userAgent(),
-            is_string($request->validated('device_name')) ? $request->validated('device_name') : null,
-        );
+        try {
+            $payload = $this->authentication->login(
+                (string) $request->validated('email'),
+                (string) $request->validated('password'),
+                is_string($request->validated('totp_code')) ? $request->validated('totp_code') : null,
+                is_string($request->validated('backup_code')) ? $request->validated('backup_code') : null,
+                ClientContext::fromRequest(
+                    $request,
+                    is_string($request->validated('device_name'))
+                        ? $request->validated('device_name')
+                        : null,
+                ),
+            );
 
-        return $this->respondWithRefreshCookie($result);
+            return $this->respondWithRefreshCookie($this->completePlatformPayload($payload));
+        } catch (AuthFailure $failure) {
+            return $this->failure($failure);
+        }
     }
 
     public function refresh(PlatformRefreshTokenRequest $request): JsonResponse
     {
-        $refreshToken = $this->refreshTokenCookie->read($request);
+        $refreshToken = $this->cookie->read($request);
         if ($refreshToken === null) {
-            return $this->errors->make(
+            return $this->failure(new AuthFailure(
                 AuthErrorCode::TOKEN_INVALID,
                 'Refresh session is not available.',
                 401,
-                'authentication',
-            );
+            ));
         }
 
-        $payload = $request->validated();
-        $payload['refresh_token'] = $refreshToken;
-        $payload['tenant_id'] = null;
-        $payload['token_scope'] = AuthTokenScope::PLATFORM;
-        $payload['scopes'] = ['platform'];
-        $payload['access_token_ttl_seconds'] = (int) config('module-auth.access_token_ttl_seconds');
-        $payload['refresh_token_ttl_seconds'] = (int) config('module-auth.refresh_token_ttl_seconds');
-
-        return $this->executionContext->runAsControlPlane(function () use ($payload): JsonResponse {
-            $result = $this->refreshTokens->refreshToken(TokenRefreshData::fromArray($payload));
-            $response = $this->respondWithRefreshCookie($result);
-
-            return $result->isFailure()
-                ? $this->refreshTokenCookie->forget($response)
-                : $response;
-        });
+        try {
+            return $this->respondWithRefreshCookie($this->completePlatformPayload([
+                'tokens' => $this->tokens->refreshPlatform($refreshToken),
+            ]));
+        } catch (AuthFailure $failure) {
+            return $this->cookie->forget($this->failure($failure));
+        }
     }
 
     public function me(): JsonResponse
     {
-        $context = $this->currentUser->current();
-        if ($context === null) {
-            return $this->errors->make(
-                AuthErrorCode::UNAUTHORIZED_ACCESS,
-                'Platform authentication is required.',
-                401,
-                'authentication',
+        try {
+            return $this->payloadResponse(
+                $this->profiles->platform($this->currentUser->requireCurrent()->tokenPayload()),
             );
+        } catch (AuthFailure $failure) {
+            return $this->failure($failure);
         }
-
-        $user = $context->user();
-
-        return response()->json((new AuthPayloadResource([
-            'user' => [
-                'id' => $context->userId(),
-                'first_name' => $user->getAttribute('first_name'),
-                'last_name' => $user->getAttribute('last_name'),
-                'email' => $user->getAttribute('email'),
-                'is_platform_operator' => true,
-            ],
-            'tenant' => null,
-            'organization_unit' => null,
-            'roles' => ['Platform Operator'],
-            'permissions' => $this->platformPermissions->permissions($context->userId()),
-            'enabled_modules' => null,
-            'is_platform_operator' => true,
-        ]))->resolve(request()));
     }
 
     public function logout(): JsonResponse
     {
-        $request = request();
-        $token = $request->bearerToken();
-        if (is_string($token) && $token !== '') {
-            $this->tokens->revokeAccessToken($token);
-        }
+        $payload = $this->currentUser->requireCurrent()->tokenPayload();
+        $this->tokens->revokePlatformSession(
+            (int) $payload['session_id'],
+            (int) $payload['platform_operator_id'],
+            'Platform operator signed out.',
+        );
 
-        $refreshToken = $this->refreshTokenCookie->read($request);
-        if ($refreshToken !== null) {
-            $this->tokens->revokeRefreshToken($refreshToken);
-        }
-
-        return $this->refreshTokenCookie->forget(response()->json(['success' => true]));
+        return $this->cookie->forget($this->noStore(response()->json(['success' => true])));
     }
 
-    private function respondWithRefreshCookie(Result $result): JsonResponse
+    /** @param array<string,mixed> $payload @return array<string,mixed> */
+    private function completePlatformPayload(array $payload): array
     {
-        if ($result->isFailure()) {
-            return $this->respond($result);
+        $accessToken = (string) ($payload['tokens']['access_token'] ?? '');
+        if ($accessToken === '') {
+            throw new AuthFailure(
+                AuthErrorCode::TOKEN_INVALID,
+                'Authentication token issuance failed.',
+                500,
+            );
         }
 
-        $payload = $result->valueOrFail();
-        $response = response()->json(
-            (new AuthPayloadResource($payload))->resolve(request()),
-        );
-        $refreshToken = $this->refreshTokenCookie->extract($payload);
+        return array_merge($payload, $this->profiles->platform(
+            $this->tokens->validateAccessToken($accessToken),
+        ));
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function respondWithRefreshCookie(array $payload): JsonResponse
+    {
+        $response = $this->payloadResponse($payload);
+        $refreshToken = $this->cookie->extract($payload);
 
         return $refreshToken === null
             ? $response
-            : $this->refreshTokenCookie->attach($response, $refreshToken);
+            : $this->cookie->attach($response, $refreshToken, $this->cookie->extractExpiry($payload));
     }
 
-    private function respond(Result $result): JsonResponse
+    /** @param array<string,mixed> $payload */
+    private function payloadResponse(array $payload): JsonResponse
     {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
+        return $this->noStore(response()->json(
+            (new AuthPayloadResource($payload))->resolve(request()),
+        ));
+    }
 
-            return $this->errors->make($error->code, $error->message, 401, 'authentication', $error->context);
-        }
+    private function failure(AuthFailure $failure): JsonResponse
+    {
+        return $this->noStore(response()->json([
+            'message' => $failure->getMessage(),
+            'code' => $failure->errorCode,
+            'details' => $failure->details,
+        ], $failure->httpStatus));
+    }
 
-        return response()->json(
-            (new AuthPayloadResource($result->valueOrFail()))->resolve(request()),
-        );
+    private function noStore(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
+
+        return $response;
     }
 }

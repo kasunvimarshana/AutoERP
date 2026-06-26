@@ -19,4 +19,7 @@ interface OrganizationUnitDirectoryInterface
 
     /** @param list<int> $organizationUnitIds @return list<int> */
     public function activeIdsOrderedByPath(int $tenantId, array $organizationUnitIds): array;
+
+    /** @return array{id:int,code:string,name:string,path:string}|null */
+    public function ownershipSummary(int $tenantId, int $organizationUnitId): ?array;
 }

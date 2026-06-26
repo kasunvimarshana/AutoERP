@@ -43,14 +43,23 @@ final class InitialAdministratorInvitationController extends Controller
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
 
-            return $this->errors->make(
+            return $this->noStore($this->errors->make(
                 $error->code,
                 $error->message,
                 $error->code === AuthErrorCode::INVITATION_INVALID ? 404 : 422,
                 $error->code === AuthErrorCode::INVITATION_INVALID ? 'not_found' : 'domain',
-            );
+            ));
         }
 
-        return response()->json(['data' => $result->valueOrFail()], $successStatus);
+        return $this->noStore(response()->json(['data' => $result->valueOrFail()], $successStatus));
+    }
+
+    private function noStore(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
+
+        return $response;
     }
 }
+

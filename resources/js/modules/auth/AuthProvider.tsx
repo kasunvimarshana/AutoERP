@@ -46,7 +46,6 @@ interface AuthContextValue {
 
 interface SessionPayload {
     token: string;
-    sessionId: number | null;
     user: AuthUser;
     tenant: AuthTenant | null;
     organizationUnit: AuthOrganizationUnit | null;
@@ -103,7 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const tenantId = session.authMode === 'tenant' ? toPositiveInteger(session.tenant?.id) : null;
         commitAuthSession({
             accessToken: session.token,
-            sessionId: session.sessionId,
             tenantId,
             authMode: session.authMode,
         });
@@ -148,7 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             commitSession({
                 token: accessToken,
-                sessionId: storedContext.sessionId,
                 user: current.user,
                 tenant: current.tenant,
                 organizationUnit: current.organization_unit,
@@ -193,7 +190,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const current = await authApi.me(payload.auth_mode);
             commitSession({
                 token: issuedToken,
-                sessionId: toPositiveInteger(session.session_id),
                 user: current.user,
                 tenant: current.tenant,
                 organizationUnit: current.organization_unit,
@@ -206,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error: unknown) {
             if (issuedToken) {
                 try {
-                    await authApi.logout(payload.auth_mode, { access_token: issuedToken });
+                    await authApi.logout(payload.auth_mode);
                 } catch {
                     // The local transaction still rolls back; the access token expires server-side.
                 }
@@ -231,10 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const current = getStoredApiContext();
         try {
             if (current.accessToken) {
-                await authApi.logout(current.authMode, {
-                    access_token: current.accessToken,
-                    session_id: current.sessionId,
-                });
+                await authApi.logout(current.authMode);
             }
         } finally {
             clearAuthState();
@@ -333,9 +326,3 @@ function isDefinitiveSessionFailure(error: ApiError): boolean {
         || error.code === 'AUTH_SESSION_MISSING';
 }
 
-function toPositiveInteger(value: number | string | null | undefined): number | null {
-    if (value === null || value === undefined || value === '') return null;
-
-    const numeric = Number(value);
-    return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : null;
-}

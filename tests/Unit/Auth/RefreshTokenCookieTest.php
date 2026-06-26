@@ -4,65 +4,54 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Auth;
 
-use Illuminate\Support\Carbon;
-use Modules\Auth\Services\RefreshTokenCookie;
+use DateTimeImmutable;
+use Modules\Auth\Services\TenantRefreshTokenCookie;
 use Tests\TestCase;
 
 final class RefreshTokenCookieTest extends TestCase
 {
-    protected function tearDown(): void
+    public function test_attach_uses_the_issued_refresh_expiry_and_secure_cookie_contract(): void
     {
-        Carbon::setTestNow();
-
-        parent::tearDown();
-    }
-
-    public function test_attach_adds_configured_secure_http_only_refresh_cookie(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-06-23 12:00:00 UTC'));
-
-        config()->set('module-auth.refresh_token_ttl_seconds', 3600);
-        config()->set('module-auth.web_refresh_cookie', [
+        config()->set('module-auth.cookies.tenant_refresh', [
             'name' => 'test_refresh_token',
-            'path' => '/api',
+            'path' => '/api/v1/auth',
             'domain' => 'example.test',
             'secure' => true,
             'same_site' => 'strict',
         ]);
 
+        $cookieService = new TenantRefreshTokenCookie();
         $response = response()->json(['success' => true]);
+        $expiresAt = new DateTimeImmutable('2026-06-26T13:30:00+00:00');
 
-        (new RefreshTokenCookie())->attach($response, 'refresh-token-value');
+        $cookieService->attach($response, 'refresh-token-value', $expiresAt);
 
         $cookies = $response->headers->getCookies();
-
-        $this->assertCount(1, $cookies);
+        self::assertCount(1, $cookies);
 
         $cookie = $cookies[0];
-        $this->assertSame('test_refresh_token', $cookie->getName());
-        $this->assertSame('refresh-token-value', $cookie->getValue());
-        $this->assertSame('/api', $cookie->getPath());
-        $this->assertSame('example.test', $cookie->getDomain());
-        $this->assertTrue($cookie->isSecure());
-        $this->assertTrue($cookie->isHttpOnly());
-        $this->assertFalse($cookie->isRaw());
-        $this->assertSame('strict', $cookie->getSameSite());
-        $this->assertSame(Carbon::now()->addHour()->getTimestamp(), $cookie->getExpiresTime());
+        self::assertSame('test_refresh_token', $cookie->getName());
+        self::assertSame('refresh-token-value', $cookie->getValue());
+        self::assertSame('/api/v1/auth', $cookie->getPath());
+        self::assertSame('example.test', $cookie->getDomain());
+        self::assertTrue($cookie->isSecure());
+        self::assertTrue($cookie->isHttpOnly());
+        self::assertSame('strict', $cookie->getSameSite());
+        self::assertSame($expiresAt->getTimestamp(), $cookie->getExpiresTime());
     }
 
-    public function test_extract_supports_nested_and_root_token_payloads_without_exposing_empty_values(): void
+    public function test_extract_supports_nested_and_root_payloads_without_empty_values(): void
     {
-        $cookie = new RefreshTokenCookie();
+        $cookieService = new TenantRefreshTokenCookie();
 
-        $this->assertSame('nested-token', $cookie->extract([
+        self::assertSame('nested-token', $cookieService->extract([
             'tokens' => ['refresh_token' => ' nested-token '],
         ]));
-        $this->assertSame('root-token', $cookie->extract([
+        self::assertSame('root-token', $cookieService->extract([
             'refresh_token' => ' root-token ',
         ]));
-        $this->assertNull($cookie->extract([
-            'refresh_token' => '   ',
-        ]));
-        $this->assertNull($cookie->extract(null));
+        self::assertNull($cookieService->extract(['refresh_token' => '   ']));
+        self::assertNull($cookieService->extract(null));
     }
+
 }

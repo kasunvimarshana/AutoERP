@@ -9,7 +9,6 @@ import {
 interface RefreshResponse {
     access_token?: string;
     token?: string;
-    session_id?: number | null;
 }
 
 interface RefreshLease {
@@ -21,7 +20,6 @@ interface RefreshBroadcastMessage {
     type: 'refreshed' | 'failed';
     owner: string;
     accessToken?: string;
-    sessionId?: number | null;
 }
 
 const AUTH_REFRESH_LOCK_NAME = 'autoerp-auth-refresh';
@@ -79,7 +77,7 @@ async function performRefresh(): Promise<string> {
             throw new ApiError('The refresh response did not include an access token.', 502, 'INVALID_REFRESH_RESPONSE', 'infrastructure');
         }
 
-        updateRefreshedSession(token, normalizePositiveInteger(data.session_id));
+        updateRefreshedSession(token);
         return token;
     } catch (error: unknown) {
         const apiError = toApiError(error);
@@ -118,7 +116,6 @@ async function withCrossTabRefreshLock(task: () => Promise<string>): Promise<str
             type: 'refreshed',
             owner,
             accessToken,
-            sessionId: getStoredApiContext().sessionId,
         });
         return accessToken;
     } catch (error) {
@@ -153,7 +150,7 @@ function waitForPeerRefresh(
             window.clearTimeout(timeout);
             channel.close();
             if (message.type === 'refreshed' && message.accessToken) {
-                updateRefreshedSession(message.accessToken, message.sessionId);
+                updateRefreshedSession(message.accessToken);
                 resolve(message.accessToken);
                 return;
             }
@@ -213,7 +210,3 @@ function isTerminalRefreshFailure(error: ApiError): boolean {
     return error.status === 401 || error.status === 403 || error.code === 'TOKEN_INVALID' || error.code === 'TOKEN_REVOKED';
 }
 
-function normalizePositiveInteger(value: number | null | undefined): number | null | undefined {
-    if (value === undefined) return undefined;
-    return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
-}

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\User\Models\UserModel;
 
 final class AuthUserPasswordCredentialModel extends TenantOwnedModel
 {
@@ -20,14 +18,7 @@ final class AuthUserPasswordCredentialModel extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'changed_at' => 'datetime',
-            'revoked_at' => 'datetime',
+            'changed_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime',
         ]);
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'user_id');
     }
 }

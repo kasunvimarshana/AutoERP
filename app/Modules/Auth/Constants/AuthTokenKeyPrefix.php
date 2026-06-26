@@ -10,6 +10,7 @@ final class AuthTokenKeyPrefix
     public const PLATFORM_ACCESS = 'pa_';
     public const TENANT_REFRESH = 'tr_';
     public const PLATFORM_REFRESH = 'pr_';
+    public const AUTHORIZATION_CODE = 'ac_';
 
     public static function accessForScope(string $scope): string
     {

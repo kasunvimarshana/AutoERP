@@ -16,18 +16,25 @@ final class PlatformOperatorInvitationController extends Controller
 
     public function inspect(InspectPlatformOperatorInvitationRequest $request): JsonResponse
     {
-        return response()->json([
+        return $this->noStore(response()->json([
             'data' => $this->invitations->inspect((string) $request->validated('token')),
-        ]);
+        ]));
     }
 
     public function accept(AcceptPlatformOperatorInvitationRequest $request): JsonResponse
     {
-        return response()->json([
+        return $this->noStore(response()->json([
             'data' => $this->invitations->accept(
                 (string) $request->validated('token'),
                 (string) $request->validated('password'),
             ),
-        ]);
+        ]));
+    }
+    private function noStore(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
+
+        return $response;
     }
 }

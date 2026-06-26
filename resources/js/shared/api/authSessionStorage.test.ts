@@ -1,105 +1,70 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-    AUTH_SESSION_INVALIDATED_EVENT,
     AUTH_SESSION_MARKER_KEY,
     clearStoredAuthSession,
     commitAuthSession,
     getStoredApiContext,
-    invalidateStoredAuthSession,
     setTransientAccessToken,
     updateRefreshedSession,
 } from './authSessionStorage';
 
-beforeEach(() => {
-    window.localStorage.clear();
-    setTransientAccessToken(null);
-});
+describe('authSessionStorage', () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+        clearStoredAuthSession();
+    });
 
-afterEach(() => {
-    clearStoredAuthSession();
-    vi.restoreAllMocks();
-});
-
-describe('auth session storage', () => {
-    it('keeps access tokens in memory and stores only non-secret session context', () => {
-        commitAuthSession({
-            accessToken: ' access-token ',
-            sessionId: 10,
-            tenantId: 20,
-            authMode: 'tenant',
-        });
+    it('keeps the access token in memory and stores only non-secret session context', () => {
+        commitAuthSession({ accessToken: ' access-token ', tenantId: 5, authMode: 'tenant' });
 
         expect(getStoredApiContext()).toMatchObject({
             accessToken: 'access-token',
-            sessionId: 10,
-            tenantId: 20,
+            tenantId: 5,
             authMode: 'tenant',
             hasSession: true,
         });
+        expect(window.localStorage.getItem(AUTH_SESSION_MARKER_KEY)).toBeTruthy();
         expect(window.localStorage.getItem('autoerp.access_token')).toBeNull();
         expect(window.localStorage.getItem('autoerp.refresh_token')).toBeNull();
-        expect(window.localStorage.getItem('autoerp.organization_unit_id')).toBeNull();
-        expect(window.localStorage.getItem(AUTH_SESSION_MARKER_KEY)).not.toBeNull();
+        expect(window.localStorage.getItem('autoerp.session_id')).toBeNull();
     });
 
-    it('does not persist tenant context for platform sessions', () => {
-        commitAuthSession({
-            accessToken: 'platform-token',
-            sessionId: 11,
-            tenantId: 22,
-            authMode: 'platform',
-        });
+    it('does not retain tenant context for a platform session', () => {
+        commitAuthSession({ accessToken: 'platform-token', tenantId: 5, authMode: 'platform' });
 
-        expect(getStoredApiContext()).toMatchObject({
-            tenantId: null,
-            authMode: 'platform',
-        });
+        expect(getStoredApiContext()).toMatchObject({ tenantId: null, authMode: 'platform' });
     });
 
-    it('rejects invalid session identifiers read from browser storage', () => {
-        window.localStorage.setItem('autoerp.session_id', '-1');
-        window.localStorage.setItem('autoerp.tenant_id', 'not-a-number');
-        window.localStorage.setItem('autoerp.organization_unit_id', '1.5');
+    it('clears legacy browser authentication state', () => {
+        window.localStorage.setItem('autoerp.access_token', 'legacy');
+        window.localStorage.setItem('autoerp.refresh_token', 'legacy-refresh');
+        window.localStorage.setItem('autoerp.session_id', '42');
 
-        expect(getStoredApiContext()).toMatchObject({
-            sessionId: null,
-            tenantId: null,
-        });
-        expect(getStoredApiContext()).not.toHaveProperty('organizationUnitId');
+        commitAuthSession({ accessToken: 'new-token', tenantId: 8, authMode: 'tenant' });
+
+        expect(window.localStorage.getItem('autoerp.access_token')).toBeNull();
+        expect(window.localStorage.getItem('autoerp.refresh_token')).toBeNull();
+        expect(window.localStorage.getItem('autoerp.session_id')).toBeNull();
     });
 
-    it('rotates only the in-memory access token during refresh', () => {
-        commitAuthSession({
-            accessToken: 'old-token',
-            sessionId: 10,
-            tenantId: 20,
-            authMode: 'tenant',
-        });
+    it('updates a rotated access token without persisting it', () => {
+        commitAuthSession({ accessToken: 'old-token', tenantId: 8, authMode: 'tenant' });
+        updateRefreshedSession('new-token');
 
-        updateRefreshedSession('new-token', 12);
-
-        expect(getStoredApiContext()).toMatchObject({ accessToken: 'new-token', sessionId: 12 });
+        expect(getStoredApiContext().accessToken).toBe('new-token');
+        expect(window.localStorage.getItem('autoerp.access_token')).toBeNull();
     });
 
-    it('clears all context and announces definitive invalidation', () => {
-        const listener = vi.fn();
-        window.addEventListener(AUTH_SESSION_INVALIDATED_EVENT, listener);
-        commitAuthSession({
-            accessToken: 'token',
-            sessionId: 10,
-            tenantId: 20,
-            authMode: 'tenant',
-        });
+    it('clears all session state', () => {
+        commitAuthSession({ accessToken: 'token', tenantId: 8, authMode: 'tenant' });
+        setTransientAccessToken('other-token');
+        clearStoredAuthSession();
 
-        invalidateStoredAuthSession();
-
-        expect(getStoredApiContext()).toMatchObject({
+        expect(getStoredApiContext()).toEqual({
             accessToken: null,
-            sessionId: null,
             tenantId: null,
+            authMode: 'tenant',
             hasSession: false,
         });
-        expect(listener).toHaveBeenCalledOnce();
-        window.removeEventListener(AUTH_SESSION_INVALIDATED_EVENT, listener);
     });
 });

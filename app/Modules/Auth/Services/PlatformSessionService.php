@@ -4,217 +4,132 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\DatabaseManager;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Modules\Audit\Constants\AuditEventCategory;
-use Modules\Audit\Contracts\AuditRecorderInterface;
-use Modules\Audit\Data\AuditEventData;
-use Modules\Auth\Models\AuthPlatformAccessTokenModel;
-use Modules\Auth\Models\AuthPlatformMfaMethodModel;
-use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
+use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
-use Modules\User\Models\PlatformOperatorModel;
 
-final class PlatformSessionService implements PlatformOperatorSessionRevokerInterface
+final readonly class PlatformSessionService implements PlatformOperatorSessionRevokerInterface
 {
     public function __construct(
-        private readonly AuthPlatformSessionModel $sessions,
-        private readonly AuthPlatformAccessTokenModel $accessTokens,
-        private readonly AuthPlatformRefreshTokenModel $refreshTokens,
-        private readonly AuthPlatformMfaMethodModel $mfaMethods,
-        private readonly PlatformOperatorModel $operators,
-        private readonly ClockInterface $clock,
-        private readonly CurrentUserContextAccessorInterface $currentUser,
-        private readonly TenantExecutionContextInterface $executionContext,
-        private readonly DatabaseManager $database,
-        private readonly AuditRecorderInterface $audit,
+        private TenantExecutionContextInterface $executionContext,
+        private PlatformOperatorAuthenticationDirectoryInterface $operators,
+        private TokenService $tokens,
+        private ClockInterface $clock,
     ) {}
 
-    public function create(
-        int $operatorId,
-        ?string $ipAddress,
-        ?string $userAgent,
-        ?string $deviceName,
-        int $lifetimeSeconds,
-    ): AuthPlatformSessionModel {
-        return $this->executionContext->runAsControlPlane(function () use (
-            $operatorId,
-            $ipAddress,
-            $userAgent,
-            $deviceName,
-            $lifetimeSeconds,
-        ): AuthPlatformSessionModel {
-            $this->assertPlatformOperator($operatorId);
-            $now = $this->clock->now();
-
-            return $this->sessions->newQuery()->create([
-                'public_id' => (string) Str::uuid(),
-                'platform_operator_id' => $operatorId,
-                'status' => 'active',
-                'ip_address' => $this->nullableString($ipAddress),
-                'user_agent' => $this->truncate($userAgent, 1024),
-                'device_name' => $this->truncate($deviceName, 160),
-                'authenticated_at' => $now,
-                'last_activity_at' => $now,
-                'expires_at' => $now->modify('+'.max(1, $lifetimeSeconds).' seconds'),
-                'row_version' => 1,
-            ]);
-        });
-    }
-
-    public function page(?int $operatorId, int $page, int $perPage): LengthAwarePaginator
+    /** @return array{data:list<array<string,mixed>>,meta:array<string,int|null>} */
+    public function page(?int $operatorId, int $page, int $perPage): array
     {
-        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $page, $perPage): LengthAwarePaginator {
-            return $this->sessions->newQuery()
-                ->with('operator:id,first_name,last_name,email,status')
-                ->when($operatorId !== null, fn (Builder $query) => $query->where('platform_operator_id', $operatorId))
+        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $page, $perPage): array {
+            $paginator = AuthPlatformSessionModel::query()
+                ->when($operatorId !== null, static fn ($query) => $query->where('platform_operator_id', $operatorId))
                 ->orderByDesc('last_activity_at')
-                ->paginate($perPage, ['*'], 'page', $page);
+                ->paginate(max(1, min(100, $perPage)), ['*'], 'page', max(1, $page));
+
+            $operatorIds = [];
+            foreach ($paginator->items() as $session) {
+                $operatorIds[] = (int) $session->getAttribute('platform_operator_id');
+            }
+            $operatorSummaries = $this->operators->summariesByIds($operatorIds);
+
+            $data = [];
+            foreach ($paginator->items() as $session) {
+                $data[] = $this->present(
+                    $session,
+                    $operatorSummaries[(int) $session->getAttribute('platform_operator_id')] ?? null,
+                );
+            }
+
+            return [
+                'data' => $data,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => max(1, $paginator->lastPage()),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                ],
+            ];
         });
     }
 
-    public function revoke(string $publicId, string $reason): AuthPlatformSessionModel
+    public function revokeCurrent(int $sessionId, int $operatorId, string $reason): void
     {
-        return $this->executionContext->runAsControlPlane(function () use ($publicId, $reason): AuthPlatformSessionModel {
-            return $this->database->transaction(function () use ($publicId, $reason): AuthPlatformSessionModel {
-                $session = $this->sessions->newQuery()->where('public_id', trim($publicId))->lockForUpdate()->first();
-                if (! $session instanceof AuthPlatformSessionModel) {
-                    throw (new ModelNotFoundException())->setModel(AuthPlatformSessionModel::class, [$publicId]);
-                }
-                if ($session->getAttribute('status') === 'active') {
-                    $this->revokeTokens((int) $session->getKey());
-                    $session->forceFill([
-                        'status' => 'revoked',
-                        'revoked_at' => $this->clock->now(),
-                        'row_version' => (int) $session->getAttribute('row_version') + 1,
-                    ])->save();
-                }
-                $this->recordAudit('session_revoked', $session, $reason);
+        $this->tokens->revokePlatformSession($sessionId, $operatorId, $reason);
+    }
 
-                return $session->fresh(['operator']) ?? $session;
-            }, 3);
+    /** @return array<string,mixed> */
+    public function revoke(string $publicId, string $reason): array
+    {
+        return $this->executionContext->runAsControlPlane(function () use ($publicId, $reason): array {
+            $session = AuthPlatformSessionModel::query()->where('public_id', trim($publicId))->first();
+            if (! $session instanceof AuthPlatformSessionModel) {
+                throw (new ModelNotFoundException())->setModel(AuthPlatformSessionModel::class, [$publicId]);
+            }
+            $this->tokens->revokePlatformSession(
+                (int) $session->getKey(),
+                (int) $session->getAttribute('platform_operator_id'),
+                $reason,
+            );
+            $fresh = $session->fresh() ?? $session;
+            $summary = $this->operators->summariesByIds([(int) $session->getAttribute('platform_operator_id')]);
+            return $this->present($fresh, $summary[(int) $session->getAttribute('platform_operator_id')] ?? null);
         });
     }
 
     public function revokeAllForOperator(int $operatorId, string $reason): int
     {
+        if ($this->operators->summariesByIds([$operatorId]) === []) {
+            throw (new ModelNotFoundException())->setModel('platform_operator', [$operatorId]);
+        }
+
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $reason): int {
-            return $this->database->transaction(fn (): int => $this->revokeAllLocked($operatorId, $reason), 3);
-        });
-    }
-
-    public function resetMfa(int $operatorId, string $reason): void
-    {
-        $this->executionContext->runAsControlPlane(function () use ($operatorId, $reason): void {
-            $this->database->transaction(function () use ($operatorId, $reason): void {
-                $operator = $this->assertPlatformOperator($operatorId, true);
-                $this->mfaMethods->newQuery()
-                    ->where('platform_operator_id', $operatorId)
-                    ->lockForUpdate()->delete();
-                $this->revokeAllLocked($operatorId, 'MFA reset: '.$reason, false);
-                $this->audit->recordPlatform(new AuditEventData(
-                    eventName: 'platform.operator.mfa_reset',
-                    eventCategory: AuditEventCategory::SECURITY,
-                    sourceModule: 'auth',
-                    subjectType: 'platform_operator',
-                    subjectId: (string) $operatorId,
-                    subjectReference: (string) $operator->getAttribute('email'),
-                    changes: ['new' => ['mfa_status' => 'not_enrolled']],
-                    metadata: ['reason' => trim($reason)],
-                    tags: ['platform', 'operator', 'mfa', 'security'],
-                ));
-            }, 3);
-        });
-    }
-
-    private function revokeAllLocked(int $operatorId, string $reason, bool $assertOperator = true): int
-    {
-        if ($assertOperator) {
-            $this->assertPlatformOperator($operatorId, true);
-        }
-        $sessions = $this->sessions->newQuery()
-            ->where('platform_operator_id', $operatorId)
-            ->where('status', 'active')->lockForUpdate()->get();
-        foreach ($sessions as $session) {
-            if (! $session instanceof AuthPlatformSessionModel) {
-                continue;
+            $sessionIds = AuthPlatformSessionModel::query()
+                ->where('platform_operator_id', $operatorId)
+                ->where('status', SessionStatus::ACTIVE->value)
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+            foreach ($sessionIds as $sessionId) {
+                $this->tokens->revokePlatformSession($sessionId, $operatorId, $reason);
             }
-            $this->revokeTokens((int) $session->getKey());
-            $session->forceFill([
-                'status' => 'revoked',
-                'revoked_at' => $this->clock->now(),
-                'row_version' => (int) $session->getAttribute('row_version') + 1,
-            ])->save();
-            $this->recordAudit('session_revoked', $session, $reason);
+            return count($sessionIds);
+        });
+    }
+
+    /** @param array<string,mixed>|null $operator @return array<string,mixed> */
+    private function present(AuthPlatformSessionModel $session, ?array $operator): array
+    {
+        $expiresAt = $session->getAttribute('expires_at');
+        $status = (string) $session->getAttribute('status');
+        if ($status === SessionStatus::ACTIVE->value
+            && $expiresAt !== null
+            && $this->clock->now()->getTimestamp() >= $expiresAt->getTimestamp()) {
+            $status = SessionStatus::EXPIRED->value;
         }
 
-        return $sessions->count();
-    }
-
-    private function revokeTokens(int $sessionId): void
-    {
-        $now = $this->clock->now();
-        $attributes = [
-            'status' => 'revoked',
-            'revoked_at' => $now,
-            'row_version' => DB::raw('row_version + 1'),
-            'updated_at' => $now,
-        ];
-        $this->accessTokens->newQuery()->where('platform_session_id', $sessionId)
-            ->where('status', 'active')->update($attributes);
-        $this->refreshTokens->newQuery()->where('platform_session_id', $sessionId)
-            ->where('status', 'active')->update($attributes);
-    }
-
-    private function assertPlatformOperator(int $operatorId, bool $lock = false): PlatformOperatorModel
-    {
-        $query = $this->operators->newQuery()->whereKey($operatorId);
-        if ($lock) {
-            $query->lockForUpdate();
-        }
-
-        return $query->first()
-            ?? throw (new ModelNotFoundException())->setModel(PlatformOperatorModel::class, [$operatorId]);
-    }
-
-    private function recordAudit(string $action, AuthPlatformSessionModel $session, string $reason): void
-    {
-        $this->audit->recordPlatform(new AuditEventData(
-            eventName: "platform.{$action}",
-            eventCategory: AuditEventCategory::SECURITY,
-            sourceModule: 'auth',
-            subjectType: 'platform_session',
-            subjectId: (string) $session->getAttribute('public_id'),
-            subjectReference: (string) $session->getAttribute('public_id'),
-            changes: ['new' => ['status' => $session->getAttribute('status')]],
-            metadata: [
-                'operator_id' => (int) $session->getAttribute('platform_operator_id'),
-                'reason' => trim($reason),
-                'performed_by' => $this->currentUser->currentUserId(),
+        return [
+            'id' => (string) $session->getAttribute('public_id'),
+            'operator' => $operator === null ? null : [
+                'id' => $operator['id'],
+                'name' => trim($operator['first_name'].' '.($operator['last_name'] ?? '')),
+                'email' => $operator['email'],
+                'status' => $operator['status'],
             ],
-            tags: ['platform', 'session', 'security'],
-        ));
-    }
-
-    private function nullableString(?string $value): ?string
-    {
-        $value = trim((string) $value);
-
-        return $value === '' ? null : $value;
-    }
-
-    private function truncate(?string $value, int $max): ?string
-    {
-        $value = $this->nullableString($value);
-
-        return $value === null ? null : mb_substr($value, 0, $max);
+            'status' => $status,
+            'ip_address' => $session->getAttribute('ip_address'),
+            'device_name' => $session->getAttribute('device_name'),
+            'user_agent' => $session->getAttribute('user_agent'),
+            'authenticated_at' => $session->getAttribute('authenticated_at')?->format(DATE_ATOM),
+            'mfa_verified_at' => $session->getAttribute('mfa_verified_at')?->format(DATE_ATOM),
+            'last_activity_at' => $session->getAttribute('last_activity_at')?->format(DATE_ATOM),
+            'expires_at' => $expiresAt?->format(DATE_ATOM),
+            'revoked_at' => $session->getAttribute('revoked_at')?->format(DATE_ATOM),
+        ];
     }
 }

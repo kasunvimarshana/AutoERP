@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from '@/app/routePaths';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ApiError, fieldError } from '@/shared/api/apiError';
+import { ApiError, errorDetail, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -21,7 +21,6 @@ export default function LoginPage() {
     const [authMode, setAuthMode] = useState<AuthMode>('tenant');
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
-    const [tenantCode, setTenantCode] = useState('');
     const [totpCode, setTotpCode] = useState('');
     const [backupCode, setBackupCode] = useState('');
     const [useBackupCode, setUseBackupCode] = useState(false);
@@ -60,9 +59,8 @@ export default function LoginPage() {
         try {
             await auth.login({
                 auth_mode: authMode,
-                login_identifier: loginIdentifier,
+                identifier: loginIdentifier,
                 password,
-                tenant_code: authMode === 'tenant' ? tenantCode.trim() || null : null,
                 totp_code: authMode === 'platform' && !useBackupCode ? totpCode.trim() || null : null,
                 backup_code: authMode === 'platform' && useBackupCode ? backupCode.trim() || null : null,
             });
@@ -71,11 +69,10 @@ export default function LoginPage() {
             const apiError = nextError instanceof ApiError ? nextError : new ApiError('Login failed.', null);
             if (authMode === 'platform' && apiError.code === MFA_REQUIRED) setMfaRequired(true);
             if (authMode === 'platform' && apiError.code === MFA_ENROLLMENT_REQUIRED) {
-                try {
-                    setEnrollment(await authApi.startPlatformMfaEnrollment(loginIdentifier, password));
-                } catch (enrollmentError) {
-                    setError(enrollmentError instanceof ApiError ? enrollmentError : apiError);
-                    return;
+                const enrollmentProof = errorDetail<string>(apiError, 'enrollment_proof');
+                const provisioningUri = errorDetail<string>(apiError, 'provisioning_uri');
+                if (enrollmentProof && provisioningUri) {
+                    setEnrollment({ enrollment_proof: enrollmentProof, provisioning_uri: provisioningUri });
                 }
             }
             setError(apiError);
@@ -89,7 +86,7 @@ export default function LoginPage() {
         setSubmitting(true);
         setError(null);
         try {
-            const confirmation = await authApi.confirmPlatformMfaEnrollment(loginIdentifier, password, enrollmentCode.trim());
+            const confirmation = await authApi.confirmPlatformMfaEnrollment(enrollment.enrollment_proof, enrollmentCode.trim());
             setBackupCodes(confirmation.backup_codes);
             setEnrollment(null);
             setEnrollmentCode('');
@@ -110,7 +107,7 @@ export default function LoginPage() {
                     <p className="mt-2 text-sm text-slate-500">
                         {authMode === 'platform'
                             ? 'Use a dedicated platform operator account. Sensitive control-plane actions require MFA and recent authentication.'
-                            : 'Use your account to enter an authorized tenant workspace.'}
+                            : 'Sign in from your organization’s verified workspace address using your email or username.'}
                     </p>
                 </div>
 
@@ -122,7 +119,6 @@ export default function LoginPage() {
                             className={`rounded-md px-3 py-2 text-sm font-medium ${authMode === mode ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
                             onClick={() => {
                                 setAuthMode(mode);
-                                if (mode === 'platform') setTenantCode('');
                                 resetMfaState();
                                 setError(null);
                             }}
@@ -151,7 +147,6 @@ export default function LoginPage() {
                             <p className="font-semibold">Set up multi-factor authentication</p>
                             <p className="mt-2">Add this account to an authenticator app using the setup URI or secret, then enter the current six-digit code.</p>
                             <p className="mt-3 break-all"><strong>Setup URI:</strong> <code className="text-xs">{enrollment.provisioning_uri}</code></p>
-                            <p className="mt-2 break-all"><strong>Secret:</strong> <code>{enrollment.secret}</code></p>
                         </div>
                         <Input
                             label="Authenticator code"
@@ -167,25 +162,14 @@ export default function LoginPage() {
                     </div>
                 ) : (
                     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submitLogin(); }}>
-                        {authMode === 'tenant' ? (
-                            <Input
-                                label="Workspace code"
-                                name="tenant_code"
-                                autoComplete="organization"
-                                value={tenantCode}
-                                onChange={(event) => setTenantCode(event.target.value.toUpperCase())}
-                                error={fieldError(error, 'tenant_code')}
-                                hint="Optional on a verified tenant domain. Required on the central SaaS address."
-                            />
-                        ) : null}
                         <Input
                             label={authMode === 'platform' ? 'Platform operator email' : 'Email or username'}
-                            name="login_identifier"
+                            name="identifier"
                             type={authMode === 'platform' ? 'email' : 'text'}
                             autoComplete="username"
                             value={loginIdentifier}
                             onChange={(event) => setLoginIdentifier(event.target.value)}
-                            error={fieldError(error, 'login_identifier') ?? fieldError(error, 'email')}
+                            error={fieldError(error, 'identifier') ?? fieldError(error, 'email')}
                             required
                         />
                         <Input

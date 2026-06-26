@@ -22,6 +22,7 @@ import type { PlatformSession } from './platformAdministrationTypes';
 
 interface OperatorOption extends NamedResource {
     email: string;
+    row_version: number;
 }
 
 type SecurityAction =
@@ -112,8 +113,8 @@ export default function PlatformSecurityPage() {
                 const count = await platformAdministrationApi.revokeOperatorSessions(action.operator.id, reason.trim());
                 setSuccess(`${count} active session${count === 1 ? '' : 's'} revoked for ${action.operator.name}.`);
             } else {
-                await platformAdministrationApi.resetOperatorMfa(action.operator.id, reason.trim());
-                setSuccess(`MFA was reset for ${action.operator.name}. All active sessions were revoked; the operator must enroll again.`);
+                await platformAdministrationApi.recoverOperatorAccess(action.operator, reason.trim());
+                setSuccess(`Security recovery started for ${action.operator.name}. Existing credentials and sessions were revoked, and a new invitation was queued.`);
             }
             setAction(null);
             setReason('');
@@ -129,8 +130,8 @@ export default function PlatformSecurityPage() {
     return (
         <>
             <ContentHeader
-                title="Platform sessions and MFA"
-                description="Inspect control-plane sessions, revoke compromised access, and perform audited MFA recovery without affecting tenant-user authentication."
+                title="Platform sessions and account recovery"
+                description="Inspect control-plane sessions, revoke compromised access, and start recipient-owned platform account recovery."
             />
 
             <div className="space-y-5">
@@ -159,12 +160,12 @@ export default function PlatformSecurityPage() {
                             ) : null}
                             {canManageMfa ? (
                                 <Button variant="secondary" disabled={!operator} onClick={() => operator && openAction({ type: 'mfa', operator })}>
-                                    Reset MFA
+                                    Start recovery
                                 </Button>
                             ) : null}
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-slate-500">Select an operator to review or recover a specific account. Session and MFA changes require recent platform authentication and are recorded in the platform audit log.</p>
+                    <p className="mt-3 text-xs text-slate-500">Select an operator to review or recover a specific account. Session and account-recovery changes require recent platform authentication and are recorded in the platform audit log.</p>
                 </section>
 
                 {sessions.loading && !sessions.data ? <LoadingState label="Loading platform sessions..." /> : (
@@ -215,7 +216,12 @@ export default function PlatformSecurityPage() {
 async function searchOperators({ search, page, perPage, signal }: { search: string; page: number; perPage: number; signal: AbortSignal }) {
     const result = await platformAdministrationApi.listOperators({ search: search || undefined, page, per_page: perPage }, signal);
     return {
-        data: result.data.map((operator) => ({ id: operator.id, name: operator.display_name, email: operator.email })),
+        data: result.data.map((operator) => ({
+            id: operator.id,
+            name: operator.display_name,
+            email: operator.email,
+            row_version: operator.row_version,
+        })),
         meta: result.meta,
     };
 }
@@ -223,13 +229,13 @@ async function searchOperators({ search, page, perPage, signal }: { search: stri
 function actionTitle(action: SecurityAction): string {
     if (action?.type === 'session') return 'Revoke platform session';
     if (action?.type === 'operator_sessions') return `Revoke all sessions for ${action.operator.name}`;
-    if (action?.type === 'mfa') return `Reset MFA for ${action.operator.name}`;
+    if (action?.type === 'mfa') return `Start recovery for ${action.operator.name}`;
     return 'Platform security action';
 }
 
 function actionMessage(action: SecurityAction): string {
     if (action?.type === 'session') return 'This immediately invalidates the selected platform session and its access and refresh tokens.';
     if (action?.type === 'operator_sessions') return 'This immediately invalidates every active platform session for the selected operator.';
-    if (action?.type === 'mfa') return 'This removes the operator’s enrolled MFA method, revokes active sessions, and requires fresh MFA enrollment at the next sign-in.';
+    if (action?.type === 'mfa') return 'This revokes the operator’s credentials, MFA method, and active sessions, then queues a recipient-owned invitation for password and MFA setup.';
     return '';
 }

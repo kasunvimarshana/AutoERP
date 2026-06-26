@@ -4,34 +4,28 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
+use Illuminate\Foundation\Http\FormRequest;
 
-final class AuthorizeClientRequest extends TenantScopedRequest
+final class AuthorizeClientRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'client_key' => ['required', 'string', 'max:120'],
-            'client_secret' => ['nullable', 'string', 'min:1'],
-            'user_id' => ['nullable', 'integer', 'min:1'],
-            'identity_id' => ['nullable', 'integer', 'min:1'],
-            'session_id' => ['nullable', 'integer', 'min:1'],
-            'scopes' => ['nullable', 'array'],
-            'scopes.*' => ['string', 'max:100'],
-            'redirect_uri' => ['nullable', 'url', 'max:2048'],
-            'code_challenge' => ['nullable', 'string', 'max:255'],
-            'code_challenge_method' => ['nullable', 'string', 'max:20'],
-            'ttl_seconds' => ['nullable', 'integer', 'min:30'],
+            'redirect_uri' => ['required', 'url', 'max:2048'],
+            'scopes' => ['required', 'array', 'min:1', 'max:20'],
+            'scopes.*' => ['required', 'string', 'max:120', 'distinct'],
+            'code_challenge' => ['required', 'string', 'regex:/^[A-Za-z0-9_-]{43,128}$/'],
+            'code_challenge_method' => ['required', 'in:S256'],
+            'state' => ['nullable', 'string', 'max:512'],
+            'user_id' => ['prohibited'],
+            'session_id' => ['prohibited'],
+            'client_secret' => ['prohibited'],
         ];
     }
 }

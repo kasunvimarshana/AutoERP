@@ -6,89 +6,61 @@ namespace Modules\Auth\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Modules\Core\DTOs\DataRecord;
 
 final class AuthPayloadResource extends JsonResource
 {
-    /**
-     * @var list<string>
-     */
     private const SENSITIVE_KEYS = [
-        'token_hash',
-        'refresh_hash',
         'refresh_token',
-        'challenge_hash',
-        'code_hash',
+        'token_digest',
+        'refresh_digest',
+        'code_digest',
         'client_secret_hash',
         'password',
         'password_hash',
-        'challenge_secret',
+        'secret',
+        'backup_code_hashes',
+        'enrollment_proof_digest',
     ];
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string,mixed> */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->sanitize($this->resource->toArray());
+        if (! is_array($this->resource)) {
+            return [];
         }
 
-        if (is_array($this->resource)) {
-            return $this->serializeAuthPayload($this->sanitize($this->resource));
+        $payload = $this->sanitize($this->resource);
+        if (! isset($payload['tokens']) || ! is_array($payload['tokens'])) {
+            return $this->profile($payload);
         }
 
-        if (is_bool($this->resource)) {
-            return ['success' => $this->resource];
-        }
-
-        return [];
+        return array_merge($this->profile($payload), [
+            'token' => $payload['tokens']['access_token'] ?? null,
+            'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
+            'token_expires_at' => $payload['tokens']['access_token_expires_at'] ?? null,
+            'session' => is_array($payload['session'] ?? null) ? $payload['session'] : null,
+        ]);
     }
 
-    /**
-     * @param  array<string,mixed>  $payload
-     * @return array<string,mixed>
-     */
-    private function serializeAuthPayload(array $payload): array
+    /** @param array<string,mixed> $payload @return array<string,mixed> */
+    private function profile(array $payload): array
     {
-        if (isset($payload['tokens']) && is_array($payload['tokens'])) {
-            $userPayload = is_array($payload['user'] ?? null) ? $payload['user'] : [];
+        $user = is_array($payload['user'] ?? null) ? $payload['user'] : [];
 
-            return [
-                'token' => $payload['tokens']['access_token'] ?? null,
-                'token_type' => $payload['tokens']['token_type'] ?? 'Bearer',
-                'user' => $this->userSummary($userPayload),
-                'tenant' => $this->relationSummary($payload['tenant'] ?? null),
-                'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
-                'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
-                'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
-                'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
-                'is_platform_operator' => (bool) ($payload['is_platform_operator'] ?? $userPayload['is_platform_operator'] ?? false),
-                'session_id' => $payload['session']['id'] ?? null,
-            ];
-        }
-
-        if (isset($payload['user']) && is_array($payload['user'])) {
-            $userPayload = $payload['user'];
-
-            return [
-                'user' => $this->userSummary($userPayload),
-                'tenant' => $this->relationSummary($payload['tenant'] ?? null),
-                'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
-                'roles' => $this->stringList($payload['roles'] ?? $userPayload['roles'] ?? []),
-                'permissions' => $this->stringList($payload['permissions'] ?? $userPayload['permissions'] ?? []),
-                'enabled_modules' => $this->nullableStringList($payload['enabled_modules'] ?? null),
-                'is_platform_operator' => (bool) ($payload['is_platform_operator'] ?? $userPayload['is_platform_operator'] ?? false),
-            ];
-        }
-
-        return $payload;
+        return [
+            'user' => $this->userSummary($user),
+            'tenant' => $this->relationSummary($payload['tenant'] ?? null),
+            'organization_unit' => $this->relationSummary($payload['organization_unit'] ?? null),
+            'roles' => $this->stringList($payload['roles'] ?? $user['roles'] ?? []),
+            'permissions' => $this->stringList($payload['permissions'] ?? $user['permissions'] ?? []),
+            'enabled_modules' => is_array($payload['enabled_modules'] ?? null)
+                ? $this->stringList($payload['enabled_modules'])
+                : null,
+            'is_platform_operator' => (bool) ($payload['is_platform_operator'] ?? $user['is_platform_operator'] ?? false),
+        ];
     }
 
-    /**
-     * @param  array<string,mixed>  $user
-     * @return array{id:int|string|null,name:string|null,username:string|null,email:string|null,roles:list<string>,permissions:list<string>}
-     */
+    /** @param array<string,mixed> $user @return array<string,mixed> */
     private function userSummary(array $user): array
     {
         $name = trim(implode(' ', array_filter([
@@ -107,9 +79,7 @@ final class AuthPayloadResource extends JsonResource
         ];
     }
 
-    /**
-     * @return array{id:int|string|null,code:string|null,name:string|null}|null
-     */
+    /** @return array{id:int|string|null,code:string|null,name:string|null}|null */
     private function relationSummary(mixed $relation): ?array
     {
         if (! is_array($relation)) {
@@ -123,36 +93,19 @@ final class AuthPayloadResource extends JsonResource
         ];
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function stringList(mixed $value): array
     {
         if (! is_array($value)) {
             return [];
         }
-
-        $items = [];
-        foreach ($value as $item) {
-            if (! is_scalar($item)) {
-                continue;
-            }
-
-            $normalized = trim((string) $item);
-            if ($normalized !== '') {
-                $items[] = $normalized;
+        $result = [];
+        foreach ($value as $entry) {
+            if (is_scalar($entry) && trim((string) $entry) !== '') {
+                $result[] = trim((string) $entry);
             }
         }
-
-        return array_values(array_unique($items));
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private function nullableStringList(mixed $value): ?array
-    {
-        return is_array($value) ? $this->stringList($value) : null;
+        return array_values(array_unique($result));
     }
 
     private function sanitize(mixed $value): mixed
@@ -160,16 +113,13 @@ final class AuthPayloadResource extends JsonResource
         if (! is_array($value)) {
             return $value;
         }
-
         $sanitized = [];
         foreach ($value as $key => $entry) {
             if (is_string($key) && in_array($key, self::SENSITIVE_KEYS, true)) {
                 continue;
             }
-
             $sanitized[$key] = $this->sanitize($entry);
         }
-
         return $sanitized;
     }
 }

@@ -10,11 +10,7 @@ final class AuthErrorCode
 
     public const PROVIDER_NOT_FOUND = 'AUTH_PROVIDER_NOT_FOUND';
 
-    public const PROVIDER_DISABLED = 'AUTH_PROVIDER_DISABLED';
-
     public const USER_INACTIVE = 'AUTH_USER_INACTIVE';
-
-    public const CLIENT_NOT_FOUND = 'AUTH_CLIENT_NOT_FOUND';
 
     public const CLIENT_NOT_ALLOWED = 'AUTH_CLIENT_NOT_ALLOWED';
 
@@ -30,15 +26,9 @@ final class AuthErrorCode
 
     public const TENANT_MISMATCH = 'AUTH_TENANT_MISMATCH';
 
-    public const TENANT_RESOLUTION_FAILED = 'AUTH_TENANT_RESOLUTION_FAILED';
-
     public const ORGANIZATION_UNIT_RESOLUTION_FAILED = 'AUTH_ORGANIZATION_UNIT_RESOLUTION_FAILED';
 
-    public const SSO_FAILURE = 'AUTH_SSO_FAILURE';
-
     public const SESSION_NOT_FOUND = 'AUTH_SESSION_NOT_FOUND';
-
-    public const VERIFICATION_FAILED = 'AUTH_VERIFICATION_FAILED';
 
     public const AUTHORIZATION_CODE_INVALID = 'AUTH_AUTHORIZATION_CODE_INVALID';
 
@@ -53,8 +43,6 @@ final class AuthErrorCode
     public const MFA_REQUIRED = 'AUTH_MFA_REQUIRED';
 
     public const MFA_INVALID_CODE = 'AUTH_MFA_INVALID_CODE';
-
-    public const MFA_ALREADY_ENABLED = 'AUTH_MFA_ALREADY_ENABLED';
 
     private function __construct() {}
 }

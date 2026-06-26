@@ -8,19 +8,12 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 
 final class ListSessionsRequest extends TenantScopedRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'user_id' => ['nullable', 'integer', 'min:1'],
+            'user_id' => ['prohibited'],
+            'tenant_id' => ['prohibited'],
         ];
     }
 }

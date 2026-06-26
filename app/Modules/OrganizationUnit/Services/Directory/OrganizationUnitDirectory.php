@@ -79,6 +79,28 @@ final class OrganizationUnitDirectory implements OrganizationUnitDirectoryInterf
         return array_keys($this->summaries($tenantId, $organizationUnitIds));
     }
 
+    public function ownershipSummary(int $tenantId, int $organizationUnitId): ?array
+    {
+        if ($tenantId < 1 || $organizationUnitId < 1) {
+            return null;
+        }
+
+        $unit = OrganizationUnitModel::query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($organizationUnitId)
+            ->first(['id', 'code', 'name', 'path']);
+        if (! $unit instanceof OrganizationUnitModel) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $unit->getKey(),
+            'code' => (string) $unit->getAttribute('code'),
+            'name' => (string) $unit->getAttribute('name'),
+            'path' => (string) $unit->getAttribute('path'),
+        ];
+    }
+
     /** @param list<int> $ids @return list<int> */
     private function normalizeIds(array $ids): array
     {

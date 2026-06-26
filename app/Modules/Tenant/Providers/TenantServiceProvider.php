@@ -9,6 +9,8 @@ use Illuminate\Support\ServiceProvider;
 use LogicException;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\TenantAggregateLockInterface;
+use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
+use Modules\Core\Contracts\TenantDirectoryInterface;
 use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TenantPrivateFileServiceInterface;
@@ -55,7 +57,9 @@ use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
 use Modules\Tenant\Services\Configuration\TenantConfigurationTargetPopulation;
 use Modules\Tenant\Services\Configuration\TenantConfigurationTargetValidator;
 use Modules\Tenant\Services\Concurrency\TenantAggregateLock;
+use Modules\Tenant\Services\Authentication\TenantAuthenticationDirectory;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
+use Modules\Tenant\Services\Directory\TenantDirectory;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Documents\Scanning\ClamAvTenantDocumentScanner;
@@ -96,6 +100,8 @@ final class TenantServiceProvider extends ServiceProvider
         });
         $this->app->singleton(PlatformHostPolicy::class);
         $this->app->scoped(TenantAggregateLockInterface::class, TenantAggregateLock::class);
+        $this->app->scoped(TenantAuthenticationDirectoryInterface::class, TenantAuthenticationDirectory::class);
+        $this->app->scoped(TenantDirectoryInterface::class, TenantDirectory::class);
         $this->app->scoped(TenantEntitlementReaderInterface::class, \Modules\Tenant\Services\TenantEntitlementService::class);
         $this->app->singleton(TenantPrivateFileServiceInterface::class, TenantPrivateFileService::class);
         $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(

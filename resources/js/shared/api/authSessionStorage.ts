@@ -2,7 +2,6 @@ export type AuthMode = 'tenant' | 'platform';
 
 export interface StoredApiContext {
     accessToken: string | null;
-    sessionId: number | null;
     tenantId: number | null;
     authMode: AuthMode;
     hasSession: boolean;
@@ -10,7 +9,6 @@ export interface StoredApiContext {
 
 export interface AuthSessionContext {
     accessToken: string;
-    sessionId: number | null;
     tenantId: number | null;
     authMode: AuthMode;
 }
@@ -18,7 +16,6 @@ export interface AuthSessionContext {
 export const AUTH_SESSION_MARKER_KEY = 'autoerp.auth_session';
 export const AUTH_SESSION_INVALIDATED_EVENT = 'autoerp:auth-session-invalidated';
 
-const SESSION_KEY = 'autoerp.session_id';
 const TENANT_KEY = 'autoerp.tenant_id';
 const AUTH_MODE_KEY = 'autoerp.auth_mode';
 const LEGACY_AUTH_KEYS = [
@@ -31,6 +28,7 @@ const LEGACY_AUTH_KEYS = [
     'autoerp.tenant',
     'autoerp.organization_unit',
     'autoerp.organization_unit_id',
+    'autoerp.session_id',
 ];
 
 let accessTokenInMemory: string | null = null;
@@ -38,7 +36,6 @@ let accessTokenInMemory: string | null = null;
 export function getStoredApiContext(): StoredApiContext {
     return {
         accessToken: accessTokenInMemory,
-        sessionId: storedPositiveInteger(SESSION_KEY),
         tenantId: storedPositiveInteger(TENANT_KEY),
         authMode: storedAuthMode(),
         hasSession: window.localStorage.getItem(AUTH_SESSION_MARKER_KEY) !== null,
@@ -56,28 +53,23 @@ export function commitAuthSession(context: AuthSessionContext): void {
     }
 
     accessTokenInMemory = accessToken;
-    setPositiveInteger(SESSION_KEY, context.sessionId);
     setPositiveInteger(TENANT_KEY, context.authMode === 'tenant' ? context.tenantId : null);
     window.localStorage.setItem(AUTH_MODE_KEY, context.authMode);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
     window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, createSessionMarker());
 }
 
-export function updateRefreshedSession(accessToken: string, sessionId?: number | null): void {
+export function updateRefreshedSession(accessToken: string): void {
     const normalizedToken = normalizeToken(accessToken);
     if (normalizedToken === null) {
         throw new Error('A refreshed access token is required.');
     }
 
     accessTokenInMemory = normalizedToken;
-    if (sessionId !== undefined) {
-        setPositiveInteger(SESSION_KEY, sessionId);
-    }
 }
 
 export function clearStoredAuthSession(): void {
     accessTokenInMemory = null;
-    window.localStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem(TENANT_KEY);
     window.localStorage.removeItem(AUTH_MODE_KEY);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));

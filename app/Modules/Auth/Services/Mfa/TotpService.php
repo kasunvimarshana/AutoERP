@@ -20,19 +20,25 @@ final class TotpService
 
     public function verify(string $secret, string $code, ?int $timestamp = null): bool
     {
+        return $this->matchCounter($secret, $code, $timestamp) !== null;
+    }
+
+    public function matchCounter(string $secret, string $code, ?int $timestamp = null): ?int
+    {
         $code = preg_replace('/\D+/', '', $code) ?? '';
         if (strlen($code) !== self::DIGITS) {
-            return false;
+            return null;
         }
 
         $counter = intdiv($timestamp ?? time(), self::PERIOD_SECONDS);
         for ($offset = -self::VERIFICATION_WINDOW; $offset <= self::VERIFICATION_WINDOW; $offset++) {
-            if (hash_equals($this->code($secret, $counter + $offset), $code)) {
-                return true;
+            $candidate = $counter + $offset;
+            if (hash_equals($this->code($secret, $candidate), $code)) {
+                return $candidate;
             }
         }
 
-        return false;
+        return null;
     }
 
     public function provisioningUri(string $secret, string $email, string $issuer): string

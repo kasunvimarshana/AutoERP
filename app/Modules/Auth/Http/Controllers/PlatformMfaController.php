@@ -6,46 +6,37 @@ namespace Modules\Auth\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use InvalidArgumentException;
+use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Http\Requests\ConfirmPlatformMfaEnrollmentRequest;
-use Modules\Auth\Http\Requests\PlatformMfaEnrollmentRequest;
 use Modules\Auth\Services\Mfa\PlatformMfaService;
-use Modules\Core\Http\Responses\ApiErrorResponseFactory;
-use Modules\Core\Results\Result;
 
 final class PlatformMfaController extends Controller
 {
-    public function __construct(
-        private readonly PlatformMfaService $mfa,
-        private readonly ApiErrorResponseFactory $errors,
-    ) {}
-
-    public function start(PlatformMfaEnrollmentRequest $request): JsonResponse
-    {
-        return $this->respond($this->mfa->startEnrollment(
-            (string) $request->validated('email'),
-            (string) $request->validated('password'),
-            (string) $request->ip(),
-        ));
-    }
+    public function __construct(private readonly PlatformMfaService $mfa) {}
 
     public function confirm(ConfirmPlatformMfaEnrollmentRequest $request): JsonResponse
     {
-        return $this->respond($this->mfa->confirmEnrollment(
-            (string) $request->validated('email'),
-            (string) $request->validated('password'),
-            (string) $request->validated('code'),
-            (string) $request->ip(),
-        ));
+        try {
+            return $this->noStore(response()->json([
+                'data' => $this->mfa->confirmEnrollment(
+                    (string) $request->validated('enrollment_proof'),
+                    (string) $request->validated('code'),
+                ),
+            ]));
+        } catch (InvalidArgumentException $exception) {
+            return $this->noStore(response()->json([
+                'message' => $exception->getMessage(),
+                'code' => AuthErrorCode::MFA_ENROLLMENT_FAILED,
+            ], 422));
+        }
     }
 
-    private function respond(Result $result): JsonResponse
+    private function noStore(JsonResponse $response): JsonResponse
     {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
 
-            return $this->errors->make($error->code, $error->message, 401, 'authentication', $error->context);
-        }
-
-        return response()->json($result->valueOrFail());
+        return $response;
     }
 }

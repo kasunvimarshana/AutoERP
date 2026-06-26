@@ -12,38 +12,25 @@ return new class extends Migration
     {
         Schema::create('auth_identities', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
-            $table->unsignedBigInteger('organization_unit_id')->nullable();
-            $table->json('metadata')->nullable();
-
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->unsignedBigInteger('provider_id');
             $table->unsignedBigInteger('user_id');
-            $table->string('provider_user_key', 190)->comment('Provider-side subject/identifier');
-            $table->string('status', 40)->default('active');
-            $table->boolean('is_primary')->default(false);
-            $table->timestamp('last_authenticated_at')->nullable();
+            $table->string('provider_user_key', 190);
+            $table->string('status', 30);
+            $table->string('primary_marker', 20)->nullable();
             $table->timestamp('verified_at')->nullable();
-            $table->json('claims')->nullable();
-
+            $table->timestamp('last_authenticated_at')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique(['id', 'tenant_id'], 'auth_identities_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_identities_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['provider_id', 'tenant_id'], 'auth_identities_provider_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('auth_providers')
-                ->cascadeOnDelete();
-            $table->foreign(['user_id', 'tenant_id'], 'auth_identities_user_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->cascadeOnDelete();
-            $table->unique(['tenant_id', 'provider_id', 'provider_user_key'], 'auth_identities_subject_uk');
-            $table->index(['tenant_id', 'user_id', 'status'], 'auth_identities_user_idx');
+            $table->unique(['id', 'tenant_id'], 'auth_identity_id_tenant_uk');
+            $table->foreign(['provider_id', 'tenant_id'], 'auth_identity_provider_fk')
+                ->references(['id', 'tenant_id'])->on('auth_providers')->restrictOnDelete();
+            $table->foreign(['user_id', 'tenant_id'], 'auth_identity_user_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->unique(['tenant_id', 'provider_id', 'provider_user_key'], 'auth_identity_subject_uk');
+            $table->unique(['tenant_id', 'user_id', 'primary_marker'], 'auth_identity_primary_uk');
+            $table->index(['tenant_id', 'user_id', 'status'], 'auth_identity_user_idx');
         });
     }
 

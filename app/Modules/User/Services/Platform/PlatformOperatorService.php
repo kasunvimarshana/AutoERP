@@ -18,6 +18,8 @@ use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\Core\Authorization\PlatformPermission;
+use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
+use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
@@ -33,6 +35,8 @@ final class PlatformOperatorService
         private readonly PlatformOperatorPermissionModel $assignments,
         private readonly PlatformPermissionCatalogSynchronizer $catalogue,
         private readonly PlatformOperatorSessionRevokerInterface $sessions,
+        private readonly PlatformOperatorCredentialProvisionerInterface $credentials,
+        private readonly PlatformMfaEnrollmentIssuerInterface $mfa,
         private readonly PlatformOperatorInvitationService $invitations,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
@@ -107,9 +111,12 @@ final class PlatformOperatorService
                 $operator = $this->reload($operator);
                 $this->recordAudit('created', $operator, null, $this->snapshot($operator));
 
-                return $operator;
-            }, 3);
-        });
+                        return $operator;
+                    },
+                    3,
+                );
+            },
+        );
     }
 
     /** @param list<string> $permissionNames */
@@ -222,6 +229,80 @@ final class PlatformOperatorService
             'permissionAssignments.permission',
             'latestInvitation.deliveries' => fn ($query) => $query->latest('attempt_number'),
         ]);
+    }
+
+    public function recoverAccess(
+        int $operatorId,
+        int $expectedVersion,
+        string $reason,
+    ): PlatformOperatorModel {
+        return $this->executionContext->runAsControlPlane(
+            function () use ($operatorId, $expectedVersion, $reason): PlatformOperatorModel {
+                $reason = trim($reason);
+                if (mb_strlen($reason) < 10) {
+                    throw ValidationException::withMessages([
+                        'reason' => [
+                            'A security-recovery reason of at least 10 characters is required.',
+                        ],
+                    ]);
+                }
+
+                return $this->database->transaction(
+                    function () use ($operatorId, $expectedVersion, $reason): PlatformOperatorModel {
+                        $this->lockActiveOperators();
+                        $operator = $this->find($operatorId, true);
+                        $this->assertVersion($operator, $expectedVersion);
+
+                        if ($this->currentUser->currentUserId() === $operatorId) {
+                            throw new AuthorizationException(
+                                'You cannot start security recovery for your own platform account.',
+                            );
+                        }
+
+                        if (
+                            $this->hasPermission($operatorId, PlatformPermission::OPERATORS_MANAGE)
+                            && (string) $operator->getAttribute('status') === PlatformOperatorStatus::ACTIVE
+                            && $this->isLastActiveManager($operatorId)
+                        ) {
+                            throw new ConflictHttpException(
+                                'Security recovery cannot remove the last active platform manager.',
+                            );
+                        }
+
+                        $before = $this->snapshot($operator);
+                        $recoveryReason = 'Platform access recovery: '.$reason;
+                        $this->sessions->revokeAllForOperator($operatorId, $recoveryReason);
+                        $this->credentials->revoke($operatorId);
+                        $this->mfa->revokeForOperator($operatorId);
+
+                        $now = $this->clock->now();
+                        $operator->forceFill([
+                            'status' => PlatformOperatorStatus::INVITED,
+                            'credentials_ready_at' => null,
+                            'invited_at' => $now,
+                            'activated_at' => null,
+                            'deactivated_at' => $now,
+                            'row_version' => $expectedVersion + 1,
+                            'updated_by_operator_id' => $this->currentUser->currentUserId(),
+                            'updated_at' => $now,
+                        ])->save();
+
+                        $this->invitations->issueForOperator($operator);
+                        $operator = $this->reload($operator);
+                        $this->recordAudit(
+                            'security_recovery_started',
+                            $operator,
+                            $before,
+                            $this->snapshot($operator),
+                            $reason,
+                        );
+
+                        return $operator;
+                    },
+                    3,
+                );
+            },
+        );
     }
 
     /** @param list<string> $permissionNames */

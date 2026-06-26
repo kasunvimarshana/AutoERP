@@ -4,272 +4,94 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Modules\Auth\Console\Commands\AuthClientCreateCommand;
-use Modules\Auth\Constants\AuthTokenScope;
-use Modules\Auth\Contracts\Providers\AuthProviderRegistryInterface;
-use Modules\Auth\Contracts\Providers\IdentityProviderInterface;
-use Modules\Auth\Contracts\Providers\SessionProviderInterface;
-use Modules\Auth\Contracts\Providers\SsoProviderInterface;
-use Modules\Auth\Contracts\Providers\TokenProviderInterface;
-use Modules\Auth\Contracts\Providers\VerificationProviderInterface;
-use Modules\Auth\Http\Middleware\AuthContextMiddleware;
-use Modules\Auth\Http\Middleware\AuthenticateMiddleware;
-use Modules\Auth\Http\Middleware\SSOContextMiddleware;
-use Modules\Auth\Http\Middleware\TokenValidationMiddleware;
+use Modules\Auth\Console\Commands\AuthRetentionPurgeCommand;
+use Modules\Auth\Enums\AuthScope;
+use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Http\Middleware\RequireRecentPlatformAuthenticationMiddleware;
 use Modules\Auth\Listeners\RevokeTenantAccessOnStatusChange;
-use Modules\Auth\Models\AuthAccessTokenModel;
-use Modules\Auth\Models\AuthAuthorizationCodeModel;
-use Modules\Auth\Models\AuthClientModel;
-use Modules\Auth\Models\AuthIdentityModel;
-use Modules\Auth\Models\AuthLoginAttemptModel;
-use Modules\Auth\Models\AuthProviderModel;
-use Modules\Auth\Models\AuthPlatformAccessTokenModel;
-use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
-use Modules\Auth\Models\AuthRefreshTokenModel;
-use Modules\Auth\Models\AuthSessionModel;
-use Modules\Auth\Models\AuthVerificationChallengeModel;
-use Modules\Auth\Policies\AuthClientPolicy;
-use Modules\Auth\Repositories\AuthAccessTokenRepositoryInterface;
-use Modules\Auth\Repositories\AuthAuthorizationCodeRepositoryInterface;
-use Modules\Auth\Repositories\AuthClientRepositoryInterface;
-use Modules\Auth\Repositories\AuthIdentityRepositoryInterface;
-use Modules\Auth\Repositories\AuthLoginAttemptRepositoryInterface;
-use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
-use Modules\Auth\Repositories\AuthPlatformAccessTokenRepositoryInterface;
-use Modules\Auth\Repositories\AuthPlatformRefreshTokenRepositoryInterface;
-use Modules\Auth\Repositories\AuthRefreshTokenRepositoryInterface;
-use Modules\Auth\Repositories\AuthSessionRepositoryInterface;
-use Modules\Auth\Repositories\AuthVerificationChallengeRepositoryInterface;
-use Modules\Auth\Repositories\EloquentAuthAccessTokenRepository;
-use Modules\Auth\Repositories\EloquentAuthAuthorizationCodeRepository;
-use Modules\Auth\Repositories\EloquentAuthClientRepository;
-use Modules\Auth\Repositories\EloquentAuthIdentityRepository;
-use Modules\Auth\Repositories\EloquentAuthLoginAttemptRepository;
-use Modules\Auth\Repositories\EloquentAuthProviderRepository;
-use Modules\Auth\Repositories\EloquentAuthPlatformAccessTokenRepository;
-use Modules\Auth\Repositories\EloquentAuthPlatformRefreshTokenRepository;
-use Modules\Auth\Repositories\EloquentAuthRefreshTokenRepository;
-use Modules\Auth\Repositories\EloquentAuthSessionRepository;
-use Modules\Auth\Repositories\EloquentAuthVerificationChallengeRepository;
-use Modules\Auth\Services\AuthProviderRegistry;
-use Modules\Auth\Services\Contracts\AuthDomainServiceInterface;
-use Modules\Auth\Services\CurrentUserContextResolver;
-use Modules\Auth\Services\DatabaseIdentityProvider;
-use Modules\Auth\Services\DatabaseSessionProvider;
-use Modules\Auth\Services\DatabaseSsoProvider;
-use Modules\Auth\Services\DatabaseTokenProvider;
-use Modules\Auth\Services\DatabaseVerificationProvider;
-use Modules\Auth\Services\InternalAuthenticationProvider;
-use Modules\Auth\Services\Mfa\PlatformMfaService;
-use Modules\Auth\Services\Mfa\TotpService;
-use Modules\Auth\Services\Rules\AuthDomainService;
-use Modules\Auth\Services\ValidateTokenService;
-use Modules\Core\Contracts\CurrentUserContextResolverInterface;
-use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
-use Modules\User\Contracts\TenantUserAccessRevokerInterface;
-use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
-use Modules\Tenant\Events\TenantStatusChanged;
-use Modules\User\Models\PlatformOperatorModel;
-use Modules\User\Models\UserModel;
-use Modules\Auth\Models\AuthRegistrationInvitationModel;
-use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
-use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
-use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
-use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
-use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
-use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
-use Modules\Auth\Services\PlatformSessionService;
-
+use Modules\Auth\Services\CurrentUserContextResolver;
+use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
 use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
+use Modules\Auth\Services\PlatformSessionService;
+use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
+use Modules\Auth\Services\Registration\InvitationDeliveryHealthReader;
+use Modules\Auth\Services\Registration\RegistrationInvitationService;
+use Modules\Auth\Services\Security\AuthSecurityConfig;
+use Modules\Auth\Services\Security\LoginThrottle;
+use Modules\Auth\Services\Security\OpaqueTokenCodec;
+use Modules\Auth\Services\PlatformTokenService;
+use Modules\Auth\Services\TenantTokenService;
+use Modules\Auth\Services\TokenService;
+use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
+use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
+use Modules\Core\Contracts\AuthInvitationDeliveryHealthReaderInterface;
+use Modules\Core\Contracts\CurrentUserContextResolverInterface;
+use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
+use Modules\Tenant\Events\TenantStatusChanged;
+use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\User\Contracts\AuthenticationPrincipalProviderInterface;
+use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
+use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
+use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
+use Modules\User\Contracts\TenantUserAccessRevokerInterface;
+use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
+use Throwable;
 
 final class AuthServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/auth.php', 'module-auth');
-        $this->app->tag([AuthOrganizationUnitLifecycleBlocker::class], 'organization-unit.lifecycle_blocker');
-        $this->app->singleton(OrganizationUnitAuthScopeRevokerInterface::class, RevokeOrganizationUnitAuthScopeService::class);
 
-        $this->app->singleton(AuthDomainServiceInterface::class, AuthDomainService::class);
-        $this->app->singleton(RegistrationInvitationService::class);
-        $this->app->singleton(PasswordCredentialService::class);
-        $this->app->singleton(TenantUserInvitationIssuerInterface::class, RegistrationInvitationService::class);
-        $this->app->singleton(TenantUserAccessRevokerInterface::class, TenantUserAccessRevoker::class);
-        $this->app->singleton(PlatformOperatorCredentialProvisionerInterface::class, PasswordCredentialService::class);
-        $this->app->singleton(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
-        $this->app->singleton(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
+        $this->app->singleton(AuthSecurityConfig::class, static fn (): AuthSecurityConfig => AuthSecurityConfig::fromConfig());
+        $this->app->singleton(OpaqueTokenCodec::class, fn (): OpaqueTokenCodec => new OpaqueTokenCodec(
+            (string) $this->app['config']->get('app.key'),
+        ));
 
-        $this->app->singleton(
-            AuthProviderRepositoryInterface::class,
-            fn (): AuthProviderRepositoryInterface => new EloquentAuthProviderRepository(new AuthProviderModel),
-        );
-        $this->app->singleton(
-            AuthClientRepositoryInterface::class,
-            fn (): AuthClientRepositoryInterface => new EloquentAuthClientRepository(new AuthClientModel),
-        );
-        $this->app->singleton(
-            AuthIdentityRepositoryInterface::class,
-            fn (): AuthIdentityRepositoryInterface => new EloquentAuthIdentityRepository(new AuthIdentityModel),
-        );
-        $this->app->singleton(
-            AuthSessionRepositoryInterface::class,
-            fn (): AuthSessionRepositoryInterface => new EloquentAuthSessionRepository(new AuthSessionModel),
-        );
-        $this->app->singleton(
-            AuthAccessTokenRepositoryInterface::class,
-            fn (): AuthAccessTokenRepositoryInterface => new EloquentAuthAccessTokenRepository(
-                new AuthAccessTokenModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthRefreshTokenRepositoryInterface::class,
-            fn (): AuthRefreshTokenRepositoryInterface => new EloquentAuthRefreshTokenRepository(
-                new AuthRefreshTokenModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthPlatformAccessTokenRepositoryInterface::class,
-            fn (): AuthPlatformAccessTokenRepositoryInterface => new EloquentAuthPlatformAccessTokenRepository(
-                new AuthPlatformAccessTokenModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthPlatformRefreshTokenRepositoryInterface::class,
-            fn (): AuthPlatformRefreshTokenRepositoryInterface => new EloquentAuthPlatformRefreshTokenRepository(
-                new AuthPlatformRefreshTokenModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthAuthorizationCodeRepositoryInterface::class,
-            fn (): AuthAuthorizationCodeRepositoryInterface => new EloquentAuthAuthorizationCodeRepository(
-                new AuthAuthorizationCodeModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthVerificationChallengeRepositoryInterface::class,
-            fn (): AuthVerificationChallengeRepositoryInterface => new EloquentAuthVerificationChallengeRepository(
-                new AuthVerificationChallengeModel,
-            ),
-        );
-        $this->app->singleton(
-            AuthLoginAttemptRepositoryInterface::class,
-            fn (): AuthLoginAttemptRepositoryInterface => new EloquentAuthLoginAttemptRepository(
-                new AuthLoginAttemptModel,
-            ),
-        );
-
-        $this->app->singleton(InternalAuthenticationProvider::class);
-        $this->app->singleton(DatabaseTokenProvider::class);
-        $this->app->singleton(DatabaseSessionProvider::class);
-        $this->app->singleton(DatabaseSsoProvider::class);
-        $this->app->singleton(DatabaseVerificationProvider::class);
-        $this->app->singleton(DatabaseIdentityProvider::class);
-        $this->app->singleton(TokenProviderInterface::class, DatabaseTokenProvider::class);
-        $this->app->singleton(SessionProviderInterface::class, DatabaseSessionProvider::class);
-        $this->app->singleton(SsoProviderInterface::class, DatabaseSsoProvider::class);
-        $this->app->singleton(VerificationProviderInterface::class, DatabaseVerificationProvider::class);
-        $this->app->singleton(IdentityProviderInterface::class, DatabaseIdentityProvider::class);
-        $this->app->singleton(TotpService::class);
+        $this->app->scoped(AuthInvitationDeliveryHealthReaderInterface::class, InvitationDeliveryHealthReader::class);
+        $this->app->scoped(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
+        $this->app->scoped(TenantTokenService::class);
+        $this->app->scoped(PlatformTokenService::class);
+        $this->app->scoped(TokenService::class);
+        $this->app->scoped(LoginThrottle::class);
         $this->app->scoped(PlatformMfaService::class);
-        $this->app->singleton(AuthProviderRegistryInterface::class, AuthProviderRegistry::class);
-        $this->app->singleton(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
+        $this->app->scoped(RegistrationInvitationService::class);
+        $this->app->scoped(PasswordCredentialService::class);
+
+        $this->app->scoped(TenantUserInvitationIssuerInterface::class, RegistrationInvitationService::class);
+        $this->app->scoped(TenantUserAccessRevokerInterface::class, TenantUserAccessRevoker::class);
+        $this->app->scoped(PlatformOperatorCredentialProvisionerInterface::class, PasswordCredentialService::class);
+        $this->app->scoped(PlatformMfaEnrollmentIssuerInterface::class, PlatformMfaService::class);
+        $this->app->scoped(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
+        $this->app->scoped(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
+        $this->app->scoped(OrganizationUnitAuthScopeRevokerInterface::class, RevokeOrganizationUnitAuthScopeService::class);
+
+        $this->app->tag([AuthOrganizationUnitLifecycleBlocker::class], 'organization-unit.lifecycle_blocker');
     }
 
     public function boot(): void
     {
-        $this->app->make(ConfigurationDefinitionRegistryInterface::class)
-            ->register('Auth', require __DIR__.'/../Config/configuration-definitions.php');
+        $this->app->make(AuthSecurityConfig::class);
+        $this->app->make(ConfigurationDefinitionRegistryInterface::class)->register(
+            'Auth',
+            require __DIR__.'/../Config/configuration-definitions.php',
+        );
 
-        $router = $this->app->make(Router::class);
-        $router->aliasMiddleware(
-            (string) config('module-auth.middleware.authenticate_alias', 'auth.module.authenticate'),
-            AuthenticateMiddleware::class,
-        );
-        $router->aliasMiddleware(
-            (string) config('module-auth.middleware.token_validation_alias', 'auth.module.token'),
-            TokenValidationMiddleware::class,
-        );
-        $router->aliasMiddleware(
-            (string) config('module-auth.middleware.context_alias', 'auth.module.context'),
-            AuthContextMiddleware::class,
-        );
-        $router->aliasMiddleware(
-            (string) config('module-auth.middleware.sso_context_alias', 'auth.module.sso-context'),
-            SSOContextMiddleware::class,
-        );
-        $router->aliasMiddleware(
+        $this->configureRateLimiters();
+        $this->configureGuards();
+        $this->app->make(Router::class)->aliasMiddleware(
             (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
             RequireRecentPlatformAuthenticationMiddleware::class,
-        );
-
-        Auth::viaRequest(
-            (string) config('module-auth.token_guard_driver', 'module-auth-token'),
-            function (Request $request): ?UserModel {
-                $payload = $this->validatedBearerPayload($request);
-                $userId = $payload['tenant_user_id'] ?? null;
-                $tenantId = $payload['tenant_id'] ?? null;
-                if (
-                    ($payload['token_scope'] ?? null) !== AuthTokenScope::TENANT
-                    || ! is_numeric($userId)
-                    || ! is_numeric($tenantId)
-                ) {
-                    return null;
-                }
-
-                $user = $this->app->make(TenantExecutionContextInterface::class)
-                    ->runForTenant((int) $tenantId, static fn (): ?UserModel => UserModel::query()
-                        ->whereKey((int) $userId)
-                        ->where('status', 'active')
-                        ->whereNotNull('credentials_ready_at')
-                        ->first());
-                if (! $user instanceof UserModel) {
-                    return null;
-                }
-
-                $request->attributes->set('auth_access_token', $payload);
-
-                return $user;
-            },
-        );
-
-        Auth::viaRequest(
-            (string) config('module-auth.platform_token_guard_driver', 'module-platform-token'),
-            function (Request $request): ?PlatformOperatorModel {
-                $payload = $this->validatedBearerPayload($request);
-                $operatorId = $payload['platform_operator_id'] ?? null;
-                if (
-                    ($payload['token_scope'] ?? null) !== AuthTokenScope::PLATFORM
-                    || ! is_numeric($operatorId)
-                    || ($payload['tenant_id'] ?? null) !== null
-                ) {
-                    return null;
-                }
-
-                $operator = $this->app->make(TenantExecutionContextInterface::class)
-                    ->runAsControlPlane(fn (): ?PlatformOperatorModel => PlatformOperatorModel::query()
-                        ->whereKey((int) $operatorId)
-                        ->where('status', 'active')
-                        ->whereNotNull('credentials_ready_at')
-                        ->first());
-                if (! $operator instanceof PlatformOperatorModel) {
-                    return null;
-                }
-
-                $request->attributes->set('auth_access_token', $payload);
-
-                return $operator;
-            },
         );
 
         Event::listen(TenantStatusChanged::class, RevokeTenantAccessOnStatusChange::class);
@@ -277,29 +99,102 @@ final class AuthServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
-        Gate::policy(AuthClientModel::class, AuthClientPolicy::class);
         if ($this->app->runningInConsole()) {
-            $this->commands([
-                AuthClientCreateCommand::class,
-            ]);
-
+            $this->commands([AuthClientCreateCommand::class, AuthRetentionPurgeCommand::class]);
             $this->publishes([
                 __DIR__.'/../Config/auth.php' => config_path('module-auth.php'),
             ], 'auth-config');
         }
     }
 
-    /** @return array<string, mixed> */
-    private function validatedBearerPayload(Request $request): array
+    private function configureGuards(): void
     {
-        $plainAccessToken = $request->bearerToken();
-        if (! is_string($plainAccessToken) || trim($plainAccessToken) === '') {
+        Auth::viaRequest(
+            (string) config('module-auth.token_guard_driver', 'module-auth-token'),
+            function (Request $request) {
+                $payload = $this->validatedPayload($request);
+                if (($payload['token_scope'] ?? null) !== AuthScope::TENANT->value) {
+                    return null;
+                }
+                $tenantId = $this->positiveInt($payload['tenant_id'] ?? null);
+                $userId = $this->positiveInt($payload['tenant_user_id'] ?? null);
+                return $tenantId === null || $userId === null
+                    ? null
+                    : $this->app->make(AuthenticationPrincipalProviderInterface::class)
+                        ->tenantPrincipal($tenantId, $userId);
+            },
+        );
+
+        Auth::viaRequest(
+            (string) config('module-auth.platform_token_guard_driver', 'module-platform-token'),
+            function (Request $request) {
+                $payload = $this->validatedPayload($request);
+                if (($payload['token_scope'] ?? null) !== AuthScope::PLATFORM->value) {
+                    return null;
+                }
+                $operatorId = $this->positiveInt($payload['platform_operator_id'] ?? null);
+                return $operatorId === null
+                    ? null
+                    : $this->app->make(AuthenticationPrincipalProviderInterface::class)
+                        ->platformPrincipal($operatorId);
+            },
+        );
+    }
+
+    /** @return array<string,mixed> */
+    private function validatedPayload(Request $request): array
+    {
+        $existing = $request->attributes->get('auth_access_token');
+        if (is_array($existing)) {
+            return $existing;
+        }
+
+        $plainToken = $request->bearerToken();
+        if (! is_string($plainToken) || trim($plainToken) === '') {
             return [];
         }
 
-        $validation = $this->app->make(ValidateTokenService::class)
-            ->validateToken($plainAccessToken);
+        try {
+            $payload = $this->app->make(TokenService::class)->validateAccessToken($plainToken);
+            $request->attributes->set('auth_access_token', $payload);
+            return $payload;
+        } catch (AuthFailure) {
+            return [];
+        } catch (Throwable $exception) {
+            report($exception);
+            return [];
+        }
+    }
 
-        return $validation->isSuccess() ? $validation->valueOrFail() : [];
+    private function configureRateLimiters(): void
+    {
+        $windowMinutes = max(1, (int) ceil(((int) config('module-auth.rate_limits.window_seconds', 900)) / 60));
+        $globalMax = max(1, (int) config('module-auth.rate_limits.global_ip_max_attempts', 30));
+
+        RateLimiter::for('auth.tenant.login', static fn (Request $request) => Limit::perMinutes($windowMinutes, $globalMax)
+            ->by('tenant-login:'.(string) $request->ip()));
+        RateLimiter::for('auth.platform.login', static fn (Request $request) => Limit::perMinutes($windowMinutes, $globalMax)
+            ->by('platform-login:'.(string) $request->ip()));
+        RateLimiter::for('auth.tenant.refresh', static fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('module-auth.rate_limits.refresh_per_minute', 30)),
+        )->by('tenant-refresh:'.(string) $request->ip()));
+        RateLimiter::for('auth.platform.refresh', static fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('module-auth.rate_limits.refresh_per_minute', 30)),
+        )->by('platform-refresh:'.(string) $request->ip()));
+        RateLimiter::for('auth.oauth.exchange', static fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('module-auth.rate_limits.oauth_exchange_per_minute', 30)),
+        )->by('oauth-exchange:'.(string) $request->ip()));
+        RateLimiter::for('auth.invitations', static fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('module-auth.rate_limits.invitations_per_minute', 10)),
+        )->by('auth-invitation:'.(string) $request->ip()));
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        if (! is_int($value) && ! ctype_digit((string) $value)) {
+            return null;
+        }
+        $value = (int) $value;
+        return $value > 0 ? $value : null;
     }
 }

@@ -12,20 +12,19 @@ return new class extends Migration
     {
         Schema::create('auth_user_password_credentials', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->unsignedBigInteger('user_id');
             $table->string('password_hash');
-            $table->string('status', 30)->default('active');
+            $table->string('status', 30);
             $table->timestamp('changed_at');
             $table->timestamp('revoked_at')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
-            $table->unique(['id', 'tenant_id'], 'auth_user_credentials_id_tenant_uk');
-            $table->unique(['tenant_id', 'user_id'], 'auth_user_credentials_user_uk');
-            $table->foreign(['user_id', 'tenant_id'], 'auth_user_credentials_user_tenant_fk')
-                ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
-            $table->index(['tenant_id', 'status'], 'auth_user_credentials_status_idx');
+            $table->unique(['tenant_id', 'user_id'], 'auth_user_credential_user_uk');
+            $table->foreign(['user_id', 'tenant_id'], 'auth_user_credential_user_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->index(['tenant_id', 'status'], 'auth_user_credential_status_idx');
         });
     }
 

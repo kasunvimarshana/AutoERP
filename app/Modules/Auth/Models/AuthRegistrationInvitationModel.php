@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class AuthRegistrationInvitationModel extends TenantOwnedModel
 {
@@ -63,8 +61,4 @@ final class AuthRegistrationInvitationModel extends TenantOwnedModel
             ->latestOfMany('attempt_number');
     }
 
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
 }

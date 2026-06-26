@@ -13,9 +13,7 @@ final class RefreshTokenRequest extends FormRequest
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -23,6 +21,8 @@ final class RefreshTokenRequest extends FormRequest
             'scopes' => ['prohibited'],
             'access_token_ttl_seconds' => ['prohibited'],
             'refresh_token_ttl_seconds' => ['prohibited'],
+            'session_id' => ['prohibited'],
+            'user_id' => ['prohibited'],
         ];
     }
 }

@@ -12,26 +12,25 @@ return new class extends Migration
     {
         Schema::create('auth_platform_access_tokens', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1);
-            $table->json('metadata')->nullable();
             $table->unsignedBigInteger('platform_session_id');
             $table->unsignedBigInteger('platform_operator_id');
-            $table->string('token_key', 120);
-            $table->string('token_hash');
-            $table->json('scopes')->nullable();
-            $table->string('grant_type', 80)->nullable();
-            $table->string('status', 40)->default('active');
+            $table->string('token_key', 64);
+            $table->string('token_digest', 64);
+            $table->json('scopes');
+            $table->string('grant_type', 40);
+            $table->string('status', 30);
             $table->timestamp('issued_at');
-            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('expires_at');
             $table->timestamp('revoked_at')->nullable();
+            $table->string('revocation_reason', 255)->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->foreign(['platform_session_id', 'platform_operator_id'], 'auth_platform_access_session_operator_fk')
-                ->references(['id', 'platform_operator_id'])->on('auth_platform_sessions')->cascadeOnDelete();
-            $table->unique('token_key', 'auth_platform_access_tokens_key_uk');
-            $table->index(['platform_operator_id', 'status'], 'auth_platform_access_operator_status_idx');
-            $table->index(['platform_session_id', 'status'], 'auth_platform_access_session_status_idx');
+            $table->foreign(['platform_session_id', 'platform_operator_id'], 'auth_plat_access_session_fk')
+                ->references(['id', 'platform_operator_id'])->on('auth_platform_sessions')->restrictOnDelete();
+            $table->unique('token_key', 'auth_plat_access_key_uk');
+            $table->unique(['id', 'platform_session_id', 'platform_operator_id'], 'auth_plat_access_graph_uk');
+            $table->index(['platform_session_id', 'status', 'expires_at'], 'auth_plat_access_status_idx');
         });
     }
 

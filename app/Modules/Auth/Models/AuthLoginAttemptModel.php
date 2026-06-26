@@ -9,30 +9,15 @@ use Modules\Core\Models\TenantOwnedModel;
 final class AuthLoginAttemptModel extends TenantOwnedModel
 {
     protected $table = 'auth_login_attempts';
-
     protected $fillable = [
-        'row_version',
-        'tenant_id',
-        'organization_unit_id',
-        'metadata',
-        'provider_id',
-        'client_id',
-        'identity_id',
-        'user_id',
-        'login_identifier',
-        'was_successful',
-        'failure_code',
-        'ip_address',
-        'user_agent',
-        'attempt_type',
-        'attempted_at',
+        'tenant_id', 'user_id', 'login_identifier_hash', 'was_successful',
+        'failure_code', 'ip_address', 'user_agent', 'attempted_at',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'was_successful' => 'boolean',
-            'attempted_at' => 'datetime',
+            'was_successful' => 'boolean', 'attempted_at' => 'immutable_datetime',
         ]);
     }
 }
