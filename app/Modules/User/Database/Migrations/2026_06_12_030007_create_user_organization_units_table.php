@@ -33,10 +33,10 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['user_id', 'tenant_id'], 'user_org_units_user_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
-            foreach (['created_by_user_id', 'updated_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'user_org_units_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            }
+            $table->foreign(['created_by_user_id', 'tenant_id'], 'user_org_units_created_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['updated_by_user_id', 'tenant_id'], 'user_org_units_updated_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
     }
 

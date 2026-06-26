@@ -30,12 +30,18 @@ return new class extends Migration
             $table->unique(['tenant_id', 'guard_name', 'active_name_key'], 'roles_active_name_guard_uk');
             $table->unique(['tenant_id', 'system_key'], 'roles_system_key_uk');
 
-            foreach (['created_by_user_id', 'updated_by_user_id', 'deleted_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'roles_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])
-                    ->on('users')
-                    ->restrictOnDelete();
-            }
+            $table->foreign(['created_by_user_id', 'tenant_id'], 'roles_created_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by_user_id', 'tenant_id'], 'roles_updated_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['deleted_by_user_id', 'tenant_id'], 'roles_deleted_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 

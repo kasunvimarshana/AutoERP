@@ -26,10 +26,10 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
             $table->foreign(['permission_id', 'tenant_id'], 'user_permissions_permission_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('permissions')->restrictOnDelete();
-            foreach (['created_by_user_id', 'updated_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'user_permissions_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            }
+            $table->foreign(['created_by_user_id', 'tenant_id'], 'user_permissions_created_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['updated_by_user_id', 'tenant_id'], 'user_permissions_updated_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
     }
 

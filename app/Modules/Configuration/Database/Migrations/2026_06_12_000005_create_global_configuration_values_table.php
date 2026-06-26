@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Configuration\Constants\ConfigurationValueType;
 
 return new class extends Migration
 {
@@ -17,7 +16,7 @@ return new class extends Migration
             $table->string('key', 191)->unique('global_configuration_values_key_uk');
             $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
-            $table->enum('value_type', ConfigurationValueType::values());
+            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
             $table->boolean('is_sensitive')->default(false);
             $table->timestamps();
         });

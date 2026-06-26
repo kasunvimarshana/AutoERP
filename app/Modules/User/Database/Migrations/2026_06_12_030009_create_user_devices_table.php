@@ -30,10 +30,10 @@ return new class extends Migration
             $table->index(['tenant_id', 'user_id', 'revoked_at'], 'user_devices_active_ix');
             $table->foreign(['user_id', 'tenant_id'], 'user_devices_user_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
-            foreach (['registered_by_user_id', 'revoked_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'user_devices_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            }
+            $table->foreign(['registered_by_user_id', 'tenant_id'], 'user_devices_registered_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['revoked_by_user_id', 'tenant_id'], 'user_devices_revoked_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
     }
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 
 return new class extends Migration
 {
@@ -23,7 +22,7 @@ return new class extends Migration
             $table->string('path', 1024)->comment('Server-derived readable materialized path.');
             $table->char('path_hash', 64)->comment('SHA-256 hierarchy uniqueness key.');
             $table->unsignedInteger('depth')->comment('Server-derived hierarchy depth.');
-            $table->enum('root_marker', OrganizationUnitHierarchy::rootMarkerValues())
+            $table->enum('root_marker', ['root'])
                 ->nullable()
                 ->comment('Set only for the protected tenant root.');
             $table->boolean('is_active')->default(true);

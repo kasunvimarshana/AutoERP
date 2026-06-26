@@ -35,10 +35,10 @@ return new class extends Migration
             $table->unique(['tenant_id', 'user_id', 'active_name_key'], 'user_documents_active_name_uk');
             $table->foreign(['user_id', 'tenant_id'], 'user_documents_user_tenant_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            foreach (['uploaded_by_user_id', 'updated_by_user_id'] as $column) {
-                $table->foreign([$column, 'tenant_id'], 'user_documents_'.$column.'_tenant_fk')
-                    ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
-            }
+            $table->foreign(['uploaded_by_user_id', 'tenant_id'], 'user_documents_uploaded_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['updated_by_user_id', 'tenant_id'], 'user_documents_updated_by_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
     }
 

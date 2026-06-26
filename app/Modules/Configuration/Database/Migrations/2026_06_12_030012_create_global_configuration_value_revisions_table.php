@@ -5,9 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Configuration\Constants\ConfigurationActorType;
-use Modules\Configuration\Constants\ConfigurationRevisionOperation;
-use Modules\Configuration\Constants\ConfigurationValueType;
 
 return new class extends Migration
 {
@@ -17,15 +14,15 @@ return new class extends Migration
             $table->id();
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
-            $table->enum('operation', ConfigurationRevisionOperation::values());
+            $table->enum('operation', ['created', 'updated', 'removed', 'rolled_back']);
             $table->longText('stored_value')->nullable();
-            $table->enum('value_type', ConfigurationValueType::values());
+            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
             $table->boolean('is_sensitive')->default(false);
             $table->unsignedBigInteger('resulting_row_version')->nullable();
             $table->foreignId('source_revision_id')->nullable()
                 ->constrained('global_configuration_value_revisions', indexName: 'global_configuration_value_revisions_source_revision_fk')
                 ->restrictOnDelete();
-            $table->enum('actor_type', ConfigurationActorType::values());
+            $table->enum('actor_type', ['system', 'platform_operator', 'tenant_user']);
             $table->unsignedBigInteger('actor_id')->nullable();
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();

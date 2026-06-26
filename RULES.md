@@ -92,6 +92,12 @@ This project uses `/docs/changes` as its shared memory. Before starting any task
 
 This project uses /docs/changes as shared memory. Before working, read recent records to understand context. Make only necessary changes and avoid touching unrelated or shared files. After finishing, add a new change record. Never modify or delete existing records.
 
+In Laravel migrations, always prefer KISS + Explicit over DRY.
+
+Migrations are database schema history, not application code. Never use loops, conditionals, or dynamic naming for foreign keys, columns, or constraints. Write every column, every foreign key, and every index explicitly—line by line, even if it repeats. This makes reviews instant, rollbacks safe, and debugging trivial. The tiny repetition you save is never worth the confusion of decoding dynamic logic inside a migration file. Future developers (including you) will thank you. Keep it stupidly simple and brutally explicit. Period.
+
+Wise developers know when to follow the framework and when to break away. Be wise.
+
 Evidence over guessing: If requirements are unclear or information is missing, ask for clarification instead of guessing.
 
 Always fix issues in the layer where the root cause exists. Backend issues must be resolved in the backend, not hidden or worked around in the frontend. Core business logic, validations, rules, calculations, permissions, and data integrity enforcement must be implemented and enforced in the backend as the single source of truth. The frontend should focus on presentation, user interaction, and user experience, and may only duplicate validations for immediate feedback—not as the authoritative enforcement point.

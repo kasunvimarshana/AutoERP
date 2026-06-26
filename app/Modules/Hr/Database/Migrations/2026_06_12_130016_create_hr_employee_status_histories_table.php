@@ -12,7 +12,16 @@ return new class extends Migration
     {
         Schema::create('hr_employee_status_histories', function (Blueprint $table): void {
             $table->id();
-            $this->scope($table, 'hr_emp_status_history');
+            $table->foreignId('tenant_id');
+            $table->foreign('tenant_id', 'hr_employee_status_histories_tenant_fk')
+                ->references('id')
+                ->on('tenants')
+                ->restrictOnDelete();
+            $table->foreignId('organization_unit_id')->nullable();
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_employee_status_histories_org_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('organization_units')
+                ->restrictOnDelete();
             $table->foreignId('employee_id');
             $table->string('old_status')->nullable();
             $table->string('new_status');
@@ -35,17 +44,4 @@ return new class extends Migration
         Schema::dropIfExists('hr_employee_status_histories');
     }
 
-    private function scope(Blueprint $table, string $constraintPrefix): void
-    {
-        $table->foreignId('tenant_id');
-        $table->foreign('tenant_id', $constraintPrefix.'_tenant_fk')
-            ->references('id')
-            ->on('tenants')
-            ->restrictOnDelete();
-        $table->foreignId('organization_unit_id')->nullable();
-        $table->foreign(['organization_unit_id', 'tenant_id'], $constraintPrefix.'_org_tenant_fk')
-            ->references(['id', 'tenant_id'])
-            ->on('organization_units')
-            ->restrictOnDelete();
-    }
 };
