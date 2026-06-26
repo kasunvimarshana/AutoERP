@@ -180,7 +180,7 @@ function readInvitationToken(): string | null {
     const query = new URLSearchParams(window.location.search).get('token');
     const value = (hash ?? query ?? '').trim();
 
-    return /^[A-Za-z0-9]{72}$/.test(value) ? value : null;
+    return /^[A-Za-z0-9_-]{72}$/.test(value) ? value : null;
 }
 
 function formatDateTime(value: string): string {

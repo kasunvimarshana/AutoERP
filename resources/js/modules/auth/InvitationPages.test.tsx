@@ -18,7 +18,7 @@ vi.mock('./authApi', () => ({
 }));
 
 const initialAdministratorToken = 'a'.repeat(64);
-const platformOperatorToken = 'B'.repeat(72);
+const platformOperatorToken = `${'B'.repeat(35)}-${'C'.repeat(35)}_`;
 
 const getPasswordInput = (name: 'password' | 'password_confirmation'): HTMLInputElement => {
     const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
