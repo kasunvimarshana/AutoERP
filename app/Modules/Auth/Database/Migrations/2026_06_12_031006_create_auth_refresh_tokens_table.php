@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreign(['access_token_id', 'tenant_id', 'session_id', 'user_id'], 'auth_refresh_access_fk')
                 ->references(['id', 'tenant_id', 'session_id', 'user_id'])->on('auth_access_tokens')->restrictOnDelete();
             $table->foreign(['parent_refresh_token_id', 'tenant_id'], 'auth_refresh_parent_fk')
-                ->references(['id', 'tenant_id'])->on('auth_refresh_tokens')->nullOnDelete();
+                ->references(['id', 'tenant_id'])->on('auth_refresh_tokens')->restrictOnDelete();
             $table->foreign(['session_id', 'tenant_id', 'user_id'], 'auth_refresh_session_fk')
                 ->references(['id', 'tenant_id', 'user_id'])->on('auth_sessions')->restrictOnDelete();
             $table->foreign(['client_id', 'tenant_id'], 'auth_refresh_client_fk')

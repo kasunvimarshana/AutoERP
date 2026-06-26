@@ -43,39 +43,39 @@ final class AuthClientCreateCommand extends Command
     {
         $tenantId = filter_var($this->argument('tenant_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($tenantId === false) {
-            return $this->fail('Tenant identifier must be a positive integer.');
+            return $this->commandFailure('Tenant identifier must be a positive integer.');
         }
 
         $clientKey = trim((string) $this->argument('client_key'));
         $clientName = trim((string) $this->argument('client_name'));
         if ($clientKey === '' || $clientName === '') {
-            return $this->fail('Client key and client name are required.');
+            return $this->commandFailure('Client key and client name are required.');
         }
 
         $scopes = $this->csv((string) $this->option('scopes'));
         if ($scopes === [] || array_diff($scopes, $this->config->oauthScopes) !== []) {
-            return $this->fail('Scopes must be a non-empty subset of the registered Auth scope catalogue.');
+            return $this->commandFailure('Scopes must be a non-empty subset of the registered Auth scope catalogue.');
         }
 
         $supportedGrants = [GrantType::AUTHORIZATION_CODE->value, GrantType::REFRESH_TOKEN->value];
         $grants = $this->csv((string) $this->option('grant-types'));
         if ($grants === [] || array_diff($grants, $supportedGrants) !== []) {
-            return $this->fail('Grant types must be authorization_code and/or refresh_token.');
+            return $this->commandFailure('Grant types must be authorization_code and/or refresh_token.');
         }
 
         $redirectUris = $this->csv((string) $this->option('redirect-uris'));
         if (in_array(GrantType::AUTHORIZATION_CODE->value, $grants, true) && $redirectUris === []) {
-            return $this->fail('Authorization-code clients require at least one exact redirect URI.');
+            return $this->commandFailure('Authorization-code clients require at least one exact redirect URI.');
         }
         foreach ($redirectUris as $redirectUri) {
             if (filter_var($redirectUri, FILTER_VALIDATE_URL) === false) {
-                return $this->fail('Every redirect URI must be an absolute URL.');
+                return $this->commandFailure('Every redirect URI must be an absolute URL.');
             }
         }
 
         $expiresAt = $this->parseExpiry($this->option('expires-at'));
         if ($this->option('expires-at') !== null && $expiresAt === null) {
-            return $this->fail('expires-at must be a future ISO-8601 timestamp.');
+            return $this->commandFailure('expires-at must be a future ISO-8601 timestamp.');
         }
 
         $isConfidential = ! (bool) $this->option('public');
@@ -114,7 +114,7 @@ final class AuthClientCreateCommand extends Command
             });
         } catch (Throwable $exception) {
             report($exception);
-            return $this->fail('The OAuth client could not be created. Verify uniqueness and tenant readiness.');
+            return $this->commandFailure('The OAuth client could not be created. Verify uniqueness and tenant readiness.');
         }
 
         $this->info('OAuth client created. ID: '.(string) $client->getKey());
@@ -166,7 +166,7 @@ final class AuthClientCreateCommand extends Command
         }
     }
 
-    private function fail(string $message): int
+    private function commandFailure(string $message): int
     {
         $this->error($message);
         return self::FAILURE;

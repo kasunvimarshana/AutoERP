@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services;
 
+use DateTimeInterface;
 use Illuminate\Database\DatabaseManager;
 use Modules\Auth\Enums\AuthorizationCodeStatus;
 use Modules\Auth\Enums\SessionStatus;
@@ -13,6 +14,8 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 
 final readonly class AuthRetentionService
 {
+    private const REFRESH_PURGE_BATCH_SIZE = 500;
+
     public function __construct(
         private DatabaseManager $database,
         private ClockInterface $clock,
@@ -61,11 +64,10 @@ final readonly class AuthRetentionService
                     TokenStatus::REVOKED->value,
                     TokenStatus::EXPIRED->value,
                 ];
-                $counts['tenant_refresh_tokens'] = $this->database->table('auth_refresh_tokens')
-                    ->where(function ($query) use ($terminalTokens, $tokenCutoff): void {
-                        $query->whereIn('status', $terminalTokens)
-                            ->where('updated_at', '<', $tokenCutoff);
-                    })->orWhere('expires_at', '<', $tokenCutoff)->delete();
+                $counts['tenant_refresh_tokens'] = $this->purgeTenantRefreshTokens(
+                    $tokenCutoff,
+                    $terminalTokens,
+                );
                 $counts['platform_refresh_tokens'] = $this->database->table('auth_platform_refresh_tokens')
                     ->where(function ($query) use ($terminalTokens, $tokenCutoff): void {
                         $query->whereIn('status', $terminalTokens)
@@ -107,4 +109,44 @@ final readonly class AuthRetentionService
             }, 3);
         });
     }
+    /** @param list<string> $terminalStatuses */
+    private function purgeTenantRefreshTokens(
+        DateTimeInterface $cutoff,
+        array $terminalStatuses,
+    ): int {
+        $deletedTotal = 0;
+
+        do {
+            $candidateIds = $this->database->table('auth_refresh_tokens as candidate')
+                ->where(function ($query) use ($terminalStatuses, $cutoff): void {
+                    $query->where(function ($terminal) use ($terminalStatuses, $cutoff): void {
+                        $terminal->whereIn('candidate.status', $terminalStatuses)
+                            ->where('candidate.updated_at', '<', $cutoff);
+                    })->orWhere('candidate.expires_at', '<', $cutoff);
+                })
+                ->whereNotExists(function ($query): void {
+                    $query->selectRaw('1')
+                        ->from('auth_refresh_tokens as child')
+                        ->whereColumn('child.parent_refresh_token_id', 'candidate.id');
+                })
+                ->orderByDesc('candidate.id')
+                ->limit(self::REFRESH_PURGE_BATCH_SIZE)
+                ->pluck('candidate.id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all();
+
+            if ($candidateIds === []) {
+                break;
+            }
+
+            $deleted = $this->database->table('auth_refresh_tokens')
+                ->whereIn('id', $candidateIds)
+                ->delete();
+
+            $deletedTotal += $deleted;
+        } while ($deleted > 0);
+
+        return $deletedTotal;
+    }
+
 }
